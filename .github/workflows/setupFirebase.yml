@@ -37,3 +37,10 @@ jobs:
             watson: $WATSON_PROD_CONFIG
           };
           EOF
+      
+      - name: Upload environment files
+        uses: actions/upload-artifact@v4
+        with:
+          name: environment-files
+          path: src/environments/
+          retention-days: 1
