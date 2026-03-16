@@ -34,7 +34,7 @@
         </button>
         <mat-menu #notificationMenu="matMenu" class="notification-menu">
           <div class="notification-header" (click)="$event.stopPropagation()">
-            <h3>Notifications</h3>
+            <h3>My Notifications</h3>
             <button mat-button color="primary" *ngIf="unreadCount > 0" (click)="markAllAsRead()">
               Mark all read
             </button>
