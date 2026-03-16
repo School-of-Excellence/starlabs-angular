@@ -23,7 +23,7 @@ jobs:
           # Create environment.development.ts
           cat > src/environments/environment.development.ts << EOF
           export const environment = {
-            production: false,
+            production: true,
             firebase: $FIREBASE_TEST_CONFIG,
             watson: $WATSON_TEST_CONFIG
           };

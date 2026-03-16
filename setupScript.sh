@@ -22,7 +22,12 @@ echo "✅ Workflow completed successfully"
 echo "📥 Downloading environment files..."
 gh run download $RUN_ID -n environment-files
 
-echo "✓ Files downloaded"
+echo "📁 Moving files to src/environments/..."
+mkdir -p src/environments
+mv environment.ts src/environments/ 2>/dev/null || true
+mv environment.development.ts src/environments/ 2>/dev/null || true
+
+echo "✓ Files downloaded to src/environments/"
 
 echo "🗑️ Deleting artifact..."
 ARTIFACT_ID=$(gh api "/repos/{owner}/{repo}/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="environment-files") | .id')
