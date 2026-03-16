@@ -614,6 +614,64 @@
   }
 }
 
+/* Assignment Card */
+.assignment-card {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  transition: box-shadow 0.2s ease;
+}
+
+.assignment-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Button icon */
+.button-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+/* Button styling */
+.btn-primary {
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+  color: white;
+}
+
+/* Badge styling */
+.badge {
+  padding: 6px 12px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+/* Stage name highlight */
+.stage-name {
+  color: rgb(14, 26, 77);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  h2.text-primary {
+    font-size: 1.5rem;
+  }
+  
+  .assignment-card {
+    margin-bottom: 20px;
+  }
+}
+
 /*
 .current-appointments {
   margin-bottom: 2rem;

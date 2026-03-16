@@ -915,8 +915,15 @@
                         <div class="participant-names">
                           <div class="p-card" *ngFor="let participant of segment.participants; let i = index;">
                             <div>
-                              <div class="p-name"><span style="font-weight: normal;">{{i + 1}} {{')'}} </span><span>{{
-                                  getProfileName(participant.profile_id || participant.profileid) }}</span></div>
+                              <div class="p-name">
+                                <span style="font-weight: normal;">{{i + 1}} {{')'}} </span>
+                                <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                                <span 
+                                  *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid) as phone"
+                                  style="font-weight: normal; color: #030303; font-size: 0.95em; margin-left: 8px;">
+                                  📞 {{ phone }}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>

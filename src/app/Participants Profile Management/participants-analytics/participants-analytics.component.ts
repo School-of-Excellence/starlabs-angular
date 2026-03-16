@@ -400,6 +400,7 @@ export class ParticipantsAnalyticsComponent {
     // Participant metadata
     metadataSnap.docs.forEach(e => {
       const element = e.data();
+      console.log('DOB:', element['dateofbirth'], '| Keys:', Object.keys(element).filter(k => k.includes('date') || k.includes('birth') || k.includes('dob')));  // DEBUG
       element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
       if(![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
         for (let i = 0; i < element['profiletags'].length; i++) {

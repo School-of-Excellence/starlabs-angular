@@ -522,8 +522,8 @@
                                 <input matInput type="text" formControlName="calltoaction">
                               </mat-form-field>
                               <mat-form-field class="ml-3" appearance="outline">
-                                <mat-label>Applicable Variations *</mat-label>
-                                <mat-select formControlName="variations" multiple (openedChange)="onVariationOpened($event, i, j)">
+                                <mat-label>Applicable Variations</mat-label>
+                                <mat-select formControlName="variations" multiple (openedChange)="!$event && getNextStageArray(i).controls[j].get('variations').markAsTouched()">
                                   <div class="mat-option" style="padding: 12px 24px; cursor: pointer;" (click)="onSelectAllVariations(i, j)">
                                     <b>All Variations</b>
                                   </div>
@@ -531,15 +531,13 @@
                                     {{variation.value.variationname || 'Unnamed Variation'}}
                                   </mat-option>
                                 </mat-select>
+                                <mat-error>select at least one variation</mat-error>
                               </mat-form-field>
                               <mat-checkbox class="ml-3" formControlName="markascompleted">Mark as Session Completed</mat-checkbox>
                               &nbsp;&nbsp;<button mat-icon-button type="button" (click)="addNextStage(i)"><mat-icon>add</mat-icon></button>
                               &nbsp;&nbsp;<button mat-icon-button type="button" (click)="removeNextStage(i,j)"><mat-icon>remove</mat-icon></button>
                             </div>
-                            <div *ngIf="touchedVariations.has(i.toString() + '-' + j.toString()) && getNextStageArray(i).controls[j].get('variations').value?.length === 0"
-                              style="margin-left: 430px; margin-top: -8px; margin-bottom: 8px;">
-                              <span style="color: red; font-size: 12px;">Please select at least one variation</span>
-                            </div>
+
                           </div>
                           <div *ngIf="getNextStageArray(i).controls.length === 0">
                             &nbsp;&nbsp;<button mat-stroked-button type="button" (click)="addNextStage(i)">Add Next Stage & Call to Action</button>

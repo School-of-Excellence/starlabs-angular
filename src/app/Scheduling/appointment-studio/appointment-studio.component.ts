@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { MatTableDataSource } from '@angular/material/table';
-import { Firestore, collection, query, orderBy, where, collectionSnapshots, Query, doc, limit, getDocs, getDoc } from '@angular/fire/firestore';
+import { Firestore, collection, query, orderBy, where, collectionSnapshots, Query, doc, limit, getDocs, getDoc, serverTimestamp, setDoc, updateDoc } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -12,6 +12,7 @@ import { MatCardModule } from '@angular/material/card';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { MarkAppointmentStatusComponent } from '../mark-appointment-status/mark-appointment-status.component';
+import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 
 @Component({
   selector: 'app-appointment-studio',
@@ -55,6 +56,8 @@ export class AppointmentStudioComponent {
 
   productOwnerAppointments = []
   upcomingAppointmentModel = []
+
+  openViduAppointments = []
 
   constructor(public firestore: Firestore, public guard: AuthguardService, public datepipe: DatePipe, public matdialog: MatDialog, public router: Router, public route: ActivatedRoute, public dialog: MatDialog,public http: HttpClient) {
 
@@ -166,14 +169,17 @@ export class AppointmentStudioComponent {
         metaData["hostpath"] = hostID        
         metaData["activejourney"] = this.mapJourney[this.mapProfileMeta[appointmentData["bookedby"].id]["activejourney"]]
         
+        
         var startTime = new Date(appointmentData["starttime"].toDate())
         var endTime = new Date(appointmentData["endtime"].toDate())
+        var platform = appointmentData['platform']
 
         var calendarEvent = {
           start: startTime,
           end: endTime,
           title: `${metaData["clientname"]} - ${metaData["appointmenttype"]}`,
-          meta: metaData
+          meta: metaData,
+          platform: platform
         }
 
         if(endTime.getTime() >= new Date().getTime()){
@@ -182,6 +188,8 @@ export class AppointmentStudioComponent {
       }
       
       this.currentAppointments = currentAppointments
+      this.openViduAppointments = currentAppointments.filter(e => e['platform'] == 'openvidu').map(e => e['meta']["bookingid"]);
+
       
       this.timerSub = interval(1000).subscribe(() => this.checkLiveAppointment());
     })
@@ -608,5 +616,64 @@ export class AppointmentStudioComponent {
       calendarWindow.focus(); // Switch to the tab if it's already open
     }
   }
+
+  async joinRoom_Appointment(appointment){
+      console.log(appointment)
+      if(this.openViduAppointments.includes(appointment.meta["bookingid"])){
+        console.log("OpenVidu")
+  
+        var loading = this.dialog.open(LoadingProgressComponent, {
+          data: {msg: "Setting uP!..."},
+          disableClose: true
+        })
+  
+        try{
+          var appointmentId = appointment.meta["bookingid"]
+          
+          var roomDoc = doc(this.firestore, "openviduroom", appointmentId)
+          const hostIds = appointment.meta["hosts"].map(ref => ref.path?.split('/').pop());
+
+  
+          await getDoc(roomDoc).then(async doc =>{
+            if(!doc.exists()){
+              var roomData = {
+                active: true,
+                createddate: serverTimestamp(),
+                sessiontype: "appointment",
+                sessionid: appointmentId,
+                roomid: appointmentId,
+                hosts: hostIds,
+                participantid: appointment["bookedby"].id,
+                title: `${this.mapProfile[appointment["bookedbyId"]]} - ${this.mapAppointment[appointment["appointment"].id]} (${appointment["hostIds"].map(e => this.mapProfile[e]).join(", ")})`,
+                metadata: {
+                  appointmentid: appointmentId
+                }
+              }
+              await setDoc(roomDoc, roomData)
+            }
+            else{
+              if(!doc.data()["active"]){
+                await updateDoc(roomDoc, {active: true})
+              }
+            }
+          })
+          loading.close();
+    
+          var hostname = window.location.origin
+          window.open(`${hostname}/joinroom/${appointmentId}`, '_blank')
+        } catch(err){
+          loading.close()
+          console.log(err)
+        }
+        
+      }
+      else{
+        console.log("Zoom")
+        const url = this.router.serializeUrl(
+          this.router.createUrlTree(['/openappointmentzoom', appointment['docid']])
+        );
+        window.open(url, "_blank");
+      }
+    }
 
 }

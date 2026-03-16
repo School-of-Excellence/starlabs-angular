@@ -89,6 +89,7 @@ export class ScheduleDialogComponent {
   participantjourneyproductid: any;
   profileid: any;
   generalnote: any;
+  loggedinProfileRole = {}
   constructor(@Inject(MAT_DIALOG_DATA) public data: any,
     public dialogRef: MatDialogRef<any>,
     private dialog: MatDialog,
@@ -102,6 +103,7 @@ export class ScheduleDialogComponent {
     this.userAvailableSlots = []
     guard.getRoles().then(async data => {
       this.loggedinPID = data.profile_ref.id
+      this.loggedinProfileRole = data
       var adminRole = data.admin != null ? data.admin : false
       var schedulerRole = data.scheduler != null ? data.scheduler : false
       var ahRole = data.ah != null ? data.ah : false

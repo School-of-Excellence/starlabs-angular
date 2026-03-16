@@ -154,7 +154,7 @@ export class ListOpenviduRoomComponent {
     else{
       console.log("Zoom")
       const url = this.router.serializeUrl(
-        this.router.createUrlTree(['/openmeeting', appointment['docid']])
+        this.router.createUrlTree(['/openappointmentzoom', appointment['docid']])
       );
       window.open(url, "_blank");
     }

@@ -78,7 +78,7 @@
       <div class="slots-container">
         <h4 mat-dialog-title >Selected Date ({{ selectedDate | date: 'dd-MM-yyyy' }})</h4>
         <!-- Meeting Platform Selector -->
-        <div class="meeting-platform-section">
+        <div class="meeting-platform-section" *ngIf="loggedinProfileRole['developer']">
           <label class="platform-label">Select Meeting Platform</label>
           <div class="platform-options">
             <div

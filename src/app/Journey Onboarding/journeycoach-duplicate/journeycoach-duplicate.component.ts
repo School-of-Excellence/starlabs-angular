@@ -612,7 +612,6 @@ export class JourneycoachDuplicateComponent {
 
   // Function to check if all data is loaded 
   private checkAllDataLoaded(): void {
-    console.log("laoding states", this.loadingStates)
     const allLoaded = Object.values(this.loadingStates).every(state => state === true);
     if (allLoaded) {
       this.isLoading = false;

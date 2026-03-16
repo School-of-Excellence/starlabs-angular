@@ -365,7 +365,7 @@ export class QueueCreationV3Component {
                   stage: [obj['stage'], { validators: [], updateOn: "change" }],
                   calltoaction: [obj['calltoaction'], { validators: [], updateOn: "change" }],
                   markascompleted: [obj['markascompleted'] ?? false, { validators: [], updateOn: "change" }],
-                  variations: [obj['variations'] ?? [], { validators: [], updateOn: "change" }]
+                  variations: [obj['variations'] ?? [], { validators: [control => control.value?.length === 0 ? { required: true } : null], updateOn: "change" }]
                 })
               )
             })
@@ -768,7 +768,7 @@ addNextStage(mainIndex: number) {
       stage: [null, { validators: [], updateOn: "change" }],
       calltoaction: [null, { validators: [], updateOn: "change" }],
       markascompleted: [false,],
-      variations: [[], { validators: [], updateOn: "change" }]
+      variations: [[], { validators: [control => control.value?.length === 0 ? { required: true } : null], updateOn: "change" }]
     })
   )
 }
@@ -1261,11 +1261,6 @@ addNextStage(mainIndex: number) {
       control.setValue([]);
     } else {
       control.setValue(allDocids);
-    }
-  }
-  onVariationOpened(opened: boolean, stageIndex: number, nextStageIndex: number) {
-    if (!opened) {
-      this.touchedVariations.add(`${stageIndex}-${nextStageIndex}`);
     }
   }
 

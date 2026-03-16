@@ -20,6 +20,7 @@ import { MatDatepickerModule, MatDateRangePicker } from '@angular/material/datep
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 interface TableHeader {
   key: string;
@@ -119,6 +120,7 @@ interface SpecialistRow {
     MatDatepickerModule,
     MatNativeDateModule,
     MatInputModule,
+    MatSlideToggleModule
   ],
   providers: [DatePipe],
   templateUrl: './delivery-dashboard-clone.component.html',
@@ -147,6 +149,7 @@ export class DeliveryDashboardCloneComponent {
 
   searchText: string = '';
   filteredData: any[] = [];
+  fileredStatsData: any[] = [];
   rawProductData = [];
 
   hideTimeout: any;
@@ -294,6 +297,48 @@ export class DeliveryDashboardCloneComponent {
 
   };
 
+  searchName: string = '';
+  filteredOriginalData: any = {};
+
+  // *Abishek Vimal
+
+  // Search participant
+  showSearchBar = false;
+  showTable = false;
+
+  tableData: any[] = [];
+  filteredParticipantData: any = {};
+
+  searchedParticipantHeaders: string[] = [
+    'Name',
+    'Email',
+    'Initiated',
+    'Welcome Call',
+    'Clarity Call',
+    'Diagnostics',
+    'Implementation',
+    'Mid Review - Diagnostics',
+    'Implementation Phase 2',
+    'Final Review',
+    'Completed',
+    'Needs Validation'
+  ];
+
+  categoryColumnMap: { [category: string]: string } = {
+    initiatedToday: 'initiated',
+    welcomeCall: 'welcomeCall',
+    clarityCall: 'clarityCall',
+    diagnostics: 'diagnostics',
+    implementation: 'implementation',
+    midReviewDiagnostics: 'midReviewDiagnostics',
+    implementationPhase2: 'implementationPhase2',
+    finalReview: 'finalReview',
+    completed: 'completed',
+    needsValidation: 'needsValidation'
+  };
+
+  // Abishek Vimal M*
+
   awaitingPendingCount = 0;
   initiatedClearedCount = 0;
   initiatedPendingCount = 0;
@@ -377,7 +422,7 @@ export class DeliveryDashboardCloneComponent {
       );
       this.bonusPackageIds = new Set(packageSnap.docs.map((d) => d.id));
 
-      // Process journey
+      // Process journey 
       for (const doc of journeySnap.docs) {
         const data = doc.data();
         this.mapjourneyname[data['id']] = data['journey'];
@@ -509,6 +554,8 @@ export class DeliveryDashboardCloneComponent {
       const isEligible = !excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
       const statusdate = item['statusdate'] || {};
       const tentativestart = item['tentativestart'] || null;
+
+      console.log("statusdate", statusdate)
 
       // eligible badge & eligibility breakdown: exclude completed
       if (!['completed', 'ongoing'].includes(status)) {
@@ -1701,257 +1748,322 @@ export class DeliveryDashboardCloneComponent {
       const startTimestamp = Timestamp.fromDate(monthStart);
       const endTimestamp = Timestamp.fromDate(monthEnd);
 
-      const appointmentsSnap = await getDocs(query(
+      const appointments$ = collectionData(query(
         collection(this.firestore, "appointments"),
         where("cancelled", "==", false),
         where("starttime", ">=", startTimestamp),
         where("starttime", "<=", endTimestamp)
-      ));
+      ), { idField: 'id' });
 
-      if (appointmentsSnap.empty) {
-        this.loadingStates.appointments = true;
-        this.journeyFlowLoading = false; 
-        this.cdr.detectChanges();
-        return;
-      }
+      appointments$.subscribe(async (appointmentsSnap: any[]) => {
 
-      const participantAppointments = new Map();
-      appointmentsSnap.docs.forEach(doc => {
-        const appointmentData = doc.data();
-        const bookedBy = appointmentData["bookedby"];
-        const bookedByPath = bookedBy?.path || null;
-        const participantId = bookedBy?.id;
-        const startTime = appointmentData["endtime"];
-        const productId = appointmentData["productid"];
+        if (appointmentsSnap.length === 0) {
+          this.loadingStates.appointments = true;
+          this.journeyFlowLoading = false;
+          this.cdr.detectChanges();
+          return;
+        }
 
-        if (bookedByPath && validProfileData.has(bookedByPath) && participantId && productId) {
-          const activeProducts = validProfileData.get(bookedByPath);
-          if (activeProducts?.includes(productId)) {
-            appointmentData["docid"] = doc.id;
-            const existing = participantAppointments.get(participantId);
+        const participantAppointments = new Map();
 
-            if (!existing) {
-              participantAppointments.set(participantId, { latest: appointmentData, previous: null });
-            } else {
-              const existingTime = existing.latest.starttime?.seconds || 0;
-              const currentTime = startTime?.seconds || 0;
+        appointmentsSnap.forEach(doc => {
 
-              if (currentTime > existingTime) {
-                participantAppointments.set(participantId, {
-                  latest: appointmentData,
-                  previous: existing.latest
-                });
-              } else if (currentTime < existingTime) {
-                const previousTime = existing.previous?.starttime?.seconds || 0;
-                if (currentTime > previousTime) {
+          const appointmentData = doc;
+          const bookedBy = appointmentData["bookedby"];
+          const bookedByPath = bookedBy?.path || null;
+          const participantId = bookedBy?.id;
+          const startTime = appointmentData["endtime"];
+          const productId = appointmentData["productid"];
+
+          console.log("participant appointments", appointmentsSnap);
+
+          if (bookedByPath && validProfileData.has(bookedByPath) && participantId && productId) {
+
+            const activeProducts = validProfileData.get(bookedByPath);
+
+            if (activeProducts?.includes(productId)) {
+
+              appointmentData["docid"] = doc.id;
+
+              const existing = participantAppointments.get(participantId);
+
+              if (!existing) {
+                participantAppointments.set(participantId, { latest: appointmentData, previous: null });
+              } else {
+
+                const existingTime = existing.latest.starttime?.seconds || 0;
+                const currentTime = startTime?.seconds || 0;
+
+                if (currentTime > existingTime) {
+
                   participantAppointments.set(participantId, {
-                    latest: existing.latest,
-                    previous: appointmentData
+                    latest: appointmentData,
+                    previous: existing.latest
                   });
+
+                } else if (currentTime < existingTime) {
+
+                  const previousTime = existing.previous?.starttime?.seconds || 0;
+
+                  if (currentTime > previousTime) {
+
+                    participantAppointments.set(participantId, {
+                      latest: existing.latest,
+                      previous: appointmentData
+                    });
+
+                  }
                 }
               }
             }
           }
+        });
+
+        const participantLatestAppointments = new Map();
+
+        participantAppointments.forEach((value, key) => {
+          const latestWithPrevious = {
+            ...value.latest,
+            previousAppointment: value.previous
+          };
+          participantLatestAppointments.set(key, latestWithPrevious);
+        });
+
+        if (participantLatestAppointments.size === 0) {
+          this.loadingStates.appointments = true;
+          this.journeyFlowLoading = false;
+          this.cdr.detectChanges();
+          return;
         }
-      });
 
-      const participantLatestAppointments = new Map();
-      participantAppointments.forEach((value, key) => {
-        const latestWithPrevious = { ...value.latest, previousAppointment: value.previous };
-        participantLatestAppointments.set(key, latestWithPrevious);
-      });
+        const allAppointments = Array.from(participantLatestAppointments.values());
+        const appointmentTypeRefs = new Map();
+        allAppointments.forEach(appointmentData => {
+          const ref = appointmentData["appointment"];
+          if (ref) appointmentTypeRefs.set(ref.path, ref);
+          const prevRef = appointmentData.participantLatestAppointments?.appointment;
+          if (prevRef) appointmentTypeRefs.set(prevRef.path, prevRef);
+        });
 
-      if (participantLatestAppointments.size === 0) {
+        const appointmentTypePromises = Array.from(appointmentTypeRefs.values()).map(ref =>
+          getDoc(ref).catch(error => {
+            console.error("Error fetching appointment type:", error);
+            return null;
+          })
+        );
+
+        const appointmentTypeDocs = await Promise.all(appointmentTypePromises);
+        const typeNameMap = new Map();
+        Array.from(appointmentTypeRefs.keys()).forEach((path, index) => {
+          const doc = appointmentTypeDocs[index];
+          if (doc?.exists()) typeNameMap.set(path, doc.data()["appointmenttype"] || "");
+        });
+
+        const categoryMap = {
+          "Welcome To WiSH": "welcomeCall",
+
+          "EI Starter Pack Clarity Call": "clarityCall",
+
+          "A&H Light Diagnostics": "diagnostics",
+          "EI Starter Pack Diagnostics": "diagnostics",
+          "WiSH Diagnostics": "diagnostics",
+          "Critical Support Diagnostics": "diagnostics",
+          "EI Diagnostics": "diagnostics",
+
+          "EI Implementation": "implementation",
+          "WiSH Implementation": "implementation",
+          "Critical Support Implementation": "implementation",
+          "A&H Light Implementation": "implementation",
+          "EI Starter Pack Implementation": "implementation",
+
+          "Critical Support Mid Review": "midReviewDiagnostics",
+          "A&H Light Mid Review": "midReviewDiagnostics",
+
+          "A&H Light Review": "finalReview",
+          "EI Review": "finalReview",
+          "WiSH Review": "finalReview",
+          "EI Starter Pack Review": "finalReview",
+          "Critical Support Review": "finalReview",
+          "WiSH Final Review Call": "finalReview",
+
+          "EI Celebration Call": "completed",
+          "WiSH Celebration Call": "completed",
+          "WiSH Experience Call": "completed",
+        };
+
+        const productKeywordsMap: any = {
+          "WISH": ["WiSH"],
+          "A&H LIGHT": ["A&H Light"],
+          "EI Solution": ["EI Solution", "EI Celebration", "EI Implementation", "EI Diagnostics", "EI Review"],
+          "EI Starter Pack": ["EI Starter Pack"],
+          "Critical Support": ["Critical Support"]
+        };
+
+        // Add appointment type names and categories for both current and previous appointments
+        allAppointments.forEach(appointmentData => {
+          const appointmentTypeRef = appointmentData["appointment"];
+          if (appointmentTypeRef) {
+            const appointmentTypeName = typeNameMap.get(appointmentTypeRef.path);
+            if (appointmentTypeName) {
+              appointmentData["appointmentTypeName"] = appointmentTypeName;
+              appointmentData["category"] = categoryMap[appointmentTypeName] || null;
+            }
+          }
+
+          // Add type name for previous appointment
+          if (appointmentData.previousAppointment?.appointment) {
+            const prevTypeName = typeNameMap.get(appointmentData.previousAppointment.appointment.path);
+            if (prevTypeName) {
+              appointmentData.previousAppointment["appointmentTypeName"] = prevTypeName;
+            }
+          }
+        });
+
+        // Filter by selected product
+        let filteredLatestAppointments = allAppointments;
+        if (this.selectedProduct !== "All Products Overview") {
+          const selectedKeywords = productKeywordsMap[this.selectedProduct] || [];
+          filteredLatestAppointments = allAppointments.filter(appointment => {
+            const appointmentTypeName = appointment["appointmentTypeName"] || "";
+            return selectedKeywords.some(keyword => appointmentTypeName.includes(keyword));
+          });
+        }
+
+        // Calculate stuck cases and days stuck
+        const stuckCasesArray = [];
+        const currentDate = new Date();
+
+        filteredLatestAppointments.forEach(latestAppointment => {
+          const appointmentEnd = latestAppointment["endtime"] || latestAppointment["starttime"];
+          const appointmentEndDate = appointmentEnd?.toDate ? appointmentEnd.toDate() : appointmentEnd;
+          const daysSinceAppointment = this.calculateWaitingPeriod(appointmentEndDate);
+
+          const participantId = latestAppointment["bookedby"]?.id;
+          let assignedToName = 'Unassigned';
+          if (latestAppointment["hosts"] && latestAppointment["hosts"].length > 0) {
+            const roleRef = latestAppointment["hosts"][0];
+            if (roleRef?.id) {
+              assignedToName = this.mapprofile[roleRef.id] || roleRef.id;
+            }
+          }
+
+          const productId = latestAppointment["productid"];
+          const actualProductName = this.mapProductName[productId] || 'N/A';
+          latestAppointment["waitingperiod"] = this.calculateWaitingPeriod(appointmentEndDate);
+          latestAppointment["profileid"] = participantId;
+          latestAppointment["appointmentstatus"] = latestAppointment["attended"] ? 'Completed' : 'Scheduled'
+          latestAppointment["appointment"] = latestAppointment["appointmentTypeName"] || 'N/A';
+          latestAppointment["product"] = actualProductName;
+          latestAppointment["date"] = appointmentEnd;
+          latestAppointment["assignedto"] = assignedToName;
+          const journeyId = this.mapMetaData[participantId]?.['activejourney'];
+          latestAppointment["activejourney"] = this.mapjourneyname[journeyId] || 'N/A';
+          latestAppointment["escalationlevel"] = daysSinceAppointment > 30 ? 'HIGH' : daysSinceAppointment > 15 ? 'MEDIUM' : 'LOW';
+          latestAppointment["issuetype"] = daysSinceAppointment > 15 ? 'Stuck in Phase' : 'In Progress';
+          latestAppointment["lastaction"] = latestAppointment.previousAppointment?.appointmentTypeName || 'N/A';
+          latestAppointment["resolution"] = daysSinceAppointment > 15 ? 'Pending' : 'N/A';
+
+          if (daysSinceAppointment > 15) {
+            stuckCasesArray.push(latestAppointment);
+          }
+        });
+
+        // Categorize appointments
+        const categorizedData = {
+          welcomeCall: [],
+          clarityCall: [],
+          diagnostics: [],
+          implementation: [],
+          midReviewDiagnostics: [],
+          implementationPhase2: [],
+          finalReview: [],
+          completed: [],
+          needsValidation: []
+        };
+
+        filteredLatestAppointments.forEach(appointmentData => {
+          const category = appointmentData["category"];
+          if (category && categorizedData[category]) {
+
+            categorizedData[category].push(appointmentData);
+          }
+        });
+
+        Object.keys(categorizedData).forEach(key => {
+          this.originalData[key].data = categorizedData[key];
+          this.originalData[key].count = categorizedData[key].length;
+        });
+
+        this.originalData['stuckCases'].data = stuckCasesArray;
+        this.originalData['stuckCases'].count = stuckCasesArray.length;
+        this.totalParticipants =
+          (this.originalData['currentJourneyInitiated']?.count || 0) +
+          (this.originalData['welcomeCall']?.count || 0) +
+          (this.originalData['clarityCall']?.count || 0) +
+          (this.originalData['diagnostics']?.count || 0) +
+          (this.originalData['implementation']?.count || 0) +
+          (this.originalData['midReviewDiagnostics']?.count || 0) +
+          (this.originalData['implementationPhase2']?.count || 0) +
+          (this.originalData['finalReview']?.count || 0) +
+          (this.originalData['completed']?.count || 0) +
+          (this.originalData['needsValidation']?.count || 0);
+
+        this.completedCount = this.originalData['completed']?.count || 0;
+        this.inProcessCount = this.totalParticipants - this.completedCount;
         this.loadingStates.appointments = true;
+        this.allFetchedAppointments = allAppointments;
+
+        // Abishek Vimal
+        // Filter Participant Table
+
+        const allRecords = Object.values(this.originalData)
+          .flatMap((item: any) => item.data || []);
+
+        const rows = allRecords.map((item: any) => {
+
+          const participantId = item.bookedby?.id;
+          const participant = this.mapMetaData[participantId] || {};
+
+          const row: any = {
+            name: participant.name || '-',
+            email: participant.email || '-',
+            initiated: '-',
+            welcomeCall: '-',
+            clarityCall: '-',
+            diagnostics: '-',
+            implementation: '-',
+            midReviewDiagnostics: '-',
+            implementationPhase2: '-',
+            finalReview: '-',
+            completed: '-',
+            needsValidation: '-'
+          };
+
+          if (item.category === 'initiatedToday') row.initiated = item.appointmentstatus;
+          if (item.category === 'welcomeCall') row.welcomeCall = item.appointmentstatus;
+          if (item.category === 'clarityCall') row.clarityCall = item.appointmentstatus;
+          if (item.category === 'diagnostics') row.diagnostics = item.appointmentstatus;
+          if (item.category === 'implementation') row.implementation = item.appointmentstatus;
+          if (item.category === 'midReviewDiagnostics') row.midReviewDiagnostics = item.appointmentstatus;
+          if (item.category === 'implementationPhase2') row.implementationPhase2 = item.appointmentstatus;
+          if (item.category === 'finalReview') row.finalReview = item.appointmentstatus;
+          if (item.category === 'completed') row.completed = item.appointmentstatus;
+          if (item.category === 'needsValidation') row.needsValidation = item.appointmentstatus;
+
+          return row;
+        });
+
+        this.tableData = rows;        // store original rows
+        this.filteredData = [...rows]; // display rows
+
+        this.applyProductFilter();
         this.journeyFlowLoading = false;
         this.cdr.detectChanges();
-        return;
-      }
-
-      const allAppointments = Array.from(participantLatestAppointments.values());
-      const appointmentTypeRefs = new Map();
-      allAppointments.forEach(appointmentData => {
-        const ref = appointmentData["appointment"];
-        if (ref) appointmentTypeRefs.set(ref.path, ref);
-        const prevRef = appointmentData.previousAppointment?.appointment;
-        if (prevRef) appointmentTypeRefs.set(prevRef.path, prevRef);
       });
-
-      const appointmentTypePromises = Array.from(appointmentTypeRefs.values()).map(ref =>
-        getDoc(ref).catch(error => {
-          console.error("Error fetching appointment type:", error);
-          return null;
-        })
-      );
-
-      const appointmentTypeDocs = await Promise.all(appointmentTypePromises);
-      const typeNameMap = new Map();
-      Array.from(appointmentTypeRefs.keys()).forEach((path, index) => {
-        const doc = appointmentTypeDocs[index];
-        if (doc?.exists()) typeNameMap.set(path, doc.data()["appointmenttype"] || "");
-      });
-
-      const categoryMap = {
-        "Welcome To WiSH": "welcomeCall",
-
-        "EI Starter Pack Clarity Call": "clarityCall",
-
-        "A&H Light Diagnostics": "diagnostics",
-        "EI Starter Pack Diagnostics": "diagnostics",
-        "WiSH Diagnostics": "diagnostics",
-        "Critical Support Diagnostics": "diagnostics",
-        "EI Diagnostics": "diagnostics",
-
-        "EI Implementation": "implementation",
-        "WiSH Implementation": "implementation",
-        "Critical Support Implementation": "implementation",
-        "A&H Light Implementation": "implementation",
-        "EI Starter Pack Implementation": "implementation",
-
-        "Critical Support Mid Review": "midReviewDiagnostics",
-        "A&H Light Mid Review": "midReviewDiagnostics",
-
-
-        "A&H Light Review": "finalReview",
-        "EI Review": "finalReview",
-        "WiSH Review": "finalReview",
-        "EI Starter Pack Review": "finalReview",
-        "Critical Support Review": "finalReview",
-        "WiSH Final Review Call": "finalReview",
-
-        "EI Celebration Call": "completed",
-        "WiSH Celebration Call": "completed",
-        "WiSH Experience Call": "completed",
-      };
-
-      const productKeywordsMap: any = {
-        "WISH": ["WiSH"],
-        "A&H LIGHT": ["A&H Light"],
-        "EI Solution": ["EI Solution", "EI Celebration", "EI Implementation", "EI Diagnostics", "EI Review"],
-        "EI Starter Pack": ["EI Starter Pack"],
-        "Critical Support": ["Critical Support"]
-      };
-
-      // Add appointment type names and categories for both current and previous appointments
-      allAppointments.forEach(appointmentData => {
-        const appointmentTypeRef = appointmentData["appointment"];
-        if (appointmentTypeRef) {
-          const appointmentTypeName = typeNameMap.get(appointmentTypeRef.path);
-          if (appointmentTypeName) {
-            appointmentData["appointmentTypeName"] = appointmentTypeName;
-            appointmentData["category"] = categoryMap[appointmentTypeName] || null;
-          }
-        }
-
-        // Add type name for previous appointment
-        if (appointmentData.previousAppointment?.appointment) {
-          const prevTypeName = typeNameMap.get(appointmentData.previousAppointment.appointment.path);
-          if (prevTypeName) {
-            appointmentData.previousAppointment["appointmentTypeName"] = prevTypeName;
-          }
-        }
-      });
-
-      // Filter by selected product
-      let filteredLatestAppointments = allAppointments;
-      if (this.selectedProduct !== "All Products Overview") {
-        const selectedKeywords = productKeywordsMap[this.selectedProduct] || [];
-        filteredLatestAppointments = allAppointments.filter(appointment => {
-          const appointmentTypeName = appointment["appointmentTypeName"] || "";
-          return selectedKeywords.some(keyword => appointmentTypeName.includes(keyword));
-        });
-      }
-
-      // Calculate stuck cases and days stuck
-      const stuckCasesArray = [];
-      const currentDate = new Date();
-
-      filteredLatestAppointments.forEach(latestAppointment => {
-        const appointmentEnd = latestAppointment["endtime"] || latestAppointment["starttime"];
-        const appointmentEndDate = appointmentEnd?.toDate ? appointmentEnd.toDate() : appointmentEnd;
-        const daysSinceAppointment = this.calculateWaitingPeriod(appointmentEndDate);
-
-        const participantId = latestAppointment["bookedby"]?.id;
-        let assignedToName = 'Unassigned';
-        if (latestAppointment["hosts"] && latestAppointment["hosts"].length > 0) {
-          const roleRef = latestAppointment["hosts"][0];
-          if (roleRef?.id) {
-            assignedToName = this.mapprofile[roleRef.id] || roleRef.id;
-          }
-        }
-
-        const productId = latestAppointment["productid"];
-        const actualProductName = this.mapProductName[productId] || 'N/A';
-        latestAppointment["waitingperiod"] = this.calculateWaitingPeriod(appointmentEndDate);
-        latestAppointment["profileid"] = participantId;
-        latestAppointment["appointmentstatus"] = latestAppointment["attended"] ? 'Completed' : 'Scheduled'
-        latestAppointment["appointment"] = latestAppointment["appointmentTypeName"] || 'N/A';
-        latestAppointment["product"] = actualProductName;
-        latestAppointment["date"] = appointmentEnd;
-        latestAppointment["assignedto"] = assignedToName;
-        const journeyId = this.mapMetaData[participantId]?.['activejourney'];
-        latestAppointment["activejourney"] = this.mapjourneyname[journeyId] || 'N/A';
-        latestAppointment["escalationlevel"] = daysSinceAppointment > 30 ? 'HIGH' : daysSinceAppointment > 15 ? 'MEDIUM' : 'LOW';
-        latestAppointment["issuetype"] = daysSinceAppointment > 15 ? 'Stuck in Phase' : 'In Progress';
-        latestAppointment["lastaction"] = latestAppointment.previousAppointment?.appointmentTypeName || 'N/A';
-        latestAppointment["resolution"] = daysSinceAppointment > 15 ? 'Pending' : 'N/A';
-
-        if (daysSinceAppointment > 15) {
-          stuckCasesArray.push(latestAppointment);
-        }
-      });
-
-      // Categorize appointments
-      const categorizedData = {
-        welcomeCall: [],
-        clarityCall: [],
-        diagnostics: [],
-        implementation: [],
-        midReviewDiagnostics: [],
-        implementationPhase2: [],
-        finalReview: [],
-        completed: [],
-        needsValidation: []
-      };
-
-      filteredLatestAppointments.forEach(appointmentData => {
-        const category = appointmentData["category"];
-        if (category && categorizedData[category]) {
-          categorizedData[category].push(appointmentData);
-        }
-      });
-
-      Object.keys(categorizedData).forEach(key => {
-        this.originalData[key].data = categorizedData[key];
-        this.originalData[key].count = categorizedData[key].length;
-      });
-
-      this.originalData['stuckCases'].data = stuckCasesArray;
-      this.originalData['stuckCases'].count = stuckCasesArray.length;
-      this.totalParticipants =
-        (this.originalData['currentJourneyInitiated']?.count || 0) +
-        (this.originalData['welcomeCall']?.count || 0) +
-        (this.originalData['clarityCall']?.count || 0) +
-        (this.originalData['diagnostics']?.count || 0) +
-        (this.originalData['implementation']?.count || 0) +
-        (this.originalData['midReviewDiagnostics']?.count || 0) +
-        (this.originalData['implementationPhase2']?.count || 0) +
-        (this.originalData['finalReview']?.count || 0) +
-        (this.originalData['completed']?.count || 0) +
-        (this.originalData['needsValidation']?.count || 0);
-
-      this.completedCount = this.originalData['completed']?.count || 0;
-      this.inProcessCount = this.totalParticipants - this.completedCount;
-      this.loadingStates.appointments = true;
-      this.allFetchedAppointments = allAppointments;
-
-      this.applyProductFilter();
-      this.journeyFlowLoading = false; 
-      this.cdr.detectChanges();
     } catch (error) {
       console.error("Error loading appointments:", error);
       this.loadingStates.appointments = true;
-      this.journeyFlowLoading = false; 
+      this.journeyFlowLoading = false;
       this.cdr.detectChanges();
     }
   }
@@ -2055,6 +2167,65 @@ export class DeliveryDashboardCloneComponent {
     this.completedCount = this.originalData['completed']?.count || 0;
     this.inProcessCount = this.totalParticipants - this.completedCount;
     this.cdr.detectChanges();
+  }
+
+  // Abishek Vimal
+
+  // Search Participant data from table
+
+  searchStatsParticipant(event: any) {
+
+    const searchText = event.target.value?.toLowerCase().trim();
+
+    if (!searchText) {
+      this.filteredOriginalData = JSON.parse(JSON.stringify(this.originalData));
+      return;
+    }
+
+    const filtered: any = {};
+
+    Object.keys(this.originalData).forEach((key: any) => {
+
+      const section = this.originalData[key];
+
+      const filteredRows = section.data.filter((item: any) => {
+
+        const participantId = item.bookedby?.id;
+        const participant = this.mapMetaData[participantId] || {};
+        const name = participant.name?.toLowerCase() || "";
+        const email = participant.email?.toLowerCase() || "";
+
+        return (
+          name.includes(searchText) ||
+          email.includes(searchText)
+        );
+      });
+
+      filtered[key] = {
+        ...section,
+        data: filteredRows,
+        count: filteredRows.length
+      };
+
+    });
+
+    this.originalData = filtered;
+
+  }
+
+  searchParticipant(event: any) {
+
+    const searchText = event.target.value?.toLowerCase().trim();
+
+    if (!searchText) {
+      this.filteredData = [...this.tableData];
+      return;
+    }
+
+    this.filteredData = this.tableData.filter((row: any) =>
+      row.name?.toLowerCase().includes(searchText) ||
+      row.email?.toLowerCase().includes(searchText)
+    );
   }
 
   async loadModes() {
@@ -2363,6 +2534,7 @@ export class DeliveryDashboardCloneComponent {
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
     this.displayMonth = `${monthNames[this.selectedMonth.getMonth()]} ${this.selectedMonth.getFullYear()}`;
+    console.log("original data", this.originalData)
   }
 
   goToPreviousMonth() {
@@ -2426,6 +2598,7 @@ export class DeliveryDashboardCloneComponent {
     const total = Object.keys(this.loadingStates).length;
     return (loaded / total) * 100;
   }
+
 
   // Function to get total loaded count 
   getLoadedCount(): number {
@@ -2777,7 +2950,7 @@ export class DeliveryDashboardCloneComponent {
         element['generalnotes'] = element['generalnotes'] || []
         element['generalnotes'].push(generalnotes)
         console.log("Temporary Note Added:", generalnotes);
-        this.guard.openSnackBar("Note Added Temporarily", "OK",600);
+        this.guard.openSnackBar("Note Added Temporarily", "OK");
       }
     })
   }
@@ -3251,7 +3424,7 @@ export class DeliveryDashboardCloneComponent {
 
   onProductFilterChange(event: any) {
     this.selectedProduct = event.target.value;
-    this.applyProductFilter(); 
+    this.applyProductFilter();
   }
 
   onJourneyMonthChange(event: any) {
@@ -3545,5 +3718,9 @@ export class DeliveryDashboardCloneComponent {
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     XLSX.writeFile(wb, `${filename.replace(/\s+/g, '_')}.xlsx`);
+  }
+
+  toggleTableView() {
+    this.showTable = !this.showTable;
   }
 }
