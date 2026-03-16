@@ -15,29 +15,17 @@ RUN_ID=$(gh run list --workflow=setupFirebase.yml --limit 1 --json databaseId --
 
 echo "📡 Watching workflow..."
 
-gh run watch $RUN_ID
+gh run watch $RUN_ID --exit-status
 
-STATUS=$(gh run view $RUN_ID --json conclusion --jq '.conclusion')
+echo "✅ Workflow completed successfully"
 
-if [ "$STATUS" = "success" ]; then
-    echo "✅ Workflow completed successfully"
-    
-    echo "📥 Downloading environment files..."
-    gh run download $RUN_ID -n environment-files -D src/environments
-    
-    echo "✓ Environment files downloaded to src/environments/"
-    
-    echo "🗑️  Deleting artifact from GitHub..."
-    ARTIFACT_ID=$(gh api "/repos/{owner}/{repo}/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="environment-files") | .id')
-    
-    if [ -n "$ARTIFACT_ID" ]; then
-        gh api --method DELETE "/repos/{owner}/{repo}/actions/artifacts/$ARTIFACT_ID" && echo "✓ Artifact deleted" || echo "⚠️  Could not delete artifact"
-    else
-        echo "⚠️  Artifact not found"
-    fi
-    
-    exit 0
-else
-    echo "❌ Workflow failed"
-    exit 1
-fi
+echo "📥 Downloading environment files..."
+gh run download $RUN_ID -n environment-files
+
+echo "✓ Files downloaded"
+
+echo "🗑️ Deleting artifact..."
+ARTIFACT_ID=$(gh api "/repos/{owner}/{repo}/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="environment-files") | .id')
+gh api --method DELETE "/repos/{owner}/{repo}/actions/artifacts/$ARTIFACT_ID"
+
+echo "✓ Done"
