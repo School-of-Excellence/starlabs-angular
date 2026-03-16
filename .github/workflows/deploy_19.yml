@@ -63,6 +63,14 @@ jobs:
           EOF
           fi
 
+      - name: Update Firebase Site
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/development" ]; then
+            jq '.hosting.site = "breakthroughs-test"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
+          else
+            jq '.hosting.site = "breakthroughs"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
+          fi
+
       - name: Install Dependencies
         run: npm install
 

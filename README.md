@@ -1,32 +1,45 @@
-# Firebase Environment Setup
+# Starlabs Angular - Setup & Deployment
 
-## Quick Start
+## Local Setup
 
-After cloning or pulling the repo, run:
+After cloning the repository, run:
 
 ```bash
 ./setupScript.sh
 ```
 
-This triggers a GitHub workflow that:
-1. Creates `src/environments/environment.ts` (production)
-2. Creates `src/environments/environment.development.ts` (test)
-
-Wait for the script to show **"✅ Workflow completed successfully"** then pull the changes:
-
-Done! Your environment files are ready.
-
----
-
-## Requirements
-
-- GitHub CLI installed: `brew install gh` (Mac) or `winget install GitHub.CLI` (Windows)
+**Requirements: Before running script**
+- GitHub CLI installed:
+  - Mac: `brew install gh`
+  - Windows: `winget install GitHub.CLI`
+  - Ubuntu: `sudo apt install gh`
 - Authenticated: `gh auth login`
 
 ---
 
-## Notes
+## Deployment
 
-- Environment files are auto-generated from GitHub Secrets
-- Don't edit them manually - changes will be overwritten
-- The workflow runs on-demand only (manual trigger)
+### To Test Environment
+
+```bash
+git push origin development
+```
+
+- Deploys to `breakthroughs-test` Firebase site
+
+
+### To Production
+
+```bash
+git push origin production
+```
+
+- Deploys to `breakthroughs` Firebase site
+
+---
+
+## Important Notes
+
+- Environment files are auto-generated from GitHub secrets
+- **Do not commit** `src/environments/` files to git
+- Missing environment files? Run `./setupScript.sh` again
