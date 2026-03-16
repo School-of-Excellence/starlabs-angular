@@ -4,14 +4,14 @@ set -e
 
 echo "🔥 Triggering Firebase setup workflow..."
 
-gh workflow run setup-firebase.yml
+gh workflow run setupFirebase.yml
 
 echo "✓ Workflow triggered"
 echo "⏳ Waiting for workflow to start..."
 
 sleep 5
 
-RUN_ID=$(gh run list --workflow=setup-firebase.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+RUN_ID=$(gh run list --workflow=setupFirebase.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 
 echo "📡 Watching workflow..."
 
