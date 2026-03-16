@@ -1,0 +1,417 @@
+<div class="mainscreen mb-2">
+    <div class="row">
+      <div class="col-sm">
+        <mat-form-field *ngIf="ongoingQueueList.length > 1" class="w-100" appearance="outline">
+          <mat-label>Live Queue</mat-label>
+          <mat-select [compareWith]="compareFn" [(ngModel)]="ongoingQueue" (selectionChange)="onQueueSelect(); checkoutQueue()" [disabled]="liveStudio.length != 0">
+            <mat-option *ngFor="let queue of ongoingQueueList" [value]="queue">{{queue['queuename']}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div class="col-sm">
+        <h5 class="title mb-3" style="font-size: 20px;">My Arena ({{ongoingQueue["queuename"]}})</h5>
+      </div>
+      <div class="col-sm"></div>
+    </div>
+  
+    <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
+      <h6 class="secondtitle fs-6 mb-2">Other Studio that you are invited to Join</h6>
+      <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index" class="mr-3" (click)="visitOtherStudio(studio)">
+        <span>Studio {{i+1}}:</span>&nbsp;
+        <span *ngFor="let participant of studio['pairing']; let j = index">
+          <span>{{mapProfile[participant]}}</span>
+          <span *ngIf="j+1 != studio['pairing'].length">,&nbsp;</span>
+        </span>
+      </button>
+      <div class="mt-2">
+        <span class="label font-italic">Click on the studio to join the call</span>
+      </div>
+    </div>
+    
+    <button mat-stroked-button *ngFor="let studio of studioList; let i = index" class="me-3 mt-2" [ngClass]="selectedStudio['docid'] == studio['docid'] ? 'primarystudio' : studio['checkin'] ? 'secondarystudio' : ''" [value]="studio" (click)="onStudioSelect(studio)">
+      <span>My Studio {{i+1}}:</span>&nbsp;
+      <span *ngFor="let participant of studio['participants']; let j = index">
+        <span>{{mapActivity[studio["participantsactivity"][participant]]}}</span>
+        <span *ngIf="participant == profileid && studio['participants'].length != 1">&nbsp;(You)</span>
+        <span *ngIf="participant != profileid">&nbsp;({{mapProfile[participant]}})</span>
+        <span *ngIf="j+1 != studio['participants'].length">,&nbsp;</span>
+      </span>
+      <mat-icon *ngIf="mapStudioLiveAssignment[studio['docid']]" class="ml-2">live_tv</mat-icon>
+    </button>
+  
+    <div class="mt-3 mb-3" *ngIf="selectedStudio['docid'] && liveAssignment == null">
+      <mat-slide-toggle labelPosition="before" [checked]="selectedStudio['checkin']" [disabled]="onhold == true" (change)="onhold ? $event.source.checked = selectedStudio['checkin'] : checkinStudio($event.checked)">Studio Checkin</mat-slide-toggle>
+    </div>
+  
+     <!-- Participant Conversation -->
+    <!-- <div *ngIf="chatdiv"> -->
+      <div class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
+        <button mat-icon-button (click)="toggleChatContainer()">
+          <mat-icon (click)="toggleChatContainer()">chat</mat-icon>
+        </button>      
+      </div>
+     
+      <div class="example-container" *ngIf="isChatContainerOpen && studiochatList.length != 0">
+        <div *ngFor="let participant of studiochatList; let i = index" class="participant-item">
+          {{ participant.participantname }}
+          <span *ngIf="pendingMessagesCount[participant.docid] && pendingMessagesCount[participant.docid] > 0">
+            ({{ pendingMessagesCount[participant.docid] }} unread)
+          </span>
+            <button mat-icon-button (click)="getstudiochat(participant)">
+              <mat-icon>chat</mat-icon>
+            </button>
+            <div *ngIf="selectedParticipant === true && selectedChat && selectedChat.docid === participant.docid">
+              <div *ngIf="messages.length != 0" style="height:300px" class="w-100 overflow-auto">
+                <span *ngFor="let list of messages">
+                  <span *ngIf="list['sender_uid'] === currentuseruid">
+                    <div class="talk-bubble round" style="float:right;">
+                      <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
+                        <span class="d-flex justify-content-between">
+                          <!-- <button mat-icon-button type="button" ><mat-icon (click)="onChatPinned(list['pinned'] ? false : true,list)" style="vertical-align:top;" [ngClass]="list['pinned'] ? 'golden' : 'white'" >star</mat-icon></button> -->
+                          <span class="d-flex justify-content-between">
+                            <p [innerHTML]="processMessage(list['message'])"></p>
+                          </span>
+                        </span>
+                        <span style="font-size: 14px;color: deepskyblue;" [ngClass]="list['sender_uid'] == currentuseruid ? 'right' : 'bluetickleft'">
+                          <p>{{list['time']?.toDate() | date:'short'}}</p>
+                        </span>
+                      </div>
+                    </div>
+                  </span>
+                  <span *ngIf="list['sender_uid'] !== currentuseruid">
+                    <div class="talk-bubble1 round">
+                      <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
+                        <span class="d-flex justify-content-between" style="font-style: italic;color: rgb(1, 121, 161);">
+                          <p>{{mapProfileuid[list['sender_uid']]['name']}}</p>
+                          <!-- <button mat-icon-button type="button" ><mat-icon style="vertical-align:top;" [ngClass]="list['pinned'] ? 'golden' : 'white'" >star</mat-icon></button> -->
+                        </span>
+                        <span>
+                            <span class="d-flex justify-content-between">
+                                <p [innerHTML]="processMessage(list['message'])"></p>
+                              </span>
+                        </span>
+                        <span style="font-size: 14px;color: rgb(1, 121, 161);">
+                          <p>{{list['time']?.toDate() | date:'short'}}</p> 
+                        </span>
+                      </div>
+                    </div>
+                  </span>
+                </span>
+              </div>
+              <section>
+                <br>
+                <form [formGroup]="messageform" (ngSubmit)="sendMessage(messageform.value)">
+                  <textarea 
+                    name="sms" 
+                    autofocus
+                    id="message" 
+                    placeholder="Type your message..." 
+                    class="form-control messageinput" 
+                    (keydown.enter)="sendMsg($event)" 
+                    formControlName="sms" >
+                  </textarea>
+                </form>
+                <!-- <button style="margin-top:10px;margin-left:10px" mat-icon-button type="submit" (ngSubmit)="sendMessage(messageform.value)"><mat-icon>send</mat-icon></button> -->
+              </section>
+            </div>
+        </div>
+      </div>
+    <!-- </div> -->
+  
+  
+    <!-- Stage Waiting list -->
+    <div *ngIf="liveAssignment == null && selectedStudio['checkin']">
+      <div class="row">
+        <div *ngFor="let stage of stageTokenList; let stageindex = index" class="col-sm">
+          <div class="mat-elevation-z2">
+            <div class="stagename">{{stage.stagename}}</div>
+            <div class="stagequeue">
+              <div *ngFor="let token of stage.tokenlist">
+                <div class="token">
+                  <div class="w-100">
+                    <span class="label">Token Number:</span> {{token.tokennumber}}
+                    <br>
+                    <span class="label">Name:</span> {{mapProfile[token.profile_id]}}
+                    <br>
+                    <span class="label">Status:</span> <span [ngClass]="token.status == 'ready' ? 'text-success' : ''">{{token.status}}</span>
+                    <div *ngIf="token.preassigned != null && token.preassigned[stage.stagename] != null && token.preassigned[stage.stagename]?.includes(selectedStudio['docid'])">
+                      <span class="label font-italic">* Preassigned to you</span>
+                    </div>
+                  </div>
+                  <div class="btnarea">
+                    <div>
+                      <button class="stagebtn" mat-stroked-button (click)="sendStudioInvitation(token)">
+                        Bring To Studio
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    
+    <!-- Live Assignment -->
+    <div *ngIf="liveAssignment != null">
+      <div class="mainheading">
+        <span class="title h5">You are with Participant "{{mapProfile[liveAssignment["token"]?.profile_id]}}" {{liveAssignment["stagename"]}} Stage</span><br>
+        <div class="studiopeople font-italic">
+          <span>Participant Product:</span>
+          <span> {{liveAssignment["token"]?.productname}}</span>
+          <span *ngIf="liveAssignment['token']?.variationid != null"> - ({{mapVariationName[liveAssignment['token']?.variationid]}})</span>
+        </div>
+        <!-- (<span class="studiopeople" *ngFor="let specialist of liveAssignment['pairing']; let i = index">{{mapProfile[specialist]}}{{i+1 == liveAssignment['pairing'].length ? '' : ', '}}</span>) -->
+        <div class="statusmessage" *ngIf="ongoingQueue['zoomlinkrequired'] != false && [false,undefined].includes(ongoingQueue['enablezoommeetingsdk']) && selectedStudio['openvidu'] != true">
+          <mark>
+            We have invited the participant '{{mapProfile[liveAssignment["token"]?.profile_id]}}' to join this zoom meeting.
+            <a class="zoomlink" [href]="liveAssignment['zoomdata']?.start_url" target="_blank">{{liveAssignment['zoomdata']?.start_url == null ? 'Generating Link...' : 'https://us02web.zoom.us/j'}}</a> - Please join the Zoom Link.<br>
+            <button class="button-36 mt-2"  type="button" (click)="navigateMeeting(liveAssignment)" [disabled]="liveAssignment['zoomdata'] === undefined">Start Meeting</button><br>
+          </mark>
+          <button class="mt-2" *ngIf="liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator && ongoingQueue['stageproperty'][liveAssignment['stagename']]['enablezoom']" mat-raised-button (click)="regenerateZoomLink()">Generate New Link?</button>
+        </div>
+        <!-- <div class="statusmessage" *ngIf="ongoingQueue['zoomlinkrequired'] != false && ![false,undefined].includes(ongoingQueue['enablezoommeetingsdk'])">
+          <button class="button-36"  type="button" (click)="navigateMeeting(liveAssignment)" [disabled]="liveAssignment['zoomdata'] === undefined">Start Meeting</button><br>
+          <button class="mt-2" *ngIf="liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator" mat-stroked-button (click)="regenerateZoomLink()">Generate New Link?</button>
+        </div> -->
+
+        <!-- OpenVidu -->
+        <div class="statusmessage" *ngIf="selectedStudio['openvidu']">
+          <mark>
+            We have invited the participant '{{mapProfile[liveAssignment["token"]?.profile_id]}}' to join this meeting.
+          </mark>
+          <br>
+          <button class="button-36 mt-2"  type="button" mat-raised-button (click)="joinOpenViduRoom()">Start Meeting</button>
+        </div>
+
+        <div class="w-100 text-left">
+          <button mat-stroked-button (click)="inviteMore(false)">Invite More Participant in this Studio</button>
+        </div>
+  
+        <!-- form -->
+        <div *ngIf="participantForm.length != 0" class="widgetbox mat-elevation-z2">
+          <span class="actiontitle">Forms submitted by the Participant</span>
+          <br>
+          <button *ngFor="let form of participantForm" class="actionbtn mt-2 mr-3" mat-stroked-button (click)="viewform(form)">
+            {{form["formname"]}} - ({{mapQueue[form["queueid"]]}})
+            <mat-icon>open_in_new</mat-icon>
+          </button>
+        </div>
+  
+        <!-- Studio Widget -->
+        <div *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets">
+  
+          <!-- Participant AEL -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('validateael')">
+            <span class="actiontitle">Participant AEL</span><br><br>
+            <span *ngIf="participantAEL['crossovermetric'] == null" class="text-secondary font-italic mt-2">No AEL Found</span>
+            <div *ngIf="participantAEL['crossovermetric'] != null && participantAEL['crossovermetric'] != undefined">
+              <div *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; let i = index">
+                <h5 class="fw-bold fs-6">{{i+1}}. {{crossover.key}}</h5>
+                <mat-form-field appearance="outline" class="w-50 mt-2">
+                  <mat-label>Current Level</mat-label>
+                  <mat-select [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
+                    <mat-option *ngFor="let option of aelLevelList" [value]="option['startpoint'] + '---' + option['endpoint']">{{option["startpoint"]}} to {{option["endpoint"]}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              <button class="mt-2 mr-3" [class]="participantAEL['aelStatus'] == 'validated' ? 'aelValidated' : 'aelNotValidated'" mat-stroked-button (click)="updateCurrentAEL()">
+                {{participantAEL['aelStatus'] == "edited" ? "Update Changes & Mark this AEL as Validated" : participantAEL['aelStatus'] == "validated" ? "This AEL is Validated" : "Mark this AEL as Validated" }}
+              </button>
+            </div>
+          </div>
+  
+          <!-- Triple ATC -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('viewtripleatc')">
+            <span class="actiontitle">Triple ATC Submitted by '{{mapProfile[liveAssignment["token"]?.profile_id]}}' - Yet To Validate</span><br>
+            <span *ngIf="tripleATCList.length == 0" class="text-secondary font-italic mt-2">No Triple ATC found for validation!</span>
+            <button *ngFor="let atc of tripleATCList; let i = index" class="actionbtn mt-2 mr-3" mat-stroked-button (click)="viewTripleATC(atc['atcid'])">
+              Triple ATC {{i+1}}: {{atc["prescription_date"].toDate() | date}} - ({{mapQueue[atc["queueid"]]}}) <mat-icon>open_in_new</mat-icon>
+            </button>
+          </div>
+  
+          <!-- Prescribed Alpha ATC List -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('prescribedvalidatedatc')">
+            <span class="actiontitle">ATC Prescribed to the Participant</span>
+            <button class="ml-1 text-success" mat-icon-button (click)="previewATC('alpha')"><mat-icon>refresh</mat-icon></button>
+            <br>
+            <div class="text-secondary ml-3 mt-2" *ngIf="alphaATCList.length == 0">No ATC Found!</div>
+            <div class="ml-3" *ngFor="let atc of alphaATCList; let i = index">
+              <div class="steplabel mt-3">
+                ATC {{i+1}}: {{atc["atcdata"]["prescription_date"].toDate() | date}} - ({{mapQueue[atc["atcdata"]["queueid"]]}})
+                <button class="editbtn" mat-stroked-button (click)="updateATC(atc.atcid, 'alpha', '')">Edit ATC</button>
+                <!-- <button class="editbtn" mat-stroked-button (click)="editDiagnosticsATC(atc.atcid)">Edit ATC</button> -->
+              </div>
+
+              <div class="ms-3" *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
+                <!-- <label><strong>{{mapActivity[$any(activity.key)]}}: </strong>{{mapProfile[$any(activity.value)]}}</label> -->
+                <label>
+                  <strong>{{mapActivity[$any(activity.key)]}}: </strong>
+                  <span *ngFor="let specialist of $any(activity.value); let isLast = last">{{mapProfile[specialist]}}{{isLast ? "" : ", "}}</span>
+                </label>
+              </div>
+
+              <div class="m-3">
+                <label> <span class="fw-bold font-italic">ATC Directive: </span> {{atc["atcdata"]["directive"]}}</label>
+              </div>
+              <div *ngFor="let adjustment of atc['transcription']; let i = index">
+                <div *ngIf="adjustment?.procedure.length != 0">
+                  <div class="adjustmentlabel">
+                    <label><u>Adjustment {{i+1}}</u>. {{adjustment?.adjustment}}</label>
+                  </div>
+                  <div *ngFor="let procedure of adjustment?.procedure; let j = index">
+                    <div class="procedurelabel">
+                      * {{mapProcedure[procedure?.procedureid]}}
+                      <!-- <button mat-stroked-button class="ml-2" [ngClass]="procedure.status == 'completed' ? 'marked' : 'tomark'" (click)="markProcedure(i, j)">{{procedure.status == "completed" ? 'Completed' : "Mark as Completed"}}</button> -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ml-4 m-3" *ngIf="mapATCnotes[atc.atcdata['notesid']] || mapATCnotes[atc.atcdata['mentoringid']]">
+                <!-- Consultation Summary -->
+                <div *ngIf="!['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['consultationsummary'])">
+                  <span class="actiontitle">ATC Summary:</span><br>
+                  <label>{{mapATCnotes[atc.atcdata['notesid']]['consultationsummary']}}</label>
+                </div>
+                <!-- Consultation Notes -->
+                <div *ngIf="!['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]) && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['notes'])">
+                  <span class="actiontitle">ATC Notes:</span><br>
+                  <label>{{mapATCnotes[atc.atcdata['notesid']]['notes']}}</label>
+                </div>
+                <!-- Mentoring Notes -->
+                <div *ngIf="!['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]) && !['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'])">
+                  <span class="actiontitle">Mentoring Note:</span><br>
+                  <label>{{mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote']}}</label>
+                </div>
+              </div>
+            </div>
+          </div> 
+  
+  
+          <!-- Prescribed Unvalidated ATC List -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('prescribedunvalidatedatc')">
+            <span class="actiontitle">ATC Prescribed to the Participant (Yet to Validate)</span>
+            <button class="ml-1 text-success" mat-icon-button (click)="previewATC('validation')"><mat-icon>refresh</mat-icon></button>
+            <br>
+            <div class="text-secondary ml-3 mt-2" *ngIf="unvalidatedATCList.length == 0">No ATC Found!</div>
+            <div class="ml-3" *ngFor="let atc of unvalidatedATCList; let i = index">
+              <div class="steplabel mt-3">
+                ATC {{i+1}}: {{atc["atcdata"]["prescription_date"].toDate() | date}} - ({{mapQueue[atc["atcdata"]["queueid"]]}})
+                <button class="editbtn" mat-stroked-button (click)="updateATC(atc.atcid, 'validation', '')">Edit ATC</button>
+              </div>
+
+              <div class="ms-3" *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
+                <!-- <label><strong>{{mapActivity[$any(activity.key)]}}: </strong>{{mapProfile[$any(activity.value)]}}</label> -->
+                <label>
+                  <strong>{{mapActivity[$any(activity.key)]}}: </strong>
+                  <span *ngFor="let specialist of $any(activity.value); let isLast = last">{{mapProfile[specialist]}}{{isLast ? "" : ", "}}</span>
+                </label>
+              </div>
+
+              <div class="m-3">
+                <label> <span class="fw-bold font-italic">ATC Directive: </span> {{atc["atcdata"]["directive"]}}</label>
+              </div>
+              <div *ngFor="let adjustment of atc['transcription']; let i = index">
+                <div *ngIf="adjustment?.procedure.length != 0">
+                  <div class="adjustmentlabel">
+                    <label><u>Adjustment {{i+1}}</u>. {{adjustment?.adjustment}}</label>
+                  </div>
+                  <div *ngFor="let procedure of adjustment?.procedure; let j = index">
+                    <div class="procedurelabel">
+                      * {{mapProcedure[procedure?.procedureid]}}
+                      <!-- <button mat-stroked-button class="ml-2" [ngClass]="procedure.status == 'completed' ? 'marked' : 'tomark'" (click)="markProcedure(i, j)">{{procedure.status == "completed" ? 'Completed' : "Mark as Completed"}}</button> -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ml-4 m-3" *ngIf="mapATCnotes[atc.atcdata['notesid']] || mapATCnotes[atc.atcdata['mentoringid']]">
+                <!-- Consultation Summary -->
+                <div *ngIf="!['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['consultationsummary'])">
+                  <span class="actiontitle">ATC Summary:</span><br>
+                  <label>{{mapATCnotes[atc.atcdata['notesid']]['consultationsummary']}}</label>
+                </div>
+                <!-- Consultation Notes -->
+                <div *ngIf="!['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['notes'])">
+                  <span class="actiontitle">ATC Notes:</span><br>
+                  <label>{{mapATCnotes[atc.atcdata['notesid']]['notes']}}</label>
+                </div>
+                <!-- Mentoring Notes -->
+                <div *ngIf="!['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]) && !['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'])">
+                  <span class="actiontitle">Mentoring Note:</span><br>
+                  <label>{{mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote']}}</label>
+                </div>
+              </div>
+            </div>
+          </div> 
+  
+          <!-- Prescribe ATC -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc') || ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')">
+            <span class="actiontitle">Prescribe New ATC for the Participant</span><br>
+            <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')" class="actionbtn me-2 ml-3" mat-stroked-button (click)="addATC(true,liveAssignment['token']?.profile_id)">Add ATC for Implementation/Event</button>
+            <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc')" class="actionbtn me-2 ml-3" mat-stroked-button (click)="addATC(false,liveAssignment['token']?.profile_id)">Add ATC for Consultation/Review (Requires Validation)</button> 
+          </div>
+  
+          <!-- Assign Changeagent -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('assignprocedure')">
+            <span class="actiontitle">Assign Changeagent to Procedures</span><br>
+            <button class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(true)">Open ATC</button>
+            <!-- <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(true)">Open ATC given for Changework</button>
+            <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc')" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(false)">Open ATC given for Consultation</button> -->
+          </div>
+  
+          <!-- Mark Changework Complete -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('assignedatc')">
+            <span class="actiontitle">Mark Completed Procedures</span><br>
+            <div class="text-secondary ml-4 mt-1" *ngIf="cwATClist.length == 0">No Mandatory Procedure Found</div>
+            <div class="border mt-3 pb-2" *ngFor="let atc of cwATClist; let a = index">
+              <div class="adjustmentlabel font-weight-bold">
+                <label>ATC {{a+1}}: {{atc["atcdata"]?.prescription_date?.toDate() | date}} - ({{mapQueue[atc["queueid"]]}})</label> <!-- ATC Label-->
+              </div>
+              <!-- Adjustment Box -->
+              <div class="text-secondary ml-4 mt-1" *ngIf="atc['adjustments'].length == 0">No Mandatory Procedure assigned for this ATC</div>
+              <div class="ml-3" *ngFor="let adjustment of atc['adjustments']; let i = index">
+                <div *ngIf="adjustment?.procedure.length != 0">
+                  <div class="adjustmentlabel">
+                    <label>{{i+1}}. {{adjustment?.adjustments}}</label>
+                  </div>
+                  <!-- Procedure Box -->
+                  <div *ngFor="let procedure of adjustment?.procedure; let j = index">
+                    <div class="procedurelabel">
+                      * {{mapProcedure[procedure?.procedureid]}}
+                      <button mat-stroked-button class="ml-2" [ngClass]="procedure.status == 'completed' ? 'marked' : 'tomark'" (click)="markProcedure(a, i, j)">{{procedure.status == "completed" ? 'Completed' : "Mark as Completed"}}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div *ngIf="atc['cwbrief'].length != 0">
+                <div class="mt-3 ml-2" *ngFor="let audio of atc['cwbrief']">
+                  <audio controls="">
+                    <source [src]="audio" type="audio/wav">
+                  </audio>
+                </div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- move participants to next month review -->
+          <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('movetonextqueue')">
+            <span class="actiontitle">Move Participants to next month Review</span><br>
+            <button class="actionbtn mt-2 ml-3" mat-stroked-button (click)=" movetoNextMonthReview()">Mark participant for next month review</button>
+          </div>
+        </div>
+  
+        <!-- Next Stage Configuration -->
+        <div class="widgetbox mat-elevation-z2">
+          <span class="actiontitle">Completed {{liveAssignment['stagename'] | uppercase}}?</span>
+          <div *ngFor="let config of ongoingQueue['stageproperty'][liveAssignment['stagename']]?.nextstage">            
+            <button *ngIf=" (liveAssignment['token']?.variationid == null || liveAssignment['token']?.variationid == undefined) && (!config.variations || config.variations.length === 0)" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="moveStage(config.stage, config.markascompleted)"> {{config.calltoaction}} </button>
+            <button *ngIf=" liveAssignment['token']?.variationid != null && liveAssignment['token']?.variationid != undefined && queueVariation[liveAssignment['token']?.variationid] && queueVariation[liveAssignment['token']?.variationid].includes(liveAssignment['stagename']) && config.variations && config.variations.includes(liveAssignment['token']?.variationid)" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="moveStage(config.stage, config.markascompleted)"> {{config.calltoaction}} </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+    

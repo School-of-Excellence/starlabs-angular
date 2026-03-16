@@ -1,0 +1,52 @@
+.float {
+    position: absolute;
+    top: 10px; /* Adjust as needed */
+    left: 1250px; /* Adjust as needed */
+    z-index: 9999; /* Ensure it appears on top of other elements */
+    background-color: #f12155; /* Button color */
+    color: white; /* Text color */
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+}
+
+.slider-container {
+  position: absolute;
+  bottom: 50px; /* Adjust as needed */
+  left: 10px; /* Adjust as needed */
+  z-index: 9999; /* Ensure it appears on top of other elements */
+  background-color: transparent;
+  color: white; /* Text color */
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: start; /* Center align items */
+  justify-content: start;
+  width: 900px;
+}
+
+.slider-item {
+  flex: 0 0 auto;
+  margin-right: 10px; /* Space between videos */
+}
+
+.slider-item img {
+  margin-bottom: 5px;
+  width: 100px;  /* Fixed width for thumbnails */
+  height: 80px; /* Fixed height for thumbnails */
+  object-fit: cover; /* Ensure the video covers the area, cropping if necessary */
+  border-radius: 5px; /* Optional: add rounded corners to thumbnails */
+  border: 2px solid #fff; /* Optional: add a border around thumbnails */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: add a shadow for a raised effect */
+}
+
+.trending{
+  position: relative;
+}
+
+  

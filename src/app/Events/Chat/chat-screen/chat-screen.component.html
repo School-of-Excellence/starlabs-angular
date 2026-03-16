@@ -1,0 +1,568 @@
+<div class="chat-container">
+  <!-- Left Sidebar - Chat List -->
+  <div class="chat-sidebar">
+    <div class="sidebar-header">
+      <h2>Support Chats</h2>
+      <div class="header-actions">
+        <button mat-icon-button (click)="editGroup(null)" matTooltip="Create New Group" class="create-group-btn">
+          <mat-icon>add</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-container">
+      <mat-form-field class="search-field" appearance="outline">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput placeholder="Search Groups..." [(ngModel)]="searchQuery" (input)="filterChats()">
+        <button *ngIf="searchQuery" matSuffix mat-icon-button (click)="searchQuery=''; filterChats()"
+          matTooltip="Clear search">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </mat-form-field>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div *ngIf="chatlistloading" class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p class="montserratfont">Loading chats...</p>
+    </div>
+
+    <!-- Chat List -->
+    <div class="chat-list" *ngIf="!chatlistloading">
+      <div *ngFor="let chat of filteredChatList; trackBy: trackByMessageId" class="chat-item"
+        [class.selected]="selectedChat.docid === chat.docid" [class.pinned]="chat.pinned" (click)="selectChat(chat)">
+
+        <div class="chat-content">
+          <!-- Chat Avatar -->
+          <div class="chat-avatar" [class.editable]="canEditGroup(chat)" (click)="onGroupIconClick($event, chat)"
+            [matTooltip]="canEditGroup(chat) ? 'Click to edit group' : chat.chatname">
+            <img [src]="chat.chatprofile">
+
+            <!-- Unread Message Indicator -->
+            <div *ngIf="chat.hasUnreadMessages" class="unread-indicator">
+              <mat-icon>fiber_manual_record</mat-icon>
+            </div>
+          </div>
+
+          <!-- Chat Info -->
+          <div class="chat-info">
+            <div class="chat-header">
+              <h3 class="chat-name">{{ chat.chatname }}</h3>
+              <span class="chat-time">{{ formatChatTime(chat.time) }}</span>
+            </div>
+
+            <div class="chat-preview">
+              <span class="last-message" [innerHTML]="truncateMessage(chat.message)"></span>
+              <div class="chat-indicators">
+                <span *ngIf="chat.hasUnreadMessages" class="unread-count">{{ chat.pending.length }}</span>
+                <mat-icon *ngIf="chat.pinned" class="pinned-icon">push_pin</mat-icon>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- <div class="pin-container">
+            <button mat-icon-button class="pin-button" [class.pinned]="chat.pinned"
+              (click)="hideGroup(chat)" matTooltip="{{ 'Hide Group' }}">
+              <mat-icon>{{ 'delete' }}</mat-icon>
+            </button>
+          </div> -->
+
+          <!-- Pin Icon -->
+          <div class="pin-container">
+            <button mat-icon-button class="pin-button" [class.pinned]="chat.pinned"
+              (click)="togglePinChat($event, chat)" matTooltip="{{ chat.pinned ? 'Unpin chat' : 'Pin chat' }}">
+              <mat-icon>{{ chat.pinned ? 'push_pin' : 'push_pin' }}</mat-icon>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="filteredChatList.length === 0 && !chatlistloading" class="empty-state">
+        <mat-icon>{{ searchQuery ? 'search_off' : 'chat' }}</mat-icon>
+        <p>{{ searchQuery ? 'No chats found' : 'No chats available' }}</p>
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">
+          Clear Search
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Content - Chat Messages -->
+  <div class="chat-content-area">
+    <!-- No Chat Selected -->
+    <div *ngIf="!selectedChat.docid" class="no-chat-selected">
+      <div class="empty-state-content">
+        <mat-icon>chat_bubble_outline</mat-icon>
+        <h2>Select a chat to start messaging</h2>
+        <p class="montserratfont">Choose a chat from the sidebar to view messages and start conversations</p>
+      </div>
+    </div>
+
+    <!-- Chat Selected -->
+    <div *ngIf="selectedChat.docid" class="chat-area">
+      <!-- Chat Header -->
+      <div class="chat-header-bar">
+        <div class="chat-header-info">
+          <img [src]="selectedChat.chatprofile" class="header-avatar">
+          <div class="header-text">
+            <h3>{{ selectedChat.chatname }}</h3>
+            <p>{{ selectedChat.members?.length }} members • {{ selectedChat.chattype }}</p>
+          </div>
+        </div>
+
+        <!-- Selection Mode Actions -->
+        <div *ngIf="selectionMode" class="selection-actions">
+          <span class="selection-count">{{ selectedMessages.size }} selected</span>
+          <button mat-icon-button (click)="deleteSelectedMessages()" matTooltip="Delete Selected" class="delete-btn">
+            <mat-icon>delete</mat-icon>
+          </button>
+          <button mat-icon-button (click)="exitSelectionMode()" matTooltip="Cancel">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <!-- Normal Actions -->
+        <div *ngIf="!selectionMode" class="chat-actions">
+          <button mat-icon-button (click)="toggleMessageSearch()" matTooltip="Search Messages"
+            [class.active]="showMessageSearch">
+            <mat-icon>search</mat-icon>
+          </button>
+          <!-- Pinned Messages Toggle Button -->
+          <button mat-icon-button (click)="togglePinnedSection()" matTooltip="Toggle Pinned Messages"
+            class="pinned-messages-toggle" [class.active]="showPinnedSection">
+            <mat-icon>push_pin</mat-icon>
+            <span *ngIf="pinnedMessagesCount > 0" class="pin-count-badge">{{ pinnedMessagesCount }}</span>
+          </button>
+          <button mat-icon-button matTooltip="Chat Info">
+            <mat-icon>info</mat-icon>
+          </button>
+          <button mat-icon-button [matMenuTriggerFor]="chatMenu" matTooltip="More options">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #chatMenu="matMenu">
+            <button mat-menu-item (click)="togglePinChat($event, selectedChat)">
+              <mat-icon>{{ selectedChat.pinned ? 'push_pin' : 'push_pin' }}</mat-icon>
+              <span>{{ selectedChat.pinned ? 'Unpin' : 'Pin' }} Chat</span>
+            </button>
+            <button mat-menu-item (click)="enterSelectionMode()">
+              <mat-icon>checklist</mat-icon>
+              <span class="montserratfont">Select Messages</span>
+            </button>
+          </mat-menu>
+        </div>
+      </div>
+
+      <!-- Message Search Bar -->
+      <div *ngIf="showMessageSearch" class="message-search-bar">
+        <mat-form-field class="message-search-field" appearance="outline">
+          <mat-icon matPrefix>search</mat-icon>
+          <input #messageSearchInput matInput placeholder="Search messages..." [(ngModel)]="messageSearchQuery"
+            (input)="filterMessages()">
+          <button *ngIf="messageSearchQuery" matSuffix mat-icon-button (click)="messageSearchQuery=''; filterMessages()"
+            matTooltip="Clear search">
+            <mat-icon>clear</mat-icon>
+          </button>
+        </mat-form-field>
+        <button mat-icon-button (click)="toggleMessageSearch()" matTooltip="Close search">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Pinned Messages Section - Integrated in Chat -->
+      <div *ngIf="showPinnedSection && getPinnedMessages().length > 0" class="pinned-messages-section">
+        <!-- Pinned Messages Header -->
+        <!-- <div class="pinned-section-header">
+          <div class="pinned-section-title">
+            <mat-icon class="pinned-icon">push_pin</mat-icon>
+            <span>{{ getPinnedMessages().length }} Pinned Message{{ getPinnedMessages().length !== 1 ? 's' : ''
+              }}</span>
+          </div>
+          <div class="pinned-section-actions">
+            <button mat-icon-button (click)="unpinAllMessages()" matTooltip="Unpin All Messages"
+              [disabled]="getPinnedMessages().length === 0" class="unpin-all-btn">
+              <mat-icon>clear_all</mat-icon>
+            </button>
+            <button mat-icon-button (click)="togglePinnedSection()" matTooltip="Hide Pinned Messages">
+              <mat-icon>expand_less</mat-icon>
+            </button>
+          </div>
+        </div> -->
+
+        <!-- Pinned Messages List -->
+        <div class="pinned-section-content">
+          <div class="pinned-messages-grid">
+            <div *ngFor="let message of getPinnedMessages().slice(0, maxPinnedDisplay); trackBy: trackByMessageId"
+              class="pinned-message-card" (click)="jumpToMessage(message)">
+
+              <!-- Message Header -->
+              <div class="pinned-card-header">
+                <div class="pinned-card-author">
+                  <div class="pinned-card-avatar">
+                    <img *ngIf="mapProfileuid[message.senderuid]?.profile"
+                      [src]="mapProfileuid[message.senderuid].profile" [alt]="mapProfileuid[message.senderuid].name">
+                    <mat-icon *ngIf="!mapProfileuid[message.senderuid]?.profile">person</mat-icon>
+                  </div>
+                  <div class="pinned-card-info">
+                    <span class="card-author-name">{{ mapProfileuid[message.senderuid]?.name || 'Unknown User' }}</span>
+                    <span class="card-date">{{ message.time.toDate() | date: 'medium' }}</span>
+                  </div>
+                </div>
+                <button mat-icon-button (click)="$event.stopPropagation(); pinMessage(message)"
+                  matTooltip="Unpin Message" class="card-unpin-btn">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <!-- Message Content Preview -->
+              <div class="pinned-card-content">
+                <!-- Text Content -->
+                <div *ngIf="message.message" class="pinned-card-text"
+                  [innerHTML]="truncatePinnedMessage(message.message) | enhancedMessage:mapProfileuid:message.sender_uid:mapProfileuid | linebreaks | link">
+                </div>
+
+                <!-- File/Image Preview -->
+                <div *ngIf="message.files && message.files.length > 0" class="pinned-card-files">
+                  <!-- Image Preview -->
+                  <div *ngIf="getImageFiles(message.files).length > 0" class="pinned-card-images">
+                    <img *ngFor="let imageFile of getImageFiles(message.files).slice(0, 2)" [src]="imageFile.fileurl"
+                      class="pinned-card-image" (click)="$event.stopPropagation(); openImage(imageFile)">
+                    <div *ngIf="getImageFiles(message.files).length > 2" class="more-images-indicator"
+                      (click)="$event.stopPropagation(); showAllImages(message)">
+                      +{{ getImageFiles(message.files).length - 2 }}
+                    </div>
+                  </div>
+
+                  <!-- File Attachments -->
+                  <div *ngIf="message.files.length > getImageFiles(message.files).length" class="pinned-card-file-info">
+                    <mat-icon class="file-indicator">attachment</mat-icon>
+                    <span class="file-count">{{ message.files.length - getImageFiles(message.files).length }}
+                      file(s)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pin Badge -->
+              <div class="pinned-card-badge">
+                <mat-icon>push_pin</mat-icon>
+              </div>
+            </div>
+
+            <!-- Show More Button -->
+            <div *ngIf="getPinnedMessages().length > maxPinnedDisplay" class="show-more-pinned">
+              <button mat-button (click)="expandPinnedMessages()" class="show-more-btn">
+                <mat-icon>expand_more</mat-icon>
+                Show {{ getPinnedMessages().length - maxPinnedDisplay }} more pinned message{{
+                getPinnedMessages().length - maxPinnedDisplay !== 1 ? 's' : '' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pinned Messages Empty State -->
+      <div *ngIf="showPinnedSection && getPinnedMessages().length === 0" class="pinned-empty-section">
+        <div class="pinned-empty-content">
+          <mat-icon>push_pin</mat-icon>
+          <h4>No Pinned Messages</h4>
+          <p>Pin important messages to keep them at the top of your chat for quick access.</p>
+          <button mat-stroked-button (click)="togglePinnedSection()" class="hide-empty-btn">
+            Hide Section
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div class="messages-container" #messageContainer [class.with-pinned]="showPinnedSection">
+        <!-- Loading Messages -->
+        <div *ngIf="messagesLoading" class="loading-messages">
+          <mat-spinner diameter="30"></mat-spinner>
+          <p class="montserratfont">Loading messages...</p>
+        </div>
+
+        <!-- Messages List with Date Grouping -->
+        <div *ngIf="!messagesLoading" class="messages-list">
+          <div *ngFor="let group of groupedMessages; trackBy: trackByGroupDate" class="message-group">
+            <!-- Date Separator -->
+            <div class="date-separator">
+              <div class="date-line"></div>
+              <span class="date-text">{{ group.date }}</span>
+              <div class="date-line"></div>
+            </div>
+
+            <!-- Messages for this date -->
+            <div *ngFor="let message of group.messages; trackBy: trackByMessageId" class="message-wrapper"
+              [class.my-message]="message.isMyMessage" [class.other-message]="!message.isMyMessage"
+              [class.selected]="selectedMessages.has(message.docid)" [class.pinned-message]="message.pinned"
+              [attr.data-message-id]="message.docid" (click)="onMessageTap(message, $event)"
+              (contextmenu)="!selectionMode ? $event.preventDefault() : null">
+
+              <!-- Message Container -->
+              <div class="message-container">
+                <!-- Selection Checkbox -->
+                <div *ngIf="selectionMode && message.isMyMessage" class="message-checkbox">
+                  <!-- <mat-checkbox 
+                [checked]="selectedMessages.has(message.docid)"
+                (change)="toggleMessageSelection(message)">
+              </mat-checkbox> -->
+                </div>
+
+                <!-- Avatar for other messages -->
+                <!-- <div *ngIf="![null,undefined].includes(mapProfileuid[message.sender_uid]['profile'])"
+                  class="message-avatar">
+                  <img [src]="mapProfileuid[message.sender_uid]['profile']">
+                </div> -->
+
+                <div class="message-bubble">
+                  <!-- Pinned Indicator -->
+                  <div *ngIf="message.pinned" class="message-pin-indicator">
+                    <mat-icon>push_pin</mat-icon>
+                  </div>
+
+                  <p style="font-size: 15px;">
+                    <b>{{mapProfileuid[message.sender_uid]['name']}}</b>
+                  </p>
+
+                  <!-- Message Actions Menu -->
+                  <div *ngIf="!selectionMode" class="message-actions">
+                    <button mat-icon-button [matMenuTriggerFor]="messageMenu" class="message-menu-trigger">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #messageMenu="matMenu">
+                      <button mat-menu-item (click)="copyMessage(message)">
+                        <mat-icon>content_copy</mat-icon>
+                        <span class="montserratfont">Copy</span>
+                      </button>
+                      <button *ngIf="message.isMyMessage" mat-menu-item (click)="showReadReceiptsModal(message)">
+                        <mat-icon>visibility</mat-icon>
+                        <span class="montserratfont">Read / Un-Read</span>
+                      </button>
+                      <button *ngIf="message.isMyMessage" mat-menu-item (click)="deleteSingleMessage(message)"
+                        class="delete-option">
+                        <mat-icon>delete</mat-icon>
+                        <span class="montserratfont">Delete</span>
+                      </button>
+                      <button mat-menu-item (click)="enterSelectionMode(); toggleMessageSelection(message)">
+                        <mat-icon>checklist</mat-icon>
+                        <span class="montserratfont">Select</span>
+                      </button>
+                      <button mat-menu-item *ngIf="adminRole" (click)="pinMessage(message)">
+                        <mat-icon>push_pin</mat-icon>
+                        <span class="montserratfont">{{message.pinned ? 'UNPIN' : 'PIN'}}</span>
+                      </button>
+                    </mat-menu>
+                  </div>
+
+                  <!-- Message Content -->
+                  <div *ngIf="message.message" class="message-text"
+                    [innerHTML]="message.message | enhancedMessage:mapProfileuid:message.sender_uid:mapProfileuid | linebreaks | link">
+                  </div>
+
+                  <!-- Files -->
+                  <div *ngIf="message.files && message.files.length > 0" class="message-files">
+                    <div *ngFor="let file of message.files" class="file-attachment" (click)="openImage(file)">
+                      <div class="file-info">
+                        <mat-icon class="file-icon">{{ getFileIcon(file.filetype) }}</mat-icon>
+                        <div class="file-details">
+                          <span class="file-name">{{ file.filename }}</span>
+                          <span class="file-type">{{ file.filetype }}</span>
+                        </div>
+                      </div>
+                      <button mat-icon-button class="download-btn" matTooltip="Download"
+                        (click)="$event.stopPropagation()">
+                        <mat-icon>download</mat-icon>
+                      </button>
+                    </div>
+
+                    <!-- Image Previews -->
+                    <div *ngFor="let file of message.files" class="image-preview">
+                      <img *ngIf="file.filetype.startsWith('image/')" [src]="file.fileurl" (click)="openImage(file)"
+                        loading="lazy" class="message-image">
+                    </div>
+                  </div>
+
+                  <!-- Message Footer -->
+                  <div class="message-footer">
+                    <span class="message-time">{{ formatTime(message.time) }}</span>
+                    <div *ngIf="message.isMyMessage" class="read-status">
+                      <mat-icon [class.read-all]="!hasUnreadUsers(message)"
+                        [class.read-partial]="hasUnreadUsers(message)" matTooltip="{{ getMessageReadStatus(message) }}">
+                        {{ hasUnreadUsers(message) ? 'done' : 'done_all' }}
+                      </mat-icon>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty Messages -->
+          <div *ngIf="groupedMessages.length === 0" class="empty-messages">
+            <mat-icon>chat_bubble_outline</mat-icon>
+            <p>No messages yet</p>
+            <p>Start the conversation!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Preview Area -->
+      <div *ngIf="attachedFiles.length > 0" class="file-preview-area" #previewContainer>
+        <div class="preview-header">
+          <h4>Attached Files ({{ attachedFiles.length }})</h4>
+          <button mat-icon-button (click)="attachedFiles = []" matTooltip="Clear All">
+            <mat-icon>clear_all</mat-icon>
+          </button>
+        </div>
+        <div class="file-previews">
+          <div *ngFor="let file of attachedFiles; let i = index" class="file-preview">
+            <!-- Image Preview -->
+            <div *ngIf="file.fileurl" class="image-preview-thumb">
+              <img [src]="file.fileurl">
+              <button mat-icon-button class="remove-file" (click)="removeAttachedFile(i)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <!-- File Info Preview -->
+            <div *ngIf="!file.fileurl" class="file-info-preview">
+              <mat-icon class="file-type-icon">{{ getFileIcon(file.filetype) }}</mat-icon>
+              <div class="file-details">
+                <span class="file-name">{{ file.filename }}</span>
+                <span class="file-size">{{ formatFileSize(file.file.size) }}</span>
+              </div>
+              <button mat-icon-button class="remove-file" (click)="removeAttachedFile(i)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message Input -->
+      <div class="message-input-area" [class.drag-over]="dragOver" (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+
+        <!-- Drag & Drop Overlay -->
+        <div *ngIf="dragOver" class="drag-overlay">
+          <mat-icon>cloud_upload</mat-icon>
+          <p>Drop files here to attach</p>
+        </div>
+
+        <div style="position: relative;width: 25vw;">
+          <!-- Mentions popup - positioned absolutely to overlay -->
+          <div *ngIf="showMentionsList && filteredMembers.length > 0" class="mentions-popup">
+            <div *ngFor="let member of filteredMembers" class="mention-user-item" #mentionItem
+              (mousedown)="$event.preventDefault(); selectMention(member)" style="display: flex; align-items: center; padding: 8px 12px; 
+                        cursor: pointer; 
+                        border-radius: 4px; 
+                        transition: background-color 0.15s ease;"
+              (mouseenter)="mentionItem.style.backgroundColor='#f8f8f8'"
+              (mouseleave)="mentionItem.style.backgroundColor='transparent'">
+
+              <div style="display: flex; flex-direction: row; align-items: center; width: 100%;">
+
+                <div *ngIf="member.profile" style="margin-right: 12px; flex-shrink: 0;">
+                  <img style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" [src]="member.profile"
+                    [alt]="member.name">
+                </div>
+
+                <div class="mention-user-icon" *ngIf="!member.profile">
+                  <mat-icon style="font-size: 18px; width: 18px; height: 18px;">person</mat-icon>
+                </div>
+
+                <span class="mention-user-name">{{ member.name }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="input-container">
+          <!-- Hidden File Input -->
+          <input #fileInput type="file" multiple style="display: none" (change)="onFileSelected($event)"
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z">
+
+          <!-- Message Input Field -->
+          <mat-form-field class="message-input" appearance="outline">
+            <textarea matInput #messageInput [(ngModel)]="newMessage" placeholder="Type a message..." rows="4"
+              (input)="onMessageInputChange($event)" (keydown)="onKeyPress($event)">
+                      </textarea>
+          </mat-form-field>
+
+          <!-- Attach Button -->
+          <button mat-icon-button [matMenuTriggerFor]="attachMenu" matTooltip="Attach File" class="attach-btn">
+            <mat-icon>attach_file</mat-icon>
+          </button>
+          <mat-menu #attachMenu="matMenu">
+            <button mat-menu-item (click)="openFileInput()">
+              <mat-icon>folder</mat-icon>
+              <span class="montserratfont">Choose Files</span>
+            </button>
+          </mat-menu>
+
+          <!-- Send Button -->
+          <button mat-fab color="primary" class="send-button"
+            [disabled]="(!newMessage.trim() && attachedFiles.length === 0) || uploadingFiles" (click)="sendMessage()"
+            matTooltip="Send Message">
+            <mat-spinner *ngIf="uploadingFiles" diameter="24"></mat-spinner>
+            <mat-icon *ngIf="!uploadingFiles">send</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Read Receipts Modal -->
+  <div *ngIf="showReadReceipts" class="read-receipts-overlay" (click)="closeReadReceipts()">
+    <div class="read-receipts-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Message Receipts</h3>
+        <button mat-icon-button (click)="closeReadReceipts()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="modal-content">
+        <div *ngIf="selectedMessageForReceipts" class="receipt-info">
+          <!-- Read By Section -->
+          <div class="receipt-section">
+            <h4>
+              <mat-icon>done_all</mat-icon>
+              Read by ({{ getReadByUsers(selectedMessageForReceipts).length }})
+            </h4>
+            <div class="user-list">
+              <div *ngFor="let userId of getReadByUsers(selectedMessageForReceipts)" class="user-item">
+                <div class="user-avatar">
+                  <mat-icon>person</mat-icon>
+                </div>
+                <span>{{ mapProfileuid[userId]['name'] }}</span>
+                <mat-icon class="status-icon read">done_all</mat-icon>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pending Section -->
+          <div class="receipt-section" *ngIf="getPendingUsers(selectedMessageForReceipts).length > 0">
+            <h4>
+              <mat-icon>schedule</mat-icon>
+              Pending ({{ getPendingUsers(selectedMessageForReceipts).length }})
+            </h4>
+            <div class="user-list">
+              <div *ngFor="let userId of getPendingUsers(selectedMessageForReceipts)" class="user-item">
+                <div class="user-avatar">
+                  <mat-icon>person</mat-icon>
+                </div>
+                <span>{{ mapProfileuid[userId]['name'] }}</span>
+                <mat-icon class="status-icon pending">schedule</mat-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

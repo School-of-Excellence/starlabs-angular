@@ -1,0 +1,577 @@
+/* Main Dialog Styles */
+.appointment-dialog {
+    width: 95vw;
+    max-width: 1400px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dialog-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.email-form {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content-container {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+}
+
+.header {
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
+.title {
+    color: white;
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.color-teal {
+    background-color: rgb(0, 101, 135);
+}
+
+.close-button {
+    margin: -8px -8px -8px auto;
+}
+
+/* Left side - Editor Section */
+.editor-container {
+    width: 50%;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.subject-field {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.email-editor {
+    margin-bottom: 8px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* From Address on the right side */
+.from-address {
+    width: 45%;
+    margin-bottom: 8px;
+}
+
+/* Button Panel */
+.button-panel {
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.button-panel h5 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.form-group {
+    margin-bottom: 10px;
+}
+
+.form-control-label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.insert-button {
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.insert-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Image Resize Panel */
+.image-resize-panel {
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.image-resize-panel h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+.image-resize-controls {
+    display: flex;
+    gap: 12px;
+}
+
+.dimension-control {
+    width: 100%;
+}
+
+/* Notes Section */
+.notes-section {
+    margin-bottom: 8px;
+}
+
+.notes-field {
+    width: 100%;
+}
+
+/* Right side - Preview Section */
+.preview-container {
+    width: 50%;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.preview-section {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.preview-header {
+    padding: 8px 12px;
+    background-color: #f1f1f1;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 40px;
+    /* Even smaller header */
+}
+
+.preview-header h4 {
+    margin: 0;
+    color: #202124;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.create-button {
+    background-color: #1a73e8;
+    color: white;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    font-family: 'Google Sans', Arial, sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    height: 28px;
+    line-height: 28px;
+}
+
+.device-button {
+    color: #5f6368;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.device-button.active {
+    color: #1a73e8;
+    background-color: rgba(26, 115, 232, 0.1);
+}
+
+.preview-scroll-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Gmail Web Preview */
+.preview-content.web {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    border: 1px solid #e0e0e0;
+}
+
+.gmail-web-header {
+    height: 36px;
+    min-height: 36px;
+    background-color: white;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+}
+
+.gmail-logo {
+    display: flex;
+    align-items: center;
+}
+
+.gmail-logo img {
+    height: 24px;
+}
+
+.gmail-email-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    overflow: auto;
+}
+
+.gmail-email-header {
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    position: relative;
+}
+
+.gmail-email-subject {
+    font-size: 18px;
+    font-weight: normal;
+    color: #202124;
+    margin-bottom: 12px;
+    text-align: left;
+}
+
+.gmail-email-details {
+    display: flex;
+    align-items: center;
+}
+
+.gmail-avatar-container {
+    margin-right: 12px;
+}
+
+.gmail-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #1a73e8;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.gmail-sender-info {
+    text-align: left;
+}
+
+.gmail-sender-name {
+    font-size: 14px;
+    color: #202124;
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+}
+
+.gmail-sender-address {
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 2px;
+}
+
+.gmail-email-date {
+    font-size: 12px;
+    color: #5f6368;
+    position: absolute;
+    right: 12px;
+    top: 12px;
+}
+
+/* Email Body Styling */
+.gmail-email-body {
+    padding: 16px;
+    color: #202124;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: left;
+    flex: 1;
+    overflow: auto;
+}
+
+/* Gmail Mobile Preview */
+.preview-content.mobile {
+    width: 320px;
+    margin: 0 auto;
+    height: 100%;
+    overflow: hidden;
+    background-color: white;
+    border: 8px solid #000;
+    border-radius: 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-status-bar {
+    height: 20px;
+    background-color: #f1f3f4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    color: #5f6368;
+}
+
+.gmail-mobile-header {
+    background-color: white;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.gmail-mobile-menu {
+    font-size: 16px;
+    color: #5f6368;
+}
+
+.gmail-mobile-search {
+    flex: 1;
+    margin: 0 6px;
+    padding: 4px 8px;
+    background-color: #f1f3f4;
+    border-radius: 14px;
+    font-size: 13px;
+    color: #5f6368;
+}
+
+.gmail-mobile-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #1a73e8;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+.gmail-mobile-email {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.gmail-mobile-email-header {
+    padding: 10px;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.gmail-mobile-subject {
+    font-size: 15px;
+    font-weight: normal;
+    color: #202124;
+    margin-bottom: 10px;
+    text-align: left;
+}
+
+.gmail-mobile-sender {
+    display: flex;
+    align-items: center;
+}
+
+.gmail-mobile-sender-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: #1a73e8;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    font-size: 12px;
+}
+
+.gmail-mobile-sender-info {
+    flex: 1;
+    text-align: left;
+}
+
+.gmail-mobile-sender-name {
+    font-size: 13px;
+    color: #202124;
+}
+
+.gmail-mobile-sender-details {
+    font-size: 11px;
+    color: #5f6368;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+}
+
+.gmail-mobile-to-me {
+    margin-right: 5px;
+}
+
+.gmail-mobile-email-body {
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: auto;
+    flex: 1;
+    color: #202124;
+    text-align: left;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .main-content-container {
+        flex-direction: column;
+    }
+
+    .editor-container,
+    .preview-container {
+        width: 100%;
+    }
+
+    .editor-container {
+        height: 50%;
+        overflow-y: auto;
+    }
+
+    .preview-container {
+        height: 50%;
+    }
+
+    .preview-content.mobile {
+        height: 500px;
+    }
+}
+
+/* Make sure inline content properly styled */
+#contentContainer,
+#mobileContentContainer {
+    text-align: left !important;
+}
+
+#contentContainer *,
+#mobileContentContainer * {
+    text-align: left !important;
+    color: #202124 !important;
+    background-color: transparent !important;
+}
+
+/* Angular Editor custom styles */
+::ng-deep .angular-editor-wrapper {
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+::ng-deep .angular-editor-textarea {
+    min-height: 0 !important;
+    height: 100% !important;
+    flex: 1;
+}
+
+/* Additional fixes for responsive editor */
+::ng-deep .angular-editor {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+::ng-deep .angular-editor-toolbar {
+    flex: 0 0 auto;
+}
+
+::ng-deep .angular-editor-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Mat-form-field custom styles to reduce spacing */
+::ng-deep .mat-form-field-wrapper {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+::ng-deep .mat-form-field-infix {
+    padding: 0.5em 0;
+}
+
+::ng-deep .mat-form-field-appearance-outline .mat-form-field-wrapper {
+    margin: 0;
+}

@@ -1,0 +1,45 @@
+<div class="mainscreen">
+    <h4 class="title">Update Zoom Detail</h4>
+    <form [formGroup]="zoomaccountForm" (ngSubmit)="submit()">
+      <div>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="text" formControlName="email">
+          <mat-error *ngIf="zoomaccountForm.get('email').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>First Name</mat-label>
+          <input matInput type="text" formControlName="firstname">
+          <mat-error *ngIf="zoomaccountForm.get('firstname').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Last Name</mat-label>
+          <input matInput type="text" formControlName="lastname">
+          <mat-error *ngIf="zoomaccountForm.get('lastname').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Account Type</mat-label>
+          <mat-select formControlName="accounttype">
+            <mat-option *ngFor="let option of ['Basic', 'Licensed']" [value]="option.toLowerCase()">{{option}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="zoomaccountForm.get('accounttype').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <br>
+        <!-- <mat-checkbox formControlName="inuse">This Account is currently in Use</mat-checkbox>
+        <br><br> -->
+      </div>
+      <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update'}}</button>
+    </form>
+  </div>

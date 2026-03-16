@@ -1,0 +1,18 @@
+<div *ngIf="loading">
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+  <div  style="padding: 20px;" padding *ngIf="!loading" class="w-100">
+    <h5 class="title text-center">Evolution Wish List</h5>
+    <mat-form-field appearance="outline" class="flex-item">
+        <mat-label style="font-size: 14px;">Select Wishlist Type</mat-label>
+        <mat-select [(ngModel)]="selectedType">
+            <mat-option [disabled]="true" value="self">Self</mat-option>
+            <!-- <mat-option value="self">Self</mat-option> -->
+            <mat-option value="familyandpeers">Family and Peers</mat-option>
+        </mat-select>
+    </mat-form-field>    
+      <div class="w-100 text-center">
+        <button mat-stroked-button class="closebtn mr-3" type="button" (click)="dialogRef.close()">Close</button>&nbsp;
+        <button mat-stroked-button class="successbtn" type="submit" (click)="createLog()">Send Evolution Wishlist</button>
+      </div>
+  </div>    

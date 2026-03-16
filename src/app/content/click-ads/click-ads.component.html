@@ -1,0 +1,227 @@
+<!-- <div class="mainscreen">
+  <div class="body mat-elevation-z2">
+    <div class="actionbox">
+      <div class="actionitem">
+        <mat-form-field appearance="outline">
+          <mat-label>Filter</mat-label>
+          <input matInput (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off">
+        </mat-form-field>
+      </div>
+      <div class="actionitem">
+        <button class="addbtn" mat-stroked-button (click)="updateStory(null)">Add New Ad</button>
+      </div>
+    </div>
+    <table mat-table [dataSource]="dataSource" matSort>
+      <ng-container matColumnDef="paymentlink">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Payment Link</th>
+        <td mat-cell *matCellDef="let row">
+          <a [href]="row.paymentlink" target="_blank">Click to open payment link.</a>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="deeplinkinternal">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Deep Link</th>
+        <td mat-cell *matCellDef="let row">{{row.deeplinkinternal}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="calltoaction">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Call To Action</th>
+        <td mat-cell *matCellDef="let row">{{row.calltoaction}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="startdate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Start Date</th>
+        <td mat-cell *matCellDef="let row">{{row.startdate != undefined ? (row.startdate.toDate() | date : "medium") :""}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="enddate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>End Date</th>
+        <td mat-cell *matCellDef="let row">{{row.enddate != undefined ? (row.enddate.toDate() | date : "medium") :""}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="size">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Size</th>
+        <td mat-cell *matCellDef="let row">{{row.size}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Deleted</th>
+        <td mat-cell *matCellDef="let row">{{row.delete ? 'YES' : 'NO'}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="image_url">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Images</th>
+        <td mat-cell *matCellDef="let row">
+          <div class="imagebox" *ngIf="row.image_url != undefined">
+            <img class="mr-1" [src]="row.image_url" (click)="openImage(row.image_url)" height="80" width="80">
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="image">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>~Images~</th>
+        <td mat-cell *matCellDef="let row">
+          <div *ngIf="row.image != undefined">
+            <div class="imagebox d-flex flex-column mb-2" *ngFor="let img of row.image | keyvalue">
+              <label for="">Size : {{img.key}}</label>
+              <img class="mr-1" [src]="img.value" (click)="openImage(row.image_url)" height="80" width="80">
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef>Edit</th>
+        <td mat-cell *matCellDef="let row;">
+          <button class="deletebtn" mat-icon-button type="button" (click)="updateStory(row)">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell emptytext" colspan="11">No data matching the filter "{{inputFilter.value}}"</td>
+      </tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[10,25, 50, 100]"></mat-paginator>
+  </div>
+</div> -->
+
+
+<div class="audio-dashboard">
+  <!-- Header -->
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Click Ads</h1>
+      <p class="dash-sub">Manage advertisement campaigns</p>
+    </div>
+    <button class="btn-primary" (click)="updateStory(null)">
+      <mat-icon>add</mat-icon>
+      <span>New Ad</span>
+    </button>
+  </div>
+
+  <!-- Filter -->
+  <div class="filters-row">
+    <div class="input-box search-box">
+      <mat-icon class="ib-icon">search</mat-icon>
+      <input type="text" class="ib-input" placeholder="Search ads..."
+        (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-outer">
+    <div class="table-card">
+      <table mat-table [dataSource]="dataSource" matSort>
+
+        <!-- Payment Link -->
+        <ng-container matColumnDef="paymentlink">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Payment Link</th>
+          <td mat-cell *matCellDef="let row">
+            <a class="cell-link" [href]="row.paymentlink" target="_blank">
+              <mat-icon class="cell-link-icon">open_in_new</mat-icon>
+              Open link
+            </a>
+          </td>
+        </ng-container>
+
+        <!-- Deep Link -->
+        <ng-container matColumnDef="deeplinkinternal">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Deep Link</th>
+          <td mat-cell *matCellDef="let row"><span class="c-desc">{{ row.deeplinkinternal }}</span></td>
+        </ng-container>
+
+        <!-- Call To Action -->
+        <ng-container matColumnDef="calltoaction">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Call To Action</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="chip chip-sm" *ngIf="row.calltoaction">{{ row.calltoaction }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Start Date -->
+        <ng-container matColumnDef="startdate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-date">Start Date</th>
+          <td mat-cell *matCellDef="let row" class="col-date">
+            <span class="c-date">{{ row.startdate != undefined ? (row.startdate.toDate() | date : "mediumDate") : "—" }}</span>
+          </td>
+        </ng-container>
+
+        <!-- End Date -->
+        <ng-container matColumnDef="enddate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-date">End Date</th>
+          <td mat-cell *matCellDef="let row" class="col-date">
+            <span class="c-date">{{ row.enddate != undefined ? (row.enddate.toDate() | date : "mediumDate") : "—" }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Size -->
+        <ng-container matColumnDef="size">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Size</th>
+          <td mat-cell *matCellDef="let row" class="col-size"><span class="c-size">{{ row.size || '—' }}</span></td>
+        </ng-container>
+
+        <!-- Image URL -->
+        <ng-container matColumnDef="image_url">
+          <th mat-header-cell *matHeaderCellDef>Image</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="ad-img-wrap" *ngIf="row.image_url != undefined">
+              <img class="ad-img" [src]="row.image_url" (click)="openImage(row.image_url)" />
+            </div>
+            <span class="c-size" *ngIf="row.image_url == undefined">—</span>
+          </td>
+        </ng-container>
+
+        <!-- Image Variants -->
+        <ng-container matColumnDef="image">
+          <th mat-header-cell *matHeaderCellDef>~Images~</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="ad-variants" *ngIf="row.image != undefined">
+              <div class="ad-variant" *ngFor="let img of row.image | keyvalue">
+                <span class="ad-variant-label">{{ img.key }}</span>
+                <img class="ad-img" [src]="$any(img.value)" (click)="openImage($any(img.value))" />
+              </div>
+            </div>
+            <span class="c-size" *ngIf="row.image == undefined">—</span>
+          </td>
+        </ng-container>
+
+        <!-- Deleted -->
+        <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="status-badge" [class.deleted]="row.delete" [class.active]="!row.delete">
+              {{ row.delete ? 'Deleted' : 'Active' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Action -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef class="col-act">Edit</th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-edit" (click)="updateStory(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="empty">
+              <mat-icon>campaign</mat-icon>
+              <p>No ads matching "{{ inputFilter.value }}"</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons class="paginator"></mat-paginator>
+  </div>
+</div>

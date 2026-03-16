@@ -1,0 +1,462 @@
+<div class="template-creator-layout">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <button mat-icon-button class="back-btn">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <h1>New Templates</h1>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button class="save-draft-btn">Save as draft</button>
+      <button mat-raised-button color="primary" class="save-submit-btn" 
+              [disabled]="templateForm.invalid || isCreating"
+              (click)="validateAndCreateTemplate()">
+        <mat-icon *ngIf="isCreating">hourglass_empty</mat-icon>
+        {{isCreating ? 'Saving...' : 'Save and submit'}}
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Left Panel - Form -->
+    <div class="form-panel">
+      <form [formGroup]="templateForm">
+        <!-- Template Basic Info -->
+        <div class="form-section">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Template Name</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput formControlName="name" placeholder="Template Name">
+                <mat-error *ngIf="templateForm.get('name')?.hasError('required')">
+                  Template name is required
+                </mat-error>
+                <mat-error *ngIf="templateForm.get('name')?.hasError('pattern')">
+                  Only lowercase letters, numbers, and underscores allowed
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Category</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-select formControlName="category">
+                  <mat-option value="MARKETING">Marketing</mat-option>
+                  <mat-option value="UTILITY">Utility</mat-option>
+                  <mat-option value="AUTHENTICATION">Authentication</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Language</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-select formControlName="language">
+                  <mat-option value="en">English</mat-option>
+                  <mat-option value="en_US">English (US)</mat-option>
+                  <mat-option value="es">Spanish</mat-option>
+                  <mat-option value="fr">French</mat-option>
+                  <mat-option value="de">German</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+
+        <!-- Marketing Template Selection -->
+        <div class="form-section">
+          <label class="section-label">Select Marketing template</label>
+          <div class="template-types">
+            <div class="template-type active">
+              <mat-icon>description</mat-icon>
+              <span>Standard</span>
+            </div>
+            <div class="template-type">
+              <mat-icon>view_module</mat-icon>
+              <span>Catalog</span>
+            </div>
+            <div class="template-type">
+              <mat-icon>view_carousel</mat-icon>
+              <span>Carousel</span>
+            </div>
+            <div class="template-type">
+              <mat-icon>schedule</mat-icon>
+              <span>Limited time offers</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Components -->
+        <div formArrayName="components">
+          <!-- Header Component -->
+          <div class="form-section">
+            <label class="section-label">Broadcast title <span class="optional">(Optional)</span></label>
+            <p class="section-description">Highlight your brand here, use images or videos, to stand out</p>
+            
+            <div class="header-format-options">
+              <div class="format-option active" data-format="none">
+                <mat-icon>radio_button_checked</mat-icon>
+                <span>None</span>
+              </div>
+              <div class="format-option" data-format="text">
+                <span>Text</span>
+              </div>
+              <div class="format-option" data-format="image">
+                <span>Image</span>
+              </div>
+              <div class="format-option" data-format="video">
+                <span>Video</span>
+              </div>
+              <div class="format-option" data-format="document">
+                <span>Document</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body Component -->
+          <div class="form-section">
+            <div class="section-header">
+              <label class="section-label">Body</label>
+              <div class="body-actions">
+                <button type="button" class="add-variable-btn" (click)="addVariable()">
+                  <mat-icon>add</mat-icon>
+                  Add Variable
+                </button>
+                <button type="button" class="emoji-btn" (click)="toggleEmojiPicker()">
+                  <span>😀</span>
+                  Emoji
+                </button>
+              </div>
+            </div>
+            <p class="section-description">Make your messages personal using variables like {{1}} and get more replies!</p>
+            
+            <div class="body-editor">
+              <div class="editor-toolbar">
+                <div class="toolbar-group">
+                  <button type="button" mat-icon-button (click)="formatText('bold')" 
+                          [class.active]="isFormatActive('bold')"
+                          title="Bold">
+                    <mat-icon>format_bold</mat-icon>
+                  </button>
+                  <button type="button" mat-icon-button (click)="formatText('italic')" 
+                          [class.active]="isFormatActive('italic')"
+                          title="Italic">
+                    <mat-icon>format_italic</mat-icon>
+                  </button>
+                  <button type="button" mat-icon-button (click)="formatText('strikethrough')" 
+                          [class.active]="isFormatActive('strikethrough')"
+                          title="Strikethrough">
+                    <mat-icon>strikethrough_s</mat-icon>
+                  </button>
+                  <button type="button" mat-icon-button (click)="formatText('monospace')" 
+                          [class.active]="isFormatActive('monospace')"
+                          title="Monospace">
+                    <mat-icon>code</mat-icon>
+                  </button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group">
+                  <button type="button" mat-icon-button (click)="insertLink()" title="Insert Link">
+                    <mat-icon>link</mat-icon>
+                  </button>
+                  <button type="button" mat-icon-button (click)="clearFormatting()" title="Clear Formatting">
+                    <mat-icon>format_clear</mat-icon>
+                  </button>
+                </div>
+              </div>
+              
+              <div class="editor-content">
+                <textarea 
+                  #bodyTextarea
+                  class="body-textarea" 
+                  placeholder="Template Message"
+                  formControlName="bodyText"
+                  rows="8"
+                  (input)="onBodyTextChange($event)"
+                  (select)="onTextSelection($event)"
+                  (keyup)="onTextSelection($event)"
+                  (mouseup)="onTextSelection($event)"></textarea>
+                
+                <!-- Emoji Picker -->
+                <div class="emoji-picker" *ngIf="showEmojiPicker" (clickOutside)="hideEmojiPicker()">
+                  <div class="emoji-header">
+                    <h4>Select Emoji</h4>
+                    <button type="button" mat-icon-button (click)="hideEmojiPicker()">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <div class="emoji-categories">
+                    <button type="button" 
+                            *ngFor="let category of emojiCategories" 
+                            class="emoji-category-btn"
+                            [class.active]="selectedEmojiCategory === category.name"
+                            (click)="selectEmojiCategory(category.name)">
+                      {{category.icon}}
+                    </button>
+                  </div>
+                  <div class="emoji-grid">
+                    <button type="button" 
+                            *ngFor="let emoji of getEmojisForCategory(selectedEmojiCategory)"
+                            class="emoji-btn-grid"
+                            (click)="insertEmoji(emoji)"
+                            [title]="emoji.name">
+                      {{emoji.char}}
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="character-count">{{getBodyCharacterCount()}}/{{BODY_MAX_LENGTH}}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Component -->
+          <div class="form-section">
+            <label class="section-label">Footer <span class="optional">(Optional)</span></label>
+            <p class="section-description">Footers are great to add any disclaimers or to add a thoughtful PS</p>
+            
+            <mat-form-field appearance="outline" class="full-width">
+              <textarea 
+                matInput 
+                placeholder="Footer Text"
+                formControlName="footerText"
+                rows="2"></textarea>
+              <div matTextSuffix class="character-count">0/60</div>
+            </mat-form-field>
+          </div>
+
+          <!-- Buttons Component -->
+          <div class="form-section">
+            <div class="section-header">
+              <label class="section-label">Buttons <span class="recommended">(Recommended)</span></label>
+              <mat-slide-toggle class="buttons-toggle" [checked]="true"></mat-slide-toggle>
+            </div>
+            <p class="section-description">Insert buttons so your customers can take action and engage with your message!</p>
+
+            <div class="button-types">
+              <div class="button-type-section">
+                <div class="button-type-header">
+                  <span>Visit Website</span>
+                  <mat-icon>keyboard_arrow_down</mat-icon>
+                </div>
+                <div class="button-controls">
+                  <mat-form-field appearance="outline">
+                    <input matInput placeholder="Add button" value="">
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <div class="button-type-section">
+                <div class="button-type-header">
+                  <span>Copy offer code</span>
+                  <mat-icon>keyboard_arrow_down</mat-icon>
+                </div>
+                <div class="button-controls">
+                  <mat-form-field appearance="outline">
+                    <input matInput placeholder="Add button" value="">
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <div class="button-type-section">
+                <div class="button-type-header">
+                  <span>Quick replies</span>
+                  <mat-icon>keyboard_arrow_down</mat-icon>
+                </div>
+                <div class="button-controls">
+                  <mat-form-field appearance="outline">
+                    <input matInput placeholder="Add button" value="">
+                  </mat-form-field>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Panel - Preview -->
+    <div class="preview-panel">
+      <div class="preview-header">
+        <h3>Preview</h3>
+      </div>
+      
+      <div class="phone-preview">
+        <!-- Phone Frame -->
+        <div class="phone-frame">
+          <!-- Status Bar -->
+          <div class="status-bar">
+            <div class="status-left">
+              <span class="time">9:41</span>
+            </div>
+            <div class="status-right">
+              <div class="signal-icons">
+                <mat-icon class="signal-icon">signal_cellular_4_bar</mat-icon>
+                <mat-icon class="wifi-icon">wifi</mat-icon>
+                <mat-icon class="battery-icon">battery_full</mat-icon>
+              </div>
+            </div>
+          </div>
+
+          <!-- WhatsApp Header -->
+          <div class="whatsapp-header">
+            <button mat-icon-button class="back-arrow">
+              <mat-icon>arrow_back</mat-icon>
+            </button>
+            <div class="contact-info">
+              <div class="avatar"></div>
+              <div class="contact-details">
+                <div class="contact-name">Ana</div>
+              </div>
+            </div>
+            <div class="header-actions">
+              <mat-icon>videocam</mat-icon>
+              <mat-icon>call</mat-icon>
+              <mat-icon>more_vert</mat-icon>
+            </div>
+          </div>
+
+          <!-- Chat Area -->
+          <div class="chat-area">
+            <div class="business-notice">
+              <mat-icon class="business-icon">business</mat-icon>
+              <div class="notice-text">
+                <div>This business uses a secure service from</div>
+                <div>Meta to manage this chat. <a href="#">Tap to learn more</a></div>
+              </div>
+            </div>
+
+            <!-- Template Message -->
+            <div class="template-message" *ngIf="getBodyText() || hasHeaderComponent() || hasFooterComponent()">
+              <!-- Header -->
+              <div class="message-header" *ngIf="hasHeaderComponent()">
+                <div *ngIf="selectedHeaderFormat === 'text'" class="header-text">
+                  {{getHeaderText()}}
+                </div>
+                <div *ngIf="hasHeaderMedia()" class="header-media">
+                  <img *ngIf="selectedHeaderFormat === 'image'" [src]="getHeaderMediaUrl()" alt="Header image" />
+                  <video *ngIf="selectedHeaderFormat === 'video'" [src]="getHeaderMediaUrl()" controls></video>
+                  <div *ngIf="selectedHeaderFormat === 'document'" class="document-icon">
+                    <mat-icon>description</mat-icon>
+                    <span>Document</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Body -->
+              <div class="message-body" [innerHTML]="getPreviewBodyText()"></div>
+
+              <!-- Footer -->
+              <div class="message-footer" *ngIf="hasFooterComponent()">
+                {{getFooterText()}}
+              </div>
+
+              <!-- Buttons -->
+              <div class="message-buttons" *ngIf="hasButtonsComponent()">
+                <button class="message-btn" *ngFor="let button of getMessageButtons()">
+                  <mat-icon *ngIf="button.type === 'URL'">open_in_new</mat-icon>
+                  <mat-icon *ngIf="button.type === 'PHONE_NUMBER'">phone</mat-icon>
+                  {{button.text || 'Button'}}
+                </button>
+              </div>
+
+              <div class="message-time">16:20</div>
+            </div>
+          </div>
+
+          <!-- Input Area -->
+          <div class="input-area">
+            <div class="input-container">
+              <mat-icon class="add-icon">add</mat-icon>
+              <div class="message-input">
+                <input placeholder="Type a message" readonly>
+              </div>
+              <mat-icon class="attachment-icon">attach_file</mat-icon>
+              <mat-icon class="camera-icon">camera_alt</mat-icon>
+              <div class="voice-message">
+                <mat-icon>mic</mat-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Template Approval Tab -->
+      <div class="approval-section" *ngIf="false">
+        <mat-tab-group>
+          <mat-tab label="Approve Templates">
+            <div class="approve-content">
+              <!-- Filters -->
+              <div class="filters">
+                <mat-form-field appearance="outline">
+                  <mat-select [(value)]="selectedStatus" (selectionChange)="applyFilters()">
+                    <mat-option value="">All</mat-option>
+                    <mat-option value="pending">Pending</mat-option>
+                    <mat-option value="approved">Approved</mat-option>
+                    <mat-option value="rejected">Rejected</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button mat-raised-button (click)="loadTemplates()">
+                  <mat-icon>refresh</mat-icon> Refresh
+                </button>
+              </div>
+
+              <!-- Templates Table -->
+              <table mat-table [dataSource]="dataSource" matSort class="templates-table">
+                <ng-container matColumnDef="name">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+                  <td mat-cell *matCellDef="let template">{{template.name}}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="category">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+                  <td mat-cell *matCellDef="let template">
+                    <mat-chip>{{template.category}}</mat-chip>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+                  <td mat-cell *matCellDef="let template">
+                    <mat-chip [class]="getStatusClass(template.status)">
+                      {{template.status | titlecase}}
+                    </mat-chip>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>Actions</th>
+                  <td mat-cell *matCellDef="let template">
+                    <button mat-icon-button [matMenuTriggerFor]="menu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #menu="matMenu">
+                      <button mat-menu-item (click)="viewTemplate(template)">
+                        <mat-icon>visibility</mat-icon> View
+                      </button>
+                      <button mat-menu-item (click)="approveTemplate(template)" 
+                              *ngIf="template.status === 'pending'">
+                        <mat-icon>check</mat-icon> Approve
+                      </button>
+                      <button mat-menu-item (click)="rejectTemplate(template)"
+                              *ngIf="template.status === 'pending'">
+                        <mat-icon>close</mat-icon> Reject
+                      </button>
+                    </mat-menu>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              </table>
+
+              <mat-paginator [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons></mat-paginator>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </div>
+    </div>
+  </div>
+</div>

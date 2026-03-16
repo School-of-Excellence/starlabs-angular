@@ -1,0 +1,129 @@
+<div class="background">
+  <h4 class="title">Participant Profiles</h4>
+  <div class="actionbox">
+    <div>
+      <mat-form-field class="filterbox" appearance="outline">
+        <mat-label>Filter Name</mat-label>
+        <input matInput #filter (keyup)="filterData(filter.value)" autocomplete="off">
+      </mat-form-field>
+    </div>
+    <div>
+      <!-- <button class="addprofile" mat-stroked-button (click)="updateProfile(null)">Add New Profile</button> -->
+      <!-- <button class="addprofile" mat-stroked-button (click)="addCustomer(true, null)">Add New Customer</button> -->
+    </div>
+  </div>
+  <div class="mat-elevation-z3 tablebox">
+    <table mat-table [dataSource]="tableData" multiTemplateDataRows matSort>
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+        <td mat-cell *matCellDef="let row">
+          <a class="profilename" [routerLink]="'/profilesummary/' + row['profileid']">{{row['name']}}</a>
+          <!-- <span class="profilename" (click)="viewProfileSummary(row['profileid'])">{{row['name']}}</span> -->
+          <!-- <mat-icon class="onhold" *ngIf="row['deliveryonhold']">block</mat-icon> -->
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
+        <td mat-cell *matCellDef="let row">{{row['email']}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="number">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Contact Number</th>
+        <td mat-cell *matCellDef="let row">{{row['countrycode'] != null ? ('('+row['countrycode']+')') : ''}} {{row['number']}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="more">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let row">
+          <button mat-icon-button class="editbtn" (click)="updateProfile(row)">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-icon-button class="editbtn" (click)="toggleRow(row)">
+            <mat-icon>account_box</mat-icon>
+          </button>
+          <button mat-icon-button class="editbtn" [matMenuTriggerFor]="menu" #menuTrigger="matMenuTrigger" aria-label="Example icon-button with a menu">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button *ngIf="developerAccess" mat-menu-item (click)="deleteProfile(row)">
+              <span>Delete Profile</span>
+            </button>
+            <!-- <button mat-menu-item (click)="addCustomer(false, row)">
+              <span>Add Purchase</span>
+            </button> -->
+            <a mat-menu-item [routerLink]="'/userprofile/' + row['profileid']">
+              <span>User Profile</span>
+            </a>
+            <a mat-menu-item [routerLink]="'/participantpurchase/' + row['profileid']">
+              <span>Manage Purchase</span>
+            </a>
+            <a mat-menu-item [routerLink]="'/journeysupport/' + row['profileid']">
+              <span>Journey Support</span>
+            </a>
+            <a mat-menu-item [routerLink]="'/participantdeliverysequence/' + row['profileid']">
+              <span>Participant Delivery Sequence</span>
+            </a>
+            <!-- My Operator -->
+            <div style="padding: 16px;" (click)="$event.stopPropagation()">
+              <h4>My Operator Data</h4>
+              <mat-form-field appearance="fill" style="width: 100%;">
+                <mat-label>My Operator UID</mat-label>
+                <input matInput [(ngModel)]="myoperatoruid" placeholder="My Operator UID">
+              </mat-form-field>
+              <mat-form-field appearance="fill" style="width: 100%; margin-top: 8px;">
+                <mat-label>My Operator Number</mat-label>
+                <input matInput [(ngModel)]="myoperatornumber" placeholder="My Operator Contact">
+              </mat-form-field>
+          
+              <div style="margin-top: 16px; display: flex; justify-content: center;gap: 20px;">
+                <button mat-raised-button color="primary" (click)="updateMyOperator(row)">Submit</button>
+                <button mat-raised-button color="warn"   (click)="onmenuClose(menuTrigger)">Cancel</button>
+              </div>
+            </div>
+
+          </mat-menu>
+         
+        </td>
+      </ng-container>
+
+    <!-- Expanded Content Column -->
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let element" [attr.colspan]="6">
+        <div class="expandedbox" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <div class="rolebox">
+            <div class="checkboxrow" *ngIf="![null,undefined].includes(profilerole[element.profileid])">
+              <span *ngFor="let role of roleList">
+                <mat-checkbox *ngIf="typeof role === 'string' && role != 'developer' || role == 'developer' && developerAccess" 
+                            class="checkbox" 
+                            [(ngModel)]="profilerole[element.profileid][role]">
+                  {{role | uppercase}}
+                </mat-checkbox>
+                <ng-container *ngIf="role?.productowner">
+                  <div class="productowner-group">
+                    <label>PRODUCT OWNER : </label>
+                    <mat-checkbox *ngFor="let owner of role.productowner"
+                                  class="checkbox" 
+                                  [checked]="profilerole[element.profileid]?.productowner?.includes(owner)"
+                                  (change)="onProductOwnerChange(element.profileid, owner, $event.checked)">
+                      {{owner | uppercase}}
+                    </mat-checkbox>
+                  </div>
+                </ng-container>
+              </span>
+            </div>
+            <button mat-stroked-button class="rolebtn" (click)="updateRole(element.profileid, element.role_ref)">
+              Update Role
+            </button>
+          </div>
+        </div>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="tableHeader; sticky: true"></tr>
+    <tr class="tablerow" mat-row *matRowDef="let row; columns: tableHeader;" [class.example-expanded-row]="expandedElement === row"></tr>
+    <tr class="expandrow" mat-row *matRowDef="let row; columns: ['expandedDetail']"></tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+  </div>
+</div>

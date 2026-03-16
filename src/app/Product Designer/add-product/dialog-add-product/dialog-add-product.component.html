@@ -1,0 +1,158 @@
+<ng-container matColumnDef="atcmodel">
+  <th mat-header-cell *matHeaderCellDef mat-sort-header> ATC Model</th>
+  <td mat-cell *matCellDef="let row"> {{row.atcmodel}} </td>
+</ng-container>
+
+<div *ngIf="!delete">
+  <h2 class="formrow" mat-dialog-title>{{dialogtitle}}</h2>
+  <div  [formGroup]="addProductForm" mat-dialog-content >
+    <!-- {{addProductForm.value | json}} -->
+    <div class="text-left">
+      <!-- Product Name -->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Product</mat-label>
+        <input type="text" matInput placeholder="Enter a product" formControlName="product" (ngModelChange)="onvaluechange($event)">
+        <mat-error *ngIf="addProductForm.get('product').invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+      <!-- minimumRequiredAmount -->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Minimum Required Amount For Pre Delivery</mat-label>
+        <input type="text" matInput placeholder="Enter a minimum required amount" formControlName="minimumRequiredAmount">
+        <mat-error *ngIf="addProductForm.get('minimumRequiredAmount').invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+      <br>
+       <!-- minimumRequiredAmount -->
+       <mat-form-field class="textField" appearance="outline">
+        <mat-label>Original Fee</mat-label>
+        <input type="number" matInput placeholder="Enter a original fee" formControlName="originalfee">
+        <mat-error *ngIf="addProductForm.get('originalfee').invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+      <br>
+      <!-- ATC Model -->
+      <!-- <mat-form-field class="textField" appearance="outline">
+        <mat-label>ATC Model</mat-label>
+        <input type="text" matInput placeholder="Enter a ATC Model" formControlName="atcmodel">
+        <mat-error *ngIf="addProductForm.get('atcmodel').invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field> -->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>ATC Model</mat-label>
+        <mat-select formControlName="atcmodel">
+          <mat-option *ngFor="let list of atcModelList" [value]="list.atcmodel">{{list.atcmodel}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="addProductForm.get('atcmodel').hasError('required')">please select a atc model.</mat-error>
+      </mat-form-field>
+      <!-- ATC Directive -->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>ATC Directive</mat-label>
+        <textarea type="text" matInput placeholder="Enter Directive" formControlName="directive"></textarea>
+        <mat-error *ngIf="addProductForm.get('atcmodel').invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+
+      <br>
+      <!-- Product Mode Flow-->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Product Mode Flow</mat-label>
+        <mat-select formControlName="modeflow" multiple>
+          <mat-option *ngFor="let list of modeList" [value]="list">{{list}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="addProductForm.get('modeflow').hasError('required')">Select List of Modes.</mat-error>
+      </mat-form-field>
+      <br>
+      <!-- Product Mode -->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Product Mode</mat-label>
+        <mat-select formControlName="mode">
+          <mat-option *ngFor="let list of modeList" [value]="list">{{list}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="addProductForm.get('mode').hasError('required')">please select a mode.</mat-error>
+      </mat-form-field>
+      <!-- Delivery Planning -->
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Delivery Planning</mat-label>
+        <mat-select formControlName="deliveryplanning">
+          <mat-option *ngFor="let list of deliveryPlanningOption" [value]="list">{{list}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="addProductForm.get('mode').hasError('required')">Required.</mat-error>
+      </mat-form-field>
+      <!-- Delivery Item -->
+      <mat-form-field *ngIf="addProductForm.get('mode').value == 'Event Mode'" class="textField w-100" appearance="outline">
+        <mat-label>Delivery Item</mat-label>
+        <mat-select formControlName="deliverytype" multiple>
+          <mat-option *ngFor="let list of deliveryTypeList" [value]="list.deliverypath">{{list.deliveryname}} ({{list.type}})</mat-option>
+        </mat-select>
+        <mat-error *ngIf="addProductForm.get('deliverytype').hasError('required')">Required.</mat-error>
+      </mat-form-field>
+      <!-- type -->
+      <mat-radio-group aria-label="Select an option" formControlName="type">
+        <mat-radio-button value="DFU">DFU</mat-radio-button>
+        <mat-radio-button value="NDFU">NDFU</mat-radio-button>
+        <mat-radio-button value="Eco system">Eco system</mat-radio-button>
+      </mat-radio-group>
+      <!-- Delivery Planning -->
+       <!-- <br> -->
+      <!-- <app-mat-chip label="Category" [form]="addProductForm" valuetype="string" controlName="category"></app-mat-chip> -->
+    </div>
+      
+    <div class="text-left">
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Immersive Integration Period</mat-label>
+        <input type="number" matInput formControlName="integrationdays">
+        <mat-error *ngIf="addProductForm.get('integrationdays').invalid">Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Performance Period</mat-label>
+        <input type="number" matInput formControlName="performancedays">
+        <mat-error *ngIf="addProductForm.get('performancedays').invalid">Required</mat-error>
+      </mat-form-field>
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Extended Performance Period</mat-label>
+        <input type="number" matInput formControlName="extendedperformancedays">
+        <mat-error *ngIf="addProductForm.get('extendedperformancedays').invalid">Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Maximum Delay Period</mat-label>
+        <input type="number" matInput formControlName="delaydays">
+        <mat-error *ngIf="addProductForm.get('delaydays').invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+    </div>
+    <label for="fileupload">Product Image Upload :</label>&nbsp;&nbsp;
+    <input #fileupload type="file" accept="image/png" (change)="uploadImage(fileupload.value)" [disabled]="productimage.previewurl != null || productimage.url != null">
+    <div *ngIf="productimage.previewurl != null || productimage.url != null" style="display:flex;flex-direction: column;">
+      <img [src]="productimage.previewurl || productimage.url"alt="" height="200" width="310">
+      <button mat-stroked-button type="button" (click)="onImageRemove()">Remove Image</button>
+    </div>
+
+    <!-- unlimited flag -->
+    <mat-checkbox style="margin-left: 15px;" formControlName="unlimited">Unlimited</mat-checkbox>
+    <mat-checkbox style="margin-left: 15px;" formControlName="selfbooking">Self Booking</mat-checkbox>
+    <div *ngIf="crossmatch">
+      <p style="color: red;">{{this.croosmatcherrormessage}}</p>
+    </div>
+    <!-- {{addProductForm.value | json}}
+    {{addProductForm.invalid}} -->
+    <div class="link mt-4" >
+      <label>Product Playlist :</label>&nbsp;&nbsp;
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Select Content</mat-label>
+        <mat-select formControlName="playlist" [compareWith]="compareRef" [multiple]="true">
+          <mat-option *ngFor="let option of videos" [value]="option.docref">{{ option.title }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="formrow">
+      <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+      <button  [disabled]="addProductForm.invalid || crossmatch" mat-raised-button color="primary" (click)="onformsubmit(addProductForm.value)">{{submitbutton}}</button>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="delete" >
+  <div mat-dialog-title><h2>Delete Product</h2></div>
+  <div mat-dialog content><h3>Are you sure you want to delete?</h3></div>
+  <div mat-dialog-action>
+    <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+.mainscreen{
+  padding: 20px;
+  width: 100%;
+}
+
+.heading{
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  color: rgb(0, 50, 67);
+}
+
+table{
+  width: 100%;
+}
+
+.emptytext{
+  text-align: center;
+  color: grey;
+}
+
+::ng-deep .mat-sort-header-container {
+  justify-content: center;
+}
+
+td{
+  text-align: center;
+}
+
+.actionitem{
+  display: flex;
+  align-self: center;
+  justify-content: space-between;
+}
+
+.datefield{
+  margin-left: 15px;
+}
+
+.submitbtn{
+  color: green;
+  border: 1px solid green;
+}

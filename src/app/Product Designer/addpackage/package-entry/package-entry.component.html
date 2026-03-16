@@ -1,0 +1,30 @@
+<div *ngIf="!delete">
+    <h2 class="formrow" mat-dialog-title>{{dialogtitle}}</h2>
+    <div [formGroup]="addPackageForm" mat-dialog-content >
+        <div style="align-items:center;" class="formrow">
+            <mat-form-field class="textField" appearance="outline">
+                <mat-label>Package</mat-label>
+                <input type="text" matInput placeholder="Enter a package" formControlName="package" (ngModelChange)="onvaluechange($event)">
+                <mat-error *ngIf="addPackageForm.invalid">{{getErrorMessage()}}</mat-error>
+            </mat-form-field>
+        <br>
+        </div>
+        <p *ngIf="crossmatch" style="color: red;text-align: center;margin-top: 0;">{{this.croosmatcherrormessage}}</p>
+        <div class="formrow">
+            <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+            <button  [disabled]="addPackageForm.invalid" mat-raised-button color="primary" (click)="onformsubmit(addPackageForm.value)">{{submitbutton}}</button>
+        </div>
+    </div>
+</div>
+<div *ngIf="delete" >
+    <div mat-dialog-title>
+        <h2>Delete Package</h2>
+    </div>
+    <div mat-dialog content>
+            <h3>Are you sure you want to delete?</h3>
+    </div>
+    <div mat-dialog-action>
+        <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+        <button mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
+    </div>
+</div>

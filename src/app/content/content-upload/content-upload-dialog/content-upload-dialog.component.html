@@ -1,0 +1,164 @@
+<div class="dialog-wrap">
+  <div class="dialog-header">
+    <div class="dialog-icon add-icon">
+      <mat-icon>video_library</mat-icon>
+    </div>
+    <div>
+      <h2 class="dialog-title">{{ editMode ? 'Edit Content' : 'Add New Content' }}</h2>
+      <p class="dialog-sub">{{ editMode ? 'Update video details and tags' : 'Upload video with details and tags' }}</p>
+    </div>
+    <button class="dialog-close" (click)="dialogClose()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content class="dialog-body">
+    <div class="content-layout">
+      <div class="content-col">
+        <form [formGroup]="contentform" class="form-fields">
+          <div class="field-group">
+            <label class="label">Title <span class="required">*</span></label>
+            <div class="input-box" [class.error]="contentform.get('title')?.touched && contentform.get('title')?.hasError('required')">
+              <mat-icon class="ib-icon">title</mat-icon>
+              <input type="text" class="ib-input" placeholder="Enter content title" formControlName="title" />
+            </div>
+            <span class="field-error" *ngIf="contentform.get('title')?.touched && contentform.get('title')?.hasError('required')">Title is required</span>
+          </div>
+          <div class="field-group">
+            <div class="toggle-row">
+              <label class="label">Available</label>
+              <mat-slide-toggle formControlName="available" color="primary"></mat-slide-toggle>
+            </div>
+          </div>
+        </form>
+
+        <div class="field-group">
+          <label class="label">Video</label>
+          <div class="upload-zone" *ngIf="Videourl.length === 0" (click)="videoFileInput.click()">
+            <input #videoFileInput type="file" (change)="uploadVideo($event)" accept=".mp4,.mov,.mkv,.avi" hidden />
+            <div class="upload-zone-content">
+              <mat-icon class="upload-icon">videocam</mat-icon>
+              <span class="upload-text">Click to upload video</span>
+              <span class="upload-hint">MP4, MOV, MKV, AVI supported</span>
+            </div>
+          </div>
+          <div class="media-card" *ngFor="let doc of Videourl; let i = index">
+            <video controls class="media-preview">
+              <source [src]="sanitize(doc.url)" />
+            </video>
+            <div class="media-card-bar">
+              <mat-icon class="media-bar-icon">videocam</mat-icon>
+              <span class="media-bar-name">{{ doc.filename }}</span>
+              <button class="a-btn a-del" (click)="cancelVideo(i)" [disabled]="isUploading">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="label">Thumbnail</label>
+          <div class="upload-zone" *ngIf="Thumbnailurl.length === 0" (click)="thumbFileInput.click()">
+            <input #thumbFileInput type="file" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)" hidden />
+            <div class="upload-zone-content">
+              <mat-icon class="upload-icon">image</mat-icon>
+              <span class="upload-text">Click to upload thumbnail</span>
+              <span class="upload-hint">PNG, JPG supported</span>
+            </div>
+          </div>
+          <div class="media-card" *ngFor="let doc of Thumbnailurl; let i = index">
+            <img [src]="doc.url" class="media-preview media-preview-img" />
+            <div class="media-card-bar">
+              <mat-icon class="media-bar-icon">image</mat-icon>
+              <span class="media-bar-name">{{ doc.filename }}</span>
+              <button class="a-btn a-del" (click)="cancelthumbnail(i)" [disabled]="isUploading">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <form #myForm="ngForm" class="form-fields">
+          <div class="field-group">
+            <label class="label">Type <span class="required">*</span></label>
+            <div class="radio-row">
+              <mat-radio-group [(ngModel)]="type" name="name" #name="ngModel" required>
+                <mat-radio-button value="testimonial" color="primary">Testimonial</mat-radio-button>
+                <mat-radio-button value="event" color="primary">Event</mat-radio-button>
+              </mat-radio-group>
+            </div>
+            <span class="field-error" *ngIf="!name.valid && name.touched">Type is required</span>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Publish Date <span class="required">*</span></label>
+            <mat-form-field class="date-range-field" appearance="outline">
+              <mat-label>Publish Date</mat-label>
+              <input matInput [matDatepicker]="datepicker" [(ngModel)]="publishdate"
+                name="date" #date="ngModel" required />
+              <mat-hint>MM/DD/YYYY</mat-hint>
+              <mat-datepicker-toggle matSuffix [for]="datepicker"></mat-datepicker-toggle>
+              <mat-datepicker #datepicker>
+                <mat-datepicker-actions>
+                  <button mat-button matDatepickerCancel>Cancel</button>
+                  <button mat-raised-button color="primary" matDatepickerApply>Apply</button>
+                </mat-datepicker-actions>
+              </mat-datepicker>
+            </mat-form-field>
+          </div>
+
+          <div class="field-group">
+            <div class="checkbox-row">
+              <mat-checkbox [(ngModel)]="hero" name="heroCheckbox" color="primary">
+                Mark as Hero content
+              </mat-checkbox>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="content-col">
+        <div class="field-group">
+          <label class="label">Tags</label>
+          <div class="selected-tags" *ngIf="tags.length">
+            <span class="chip" *ngFor="let tag of tags; let i = index">
+              {{ mapTaxonomy[tag] }}
+              <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+            </span>
+          </div>
+          <div class="input-box">
+            <mat-icon class="ib-icon">search</mat-icon>
+            <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+          </div>
+          <div class="available-tags" *ngIf="filteredTaxonomyList.length">
+            <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+              <mat-icon>add_circle_outline</mat-icon>
+              {{ tag['name'] }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+  <div class="upload-progress-wrap" *ngIf="isUploading">
+    <div class="upload-progress-label">
+      <mat-icon>cloud_upload</mat-icon>
+      <span>{{ uploadLabel }} {{ uploadProgress }}%</span>
+    </div>
+    <mat-progress-bar
+      mode="determinate"
+      [value]="uploadProgress"
+      color="primary">
+    </mat-progress-bar>
+  </div>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" type="button" (click)="dialogClose()" [disabled]="isUploading">Back</button>
+    <button class="btn-primary" type="button"
+      (click)="submit(contentform.value)"
+      [disabled]="contentform.invalid || myForm.invalid || isUploading">
+      <mat-icon>{{ editMode ? 'save' : 'cloud_upload' }}</mat-icon>
+      {{ isUploading ? uploadLabel : (editMode ? 'Update Content' : 'Submit') }}
+    </button>
+  </mat-dialog-actions>
+</div>

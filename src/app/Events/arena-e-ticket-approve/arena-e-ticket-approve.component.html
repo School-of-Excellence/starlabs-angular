@@ -1,0 +1,90 @@
+<main class="p-2">
+  <!-- heading -->
+  <!-- <div class="d-flex flex-row justify-content-center mt-2">
+    <h4>Arena E-Ticket Generation</h4>
+  </div> -->
+  <!-- select event -->
+  <div class="d-flex flex-row justify-content-center mt-2">
+    <mat-form-field class="w-50" appearance="outline">
+      <mat-label> Select Event </mat-label>
+      <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
+        <mat-option *ngFor="let option of mapEvents | keyvalue" [value]="option.key">{{option.value['name']}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+  <!-- event particippation approved data -->
+  <div *ngIf="selectedEvent != null">
+    <!-- <mat-form-field class="w-50">
+      <mat-label>Filter</mat-label>
+      <input matInput (keyup)="applyFilter($event)" placeholder="Ex....." #input>
+    </mat-form-field> -->
+    <h5>Filter By :-</h5>&nbsp;&nbsp;&nbsp;&nbsp;
+    <mat-form-field class="w-25" appearance="outline">
+      <mat-label> Profile </mat-label>
+      <mat-select [(ngModel)]="filterForm.profileid" (selectionChange)="onFilter()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option [value]="null">None</mat-option>
+        <mat-option *ngFor="let option of filterProfile()" [value]="option.profileid">{{option['name']}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <mat-form-field class="w-25" appearance="outline">
+      <mat-label> Event </mat-label>
+      <mat-select [(ngModel)]="filterForm.event" (selectionChange)="onFilter()" multiple>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterEvent" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterEvents()" [value]="option.docid">{{option['name']}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <div class="mat-elevation-z8">
+      <table mat-table [dataSource]="dataSource" matSort>
+        <ng-container matColumnDef="profileid">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let row"> {{mapProfile[row.profileid]['name']}} </td>
+        </ng-container>
+        <ng-container matColumnDef="eventdate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Event Date </th>
+          <td mat-cell *matCellDef="let row"> 
+            {{mapEvents[this.selectedEvent]['start_date'].toDate() | date : "mediumDate"}} - {{mapEvents[this.selectedEvent]['end_date'].toDate() | date : "mediumDate"}}
+            <!-- {{row.eventdate ? (row.eventdate.toDate() | date : "mediumDate") : "No Date"}}  -->
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="eventref">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Event </th>
+          <td mat-cell *matCellDef="let row"> {{mapEvents[row.eventref.id]['name']}} </td>
+        </ng-container>
+        <ng-container matColumnDef="productref">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Product </th>
+          <td mat-cell *matCellDef="let row"> {{mapProducts[row.productref.id]['product']}} </td>
+        </ng-container>
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Action</th>
+          <td mat-cell *matCellDef="let row" >
+            <button *ngIf="mapArenaETicket[row['profileid']] === undefined" mat-stroked-button type="button" (click)="onSubmit(row)">Approve</button>
+            <span *ngIf="mapArenaETicket[row['profileid']] != undefined">Generated</span>&nbsp;&nbsp;
+            <span *ngIf="mapArenaETicket[row['profileid']] != undefined">
+              <span *ngIf="!mapArenaETicket[row['profileid']]['producteligible'].includes(row['productref'].id)">
+                <button mat-stroked-button type="button" (click)="onProductAppend(row)">Append Product</button>
+              </span>
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="active">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
+          <td mat-cell *matCellDef="let row" >
+            <mat-slide-toggle *ngIf="mapArenaETicket[row['profileid']] != undefined" [checked]="mapArenaETicket[row['profileid']] != undefined ? mapArenaETicket[row['profileid']]['active'] : false" (change)="onToggle($event,row)">Active</mat-slide-toggle>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        <!-- Row shown when there is no matching data. -->
+        <!-- <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" colspan="5">No data matching the filter "{{input.value}}"</td>
+        </tr> -->
+      </table>
+      <mat-paginator [pageSizeOptions]="[15,25,100,500,1000]"></mat-paginator>
+    </div>
+  </div>
+</main>

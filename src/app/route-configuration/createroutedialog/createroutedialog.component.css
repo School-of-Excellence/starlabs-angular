@@ -1,0 +1,22 @@
+.full-width {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.child-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.child-input {
+  width: 30%;
+  min-width: 200px;
+}
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+}

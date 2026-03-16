@@ -1,0 +1,149 @@
+.mainscreen{
+    padding: 20px;
+  }
+  
+  .heading{
+    text-align: center;
+    margin-bottom: 15px;
+    color: rgb(0, 50, 67);
+  }
+  
+  .body{
+    padding: 10px;
+  }
+  
+  .actionbox{
+    margin-top: 10px;
+    width: 100%;
+    display: inline-flex;
+    justify-content: space-between;
+    align-content: center;
+  }
+  
+  .actionitem{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+  
+  
+  table{
+    width: 100%;
+  }
+  /* td{
+    width: 30%;
+  } */
+  
+  
+  .emptytext{
+    text-align: center;
+    color: grey;
+  }
+  
+  .imagebox{
+    display: flex;
+  }
+  /* video{
+    width: 480px;
+    height: 200px;
+  } */
+
+  .green{
+    background-color: green;
+    color: white;
+  }
+
+  .tag-toggles-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.tag-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 180px;
+}
+
+.tag-toggle-label {
+  font-size: 15px;
+  color: #000000;
+  flex: 1;
+}
+
+.tag-checklist-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.tag-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+  padding-left: 28px;
+  font-size: 13px;
+  color: #374151;
+  user-select: none;
+}
+
+.tag-checkbox-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  left: 0;
+  height: 18px;
+  width: 18px;
+  background-color: #fff;
+  border: 2px solid #d1d5db;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.tag-checkbox-row:hover input ~ .checkmark {
+  border-color: #6366f1;
+}
+
+.tag-checkbox-row input:checked ~ .checkmark {
+  background-color: #6366f1;
+  border-color: #6366f1;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.tag-checkbox-row input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.tag-checkbox-row .checkmark:after {
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.tag-checkbox-label {
+  font-size: 13px;
+  color: #374151;
+}

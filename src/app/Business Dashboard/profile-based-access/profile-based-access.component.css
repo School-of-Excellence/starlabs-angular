@@ -1,0 +1,460 @@
+/* ===== Container ===== */
+.screen-access-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* ===== Header ===== */
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  font-size: 26px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.page-header p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ===== Cards ===== */
+.form-card,
+.table-card {
+  margin-bottom: 24px;
+}
+
+mat-card-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.table-card mat-card-title {
+  font-size: 20px !important;
+}
+
+mat-card-header {
+  display: flex !important;
+  justify-content: space-between !important;
+}
+
+.header-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.header-profile-search {
+  min-width: 350px;
+}
+
+.header{
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 14px;
+  margin-bottom: 5px;
+}
+
+/* ===== Form Row ===== */
+.form-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.form-group.user-select-group {
+  flex: 1.5;
+  min-width: 280px;
+}
+
+/* ===== Form Input ===== */
+.form-input {
+  height: 56px;
+  padding: 0 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 16px;
+  color: #1e293b;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.form-input:hover {
+  border-color: #1e293b;
+}
+
+.form-input:focus {
+  border-color: #6366f1;
+  border-width: 2px;
+  padding: 0 15px;
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
+}
+
+/* ===== User Select (standalone mat-select) ===== */
+.user-select {
+  height: 56px;
+  padding: 0 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+}
+
+.user-select:hover {
+  border-color: #1e293b;
+}
+
+::ng-deep .user-select .mat-mdc-select-trigger {
+  height: 100%;
+}
+
+::ng-deep .user-select .mat-mdc-select-value {
+  color: #1e293b;
+}
+
+::ng-deep .user-select .mat-mdc-select-placeholder {
+  color: #9ca3af;
+}
+
+.form-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ===== Add Button ===== */
+.add-btn,
+.refresh-btn {
+  padding: 0 24px !important;
+}
+
+.add-btn mat-icon {
+  margin-right: 4px;
+}
+
+.refresh-btn {
+  background-color: rgba(128, 128, 128, 0.226) !important;
+}
+
+/* ===== Select Option Styling ===== */
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.option-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.option-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.option-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.option-email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ===== Table ===== */
+.access-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.access-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.access-table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.access-table tr:hover {
+  background: #f8fafc;
+}
+
+.route-path {
+  font-family: "Monaco", "Menlo", "Consolas", monospace;
+  font-size: 13px;
+  color: #6366f1;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+/* ===== Edit Inputs ===== */
+.edit-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #6366f1;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #1e293b;
+  background: #fff;
+  outline: none;
+}
+
+.edit-input:focus {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.edit-select {
+  width: 100%;
+  min-width: 180px;
+  max-width: 400px;
+  overflow: hidden;
+  padding: 8px 12px;
+  border: 2px solid #6366f1;
+  border-radius: 4px;
+  background: #fff;
+}
+
+/* ===== User Chips ===== */
+
+
+mat-chip > button{
+  padding: 0;
+}
+
+mat-chip  {
+  background-color: transparent !important;
+}
+
+.mat-mdc-chip-remove{
+  padding: 0 !important;
+}
+
+.mat-mdc-chip-remove::after{
+  padding: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.user-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 4px;
+  background: #f1f5f9;
+  border-radius: 20px;
+  font-size: 13px !important;
+  color: #334155;
+}
+
+.chip-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.more-chip,
+.less-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  cursor: default;
+}
+
+/* ===== Actions ===== */
+.actions {
+  white-space: nowrap;
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  color: #94a3b8;
+}
+
+.empty-state mat-icon {
+  font-size: 56px;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.search-wrapper {
+  padding: 8px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.stable-panel {
+  transform: none !important;
+}
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-group,
+  .form-group.user-select-group {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .add-btn {
+    width: 100%;
+  }
+
+  .access-table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .user-chips {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ===== Dialog specific ===== */
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 0;
+  padding-top: 0;
+}
+
+.edit-form .full-width {
+  width: 100%;
+}
+
+.edit-form .edit-form mat-form-field {
+  width: 100%;
+}
+
+/* ===== Dialog option styling (reuse existing) ===== */
+::ng-deep .edit-form .mat-mdc-select-panel {
+  max-height: 300px !important;
+}
+
+/* ===== Responsive dialog ===== */
+@media (max-width: 480px) {
+  .edit-form {
+    padding: 0 8px;
+  }
+}
+/* Add this to your existing CSS */
+[mat-dialog-content] {
+  padding-top: 24px !important;
+  overflow-y: visible !important;
+}
+
+/* new styles for profile */
+
+.static-info {
+  padding: 8px 0;
+}
+
+.static-info p {
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px; /* matches mat-input */
+}
+
+.static-info .k {
+  color: rgba(0,0,0,0.60);
+  font-weight: 400;
+}
+
+.static-info .v {
+  flex: 1;
+  color: rgba(0,0,0,0.87);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+

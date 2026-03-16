@@ -1,0 +1,71 @@
+<div *ngIf="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <div class="row">
+    <div class="col"></div>
+    <div class="col"><div class="heading">Team Delivery Hours</div></div>
+    <div class="col extras">
+      <a class="extrascreens" mat-flat-button routerLink="/offtime">
+        My Offtimes
+        <mat-icon>arrow_right</mat-icon>
+      </a>
+      <a class="extrascreens" mat-flat-button (click)="addOfftime()">
+        Mark Offtime
+        <mat-icon>arrow_right</mat-icon>
+      </a>
+      <a class="extrascreens" *ngIf="superRole" mat-flat-button routerLink="/approveofftime">
+        Approve Offtimes
+        <mat-icon>arrow_right</mat-icon>
+      </a>
+    </div>
+  </div>
+  <div class="body mat-elevation-z2">
+    <div class="actionbox">
+      <div class="actionitem">
+        <mat-form-field appearance="outline">
+          <mat-label>Search</mat-label>
+          <input matInput #search (input)="applyFilter($event)" #input autocomplete="off">
+        </mat-form-field>
+      </div>
+      <div class="actionitem">
+        <button class="slotbtn" mat-stroked-button (click)="openMonthlyAvailability(null)">Schedule Availability</button>
+      </div>
+    </div>
+    <table id="event" mat-table [dataSource]="dataSource" matSort matSortActive="name">
+
+      <!-- Name -->
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+        <td mat-cell *matCellDef="let row">
+          <span [class.profile]="superRole" (click)="superRole ? openMonthlyAvailability(row) : null">
+            {{row["name"]}}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Delivery Hour -->
+      <ng-container *ngFor="let data of displayedColumns.slice(1, 8)" [matColumnDef]="data">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>{{data}}</th>
+        <td mat-cell *matCellDef="let row">
+          <ul>
+            <li *ngFor="let hour of row[data.toLowerCase()]">
+              {{hour["starttime"]}} - {{hour["endtime"]}}
+            </li>
+          </ul>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      <!-- Row shown when there is no matching data. -->
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell emptytext" colspan="8">
+          No Data
+        </td>
+      </tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+  </div>
+</div>

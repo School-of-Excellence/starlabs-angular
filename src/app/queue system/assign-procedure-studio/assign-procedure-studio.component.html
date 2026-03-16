@@ -1,0 +1,59 @@
+<div *ngIf="loading" class="mb-3">
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
+  
+  <div class="mainscreen">
+    <h5 class="title">Assign ATC</h5>
+    <label *ngIf="atcList.length == 0">No ATC Available</label>
+    <div>
+      <div *ngFor="let atc of atcList; let i = index">
+        <div class="atchead mb-3">
+          <div>
+            <span class="label">Prescribed Date: </span> <span>{{atc.date | date: 'MMM d, y, h:mm a'}}</span>
+            <br>
+            <span class="label">Product: </span> <span>{{atc.product}}</span>
+          </div>
+          <div>
+            <!-- <mat-form-field appearance="outline">
+              <mat-label>Select Change Agent</mat-label>
+              <mat-select [(ngModel)]="selectedSpecialist[i]" (selectionChange)="selectSpecialist(i)" multiple>
+                <mat-option *ngFor="let agent of atcFilter.changeagent" [value]="agent.value">{{agent.name}}</mat-option>
+              </mat-select>
+            </mat-form-field> -->
+          </div>
+        </div>
+        <div class="adjbox" *ngFor="let adjustment of atc.adjustment; let j = index">
+          <!-- <mat-checkbox [(ngModel)]="adjustment.selected" (change)="selectSpecialist(i)">Ajustment {{j+1}} - {{adjustment.name}}</mat-checkbox> -->
+          <label>Ajustment {{j+1}} - {{adjustment.name}}</label>
+          <div class="probox" *ngFor="let procedure of adjustment.procedure; let k = index">
+            - {{procedure.name}} <span *ngIf="procedure.mandatory" style="color: red;">*</span>
+            <mat-form-field class="ml-3" appearance="outline">
+              <mat-select [(ngModel)]="procedure.studioid" panelClass="fit-content">
+                <mat-select-trigger>
+                  {{ getSelectedParticipantNames(procedure.studioid) }}
+                </mat-select-trigger>
+                  <mat-option *ngFor="let studio of getSortedStudios()" [value]="studio.docid">
+                    <span [ngClass]="studio.checkin === false || studio.checkin === undefined || studio.checkin === null ? 'text-danger' : 'text-success'">
+                      <mat-icon class="statusicon">fiber_manual_record</mat-icon>
+                    </span>
+                    <!-- <mat-icon class="statusicon" [ngClass]="studio['checkin'] == false || studio['checkin'] == undefined ||  studio['checkin'] == null ? 'text-danger' : 'text-success'">fiber_manual_record</mat-icon> -->
+                    <span *ngFor="let agent of studio.participants">{{ mapProfile[agent]?.length > 25 ? (mapProfile[agent] | slice:0:15) + '...' : mapProfile[agent] }} - {{mapPreassignedagent[agent] || 0}}/{{mapPreassignedprocedure[agent] || 0}}
+                    <mat-icon *ngIf="studio.implementationexpert" class="verified-icon">check_circle</mat-icon>
+                    </span>
+                  </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            
+            <mat-checkbox class="ml-3" [(ngModel)]="procedure.mandatory">Mandatory</mat-checkbox>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="actionbox">
+      <button class="btn btn-outline-primary mr-3 me-2" (click)="dialogref.close(null)">close</button>
+      <button class="btn btn-outline-success" (click)="assignStudio()">{{loading ? 'Updating.....' : 'Assign Studio'}}</button>
+    </div>
+  </div>
+  
+  <!-- <mat-icon class="statusicon" *ngIf="studio['checkin'] == false || studio['checkin'] == undefined ||  studio['checkin'] == null ? 'text-danger' : 'text-success'">fiber_manual_record</mat-icon> -->

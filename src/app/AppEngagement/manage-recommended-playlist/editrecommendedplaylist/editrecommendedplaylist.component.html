@@ -1,0 +1,96 @@
+<h2 mat-dialog-title>Edit Recommended Playlist</h2>
+
+<mat-dialog-content>
+  <mat-progress-bar *ngIf="saving" mode="indeterminate"></mat-progress-bar>
+
+  <form [formGroup]="form" class="edit-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Title</mat-label>
+      <input matInput formControlName="title" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="3"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Expire Date</mat-label>
+      <input matInput [matDatepicker]="picker" formControlName="expiredate" />
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Recommended By</mat-label>
+      <input matInput formControlName="createdby" readonly />
+    </mat-form-field>
+
+    <div class="section">
+      <h4>EiFlix ({{ eiflix.length }})</h4>
+      <div class="chips">
+        <span class="chip" *ngFor="let id of eiflix">
+          {{ mapPlaylist[id] || id }}
+          <button class="x" (click)="eiflix = remove(eiflix, id)" type="button">&times;</button>
+        </span>
+      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Add EiFlix</mat-label>
+        <mat-select multiple [(ngModel)]="eiflix" [ngModelOptions]="{standalone: true}">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="searchEiflix" [ngModelOptions]="{standalone: true}"
+              placeholderLabel="Search..." noEntriesFoundLabel="No results"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let o of filtered(eiflixList, searchEiflix)" [value]="o.id">{{ o.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="section">
+      <h4>General Content ({{ generalcontent.length }})</h4>
+      <div class="chips">
+        <span class="chip" *ngFor="let id of generalcontent">
+          {{ mapPlaylist[id] || id }}
+          <button class="x" (click)="generalcontent = remove(generalcontent, id)" type="button">&times;</button>
+        </span>
+      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Add General Content</mat-label>
+        <mat-select multiple [(ngModel)]="generalcontent" [ngModelOptions]="{standalone: true}">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="searchGeneralcontent" [ngModelOptions]="{standalone: true}"
+              placeholderLabel="Search..." noEntriesFoundLabel="No results"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let o of filtered(generalcontentList, searchGeneralcontent)" [value]="o.id">{{ o.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="section">
+      <h4>Solar Voice ({{ solarvoice.length }})</h4>
+      <div class="chips">
+        <span class="chip" *ngFor="let id of solarvoice">
+          {{ mapPlaylist[id] || id }}
+          <button class="x" (click)="solarvoice = remove(solarvoice, id)" type="button">&times;</button>
+        </span>
+      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Add Solar Voice</mat-label>
+        <mat-select multiple [(ngModel)]="solarvoice" [ngModelOptions]="{standalone: true}">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="searchSolarvoice" [ngModelOptions]="{standalone: true}"
+              placeholderLabel="Search..." noEntriesFoundLabel="No results"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let o of filtered(solarvoiceList, searchSolarvoice)" [value]="o.id">{{ o.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()" [disabled]="saving">Cancel</button>
+  <button mat-raised-button color="primary" (click)="save()" [disabled]="saving">
+    {{ saving ? 'Saving...' : 'Update' }}
+  </button>
+</mat-dialog-actions>

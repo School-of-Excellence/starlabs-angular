@@ -1,0 +1,508 @@
+<!-- Loading -->
+<div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ "Loading Dashboard.." }}</div>
+    <div class="loading-progress">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tag Dialog (Inline) -->
+<div class="dialog-overlay" *ngIf="showTagDialog" (click)="closeTagDialog()">
+  <div class="dialog-container" (click)="$event.stopPropagation()">
+    <h2 class="dialog-title">Tag Ticket</h2>
+    <div class="dialog-content">
+      <form [formGroup]="tagForm" class="tag-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Select Date</mat-label>
+          <input 
+            matInput 
+            [matDatepicker]="tagPicker" 
+            formControlName="date"
+            [min]="minDate"
+            placeholder="Choose a date">
+          <mat-datepicker-toggle matIconSuffix [for]="tagPicker"></mat-datepicker-toggle>
+          <mat-datepicker #tagPicker></mat-datepicker>
+          <mat-error *ngIf="tagForm.get('date')?.hasError('required')">
+            Date is required
+          </mat-error>
+        </mat-form-field>
+
+        <!-- CHANGED: Time input to dropdown select -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Select Time</mat-label>
+          <mat-select formControlName="time" placeholder="Choose a time">
+            <mat-option *ngFor="let time of timeOptions" [value]="time.value">
+              {{ time.label }}
+            </mat-option>
+          </mat-select>
+          <mat-error *ngIf="tagForm.get('time')?.hasError('required')">
+            Time is required
+          </mat-error>
+        </mat-form-field>
+      </form>
+    </div>
+    <div class="dialog-actions">
+      <button mat-button (click)="closeTagDialog()">Cancel</button>
+      <button 
+        mat-raised-button 
+        color="primary" 
+        (click)="confirmTag()"
+        [disabled]="tagForm.invalid">
+        Tag Ticket
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Untag Confirmation Dialog (Inline) -->
+<div class="dialog-overlay" *ngIf="showUntagDialog" (click)="closeUntagDialog()">
+  <div class="dialog-container" (click)="$event.stopPropagation()">
+    <h2 class="dialog-title">Untag Ticket</h2>
+    <div class="dialog-content">
+      <p class="dialog-message">Are you sure you want to untag this ticket?</p>
+    </div>
+    <div class="dialog-actions">
+      <button mat-button (click)="closeUntagDialog()">Cancel</button>
+      <button 
+        mat-raised-button 
+        color="warn" 
+        (click)="confirmUntag()">
+        Untag
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- tabs group -->
+<div *ngIf="!isLoading">
+  <mat-tab-group mat-stretch-tabs="false" mat-align-tabs="start" animationDuration="0ms"
+    [(selectedIndex)]="selectedTabIndex" (selectedTabChange)="onTabSwitch()">
+    <mat-tab *ngFor="let tab of ticketArray; let i = index">
+      <ng-template mat-tab-label><b [ngClass]="i == selectedTabIndex ? 'selectedtab' : 'nonselectedtab'">{{ tab.label
+          }}</b>
+        <button *ngIf="i > 1" mat-icon-button type="button" (click)="closeTab(i)">
+          <mat-icon style="font-size: 15px">close</mat-icon>
+        </button></ng-template>
+      <div *ngIf="tab.label === 'Customer Support Dashboard'">
+        <app-customertickets-dashboard *ngIf="clientIssues.length !== 0" [tickets]="clientIssues"
+          (tabchange)="tabChange($event)"></app-customertickets-dashboard>
+      </div>
+      <!-- dashboard -->
+      <div class="tickets-wrapper" *ngIf="tab.label == 'Customer Tickets' && isAllDataLoaded">
+        <div class="tagged-banner" *ngIf="getTotalTaggedCount() > 0">
+          <div class="banner-content">
+            <div class="banner-header">
+              <mat-icon class="banner-icon">bookmarks</mat-icon>
+              <h2 class="banner-title">Tagged Tickets Overview</h2>
+              <button class="calendar-btn" (click)="openTaggedCalendarDialog()" style="margin-left: auto;">
+                <mat-icon>calendar_month</mat-icon>
+                <span>Calendar</span>
+              </button>
+            </div>
+            <div class="banner-stats">
+              <div class="stat-card today" (click)="filterTaggedTickets('today')">
+                <div class="stat-icon">
+                  <mat-icon>today</mat-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">Due Today</div>
+                  <div class="stat-count">{{ getTaggedTodayCount() }}</div>
+                </div>
+              </div>
+
+              <div class="stat-card upcoming" (click)="filterTaggedTickets('upcoming')">
+                <div class="stat-icon">
+                  <mat-icon>event</mat-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">Upcoming</div>
+                  <div class="stat-count">{{ getTaggedUpcomingCount() }}</div>
+                </div>
+              </div>
+
+              <div class="stat-card overdue" (click)="filterTaggedTickets('overdue')">
+                <div class="stat-icon">
+                  <mat-icon>schedule</mat-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">Overdue</div>
+                  <div class="stat-count">{{ getTaggedExpiredCount() }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="header-container">
+          <div class="main-box">
+            <h1 class="main-title">Tickets</h1>
+            <button mat-raised-button (click)="raiseIssue(null)">
+              Raise Ticket
+            </button>
+          </div>
+          <div class="category-filter">
+            <p class="filter-label">category</p>
+            <mat-chip-listbox class="chip-group" multiple [(ngModel)]="filters.category" [selectable]="true">
+              <mat-chip-option *ngFor="let cat of categoryList" [value]="cat.toLowerCase()" [selectable]="true"
+                (click)="applyFilter()" class="chip-option" [selected]="filters.category.includes(cat.toLowerCase())">{{
+                cat }}</mat-chip-option>
+            </mat-chip-listbox>
+          </div>
+          <div class="status status-filter">
+            <p class="filter-label">Chat Status</p>
+            <mat-chip-listbox class="chip-group" multiple [(ngModel)]="filters.chatStatus" [selectable]="true">
+              <mat-chip-option *ngFor="let chat of chatStatusList" [value]="chat.toLowerCase()" [selectable]="true"
+                (click)="applyFilter()" [selected]="filters.chatStatus.includes(chat.toLowerCase())"
+                class="chip-option status-chips">{{ chat }}</mat-chip-option>
+            </mat-chip-listbox>
+          </div>
+          <div class="status-chip-container">
+            <p class="filter-label">Status</p>
+            <mat-chip-listbox class="chip-group" [(ngModel)]="filters.status" [selectable]="true">
+              <mat-chip-option [value]="''" [selectable]="true" [selected]="true" (click)="applyFilter()"
+                class="chip-option">All</mat-chip-option>
+              <mat-chip-option [value]="'open'" [selectable]="true" (click)="applyFilter()"
+                class="chip-option">open</mat-chip-option>
+              <mat-chip-option [value]="'closed'" [selectable]="true" (click)="applyFilter()"
+                class="chip-option">Closed</mat-chip-option>
+              <mat-chip-option [value]="'tagged'" [selectable]="true" (click)="applyFilter()"
+                class="chip-option">Tagged</mat-chip-option>
+            </mat-chip-listbox>
+          </div>
+        </div>
+
+        <div style="display: flex" class="content-grid">
+          <div class="tickets-section">
+            <div *ngIf="tempIssues.length == 0" class="ticket-fallback">
+              <p>No Tickets Found</p>
+            </div>
+            <div class="tickets-container" *ngIf="tempIssues.length != 0">
+              <mat-card [class]="{
+                'ticket-card': true,
+                open: ticket?.status?.status === 'Open',
+                closed: ticket?.status?.status === 'Closed'
+              }" *ngFor="
+                let ticket of tempIssues.slice(
+                  pageIndex * pageSize,
+                  (pageIndex + 1) * pageSize
+                )
+              " (click)="messageIssue($event, ticket, false)">
+                <!-- Tag Icon Button -->
+                <button mat-icon-button class="tag-button" [class.tagged]="isTagged(ticket)"
+                  (click)="handleTagClick($event, ticket)"
+                  [title]="isTagged(ticket) ? 'Tagged - Click to untag' : 'Click to tag'">
+                  <mat-icon [class.tagged-icon]="isTagged(ticket)">
+                    {{ isTagged(ticket) ? 'bookmark' : 'bookmark_border' }}
+                  </mat-icon>
+                </button>
+
+                <div class="ticket-content">
+                  <div class="user-column">
+                    <div class="user-column" (mouseenter)="showPopup(ticket, $event)" (mouseleave)="hidePopup()">
+                      <span class="ticket-no">
+                        {{ ticket?.issueno ? ticket?.issueno : "" }}</span>
+                      <img [src]="getProfileImage(ticket?.clientid)" alt="User Avatar" class="user-avatar" />
+                      <span class="user-name">{{
+                        ticket?.name ? ticket.name : ""
+                        }}</span>
+                    </div>
+                    <div>
+                      <button mat-raised-button (click)="messageIssue($event, ticket, true)" style="
+                        background-color: red;
+                        color: white;
+                        padding-inline: 10px;
+                        font-size: 12px;
+                      " *ngIf="!isIdPresent(ticket)">
+                        {{ "Review" }}
+                      </button>
+                      <button mat-raised-button (click)="messageIssue($event, ticket, true)" style="
+                        background-color: green;
+                        color: white;
+                        padding-inline: 10px;
+                        font-size: 12px;
+                      " *ngIf="isIdPresent(ticket)">
+                        {{
+                        mapProfileData[
+                        getMostRecentTimestampKey(ticket["review"])
+                        ]?.name
+                        }}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="details-column">
+                    <p class="ticket-description">
+                      {{ ticket?.issue ? ticket.issue : "no message" }}
+                    </p>
+                  </div>
+                  <div class="info-column">
+                    <p [class]="{
+                      'ticket-status': true,
+                      new: ticket?.chatstatus === 'New',
+                      responded: ticket?.chatstatus === 'Responded',
+                      'd-making': ticket?.chatstatus === 'Decision Making'
+                    }">
+                      {{ ticket?.chatstatus || "no status" }}
+                    </p>
+                    <p class="priority-info medium" *ngIf="![null, undefined, ''].includes(ticket?.priority)">
+                      priority: {{ ticket?.priority }}
+                    </p>
+                    <p class="user-journey">
+                      Journey :
+                      <span class="journey">{{
+                        ticket?.journey
+                        ? mapJourney[ticket.journey.id]
+                        : "No Journey"
+                        }}</span>
+                    </p>
+
+                    <p class="user-category">
+                      Category :
+                      <span class="category" *ngIf="ticket?.category">{{
+                        ticket?.category
+                        }}</span>
+                    </p>
+
+                    <p class="assigned-info">
+                      assigned to: {{ mapAssignTo(ticket?.assign) }}
+                    </p>
+
+                    <!-- NEW: Display tag date and time if ticket is tagged -->
+                    <p class="tag-info" *ngIf="isTagged(ticket)" [class.tag-expired]="isTagExpired(ticket?.tagdate)">
+                      <mat-icon class="tag-icon-small">schedule</mat-icon>
+                      Tagged Date: {{ formatTagDate(ticket?.tagdate) }}
+                    </p>
+
+                    <div class="ticket-st">
+                      <p [class]="{
+                        'status-info': true,
+                        closed: ticket?.status?.status === 'Closed',
+                        open: ticket?.status?.status === 'Open'
+                      }">
+                        {{ ticket?.status?.status ? ticket.status.status : "" }}
+                      </p>
+                      <p class="ticket-meta">
+                        created {{ formatTimeStamp(ticket?.reporteddate) }} days
+                        ago
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </mat-card>
+            </div>
+            <div *ngIf="popupData" class="popup" [ngStyle]="{
+                top: popupData.position.top + 'px',
+                left: popupData.position.left + 'px'
+              }">
+              <p><b>Ticket ID:</b> {{ popupData.issueno }}</p>
+              <p><b>Ticket:</b> {{ popupData.issue }}</p>
+              <p *ngIf="popupData['notes'].length != 0"><b>Notes:</b></p>
+              <div style="line-height: 1">
+                <div *ngFor="let notes of popupData['notes']; let idx = index">
+                  <p>
+                    <b>{{ idx + 1 }}</b> &nbsp;&nbsp;
+                    {{
+                    [null, undefined, ""].includes(
+                    mapProfileData[notes["writtenBy"]]
+                    )
+                    ? "..."
+                    : mapProfileData[notes["writtenBy"]]["name"]
+                    }}
+                    : {{ notes["date"].toDate() | date : "short" }}
+                  </p>
+                  <p>&nbsp;{{ notes.remarks }}</p>
+                </div>
+              </div>
+            </div>
+            <mat-paginator [length]="tempIssues.length" [pageSize]="pageSize"
+              [pageSizeOptions]="[5, 10, 20, 50, 100, 200]" showFirstLastButtons (page)="onPageChange($event)">
+            </mat-paginator>
+          </div>
+
+          <div class="filters-sidebar">
+            <div class="filters-header">
+              <p class="filters-title">Filters</p>
+              <button type="button" mat-mini-fab color="primary" class="reset-buttom" (click)="resetFilter()">
+                <mat-icon>refresh</mat-icon>
+              </button>
+            </div>
+
+            <!-- form to filter client tickets -->
+            <form action="" class="filters-form" [formGroup]="form">
+              <div style="display: flex" class="form-row">
+                <p class="field-label">search :</p>
+                <mat-form-field class="input-field" appearance="outline">
+                  <mat-label>Search..</mat-label>
+                  <input matInput formControlName="search" (input)="applyFilter()" />
+                </mat-form-field>
+              </div>
+
+              <!-- journey filter -->
+
+              <div style="display: flex" class="form-row">
+                <p class="field-label">journey :</p>
+                <mat-form-field class="input-field" appearance="outline">
+                  <mat-label>Journey</mat-label>
+                  <mat-select formControlName="journey" multiple (selectionChange)="applyFilter()">
+                    <mat-option>
+                      <ngx-mat-select-search [(ngModel)]="filteredJourney" [ngModelOptions]="{ standalone: true }"
+                        [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                        ngDefaultControl></ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option *ngFor="let journey of returnFilterJourney()" [value]="journey.id">{{ journey.journey
+                      }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div style="display: flex" class="form-row">
+                <p class="field-label">Assigned to :</p>
+                <mat-form-field class="example-full-width" appearance="outline" class="input-field">
+                  <!-- assigned to filter -->
+                  <mat-label>Assigned To</mat-label>
+                  <mat-select formControlName="assignto" multiple (selectionChange)="applyFilter()">
+                    <mat-option>
+                      <ngx-mat-select-search [(ngModel)]="filteredAssign" [ngModelOptions]="{ standalone: true }"
+                        [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                        ngDefaultControl></ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option *ngFor="let assign of returnFilterMember()" [value]="assign">{{
+                      mapProfileData[assign]["name"] }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <!-- reported date filter -->
+              <div style="display: flex" class="form-row">
+                <p class="field-label">Reported Date :</p>
+                <mat-form-field class="input-field" appearance="outline">
+                  <mat-label>Enter a date range</mat-label>
+                  <mat-date-range-input [rangePicker]="picker">
+                    <input matStartDate formControlName="startDate" placeholder="Start date" readonly />
+                    <input matEndDate formControlName="endDate" placeholder="End date" readonly />
+                  </mat-date-range-input>
+                  <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                  <mat-date-range-picker #picker (closed)="applyFilter()"></mat-date-range-picker>
+                </mat-form-field>
+              </div>
+
+              <!-- priority filter -->
+
+              <div style="display: flex" class="form-row">
+                <p class="field-label">priority :</p>
+                <mat-form-field class="input-field" appearance="outline">
+                  <mat-label>Priority</mat-label>
+                  <mat-select formControlName="priority">
+                    <mat-option>--</mat-option>
+                    <mat-option [value]="'Low'">Low</mat-option>
+                    <mat-option [value]="'Medium'">Medium</mat-option>
+                    <mat-option [value]="'High'">High</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ticket screen -->
+      <div *ngIf="
+          !tab.label.includes('Review') &&
+          !tab.label.includes('Dashboard') &&
+          !tab.label.includes('Tickets')
+        ">
+        <app-customer-chat-screen [ticketid]="tab.ticketid" [profileid]="tab.profileid" [admin]="tab.admin"
+          [roles]="loginRoles" [mapprofiledata]="mapProfileData" [mapuserId]="mapUserId" [categories]="categories"
+          [status]="statuslist" [validators]="validators" [negligence]="negligencelist" [journeymap]="mapJourney"
+          [type]="'support'" [screentab]="i" [selectedtab]="selectedTabIndex">
+        </app-customer-chat-screen>
+      </div>
+      <div *ngIf="tab.label.includes('Review')">
+        <app-flag-review-screen [clientid]="tab.clientid" [profileid]="tab.profileid" [status]="statuslist"
+          [validators]="validators" [negligence]="negligencelist" [mapuserId]="mapUserId" [categories]="categories"
+          [mapprofiledata]="mapProfileData" [mapuserId]="mapUserId" [tabIndex]="selectedTabIndex"
+          [weeknumber]="weekNumber" [weekYear]="weekYear">
+        </app-flag-review-screen>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>
+<!-- Tagged Tickets Calendar Dialog -->
+<ng-template #taggedCalendarDialogTemplate>
+  <div class="calendar-dialog-content">
+    <div class="calendar-header">
+      <h2>Tagged Tickets Calendar</h2>
+      <button mat-icon-button (click)="closeTaggedCalendarDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="calendar-body">
+      <div class="calendar-left">
+        <mat-calendar 
+          [(selected)]="selectedTagCalendarDate" 
+          (selectedChange)="onTagCalendarDateSelected($event)"
+          [dateClass]="taggedDateClass">
+        </mat-calendar>
+
+        <div class="schedule-summary">
+          <div class="summary-item">
+            <span class="summary-label">Today Tagged:</span>
+            <span class="summary-count blue">{{ getTodayTaggedCalendarCount() }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">This Month Tagged:</span>
+            <span class="summary-count blue">{{ getMonthTaggedCalendarCount() }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tagged Ticket Details Section -->
+      <div class="calendar-right">
+        <div class="schedule-list">
+          <div *ngFor="let ticket of selectedDateTaggedTickets" 
+              [ngClass]="{
+                'schedule-item-active-open': ticket?.status?.status === 'Open',
+                'schedule-item-active-closed': ticket?.status?.status === 'Closed'
+              }">
+            <div class="schedule-info">
+              <div class="info-row">
+                <div class="info-item ticket-participant">
+                  <strong>Ticket No:</strong> {{ ticket?.issueno }}
+                </div>
+                <div class="info-separator">|</div>
+                <div class="info-item participant-name-flex">
+                  <strong>Participant:</strong> 
+                  <span class="participant-text">{{ ticket?.name }}</span>
+                </div>
+              </div>
+              
+              <div class="info-row">
+                <div class="info-item category-flex">
+                  <strong>Category:</strong> 
+                  <span class="category-text">{{ ticket?.category }}</span>
+                </div>
+                <div class="info-separator">|</div>
+                <div class="info-item tagged-date-flex">
+                  <strong>Tagged Date:</strong> 
+                  <span class="date-text">{{ formatTagDate(ticket?.tagdate) }}</span>
+                </div>
+              </div>
+              
+              <div class="ticket-issue">
+                <strong>Issue:</strong> {{ ticket?.issue }}
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="selectedDateTaggedTickets.length === 0" class="no-schedules">
+            <p>No tagged tickets for {{ selectedTagCalendarDate | date:'fullDate' }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-template>

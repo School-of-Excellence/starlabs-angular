@@ -1,0 +1,166 @@
+<div class="crossover-dialog" [class.panel-open]="showProfilePanel">
+  <!-- Header -->
+  <div class="dialog-header">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="9" cy="9" r="5"/>
+          <circle cx="15" cy="15" r="5"/>
+        </svg>
+      </div>
+      <div class="header-title">
+        <h2>Crossover Metrics</h2>
+        <span class="header-subtitle">Journey Transition Analysis</span>
+      </div>
+    </div>
+    <button class="close-btn" (click)="closeDialog()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="dialog-body">
+    <!-- Loading -->
+    <div *ngIf="loading" class="loading-container">
+      <div class="spinner"></div>
+      <span>Loading crossover data...</span>
+    </div>
+
+    <!-- Content -->
+    <div *ngIf="!loading" class="dialog-content">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="Search category, startpoint, endpoint..." [(ngModel)]="searchTerm" (input)="filterData()"/>
+        </div>
+        <div class="toolbar-stats">
+          <div class="stat-item">
+            <span class="stat-value">{{ groupedData.size }}</span>
+            <span class="stat-label">Categories</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ filteredData.length }}</span>
+            <span class="stat-label">Combinations</span>
+          </div>
+          <div class="stat-item highlight">
+            <span class="stat-value">{{ getTotalCount() }}</span>
+            <span class="stat-label">Total Entries</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Content -->
+      <div class="table-wrapper">
+        <table class="crossover-table">
+          <thead>
+            <tr>
+              <th class="th-category">Category</th>
+              <th class="th-startpoint">Startpoint</th>
+              <th class="th-endpoint">Endpoint</th>
+              <th class="th-combination">Combination</th>
+              <th class="th-count">Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let category of groupedData | keyvalue">
+              <!-- Category Group Header -->
+              <tr class="category-header-row">
+                <td colspan="5">
+                  <div class="category-header" [ngClass]="getCategoryColor(category.key)">
+                    <span class="category-name">{{ category.key }}</span>
+                    <span class="category-count">{{ getCategoryTotal(category.key) }} entries</span>
+                  </div>
+                </td>
+              </tr>
+              <!-- Category Rows -->
+              <tr *ngFor="let entry of category.value; let i = index" class="data-row" (click)="showProfiles(entry)">
+                <td class="td-category">
+                  <span class="category-tag" [ngClass]="getCategoryColor(entry.category)">
+                    {{ entry.category }}
+                  </span>
+                </td>
+                <td class="td-startpoint">
+                  <span class="point-badge start">{{ entry.startpoint }}</span>
+                </td>
+                <td class="td-endpoint">
+                  <span class="point-badge end">{{ entry.endpoint }}</span>
+                </td>
+                <td class="td-combination">
+                  <div class="combination-cell clickable">
+                    <span class="combo-start">{{ entry.startpoint }}</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    <span class="combo-end">{{ entry.endpoint }}</span>
+                    <span class="view-profiles-hint">Click to view profiles</span>
+                  </div>
+                </td>
+                <td class="td-count">
+                  <span class="count-badge">{{ entry.count }}</span>
+                </td>
+              </tr>
+            </ng-container>
+
+            <!-- Empty State -->
+            <tr *ngIf="filteredData.length === 0" class="empty-row">
+              <td colspan="5">
+                <div class="empty-state">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M8 15h8M9 9h.01M15 9h.01"/>
+                  </svg>
+                  <span>No crossover data found</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Profile Side Panel -->
+    <div class="profile-panel" [class.open]="showProfilePanel">
+      <div class="panel-header">
+        <div class="panel-title-section">
+          <h3>Participants</h3>
+          <span class="panel-subtitle" *ngIf="selectedEntry">
+            {{ selectedEntry.category }}: {{ selectedEntry.startpoint }} → {{ selectedEntry.endpoint }}
+          </span>
+        </div>
+        <button class="panel-close-btn" (click)="closeProfilePanel()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="panel-content">
+        <!-- Profile List -->
+        <div class="profile-list" *ngIf="selectedEntry">
+          <div class="profile-count-badge">
+            <span>{{ selectedEntry.profileIds.length }} Participants</span>
+          </div>
+          
+          <div class="profile-item" *ngFor="let profileId of selectedEntry.profileIds; let i = index" (click)="navigateToProfile(profileId)">
+            <div class="profile-sno">{{ i + 1 }}</div>
+            <div class="profile-info">
+              <span class="profile-id-text">{{ data.mapProfile[profileId] }}</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </div>
+          
+          <div *ngIf="selectedEntry.profileIds.length === 0" class="panel-empty">
+            <span>No profiles found</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,238 @@
+<main class="m-2" *ngIf="viewAccess == true">
+  <div class="d-flex flex-row justify-content-center">
+    <h3>Directive-based Assignment</h3>
+  </div>
+  <div class="directive-container">
+    <div class="directive-content">
+      <p class="directive-text"> <b>Given Directive :</b> {{assignmentDoc.directive}}</p>
+    </div>
+  </div>
+
+  <div class="file-upload-container">
+    <!-- Drag and drop area -->
+    <div *ngIf="['create', 'rework'].includes(viewType)"
+      class="upload-area" 
+      [class.dragging]="isDragging"
+      (dragover)="onDragOver($event)" 
+      (dragleave)="onDragLeave($event)" 
+      (drop)="onDrop($event)"
+    >
+      <mat-icon class="upload-icon">cloud_upload</mat-icon>
+      <p>Drag files here or <span class="browse-text" (click)="fileInput.click()">browse</span> to upload</p>
+      <p class="upload-hint">Maximum file size: {{maxFileSize}}MB</p>
+      
+      <!-- Hidden file input -->
+      <input 
+        #fileInput 
+        type="file" 
+        multiple 
+        hidden 
+        (change)="onFileInputChange($event)"
+      >
+    </div>
+
+    <div *ngIf="uploading" class="upload-progress-container">
+      <div class="upload-status">
+        <div class="upload-label">Uploading file...</div>
+        <div class="upload-percentage">{{ (progress | number:'1.0-0') }}%</div>
+      </div>
+      
+      <div class="progress-bar-wrapper">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" [style.width.%]="progress"></div>
+        </div>
+      </div>
+      
+      <div class="upload-details">
+        <span class="upload-transferred">{{ formatFileSize(bytesTransferred) }}</span>
+        <span class="upload-separator">of</span>
+        <span class="upload-total">{{ formatFileSize(totalbytes) }}</span>
+      </div>
+    </div>
+
+    <!-- File list -->
+    <div class="file-list" *ngIf="files.length > 0">
+      <div class="file-list-header">
+        <h3>Selected Files ({{files.length}})</h3>
+        <button mat-button color="warn" (click)="clearAllFiles()" *ngIf="files.length > 0 && ['create', 'rework'].includes(viewType)">
+          Clear All
+        </button>
+      </div>
+  
+      <div class="file-list-items">
+        <div class="file-item" *ngFor="let file of files; let i = index">
+          <div class="file-icon" (click)="openPreview(file)">
+            <mat-icon>{{getFileIcon(file)}}</mat-icon>
+          </div>
+          <div class="file-info" (click)="openPreview(file)">
+            <div class="file-name" [title]="file.name">{{file.name}}</div>
+            <div class="file-size">{{getReadableFileSize(file.size)}}</div>
+          </div>
+          <button mat-icon-button color="warn" (click)="removeFile(i)" aria-label="Remove file" *ngIf="['create', 'rework'].includes(viewType)">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  
+    <!-- File preview modal -->
+    <div class="preview-modal" *ngIf="previewVisible" (click)="closePreview()">
+      <div class="preview-content" (click)="$event.stopPropagation()">
+        <div class="preview-header">
+          <h3>{{previewFile?.name}}</h3>
+          <button mat-icon-button (click)="closePreview()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <div class="preview-body">
+          <!-- Image preview -->
+          <img *ngIf="isImageFile(previewFile)" class="preview-image" alt="Preview">
+          
+          <!-- Other previews remain the same -->
+          <iframe *ngIf="isPdfFile(previewFile)" [src]="safePreviewUrl" class="preview-pdf"></iframe>
+          
+          <!-- Text preview -->
+          <div *ngIf="isTextFile(previewFile)" class="preview-text">
+            <pre>{{textContent}}</pre>
+          </div>
+          
+          <!-- Video preview -->
+          <video *ngIf="isVideoFile(previewFile)" [src]="safePreviewUrl" controls class="preview-video"></video>
+          
+          <!-- Audio preview -->
+          <audio *ngIf="isAudioFile(previewFile)" [src]="safePreviewUrl" controls class="preview-audio"></audio>
+          
+          <!-- Unsupported file type -->
+          <div *ngIf="!canPreview(previewFile)" class="preview-unsupported">
+            <mat-icon>error_outline</mat-icon>
+            <p>Preview not available for this file type</p>
+          </div>
+          <button mat-raised-button color="primary" (click)="downloadFile(previewFile)">Download File</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes-list-container" *ngIf="viewType == 'rework'">
+    <div class="notes-header">
+      <h4>Review Notes</h4>
+    </div>
+
+    <div *ngIf=" ![null, undefined].includes(profileAssignmentDoc) && profileAssignmentDoc['activitylog'][0]['notes'].length > 0" class="notes-list">
+      <mat-card *ngFor="let note of profileAssignmentDoc['activitylog'][0]['notes']; let i = index" class="note-item">
+        <mat-card-content class="note-content">
+          <p>{{note}}</p>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+
+  <form [formGroup]="notesForm" *ngIf="viewType == 'review'">
+    <div formArrayName="notes">
+      <div *ngFor="let item of notes.controls; let i = index" [formGroupName]="i">
+        <div class="row align-items-center" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px; padding-left: 40px; padding-right: 40px;">
+          <mat-form-field appearance="outline" style="width: 100%;">
+            <mat-label>{{notesFieldNames[i]}}</mat-label>
+            <textarea matInput 
+              formControlName="note" 
+              placeholder="Enter Note" 
+              cdkTextareaAutosize 
+              cdkAutosizeMinRows="1"
+              cdkAutosizeMaxRows="5">
+            </textarea>     
+            <mat-hint><b>If No Notes leave the input field empty</b></mat-hint>       
+          </mat-form-field>
+        </div>
+      </div>
+    </div>
+  </form>
+  <!-- <div class="file-upload d-flex flex-row justify-content-center">
+    <label class="file-input-label">
+      <input
+        type="file"
+        (change)="onFileSelected($event)"
+        multiple
+        accept=".jpg,.jpeg,.png,.mp3,.pdf,.docx,"
+      />
+    </label>
+  </div> -->
+
+  <!-- <div id="filePreviewGrid" class="d-flex flex-wrap m-4" style="gap: 16px;">
+    <div *ngFor="let file of selectedFiles;let i = index" class="card text-center" style="width: 200px; height: 300px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+      <div [ngSwitch]="file.type" style="height: 70%; background-color: black; display: flex; align-items: center; justify-content: center;">
+        <img *ngSwitchCase="'image'" class="w-100 h-100" [src]="file.preview" alt="Image Preview" style="object-fit: cover;" />
+        <audio *ngSwitchCase="'audio'" controls style="width: 90%;">
+          <source [src]="file.preview" [type]="file.file.type" />
+          Your browser does not support audio.
+        </audio>
+        <button *ngSwitchCase="'application/pdf'" class="btn btn-primary" (click)="onOpen(file.preview)">Preview PDF</button>
+        <div *ngSwitchCase="'application/vnd'" class="file-doc-preview" style="display: flex; align-items: center; justify-content: center; color: white;">
+          <p *ngIf="file.url">Its a word document so download & preview it</p>
+        </div>
+      </div>
+      <div class="card-body" style="height: 30%; display: flex; flex-direction: column; justify-content: center;">
+        <h5 class="card-title" style="font-size: 14px; margin: 4px 0;">{{ file.name }}</h5>
+        <button mat-stroked-button type="button" (click)="onRemoveFiles(i)">Remove</button>
+        <a *ngIf="file.url" [href]="file.url" download style="font-size: 12px; color: blue; text-decoration: underline;">Download</a>
+      </div>
+    </div>
+  </div> -->
+
+  <!-- <div *ngIf="uploading" class="d-flex flex-row justify-content-center w-75">
+    <mat-progress-bar 
+      mode="determinate" 
+      [value]="progress">
+    </mat-progress-bar>
+    <p>{{ bytesTransferred }} of {{ totalBytes }} bytes transferred</p>
+  </div> -->
+  
+  <div class="d-flex flex-row justify-content-center" style="align-items: space-evenly;">
+    <button type="button" mat-stroked-button (click)="onSubmit('rework')" *ngIf="viewType == 'review'" color="warn">Mark As Rework</button>
+    <button type="button" mat-stroked-button (click)="onSubmit('submit')" *ngIf="viewType != 'review' && files.length != 0" color="primary">Submit</button>
+    <button type="button" mat-stroked-button (click)="onSubmit('completed')" *ngIf="viewType == 'review'" color="primary">Mark As Completed</button>
+  </div>
+</main>
+
+<!-- <div>
+  <input type="file" multiple (change)="onHlsFileSelection($event)" accept=".m3u8,.ts">
+  <button type="button" mat-stroked-button (click)="uploadFiles()" [disabled]="!selectedHlsFiles.length || isuploading">Upload HLS Files</button>
+</div> -->
+
+
+<!-- <div id="filePreviewCarousel" class="carousel slide m-4">
+  <ol class="carousel-indicators">
+    <li *ngFor="let file of selectedFiles; let i = index"
+        [ngClass]="{'active': i === activeIndex}" 
+        (click)="setActiveIndex(i)"></li>
+  </ol>
+  <div class="carousel-inner" style="background-color: black;">
+    <div *ngFor="let file of selectedFiles; let i = index" 
+         class="carousel-item" 
+         [ngClass]="{'active': i === activeIndex}"
+         [style.width]="'90vw'" [style.height]="'60vh'" >
+      <div [ngSwitch]="file.type" class="text-center">
+        <img *ngSwitchCase="'image'" class="d-block w-100" [src]="file.preview" alt="Image Preview" />
+        <audio *ngSwitchCase="'audio'" class="d-block w-100" controls>
+          <source [src]="file.preview" [type]="file.file.type" />
+          Your browser does not support audio.
+        </audio>
+        <iframe *ngSwitchCase="'application/pdf'" class="d-block w-100" [src]="trustedurl(file.preview)" [style.width]="'90vw'" [style.height]="'60vh'"></iframe>
+        <div *ngSwitchCase="'application/vnd'" class="file-doc-preview">
+          <p>{{ file.name }}</p>
+        </div>
+      </div>
+      <div class="carousel-caption d-none d-md-block">
+        <h5>{{file.name}}</h5>
+        <a *ngIf="file.downloadurl" [href]="file.downloadurl" download>Download</a>
+      </div>
+    </div>
+  </div>
+  <a class="carousel-control-prev" role="button" (click)="prevSlide()">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="sr-only">Previous</span>
+  </a>
+  <a class="carousel-control-next" role="button" (click)="nextSlide()">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="sr-only">Next</span>
+  </a>
+</div> -->

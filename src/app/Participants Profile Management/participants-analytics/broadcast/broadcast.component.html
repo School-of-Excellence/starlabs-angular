@@ -1,0 +1,83 @@
+<main class="m-4">
+  <span *ngIf="loading">
+    <mat-spinner class="custom-spinner" strokeWidth="2" diameter="40"></mat-spinner>
+  </span>
+  <span *ngIf="!loading">
+      <div style="display: flex;flex-direction: row;justify-content: space-between;">
+          <h2>Broadcast Templates</h2>
+          <button type="button" mat-raised-button (click)="createtemplate()"><mat-icon>add</mat-icon>Create Template</button>
+      </div>
+      <br>
+
+      <div style="max-height: 70vh;min-height: 100px;overflow-y: auto;">
+          <div *ngFor="let item of templateList,let i = index">
+              <div style="display: flex;flex-direction: row;">
+                  <button mat-mini-fab type="button" (click)="selectedbroadcast = item" [ngClass]="selectedbroadcast != null && selectedbroadcast['docid'] == item.docid ? 'selected' : 'notselected' "><mat-icon>check</mat-icon></button>
+                  &nbsp;&nbsp;
+                  <mat-accordion style="width: 100%;margin-bottom: 5px;">
+                      <mat-expansion-panel (opened)="panelOpenState = true" (closed)="panelOpenState = false">
+                          <mat-expansion-panel-header>
+                              <mat-panel-title>
+                                  <b>Title : </b>{{item.title}}
+                              </mat-panel-title>
+                          <mat-panel-description>
+                            <b style="color: black;">Category : </b>{{item.category}}
+                          </mat-panel-description>
+                          <mat-panel-description>
+                              <b style="color: black;">Date : </b>{{item.date.toDate() | date:"medium"}}
+                            </mat-panel-description>
+                        </mat-expansion-panel-header>
+                        <div style="border: 1px solid grey;width: 400px;height: 700px;border-radius: 30px;align-items: center;display: flex;justify-content: center;align-items: center;">
+                          <div style="border: 1px solid grey;width: 380px;height: 680px;border-radius: 30px;background-color: #023c57;">
+                              <div style="height: 45px;background-color: #023c57;border-top-left-radius: 30px;border-top-right-radius: 30px;"></div>
+                              <div style="height: 60px;background-color: #00557D;"></div>
+                              <div class="chatscreen">
+                                  <div style="width: 300px;border-radius: 20px;background-color: white;padding: 10px;">
+                                      <div style="background-color: rgb(192, 192, 192);height: 150px;border-radius: 20px;display: inline-flex;justify-content: center;vertical-align: middle;align-items: center;border: 1px solid grey;width: 100%;">
+                                          <img *ngIf="item.files.length == 0" src="assets/Images/noimage.png" width="50px" height="50px" alt="">
+                                          <span *ngIf="item.files.length != 0">
+                                              <img *ngIf="item.files[0].mediatype == 'image'" [src]="item.files[0].fileurl" width="100%" height="150px" style="border-radius: 20px;overflow: hidden;"alt="">
+                                              <video *ngIf="item.files[0].mediatype == 'video'" style="border-radius: 20px; overflow: hidden;margin-top:5px; " width="100%" height="150px" controls id="myvideo">
+                                                  <source [src]="trustedurl(item.files[0].fileurl)" type="video/*" >
+                                              </video>
+                                              <img *ngIf="item.files[0].mediatype == 'application'" src="/assets/Images/doc.png" alt="">
+                                          </span>
+                                      </div>
+          
+                                      <br><br>
+                                      <p id="messages" [innerHTML]=" item.body | linebreaks | link"></p>
+                                      <br>
+                                      <div style="display: flex;flex-direction: row;justify-content: space-between;">
+                                          <p style="font-size: 14px;color: grey;text-align: center;">{{item.footer}}</p>
+                                          <p style="font-size: 14px;"><b>{{item.date.toDate() | date:"medium"}}</b></p>    
+                                      </div>
+                                  </div>
+          
+                                  <br>
+          
+                                  <div *ngIf="![null,undefined,''].includes(item.link)" style="width: 300px;border-radius: 20px;background-color: white;padding: 10px;display: flex;flex-direction: row;justify-content: center;vertical-align: middle;">
+                                      <b>{{item.buttonname}}</b>
+                                      <mat-icon style="margin-top: 5px;" *ngIf="![null,undefined,''].includes(item.link) && ![null,undefined,''].includes(item.link)">open_in_new</mat-icon>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                      </mat-expansion-panel>
+                      </mat-accordion>
+                      
+                      <button mat-icon-button [matMenuTriggerFor]="menu"><mat-icon>more_vert</mat-icon></button>
+                      <mat-menu #menu="matMenu">
+                          <button mat-menu-item type="button" (click)="openDupliacte(item.docid)"><mat-icon>content_copy</mat-icon> Duplicate</button>
+                          <button mat-menu-item type="button" [disabled]="!item.draft"><mat-icon>edit_note</mat-icon>Edit Template</button>
+                      </mat-menu>
+                    <br>
+              </div>
+          </div>
+      </div>
+      <br>
+      <span style="display: flex;flex-direction: row;justify-content: space-between;">
+          <button mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="selectedbroadcast == null">Submit</button>
+      </span>
+  </span>
+</main>

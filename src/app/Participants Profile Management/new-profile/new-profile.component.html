@@ -1,0 +1,1012 @@
+<div *ngIf="loading" class="loading">
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  </div>
+  <div *ngIf="!loading" style="padding: 20px;">
+    <div class="row">
+      <div class="col-md-4">
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Search Participant</mat-label>
+          <input matInput [(ngModel)]="searchTerm" (input)="filterData()" placeholder="Type Participant Name">
+          <mat-icon matSuffix (click)="clearSearch()">clear</mat-icon>
+        </mat-form-field>
+        <div *ngIf="filteredProfiles.length > 0" class="search-results">
+          <h4>Participant List</h4>
+          <ul>
+            <li 
+              *ngFor="let profile of filteredProfiles" 
+              (click)="onProfileIdClickedSubsEnd(profile.id)" 
+              style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+            >
+              {{ profile.name }}
+              <span style="display: flex; align-items: center;">
+                <mat-icon 
+                  [matMenuTriggerFor]="menuIndiv"
+                  (click)="$event.stopPropagation()"
+                  style="cursor: pointer;"
+                >
+                  timeline
+                </mat-icon>
+                <mat-menu #menuIndiv="matMenu">
+                  <button mat-menu-item (click)="navigatetoTimeline([profile.id], '', 'Absolute')">Absolute</button>
+                  <button mat-menu-item (click)="navigatetoTimeline([profile.id], '', 'Relative')">Relative</button>
+                </mat-menu>
+              </span>
+            </li>
+          </ul>
+        </div>      
+      </div>
+      <div class="col-md-4">
+        <div class="status-label" style="padding-top: 20px;">
+          <mat-icon>monetization_on</mat-icon> 
+          <span class="hyphen">-</span>
+          Finance Status
+          <mat-icon>person</mat-icon>
+          <span class="hyphen">-</span>
+          Customer Status
+        </div>
+      </div>
+      <!-- <div class="col-md-4" style="display: flex; justify-content: flex-end; position: relative;">
+        <mat-icon 
+          matTooltip="New release!"
+          matTooltipClass="custom-tooltip"
+          style="cursor: pointer;">
+          new_releases
+        </mat-icon>
+      </div> -->
+      <!-- <div class="col-md-4" style="display: flex; justify-content: flex-end;">
+        <mat-icon matTooltip="New release!"  matTooltipClass="custom-tooltip" style="cursor: pointer;" (click)="openDialog()" style="cursor: pointer;">new_releases</mat-icon>
+      </div> -->
+    </div>  
+      <div class="row">
+        <div class="col-md-4">
+          <div class="card-container" style="cursor: pointer;">
+              <div *ngFor="let subscription of subscriptionData" class="card" [ngClass]="{
+                  'active-card': subscription.type === 'Active subscription',
+                  'non-active-card': subscription.type === 'Non-Active Subscription End',
+                  'discontinued-card': subscription.type === 'Discontinued Participants',
+                  'all-participant-card': subscription.type === 'All Participant',
+                  'selected-card-border': subscription === selectedCard
+                }" (click)="selectCard(subscription)">
+                  <div class="card-body">
+                    <h4 class="card-title" [ngClass]="{
+                      'active-text': subscription.type === 'Active subscription',
+                      'non-active-text': subscription.type === 'Non-Active Subscription End',
+                      'discontinued-text': subscription.type === 'Discontinued Participants',
+                      'all-participant-text': subscription.type === 'All Participant'
+                    }">{{ subscription.type }}</h4>
+                    <h3 class="card-text" [ngClass]="{
+                      'active-count-text': subscription.type === 'Active subscription',
+                      'non-active-count-text': subscription.type === 'Non-Active Subscription End',
+                      'discontinued-count-text': subscription.type === 'Discontinued Participants',
+                      'all-participant-count-text': subscription.type === 'All Participant'
+                    }">{{ subscription.activeCount.length }}</h3>
+                    <hr>  
+                    <div class="card-stats">
+                      <p class="card-stat-item">Regular <span>{{ subscription.Regular.length }}</span></p>
+                      <p class="card-stat-item">Defaulted <span>{{ subscription.Defaulted.length }}</span></p>
+                      <p class="card-stat-item">Locked <span>{{ subscription.Locked.length }}</span></p>
+                      <!-- <hr>others<hr> -->
+                      <!-- <div *ngIf="subscription.type === 'All Participant'"> -->
+                      <div>
+                        <div class="divider-with-text">
+                          <hr />
+                          <span class="divider-text">others</span>
+                          <hr />
+                        </div>
+                        <p class="card-stat-item">Banned <span>{{ subscription.Banned.length }}</span></p>
+                        <p class="card-stat-item">Late <span>{{ subscription.Late.length }}</span></p>
+                        <p class="card-stat-item">Discontinued <span>{{ subscription.Discontinued.length }}</span></p>
+                        <p class="card-stat-item">Undefined <span>{{ subscription.Undefined.length }}</span></p>
+                      </div>
+  
+                    </div>
+                  </div>
+                </div>
+          </div>
+          <div>
+              <div style="display: flex;align-items: center;justify-content: left;">
+              <h3>Subscription Ends</h3>&nbsp;&nbsp;&nbsp;&nbsp;
+              <mat-form-field appearance="outline">
+                  <mat-label>Select Date</mat-label>
+                  <input 
+                    matInput 
+                    [matDatepicker]="picker" 
+                    [(ngModel)]="selectedDate"
+                    (dateChange)="updateMonthLabels()">
+                  <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                  <mat-datepicker #picker></mat-datepicker>
+                </mat-form-field>&nbsp;&nbsp;
+                <!-- <button *ngIf="selectedMonthForSubscription != null" style="font-weight: bold;" mat-raised-button color="accent">Pipeline for {{selectedMonthForSubscription}}</button>  -->
+              </div>
+              <div>
+                <div class="row supscription" style="display: flex; justify-content: center; align-items: center;padding: 20px;">
+                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" (click)="onMonthClick('Last Month')">
+                    <p [style.border]="selectedMonthForSubscription === 'Last Month'?'2px solid #000000': ''"
+                    [style.border-radius]="selectedMonthForSubscription === 'Last Month'?'10px': ''">                    
+                      <span style="color: red;font-weight: bold;font-size: 24px;">{{lastMonthCount.count}}</span><br>
+                      <span style="color: red;">Last Month</span>
+                      <br>
+                      <span style="color: black;">{{ lastMonth | date: 'MMMM' }}</span>
+                    </p>
+                  </div>
+                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" (click)="onMonthClick('This Month')">
+                    <p [style.border]="selectedMonthForSubscription === 'This Month'?'2px solid #000000': ''"
+                    [style.border-radius]="selectedMonthForSubscription === 'This Month'?'10px': ''">                    
+                      <span style="color: green;font-weight: bold;font-size: 24px;">{{currentMonthCount.count }}</span><br>
+                      <span style="color: green;">This Month</span>
+                      <br>
+                      <span style="color: black;">{{ currentMonth | date: 'MMMM' }}</span>
+                    </p>
+                  </div>
+                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" (click)="onMonthClick('Next Month')">
+                    <p [style.border]="selectedMonthForSubscription === 'Next Month'?'2px solid #000000': ''"
+                    [style.border-radius]="selectedMonthForSubscription === 'Next Month'?'10px': ''">                    
+                      <span style="color: grey;font-weight: bold;font-size: 24px;">{{nextMonthCount.count }}</span><br>
+                      <span style="color: grey;">Next Month</span>
+                      <br>
+                      <span style="color: black;">{{ nextMonth | date: 'MMMM' }}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="engagement-container">
+                  <p style="font-weight: 600;font-size: 20px;">Engagement Level</p>
+                  <mat-radio-group
+                    class="radio-group"
+                    aria-label="Select an option"
+                    [(ngModel)]="selectedEngagementCategory"
+                    (change)="onEngagementCategoryChange($event.value)"
+                  >
+                    <!-- <mat-radio-button value="All">All</mat-radio-button>&nbsp;&nbsp;&nbsp; -->
+                    <mat-radio-button value="ActiveOnly">Active Subscription</mat-radio-button>&nbsp;&nbsp;&nbsp;
+                    <mat-radio-button value="CustomerActive">Non-Active Subscription</mat-radio-button>
+                  </mat-radio-group>
+                
+                  <div class="card-containerminibox">
+                    <div
+                    class="card2 disappear"
+                    (click)="engagementLevelClick('Disappear', engagementLevel.disappear)">
+                    <div class="label2">Disappear</div>
+                    <div class="value">{{ engagementLevel.disappear.length }}</div>
+                    <button 
+                      mat-icon-button
+                      matTooltip="View Timeline"
+                      class="icon-container"
+                      [matMenuTriggerFor]="menuDisappear"
+                      (click)="$event.stopPropagation()"
+                      >
+                      <mat-icon>timeline</mat-icon>
+                    </button>
+                    <mat-menu #menuDisappear="matMenu">
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.disappear, 'Disappear', 'Absolute')">Absolute</button>
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.disappear, 'Disappear', 'Relative')">Relative</button>
+                    </mat-menu>
+                  </div>                
+                    <div
+                      class="card2 minimal"
+                      (click)="engagementLevelClick('Minimal', engagementLevel.minimal)">
+                      <div class="label2">Minimal</div>
+                      <div class="value">{{ engagementLevel.minimal.length }}</div>
+                      <!-- <div matTooltip="View Timeline"
+                        class="icon-container"
+                        (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal')">
+                        <mat-icon>timeline</mat-icon>
+                      </div> -->
+                      <button 
+                      mat-icon-button
+                      matTooltip="View Timeline"
+                      class="icon-container"
+                      [matMenuTriggerFor]="menuMinimal"
+                      (click)="$event.stopPropagation()"
+                      >
+                      <mat-icon>timeline</mat-icon>
+                    </button>
+                    <mat-menu #menuMinimal="matMenu">
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal', 'Absolute')">Absolute</button>
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal', 'Relative')">Relative</button>
+                    </mat-menu>
+                    </div>
+                    <div
+                      class="card2 average"
+                      (click)="engagementLevelClick('Average', engagementLevel.average)">
+                      <div class="label2">Average</div>
+                      <div class="value">{{ engagementLevel.average.length }}</div>
+                      <!-- <div matTooltip="View Timeline"
+                        class="icon-container"
+                        (click)="navigatetoTimeline(engagementLevel.average, 'Average')">
+                        <mat-icon>timeline</mat-icon>
+                      </div> -->
+                      <button 
+                      mat-icon-button
+                      matTooltip="View Timeline"
+                      class="icon-container"
+                      [matMenuTriggerFor]="menuAverage"
+                      (click)="$event.stopPropagation()"
+                      >
+                      <mat-icon>timeline</mat-icon>
+                    </button>
+                    <mat-menu #menuAverage="matMenu">
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.average, 'Average', 'Absolute')">Absolute</button>
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.average, 'Average', 'Relative')">Relative</button>
+                    </mat-menu>
+                    </div>
+                    <div
+                      class="card2 optimal"
+                      (click)="engagementLevelClick('Optimal', engagementLevel.optimal)">
+                      <div class="label2">Optimal</div>
+                      <div class="value">{{ engagementLevel.optimal.length }}</div>
+                      <!-- <div matTooltip="View Timeline"
+                        class="icon-container"
+                        (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal')">
+                        <mat-icon>timeline</mat-icon>
+                      </div> -->
+                      <button 
+                      mat-icon-button
+                      matTooltip="View Timeline"
+                      class="icon-container"
+                      [matMenuTriggerFor]="menuOptimal"
+                      (click)="$event.stopPropagation()"
+                      >
+                      <mat-icon>timeline</mat-icon>
+                    </button>
+                    <mat-menu #menuOptimal="matMenu">
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal', 'Absolute')">Absolute</button>
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal', 'Relative')">Relative</button>
+                    </mat-menu>
+                    </div>
+                    <div
+                      class="card2 super-optimal"
+                      (click)="engagementLevelClick('Super Optimal', engagementLevel.superoptimal)">
+                      <div class="label2">Super Optimal</div>
+                      <div class="value">{{ engagementLevel.superoptimal.length }}</div>
+                      <!-- <div matTooltip="View Timeline"
+                        class="icon-container"
+                        (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal')">
+                        <mat-icon>timeline</mat-icon>
+                      </div> -->
+                      <button 
+                      mat-icon-button
+                      matTooltip="View Timeline"
+                      class="icon-container"
+                      [matMenuTriggerFor]="menuSuperoptimal"
+                      (click)="$event.stopPropagation()"
+                      >
+                      <mat-icon>timeline</mat-icon>
+                    </button>
+                    <mat-menu #menuSuperoptimal="matMenu">
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal', 'Absolute')">Absolute</button>
+                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal', 'Relative')">Relative</button>
+                    </mat-menu>
+                    </div>
+                  </div>
+                </div>
+                
+              </div>
+          </div>
+        </div>
+        <div *ngIf="selectedCard" class="col-md-8 d-flex justify-content-left">
+          <div *ngIf="selectedCard.type !== 'Discontinued Participants' && !selectedMonthForSubscription" style="width: 50%;" class="selected-card" [ngClass]="{
+            'active-border': selectedCard.type === 'Active subscription',
+            'non-active-border': selectedCard.type === 'Non-Active Subscription End',
+            'discontinued-border': selectedCard.type === 'Discontinued Participants',
+            'all-participant-border': selectedCard.type === 'All Participant'
+          }">
+        <div style="margin-bottom: 20px;">
+          <h4 style="color: grey; margin-bottom: 10px;">Filter by finance</h4>
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; margin-bottom: 20px;"> 
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, 'regular')"
+                [checked]="checkedValues.includes('regular')">
+                Regular
+              </mat-checkbox>
+            <!-- </div> -->
+  
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, 'defaulted')"
+                [checked]="checkedValues.includes('defaulted')">
+                Defaulted
+              </mat-checkbox>
+            <!-- </div> -->
+  
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, 'locked')"
+                [checked]="checkedValues.includes('locked')">
+                Locked
+              </mat-checkbox>
+            <!-- </div> -->
+  
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, 'banned')"
+                [checked]="checkedValues.includes('banned')">
+                Banned
+              </mat-checkbox>
+            <!-- </div> -->
+  
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, 'late')"
+                [checked]="checkedValues.includes('late')">
+                Late
+              </mat-checkbox>
+            <!-- </div> -->
+  
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, 'discontinued')"
+                [checked]="checkedValues.includes('discontinued')">
+                Discontinued
+              </mat-checkbox>
+            <!-- </div> -->
+  
+            <!-- <div style="flex: 1 0 30%; max-width: 30%;"> -->
+              <mat-checkbox
+                (change)="onCheckboxChange($event, undefined)"
+                [checked]="checkedValues.includes(undefined)">
+                Undefined
+              </mat-checkbox>
+            <!-- </div> -->
+          </div>
+        </div>
+            <h4 [style.color]="selectedCard.type === 'Active subscription' ? '#34C759' : 
+            selectedCard.type === 'Non-Active Subscription End' ? '#F2C464' : 
+            selectedCard.type === 'Discontinued Participants' ? '#FF3737' : '#000000'" *ngIf="selectedCard">{{ selectedCard.type }}</h4>
+          <div>
+            <mat-form-field appearance="outline" style="width: 100%;">
+              <mat-label>Sort By</mat-label>
+              <mat-select [(value)]="selectedSortOption" (selectionChange)="sortByOption()">
+                <mat-option value="journeyAtoZ">Journey A to Z</mat-option>
+                <mat-option value="participantHighToLow">Participant High to Low</mat-option>
+                <mat-option value="participantLowToHigh">Participant Low to High</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+            <hr>
+            <div *ngIf="selectedCard.type === 'Non-Active Subscription End' || selectedCard.type === 'Active subscription'">
+              <h5 style="color: #FF3737;font-size: 16px;">Active Journeys</h5>
+              <ul style="text-align: left;" class="list-unstyled scroll-container">
+                <li *ngFor="let journey of selectedCard.activeJourney; let i = index" 
+                  style="display: flex; justify-content: space-between; cursor: pointer; padding: 8px; margin-bottom: 5px; border-bottom: 1px solid #f0f0f0; border-radius: 4px;" 
+                  (click)="onJourneyChecked(null, journey, 'active')" 
+                  [ngClass]="{'all-participant-selected': isSelected(journey, 'active')}">
+                  <span style="font-weight: 400;font-size: 16px;">{{ mapJourney[journey] }}</span>
+                  <span style="font-weight: 400;font-size: 16px;color: #007bff;">{{ selectedCard.activeJourneyCount[journey].count }}</span>
+                </li>
+              </ul>
+              <h5 style="color: #FF3737;font-size: 16px;">Non-Active Journeys</h5>
+              <ul style="text-align: left;" class="list-unstyled scroll-container">
+                  <li *ngFor="let journey of selectedCard.lastJourney; let i = index"  style="display: flex; justify-content: space-between; cursor: pointer; padding: 8px; margin-bottom: 5px; border-bottom: 1px solid #f0f0f0; border-radius: 4px;"   (click)="onJourneyChecked(null, journey, 'last')" [ngClass]="{'all-participant-selected': isSelected(journey, 'last')}">
+                      <span style="font-weight: 400;font-size: 16px;">{{ mapJourney[journey] }}</span>
+                      <span style="font-weight: 400;font-size: 16px;color: #007bff;">{{ selectedCard.lastJourneyCount[journey].count }}</span>
+                  </li>
+              </ul>
+            </div>
+          <!-- All Participants -->
+          <div *ngIf="selectedCard.type === 'All Participant'">
+            <h5 style="color: #FF3737;">Journeys</h5>
+            <ul style="text-align: left;" class="list-unstyled scroll-container">
+                <li *ngFor="let journey of selectedCard.journey; let i = index" style="display: flex; justify-content: space-between; cursor: pointer;" (click)="onJourneyChecked(null, journey, 'all')" [ngClass]="{'all-participant-selected': isSelected(journey, 'all')}">
+                    <span style="font-weight: 600;font-size: 16px;">{{ mapJourney[journey] }}</span>
+                    <span style="font-weight: 600;font-size: 16px;color: #007bff;;">{{ selectedCard.journeyCount[journey].count }}</span>
+                </li>
+            </ul>
+            <!-- <h5 style="color: red;">Non-Active Journeys</h5>
+            <ul style="text-align: left;" class="list-unstyled scroll-container">
+                <li *ngFor="let journey of selectedCard.lastJourney; let i = index" style="display: flex; justify-content: space-between; cursor: pointer;" (click)="onJourneyChecked(null, journey, 'last')" [ngClass]="{'all-participant-selected': isSelected(journey, 'last')}">
+                    <span style="font-weight: 700;font-size: 20px;">{{ journey }}</span>
+                    <span style="font-weight: 700;font-size: 20px;color: blue">{{ selectedCard.lastJourneyCount[journey].count }}</span>
+                </li>
+            </ul> -->
+          </div>
+            <!-- for non active split -->
+            <!-- <div *ngIf="selectedCard.type === 'Non-Active Subscription End'">
+              <h3 style="color: red;">Active Journeys</h3>
+              <ul style="text-align: left;" class="list-unstyled">
+                <li *ngFor="let journey of selectedCard.activeJourney; let i = index" style="display: flex; justify-content: space-between; cursor: pointer;" (click)="onJourneyChecked(null, journey, 'active')" [ngClass]="{'all-participant-selected': isSelected(journey, 'active')}">
+                  <span style="font-weight: 700;font-size: 20px;">{{ journey }}</span>
+                  <span style="font-weight: 700;font-size: 20px;color: blue;">{{ selectedCard.activeJourneyCount[journey].count }}</span>
+                </li>
+              </ul>
+              <h3 style="color: red;">Non-Active Journeys</h3>
+              <ul style="text-align: left;" class="list-unstyled">
+                <li *ngFor="let journey of selectedCard.lastJourney; let i = index" style="display: flex; justify-content: space-between; cursor: pointer;" (click)="onJourneyChecked(null, journey, 'last')" [ngClass]="{'all-participant-selected': isSelected(journey, 'last')}">
+                  <span style="font-weight: 700;font-size: 20px;">{{ journey }}</span>
+                  <span style="font-weight: 700;font-size: 20px;color: blue">{{ selectedCard.lastJourneyCount[journey].count }}</span>
+                </li>
+              </ul>
+            </div> -->
+            <!-- <div *ngIf="selectedCard.type === 'Active subscription'">
+              <ul style="text-align: left;" class="list-unstyled">
+                  <li *ngFor="let journey of selectedCard.journey; let i = index" style="display: flex; justify-content: space-between; cursor: pointer;" (click)="onJourneyChecked(null, journey)" [ngClass]="{'selected': isSelected(journey)}">
+                      <span style="font-weight: 700;font-size: 20px;">{{ journey }}</span>
+                      <span style="font-weight: 700;font-size: 20px;color: blue">{{ selectedCard.journeyCount[journey].count }}</span>
+                  </li>
+              </ul>
+          </div> -->
+  
+            <!-- <div *ngIf="selectedCard.type !== 'All Participant' || selectedCard.type !== 'Non-Active Subscription End' || selectedCard.type !=='Active subscription'">
+              <ul style="text-align: left;" class="list-unstyled">
+                <li *ngFor="let journey of selectedCard.journey; let i = index" style="display: flex; justify-content: space-between; cursor: pointer;" (click)="onJourneyChecked(null, journey)" [ngClass]="{'selected': isSelected(journey)}">
+                  <span style="font-weight: 700;font-size: 20px;">{{ journey }}</span>
+                  <span style="font-weight: 700;font-size: 20px;color: blue">{{ selectedCard.journeyCount[journey].count }}</span>
+                </li>
+              </ul>
+            </div> -->
+          </div>
+          <div *ngIf="selectedCard.type !== 'Discontinued Participants' && !selectedMonthForSubscription" class="selected-profiles" style="margin-left: 20px;width: 30%;">
+            <!-- <div class="status-label" style="padding-bottom: 10px;">
+              <mat-icon>monetization_on</mat-icon> 
+              <span class="hyphen">-</span>
+              Finance Status
+              <mat-icon>person</mat-icon>
+              <span class="hyphen">-</span>
+              Customer Status
+            </div> -->
+            <h4 style="font-weight: 700;" [style.color]="selectedCard.type === 'Active subscription' ? '#34C759' : 
+            selectedCard.type === 'Non-Active Subscription End' ? '#F2C464' : 
+            selectedCard.type === 'Discontinued Participants' ? '#FF3737': '#000000'">
+              {{selectedJourneysProfileIds.length === 0 ? 'No Journey Selected' : mapJourney[selectedJourneys] + ' - ' + selectedJourneysProfileIds.length }}
+            </h4>     
+            <div *ngIf="selectedJourneysProfileIds.length !== 0" style="display: flex; align-items: center; width: 100%;">
+              <mat-form-field appearance="outline" style="flex: 1; margin-right: 8px;">
+                <mat-label>Sort By</mat-label>
+                <mat-select [(value)]="selectedSortOption" (selectionChange)="sortByOption()">
+                  <mat-option value="nameAtoZ">Name A to Z</mat-option>
+                  <mat-option value="nameZtoA">Name Z to A</mat-option>
+                  <mat-option value="subsEarliest">Subscription End Earliest First</mat-option>
+                  <mat-option value="subsLatest">Subscription End Latest First</mat-option>
+                  <mat-option *ngIf="selectedCard.type === 'All Participant'" value="activeFirst">Active First</mat-option>
+                  <mat-option *ngIf="selectedCard.type === 'All Participant'" value="nonactiveFirst">Non-Active First</mat-option>
+                </mat-select>
+              </mat-form-field>
+              
+              <!-- <button mat-icon-button class="square-icon-button" matTooltip="View Timeline" color="primary" [matMenuTriggerFor]="menu">
+                <mat-icon>timeline</mat-icon>
+              </button>&nbsp;&nbsp;&nbsp; -->
+              <!-- print -->
+              <button mat-icon class="square-icon-button" matTooltip="View Timeline" color="primary" (click)="printDataExcel(mapJourney[selectedJourneys])">
+                <mat-icon>print</mat-icon>
+              </button>
+              
+              <mat-menu #menu="matMenu">
+                <button mat-menu-item (click)="navigatetoTimeline(selectedJourneysProfileIds, selectedCard.type,'Absolute')">Absolute</button>
+                <button mat-menu-item (click)="navigatetoTimeline(selectedJourneysProfileIds, selectedCard.type,'Relative')">Relative</button>
+              </mat-menu>
+            </div>
+             
+            <hr>
+  
+            <p *ngIf="selectedJourneysProfileIds.length !== 0" style="text-align: left;font-weight: bold;color: #007bff;;font-size: 20px;">
+              <!-- <button mat-raised-button style="margin-right: 10px;"><mat-icon> email</mat-icon> Mail</button>
+              <button mat-raised-button style="margin-right: 10px;"><mat-icon>notifications</mat-icon> Notification</button>
+              <button mat-raised-button style="margin-right: 10px;"><mat-icon> message</mat-icon> Message</button><br><br> -->
+              <!-- <mat-checkbox (change)="selectAllProfileIds($event)">
+                {{selectedProfileIds.length + ' selected'}}
+              </mat-checkbox> -->
+            </p>
+            <button *ngIf="selectedJourneysProfileIds.length !== 0 && selectedProfileIds.length === 1"  mat-raised-button style="margin-right: 10px;" (click)="userProfile()"><mat-icon>account_circle</mat-icon> View Profile </button>
+            <br *ngIf="selectedProfileIds.length === 1">
+            <br *ngIf="selectedProfileIds.length === 1">
+            <ul *ngIf="selectedJourneysProfileIds.length > 0" style="text-align: left;font-weight: 600;font-size:16px;" class="list-unstyled">
+              <li style="cursor: pointer;" *ngFor="let profileId of selectedJourneysProfileIds; let i = index"
+                  (click)="onProfileIdClickedSubsEnd(profileId)" 
+                  (mouseenter)="hoveredProfileId = profileId" 
+                  (mouseleave)="hoveredProfileId = null" 
+                  [ngStyle]="{
+                      'background-color': hoveredProfileId === profileId ? 'black' : 'transparent',
+                      'color': hoveredProfileId === profileId ? 'white' : 'black',
+                      'border-radius': hoveredProfileId === profileId ? '10px' : '0',
+                      'margin-left': hoveredProfileId === profileId ? '-15px' : '0',
+                      'padding-left': hoveredProfileId === profileId ? '15px' : '0',
+                      'padding-right': hoveredProfileId === profileId ? '15px' : '0',
+                      'margin-right': hoveredProfileId === profileId ? '-15px' : '0'
+                    }">
+                {{ i + 1 }}. 
+                <span *ngIf="mapProfile[profileId];">
+                  {{ mapProfile[profileId] }}  
+                  <div class="status-container">
+                    <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                      <mat-icon>monetization_on</mat-icon> 
+                      <span class="hyphen">-</span>
+                      <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                        {{ financialStatusMap[profileId] || 'Undefined' }}
+                      </span>
+                    </div>
+                    <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                      <mat-icon>person</mat-icon> 
+                      <span class="hyphen">-</span>
+                      <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                        {{ customerStatusMap[profileId] || 'Undefined' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="subscription-end">
+                    <span [ngClass]="{'subs-end': true, 'status-label-hover': hoveredProfileId === profileId}">
+                      Subscription End on : {{ subscriptionEndMap[profileId] | date:'MMM d yyyy' }}
+                    </span>
+                    <!-- {{ subscriptionEndMap[profileId] | date:'MMM d yyyy' }} -->
+                  </div>
+                </span>
+                <span *ngIf="!mapProfile[profileId]">
+                  No Profile Name
+                </span>
+                <hr>
+              </li>
+            </ul>
+          </div>
+  
+          <div *ngIf="(selectedCard.type === 'Discontinued Participants') && !selectedMonthForSubscription" class="selected-profiles" style="margin-left: 20px;width: 36%;">
+            <div style="margin-bottom: 20px;">
+              <h4 style="color: grey; margin-bottom: 10px;">Filter by finance</h4> 
+              <div style="display: flex; flex-wrap: wrap; justify-content: space-between; margin-bottom: 20px;"> 
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, 'regular')"
+                    [checked]="checkedValues.includes('regular')">
+                    Regular
+                  </mat-checkbox>
+                </div>
+      
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, 'defaulted')"
+                    [checked]="checkedValues.includes('defaulted')">
+                    Defaulted
+                  </mat-checkbox>
+                </div>
+      
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, 'locked')"
+                    [checked]="checkedValues.includes('locked')">
+                    Locked
+                  </mat-checkbox>
+                </div>
+      
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, 'banned')"
+                    [checked]="checkedValues.includes('banned')">
+                    Banned
+                  </mat-checkbox>
+                </div>
+      
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, 'late')"
+                    [checked]="checkedValues.includes('late')">
+                    Late
+                  </mat-checkbox>
+                </div>
+      
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, 'discontinued')"
+                    [checked]="checkedValues.includes('discontinued')">
+                    Discontinued
+                  </mat-checkbox>
+                </div>
+      
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox
+                    (change)="onCheckboxChange($event, undefined)"
+                    [checked]="checkedValues.includes(undefined)">
+                    Undefined
+                  </mat-checkbox>
+                </div>
+              </div>
+            </div>
+            <h4 *ngIf="selectedCard.type === 'Discontinued Participants'" style="color: #FF3737;">Discontinued Participants</h4>        
+            <!-- <div class="status-label" style="padding-bottom: 10px;">
+              <mat-icon>monetization_on</mat-icon> 
+              <span class="hyphen">-</span>
+              Finance Status
+              <mat-icon>person</mat-icon>
+              <span class="hyphen">-</span>
+              Customer Status
+            </div> -->
+            <div style="display: flex; align-items: center; width: 100%;">
+              <mat-form-field appearance="outline" style="flex: 1; margin-right: 8px;">
+                <mat-label>Sort By</mat-label>
+                <mat-select [(value)]="selectedSortOption" (selectionChange)="sortByOption()">
+                  <mat-option value="nameAtoZ">Name A to Z</mat-option>
+                  <mat-option value="nameZtoA">Name Z to A</mat-option>
+                  <!-- <mat-option value="subsEarliest">Subscription End Earliest First</mat-option>
+                  <mat-option value="subsLatest">Subscription End Latest First</mat-option>
+                  <mat-option *ngIf="selectedCard.type === 'All Participant'" value="activeFirst">Active First</mat-option>
+                  <mat-option *ngIf="selectedCard.type === 'All Participant'" value="nonactiveFirst">Non-Active First</mat-option> -->
+                </mat-select>
+              </mat-form-field>
+              <button mat-icon-button class="square-icon-button" matTooltip="View Timeline" color="primary" [matMenuTriggerFor]="menuDis">
+                <mat-icon>timeline</mat-icon>
+              </button>
+              <mat-menu #menuDis="matMenu">
+                <button mat-menu-item (click)="navigatetoTimeline(selectedCard.profileIds, selectedCard.type,'Absolute')">Absolute</button>
+                <button mat-menu-item (click)="navigatetoTimeline(selectedCard.profileIds, selectedCard.type,'Relative')">Relative</button>
+              </mat-menu>
+            </div>  
+            <hr>
+            <p *ngIf="selectedCard.profileIds.length !== 0" style="text-align: left;font-weight: bold;color: #007bff;;font-size: 20px;">
+              <!-- <button mat-raised-button style="margin-right: 10px;"><mat-icon> email</mat-icon> Mail</button>
+              <button mat-raised-button style="margin-right: 10px;"><mat-icon>notifications</mat-icon> Notification</button>
+              <button mat-raised-button style="margin-right: 10px;"><mat-icon> message</mat-icon> Message</button><br><br> -->
+              <!-- <mat-checkbox (change)="selectAllProfileIdsDiscontinued($event)">
+                {{selectedProfileIdsDiscontinued.length + ' selected'}}
+              </mat-checkbox> -->
+            </p>
+            <button *ngIf="selectedProfileIdsDiscontinued.length === 1"  mat-raised-button style="margin-right: 10px;" (click)="userProfile()"><mat-icon>account_circle</mat-icon> View Profile </button>
+            <br *ngIf="selectedProfileIdsDiscontinued.length === 1">
+            <br *ngIf="selectedProfileIdsDiscontinued.length === 1">
+            <ul *ngIf="selectedProfileIdsDiscontinued.length > 0" style="text-align: left;font-weight: bold;font-size:20px;" class="list-unstyled">
+              <li style="cursor: pointer;" *ngFor="let profileId of selectedProfileIdsDiscontinued; let i = index"
+              (click)="onProfileIdClickedSubsEnd(profileId)" 
+              (mouseenter)="hoveredProfileId = profileId" 
+              (mouseleave)="hoveredProfileId = null" 
+              [ngStyle]="{
+                  'background-color': hoveredProfileId === profileId ? 'black' : 'transparent',
+                  'color': hoveredProfileId === profileId ? 'white' : 'black',
+                  'border-radius': hoveredProfileId === profileId ? '10px' : '0',
+                  'margin-left': hoveredProfileId === profileId ? '-15px' : '0',
+                  'padding-left': hoveredProfileId === profileId ? '15px' : '0',
+                  'padding-right': hoveredProfileId === profileId ? '15px' : '0',
+                  'margin-right': hoveredProfileId === profileId ? '-15px' : '0'
+                }">
+            {{ i + 1 }}. 
+            <span *ngIf="mapProfile[profileId];">
+              {{ mapProfile[profileId] }}  
+              <div class="status-container">
+                <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                  <mat-icon>monetization_on</mat-icon> 
+                  <span class="hyphen">-</span>
+                  <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                    {{ financialStatusMap[profileId] || 'Undefined' }}
+                  </span>
+                </div>
+                <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                  <mat-icon>person</mat-icon> 
+                  <span class="hyphen">-</span>
+                  <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                    {{ customerStatusMap[profileId] || 'Undefined' }}
+                  </span>
+                </div>
+              </div>
+            </span>
+            <span *ngIf="!mapProfile[profileId]">
+              No Profile Name
+            </span>
+            <hr>
+            <!-- <span *ngIf="mapProfile[profileId];">
+              {{ mapProfile[profileId] }}  
+              <div [ngClass]="{'status-label': true, 'status-label-hover': hoveredProfileId === profileId}">
+                Financial Status - <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">({{ financialStatusMap[profileId] || 'Undefined' }})</span>
+              </div>
+              <div [ngClass]="{'status-label': true, 'status-label-hover': hoveredProfileId === profileId}">
+                Customer Status - <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">({{ customerStatusMap[profileId] || 'Undefined' }})</span>
+              </div>
+            </span>
+            <span *ngIf="!mapProfile[profileId]">
+              No Profile Name
+            </span> -->
+          </li>
+          </ul>
+          </div>
+        </div>        
+         
+          
+          <!-- subscription end -->
+          <div *ngIf="selectedMonthForSubscription" class="selected-profiles" style="margin-left: 20px;width: 30%;">
+            <div style="margin-bottom: 20px;">
+              <h4 style="color: grey; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                Filter by finance
+                <div style="display: flex; gap: 10px;">
+                  <button mat-raised-button color="primary" (click)="downloadCSV()">
+                    <mat-icon>print</mat-icon>
+                  </button>
+                  <button mat-raised-button color="primary" [matMenuTriggerFor]="menuSubsMonth">
+                    <mat-icon>timeline</mat-icon>
+                  </button>
+                  <mat-menu #menuSubsMonth="matMenu">
+                    <button mat-menu-item (click)="navigatetoTimeline(selectedProfileIdsForMonth, 'Subscription Ends on ' + selectedMonthForSubscription, 'Absolute')">Absolute</button>
+                    <button mat-menu-item (click)="navigatetoTimeline(selectedProfileIdsForMonth, 'Subscription Ends on ' + selectedMonthForSubscription, 'Relative')">Relative</button>
+                  </mat-menu>
+                </div>
+              </h4>
+                       
+              <div style="display: flex; flex-wrap: wrap; justify-content: space-between; margin-bottom: 20px;"> 
+                <!-- <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, 'regular')" [checked]="selectedFinancialStatuses.includes('regular')">
+                    Regular
+                  </mat-checkbox>
+                </div>
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, 'defaulted')" [checked]="selectedFinancialStatuses.includes('defaulted')">
+                    Defaulted
+                  </mat-checkbox>
+                </div>
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, 'locked')" [checked]="selectedFinancialStatuses.includes('locked')">
+                    Locked
+                  </mat-checkbox>
+                </div>
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, 'banned')" [checked]="selectedFinancialStatuses.includes('banned')">
+                    Banned
+                  </mat-checkbox>
+                </div>
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, 'late')" [checked]="selectedFinancialStatuses.includes('late')">
+                    Late
+                  </mat-checkbox>
+                </div>
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, 'discontinued')" [checked]="selectedFinancialStatuses.includes('discontinued')">
+                    Discontinued
+                  </mat-checkbox>
+                </div>
+                <div style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox (change)="onCheckboxChange($event, undefined)" [checked]="selectedFinancialStatuses.includes(undefined)">
+                    Undefined
+                  </mat-checkbox>
+                </div> -->
+                <div *ngFor="let status of ['regular', 'defaulted', 'locked', 'banned', 'late', 'discontinued', undefined]" style="flex: 1 0 30%; max-width: 30%;">
+                  <mat-checkbox 
+                    (change)="onCheckboxChange($event, status)" 
+                    [checked]="selectedFinancialStatuses.includes(status)">
+                    {{ status || 'Undefined' }}
+                  </mat-checkbox>
+                </div>
+              </div>
+            </div>.
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <mat-form-field appearance="outline" style="width: 100%;">
+                <mat-label>Filter By Journey</mat-label>
+                <mat-select 
+                  multiple 
+                  [(value)]="selectedActiveJourneys" 
+                  (selectionChange)="filterJourneyCount()">
+                  <mat-option *ngFor="let journey of uniqueActiveJourneys" [value]="journey">
+                    {{ mapJourney[journey] }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>  
+              <mat-form-field appearance="outline" style="width: 100%;">
+                <mat-label>Sort By</mat-label>
+                <mat-select [(value)]="selectedSortOption" (selectionChange)="sortByOption()">
+                  <mat-option value="nameAtoZ">Name A to Z</mat-option>
+                  <mat-option value="nameZtoA">Name Z to A</mat-option>
+                  <mat-option value="subsEarliest">Subscription End Earliest First</mat-option>
+                  <mat-option value="subsLatest">Subscription End Latest First</mat-option>
+                  <mat-option value="activeFirst">Active First</mat-option>
+                  <mat-option value="nonactiveFirst">Non-Active First</mat-option>
+                </mat-select>
+              </mat-form-field>  
+  
+            </div>
+                 
+            <h2 style="color: #FF3737;">Subscription End {{selectedMonthForSubscription + ' (' + selectedProfileIdsForMonth.length + ')'}}</h2>        
+            <hr>
+            <p *ngIf="selectedProfileIdsForMonth.length !== 0" style="text-align: left;font-weight: bold;color: #007bff;;font-size: 20px;">
+              <!-- <button mat-raised-button style="margin-right: 10px;"><mat-icon> email</mat-icon> Mail</button>
+              <button mat-raised-button style="margin-right: 10px;"><mat-icon>notifications</mat-icon> Notification</button>
+              <button mat-raised-button style="margin-right: 10px;"><mat-icon> message</mat-icon> Message</button><br><br> -->
+              <!-- <mat-checkbox (change)="selectAllProfileIdsEndSubs($event)">
+                {{selectedProfileIdsForEndSubs.length + ' selected'}}
+              </mat-checkbox> -->
+            </p>
+            <ul *ngIf="selectedMonthForSubscription" style="text-align: left;font-weight: bold;font-size:20px;" class="list-unstyled">
+              <li style="cursor: pointer;" *ngFor="let profileId of selectedProfileIdsForMonth; let i = index"
+              (click)="onProfileIdClickedSubsEnd(profileId)" 
+              (mouseenter)="hoveredProfileId = profileId" 
+              (mouseleave)="hoveredProfileId = null" 
+              [ngStyle]="{
+                  'background-color': hoveredProfileId === profileId ? 'black' : 'transparent',
+                  'color': hoveredProfileId === profileId ? 'white' : 'black',
+                  'border-radius': hoveredProfileId === profileId ? '10px' : '0',
+                  'margin-left': hoveredProfileId === profileId ? '-15px' : '0',
+                  'padding-left': hoveredProfileId === profileId ? '15px' : '0',
+                  'padding-right': hoveredProfileId === profileId ? '15px' : '0',
+                  'margin-right': hoveredProfileId === profileId ? '-15px' : '0'
+                }">
+            {{ i + 1 }}. 
+            <span *ngIf="mapProfile[profileId];">
+              {{ mapProfile[profileId] }}  
+              <span *ngIf="activeJourneyMap[profileId]">
+                ({{ activeJourneyMap[profileId] }} - Active)
+              </span>
+              <span *ngIf="!activeJourneyMap[profileId] && lastJourneyMap[profileId]">
+                ({{ lastJourneyMap[profileId] }} - Last)
+              </span>
+              <div class="status-container">
+                <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                  <mat-icon>monetization_on</mat-icon> 
+                  <span class="hyphen">-</span>
+                  <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                    {{ financialStatusMap[profileId] || 'Undefined' }}
+                  </span>
+                </div>
+                <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                  <mat-icon>person</mat-icon> 
+                  <span class="hyphen">-</span>
+                  <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                    {{ customerStatusMap[profileId] || 'Undefined' }}
+                  </span>
+                </div>
+              </div>
+              <div class="subscription-end">
+                <span [ngClass]="{'subs-end': true, 'status-label-hover': hoveredProfileId === profileId}">
+                  Subscription End on : {{ subscriptionEndMap[profileId] | date:'MMM d yyyy' }}
+                </span>
+                <!-- {{ subscriptionEndMap[profileId] | date:'MMM d yyyy' }} -->
+              </div>
+            </span>
+            <span *ngIf="!mapProfile[profileId]">
+              No Profile Name
+            </span>
+            <hr>
+            <!-- <span *ngIf="mapProfile[profileId];">
+              {{ mapProfile[profileId] }}  
+              <span *ngIf="activeJourneyMap[profileId]">
+                ({{ activeJourneyMap[profileId] }} - Active)
+              </span>
+              <span *ngIf="!activeJourneyMap[profileId] && lastJourneyMap[profileId]">
+                ({{ lastJourneyMap[profileId] }} - Last)
+              </span>
+              <div style="font-size: 18px;" [ngClass]="{'status-label': true, 'status-label-hover': hoveredProfileId === profileId}">
+                Financial Status - <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">({{ financialStatusMap[profileId] || 'Undefined' }})</span>
+              </div>
+              <div style="font-size: 18px;" [ngClass]="{'status-label': true, 'status-label-hover': hoveredProfileId === profileId}">
+                Customer Status - <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">({{ customerStatusMap[profileId] || 'Undefined' }})</span>
+              </div>
+            </span>
+            
+            <span *ngIf="!mapProfile[profileId]">
+              No Profile Name
+            </span> -->
+          </li>
+            </ul>
+          </div>
+          <!-- Engagement Level Profile IDs Section -->
+          <div *ngIf="selectedEngagement" class="selected-profiles" style="margin-left: 20px;width: 30%;">
+            <h2 style="color: #FF3737;">{{ selectedEngagement +' (' + selectedEngagementProfileIds.length + ')'}}</h2>
+            <hr>
+            
+            <!-- Filter by finance -->
+            <h4 style="color: grey; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                Filter by finance
+                <button mat-raised-button color="primary" (click)="downloadCSVEngagement()"><mat-icon>print</mat-icon></button>
+            </h4>
+            <div class="checkbox-grid">
+              <div *ngFor="let status of ['regular', 'defaulted', 'locked', 'banned', 'late', 'discontinued', undefined]" 
+                   class="checkbox-item">
+                  <mat-checkbox 
+                      (change)="onCheckboxChange($event, status)" 
+                      [checked]="selectedFinancialStatuses.includes(status)">
+                      {{ status || 'Undefined' }}
+                  </mat-checkbox>
+              </div>
+            </div>
+            <!-- <div style="display: flex; flex-wrap: wrap; justify-content: space-between; margin-bottom: 20px;"> 
+                <div *ngFor="let status of ['regular', 'defaulted', 'locked', 'banned', 'late', 'discontinued', undefined]" style="flex: 1 0 30%; max-width: 30%;">
+                    <mat-checkbox 
+                        (change)="onCheckboxChange($event, status)" 
+                        [checked]="selectedFinancialStatuses.includes(status)">
+                        {{ status || 'Undefined' }}
+                    </mat-checkbox>
+                </div>
+            </div> -->
+
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <mat-form-field appearance="outline" style="width: 100%;">
+                <mat-label>Filter By Journey</mat-label>
+                <mat-select 
+                  multiple 
+                  [(value)]="selectedActiveJourneys" 
+                  (selectionChange)="filterJourneyCount()">
+                  <mat-option *ngFor="let journey of uniqueActiveJourneys" [value]="journey">
+                    {{ mapJourney[journey] }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field> 
+              <mat-form-field appearance="outline" style="width: 100%;">
+                <mat-label>Sort By</mat-label>
+                <mat-select [(value)]="selectedSortOption" (selectionChange)="sortByOption()">
+                  <mat-option value="nameAtoZ">Name A to Z</mat-option>
+                  <mat-option value="nameZtoA">Name Z to A</mat-option>
+                  <mat-option value="subsEarliest">Subscription End Earliest First</mat-option>
+                  <mat-option value="subsLatest">Subscription End Latest First</mat-option>
+                  <mat-option value="activeFirst">Active First</mat-option>
+                  <mat-option value="nonactiveFirst">Non-Active First</mat-option>
+                </mat-select>
+              </mat-form-field>  
+            </div>
+            <ul *ngIf="selectedEngagementProfileIds.length > 0" style="text-align: left;font-weight: bold;font-size:20px;" class="list-unstyled">
+                <li *ngFor="let profileId of selectedEngagementProfileIds; let i = index"
+                    (click)="onProfileIdClickedSubsEnd(profileId)" 
+                    (mouseenter)="hoveredProfileId = profileId" 
+                    (mouseleave)="hoveredProfileId = null" 
+                    [ngStyle]="{
+                        'background-color': hoveredProfileId === profileId ? 'black' : 'transparent',
+                        'color': hoveredProfileId === profileId ? 'white' : 'black',
+                        'border-radius': hoveredProfileId === profileId ? '10px' : '0',
+                        'margin-left': hoveredProfileId === profileId ? '-15px' : '0',
+                        'padding-left': hoveredProfileId === profileId ? '15px' : '0',
+                        'padding-right': hoveredProfileId === profileId ? '15px' : '0',
+                        'margin-right': hoveredProfileId === profileId ? '-15px' : '0'
+                    }">
+                    {{ i + 1 }}. 
+                    <span *ngIf="mapProfile[profileId];">
+                      {{ mapProfile[profileId] }}  
+                      <span *ngIf="activeJourneyMap[profileId]">
+                        ({{ activeJourneyMap[profileId] }} - Active)
+                    </span>
+                    <span *ngIf="!activeJourneyMap[profileId] && lastJourneyMap[profileId]">
+                        ({{ lastJourneyMap[profileId] }} - Last)
+                    </span>
+                      <div class="status-container">
+                        <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                          <mat-icon>monetization_on</mat-icon> 
+                          <span class="hyphen">-</span>
+                          <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                            {{ financialStatusMap[profileId] || 'Undefined' }}
+                          </span>
+                        </div>
+                        <div class="status-label" [ngClass]="{'status-label-hover': hoveredProfileId === profileId}">
+                          <mat-icon>person</mat-icon> 
+                          <span class="hyphen">-</span>
+                          <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">
+                            {{ customerStatusMap[profileId] || 'Undefined' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="subscription-end">
+                        <span [ngClass]="{'subs-end': true, 'status-label-hover': hoveredProfileId === profileId}">
+                          Subscription End on : {{ subscriptionEndMap[profileId] | date:'MMM d yyyy' }}
+                        </span>
+                        <!-- {{ subscriptionEndMap[profileId] | date:'MMM d yyyy' }} -->
+                      </div>
+                    </span>
+                    <span *ngIf="!mapProfile[profileId]">
+                      No Profile Name
+                    </span>
+                    <hr>
+                    <!-- <span *ngIf="mapProfile[profileId];">
+                        {{ mapProfile[profileId] }}  
+                        <span *ngIf="activeJourneyMap[profileId]">
+                            ({{ activeJourneyMap[profileId] }} - Active)
+                        </span>
+                        <span *ngIf="!activeJourneyMap[profileId] && lastJourneyMap[profileId]">
+                            ({{ lastJourneyMap[profileId] }} - Last)
+                        </span>
+                        <div style="font-size: 18px;" [ngClass]="{'status-label': true, 'status-label-hover': hoveredProfileId === profileId}">
+                            Financial Status - <span [ngClass]="{'financial-status': true, 'status-label-hover': hoveredProfileId === profileId}">({{ financialStatusMap[profileId] || 'Undefined' }})</span>
+                        </div>
+                        <div style="font-size: 18px;" [ngClass]="{'status-label': true, 'status-label-hover': hoveredProfileId === profileId}">
+                            Customer Status - <span [ngClass]="{'customer-status': true, 'status-label-hover': hoveredProfileId === profileId}">({{ customerStatusMap[profileId] || 'Undefined' }})</span>
+                        </div>
+                    </span>
+                    <span *ngIf="!mapProfile[profileId]">
+                        No Profile Name
+                    </span> -->
+                </li>
+            </ul>
+        </div>
+          <div *ngIf="selectedProfileIdsForEndSubs.length !== 0" class="selected-profiles" style="margin-left: 20px;width: 30%;">
+            <h2 style="color: #FF3737;">Participant Details</h2>        
+            <hr>
+            <ul *ngIf="selectedProfileIdsForEndSubs.length !== 0" style="text-align: left;font-weight: bold;font-size:20px;" class="list-unstyled">
+              <li *ngFor="let profileId of selectedProfileIdsForEndSubs">
+                <div class="participant-details">
+                  <div class="participant-name">{{mapProfile[profileId]}}</div>
+                  <div class="participant-contact">
+                    <div>{{mapEmail[profileId]}}</div>
+                    <div>{{mapPhone[profileId]}}</div>
+                  </div>
+                  <hr>
+                </div>
+              </li>
+            </ul>
+      </div>
+    </div>
+  

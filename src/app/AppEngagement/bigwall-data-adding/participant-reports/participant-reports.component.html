@@ -1,0 +1,98 @@
+\<!-- <mat-tab-group mat-stretch-tabs="true" mat-align-tabs="center"> -->
+    <!-- <mat-tab label="ADD"> -->
+        <div class="form-container">
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-select [(ngModel)]="selectedProfile" placeholder="Select Participant">
+                  <mat-option *ngFor="let participant of profileid" [value]="participant">
+                    {{ mapProfile[participant] }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Title</mat-label>
+                <input matInput placeholder="Enter Title" [(ngModel)]="title">
+              </mat-form-field>
+            </div>
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Description</mat-label>
+                <textarea matInput placeholder="Enter Description" [(ngModel)]="description"></textarea>
+              </mat-form-field>
+            </div>
+            <div>
+              <div>
+                <mat-slide-toggle 
+                class="example-margin"
+                [(ngModel)]="anonymous"
+                [color]="color"
+                [checked]="checked"
+                [disabled]="disabled">
+                Anonymous
+            </mat-slide-toggle>
+              </div>
+            <h5>Upload Images</h5>
+            <input #fileInput type="file" accept="image/*" (change)="importImages($event)">
+            <div class="row ml-2 mt-2">
+                <div class="mr-2 text-center" *ngFor="let preview of previewImages; let imgIndex = index">
+                <img [src]="preview" height="70" width="70">
+                <br>
+                <label class="removetext" style="color: red;" (click)="removeImage(imgIndex)">Remove</label>
+                </div>
+            </div>
+            </div>
+            <div class="button-container">
+              <button mat-raised-button color="primary" class="submit-button" [disabled]="submiting" (click)="submit()">
+                {{submiting ? 'Uploading' : 'Submit'}}
+            </button>
+            </div>
+          </div>
+    <!-- </mat-tab> -->
+    <!-- <mat-tab label="VIEW"> -->
+        <table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>
+            <!-- participant -->
+            <ng-container matColumnDef="participant">
+             <th mat-header-cell *matHeaderCellDef mat-sort-header> Participant </th>
+             <td mat-cell *matCellDef="let row"> {{mapProfile[row.profileid]}}</td>
+           </ng-container>
+            <!-- anonymous -->
+            <ng-container matColumnDef="anonymous">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Anonymous</th>
+              <td mat-cell *matCellDef="let row"> {{row.anonymous ? 'Yes' : 'No'}} </td>
+            </ng-container>
+            <!-- title -->
+            <ng-container matColumnDef="title">
+             <th mat-header-cell *matHeaderCellDef mat-sort-header>title</th>
+             <td mat-cell *matCellDef="let row"> {{row.title}} </td>
+           </ng-container>
+            <!-- description -->
+            <ng-container matColumnDef="description">
+             <th mat-header-cell *matHeaderCellDef mat-sort-header>description</th>
+             <td mat-cell *matCellDef="let row"> {{row.description}} </td>
+           </ng-container>
+            <!-- image -->
+            <ng-container matColumnDef="image">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Image</th>
+                <td mat-cell *matCellDef="let row">
+                    <img *ngFor="let image of row.images" class="image" [src]="image" alt="image">
+                </td>
+              </ng-container>
+            <!-- created -->
+            <ng-container matColumnDef="created">
+             <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
+             <td mat-cell *matCellDef="let row"> {{row.created.toDate() | date : 'short'}} </td>
+           </ng-container>
+           <ng-container matColumnDef="share">
+             <th mat-header-cell *matHeaderCellDef mat-sort-header>Share</th>
+             <td mat-cell *matCellDef="let row">
+               <button mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
+             </td>
+           </ng-container>
+           <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+           <tr mat-row *matRowDef="let row; columns: displayedColumns" ></tr>
+           <!-- <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr> -->
+         </table>
+         <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" aria-label="Select page of users"></mat-paginator>         
+    <!-- </mat-tab> -->
+<!-- </mat-tab-group> -->

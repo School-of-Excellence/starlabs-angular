@@ -1,0 +1,62 @@
+<div class="mainscreen">
+    <h4 class="title">Add {{newCustomer ? 'New Customer' : 'Purchase'}}</h4>
+    <form [formGroup]="purchaseForm" (ngSubmit)="addPurchase()">
+      <div>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Purchased Journey</mat-label>
+          <mat-select formControlName="journeyref">
+            <mat-option *ngFor="let option of journeyOption" [value]="option.id">{{option.journey}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="purchaseForm.get('journeyref').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div *ngIf="newCustomer">
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Full Name</mat-label>
+          <input matInput type="text" formControlName="name">
+          <mat-error *ngIf="purchaseForm.get('name').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+          <mat-error *ngIf="purchaseForm.get('email').hasError('required')">
+            Required
+          </mat-error>
+          <mat-error *ngIf="purchaseForm.get('email').hasError('email')">
+            Email is <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="countrycode" appearance="outline">
+          <mat-label>Code</mat-label>
+          <input matInput type="tel" formControlName="countrycode">
+          <mat-error *ngIf="purchaseForm.get('countrycode').hasError('required')">
+            <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field class="numberinputfields" appearance="outline">
+          <mat-label>Mobile Number</mat-label>
+          <input matInput type="text" formControlName="number">
+          <mat-error *ngIf="purchaseForm.get('number').hasError('required')">
+            Number <strong>required</strong>
+          </mat-error>
+          <mat-error *ngIf="purchaseForm.get('number').hasError('pattern')">
+            <strong>Invalid</strong> Format
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div *ngIf="!newCustomer">
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Full Name</mat-label>
+          <input matInput type="text" disabled [(ngModel)]="dialogData.profile.name" [ngModelOptions]="{standalone: true}">
+        </mat-form-field>
+      </div>
+      <button mat-stroked-button class="cancelbtn" type="button" (click)="close(false)" [disabled]="loading">Close</button>
+      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Add Purchase'}}</button>
+    </form>
+</div>

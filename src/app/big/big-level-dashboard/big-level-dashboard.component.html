@@ -1,0 +1,57 @@
+<table mat-table [dataSource]="dataSource" class="mat-elevation-z8" style="width: 100%;">
+
+  <ng-container matColumnDef="atcmodel">
+    <th mat-header-cell *matHeaderCellDef> Atc Model </th>
+    <td mat-cell *matCellDef="let user"> {{ user.atcmodel }} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="levelup">
+    <th mat-header-cell *matHeaderCellDef> Levelup </th>
+    <td mat-cell *matCellDef="let user"> {{ user.levelupcount }} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="levelupname">
+    <th mat-header-cell *matHeaderCellDef> Levelup Name </th>
+    <td mat-cell *matCellDef="let user"> {{ user.levelname }} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="fasttrack">
+    <th mat-header-cell *matHeaderCellDef> Fast Track </th>
+    <td mat-cell *matCellDef="let user">
+      <ng-container *ngIf="user.fasttrack && user.fasttrack.length > 0">
+        <span *ngFor="let track of user.fasttrack; let last = last">
+          {{bigLevel[track?.level?.id]?.level}}  <span *ngIf="!last">, </span>
+
+          <ng-container *ngIf="track.validation  && track.validation.length > 0">
+            <span *ngFor="let entry of track.validation; let lasts = last">
+               val- {{entry?.completed}} / {{entry?.metric}}<span *ngIf="!lasts"><br> </span>
+            </span>
+          </ng-container>
+          <br>
+          <ng-container *ngIf="track.stabilization && track.stabilization.length > 0">sta-
+            <span *ngFor="let entry of track.stabilization; let lasts = last">
+              {{entry?.completed}} / {{entry?.metric}}<span *ngIf="!lasts">, </span>
+            </span>
+          </ng-container>
+
+        </span>
+      </ng-container>
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="regular">
+    <th mat-header-cell *matHeaderCellDef> Regular </th>
+    <td mat-cell *matCellDef="let user"> {{bigLevel[user.level.id].level}}-
+      <ng-container *ngIf="user.regular && user.regular.length > 0">
+        <span *ngFor="let track of user.regular; let last = last">
+          {{track?.completed}} / {{track?.metric}} <span *ngIf="!last">, </span>
+        </span>
+      </ng-container>
+    </td>
+  </ng-container>
+
+
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+</table>

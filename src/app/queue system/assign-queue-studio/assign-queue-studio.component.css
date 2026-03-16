@@ -1,0 +1,9 @@
+.cancelbtn{
+    color: red;
+    border: 1px solid red;
+  }
+  
+  .submitbtn{
+    background-color: green;
+    color: white;
+  }

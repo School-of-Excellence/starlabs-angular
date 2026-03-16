@@ -1,0 +1,528 @@
+/* ═══════════════════════════════════════════════════
+   APPOINTMENT DASHBOARD
+   Product (always open) → Appointment Types (horizontal row) → Slots
+   ═══════════════════════════════════════════════════ */
+
+:host {
+  display: block;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1e293b;
+  background: #f1f5f9;
+  min-height: 100vh;
+}
+
+.dashboard-wrapper {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* ═══════════════════════════════════════════════════
+   TOP BAR
+   ═══════════════════════════════════════════════════ */
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.top-bar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.page-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.top-bar-right {
+  flex-shrink: 0;
+}
+
+.date-range-field {
+  width: 280px;
+}
+
+.date-range-field .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   LOADING & EMPTY STATES
+   ═══════════════════════════════════════════════════ */
+.loading-state,
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.empty-state {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-state mat-icon {
+  font-size: 40px;
+  width: 40px;
+  height: 40px;
+  color: #cbd5e1;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-icon {
+  animation: spin 1.2s linear infinite;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: #3b82f6;
+}
+
+.spin-icon.small {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* ═══════════════════════════════════════════════════
+   PRODUCT CARD (always expanded)
+   ═══════════════════════════════════════════════════ */
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.product-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.product-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.product-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.product-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-icon {
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+  color: #3b82f6;
+}
+
+.product-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.product-header-right {
+  display: flex;
+  align-items: center;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.appt-count-badge {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.slot-count-badge {
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-count-badge.has-slots {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.slot-count-badge.no-slots {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* ═══════════════════════════════════════════════════
+   APPOINTMENT TYPES — HORIZONTAL ROW
+   ═══════════════════════════════════════════════════ */
+.product-body {
+  padding: 0;
+}
+
+.appt-types-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+}
+
+.appt-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.appt-type-chip:hover {
+  border-color: #93c5fd;
+  background: #f8fafc;
+}
+
+.appt-type-chip.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.appt-chip-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #8b5cf6;
+}
+
+.appt-type-chip.active .appt-chip-icon {
+  color: #3b82f6;
+}
+
+.appt-chip-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.appt-type-chip.active .appt-chip-name {
+  color: #1e40af;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════
+   SLOTS CONTAINER (expands below the row)
+   ═══════════════════════════════════════════════════ */
+.slots-container {
+  padding: 8px 20px 16px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #fafbff;
+}
+
+.slots-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.no-slots-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.no-slots-msg mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #cbd5e1;
+}
+
+/* ─── Date Group ─── */
+.date-group {
+  margin-bottom: 14px;
+}
+
+.date-group:last-child {
+  margin-bottom: 0;
+}
+
+.date-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.date-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+}
+
+.date-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.date-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+/* ─── Slot Cards Grid ─── */
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+}
+
+.slot-card {
+  padding: 12px 14px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.slot-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+}
+
+.slot-card.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ─── Single vs Multi Role visual distinction ─── */
+.slot-card.single-role {
+  border-left: 3px solid #f59e0b;
+}
+
+.slot-card.multi-role {
+  border-left: 3px solid #10b981;
+}
+
+.slot-card.single-role.selected {
+  border-color: #3b82f6;
+  border-left: 3px solid #3b82f6;
+}
+
+.slot-card.multi-role.selected {
+  border-color: #3b82f6;
+  border-left: 3px solid #3b82f6;
+}
+
+/* ─── Role Count Indicator ─── */
+.slot-role-indicator {
+  margin-bottom: 8px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.role-badge-icon {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+}
+
+.role-badge.role-single {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.role-badge.role-full {
+  background: #d1fae5;
+  color: #047857;
+}
+
+/* Slot Time Row */
+.slot-time-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.slot-clock-icon {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  color: #3b82f6;
+}
+
+.slot-time {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.slot-dash {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 2px;
+}
+
+/* Slot Specialist */
+.slot-specialist-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.slot-person-icon {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  color: #64748b;
+}
+
+.slot-specialist-name {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* EIS Chips */
+.slot-eis-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.eis-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .dashboard-wrapper {
+    padding: 12px 8px;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .date-range-field {
+    width: 100%;
+  }
+
+  .appt-types-row {
+    padding: 12px 12px;
+    gap: 6px;
+  }
+
+  .appt-type-chip {
+    padding: 6px 10px;
+  }
+
+  .appt-chip-name {
+    font-size: 12px;
+  }
+
+  .slots-container {
+    padding-left: 12px;
+    padding-right: 8px;
+  }
+
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+}

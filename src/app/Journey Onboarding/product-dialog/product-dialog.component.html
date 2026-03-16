@@ -1,0 +1,87 @@
+<div *ngIf="loading" class="loading-container">
+  <mat-progress-spinner class="spinner" [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+  <span class="loading-text">Fetching Journey...</span>
+</div>
+
+<div class="container">
+  <div *ngIf="!loading">
+    <header class="header">
+      <h1 class="title">Purchases of {{![null,undefined,''].includes(participantjourneyproduct['name']) ? participantjourneyproduct['name'] : ''}}</h1>
+      <button mat-icon-button mat-dialog-close class="close-button">
+        <mat-icon>close</mat-icon>
+      </button>
+    </header>
+
+    <main class="main-content">
+      <section class="journey-section" *ngIf="journeyList.length != 0">
+        <div class="journey-container" *ngFor="let journey of journeyList">
+          <div class="journey-card" (click)="products(journey)">
+            <div class="journey-info">
+              <h2 class="journey-name" *ngIf="![null,undefined,''].includes(journey['journeyref'])">
+                {{mapjourneyname[journey['journeyref'].id]['journey']}}
+              </h2>
+              <h2 class="journey-name" *ngIf="[null,undefined,''].includes(journey['journeyref'])">
+                {{'Addons'}}
+              </h2>
+              <span class="journey-status">
+                {{[null,undefined,''].includes(journey['journeystatus']) ? 'Yet to Start' : journey['journeystatus']}}
+              </span>
+            </div>
+          </div>
+          
+          <!-- Products section that shows when this journey is selected -->
+          <div class="products-section" *ngIf="selectedJourney === journey">
+            
+            <!-- Both products and bonus length is not zero -->
+            <div *ngIf="selectedJourney['products'].length != 0">
+              <h5><b>Products</b></h5>
+              <div class="products-grid">
+                <div class="product-card" *ngFor="let product of selectedJourney['products']">
+                  <div class="product-content">
+                    <span class="product-name">{{mapproductname[product['productref'].id]}}</span>
+
+                    <span class="product-status" [ngClass]="getStatusClass(mapProductStatus[product['participantproductid']]['status'])">
+                      {{[null,undefined,''].includes(mapProductStatus[product['participantproductid']]['status'])? 'No-status' : mapProductStatus[product['participantproductid']]['status']}} <div *ngIf="![null,undefined,''].includes(mapProductStatus[product['participantproductid']]['statusdate'])">{{[null,undefined,''].includes(mapProductStatus[product['participantproductid']]['statusdate']) ? '' : [null,undefined,''].includes(mapProductStatus[product['participantproductid']]['statusdate'][mapProductStatus[product['participantproductid']]['status']]) ? '' : (mapProductStatus[product['participantproductid']]['statusdate'][mapProductStatus[product['participantproductid']]['status']].toDate() | date:'short')}}</div>
+                    </span>
+
+                  </div>
+                </div>
+              </div>
+              <br>
+            </div>
+
+            <!-- Both products and bonus length is not zero -->
+            <div *ngIf="selectedJourney['bonus'].length != 0">
+              <h5><b>Bonus</b></h5>
+              <div class="products-grid">
+                <div class="product-card" *ngFor="let product of selectedJourney['bonus']">
+                  <div class="product-content">
+                    <span class="product-name">{{mapproductname[product['productref'].id]}}</span>
+                    <span class="product-status">{{[null,undefined,''].includes(mapProductStatus[product['participantproductid']]['status'])? 'No-status' : mapProductStatus[product['participantproductid']]['status']}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Both products and bonus length is zero -->
+            <div *ngIf="selectedJourney['products'].length == 0 && selectedJourney['bonus'].length == 0">
+              <h5><b>Products</b></h5>
+              <div class="products-grid">
+                <div class="product-card" *ngFor="let product of selectedJourney['participantproducts']">
+                  <div class="product-content">
+                    <span class="product-name">{{mapproductname[product['productref'].id]}}</span>
+                    <span class="product-status">
+                      {{[null,undefined,''].includes(mapProductStatus[product['participantproductid']]['status'])? 'No-status' : mapProductStatus[product['participantproductid']]['status']}}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <br>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>

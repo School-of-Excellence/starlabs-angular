@@ -1,0 +1,134 @@
+<div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+</div>
+
+<div *ngIf="!loading" style="padding: 24px; border-radius: 8px;">
+  <div style="display: flex;justify-content: end;">
+  <button mat-mini-fab color="warn" (click)="close()">
+    <mat-icon>close</mat-icon>
+  </button>
+  </div>
+  <h2 style="margin-bottom: 24px; font-weight: 600;">Main Component</h2>
+  <div  style="padding: 10px;" class="child-row">
+  <mat-form-field appearance="outline" class="child-input">
+    <mat-label>Label</mat-label>
+    <input matInput [(ngModel)]="label" placeholder="Enter label" />
+  </mat-form-field>
+  
+  <mat-form-field *ngIf="data?.editData" appearance="outline" class="child-input">
+    <mat-label>Sequence</mat-label>
+    <input 
+      matInput 
+      [(ngModel)]="orderNumber" 
+      placeholder="Enter Sequence" 
+      type="number" 
+      min="0" 
+      (ngModelChange)="onOrderNumberChange($event)"
+    />
+  </mat-form-field>
+  <mat-form-field class="child-input" appearance="outline">
+    <mat-label>Roles</mat-label>
+    <mat-select multiple [(ngModel)]="selectedRoles" [disabled]="enabled">
+      <ng-container *ngFor="let role of roleList">
+        <mat-option *ngIf="role !== 'RootAccess'" [value]="role">
+          {{ role | uppercase }}
+        </mat-option>
+      </ng-container>
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="child-input">
+    <mat-label>Route</mat-label>
+    <input
+      matInput
+      [(ngModel)]="route"
+      placeholder="/example-route"
+      [disabled]="enabled"
+    />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="child-input">
+    <mat-label>Select Icon</mat-label>
+    <mat-select [(ngModel)]="icon">
+      <mat-option *ngFor="let icon of icons" [value]="icon">
+        <mat-icon>{{ icon }}</mat-icon> {{ icon }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" class="child-input">
+    <mat-label>Show in Sidenav</mat-label>
+    <mat-select [(ngModel)]="showInSidenav">
+      <mat-option [value]="true">Yes</mat-option>
+      <mat-option [value]="false">No</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-slide-toggle
+    [(ngModel)]="enabled"
+    (ngModelChange)="onToggleSubComponent($event)"
+    style="margin-top: 10px;"
+  >
+    Has Sub Component
+  </mat-slide-toggle>
+  </div>
+  <mat-divider></mat-divider>
+  <div *ngIf="enabled" style="margin-top: 32px;">
+    <h3 style="margin-bottom: 16px;">Sub Components</h3>
+
+    <div
+      *ngFor="let child of children; let i = index"
+      style="margin-bottom: 20px; padding: 16px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #90caf9;"
+    >
+      <div class="child-row">
+        <mat-form-field appearance="outline" class="child-input">
+          <mat-label>Child Label</mat-label>
+          <input matInput [(ngModel)]="child.label" placeholder="Enter label" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="child-input">
+          <mat-label>Child Route</mat-label>
+          <input matInput [(ngModel)]="child.route" placeholder="/child-route" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="child-input">
+          <mat-label>Child Icon</mat-label>
+          <mat-select [(ngModel)]="child.icon">
+            <mat-option *ngFor="let icon of icons" [value]="icon">
+              <mat-icon>{{ icon }}</mat-icon> {{ icon }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="child-input">
+          <mat-label>Child Roles</mat-label>
+          <mat-select multiple [(ngModel)]="child.roles">
+            <mat-option *ngFor="let role of roleList;" [value]="role">{{ role | uppercase }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="child-input">
+          <mat-label>Show Child in Sidenav</mat-label>
+          <mat-select [(ngModel)]="child.showInSidenav">
+            <mat-option [value]="true">Yes</mat-option>
+            <mat-option [value]="false">No</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-icon-button color="warn" (click)="removeChildField(i)">
+          <mat-icon>remove</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <button mat-stroked-button color="primary" (click)="addChildField()">Add Sub Component</button>
+  </div>
+  <div *ngIf="errorMessage" style="color: red; margin-top: 10px;">
+    {{ errorMessage }}
+  </div>
+  <br><br>
+  <mat-divider></mat-divider>
+  <div style="margin-top: 30px; display: flex;justify-content: center;">
+  <button mat-raised-button color="primary" [disabled]="!isMainValid || !ordernumberValid" (click)="save()">
+    {{ data?.editData ? 'Update' : 'Save' }}
+  </button>&nbsp;&nbsp;&nbsp;
+  <button mat-raised-button color="warn" (click)="close()">
+    {{ 'close'}}
+  </button>
+  </div>
+</div>

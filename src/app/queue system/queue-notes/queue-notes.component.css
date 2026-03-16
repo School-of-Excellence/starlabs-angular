@@ -1,0 +1,275 @@
+.notes-tags-dialog {
+    display: flex;
+    flex-direction: column;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+  }
+  
+  /* Header */
+  .dialog-header {
+    padding: 16px 24px;
+    background-color: #f5f5f5;
+    border-radius: 4px 4px 0 0;
+  }
+  
+  .title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .header-icon {
+    margin-right: 12px;
+  }
+  
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .participant-info {
+    color: #757575;
+    font-size: 14px;
+  }
+  
+  .participant-name {
+    font-weight: 500;
+  }
+  
+  /* Content */
+  .dialog-content {
+    padding: 16px 24px;
+    overflow-y: auto;
+    max-height: calc(90vh - 180px);
+  }
+  
+  .section-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .section-header mat-icon {
+    margin-right: 8px;
+    color: #3f51b5;
+  }
+  
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  /* Notes Section */
+  .notes-section {
+    margin-bottom: 24px;
+  }
+  
+  .notes-field {
+    width: 100%;
+  }
+  
+  .notes-list-container {
+    margin-bottom: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+  }
+  
+  .note-item {
+    display: flex;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fafafa;
+  }
+  
+  .note-item:last-child {
+    border-bottom: none;
+  }
+  
+  .note-content {
+    flex: 1;
+  }
+  
+  .note-text {
+    font-size: 14px;
+    color: #333;
+    white-space: pre-wrap;
+    margin-bottom: 4px;
+  }
+  
+  .note-meta {
+    font-size: 12px;
+    color: #757575;
+  }
+  
+  .note-timestamp {
+    margin-right: 8px;
+  }
+  
+  .note-author {
+    font-style: italic;
+  }
+  
+  .note-remove-btn {
+    margin-left: 8px;
+  }
+  
+  /* Tags Section */
+  .selected-tags-container {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+  }
+  
+  .selected-tags-wrapper {
+    min-height: 40px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .tag-chip {
+    background-color: #e3f2fd !important;
+    color: #0d47a1 !important;
+    font-weight: 500;
+  }
+  
+  .tag-input-container {
+    width: 100%;
+  }
+  
+  .tag-input {
+    width: 100%;
+  }
+  
+  /* Available Tags */
+  .available-tags-container {
+    margin-top: 16px;
+    padding: 16px;
+    background-color: #fafafa;
+    border-radius: 4px;
+    border: 1px solid #eeeeee;
+  }
+  
+  .available-tags-header {
+    margin-bottom: 12px;
+  }
+  
+  .available-tags-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #757575;
+  }
+  
+  .available-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .tag-button {
+    height: 32px;
+    line-height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    background-color: white;
+  }
+  
+  .tag-selected {
+    background-color: #e8eaf6;
+    color: #3f51b5;
+    border-color: #c5cae9;
+  }
+  
+  .tag-icon {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+    margin-right: 4px;
+  }
+  
+  /* Actions */
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px 24px;
+    gap: 12px;
+  }
+  
+  .cancel-button {
+    color: #757575;
+  }
+  
+  .save-button {
+    min-width: 100px;
+  }
+  
+  /* Token display styles */
+  .token-indicators {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .indicator-chip {
+    height: 28px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .notes-chip {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+  }
+  
+  .notes-chip:hover {
+    background-color: #c8e6c9;
+  }
+  
+  .tags-chip {
+    background-color: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+  }
+  
+  .tags-chip:hover {
+    background-color: #bbdefb;
+  }
+  
+  .indicator-icon {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+    margin-right: 6px;
+  }
+  
+  .add-button {
+    color: #3f51b5;
+    border-color: #c5cae9;
+    background-color: white;
+    font-size: 13px;
+    height: 28px;
+    line-height: 28px;
+    padding: 0 12px;
+  }
+  
+  .add-button mat-icon {
+    font-size: 16px;
+    height: 16px;
+    width: 16px;
+    margin-right: 4px;
+  }

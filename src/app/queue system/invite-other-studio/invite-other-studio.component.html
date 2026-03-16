@@ -1,0 +1,38 @@
+<div class="w-100" style="padding: 20px;">
+    <h5 class="title">Waiting for Specialist Response</h5>
+    <span class="subtitle">You can start the Call once the specialist accepts their invitation.</span>
+    <div class="mt-3" *ngIf="mandatoryStudio.length != 0">
+      <ul>
+        Mandatory person required to start the Call
+        <li *ngFor="let studio of mandatoryStudio">
+          <span *ngFor="let specialist of mapStudio[studio]['participants']; let i = index">
+            {{mapProfile[specialist]}}
+            <span *ngIf="i+1 != mapStudio[studio]['participants'].length">,&nbsp;</span>
+          </span>
+          (<span [ngClass]="acceptedStudio.includes(studio) ? 'text-success' : deniedStudio.includes(studio) ? 'text-danger' : 'text-secondary'">
+            {{acceptedStudio.includes(studio) ? "Accepted" : deniedStudio.includes(studio) ? "Denied" : "Pending"}}
+          </span>)
+        </li>
+      </ul>
+    </div>
+  
+    <div class="mt-3" *ngIf="optionalStudio.length != 0">
+      <ul>
+        Additional person required to start the Call (Optional)
+        <li *ngFor="let studio of optionalStudio">
+          <span *ngFor="let specialist of mapStudio[studio]['participants']; let i = index">
+            {{mapProfile[specialist]}}
+            <span *ngIf="i+1 != mapStudio[studio]['participants'].length">,&nbsp;</span>
+          </span>
+          (<span [ngClass]="acceptedStudio.includes(studio) ? 'text-success' : deniedStudio.includes(studio) ? 'text-danger' : 'text-secondary'">
+            {{acceptedStudio.includes(studio) ? "Accepted" : deniedStudio.includes(studio) ? "Denied" : "Pending"}}
+          </span>)
+        </li>
+      </ul>
+    </div>
+  
+    <div class="mt-3 text-center" style="display: flex;justify-content: center;align-items: center;">
+      <button class="cancelbtn mr-3" mat-stroked-button (click)="cancel()">Cancel Invitation</button>
+      <button class="successbtn" mat-stroked-button (click)="submit()" [disabled]="!callReady">Invite Participant</button>
+    </div>
+  </div>

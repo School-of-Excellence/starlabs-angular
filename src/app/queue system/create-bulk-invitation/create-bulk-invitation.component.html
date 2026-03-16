@@ -1,0 +1,36 @@
+<main style="padding: 30px;" *ngIf="dialogData != null" class="w-100 text-center">
+    <section>
+      <h4 >Bulk Invitation</h4>
+    </section>
+    <form [formGroup]="invitationForm" (ngSubmit)="sendInvitation()">
+      <mat-form-field appearance="outline">
+        <mat-label>Invite To</mat-label>
+        <mat-select formControlName="stage" required>
+          <mat-option *ngFor="let option of activityStage" [value]="option">{{option}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="invitationForm.controls['stage'].hasError('required')">Required</mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field appearance="outline">
+        <mat-label>Total Participant Required</mat-label>
+        <input matInput formControlName="totalinvited" type="number">
+        <mat-error *ngIf="invitationForm.controls['totalinvited'].hasError('required')">Required</mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field appearance="outline">
+        <mat-label>Invitation Duration (Mins)</mat-label>
+        <input matInput formControlName="duration" type="number">
+        <mat-error *ngIf="invitationForm.controls['duration'].hasError('required')">Required</mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field appearance="outline">
+        <mat-label>Expiry Time</mat-label>
+        <input matInput formControlName="expirydate" type="datetime-local">
+        <mat-error *ngIf="invitationForm.controls['expirydate'].hasError('required')">Required</mat-error>
+      </mat-form-field>
+      <div>
+        <button mat-stroked-button class="cancelbtn" type="button" (click)="dialogRef.close(null)" [disabled]="loading">Cancel</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="invitationForm.invalid || loading">{{loading ? 'Sending Invitation...' : 'Send Invitation'}}</button>
+      </div>
+    </form>
+</main>

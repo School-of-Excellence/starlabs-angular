@@ -1,0 +1,43 @@
+<div class="mainscreen">
+  <div class="heading" mat-dialog-title>Map Appointment Type and Delivery Role</div>
+  <div [formGroup]="mapAppointmentRoleForm" mat-dialog-content >
+    <div>
+      <mat-form-field appearance="outline">
+        <mat-label>Appointment Type</mat-label>
+        <mat-select formControlName="selectedApptType" [disabled]="data['data'] != null">
+          <mat-option class="matOption" *ngFor="let list of appointmentTypeList" [value]="list.id">{{list.appointmenttype}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="mapAppointmentRoleForm.get('selectedApptType').hasError('required')">
+          Name <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="mapAppointmentRoleForm.get('selectedApptType').hasError('exists')">
+          Already <strong>Exists</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfield" appearance="outline">
+        <mat-label>Required Role</mat-label>
+        <mat-select formControlName="required_role" multiple>
+          <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="mapAppointmentRoleForm.get('required_role').hasError('required')">
+          Role <strong>Required</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfield" appearance="outline">
+        <mat-label>Additional Role</mat-label>
+        <mat-select formControlName="additional_role" multiple>
+          <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <div class="btnarea">
+    <button class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
+    <button class="submitbtn" mat-stroked-button (click)="onformsubmit(mapAppointmentRoleForm.value)" [disabled]="loading">
+      Update Role
+    </button>
+  </div>
+</div>

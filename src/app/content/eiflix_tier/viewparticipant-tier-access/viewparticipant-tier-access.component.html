@@ -1,0 +1,242 @@
+<!-- <div class="d-flex flex-row justify-content-start">
+  <div class="m-2 d-flex flex-row justify-content-start flex-wrap">
+    <div class="m-2" *ngFor="let list of testTier | keyvalue;">
+      <h4>{{list.key != 'Tierless Participant' ? maptier[list.key] : list.key}}-{{testTier[list.key].length}}</h4>
+      <div class="example-list" >
+        <div class="example-box" *ngFor="let item of testTier[list.key]">
+          {{item}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div> -->
+<div class="audio-dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Tier Access</h1>
+      <p class="dash-sub">Manage members, configurations, and series access by tier</p>    </div>
+  </div>
+
+  <mat-tab-group class="as-tabs" animationDuration="200ms">
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="as-tab-icon">people</mat-icon> Members
+      </ng-template>
+      <div class="as-tab-content">
+        <div class="filters-row">
+          <div class="input-box search-box">
+            <mat-icon class="ib-icon">search</mat-icon>
+            <input type="text" class="ib-input" placeholder="Search members..."
+              [(ngModel)]="memberSearchText" (keyup)="onMemberSearch()" autocomplete="off" />
+          </div>
+          <button class="btn-primary" (click)="openDialog()">
+            <mat-icon>add</mat-icon>
+            <span>Add Tier</span>
+          </button>
+        </div>
+
+        <div class="vp-tier-grid">
+          <div class="vp-tier-card" *ngFor="let key of filteredTierKeys">
+            <div class="vp-tier-header">
+              <span class="vp-tier-name">{{ key != 'Tierless Participant' ? maptier[key] : key }}</span>&nbsp;&nbsp;
+              <span class="chip chip-sm">{{ testTier[key].length }}</span>
+              <button class="a-btn a-edit" *ngIf="key != 'Tierless Participant'" (click)="onEditDialog(key)" style="margin-left: auto;">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </div>
+            <div class="vp-participant-list">
+              <div class="vp-participant" *ngFor="let item of testTier[key]">
+                <mat-icon class="vp-participant-icon">person</mat-icon>
+                <span class="vp-participant-name">{{ item }}</span>
+              </div>
+              <div class="vp-empty" *ngIf="testTier[key].length === 0">
+                <mat-icon>group_off</mat-icon>
+                <span>No participants</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="vp-empty-state" *ngIf="filteredTierKeys.length === 0">
+          <div class="empty">
+            <mat-icon>people</mat-icon>
+            <p>No participant data available</p>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="as-tab-icon">layers</mat-icon> Tier Mapped
+      </ng-template>
+      <div class="as-tab-content">
+        <div class="filters-row">
+          <div class="input-box search-box">
+            <mat-icon class="ib-icon">search</mat-icon>
+            <input type="text" class="ib-input" placeholder="Search tier access..."
+              [(ngModel)]="tierAccessSearchText" (keyup)="onTierAccessSearch()" autocomplete="off" />
+          </div>
+          <button class="btn-primary" (click)="onAddTierAccess()">
+            <mat-icon>add</mat-icon>
+            <span>Add Config</span>
+          </button>
+        </div>
+
+        <div class="vp-tier-grid">
+          <div class="vp-tier-card" *ngFor="let row of filteredTierAccessData">
+            <div class="vp-tier-header">
+              <span class="vp-tier-name">{{ maptier[row.tierid] }}</span>
+              <span class="chip chip-sm">{{ row.tieraccessby }}</span>
+              <div style="margin-left: auto; display: flex; gap: 2px;">
+                <button class="a-btn a-edit" (click)="onEditTierAccess(row)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button class="a-btn a-del" (click)="onDeleteTierAccess(row)">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </div>
+            </div>
+            <div class="vp-participant-list">
+              <ng-container *ngIf="row.tieraccessby === 'biglevel'">
+                <ng-container *ngIf="row['biglevel'] === undefined">
+                  <div class="vp-participant" *ngFor="let level of row['biglevelid']">
+                    <mat-icon class="vp-participant-icon">stairs</mat-icon>
+                    <span class="vp-participant-name">{{ mapBigLevel[level] }}</span>
+                  </div>
+                </ng-container>
+                <ng-container *ngIf="row['biglevel'] != undefined">
+                  <div class="vp-participant vp-participant-col" *ngFor="let item of row['biglevel']">
+                    <div class="vp-config-row">
+                      <span class="vp-config-label">ATC Model:</span>
+                      <span class="vp-participant-name">{{ item.atcmodel }}</span>
+                    </div>
+                    <div class="vp-config-row">
+                      <span class="vp-config-label">Levels:</span>
+                      <div class="tags-wrap">
+                        <span class="chip chip-sm" *ngFor="let level of item['biglevelid']">{{ mapBigLevel[level] }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
+              </ng-container>
+              <ng-container *ngIf="row.tieraccessby === 'product'">
+                <div class="vp-participant vp-participant-col" *ngFor="let journeyid of row.productaccess | keyvalue">
+                  <div class="vp-config-row">
+                    <i style="color: #EC008C;" class="fa-solid fa-flag"></i>
+                    <span class="vp-participant-name" style="font-weight: 600;">{{ mapJourney[$any(journeyid.key)] }}</span>
+                  </div>
+                  <div class="vp-config-sub" *ngFor="let prd of $any(journeyid.value)">
+                    <mat-icon class="vp-participant-icon">inventory_2</mat-icon>
+                    <span class="vp-participant-name">{{ mapProduct[prd.productid] }}</span>
+                    <span class="chip chip-sm" style="margin-left: auto;">{{ prd.count }}</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <div class="vp-empty" *ngIf="row.tieraccessby !== 'biglevel' && row.tieraccessby !== 'product'">
+                <mat-icon>info</mat-icon>
+                <span>No configuration</span>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="vp-empty-state" *ngIf="filteredTierAccessData.length === 0">
+          <div class="empty">
+            <mat-icon>layers</mat-icon>
+            <p>No tier access configurations found</p>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="as-tab-icon">video_library</mat-icon> Series
+      </ng-template>
+      <div class="as-tab-content">
+        <div class="filters-row">
+          <div class="input-box search-box">
+            <mat-icon class="ib-icon">search</mat-icon>
+            <input type="text" class="ib-input"
+              [placeholder]="seriesViewMode === 'series' ? 'Search series...' : 'Search tiers...'"
+              [(ngModel)]="seriesSearchText" (keyup)="onSeriesSearch()" autocomplete="off" />
+          </div>
+          <div class="vp-btn-group" *ngIf="seriesViewMode === 'series'">
+            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'az'" (click)="seriesSortMode = 'az'; applySortAndFilter()">
+              <i class="fa-solid fa-arrow-down-a-z"></i>
+            </button>
+            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'za'" (click)="seriesSortMode = 'za'; applySortAndFilter()">
+              <i class="fa-solid fa-arrow-down-z-a"></i>
+            </button>
+            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'newest'" (click)="seriesSortMode = 'newest'; applySortAndFilter()">
+              <mat-icon>arrow_downward</mat-icon> Newest
+            </button>
+            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'oldest'" (click)="seriesSortMode = 'oldest'; applySortAndFilter()">
+              <mat-icon>arrow_upward</mat-icon> Oldest
+            </button>
+          </div>
+          <div class="vp-btn-group">
+            <button class="vp-btn-toggle" [class.active]="seriesViewMode === 'series'" (click)="seriesViewMode = 'series'; applySortAndFilter()">
+              <mat-icon>video_library</mat-icon> Series
+            </button>
+            <button class="vp-btn-toggle" [class.active]="seriesViewMode === 'tier'" (click)="seriesViewMode = 'tier'; applySortAndFilter()">
+              <mat-icon>layers</mat-icon> Tier
+            </button>
+          </div>
+        </div>
+        <div class="vp-tier-grid" *ngIf="seriesViewMode === 'series'">
+          <div class="vp-tier-card" *ngFor="let series of filteredSeriesData">
+            <div class="vp-tier-header">
+              <span class="vp-tier-name">{{ series.seriesName }}</span>
+              <span class="chip chip-sm">{{ series.tiers.length }}</span>
+              <button class="a-btn a-edit" (click)="onAssignEditDialog(series)" style="margin-left: auto;">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </div>
+            <!-- <div class="vp-tier-header">
+              <span class="vp-tier-name">{{ series.seriesName }}</span>
+              <span class="chip chip-sm">{{ series.tiers.length }}</span>
+            </div> -->
+            <div class="vp-participant-list">
+              <div class="vp-participant" *ngFor="let tier of series.tiers">
+                <mat-icon class="vp-participant-icon">layers</mat-icon>
+                <span class="vp-participant-name">{{ tier }}</span>
+              </div>
+              <div class="vp-empty" *ngIf="series.tiers.length === 0">
+                <mat-icon>layers_clear</mat-icon>
+                <span>No tiers assigned</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="vp-tier-grid" *ngIf="seriesViewMode === 'tier'">
+          <div class="vp-tier-card" *ngFor="let tier of filteredTierSeriesData">
+            <div class="vp-tier-header">
+              <span class="vp-tier-name">{{ tier.tierName }}</span>
+              <span class="chip chip-sm">{{ tier.seriesList.length }}</span>
+            </div>
+            <div class="vp-participant-list">
+              <div class="vp-participant" *ngFor="let s of tier.seriesList">
+                <mat-icon class="vp-participant-icon">video_library</mat-icon>
+                <span class="vp-participant-name">{{ s }}</span>
+              </div>
+              <div class="vp-empty" *ngIf="tier.seriesList.length === 0">
+                <mat-icon>video_library</mat-icon>
+                <span>No series assigned</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="vp-empty-state" *ngIf="seriesTierData.length === 0">
+          <div class="empty">
+            <mat-icon>video_library</mat-icon>
+            <p>No series data available</p>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>

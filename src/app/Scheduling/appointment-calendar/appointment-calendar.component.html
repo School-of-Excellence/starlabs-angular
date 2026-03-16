@@ -1,0 +1,140 @@
+<div *ngIf="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <div class="contentbox">
+    <div class="datecontrol row text-center">
+      <div class="col-md-4">
+        <div *ngIf="appointmentView != 'agenda'" class="btn-group">
+          <div
+            class="btn btn-primary"
+            mwlCalendarPreviousView
+            [view]="appointmentView"
+            [(viewDate)]="appointmentViewDate"
+            (viewDateChange)="dateChangeEvent($event)"
+          >Previous Month</div>
+          <div
+            class="btn btn-outline-secondary"
+            mwlCalendarToday
+            [(viewDate)]="appointmentViewDate"
+            (viewDateChange)="dateChangeEvent($event)"
+          >Current Month</div>
+          <div
+            class="btn btn-primary"
+            mwlCalendarNextView
+            [view]="appointmentView"
+            [(viewDate)]="appointmentViewDate"
+            (viewDateChange)="dateChangeEvent($event)"
+          >Next Month</div>
+        </div>
+
+        <div *ngIf="appointmentView == 'agenda'" class="btn-group">
+          <div
+            class="btn btn-primary"
+            (click)="moveMonth(false)"
+          >Previous Month</div>
+          <div
+            class="btn btn-outline-secondary"
+            (click)="selectCurrentMonth()"
+          >Current Month</div>
+          <div
+            class="btn btn-primary"
+            (click)="moveMonth(true)"
+          >Next Month</div>
+        </div> 
+      </div>
+      <div class="col-md-4">
+        <label *ngIf="appointmentView != 'agenda'" class="heading">{{ appointmentViewDate | calendarDate:(appointmentView + 'ViewTitle'):'en' }}</label>
+        <label *ngIf="appointmentView == 'agenda'" class="heading">{{ selectedMonth }}</label>
+      </div>
+      <div class="col-md-4">
+        <div class="btn-group">
+          <div
+            class="btn btn-primary"
+            (click)="setAppointmentView(CalendarView.Month)"
+            [class.active]="appointmentView === CalendarView.Month"
+          >
+            Monthly Calendar
+          </div>
+          <!-- <div
+            class="btn btn-primary"
+            (click)="setAppointmentView(CalendarView.Week)"
+            [class.active]="appointmentView === CalendarView.Week"
+          >
+            Week
+          </div>
+          <div
+            class="btn btn-primary"
+            (click)="setAppointmentView(CalendarView.Day)"
+            [class.active]="appointmentView === CalendarView.Day"
+          >
+            Day
+          </div> -->
+          <div
+            class="btn btn-primary"
+            (click)="setAppointmentView('agenda')"
+            [class.active]="appointmentView == 'agenda'"
+          >
+            Monthly Agenda
+          </div>
+        </div>
+      </div>
+    </div>
+    <div [ngSwitch]="appointmentView">
+      <mwl-calendar-month-view
+        *ngSwitchCase="CalendarView.Month"
+        [viewDate]="appointmentViewDate"
+        [events]="appointmentEvents"
+        [activeDayIsOpen]="appointmentDayIsOpen"
+        (dayClicked)="appointmentDayClicked($event.day)"
+        (eventClicked)="eventClick($event.event)"
+      >
+      </mwl-calendar-month-view>
+      <mwl-calendar-week-view
+        *ngSwitchCase="CalendarView.Week"
+        [viewDate]="appointmentViewDate"
+        [events]="appointmentEvents"
+        (eventClicked)="eventClick($event.event)"
+      >
+      </mwl-calendar-week-view>
+      <mwl-calendar-day-view
+        *ngSwitchCase="CalendarView.Day"
+        [viewDate]="appointmentViewDate"
+        [events]="appointmentEvents"
+        (eventClicked)="eventClick($event.event)"
+      >
+      </mwl-calendar-day-view>
+      <div class="tablebox" *ngSwitchCase="'agenda'">
+        <table mat-table [dataSource]="agendaDataSource">
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="date">{{row.date | date:"d"}}</div>
+              <div class="weekday">{{row.date | date:"EEEE"}}</div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="time">
+            <th mat-header-cell *matHeaderCellDef>Slot</th>
+            <td mat-cell *matCellDef="let row">
+              <div *ngFor="let time of row.calendardata; let i = index" class="subrow" 
+                [ngClass]="{'subrowborder': i+1 != row.calendardata.length, 'text-danger': time['meta']['cancelled']}">
+                {{time.start | date:"shortTime"}} - {{time.end | date:"shortTime"}}
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="title">
+            <th mat-header-cell *matHeaderCellDef>Appointments</th>
+            <td mat-cell *matCellDef="let row">
+              <div *ngFor="let time of row.calendardata; let i = index" class="subrow" [ngClass]="{'subrowborder': i+1 != row.calendardata.length}">
+                <span class="openevent" (click)="eventClick(time)">{{time.title}}</span>
+              </div>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="agendaHeading"></tr>
+          <tr mat-row *matRowDef="let row; columns: agendaHeading;"></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

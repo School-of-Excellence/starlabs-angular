@@ -1,0 +1,21 @@
+<div style="padding: 20px;" *ngIf="edit">
+  <div mat-dialog-title>
+    <h1>Edit Image</h1>
+  </div>
+  
+  <div mat-dialog-content>
+    <label for="file">Choose an Image</label><br>
+    <input type="file" (change)="previewImage($event)" accept="image/*"/><br>
+    <img *ngIf="imageUrl" [src]="imageUrl" alt="Preview" style="max-width: 300px; max-height: 300px;"><br>
+  </div>
+  
+  <div mat-dialog-actions class="btn">
+    <button mat-raised-button 
+            color="primary" 
+            (click)="onedit(data.id, data.imageurl, file)" 
+            [disabled]="!file">
+      Submit
+    </button>&nbsp;&nbsp;&nbsp;&nbsp;
+    <button mat-raised-button color="warn" (click)="onNoClick()">Close</button>
+  </div>
+</div>

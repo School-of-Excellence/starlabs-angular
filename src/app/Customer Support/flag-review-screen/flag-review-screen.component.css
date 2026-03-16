@@ -1,0 +1,354 @@
+.main-content {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 15px;
+  background-color: rgb(232, 232, 232);
+  font-family: Montserrat;
+}
+
+.details-container {
+  width: 21%;
+  border-radius: 25px;
+}
+
+.chat-container {
+  width: 78%;
+  background-color: white;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+  padding: 15px;
+  font-family: Montserrat;
+  border-radius: 25px;
+  height: 90vh;
+}
+
+.date {
+  padding: 8px;
+  background-color: #984C0C;
+  border: 1px thin grey;
+  border-top-right-radius: 15px;
+  align-items: center;
+  text-align: center;
+  font-size: 16px;
+  color: white;
+  font-weight: bold;
+  width: fit-content;
+  margin-bottom: 10px;
+}
+
+.flexCenter {
+  display: flex;
+  justify-content: center;
+}
+
+.flexLeft {
+  display: flex;
+  align-items: flex-end;
+}
+
+.ticketopen {
+  font-size: 22px;
+  font-weight: bold;
+  background-color: rgb(10, 179, 10);
+  color: white;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.ticketclose {
+  font-size: 22px;
+  font-weight: bold;
+  background-color: red;
+  color: white;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.otherchat {
+  background-color: #eeeef8;
+  float: left;
+  margin: 5px;
+  width: 70%;
+  border-top-left-radius: 23px;
+  border-top-right-radius: 23px;
+  border-bottom-right-radius: 23px;
+  padding-left: 10px;
+  padding-top: 5px;
+  color: black;
+  font-size: 14px;
+}
+
+.mychat {
+  border-top-left-radius: 23px;
+  border-top-right-radius: 23px;
+  border-bottom-left-radius: 23px;
+  background-color: #eeeef8;
+  width: 70%;
+  float: right;
+  margin: 5px;
+  padding-left: 10px;
+  padding-top: 5px;
+  color: black;
+  font-size: 14px;
+}
+
+.custom-form-field {
+  margin: 0;
+  height: 56px;
+  width: 150px;
+  min-width: 0;
+  max-width: none;
+  flex: none;
+}
+
+.notes-container {
+  background-color: #FFE5D0;
+  text-align: center;
+  align-items: center;
+  margin: 5px;
+  width: 70%;
+  border-radius: 23px;
+  padding: 10px;
+  color: black;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.interaction-history {
+  height: 60vh;
+  background-color: white;
+  border-radius: 15px;
+  padding: 15px;
+}
+
+.history-container {
+  border: rgb(179, 173, 173) 1px solid;
+  padding: 10px;
+  border-radius: 15px;
+  margin: 5px;
+  line-height: 0.8;
+  font-size: 14px;
+}
+
+.selected-container {
+  background-color: #ff7a55;
+  padding: 10px;
+  border-radius: 15px;
+  margin: 5px;
+  line-height: 0.8;
+  font-size: 14px;
+  color: white;
+}
+
+.chat-tile {
+  background-color: rgb(237, 237, 237);
+  border-radius: 15px;
+  height: 3vh;
+  padding: 10px;
+  width: auto;
+  color: black;
+  font-weight: bold;
+  font-size: 10px;
+  margin-right: 10px;
+  text-align: center;
+}
+
+.popup {
+  font-family: Montserrat;
+  position: absolute;
+  padding: 10px;
+  background-color: white;
+  border: 1px solid #ddd;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  left: 10%;
+  bottom: 50%;
+  font-size: 16px;
+  width: 40vw;
+  border-radius: 20px;
+}
+
+.current-ticket {
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  border-radius: 15px;
+  font-size: 14px;
+  margin-bottom: 7px;
+  padding: 10px;
+}
+
+.divider {
+  margin-bottom: 10px;
+  margin-top: 10px;
+  width: 100%;
+  height: 1px;
+  background-color: rgb(141, 133, 133);
+}
+
+.submitbtn {
+  background-color: #0D6EFD;
+  color: white;
+  font-weight: bold;
+  height: 38px;
+}
+
+.reviewbtn {
+  background-color: #0D6EFD;
+  color: white;
+  font-weight: bold;
+  height: 48px;
+  font-size: 25px;
+  margin: 20px;
+}
+
+.progress-bar-container {
+  border: 3px solid darkblue;
+  padding: 3px;
+  border-radius: 70px;
+  padding-right: 6px;
+  width: 50%;
+}
+
+mat-progress-bar {
+  height: 12px;
+  border-radius: 20px;
+}
+
+.flagbtn {
+  font-weight: bold;
+  color: white;
+}
+
+.flagnegligence {
+  align-items: center;
+  justify-content: space-evenly;
+  line-height: 0.7;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-scale {
+  width: 5%;
+  font-weight: bold;
+  color: black;
+  font-family: 'Lato', sans-serif;
+}
+
+.btn-scale-asc-1,
+.btn-scale-desc-10 {
+  background-color: #33FF00;
+}
+
+.btn-scale-asc-1:hover,
+.btn-scale-desc-10:hover {
+  background-color: #2CDE00;
+}
+
+.btn-scale-asc-2,
+.btn-scale-desc-9 {
+  background-color: #66FF00;
+}
+
+.btn-scale-asc-2:hover,
+.btn-scale-desc-9:hover {
+  background-color: #59DE00;
+}
+
+.btn-scale-asc-3,
+.btn-scale-desc-8 {
+  background-color: #99FF00;
+}
+
+.btn-scale-asc-3:hover,
+.btn-scale-desc-8:hover {
+  background-color: #85DE00;
+}
+
+.btn-scale-asc-4,
+.btn-scale-desc-7 {
+  background-color: #CCFF00;
+}
+
+.btn-scale-asc-4:hover,
+.btn-scale-desc-7:hover {
+  background-color: #B1DE00;
+}
+
+.btn-scale-asc-5,
+.btn-scale-desc-6 {
+  background-color: #FFFF00;
+}
+
+.btn-scale-asc-5:hover,
+.btn-scale-desc-6:hover {
+  background-color: #DEDE00;
+}
+
+.btn-scale-asc-6,
+.btn-scale-desc-5 {
+  background-color: #FFCC00;
+}
+
+.btn-scale-asc-6:hover,
+.btn-scale-desc-5:hover {
+  background-color: #DEB100;
+}
+
+.btn-scale-asc-7,
+.btn-scale-desc-4 {
+  background-color: #FF9900;
+}
+
+.btn-scale-asc-7:hover,
+.btn-scale-desc-4:hover {
+  background-color: #DE8500;
+}
+
+.btn-scale-asc-8,
+.btn-scale-desc-3 {
+  background-color: #FF6600;
+}
+
+.btn-scale-asc-8:hover,
+.btn-scale-desc-3:hover {
+  background-color: #DE5900;
+}
+
+.btn-scale-asc-9,
+.btn-scale-desc-2 {
+  background-color: #FF3300;
+}
+
+.btn-scale-asc-9:hover,
+.btn-scale-desc-2:hover {
+  background-color: #DE2C00;
+}
+
+.btn-scale-asc-10,
+.btn-scale-desc-1 {
+  background-color: #FF0000;
+}
+
+.btn-scale-asc-10:hover,
+.btn-scale-desc-1:hover {
+  background-color: #DE0000;
+}
+
+.reviewedbtn {
+  background-color: green;
+  color: white;
+  font-weight: bold;
+  height: 48px;
+  font-size: 25px;
+  margin: 20px;
+}
+
+.assignedTicket {
+  background-color: #D6EAF8;
+}

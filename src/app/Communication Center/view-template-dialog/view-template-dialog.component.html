@@ -1,0 +1,70 @@
+<div class="d-flex flex-column w-100" style="overflow: auto;">
+    <div style="background-color:#CFE5EE; padding-left: 20px; justify-content: space-between;">
+        <div class="row justify-content-center">
+            <div>
+                Type: <b>{{templateData['type'].toUpperCase()}}</b> &nbsp;&nbsp; | &nbsp;&nbsp;
+            </div>
+            <div>
+                Template Name: <b>{{templateData['templatename']}}</b> &nbsp;&nbsp; | &nbsp;&nbsp;
+                Template Alias: <b>{{templateData['templatealias']}}</b> &nbsp;&nbsp; | &nbsp;&nbsp;
+                Template Category: <b>{{templateData['category']}}</b> &nbsp;&nbsp;
+            </div>
+        </div>
+
+        <div *ngIf="templateData['templatevalidated'] == false" class="row justify-content-center">
+            <button mat-raised-button type="button" style="color:green" (click)="onSubmit()">Approve</button>
+            &nbsp;&nbsp;
+            <button mat-raised-button type="button" style="color: red;" (click)="onDialogCancel()">Reject</button>
+        </div>
+        <div *ngIf="templateData['templatevalidated'] == true" class="row justify-content-center">
+            <h5 style="color: green;"><b>Approved</b></h5>
+        </div>
+    </div>
+    <div *ngIf="templateData['type'] == 'email'">
+        <div style="padding: 15px;">
+            <div style="overflow-wrap: break-word; white-space: normal; border: 2px solid grey; height: 60vh; overflow: auto;padding: 20px;" [innerHTML]="templateHtml"></div>
+        </div>
+    </div>
+
+    <div *ngIf="templateData['type'] == 'whatsapp'">
+        <div style="border: 1px solid grey; padding: 10px;">
+            <pre style="white-space: pre-wrap; word-break: break-word;">{{templateData['htmlbody']}}</pre>
+        </div>
+    </div>
+
+    <div *ngIf="templateData['type'] == 'notification'">
+        <div style="padding: 15px;">
+            <div class="notificationcontainer">
+                <div class="row">
+                    <img src="./../../../assets/AH White Logo Only.png" width="35px" height="30px"/>
+                    <div class="col-md-10">
+                        <p>Breakthroughs</p>
+                        <h5><b>{{[null, undefined, ""].includes(templateData['title']) ? "Title" : templateData['title']}}</b></h5>
+                        <h6>{{[null, undefined, ""].includes(templateData['message']) ? "Message" : templateData['message']}}</h6>
+                        <img *ngIf="notificationimage != null" [src]="notificationimage" width="400px" height="300px"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-center" *ngIf="templateData['type'] == 'inappmessage'">
+        <div style="padding: 15px;">
+            <div class="inappcontainer">
+                <div style="display: flex;flex-direction: column;justify-content: center;">
+                    <h4 style="color: red;">
+                        <b>{{[null, undefined, ""].includes(templateData['title']) ? "Title" : templateData['title']}}</b></h4>
+                    <div class="inappcontent">
+                        <h5><b>{{[null, undefined, ""].includes(templateData['subtitle']) ? "Subtitle" : templateData['subtitle']}}</b></h5>
+                        <h6><b>{{[null, undefined, ""].includes(templateData['message']) ? "Message" : templateData['message']}}</b></h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-column justify-content-startw-100 " style="background-color: #CFE5EE;padding: 10px;">
+        <span>NOTES : </span>
+        <h6><b>{{[null, undefined, ""].includes(templateData['notes']) ? "No Notes" : templateData['notes']}}</b></h6>
+    </div>
+</div>

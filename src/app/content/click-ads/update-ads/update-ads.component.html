@@ -1,0 +1,226 @@
+<!-- <div style="padding: 20px;height: 90vh;overflow: auto;">
+  <h4 style="text-align: center;" mat-dialog-title>Update Ads</h4>
+  <div mat-dialog-content>
+    <div class="d-flex flex-row">
+      <mat-label>Select Image as per ratio : </mat-label>&nbsp;&nbsp;
+      <mat-form-field >
+        <mat-select (selectionChange)="onAddNewRatio($event)">
+          <mat-option *ngFor="let option of ratioList" [value]="option">{{option}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div *ngFor="let list of image;let i = index" class="mt-4">
+      <span class="d-flex flex-row">
+        <span>Ratio : W&nbsp;&nbsp;</span>
+        <input [(ngModel)]="list.w" type="text" style="width:40px;" (keyup)="onUpdateWidthAndHeight(i)">&nbsp;&nbsp;
+        <span>H&nbsp;&nbsp;</span>
+        <input [(ngModel)]="list.h" type="text" style="width:40px;" (keyup)="onUpdateWidthAndHeight(i)">&nbsp;&nbsp;&nbsp;&nbsp;
+        <input  type="file" accept="image/*" (change)="importImages($event,i)">&nbsp;&nbsp;&nbsp;&nbsp;
+        <button mat-stroked-button type="button" (click)="onRemoveImage(i)">Remove File</button>
+      </span>
+      <span *ngIf="list.fileurl != null || list.url != null" class="mt-2">
+        <img [src]="list.url != null ? list.url : list.fileurl" height="240" width="320"><br>
+        <button mat-stroked-button (click)="removeImage(i)">Remove Image</button>
+      </span>
+    </div>
+    <form [formGroup]="adsForm" (ngSubmit)="submit()">
+      <div class="mt-2">
+        <mat-form-field class="inputfields w-100" appearance="outline">
+          <mat-label>Payment Link</mat-label>
+          <input matInput type="text" formControlName="paymentlink">
+          <mat-error *ngIf="adsForm.get('paymentlink').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="mt-2">
+        <mat-form-field class="inputfields w-100" appearance="outline">
+          <mat-label>Display Screen</mat-label>
+          <mat-select formControlName="displayscreen">
+            <mat-option *ngFor="let option of ['home','eiflix']" [value]="option">{{option}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="adsForm.get('displayscreen').hasError('required')">
+            Required
+          </mat-error>
+          <mat-hint>In which screen ads gona be displayed.</mat-hint>
+        </mat-form-field>
+      </div>
+      <div class="mt-2">
+        <mat-checkbox formControlName="deeplink">Deep Link to Internal(ex:'in app')</mat-checkbox>
+      </div>
+      <div class="mt-2">
+        <mat-form-field class="inputfields w-100" appearance="outline">
+          <mat-label>Deep Link</mat-label>
+          <input matInput type="text" formControlName="deeplinkinternal">
+          <mat-error *ngIf="adsForm.get('deeplinkinternal').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="mt-2">
+        <mat-form-field class="inputfields w-100" appearance="outline">
+          <mat-label>Call to action.</mat-label>
+          <input matInput type="text" formControlName="calltoaction">
+          <mat-error *ngIf="adsForm.get('calltoaction').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="mt-2">
+        <mat-form-field class="w-100" appearance="fill">
+          <mat-label>Ads Start to End Date</mat-label>
+          <mat-date-range-input [rangePicker]="picker">
+            <input matStartDate formControlName="startdate" placeholder="Start date">
+            <input matEndDate formControlName="enddate" placeholder="End date">
+          </mat-date-range-input>
+          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+      <div class="mt-2 d-flex flex-row justify-content-center">
+        <mat-checkbox formControlName="delete">Delete this Ad</mat-checkbox>
+      </div>
+      <div class="d-flex flex-row justify-content-center mt-2">
+        <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>&nbsp;&nbsp;
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="adsForm.invalid || loading">{{loading ? 'Updating....' : 'Update Ad'}}</button>
+      </div>
+    </form>
+  </div>
+</div> -->
+
+<!-- UPDATE ADS DIALOG -->
+<div class="dialog-wrap">
+  <div class="dialog-header">
+    <div class="dialog-icon" [ngClass]="dailogData.addata ? 'edit-icon' : 'add-icon'">
+      <mat-icon>{{ dailogData.addata ? 'edit' : 'campaign' }}</mat-icon>
+    </div>
+    <div>
+      <h2 class="dialog-title">{{ dailogData.addata ? 'Edit Ad' : 'Create New Ad' }}</h2>
+      <p class="dialog-sub">{{ dailogData.addata ? 'Update advertisement details' : 'Set up a new advertisement' }}</p>
+    </div>
+    <button class="dialog-close" (click)="close()" [disabled]="loading">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content class="dialog-body">
+    <div class="field-group">
+      <label class="label">Image Ratios</label>
+      <div class="input-box ratio-select-box">
+        <mat-icon class="ib-icon">aspect_ratio</mat-icon>
+        <mat-select (selectionChange)="onAddNewRatio($event)" placeholder="Add image ratio" panelClass="custom-tag-panel">
+          <mat-option *ngFor="let option of ratioList" [value]="option">{{ option }}</mat-option>
+        </mat-select>
+      </div>
+    </div>
+    <br>
+    <!-- Image slots -->
+    <div class="img-slot" *ngFor="let list of image; let i = index">
+      <div class="img-slot-header">
+        <div class="ratio-inputs">
+          <div class="input-box ratio-input-box">
+            <span class="ratio-label">W</span>
+            <input type="text" class="ib-input ratio-val" [(ngModel)]="list.w" (keyup)="onUpdateWidthAndHeight(i)" />
+          </div>
+          <mat-icon class="ratio-sep">close</mat-icon>
+          <div class="input-box ratio-input-box">
+            <span class="ratio-label">H</span>
+            <input type="text" class="ib-input ratio-val" [(ngModel)]="list.h" (keyup)="onUpdateWidthAndHeight(i)" />
+          </div>
+        </div>
+        <div class="img-slot-actions">
+          <button class="btn-cancel btn-sm" type="button" (click)="imgFileInput.click()">
+            <mat-icon>upload</mat-icon> Choose
+          </button>
+          <input #imgFileInput type="file" accept="image/*" (change)="importImages($event, i)" hidden />
+          <button class="a-btn a-del" type="button" (click)="onRemoveImage(i)">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+      </div>
+      <div class="img-slot-preview" *ngIf="list.fileurl != null || list.url != null">
+        <img class="img-slot-img" [src]="list.url != null ? list.url : list.fileurl" />
+        <button class="img-remove-overlay" type="button" (click)="removeImage(i)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="empty-hint" *ngIf="image.length === 0">
+      <mat-icon>add_photo_alternate</mat-icon>
+      <p>Select a ratio above to add images</p>
+    </div>
+
+    <!-- ═══ FORM FIELDS ═══ -->
+    <form [formGroup]="adsForm" (ngSubmit)="submit()" class="form-fields">
+
+      <div class="field-group">
+        <label class="label">Payment Link</label>
+        <div class="input-box">
+          <mat-icon class="ib-icon">payment</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter payment link" formControlName="paymentlink" />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Display Screen <span class="required">*</span></label>
+        <div class="input-box">
+          <mat-icon class="ib-icon">tv</mat-icon>
+          <mat-select formControlName="displayscreen" placeholder="Select screen" panelClass="custom-tag-panel">
+            <mat-option *ngFor="let option of ['home','eiflix']" [value]="option">{{ option }}</mat-option>
+          </mat-select>
+        </div>
+        <span class="field-hint">Screen where the ad will be displayed</span>
+        <span class="field-error" *ngIf="adsForm.get('displayscreen')?.touched && adsForm.get('displayscreen')?.hasError('required')">Display screen is required</span>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Deep Link</label>
+        <div class="input-box">
+          <mat-icon class="ib-icon">link</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter deep link" formControlName="deeplinkinternal" />
+        </div>
+        <div class="checkbox-row">
+          <mat-checkbox formControlName="deeplink" color="primary">Internal deep link (in-app)</mat-checkbox>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Call To Action <span class="required">*</span></label>
+        <div class="input-box">
+          <mat-icon class="ib-icon">touch_app</mat-icon>
+          <input type="text" class="ib-input" placeholder="e.g. Learn More, Buy Now" formControlName="calltoaction" />
+        </div>
+        <span class="field-error" *ngIf="adsForm.get('calltoaction')?.touched && adsForm.get('calltoaction')?.hasError('required')">Call to action is required</span>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Ad Duration <span class="required">*</span></label>
+        <mat-form-field class="date-range-field" appearance="outline">
+          <mat-label>Start — End</mat-label>
+          <mat-date-range-input [rangePicker]="picker">
+            <input matStartDate formControlName="startdate" placeholder="Start date">
+            <input matEndDate formControlName="enddate" placeholder="End date">
+          </mat-date-range-input>
+          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+
+      <div class="field-group delete-check">
+        <mat-checkbox formControlName="delete" color="warn">
+          <span class="delete-check-text">Delete this Ad</span>
+        </mat-checkbox>
+      </div>
+
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" type="button" (click)="close()" [disabled]="loading">Cancel</button>
+    <button class="btn-primary" type="button" (click)="submit()" [disabled]="adsForm.invalid || loading">
+      <mat-icon>{{ loading ? 'hourglass_empty' : 'save' }}</mat-icon>
+      {{ loading ? 'Updating...' : (dailogData.addata ? 'Update Ad' : 'Create Ad') }}
+    </button>
+  </mat-dialog-actions>
+</div>

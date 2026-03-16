@@ -1,0 +1,29 @@
+<div style="padding: 30px;">
+  <h4 class="title">Update Level</h4>
+  <form [formGroup]="levelForm" (ngSubmit)="submit()">
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Level</mat-label>
+        <input matInput type="text" formControlName="level">
+        <mat-error *ngIf="levelForm.get('level').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Category</mat-label>
+          <mat-select  formControlName="category">
+            <mat-option *ngFor="let category of bigleveltypes" [value]="category">
+              {{ category }}
+            </mat-option>
+          </mat-select>        
+          <mat-error *ngIf="levelForm.get('category').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+    <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Level'}}</button>
+  </form>
+</div>

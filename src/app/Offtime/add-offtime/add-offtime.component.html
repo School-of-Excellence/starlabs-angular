@@ -1,0 +1,85 @@
+<div class="mainscreen">
+  <div class="heading">Mark Offtime</div>
+  <div class="selectprofilebox">
+    <div *ngIf="superRole">
+      <mat-form-field class="namefield" appearance="outline">
+        <mat-label>Select Specialist</mat-label>
+        <mat-select [(ngModel)]="selectedSpecialist" (selectionChange)="onSpecialistSelected()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filteredname" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let user of returnSpecialist()" [value]="user.id">{{user.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div style="margin-left: 20px;">
+      <mat-checkbox [(ngModel)]="dateRange" [disabled]="loading">Enable Date Range</mat-checkbox>
+    </div>
+  </div>
+
+  <div class="form">
+    <form [formGroup]="offtimeForm" (ngSubmit)="submit()">
+      <div *ngIf="selectedSpecialist != null" formGroupName="offtime">
+        <ul>
+          <li *ngFor="let slot of slots().controls; let i = index" [formGroupName]="i">
+            <!-- Date -->
+            <mat-form-field *ngIf="!dateRange" class="inputfield" appearance="outline">
+              <mat-label>Date</mat-label>
+              <input matInput formControlName="startdate" [matDatepicker]="picker" [min]="minDate" (click)="picker.open()" placeholder="MM-DD-YYYY" required>
+              <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-datepicker #picker></mat-datepicker>
+              <mat-error *ngIf="offtimeForm.get('offtime')['controls'][i].get('startdate').hasError('required')">
+                Date <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+            <mat-form-field *ngIf="dateRange" class="inputfield" appearance="outline">
+              <mat-label>Date Range</mat-label>
+              <mat-date-range-input [rangePicker]="picker">
+                <input matStartDate (click)="picker.open()" formControlName="startdate">
+                <input matEndDate (click)="picker.open()" formControlName="enddate">
+              </mat-date-range-input>
+              <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-date-range-picker touchUi #picker></mat-date-range-picker>
+              <mat-error *ngIf="offtimeForm.get('offtime')['controls'][i].get('startdate').hasError('required') || offtimeForm.get('offtime')['controls'][i].get('enddate').hasError('required')">
+                Date <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+            <!-- Start Time -->
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>Start Time</mat-label>
+              <input matInput type="time" formControlName="starttime" #starttime (change)="onStartTimeChange(i)" required>
+              <mat-error *ngIf="offtimeForm.get('offtime')['controls'][i].get('starttime').hasError('required')">
+                Start Time <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+            <!-- End Time -->
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>End Time</mat-label>
+              <input matInput type="time" formControlName="endtime" (change)="onEndTimeChange(i)" required>
+              <mat-error *ngIf="offtimeForm.get('offtime')['controls'][i].get('endtime').hasError('required')">
+                End Time <strong>Required</strong>
+              </mat-error>
+              <mat-error *ngIf="offtimeForm.get('offtime')['controls'][i].get('endtime').hasError('invalid')">
+                Invalid Time Difference
+              </mat-error>
+            </mat-form-field>
+            <button class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeSlot(i)">
+              <mat-icon class="icon">remove</mat-icon>
+            </button>
+            <button class="addremovebtn" *ngIf="i+1 == slots().controls.length" mat-icon-button type="button" (click)="addSlot()">
+              <mat-icon class="icon">add</mat-icon>
+            </button>
+            <!-- Full Day -->
+            <div class="checkbox">
+              <mat-checkbox formControlName="fullday" (change)="onChecked(i, $event.checked)">Full Day Off</mat-checkbox>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="btnbox">
+        <button mat-stroked-button class="cancelbtn" type="button" (click)="dialogref.close()" [disabled]="loading">Close</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Loading.....' : 'Submit'}}</button>
+      </div>
+    </form>
+  </div>
+</div>

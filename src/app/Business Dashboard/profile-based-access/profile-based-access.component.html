@@ -1,0 +1,709 @@
+<div class="screen-access-container">
+  <!-- Header -->
+  <div class="page-header">
+    <h1>Screen Access</h1>
+    <p>Assign screen access to users</p>
+  </div>
+
+  <!-- Add New Form -->
+  <!-- <mat-card class="form-card">
+    <mat-card-header>
+      <mat-card-title>Add Screen Access</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Route Path</label>
+          <input
+            type="text"
+            [(ngModel)]="routePath"
+            placeholder="dashboard"
+            class="form-input"
+            [disabled]="existPath"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Screen Name</label>
+          <input
+            type="text"
+            [(ngModel)]="screenName"
+            placeholder="Dashboard"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group user-select-group">
+          <label>Profiles</label>
+          <mat-select
+            [(ngModel)]="selectedProfileIds"
+            multiple
+            class="user-select"
+            placeholder="Select Profiles"
+          >
+            <mat-select-trigger>
+              {{ getSelectedProfiles(selectedProfileIds) }}
+            </mat-select-trigger>
+
+            <mat-option>
+              <ngx-mat-select-search
+                [(ngModel)]="addSearchProfile"
+                [ngModelOptions]="{ standalone: true }"
+                [placeholderLabel]="'Search'"
+                [noEntriesFoundLabel]="'No matching profile'"
+                ngDefaultControl
+              ></ngx-mat-select-search>
+            </mat-option>
+
+            @for (profileId of getProfileIds(); track profileId ) {
+            <mat-option
+              [value]="profileId"
+              [style]="{
+                display: filterProfilesIds(addSearchProfile, profileId)
+                  ? ''
+                  : 'none'
+              }"
+            >
+              <div class="option-content">
+                <span class="option-avatar">{{ getInitials(profileId) }}</span>
+                <div class="option-details">
+                  <span class="option-name">{{
+                    getProfileFields(profileId, "name")
+                  }}</span>
+                  <span class="option-email">{{
+                    getProfileFields(profileId, "email")
+                  }}</span>
+                </div>
+              </div>
+            </mat-option>
+            }
+          </mat-select>
+        </div>
+
+        <div class="form-btn">
+          <button mat-button class="refresh-btn" (click)="clearForm()">
+            <mat-icon>refresh</mat-icon>
+            clear
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="existPath ? saveDeletedAccess() : addAccess()"
+            [disabled]="
+              !routePath || !screenName || selectedProfileIds.length === 0
+            "
+            class="add-btn"
+          >
+            <mat-icon>add</mat-icon>
+            Add
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="selectedProfileIds?.length > 0">
+        <p class="header">Selected Profiles</p>
+        <mat-chip-listbox>
+          <mat-chip
+            *ngFor="let profileId of selectedProfileIds"
+            [removable]="true"
+            (removed)="removeProfileAddForm(profileId)"
+            [matTooltip]="getProfileFields(profileId, 'email')"
+            style="background-color: transparent"
+          >
+            <div
+              class="user-chip"
+              [matTooltip]="getProfileFields(profileId, 'email')"
+            >
+              <span class="chip-avatar">{{ getInitials(profileId) }}</span>
+              {{ getProfileFields(profileId, "name") }}
+              <button matChipRemove>
+                <mat-icon>cancel</mat-icon>
+              </button>
+            </div>
+          </mat-chip>
+        </mat-chip-listbox>
+      </div>
+    </mat-card-content>
+  </mat-card> -->
+
+  <!-- Access Table -->
+  <mat-card class="table-card">
+    <mat-card-header>
+      <mat-card-title>Screen Access List</mat-card-title>
+
+      <div class="header-controls">
+        <!-- Search Input -->
+        <mat-form-field appearance="outline" class="header-search">
+          <mat-label>Search</mat-label>
+          <input
+            matInput
+            [(ngModel)]="filters.search"
+            (input)="accessFilter()"
+            placeholder="Ex:/path or dashboard"
+          />
+        </mat-form-field>
+
+        <!-- Profile filter -->
+        <mat-form-field appearance="outline" class="header-profile-search">
+          <mat-label>Search Profile</mat-label>
+
+          <mat-select
+            [(ngModel)]="filters.profileIds"
+            [ngModelOptions]="{ standalone: true }"
+            multiple
+            placeholder="Select Profiles"
+            (selectionChange)="accessFilter()"
+          >
+            <mat-select-trigger>
+              {{ getSelectedProfiles(filters.profileIds) }}
+            </mat-select-trigger>
+
+            <mat-option disabled>
+              <ngx-mat-select-search
+                [(ngModel)]="searchProfile"
+                [ngModelOptions]="{ standalone: true }"
+                [placeholderLabel]="'Search'"
+                [noEntriesFoundLabel]="'No matching profile'"
+              ></ngx-mat-select-search>
+            </mat-option>
+
+            <mat-option
+              *ngFor="let profileId of getProfileIds()"
+              [value]="profileId"
+              [style]="{
+                display: filterProfilesIds(searchProfile, profileId)
+                  ? ''
+                  : 'none'
+              }"
+            >
+              <div class="option-content">
+                <span class="option-avatar">{{ getInitials(profileId) }}</span>
+                <div class="option-details">
+                  <span>{{ getProfileFields(profileId, "name") }}</span>
+                  <span class="option-email">
+                    {{ getProfileFields(profileId, "email") }}
+                  </span>
+                </div>
+              </div>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Access Type</mat-label>
+
+          <mat-select
+            placeholder="Select Access Type"
+            [(ngModel)]="filters.accessType"
+            (selectionChange)="accessFilter()"
+          >
+          <mat-option value="-- None --">
+            <p>-- None --</p>
+          </mat-option>
+          <mat-option value="profile">
+            <p>Profiles</p>
+          </mat-option>
+          <mat-option value="role">
+            <p>Roles and Profiles</p>
+          </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (filteredAccess.length > 0) {
+      <table class="access-table">
+        <thead>
+          <tr>
+            <th>Route Path</th>
+            <th>Screen Name</th>
+            <th>Users</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (access of filteredAccess; track $index; let accessIndex =
+          $index) {
+          <tr>
+            <td>
+              <code class="route-path">{{ access.route }}</code>
+            </td>
+
+            <td>
+              {{ access.label }}
+            </td>
+
+            <td>
+              <div class="user-chips">
+                @for (profileId of access.profileid; track profileId; let i =
+                $index) { @if (i < 3 || showFullProfiles.includes(accessIndex))
+                {
+                <span
+                  class="user-chip"
+                  [matTooltip]="getProfileFields(profileId, 'email')"
+                >
+                  <span class="chip-avatar">{{ getInitials(profileId) }}</span>
+                  {{ getProfileFields(profileId, "name") }}
+                </span>
+                } } @if (access.profileid.length > 3 &&
+                !showFullProfiles.includes(accessIndex)) {
+                <span
+                  class="more-chip"
+                  [matTooltip]="getMoreUsersTooltip(access.profileid)"
+                  (click)="showProfiles(accessIndex)"
+                >
+                  +{{ access.profileid.length - 3 }} more
+                </span>
+                } @else if (showFullProfiles.includes(accessIndex)) {
+                <span class="less-chip" (click)="showProfiles(accessIndex)">
+                  Show Less
+                </span>
+                }
+              </div>
+            </td>
+
+            <td class="actions">
+              <button
+                mat-icon-button
+                (click)="openEditDialog(access)"
+                matTooltip="Edit"
+              >
+                <mat-icon>edit</mat-icon>
+              </button>
+              <!-- <button
+                mat-icon-button
+                color="warn"
+                (click)="deleteAccess(access.docid)"
+                matTooltip="Delete"
+              >
+                <mat-icon>delete</mat-icon>
+              </button> -->
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+      } @else {
+      <div class="empty-state">
+        <mat-icon>lock_open</mat-icon>
+        <p>No screen access assigned yet</p>
+      </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>
+
+
+<div class="screen-access-container">
+  <!-- Header -->
+  <div class="page-header">
+    <h1>AHCRM Dashboard Access</h1>
+  </div>
+
+  <!-- Add New Form -->
+  <mat-card class="form-card">
+    <mat-card-header>
+      <mat-card-title>Add Dashboard Access</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="form-row">
+      
+        <div class="form-group">
+          <label>Dashboard Name</label>
+          <input
+            type="text"
+            [(ngModel)]="ahcrmScreenName"
+            placeholder="Dashboard"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group user-select-group">
+          <label>Profiles</label>
+          <mat-select
+            [(ngModel)]="ahcrmSelectedProfileIds"
+            multiple
+            class="user-select"
+            placeholder="Select Profiles"
+          >
+            <mat-select-trigger>
+              {{ getSelectedProfiles(ahcrmSelectedProfileIds) }}
+            </mat-select-trigger>
+
+            <mat-option>
+              <ngx-mat-select-search
+                [(ngModel)]="ahcrmAddSearchProfile"
+                [ngModelOptions]="{ standalone: true }"
+                [placeholderLabel]="'Search'"
+                [noEntriesFoundLabel]="'No matching profile'"
+                ngDefaultControl
+              ></ngx-mat-select-search>
+            </mat-option>
+
+            @for (profileId of getProfileIds(); track profileId ) {
+            <mat-option
+              [value]="profileId"
+              [style]="{
+                display: filterProfilesIds(ahcrmAddSearchProfile, profileId)
+                  ? ''
+                  : 'none'
+              }"
+            >
+              <div class="option-content">
+                <span class="option-avatar">{{ getInitials(profileId) }}</span>
+                <div class="option-details">
+                  <span class="option-name">{{
+                    getProfileFields(profileId, "name")
+                  }}</span>
+                  <span class="option-email">{{
+                    getProfileFields(profileId, "email")
+                  }}</span>
+                </div>
+              </div>
+            </mat-option>
+            }
+          </mat-select>
+        </div>
+
+        <div class="form-btn">
+          <button mat-button class="refresh-btn" (click)="clearAhcrmForm()">
+            <mat-icon>refresh</mat-icon>
+            clear
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="addAhcrmScreenAccess()"
+            [disabled]="
+              !ahcrmScreenName || ahcrmSelectedProfileIds.length === 0
+            "
+            class="add-btn"
+          >
+            <mat-icon>add</mat-icon>
+            Add
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="ahcrmSelectedProfileIds?.length > 0">
+        <p class="header">Selected Profiles</p>
+        <mat-chip-listbox>
+          <mat-chip
+            *ngFor="let profileId of ahcrmSelectedProfileIds"
+            [removable]="true"
+            (removed)="removeProfileAhcrmAddForm(profileId)"
+            [matTooltip]="getProfileFields(profileId, 'email')"
+            style="background-color: transparent"
+          >
+            <div
+              class="user-chip"
+              [matTooltip]="getProfileFields(profileId, 'email')"
+            >
+              <span class="chip-avatar">{{ getInitials(profileId) }}</span>
+              {{ getProfileFields(profileId, "name") }}
+              <button matChipRemove>
+                <mat-icon>cancel</mat-icon>
+              </button>
+            </div>
+          </mat-chip>
+        </mat-chip-listbox>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Access Table -->
+  <mat-card class="table-card">
+    <mat-card-header style="margin-bottom: 20px;">
+      <mat-card-title style="word-spacing : 5px">AHCRM Dashboard Access List</mat-card-title>
+
+      <!-- <div class="header-controls">
+    
+        <mat-form-field appearance="outline" class="header-search">
+          <mat-label>Search</mat-label>
+          <input
+            matInput
+            [(ngModel)]="filters.search"
+            (input)="accessFilter()"
+            placeholder="Ex:/path or dashboard"
+          />
+        </mat-form-field>
+
+    
+        <mat-form-field appearance="outline" class="header-profile-search">
+          <mat-label>Search Profile</mat-label>
+
+          <mat-select
+            [(ngModel)]="filters.profileIds"
+            [ngModelOptions]="{ standalone: true }"
+            multiple
+            placeholder="Select Profiles"
+            (selectionChange)="accessFilter()"
+          >
+            <mat-select-trigger>
+              {{ getSelectedProfiles(filters.profileIds) }}
+            </mat-select-trigger>
+
+            <mat-option disabled>
+              <ngx-mat-select-search
+                [(ngModel)]="searchProfile"
+                [ngModelOptions]="{ standalone: true }"
+                [placeholderLabel]="'Search'"
+                [noEntriesFoundLabel]="'No matching profile'"
+              ></ngx-mat-select-search>
+            </mat-option>
+
+            <mat-option
+              *ngFor="let profileId of getProfileIds()"
+              [value]="profileId"
+              [style]="{
+                display: filterProfilesIds(searchProfile, profileId)
+                  ? ''
+                  : 'none'
+              }"
+            >
+              <div class="option-content">
+                <span class="option-avatar">{{ getInitials(profileId) }}</span>
+                <div class="option-details">
+                  <span>{{ getProfileFields(profileId, "name") }}</span>
+                  <span class="option-email">
+                    {{ getProfileFields(profileId, "email") }}
+                  </span>
+                </div>
+              </div>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div> -->
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (getAhcrmAccess.length > 0) {
+      <table class="access-table">
+        <thead>
+          <tr>
+            <th>Dashboard Name</th>
+            <th>Users</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (access of getAhcrmAccess; track $index;) {
+          <tr>
+            <td style="text-transform: capitalize;">
+              {{ access }}
+            </td>
+
+            <td>
+              <div class="user-chips">
+                @for (profileId of ahcrmScreenAccess[access]; track profileId; let i =
+                $index) { @if (i < 3 || showAhcrmFullProfiles.includes(access))
+                {
+                <span
+                  class="user-chip"
+                  [matTooltip]="getProfileFields(profileId, 'email')"
+                >
+                  <span class="chip-avatar">{{ getInitials(profileId) }}</span>
+                  {{ getProfileFields(profileId, "name") }}
+                </span>
+                } } @if (ahcrmScreenAccess[access].length > 3 &&
+                !showAhcrmFullProfiles.includes(access)) {
+                <span
+                  class="more-chip"
+                  [matTooltip]="getMoreUsersTooltip(ahcrmScreenAccess[access])"
+                  (click)="showAhcrmProfiles(access)"
+                >
+                  +{{ ahcrmScreenAccess[access].length - 3 }} more
+                </span>
+                } @else if (showAhcrmFullProfiles.includes(access)) {
+                <span class="less-chip" (click)="showAhcrmProfiles(access)">
+                  Show Less
+                </span>
+                }
+              </div>
+            </td>
+
+            <td class="actions">
+              <button
+                mat-icon-button
+                (click)="openAhcmEditDialog(access)"
+                matTooltip="Edit"
+              >
+                <mat-icon>edit</mat-icon>
+              </button>
+              <!-- <button
+                mat-icon-button
+                color="warn"
+                (click)="deleteAccess(access.docid)"
+                matTooltip="Delete"
+              >
+                <mat-icon>delete</mat-icon>
+              </button> -->
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+      } @else {
+      <div class="empty-state">
+        <mat-icon>lock_open</mat-icon>
+        <p>No screen access assigned yet</p>
+      </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<!-- Dialog template -->
+<ng-template #editDialog>
+  <h2 mat-dialog-title style="margin-bottom: 0;">Edit Screen Access</h2>
+  <div mat-dialog-content *ngIf="editRoute" class="edit-form">
+    <div class="static-info">
+  <p><span class="k">Dashboard Name</span><span class="sep">:</span><span class="v">{{ editRoute?.label || "-" }}</span></p>
+  <p><span class="k">Route Path</span><span class="sep">:</span><span class="v">{{ editRoute?.route || "-" }}</span></p>
+</div>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Profiles</mat-label>
+      <mat-select [(ngModel)]="editRoute.profileid" multiple>
+        <mat-select-trigger>
+          {{ getProfileNamesFromIds(editRoute?.profileid) }}
+        </mat-select-trigger>
+
+        <mat-option disabled>
+          <ngx-mat-select-search
+            [(ngModel)]="editSearchProfile"
+            [ngModelOptions]="{ standalone: true }"
+            [placeholderLabel]="'Search'"
+            [noEntriesFoundLabel]="'No matching profile'"
+          ></ngx-mat-select-search>
+        </mat-option>
+
+        <mat-option
+          *ngFor="let profileId of getProfileIds()"
+          [value]="profileId"
+          [style]="{
+            display: filterProfilesIds(editSearchProfile, profileId)
+              ? ''
+              : 'none'
+          }"
+        >
+          <div class="option-content">
+            <span class="option-avatar">{{ getInitials(profileId) }}</span>
+            <div class="option-details">
+              <span>{{ getProfileFields(profileId, "name") }}</span>
+              <span class="option-email">
+                {{ getProfileFields(profileId, "email") }}
+              </span>
+            </div>
+          </div>
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-chip-listbox *ngIf="(editRoute.profileid || []).length > 0">
+      <mat-chip
+        *ngFor="let profileId of editRoute.profileid"
+        [removable]="true"
+        (removed)="removeProfileEditForm(profileId)"
+        [matTooltip]="getProfileFields(profileId, 'email')"
+      >
+        <div class="user-chip">
+          <span class="chip-avatar">{{ getInitials(profileId) }}</span>
+          {{ getProfileFields(profileId, "name") }}
+          <button matChipRemove>
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </div>
+      </mat-chip>
+    </mat-chip-listbox>
+  </div>
+
+  <div mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>Cancel</button>
+    <button
+      mat-raised-button
+      color="primary"
+      [disabled]="editRoute?.profileid?.length < 0"
+      [mat-dialog-close]="editRoute"
+    >
+      Save
+    </button>
+  </div>
+</ng-template>
+
+<!-- ahcrm edit dialog -->
+<ng-template #ahcrmEditDialog>
+  <h2 mat-dialog-title style="margin-bottom: 0;">Edit Dashboard Access</h2>
+  <div mat-dialog-content *ngIf="ahcrmEditForm" class="edit-form">
+    <div class="static-info">
+  <p><span class="k">Dashboard Name</span><span class="sep">:</span><span class="v">{{ ahcrmEditForm?.dashboard || "-" }}</span></p>
+</div>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Profiles</mat-label>
+      <mat-select [(ngModel)]="ahcrmEditForm.profileid" multiple>
+        <mat-select-trigger>
+          {{ getProfileNamesFromIds(ahcrmEditForm?.profileid) }}
+        </mat-select-trigger>
+
+        <mat-option disabled>
+          <ngx-mat-select-search
+            [(ngModel)]="ahcrmEditSearchProfile"
+            [ngModelOptions]="{ standalone: true }"
+            [placeholderLabel]="'Search'"
+            [noEntriesFoundLabel]="'No matching profile'"
+          ></ngx-mat-select-search>
+        </mat-option>
+
+        <mat-option
+          *ngFor="let profileId of getProfileIds()"
+          [value]="profileId"
+          [style]="{
+            display: filterProfilesIds(ahcrmEditSearchProfile, profileId)
+              ? ''
+              : 'none'
+          }"
+        >
+          <div class="option-content">
+            <span class="option-avatar">{{ getInitials(profileId) }}</span>
+            <div class="option-details">
+              <span>{{ getProfileFields(profileId, "name") }}</span>
+              <span class="option-email">
+                {{ getProfileFields(profileId, "email") }}
+              </span>
+            </div>
+          </div>
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-chip-listbox *ngIf="(ahcrmEditForm.profileid || []).length > 0">
+      <mat-chip
+        *ngFor="let profileId of ahcrmEditForm.profileid"
+        [removable]="true"
+        (removed)="removeProfileEditAhcrmForm(profileId)"
+        [matTooltip]="getProfileFields(profileId, 'email')"
+      >
+        <div class="user-chip">
+          <span class="chip-avatar">{{ getInitials(profileId) }}</span>
+          {{ getProfileFields(profileId, "name") }}
+          <button matChipRemove>
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </div>
+      </mat-chip>
+    </mat-chip-listbox>
+  </div>
+
+  <div mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>Cancel</button>
+    <button
+      mat-raised-button
+      color="primary"
+      [disabled]="ahcrmEditForm?.profileid?.length < 0"
+      [mat-dialog-close]="ahcrmEditForm"
+    >
+      Save
+    </button>
+  </div>
+</ng-template>

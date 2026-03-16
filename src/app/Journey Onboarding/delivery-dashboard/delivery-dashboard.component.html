@@ -1,0 +1,635 @@
+<div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+    <div class="loading-progress">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="dashboard-container">
+  <div class="header-section">
+    <h1 class="main-title">Delivery Dashboard</h1>
+    <!-- <div class="header-buttons">
+      <button class="export-btn">Export Report</button>
+      <button class="refresh-btn">Refresh Data</button>
+    </div> -->
+  </div>
+
+  <div class="filter-buttons">
+    <button class="filter-btn" [class.active]="selectedTimeFilter === 'today'" (click)="onTodayFilterClick()"
+      style="pointer-events: auto; z-index: 1000;">
+      Today
+    </button>
+    <button class="filter-btn" [class.active]="selectedTimeFilter === '7days'" (click)="on7DaysFilterClick()">
+      7 Days
+    </button>
+    <button class="filter-btn" [class.active]="selectedTimeFilter === '30days'" (click)="on30DaysFilterClick()">
+      30 Days
+    </button>
+    <button class="filter-btn" [class.active]="selectedTimeFilter === 'thismonth'" (click)="onThisMonthFilterClick()">
+      This Month
+    </button>
+  </div>
+</div>
+
+<div class="cards-container">
+  <div class="cards-grid">
+    <!-- Urgent Card -->
+    <div class="card urgent">
+      <div class="card-label">URGENT: 7+ DAYS STUCK</div>
+      <div class="card-number">{{originalData['clearedMoreThan7Days'].count}}</div>
+      <div class="card-description">Participants need immediate attention</div>
+      <button class="card-button" (click)="onShow7DaysStuckClick()">TAKE ACTION NOW</button>
+    </div>
+
+    <!-- Warning Card -->
+    <div class="card warning">
+      <div class="card-label">WARNING: 30+ DAYS</div>
+      <div class="card-number">{{originalData['clearedMoreThan30Days'].count}}</div>
+      <div class="card-description">Critical backlog requiring escalation</div>
+      <button class="card-button" (click)="on30DaysStuckClick()">REVIEW CASES</button>
+    </div>
+
+    <!-- Success Card -->
+    <div class="card success">
+      <div class="card-label">SUCCESS: STARTED TODAY</div>
+      <div class="card-number">{{originalData['initiatedToday'].count}}</div>
+      <div class="card-description">Participants successfully initiated</div>
+      <button class="card-button" (click)="onInitiatedTodayClick()">VIEW DETAILS</button>
+    </div>
+
+    <!-- Ready Card -->
+    <div class="card ready">
+      <div class="card-label">READY: PAYMENT CLEARED</div>
+      <div class="card-number">{{originalData['readyForInitiation'].count}}</div>
+      <div class="card-description">Eligible for immediate initiation</div>
+      <button class="card-button" (click)="onBulkInitiateClick()">VIEW DETAILS</button>
+    </div>
+  </div>
+</div>
+
+<!-- Old Design  -->
+<div class="journey-flow-container">
+  <div class="journey-header">
+    <h2 class="journey-title">Product Journey Flow Analysis</h2>
+    <div class="product-selector">
+      <label>Analyze Product:</label>
+      <select class="product-dropdown" (change)="onProductFilterChange($event)">
+        <option>All Products Overview</option>
+        <option>WISH</option>
+        <option>A&H LIGHT</option>
+        <option>EI Solution</option>
+        <option>EI Starter Pack</option>
+        <option>Critical Support</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="journey-stats">
+    <div class="stat-box">
+      <div class="stat-value">{{ this.totalParticipants }} </div>
+      <div class="stat-label">TOTAL PARTICIPANTS</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value orange">{{this.inProcessCount }}</div>
+      <div class="stat-label">IN PROCESS</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value green">{{ this.completedCount }}</div>
+      <div class="stat-label">COMPLETED</div>
+    </div>
+
+    <div class="month-filter-container">
+      <div class="month-filter">
+        <button class="month-nav-btn" (click)="goToPreviousMonth()" title="Previous Month">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+
+        <div class="month-display">
+          <mat-icon class="calendar-icon">calendar_month</mat-icon>
+          <span class="month-text">{{ displayMonth }}</span>
+        </div>
+
+        <button class="month-nav-btn" (click)="goToNextMonth()" title="Next Month">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="kanban-board">
+    <div class="kanban-row">
+      <div class="kanban-column green-border">
+        <div class="column-header" (click)="onKanbanColumnClick('currentJourneyInitiated')" style="cursor: pointer;">
+          <span class="column-name">Initiated</span>
+          <span class="column-count">{{originalData['currentJourneyInitiated'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let participant of originalData['currentJourneyInitiated'].data">
+            <div class="participant-name">{{ mapMetaData[participant['profileid']]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ participant['initiatedtime'] ? (participant['initiatedtime']?.toDate() | date:
+                'MMM d, yyyy') : 'N/A' }}</span>
+              <span class="days-badge light-orange">{{ participant['waitingperiod'] === 'N/A' ? 'N/A' :
+                participant['waitingperiod'] + 'D'}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column red-border">
+        <div class="column-header" (click)="onKanbanColumnClick('welcomeCall')" style="cursor: pointer;">
+          <span class="column-name">Welcome Call </span>
+          <span class="column-count">{{originalData['welcomeCall'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['welcomeCall'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column orange-border">
+        <div class="column-header " (click)="onKanbanColumnClick('clarityCall')" style="cursor: pointer;">
+          <span class="column-name">Clarity Call</span>
+          <span class="column-count">{{originalData['clarityCall'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['clarityCall'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column orange-border">
+        <div class="column-header" (click)="onKanbanColumnClick('diagnostics')" style="cursor: pointer;">
+          <span class="column-name">Diagnostics</span>
+          <span class="column-count">{{originalData['diagnostics'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['diagnostics'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column orange-border">
+        <div class="column-header" (click)="onKanbanColumnClick('implementation')" style="cursor: pointer;">
+          <span class="column-name">Implementation</span>
+          <span class="column-count">{{originalData['implementation'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['implementation'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kanban-row">
+      <div class="kanban-column orange-border">
+        <div class="column-header " (click)="onKanbanColumnClick('midReviewDiagnostics')" style="cursor: pointer;">
+          <span class="column-name">Mid Review - Diagnostics</span>
+          <span class="column-count">{{originalData['midReviewDiagnostics'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['midReviewDiagnostics'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column orange-border">
+        <div class="column-header" (click)="onKanbanColumnClick('implementationPhase2')" style="cursor: pointer;">
+          <span class="column-name">Implementation Phase 2</span>
+          <span class="column-count">{{originalData['implementationPhase2'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['implementationPhase2'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column orange-border">
+        <div class="column-header" (click)="onKanbanColumnClick('finalReview')" style="cursor: pointer;">
+          <span class="column-name">Final Review</span>
+          <span class="column-count">{{originalData['finalReview'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['finalReview'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column blue-border">
+        <div class="column-header" (click)="onKanbanColumnClick('completed')" style="cursor: pointer;">
+          <span class="column-name">Completed</span>
+          <span class="column-count">{{originalData['completed'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['completed'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column blue-border">
+        <div class="column-header" (click)="onKanbanColumnClick('needsValidation')" style="cursor: pointer;">
+          <span class="column-name">Needs Validation</span>
+          <span class="column-count">{{originalData['needsValidation'].count}}</span>
+        </div>
+        <div class="column-body">
+          <div class="participant-card" *ngFor="let appointment of originalData['needsValidation'].data">
+            <div class="participant-name">{{ mapMetaData[appointment['bookedby']?.id]?.name || 'N/A' }}</div>
+            <div class="card-footer">
+              <span class="card-date">{{ appointment['appointmentTypeName'] }}</span>
+              <span class="status-badge" [ngClass]="appointment['attended'] ? 'completed-badge' : 'scheduled-badge'">
+                {{ appointment['attended'] ? 'Completed' : 'Scheduled' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="participant-management-container">
+  <div class="management-header">
+    <h2 class="management-title">Participant Management & Actions</h2>
+    <div class="management-actions">
+      <button class="action-btn primary">Bulk Initiate Ready</button>
+      <button class="action-btn primary" (click)="exportTableData()">Export List</button>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <form [formGroup]="filterForm">
+      <div class="filter-container">
+        <!-- Search Box -->
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" class="search-input" placeholder="Search by name..." formControlName="search"
+            (input)="filterTableData()" />
+          <button *ngIf="filterForm.value.search" (click)="clearSearch()" class="clear-search-btn-icon"
+            title="Clear search">
+            ✕
+          </button>
+        </div>
+
+        <!-- Journey Filter -->
+        <div class="filter-field">
+          <mat-form-field appearance="outline">
+            <mat-label>Journey</mat-label>
+            <mat-select placeholder="Select Journey" formControlName="journey" (selectionChange)="filterTableData()"
+              multiple>
+              <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{ journey
+                }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Product Filter (only for Stuck Cases tab) -->
+        <div class="filter-field"
+          *ngIf="currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity'">
+          <mat-form-field appearance="outline">
+            <mat-label>Product</mat-label>
+            <mat-select placeholder="Select Product" formControlName="product" (selectionChange)="filterTableData()"
+              multiple>
+              <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product
+                }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Refresh Button -->
+        <button mat-mini-fab color="primary" (click)="refreshFilter()" title="Reset Filters">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <mat-tab-group class="custom-tab-group" (selectedTabChange)="onTabChange($event)" #tabGroup
+    [(selectedIndex)]="currentTabIndex">
+    <!-- Awaiting Initiation Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="tab-text">Awaiting Initiation</span>
+        <span class="tab-count">({{originalData['awaitingInitiation'].count}})</span>
+      </ng-template>
+
+      <div *ngIf="isFilterActive()" class="filter-indicator">
+        <span class="filter-text">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+            <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+          </svg>
+          {{getFilterDisplayText()}}
+          <span class="filter-count" *ngIf="getActiveFilterCount()"> ({{getActiveFilterCount()}})</span>
+        </span>
+        <button class="clear-filter-btn" (click)="clearActiveFilter()">
+          Clear Filter
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="participants-table">
+          <thead>
+            <tr>
+              <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
+                [style.width]="header.width">
+                <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+                <span *ngIf="header.key !== 'checkbox'">{{header.label}}</span>
+              </th>
+            </tr>
+          </thead>
+          <ng-container *ngTemplateOutlet="tableBody"></ng-container>
+        </table>
+      </div>
+    </mat-tab>
+
+    <!-- Initiated - Not Consuming Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="tab-text">Initiated - Not Consuming</span>
+        <span class="tab-count">({{originalData['currentJourneyInitiated'].count}})</span>
+        <!-- <span class="tab-count" *ngIf="activeFilter === 'initiatedToday'">({{originalData['initiatedToday'].count}})</span> -->
+      </ng-template>
+
+      <div *ngIf="isFilterActive()" class="filter-indicator">
+        <span class="filter-text">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+            <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+          </svg>
+          {{getFilterDisplayText()}}
+          <span class="filter-count" *ngIf="getActiveFilterCount()"> ({{getActiveFilterCount()}})</span>
+        </span>
+        <button class="clear-filter-btn" (click)="clearActiveFilter()">
+          Clear Filter
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="participants-table">
+          <thead>
+            <tr>
+              <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
+                [style.width]="header.width">
+                <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+                <span *ngIf="header.key !== 'checkbox'">{{header.label}}</span>
+              </th>
+            </tr>
+          </thead>
+          <ng-container *ngTemplateOutlet="tableBody"></ng-container>
+        </table>
+      </div>
+    </mat-tab>
+
+    <!-- Stuck Cases Tab -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="tab-text">Stuck Cases</span>
+        <span class="tab-count">({{originalData['stuckCases'].count}})</span>
+        <!-- <span class="tab-count" *ngIf="activeFilter === 'welcomeCall'">({{originalData['welcomeCall'].count}})</span> -->
+        <!-- <span class="tab-count" *ngIf="activeFilter === 'clarityCall'">({{originalData['clarityCall'].count}})</span> -->
+        <!-- <span class="tab-count" *ngIf="activeFilter === 'diagnostics'">({{originalData['diagnostics'].count}})</span> -->
+        <!-- <span class="tab-count" *ngIf="activeFilter === 'implementation'">({{originalData['implementation'].count}})</span> -->
+        <!-- <span class="tab-count"
+          *ngIf="activeFilter === 'midReviewDiagnostics'">({{originalData['midReviewDiagnostics'].count}})</span>
+        <span class="tab-count"
+          *ngIf="activeFilter === 'implementationPhase2'">({{originalData['implementationPhase2'].count}})</span>
+        <span class="tab-count" *ngIf="activeFilter === 'completed'">({{originalData['completed'].count}})</span> -->
+      </ng-template>
+
+      <div *ngIf="isFilterActive()" class="filter-indicator">
+        <span class="filter-text">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+            <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+          </svg>
+          {{getFilterDisplayText()}}
+          <span class="filter-count" *ngIf="getActiveFilterCount()"> ({{getActiveFilterCount()}})</span>
+        </span>
+        <button class="clear-filter-btn" (click)="clearActiveFilter()">
+          Clear Filter
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="participants-table">
+          <thead>
+            <tr>
+              <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
+                [style.width]="header.width">
+                <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+                <span *ngIf="header.key !== 'checkbox'">{{header.label}}</span>
+              </th>
+            </tr>
+          </thead>
+          <ng-container *ngTemplateOutlet="tableBody"></ng-container>
+        </table>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+
+  <ng-template #tableBody>
+    <tbody>
+      <tr *ngFor="let participant of paginatedData" class="table-row" [ngClass]="{
+            'urgent-row': getWaitingPeriod(participant) >= 14,
+            'high-row': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14
+        }">
+        <td *ngFor="let header of getCurrentTabHeaders()">
+          <!-- Checkbox -->
+          <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+
+          <!-- Priority Badge -->
+          <span *ngIf="header.key === 'priority'" class="priority-badge" [ngClass]="{
+                    'urgent': getWaitingPeriod(participant) >= 14,
+                    'high': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14,
+                    'medium': getWaitingPeriod(participant) >= 5 && getWaitingPeriod(participant) < 10,
+                    'low': getWaitingPeriod(participant) < 5
+                }">
+            {{getPriorityLabel(getWaitingPeriod(participant))}}
+          </span>
+
+          <!-- Mapped fields (Name, Token) -->
+          <span *ngIf="header.type === 'mapped' && header.key !== 'checkbox' && header.key !== 'priority'"
+            [ngClass]="{'participant-name': header.mapValue === 'name'}">
+            {{mapMetaData[participant[header.key]]?.[header.mapValue] || 'N/A'}}
+          </span>
+
+          <span *ngIf="header.type === 'date' && header.key !== 'checkbox'">
+            {{participant[header.key]?.toDate ? (participant[header.key].toDate() | date: header.format) :
+            (participant[header.key] | date: header.format)}}
+          </span>
+
+          <span
+            *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority'  && header.key !== 'addnotes' && header.key !== 'waitingperiod'">
+            {{participant[header.key] || 'N/A'}}
+          </span>
+
+          <span *ngIf="header.key === 'waitingperiod'" class="days-badge" [ngClass]="{
+                              'days-14': participant[header.key] >= 14,
+                              'days-10': participant[header.key] >= 10 && participant[header.key] < 14,
+                              'days-7': participant[header.key] >= 7 && participant[header.key] < 10,
+                              'days-3': participant[header.key] >= 3 && participant[header.key] < 7,
+                              'days-2': participant[header.key] < 3
+                          }">
+            {{participant[header.key]}} DAYS
+          </span>
+
+          <span *ngIf="header.key === 'addnotes'">
+            <div (click)="addNotes(participant)">
+              <mat-icon class="edit-icon">edit_note</mat-icon>
+            </div>
+          </span>
+
+          <span *ngIf="header.key === 'generalnotes'" #notesContainer
+            (mouseenter)="showPopup(participant, $event, notesContainer)" (mouseleave)="hidePopupWithDelay()">
+            <div class="notes-container">
+              <div *ngIf="participant['generalnotes']?.length > 0">
+                <div>
+                  <span (click)="viewNotes(participant, header.key)" class="note-text"
+                    matTooltip="{{ participant['generalnotes'][participant['generalnotes'].length - 1].note }}">
+                    {{ participant['generalnotes'][participant['generalnotes'].length - 1].note | slice:0:20 }}...
+                  </span>
+                </div>
+              </div>
+            </div>
+          </span>
+
+          <span *ngIf="header.key === 'financialdata'" class="status-badge" [ngClass]="{
+                    'eligible': participant[header.key] === 'Cleared',
+                    'not-cleared': participant[header.key] === 'Pending'
+                }">
+            {{participant[header.key] === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED'}}
+          </span>
+
+          <!-- Bottleneck -->
+          <span *ngIf="header.key === 'bottleneck'">
+            {{participant['financialdata'] === 'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up'}}
+          </span>
+
+          <!-- Action Button -->
+          <button *ngIf="header.key === 'action'" class="action-btn-table" [ngClass]="{
+                    'escalate': participant['financialdata'] === 'Pending',
+                    'initiate': participant['financialdata'] === 'Cleared'
+                }" (click)="openParticipantPurchase(participant)">
+            {{'INITIATE NOW'}}
+          </button>
+        </td>
+      </tr>
+
+      <tr *ngIf="getCurrentTabData().length === 0">
+        <td [attr.colspan]="getCurrentTabHeaders().length" style="text-align: center; padding: 40px; color: #9ca3af;">
+          No participants found
+        </td>
+      </tr>
+    </tbody>
+  </ng-template>
+</div>
+<div class="table-footer">
+  <div class="row-info">
+    Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to
+    {{ Math.min(currentPage * itemsPerPage, getCurrentTabData().length) }} of
+    {{ getCurrentTabData().length }} entries
+  </div>
+
+  <div class="pagination">
+    <!-- First page button -->
+    <button class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
+      </svg>
+    </button>
+
+    <!-- Previous button -->
+    <button class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
+      Previous
+    </button>
+
+    <!-- Page numbers -->
+    <div class="page-numbers">
+      <button *ngFor="let page of getPageNumbers()" class="page-number" [class.active]="page === currentPage"
+        (click)="goToPage(page)">
+        {{ page }}
+      </button>
+    </div>
+
+    <!-- Next button -->
+    <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+      Next
+    </button>
+
+    <!-- Last page button -->
+    <button class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
+      </svg>
+    </button>
+  </div>
+
+  <div class="items-per-page">
+    <label>Show:</label>
+    <select [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+      <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{option}}</option>
+    </select>
+    <span>entries</span>
+  </div>
+</div>

@@ -1,0 +1,123 @@
+.quiz-dialog-container {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+/* Header */
+.dialog-header {
+  position: sticky; /* or use 'fixed' if you want it to always be on top */
+  top: 0; /* Position it at the top */
+  background-color: white; /* Ensure it has a background */
+  z-index: 10; /* Ensure it stays above other content */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: Add shadow for better visibility */
+}
+
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+/* Content */
+.dialog-content {
+  padding: 24px;
+  padding-top: 16px; /* Add padding to avoid overlap with the fixed header */
+}
+
+/* Form sections */
+.form-section {
+  margin-bottom: 24px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Options */
+.option-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.option-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.option-label {
+  font-weight: 500;
+  color: #666;
+}
+
+.option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.option-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.add-option-container {
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* Validation error */
+.validation-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d32f2f;
+  margin-top: 16px;
+}
+
+/* Form actions */
+.form-actions {
+    padding: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: #666;
+}
+
+.empty-state mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dialog-content {
+    padding: 16px;
+  }
+  
+  .option-fields {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+}

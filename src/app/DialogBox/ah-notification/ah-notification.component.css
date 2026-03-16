@@ -1,0 +1,97 @@
+.mainscreen{
+  padding: 20px;
+  justify-content: center;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.header {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.title {
+  color: white;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.color-teal {
+  background-color: rgb(0, 101, 135);
+}
+
+.eventbox{
+  vertical-align: middle;
+}
+
+.events{
+  font-weight: bold;
+}
+  
+.checkbox{
+  margin-right: 15px;
+}
+
+.profilebox{
+  margin-top: 20px;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.selectednames{
+  margin-left: 15px;
+  vertical-align: middle;
+}
+
+.messagebox{
+  margin-top: 10px;
+  margin-bottom: 15px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.textbox{
+  resize: both;
+}
+
+.notificationcontainer {
+  background-color: #333;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-left: 30px;
+  padding-top: 5px;
+  border-radius: 15px;
+}
+
+.sendButton{
+  width: 16%;
+  margin: 15px;
+  background-color: green;
+  color: white;
+  font-size:18px;
+  float: right;
+  padding: 10px;
+  font-family: 'Nunito Sans', sans-serif;
+  border-radius: 15px;
+}
+
+.createTemplateBtn{
+  text-align: center;
+  color: blue;
+}
+
+.notemplate{
+  text-align: center;
+  align-items: center;
+  margin: 20px;
+}

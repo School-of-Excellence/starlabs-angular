@@ -1,0 +1,274 @@
+<div class="detail-container">
+  <!-- Top Navigation Bar with Back Arrow Only -->
+  <div class="top-nav">
+    <button class="back-btn" (click)="goBack()">
+      <i class="material-icons">arrow_back</i>
+      <span>Back</span>
+    </button>
+  </div>
+
+  <!-- Scrollable Content -->
+  <div class="scroll-content" #scrollContainer (scroll)="onScroll($event)">
+    
+    <!-- Profile Header Card -->
+    <div class="profile-card">
+      <!-- Left Side: Image & Name -->
+      <div class="profile-left">
+        <div class="avatar-wrapper" (click)="openImageModal()">
+          <img *ngIf="profileImage" [src]="profileImage" alt="Profile" />
+          <div class="avatar-placeholder" *ngIf="!profileImage">
+            <i class="material-icons">person</i>
+          </div>
+          <div class="avatar-hover">
+            <i class="material-icons">zoom_in</i>
+          </div>
+        </div>
+
+        <h1 class="profile-name">{{ profileData?.name || 'Loading...' }}</h1>
+      </div>
+
+      <!-- Right Side: Products & Stats -->
+      <div class="profile-right">
+        <!-- Active Products -->
+        <div class="products-section">
+          <label class="section-label">Active Products</label>
+          <div class="products-chips" *ngIf="productEntries.length > 0">
+            <div class="product-chip" *ngFor="let product of productEntries">
+              <i class="material-icons">check_circle</i>
+              <span>{{ product.label }}</span>
+              <span class="chip-badge" *ngIf="product.count > 1">{{ product.count }}</span>
+            </div>
+          </div>
+          <div class="no-products" *ngIf="productEntries.length === 0">
+            <span>No active products</span>
+          </div>
+        </div>
+
+        <!-- Journey -->
+        <div class="journey-section" *ngIf="currentJourney">
+          <label class="section-label">Journey</label>
+          <div class="journey-chip">
+            <i class="material-icons">flag</i>
+            <span>{{ currentJourney.journey }}</span>
+          </div>
+        </div>
+
+        <!-- Stats Row Inside Card -->
+        <div class="stats-inside">
+          <div class="stat-item" (click)="openNotesPopup()">
+            <div class="stat-icon notes">
+              <i class="material-icons">description</i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-num">{{ reversedNotes.length }}</span>
+              <span class="stat-text">Notes</span>
+            </div>
+          </div>
+          <div class="stat-item" (click)="openFormsPopup()">
+            <div class="stat-icon forms">
+              <i class="material-icons">assignment</i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-num">{{ formNames.length }}</span>
+              <span class="stat-text">Forms</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-icon products">
+              <i class="material-icons">inventory_2</i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-num">{{ productEntries.length }}</span>
+              <span class="stat-text">Products</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes Section -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title">
+          <i class="material-icons">description</i>
+          <h2>Notes</h2>
+          <span class="count-badge">{{ reversedNotes.length }}</span>
+        </div>
+        <button class="add-btn" (click)="openNotesPopup()">
+          <i class="material-icons">add</i>
+          <span>Add Note</span>
+        </button>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-box" *ngIf="loading">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Empty -->
+      <div class="empty-box" *ngIf="!loading && reversedNotes.length === 0">
+        <i class="material-icons">note_add</i>
+        <p>No notes yet</p>
+        <button (click)="openNotesPopup()">Add First Note</button>
+      </div>
+
+      <!-- Notes List -->
+      <div class="notes-list" *ngIf="!loading && reversedNotes.length > 0">
+        <div class="note-row" *ngFor="let note of displayedNotes" (click)="openNotesPopup()">
+          <div class="note-avatar">{{ getNoteAuthor(note.givenby).charAt(0) }}</div>
+          <div class="note-content">
+            <div class="note-top">
+              <span class="note-author">{{ getNoteAuthor(note.givenby) }}</span>
+              <span class="note-time">{{ formatRelativeTime(note.date) }}</span>
+            </div>
+            <p class="note-text">{{ note.ahnotes }}</p>
+          </div>
+          <i class="material-icons">chevron_right</i>
+        </div>
+      </div>
+
+      <!-- View All -->
+      <button class="view-all" *ngIf="reversedNotes.length > 3" (click)="openNotesPopup()">
+        View All {{ reversedNotes.length }} Notes
+        <i class="material-icons">arrow_forward</i>
+      </button>
+    </div>
+
+    <!-- Forms Section -->
+    <div class="section-card" *ngIf="formNames.length > 0">
+      <div class="section-header">
+        <div class="section-title">
+          <i class="material-icons">assignment</i>
+          <h2>Forms</h2>
+          <span class="count-badge">{{ formNames.length }}</span>
+        </div>
+      </div>
+
+      <div class="forms-list">
+        <div class="form-row" *ngFor="let formName of formNames" 
+             [class.done]="isFormCompleted(formName)"
+             (click)="navigateToForm(formName)">
+          <div class="form-icon" [class.done]="isFormCompleted(formName)">
+            <i class="material-icons">{{ isFormCompleted(formName) ? 'check_circle' : 'pending' }}</i>
+          </div>
+          <div class="form-details">
+            <h4>{{ formName }}</h4>
+            <span>
+              <i class="material-icons">{{ isFormCompleted(formName) ? 'event_available' : 'schedule' }}</i>
+              {{ getFormDate(formName) || 'Pending' }}
+            </span>
+          </div>
+          <i class="material-icons">chevron_right</i>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+  </div>
+
+  <!-- Notes Popup Dialog -->
+  <div class="popup-overlay" *ngIf="showNotesPopup" (click)="closeNotesPopup()">
+    <div class="popup-dialog notes-popup" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <div class="popup-title">
+          <i class="material-icons">description</i>
+          <h3>Notes</h3>
+          <span class="popup-count">{{ reversedNotes.length }}</span>
+        </div>
+        <button class="popup-close" (click)="closeNotesPopup()">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+
+      <!-- Add Note Input -->
+      <div class="popup-input-section">
+        <textarea [(ngModel)]="newNoteText" placeholder="Write a new note..." rows="3"></textarea>
+        <button class="save-note-btn" [disabled]="!newNoteText.trim()" (click)="saveNote()">
+          <i class="material-icons">send</i>
+          <span>Save Note</span>
+        </button>
+      </div>
+
+      <!-- Notes List -->
+      <div class="popup-content">
+        <div class="popup-empty" *ngIf="reversedNotes.length === 0">
+          <i class="material-icons">note_add</i>
+          <p>No notes yet. Add your first note above!</p>
+        </div>
+        <div class="popup-list" *ngIf="reversedNotes.length > 0">
+          <div class="popup-note-item" *ngFor="let note of reversedNotes">
+            <div class="popup-note-avatar">{{ getNoteAuthor(note.givenby).charAt(0) }}</div>
+            <div class="popup-note-body">
+              <div class="popup-note-header">
+                <span class="popup-note-author">{{ getNoteAuthor(note.givenby) }}</span>
+                <span class="popup-note-date">{{ formatDateTime(note.date) }}</span>
+              </div>
+              <p class="popup-note-text">{{ note.ahnotes }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forms Popup Dialog -->
+  <div class="popup-overlay" *ngIf="showFormsPopup" (click)="closeFormsPopup()">
+    <div class="popup-dialog forms-popup" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <div class="popup-title">
+          <i class="material-icons">assignment</i>
+          <h3>Forms</h3>
+          <span class="popup-count">{{ formNames.length }}</span>
+        </div>
+        <button class="popup-close" (click)="closeFormsPopup()">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+
+      <div class="popup-content">
+        <div class="popup-empty" *ngIf="formNames.length === 0">
+          <i class="material-icons">assignment</i>
+          <p>No forms available</p>
+        </div>
+        <div class="popup-list" *ngIf="formNames.length > 0">
+          <div class="popup-form-item" *ngFor="let formName of formNames" 
+               [class.completed]="isFormCompleted(formName)"
+               (click)="navigateToForm(formName); closeFormsPopup();">
+            <div class="popup-form-icon" [class.completed]="isFormCompleted(formName)">
+              <i class="material-icons">{{ isFormCompleted(formName) ? 'check_circle' : 'pending' }}</i>
+            </div>
+            <div class="popup-form-info">
+              <h4>{{ formName }}</h4>
+              <span>
+                <i class="material-icons">{{ isFormCompleted(formName) ? 'event_available' : 'schedule' }}</i>
+                {{ getFormDate(formName) || 'Pending' }}
+              </span>
+            </div>
+            <div class="popup-form-status" [class.completed]="isFormCompleted(formName)">
+              {{ isFormCompleted(formName) ? 'Completed' : 'Pending' }}
+            </div>
+            <i class="material-icons popup-form-arrow">chevron_right</i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div class="img-modal" *ngIf="showImageModal" (click)="closeImageModal()">
+    <button class="img-close" (click)="closeImageModal()"><i class="material-icons">close</i></button>
+    <img *ngIf="profileImage" [src]="profileImage" />
+    <div class="img-placeholder" *ngIf="!profileImage"><i class="material-icons">person</i></div>
+    <div class="img-footer">
+      <h3>{{ profileData?.name }}</h3>
+      <button (click)="uploadImage(); closeImageModal();">
+        <i class="material-icons">cloud_upload</i> Change Photo
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="page-loader" *ngIf="bodyLoading">
+    <div class="loader-spin"></div>
+  </div>
+</div>

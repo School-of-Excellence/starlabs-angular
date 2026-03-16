@@ -1,0 +1,633 @@
+<div class="main-content">
+  <div class="details-panel">
+    <mat-tab-group mat-stretch-tabs="false" mat-align-tabs="center" animationDuration="0ms">
+      <mat-tab label="Details">
+        <div *ngIf="editloading" class="center" style="padding:30px;text-align:center;color:#6b7280;font-size:13px">
+          Loading...</div>
+        <ng-container *ngIf="!editloading">
+          <form [formGroup]="filterform">
+
+            <!-- ══ MAIN SINGLE CARD ══ -->
+            <div class="main-card">
+
+              <!-- Top Row: label + update btn -->
+              <div class="card-top-row">
+                <div class="assigned-label">Assigned To</div>
+                <!-- <button class="update-btn" type="button" (click)="updateTicketDetails(filterform.value)">↑ Update</button> -->
+              </div>
+
+              <!-- Assigned Chips -->
+              <div *ngFor="let assignTo of getAssigned()">
+                <ng-container *ngIf="assignTo?.length > 0; else assigntofallback">
+                  <div class="assigned-chips">
+                    <div class="assigned-chip"
+                      *ngFor="let assign of assignTo?.slice(0,showAllAssignTo ? assignTo.length : 3)">
+                      <span class="dot"></span>
+                      {{mapProfileData[assign]?.name}}
+                    </div>
+                    <div *ngIf="assignTo.length > 3" class="assigned-chip assign-toggle" (click)="toggleAssignShow()">
+                      <!-- {{showAllAssignTo ? 'Show Less' : `+ ${assignTo.length - 3} More`}} -->
+                      <span *ngIf="showAllAssignTo">Show Less</span>
+                      <span [matTooltip]="getAssignForToolTip()" *ngIf="!showAllAssignTo">{{`+ ${assignTo.length - 3}
+                        More`}}</span>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #assigntofallback>
+                  <div class="empty-state">Not assigned yet.</div>
+                </ng-template>
+              </div>
+
+              <!-- Reporter -->
+              <div class="reporter-row">
+                <div class="reporter-item">
+                  <div class="r-label">Issue Reported By</div>
+                  <div class="r-value">{{mapProfileData[currentIssueData['issueReportedBy']]?.name}}</div>
+                </div>
+                <div class="reporter-item">
+                  <div class="r-label">Reported By</div>
+                  <div class="r-value">{{mapProfileData[currentIssueData['reportedBy']]?.name}}</div>
+                </div>
+              </div>
+
+              <!-- Ticket Info -->
+
+              <!-- <div class="block-label" style="margin-bottom:10px;">Ticket Info</div> -->
+              <div class="form-elements">
+                <div class="form-header">
+                  <div class="form-label">Category</div>
+                  <div class="header-action" [class.active]="ticketEditFormStatus.category">
+                    <div *ngIf="ticketEditFormStatus.category" class="edit-options">
+                      <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                        <mat-icon>add</mat-icon>
+                      </button>
+
+                      <button class="action-btn clear-btn" type="button" (click)="cancelEdit('category')">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+
+                    <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.category"
+                      (click)="showEdit('category')">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+
+                  </div>
+                </div>
+                <ng-template #category>
+                  <p class="form-value">
+                    {{currentIssueData['category'] || ''}}
+                  </p>
+                </ng-template>
+                <ng-container *ngIf="ticketEditFormStatus.category else  category ">
+                  <mat-form-field class="formfield" appearance="outline" style="width:100%;margin-bottom:4px">
+                    <mat-label>Category</mat-label>
+                    <mat-select formControlName="category">
+                      <mat-option *ngFor="let category of categorylist" [value]="category.category">
+                        {{category.category}}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                </ng-container>
+              </div>
+
+              <div class="form-elements">
+                <div class="form-header">
+                  <div class="form-label">People Involved</div>
+                  <div class="header-action" [class.active]="ticketEditFormStatus.peopleinvolved">
+                    <div *ngIf="ticketEditFormStatus.peopleinvolved" class="edit-options">
+                      <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                        <mat-icon>add</mat-icon>
+                      </button>
+
+                      <button class="action-btn clear-btn" type="button" (click)="cancelEdit('peopleinvolved')">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+
+                    <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.peopleinvolved"
+                      (click)="showEdit('peopleinvolved')">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+
+                  </div>
+                </div>
+                <ng-template #peopleInvolved>
+                  <p class="form-value">
+                    {{[null , undefined , ''].includes(getPeopleInvolved)?'0 People Involved' : getPeopleInvolved}}
+                  </p>
+                </ng-template>
+                <ng-container *ngIf="ticketEditFormStatus.peopleinvolved else  peopleInvolved ">
+
+                  <mat-form-field class="formfield" appearance="outline" style="width:100%">
+                    <mat-label>People Involved</mat-label>
+                    <mat-select multiple formControlName="peopleinvolved">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone:true}"
+                          placeholderLabel="Search" noEntriesFoundLabel="No matching records found"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let user of returnFilterMember()" [value]="user">
+                        {{mapProfileData[user]['name']}}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                </ng-container>
+              </div>
+
+              <!-- Status -->
+              <div>
+                <div class="block-label">Status</div>
+                <div class="status-toggle">
+                  <button type="button" class="status-btn open-btn"
+                    [class.active]="currentIssueData['status']?.status?.toLowerCase() == 'open'"
+                    (click)="updateStatus('Open')">
+                    <mat-icon>lock_open</mat-icon> Open
+                  </button>
+                  <button type="button" class="status-btn closed-btn"
+                    [class.active]="currentIssueData['status']?.status?.toLowerCase() == 'closed'"
+                    (click)="updateStatus('Closed')">
+                    <mat-icon>lock</mat-icon> Closed
+                  </button>
+                </div>
+              </div>
+
+              <!-- Flag -->
+              <div>
+                <div class="block-label">Flag</div>
+                <button type="button"
+                  [class]="'flag-btn ' + ([null,undefined,false].includes(currentIssueData['flag']) ? 'unflagged' : 'flagged')"
+                  (click)="updateFlag()">
+                  <mat-icon>flag</mat-icon>
+                  {{[null,undefined,false].includes(currentIssueData['flag']) ? 'Flag This Ticket' : 'Unflag Ticket'}}
+                </button>
+
+                <div *ngIf="enableFlag" style="margin-top:8px">
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>Severity</mat-label>
+                    <mat-select [(ngModel)]="flagseverity" [ngModelOptions]="{standalone:true}">
+                      <mat-option *ngFor="let s of severityList" [value]="s">{{s}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <button mat-raised-button color="warn" style="width:100%;margin-top:4px" (click)="confirmFlag()">
+                    Confirm Flag
+                  </button>
+                </div>
+              </div>
+            </div><!-- /main-card -->
+
+            <!-- Notes History -->
+            <!-- <div class="section-block">
+              <div class="form-header">
+                <div class="section-label" style="margin-bottom:12px">{{ticketEditFormStatus.notes ? 'Add Notes' :
+                  'Notes History'}}</div>
+                <div class="header-action" [class.active]="ticketEditFormStatus.notes">
+                  <div *ngIf="ticketEditFormStatus.notes" class="edit-options">
+                    <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                      <mat-icon>add</mat-icon>
+                    </button>
+
+                    <button class="action-btn clear-btn" type="button" (click)="cancelEdit('notes')">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+
+                  <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.notes"
+                    (click)="showEdit('notes')">
+                    <mat-icon>add</mat-icon>
+                  </button>
+
+                </div>
+              </div>
+              <div class="notes-timeline" *ngIf="!ticketEditFormStatus.notes">
+                <div *ngIf="(currentIssueData['notes'] || [])?.length == 0" class="no-notes">
+                  No notes yet
+                </div>
+                <div class="note-item" *ngFor="let note of getNotes; let i = index">
+                  <div class="note-bubble">
+                    <div class="note-meta">
+                      <span class="note-author">
+                        {{[null,undefined,''].includes(mapProfileData[note['writtenBy']]) ? '...' :
+                        mapProfileData[note['writtenBy']]['name']}}
+                      </span>
+                      <span class="note-time">{{note['date'].toDate() | date:'short'}}</span>
+                    </div>
+                    <div class="note-text">{{note.remarks}}</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <mat-form-field appearance="outline" style="width:100%" *ngIf="ticketEditFormStatus.notes">
+                  <mat-label>Ticket Notes</mat-label>
+                  <textarea matInput formControlName="notes" cdkTextareaAutosize cdkAutosizeMinRows="2"
+                    cdkAutosizeMaxRows="4"></textarea>
+                </mat-form-field>
+              </div>
+
+            </div> -->
+
+            <!-- Category Log -->
+            <div class="section-block">
+              <div class="section-label">Category History</div>
+              <div class="category-log-list">
+                <ng-container *ngIf="(currentIssueData['categorylog'] || []).length > 0; else nolog">
+                  <div class="log-entry" *ngFor="let log of getCategoryLogs()">
+                    <div>
+                      <div class="log-user-name">
+                        <span style="display: inline-block;">{{getProfileName(log.user)}}</span>
+                        <span class="log-date">{{formatDate(log.time) | date:'short'}}</span>
+                      </div>
+                      <div class="log-category">
+                        <span class="tag old">{{log.categoryprevious}}</span>
+                        <span class="arrow">→</span>
+                        <span class="tag new">{{log.categoryafter}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #nolog>
+                  <div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px;">No category updates yet.
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+          </form>
+        </ng-container>
+      </mat-tab>
+      <mat-tab label="SOP"></mat-tab>
+    </mat-tab-group>
+  </div>
+
+  <div class="chat-screen">
+
+    <div *ngIf="chatloading == true && currentIssueChat.length == 0" class="center">
+      <mat-progress-spinner diameter=50 mode="indeterminate" color="primary"></mat-progress-spinner>
+    </div>
+
+    <div *ngIf="chatloading == false && currentIssueChat.length == 0" class="center">
+      <p>Chat History is Empty</p>
+    </div>
+
+    <div *ngIf="chatloading == false && currentIssueChat.length != 0">
+
+      <p [ngClass]="currentIssueData['status']?.status?.toLowerCase() == 'open' ? 'ticketopen' : 'ticketclose'">
+        Ticket No - {{ currentIssueData['issueno'] }}
+      </p>
+
+      <div class="chat-container">
+        <div *ngFor="let chat of currentIssueChat; let idx = index">
+          <div *ngIf="(idx+1) === unreadcount" class="flexCenter">
+            <div class="unread">
+              {{unreadcount}} Unread
+            </div>
+          </div>
+          <div class="flexCenter">
+            <div *ngIf="idx == (currentIssueChat.length)-1" class="date">{{chat['time']?.toDate() |
+              date:'fullDate'}}</div>
+            <div
+              *ngIf="idx != (currentIssueChat.length)-1 && (currentIssueChat[idx+1]['time']?.toDate() | date) != (currentIssueChat[idx]['time']?.toDate() | date)"
+              class="date">
+              {{chat['time']?.toDate() | date:'fullDate'}}
+            </div>
+          </div>
+
+          <div [ngClass]="chat.sender_profileid != currentIssueData['clientid'] ? 'mychat' : 'otherchat'">
+            <div style="display: flex; flex-direction: column;">
+              <div style="display: flex; flex-direction: row; justify-content: space-between; width: 95%">
+                <div style="padding-top: 5px;">
+                  <p *ngIf="![null,undefined,''].includes(chat.sender_uid)" style="font-size: 15px;">
+                    <b *ngIf="clientid != chat['sender_profileid']">
+                      {{[null,undefined].includes(mapUserId[chat.sender_uid]) ? '...' : chat.type == 'automated' ?
+                      'Automated' : mapUserId[chat.sender_uid]['name']}}
+                    </b>
+                  </p>
+                </div>
+                <div>
+                  <button type="button" mat-icon-button [matMenuTriggerFor]="menu3"
+                    style="float: inline-end;"><mat-icon>more_vert</mat-icon></button>
+                  <mat-menu #menu3="matMenu">
+                    <button mat-menu-item (click)="copyMessage(chat['originalmessage'])">Copy</button>
+                    <button mat-menu-item (click)="insertMessage(chat)">Insert Chat</button>
+                    <button mat-menu-item
+                      *ngIf="(chat['sender_uid'] == authservice.uid && calculateTimeToDelete(chat['time']) == true)"
+                      (click)="delectChat(chat['messageid'])">Delete</button>
+                  </mat-menu>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: row; width: 80%; margin-top: -15px;">
+                <div>
+                  <span *ngIf="chat['message'] == '' && chat['files'].length == 0" style="color: grey;">Loading
+                    File...</span>
+                  <span *ngIf="chat['files'] != null && chat['files'].length != 0"
+                    style="display:inline-flex;flex-direction: column;justify-content: center;min-width: 30%;max-width: 65%;">
+                    <span *ngFor="let image of chat['files']">
+                      <span style="margin-left: 5px;margin-top: 5px;">
+                        <span *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
+                          <br>
+                          <img style="margin-bottom: 5px; width: 22vw;" [src]="image['fileurl']" alt="">
+                        </span>
+                        <span #myvideo *ngIf="image['mediatype']?.includes('video')"
+                          (click)="downloadFiles(image['fileurl'])">
+                          <video style="margin-bottom: 5px; width: 22vw;" height="350" controls id="myvideo">
+                            <source [src]="image['fileurl']">
+                          </video>
+                        </span>
+                        <span *ngIf="image['mediatype']?.includes('audio')">
+                          <audio style="width: 22vw; height: 50px" controls>
+                            <source [src]="image['fileurl']">
+                          </audio>
+                        </span>
+                        <span
+                          style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px;text-align: center; border-radius: 10px; width: 12vw;">
+                          <span>
+                            <img *ngIf="image['filetype']?.includes('.sheet')" src="/src/assets/Images/xls.png"
+                              width="25" height="25">
+                            <img *ngIf="image['filetype']?.includes('pdf')" src="/src/assets/Images/pdf-file.png"
+                              width="25" height="25">
+                            <img *ngIf="image['filetype']?.includes('.document')" src="/src/assets/Images/doc.png"
+                              width="25" height="25">
+                          </span>
+                          <span class="lastmessage" style="width: 12vw; font-size: 14px;">
+                            {{image['filename']}}
+                            <button mat-icon-button
+                              (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                  </span>
+                  <p id="messages" [innerHTML]="formatMessage(chat['message'])"></p>
+                </div>
+              </div>
+              <div
+                style="display: flex; flex-direction: row; justify-content: space-between; width: 95%; font-size: 12px; margin-top: -15px; padding: 0;">
+                <div>
+                  <p></p>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                  <p style="margin-right: 5px; color:#ff7a55; font-weight: bold;"
+                    *ngIf="![null,undefined, ''].includes(chat.time)">{{chat.time.toDate() | date : 'shortTime'}}</p>
+
+                  <span *ngIf="clientid != chat['sender_profileid']">
+                    <img src="./../../../assets/Images/tick.png" style="width: 15px; height: 15px;"
+                      *ngIf="chat['pending'].includes('user') && chat['read_by'].includes('admin')">
+                    <img src="./../../../assets/Images/double_tick.png" style="width: 15px; height: 15px;"
+                      *ngIf="chat['read_by'].includes('user') && chat['read_by'].includes('admin')">
+                  </span>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="currentIssueData['status']?.status?.toLowerCase() == 'closed'">
+        <p *ngIf="![null, undefined,''].includes(currentIssueData['happinessindex'])"><b>Hapiness Index :
+          </b>{{currentIssueData['happinessindex']}}</p>
+        <p *ngIf="[null, undefined,''].includes(currentIssueData['happinessindex'])"><b>Hapiness Index :
+          </b>{{'Unrated'}}</p>
+      </div>
+
+      <div *ngIf="currentIssueChat.length != 0">
+        <span *ngIf="messageform.controls['files'].value != 0">
+          <div *ngFor="let file of messageform.controls['files'].value;let index = index">
+            <div
+              style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px; margin: 5px; text-align: center;background-color: rgb(189, 189, 189);border-radius: 10px; color: black;">
+              <span class="lastmessage">
+                <p>{{file.filename}}</p>
+              </span>
+              <button mat-icon-button (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
+            </div>
+          </div>
+        </span>
+
+        <form [formGroup]="messageform">
+          <div class="bottom"
+            *ngIf="(currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['assign'].includes(loggedinprofile_id)) || (currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['peopleinvolved']?.includes(loggedinprofile_id)) && !['website'].includes(currentIssueData['ticketfrom'])">
+            <div class="message">
+              <textarea matInput formControlName="message" placeholder="Type your message" cdkTextareaAutosize
+                #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6"></textarea>
+            </div>
+            <div class="buttons">
+              <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
+              <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+                &nbsp;&nbsp;
+                <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+                &nbsp;&nbsp;
+                <button mat-icon-button (click)="chooseType('video')"
+                  class="attach"><mat-icon>videocam</mat-icon></button>
+                <br>
+                &nbsp;&nbsp;
+                <button mat-icon-button (click)="chooseType('audio')"
+                  class="attach"><mat-icon>music_note</mat-icon></button>
+                &nbsp;&nbsp;
+                <button mat-icon-button (click)="chooseType('files')"
+                  class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
+              </mat-menu>
+              <input style="display: none;" #fileInput type="file" [accept]="filetype" (click)="onClick($event)"
+                (change)="selectFiles($event)" multiple>
+              &nbsp;
+              <button mat-mini-fab
+                (click)="sendMessage(messageform.value,currentIssueData)"><mat-icon>send</mat-icon></button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="history-screen">
+    <div class="person-data" [ngStyle]=" privatenotesview == false ? {'height': '52vh'} : {'height': '90vh'} ">
+      <div *ngIf="profileloading == true" class="center">
+        <mat-progress-spinner diameter=50 mode="indeterminate" color="primary"></mat-progress-spinner>
+      </div>
+
+      <div class="chat-header" *ngIf="profileloading == false">
+        <div style="display: flex; flex-direction: row;">
+          <div class="circular--landscape"
+            *ngIf="mapProfileData[clientid]?.profile != null && mapProfileData[clientid]?.profile != undefined">
+            <img [src]="mapProfileData[clientid].profile" width="50px">
+          </div>
+          <div class="circular--landscape"
+            *ngIf="mapProfileData[clientid]?.profile == null && mapProfileData[clientid]?.profile == undefined">
+            <img src="./../../../assets/Images/noimage.png" width="50px">
+          </div>
+          <p class="profile-name" (click)="openProfile(clientid)"><b>{{mapProfileData[clientid]?.name}}</b></p>
+        </div>
+      </div>
+
+      <div class="data-body" *ngIf="profileloading == false">
+        <span
+          style="display: flex; flex-direction: row; justify-content: space-evenly; line-height: 0.8; font-size: 16px; margin-top: 8px;">
+          <span>
+            <p><b>Email</b></p>
+            <p><b>Phone</b></p>
+            <p><b>Active Journey</b></p>
+          </span>
+          <span>
+            <p>:</p>
+            <p>:</p>
+            <p>:</p>
+          </span>
+          <span style="font-size: 15px;">
+            <p>{{mapProfileData[clientid]?.email}}</p>
+            <p>{{mapProfileData[clientid]?.number ?? mapProfileData[clientid]?.phonenumber}}</p>
+            <p>{{mapJourney[activejourney] == null ? 'No Journey Found' : mapJourney[activejourney]}}</p>
+          </span>
+        </span>
+
+        <!-- <div class="profile-info">
+          <div class="profile-name" (click)="openProfile(clientid)" >{{mapProfileData[clientid]?.name}}</div>
+          <div class="profile-row">
+            <span class="profile-label">Email</span>
+            <span class="profile-value">{{mapProfileData[clientid]?.email}}</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-label">Phone</span>
+            <span class="profile-value">{{mapProfileData[clientid]?.number}}</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-label">Journey</span>
+            <span class="journey-badge">{{mapJourney[activejourney] == null ? 'No Journey Found' : mapJourney[activejourney]}}</span>
+          </div>
+        </div> -->
+      
+        <div class="notes">
+              <!-- <div class="section-label">Notes History</div> -->
+              <div class="form-header">
+                <div class="section-label" style="margin-bottom:12px">{{ticketEditFormStatus.notes ? 'Add Notes' :
+                  'Notes History'}}</div>
+                <div class="header-action" [class.active]="ticketEditFormStatus.notes">
+                  <div *ngIf="ticketEditFormStatus.notes" class="edit-options">
+                    <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                      <mat-icon>add</mat-icon>
+                    </button>
+
+                    <button class="action-btn clear-btn" type="button" (click)="cancelEdit('notes')">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+
+                  <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.notes"
+                    (click)="showEdit('notes')">
+                    <mat-icon>add</mat-icon>
+                  </button>
+
+                </div>
+              </div>
+              <div class="notes-timeline" *ngIf="!ticketEditFormStatus.notes">
+                <div *ngIf="(currentIssueData['notes'] || [])?.length == 0" class="no-notes">
+                  No notes yet
+                </div>
+                <div class="note-item" *ngFor="let note of getNotes; let i = index">
+                  <!-- <div class="note-avatar">
+                    {{(mapProfileData[note['writtenBy']]?.name | slice:0:1) || '?'}}
+                  </div> -->
+                  <div class="note-bubble">
+                    <div class="note-meta">
+                      <span class="note-author">
+                        {{[null,undefined,''].includes(mapProfileData[note['writtenBy']]) ? '...' :
+                        mapProfileData[note['writtenBy']]['name']}}
+                      </span>
+                      <span class="note-time">{{note['date'].toDate() | date:'short'}}</span>
+                    </div>
+                    <div class="note-text">{{note.remarks}}</div>
+                  </div>
+                </div>
+              </div>
+              <div [formGroup]="filterform">
+                <mat-form-field appearance="outline" style="width:100%" *ngIf="ticketEditFormStatus.notes">
+                  <mat-label>Ticket Notes</mat-label>
+                  <textarea matInput formControlName="notes" cdkTextareaAutosize cdkAutosizeMinRows="2"
+                    cdkAutosizeMaxRows="4"></textarea>
+                </mat-form-field>
+              </div>
+
+            </div>
+
+        <!-- <span style="display: flex; flex-direction: row; align-items: center; margin-bottom: 0;">
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Profile Notes</mat-label>
+            <textarea matInput [(ngModel)]="profileNotes" cdkTextareaAutosize cdkAutosizeMinRows="5"
+              cdkAutosizeMaxRows="5"></textarea>
+          </mat-form-field>
+          <button style="height: 5vh;" mat-stroked-button (click)="addPrivateNotes()">Add Notes</button>
+        </span> -->
+
+        <!-- <div style="display: flex; flex-direction: row; align-items: center;  margin-top: -25px; margin-bottom: -20px;">
+          <b style="font-size: 15px; margin-bottom: 10px; margin-top: 0;">Profile Notes</b>
+          <button mat-icon-button (click)="privatenotesview = !privatenotesview"
+            *ngIf="privatenotesview == false"><mat-icon>keyboard_arrow_down</mat-icon></button>
+          <button mat-icon-button (click)="privatenotesview = !privatenotesview"
+            *ngIf="privatenotesview == true"><mat-icon>keyboard_arrow_up</mat-icon></button>
+        </div> -->
+
+        <!-- <div style="line-height: 1.0; max-height: 50vh; overflow: auto; padding-top: 10px; font-size: 14px;">
+
+          <div *ngIf="![null, undefined,''].includes(profileNotesArray)">
+
+            <p *ngIf="profileNotesArray.length == 0" style="font-size: 15px; padding: 15px;">No Notes History Found</p>
+
+            <div *ngIf="profileNotesArray.length != 0">
+              <div *ngIf="privatenotesview == false && ![null, undefined,''].includes(profileNotesArray)"
+                style="max-height: 15vh; overflow: auto;">
+                <div *ngFor="let notes of profileNotesArray.slice(0,2); let idx = index">
+                  <div style="line-height: 0.9;">
+                    <p><b>{{idx+1}}</b> &nbsp;&nbsp; {{[null, undefined, ''].includes(mapProfileData[notes['givenBy']])
+                      ? '...' : mapProfileData[notes['givenBy']]['name']}} : {{notes['date'].toDate() | date: 'short' }}
+                    </p>
+                    <p style="width: 400px; word-wrap: break-word; display: block; overflow-wrap: break-word;">
+                      <b>Notes:</b> &nbsp;{{notes.generalnotes}}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf=" privatenotesview == true && ![null, undefined,''].includes(profileNotesArray)">
+                <div *ngFor="let notes of profileNotesArray; let idx = index">
+                  <p><b>{{idx+1}}</b> &nbsp;&nbsp; {{[null, undefined, ''].includes(mapProfileData[notes['givenBy']]) ?
+                    '...' : mapProfileData[notes['givenBy']]['name']}} : {{notes['date'].toDate() | date: 'short' }}</p>
+                  <p style="width: 400px; word-wrap: break-word; display: block; overflow-wrap: break-word;">
+                    <b>Notes:</b> &nbsp;{{notes.generalnotes}}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> -->
+      </div>
+    </div>
+    <div class="interaction-history" *ngIf="privatenotesview == false">
+      <p><b>Interaction History</b></p>
+      <div style="max-height: 29vh; overflow: auto;">
+        <div *ngFor="let log of clientTicketsLog">
+          <div (click)="relatedTicket(log)"
+            [ngClass]="log['issueno'] == currentIssueData['issueno'] ? 'selected-container' : 'history-container'">
+            <div style="display: flex; flex-direction: row; justify-content: space-between;">
+              <p>{{log['issueno']}} - {{log['reporteddate']?.toDate() | date : 'mediumDate'}}</p>
+              <p (mouseenter)="showPopup(log, $event)" (mouseleave)="hidePopup()" style="font-weight: bold;"><u>View
+                  Details</u></p>
+            </div>
+            <p>{{log['issue'].substring(0, 35)}}{{'....'}}</p>
+            <div style="display: flex; flex-direction: row;">
+              <p class="chat-tile"
+                [ngStyle]="log['status']['status']?.toLowerCase() == 'open' ? {'color':'#22AE4B'} : {'color': 'red'}">
+                {{log['status']['status']?.toUpperCase() }}</p>
+              <!-- <p class="chat-tile">{{ ![null, undefined,""].includes(log['priority']) ? log['priority'].toUpperCase() : 'NO PRIORITY'}}</p> -->
+              <p class="chat-tile">{{log['category'].toUpperCase()}}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="popupData" class="popup">
+        <p><b>Ticket ID:</b> {{ popupData.issueno }}</p>
+        <p><b>Ticket:</b> {{ popupData.issue }}</p>
+      </div>
+    </div>
+  </div>
+</div>

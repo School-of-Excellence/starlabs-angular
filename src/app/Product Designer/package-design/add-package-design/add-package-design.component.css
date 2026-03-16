@@ -1,0 +1,40 @@
+.mainscreen{
+  text-align: left;
+  padding: 20px;
+}
+
+.title{
+  text-align: center;
+  color: rgb(0, 50, 67);
+  margin-bottom: 20px;
+  margin-top: 20px;
+}
+
+.labelheader{
+  font-weight: 600;
+}
+
+.inputfields{
+  width: 300px;
+  margin-right: 20px;
+}
+
+.btn{
+  width: 200px;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red;
+  margin-right: 20px;
+}
+
+.submitbtn{
+  background-color: green;
+  color: white;
+}
+
+.custom-dialog-container .mat-dialog-container {
+  overflow: auto !important;
+  max-height: 90vh;
+}

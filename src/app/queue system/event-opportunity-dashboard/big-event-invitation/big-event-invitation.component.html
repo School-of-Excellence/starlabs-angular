@@ -1,0 +1,63 @@
+<div class="w-100" style="padding: 20px;">
+    <h5 class="title text-center" style="font-size: 16px;">Invite Big Participants to '{{dialogData["queuename"]}}'</h5>
+    <div class="mt-3">
+      <div class="w-100 text-center">
+        <mat-form-field class="formfield" appearance="outline">
+          <mat-label>B!G Product</mat-label>
+          <mat-select [(ngModel)]="selectedProduct">
+            <mat-option *ngFor="let product of bigProduct" [value]="product['id']">{{product.product}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="formfield" appearance="outline">
+          <mat-label>Participant Name</mat-label>
+          <mat-select [(ngModel)]="selectedProfiles" multiple>
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let profile of returnprofile()" [value]="profile['profileid']">{{profile.name}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="formfield" appearance="outline">
+          <mat-label>Expiry Date</mat-label>
+          <input matInput [(ngModel)]="expirydate" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
+          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+        <br>
+        <mat-form-field class="formfield" appearance="outline">
+          <mat-label>Select Big Marathon</mat-label>
+          <mat-select [(ngModel)]="bigmarathonref">
+            <mat-option *ngFor="let marathon of bigMarathonList" [value]="marathon['ref']">{{marathon['title']}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <!-- <mat-form-field class="formfield" appearance="outline">
+          <mat-label>Select Event</mat-label>
+          <mat-select [(ngModel)]="selectedevent">
+            <mat-option *ngFor="let event of eventList" [value]="event['ref']">{{event['name']}}</mat-option>
+          </mat-select>
+        </mat-form-field> -->
+        <br>
+        <!-- <mat-checkbox [(ngModel)]="preapproved">Mark Invitation as Approved</mat-checkbox> -->
+      </div>
+      <div *ngIf="isSubmitting" class="m-2 text-center" style="font-size: 32px;color: red;">Submitting Please Wait .....</div>
+      <div class="text-left" *ngIf="invitedParticipants.length != 0">
+        <label class="text-secondary">Already Invited: </label>
+        <label *ngFor="let id of invitedParticipants">{{mapProfile[id["profileid"]]}},&nbsp;</label>
+      </div>
+      <div class="text-center mt-2">
+        <button class="closebtn"  style="margin-right: 10px;" mat-stroked-button (click)="close()">Close</button>
+        <!-- <button class="submitbtn ml-3" mat-stroked-button (click)="sendInvitation()" [disabled]="this.selectedProfiles.length != 0 && selectedProduct == null || (this.selectedProfiles.length == 0 && expirydate == null)">Send Invitation</button> -->
+        <button 
+          class="submitbtn ml-3" 
+          mat-stroked-button 
+          (click)="sendInvitation()" 
+          [disabled]="this.selectedProfiles.length === 0 || selectedProduct === null || expirydate === null || isSubmitting"
+        >
+          Send Invitation
+        </button>
+      </div>
+    </div>
+  </div>
+  

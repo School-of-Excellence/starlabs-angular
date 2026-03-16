@@ -1,0 +1,216 @@
+<div class="tv-display-container">
+  <div class="test-panel" *ngIf="showTestPanel">
+    <h4>🧪 Test Animations</h4>
+    <button (click)="testEIYAnimation()">Test EIY Pulse</button>
+    <button (click)="testLeaderboardAnimation()">Shuffle Leaderboard</button>
+    <button (click)="testRankChange()">Boost Random Rank</button>
+    <button (click)="testTimer()">Test Timer (2 min)</button>
+    <button (click)="showTestPanel = false">Close</button>
+  </div>
+  <div class="left-panel">
+    <div class="left-panel-header">
+      <div class="header-icon-left">
+        <img src="assets/AH White Logo Only.png" alt="Broadcast" />
+      </div>
+      <h2 class="event-title">{{ eventData?.name || 'Live Highlights' }}</h2>
+      <div class="live-badge">
+        <span class="live-dot-header"></span>
+        <span>LIVE</span>
+      </div>
+    </div>
+    <div class="highlights-display-container" [class.full-height]="activeTimer || isImageHighlight(getCurrentHighlight()) || activeAnnouncement">
+      
+      <!-- Active Timer Display (counting down) -->
+      <div class="highlight-single" *ngIf="activeTimer && !timerEnded">
+        <div class="highlight-card-timer">
+          <div class="timer-header">
+            <div class="timer-icon">
+              <i class="fas fa-stopwatch"></i>
+            </div>
+            <div class="timer-heading">{{ activeTimer.heading }}</div>
+          </div>
+          <div class="timer-content">
+            <div class="timer-glow-ring"></div>
+            <div class="timer-display" [@timerPulse]="timerState">
+              <div class="timer-block">
+                <div class="timer-digits">
+                  <span class="timer-digit">{{ timerDisplay.minutes[0] }}</span>
+                  <span class="timer-digit">{{ timerDisplay.minutes[1] }}</span>
+                </div>
+                <span class="timer-label">MINUTES</span>
+              </div>
+              <div class="timer-separator">
+                <span class="separator-dot"></span>
+                <span class="separator-dot"></span>
+              </div>
+              <div class="timer-block">
+                <div class="timer-digits">
+                  <span class="timer-digit">{{ timerDisplay.seconds[0] }}</span>
+                  <span class="timer-digit">{{ timerDisplay.seconds[1] }}</span>
+                </div>
+                <span class="timer-label">SECONDS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timer Ended - Show Image -->
+      <div class="highlight-single" *ngIf="activeTimer && timerEnded" @timerEndFade>
+        <div class="highlight-card-timer-ended">
+          <div class="timer-ended-content">
+            <img [src]="timerEndImage" 
+                 alt="Timer Ended" 
+                 class="timer-ended-image" />
+          </div>
+          <!-- <div class="timer-ended-footer">
+            <div class="timer-ended-icon">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="timer-ended-text">{{ activeTimer.heading }} - Time's Up!</div>
+          </div> -->
+        </div>
+      </div>
+
+      <div class="highlight-single" *ngIf="!activeTimer && activeAnnouncement">
+        <div class="highlight-card-announcement">
+          <div class="announcement-header">
+            <div class="announcement-icon">
+              <i class="fas fa-bullhorn"></i>
+            </div>
+            <div class="announcement-heading">{{ activeAnnouncement.heading }}</div>
+          </div>
+          <div class="announcement-content">
+            <div class="announcement-text">{{ activeAnnouncement.announcementtext }}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="highlights-wrapper" *ngIf="!activeTimer && !activeAnnouncement && videoAskHighlights.length > 0">
+        <ng-container *ngFor="let highlight of videoAskHighlights; let i = index; trackBy: trackByHighlightId">
+          <div class="highlight-single" 
+               *ngIf="i === displayedHighlightIndex"
+               @highlightSlide
+               (@highlightSlide.done)="onHighlightAnimationDone($event)">
+            <div class="highlight-card-single" *ngIf="!isImageHighlight(highlight)">
+              <div class="card-index-large">{{getInitials(mapProfile[highlight?.profileid])}}</div>
+              <div class="card-content-large">
+                <div class="profile-name-large">{{ mapProfile[highlight?.profileid] || 'Anonymous' }}</div>
+                <div class="transcribe-text-large">{{ highlight?.transcribe || 'No transcription available' }}</div>
+              </div>
+            </div>
+            <div class="highlight-card-image-fullscreen" *ngIf="isImageHighlight(highlight)">
+              <div class="image-content">
+                <img [src]="highlight?.imageUrl" 
+                     alt="Event Highlight" 
+                     class="highlight-image-fullscreen" />
+              </div>
+              <div class="image-highlight-footer">
+                <div class="image-icon">
+                  <i class="fas fa-camera"></i>
+                </div>
+                <div class="image-title">{{highlight?.heading}}</div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+    <div class="empty-state" *ngIf="!activeTimer && !activeAnnouncement && videoAskHighlights.length === 0">
+      <div class="header-icon-left">
+        <img src="assets/AH White Logo Only.png" alt="Broadcast" />
+      </div>
+      <p>Waiting for highlights...</p>
+    </div>
+    
+    <div class="bottom-stats-section" *ngIf="!activeTimer && !activeAnnouncement && !isImageHighlight(getCurrentHighlight())">
+      <div class="stats-card stats-card-2025">
+        <div class="stats-badge badge-2025">{{previousEventData?.name || 'UP! LIVE'}}</div>
+        <div class="stats-label">EXTENDED IMPACTFUL YEARS TOTAL</div>
+        <div class="stats-value-row">
+          <span class="eiy-label">EIY</span>
+          <span class="eiy-value value-2025">{{totalEvolutionYearSaved}}</span>
+        </div>
+      </div>
+      
+      <div class="stats-card stats-card-2026">
+        <div class="stats-badge-row">
+          <div class="stats-badge badge-2026">{{ eventData?.name || 'UP! LIVE' }}</div>
+        </div>
+        <div class="stats-label-row">
+          <span class="stats-label">EXTENDED IMPACTFUL YEARS</span>
+          <span class="predicted-badge">PREDICTED</span>
+        </div>
+        <div class="stats-value-row">
+          <span class="eiy-label">EIY</span>
+          <span class="eiy-value value-2026" [@valueUpdate]="eiyValueTrigger">{{ totalSavedYears.toFixed(0) }}</span>
+        </div>
+        <div class="updating-indicator">
+          <span class="updating-dot"></span>
+          <span>Updating live</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="leaderboard-container">
+      <div class="leaderboard-content" *ngIf="currentLeaderboard === 'changework'" @leaderboardSlide>
+        <div class="leaderboard-header">
+          <div class="trophy-icon">
+            <i class="fas fa-trophy"></i>
+          </div>
+          <h3>Leaderboard</h3>
+          <h2>Changework</h2>
+          <div class="header-underline"></div>
+        </div>
+        
+        <div class="leaderboard-list">
+          <div *ngFor="let item of doerCompletedCount | topCompletedDoers:10; let i = index; trackBy: trackByDoerId" 
+               class="changework-item"
+               [class.top-1]="i === 0"
+               [class.top-2]="i === 1"
+               [class.top-3]="i === 2"
+               [style.--item-index]="i">
+            <div class="changework-rank">{{ i + 1 }}</div>
+            <div class="changework-name">{{ mapProfile[item.doerid] }}</div>
+            <div class="changework-score">{{ item.count }}</div>
+          </div>
+          <div class="leaderboard-empty" *ngIf="doerCompletedCount.length === 0">
+            <i class="fas fa-hourglass-half"></i>
+            <p>Loading leaders...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="leaderboard-content" *ngIf="currentLeaderboard === 'eiy'" @leaderboardSlide>
+        <div class="leaderboard-header">
+          <div class="trophy-icon eiy-trophy">
+            <i class="fas fa-star"></i>
+          </div>
+          <h3>Leaderboard</h3>
+          <h2>EXTENDED IMPACTFUL YEARS 
+            <SPAN><h2 style="color: red;font-size: 15px;">PREDICTED</h2></SPAN></h2>
+          <div class="header-underline"></div>
+        </div>
+        
+        <div class="leaderboard-list">
+          <div *ngFor="let item of doerEIYCount; let i = index; trackBy: trackByDoerId" 
+               class="changework-item"
+               [class.top-1]="i === 0"
+               [class.top-2]="i === 1"
+               [class.top-3]="i === 2"
+               [style.--item-index]="i">
+            <div class="changework-rank">{{ i + 1 }}</div>
+            <div class="changework-name">{{ mapProfile[item.doerid] }}</div>
+            <div class="changework-score eiy-score">{{ item.eiy | number:'1.0-0' }} Yrs</div>
+          </div>
+          <div class="leaderboard-empty" *ngIf="doerEIYCount.length === 0">
+            <i class="fas fa-hourglass-half"></i>
+            <p>Loading leaders...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

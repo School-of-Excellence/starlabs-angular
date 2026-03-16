@@ -1,0 +1,173 @@
+<div class="p-3 w-100">
+  <div class="title text-center mb-3">ATC for Mentoring</div>
+  <div class="m-3">
+    <mat-form-field appearance="outline" class="me-4">
+      <mat-label>Filter Client</mat-label>
+      <mat-select [(ngModel)]="selectedProfile" (selectionChange)="selectedSpecialist = null; filterATC()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterProfile()" [value]="option.profileid">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="me-4">
+      <mat-label>Filter Specialist</mat-label>
+      <mat-select [(ngModel)]="selectedSpecialist" (selectionChange)="selectedProfile = null; filterATC()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterSpecialist()" [value]="option.profileid">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <button *ngIf="selectedProfile != null || selectedSpecialist != null" class="resetbtn" mat-stroked-button (click)="selectedProfile = null; selectedSpecialist = null; filterATC()">Reset</button>
+  </div>
+  <mat-tab-group mat-stretch-tabs mat-align-tabs="center">
+    <!-- Alpha ATC -->
+    <mat-tab label="Validated ATC">
+      <mat-accordion multi>
+        <mat-expansion-panel *ngFor="let atc of filteralphaATC.slice(alphaStart, alphaEnd); let i = index" (opened)="getTranscription('alpha', atc)">
+          <mat-expansion-panel-header #header collapsedHeight="175px" expandedHeight="200px">
+            <mat-panel-title>
+              <div class="expansionheader">
+                <span class="head">Client: </span><span class="body">{{mapProfile[atc.profileid]}}</span>
+                <br>
+                <span class="head">Authors: </span><span class="body" *ngFor="let author of atc.author">{{mapProfile[author.id]}},&nbsp;</span>
+                <br>
+                <span class="head">Product: </span><span class="body">{{atc.product}}</span>
+                <br>
+                <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
+                <br>
+                <button class="mt-1 tobebtn" *ngIf="!atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation(); pickformentoring('alpha', atc)">Pick For Mentoring</button>
+                <button class="mt-1 donebtn" *ngIf="atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation();">Picked For Mentoring</button>
+                <span *ngIf="atc['status'] != null" class="maticon">{{atc['status'] }}</span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div class="mt-2" *ngIf="atc.transcription == null || atc.transcription == undefined || atc.transcription.length == 0">
+            <span class="text-secondary text-center">Fetching Adjustment & Procedures.....</span>
+          </div>
+          <div *ngIf="atc.transcription != null && atc.transcription != undefined && atc.transcription.length != 0">
+            <div class="title text-left mb-0">Adjustment & Procedures</div>
+            <div class="adjbox mt-2" *ngFor="let adj of atc.transcription; let i = index">
+              <label><em>{{i+1}}) {{adj.adjustment.name}}</em></label>
+              <div class="ms-3" *ngFor="let pro of adj.procedure">
+                - {{mapProcedure[pro.name.id]}} 
+                <span *ngIf="pro.assigned_to != null">
+                  (<span *ngFor="let name of pro.assigned_to">{{mapProfile[name.id]}},&nbsp;</span>)
+                </span>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="atc.transcription != null && atc.transcription != undefined && atc.transcription.length != 0">
+            <button class="me-3" mat-stroked-button (click)="editATC(atc.atcid, 'alpha')">Edit ATC</button>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+      <div class="w-100 text-left">
+        <div class="mt-3 btn-group w-25">
+          <button *ngIf="alphaStart >= 10" class="btn btn-primary" (click)="previous('alpha')">Previous</button>
+          <button *ngIf="alphaEnd < filteralphaATC.length" class="btn btn-primary" (click)="next('alpha')">Next</button>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Validation ATC -->
+    <mat-tab label="Yet to Validated">
+      <mat-accordion multi>
+        <mat-expansion-panel *ngFor="let atc of filtervalidateATC.slice(validateStart, validateEnd); let i = index" (opened)="getTranscription('validate', atc)">
+          <mat-expansion-panel-header #header collapsedHeight="175px" expandedHeight="200px">
+            <mat-panel-title>
+              <div class="expansionheader">
+                <span class="head">Client: </span><span class="body">{{mapProfile[atc.profileid]}}</span>
+                <br>
+                <span class="head">Authors: </span><span class="body" *ngFor="let author of atc.author">{{mapProfile[author.id]}},&nbsp;</span>
+                <br>
+                <span class="head">Product: </span><span class="body">{{atc.product}}</span>
+                <br>
+                <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
+                <br>
+                <button class="mt-1 tobebtn" *ngIf="!atc.mentoring" mat-stroked-button (click)="$event.stopPropagation(); pickformentoring('validation', atc)">Pick For Mentoring</button>
+                <button class="mt-1 donebtn" *ngIf="atc.mentoring" mat-stroked-button (click)="$event.stopPropagation();">Picked For Mentoring</button>
+                <span *ngIf="atc['status'] != null && atc['status'] != 'atc given'" class="maticon">{{atc['status']}}</span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div *ngIf="atc.transcription == null || atc.transcription == undefined || atc.transcription.length == 0">
+            <span class="text-secondary text-center">Fetching Adjustment & Procedures.....</span>
+          </div>
+          <div *ngIf="atc.transcription != null && atc.transcription != undefined && atc.transcription.length != 0">
+            <div class="title text-left mb-0">Adjustment & Procedures</div>
+            <div class="adjbox mt-2" *ngFor="let adj of atc.transcription; let i = index">
+              <label><em>{{i+1}}) {{adj.adjustment.name}}</em></label>
+              <div class="ms-3" *ngFor="let pro of adj.procedure">
+                - {{mapProcedure[pro.name.id]}} 
+                <span *ngIf="pro.assigned_to != null">
+                  (<span *ngFor="let name of pro.assigned_to">{{mapProfile[name.id]}},&nbsp;</span>)
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2" *ngIf="atc.transcription != null && atc.transcription != undefined && atc.transcription.length != 0 && atc['status'] == 'atc given'">
+            <button class="me-3" mat-stroked-button (click)="editATC(atc.atcid, 'validation')">Edit ATC</button>
+            <button class="me-3" mat-stroked-button (click)="markATCvalidate(atc.atcid, atc.validator)">Validate ATC</button>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+      <div class="w-100 text-left">
+        <div class="mt-3 btn-group w-25">
+          <button *ngIf="validateStart >= 10" class="btn btn-primary" (click)="previous('validate')">Previous</button>
+          <button *ngIf="validateEnd < filtervalidateATC.length" class="btn btn-primary" (click)="next('validate')">Next</button>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Mentoring ATC -->
+    <mat-tab label="Picked For Mentoring">
+      <mat-accordion multi>
+        <mat-expansion-panel *ngFor="let atc of filtermentoringATC.slice(mentorStart, mentorEnd); let i = index" (opened)="getTranscription(atc['status'] == 'atc given' ? 'validate' : 'alpha', atc)">
+          <mat-expansion-panel-header #header collapsedHeight="110%" expandedHeight="115%">
+            <mat-panel-title>
+              <div class="expansionheader p-3">
+                <span class="head">Client: </span><span class="body">{{mapProfile[atc.profileid]}}</span>
+                <br>
+                <span class="head">Authors: </span><span class="body" *ngFor="let author of atc.author">{{mapProfile[author.id]}},&nbsp;</span>
+                <br>
+                <span class="head">Product: </span><span class="body">{{atc.product}}</span>
+                <br>
+                <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
+                <br>
+                <label class="body"> <b><i>Mentoring Note:</i></b> {{(mapMentoringNote[atc.mentoringid] || {})['mentoringnote'] != null ? mapMentoringNote[atc.mentoringid]['mentoringnote'] : 'No Notes'}}</label>
+                <!-- <span class="head">Mentoring Note: </span><label class="body">{{atc.mentoringnote.length != 0 ? atc.mentoringnote : 'No Note'}}</label> -->
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div class="mentorbox">
+            <textarea matInput class="mentornotefield" #noteField placeholder="Add Mentoring Note...."></textarea>
+            <button mat-raised-button class="mentorbtn" (click)="updateMentoringNote(noteField.value, atc)">Add Note</button>
+          </div>
+          <div *ngIf="atc.transcription == null || atc.transcription == undefined || atc.transcription.length == 0">
+            <span class="text-secondary text-center">Fetching Adjustment & Procedures.....</span>
+          </div>
+          <div *ngIf="atc.transcription != null && atc.transcription != undefined && atc.transcription.length != 0">
+            <div class="title text-left mb-0">Adjustment & Procedures</div>
+            <div class="adjbox mt-2" *ngFor="let adj of atc.transcription; let i = index">
+              <label><em>{{i+1}}) {{adj.adjustment.name}}</em></label>
+              <div class="ms-3" *ngFor="let pro of adj.procedure">
+                - {{mapProcedure[pro.name.id]}} 
+                <span *ngIf="pro.assigned_to != null">
+                  (<span *ngFor="let name of pro.assigned_to">{{mapProfile[name.id]}},&nbsp;</span>)
+                </span>
+              </div>
+            </div>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+      <div class="w-100 text-left">
+        <div class="mt-3 btn-group w-25">
+          <button *ngIf="mentorStart >= 10" class="btn btn-primary" (click)="previous('mentor')">Previous</button>
+          <button *ngIf="mentorEnd < filtermentoringATC.length" class="btn btn-primary" (click)="next('mentor')">Next</button>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

@@ -1,0 +1,266 @@
+<div class="container-fluid">
+  <div class="column">
+    <div class="header">
+      <div class="header-content">
+        <div class="program-info">
+          <div class="avatar">
+            <span>{{data.doc['name'][0] | uppercase}}</span>
+          </div>
+          <div class="program-details">
+            <h4 class="program-name">{{data.doc['name']}}</h4>
+            <div class="participants-count">
+              <i class="fas fa-users"></i>
+              <span>{{data.doc['participantidlist'].length}} Participants</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn-reset" mat-raised-button (click)="assignmentForm.reset()">
+            <i class="fas fa-redo-alt mr-2"></i>Reset
+          </button>
+          <button class="btn-submit" mat-raised-button type="button" (click)="onSubmit()"
+            [disabled]="assignmentForm.invalid">
+            <i class="fas fa-check mr-2"></i>Submit
+          </button>
+          <button class="btn-cancel" mat-button (click)="closeDialog()">
+            <i class="fas fa-times mr-2"></i>Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+    <mat-divider></mat-divider>
+    <div class="scrollable-container">
+      <div [ngClass]="removedParticipantslist.length > 0 ? 'col-md-6' : 'col-md-8'" class="scrollable-section">
+        <div [formGroup]="assignmentForm" class="column">
+          <div class="form-section">
+            <div class="title">
+              <h5><i class="fas fa-heading mr-2"></i>Title</h5>
+              <input matInput class="titlefield" type="text" formControlName="title" placeholder="Enter activity title">
+            </div>
+
+            <div class="description">
+              <h5><i class="fas fa-align-left mr-2"></i>Description</h5>
+              <input matInput class="titlefield" type="text" formControlName="description"
+                placeholder="Enter activity description">
+            </div>
+            <div class="date">
+              <h5><i class="far fa-calendar-alt mr-1"></i>Select Date & Time</h5>
+              <div class="row">
+                <div class="col-md-6">
+                  <mat-form-field class="w-100" appearance="outline">
+                    <mat-label>Start Date & Time</mat-label>
+                    <input matInput type="datetime-local" formControlName="startdate">
+                    <mat-error *ngIf="assignmentForm.get('startdate').hasError('required')">
+                      Start date & time is required
+                    </mat-error>
+                  </mat-form-field>
+                </div>
+                <div class="col-md-6">
+                  <mat-form-field class="w-100" appearance="outline">
+                    <mat-label>End Date & Time</mat-label>
+                    <input matInput type="datetime-local" formControlName="enddate">
+                    <mat-error *ngIf="assignmentForm.get('enddate').hasError('required')">
+                      End date & time is required
+                    </mat-error>
+                  </mat-form-field>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="activity">
+            <h5><i class="fas fa-tasks mr-2"></i>Activity</h5>
+            <div class="p-4">
+              <mat-form-field appearance="outline" class="w-100">
+                <mat-label>Choose an option</mat-label>
+                <mat-select formControlName="assignmenttype">
+                  <mat-option *ngFor="let option of assignmentType" [value]="option.type">{{ option.type}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <div class="link mt-4" *ngIf="assignmentForm.get('assignmenttype').value == 'Zoom Call'">
+                <!-- <h5><i class="fas fa-video mr-2"></i>Call Link ( Zoom )</h5> -->
+                <!-- <input readonly matInput class="titlefield" type="email" placeholder="Enter host email" formControlName="zoomhostemail"> -->
+                <mat-checkbox formControlName="regeneratemeeting" color="primary">Create Zoom Meeting</mat-checkbox><br>
+                <mat-hint>If you want to create a zoom meeting, check the create zoom meeting</mat-hint>
+              </div>
+
+              <div class="link mt-4" *ngIf="assignmentForm.get('assignmenttype').value == 'Form'">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Select a Form</mat-label>
+                  <mat-select formControlName="selectedform">
+                    <mat-option *ngFor="let option of forms" [value]="option.docid">{{ option.formname }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="link mt-4" *ngIf="assignmentForm.get('assignmenttype').value == 'Video'">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Select Content</mat-label>
+                  <mat-select formControlName="selectedvideos" [compareWith]="compareRef" [multiple]="true">
+                    <mat-option *ngFor="let option of videos" [value]="option.docref">{{ option.title }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="mt-4"
+                *ngIf="assignmentForm.get('assignmenttype').value == 'Manual Assignment' || assignmentForm.get('assignmenttype').value == 'Triple ATC' || assignmentForm.get('assignmenttype').value == 'ATC'">
+                <h5><i class="fas fa-clipboard-list mr-2"></i>Directive</h5>
+                <mat-form-field appearance="outline" class="w-100">
+                  <textarea matInput formControlName="directive" rows="4"
+                    placeholder="Enter directive for the assignment"></textarea>
+                  <mat-hint>Give Directive for the assignment.</mat-hint>
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+          <!-- Choose Mentor -->
+          <div class="activity">
+            <h5><i class="fa-solid fa-user-tie"></i> Support Admin</h5>
+            <div class="p-4">
+              <div class="link mt-4">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Select Admins</mat-label>
+                  <mat-select formControlName="selectedAdmin" multiple>
+                    <mat-option *ngFor="let option of mentorProfiles" [value]="option">
+                      {{ mapProfile[option] }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+              </div>
+            </div>
+          </div>
+          <!-- watti notification -->
+          <div class="activity">
+            <h5><i class="fa-brands fa-whatsapp"></i> Wati Notification</h5>
+            <div class="p-4">
+              <div class="btn-group">
+                <button type="button" class="btn"
+                  [ngClass]="{'btn-primary': assignmentForm.controls['watinotification'].value, 'btn-outline-primary': !assignmentForm.controls['watinotification'].value}"
+                  (click)="setNotification(true)">
+                  <i class="fa-regular fa-bell"></i> Enable Notifications
+                </button>
+                <button type="button" class="btn"
+                  [ngClass]="{'btn-primary': !assignmentForm.controls['watinotification'].value, 'btn-outline-primary': assignmentForm.controls['watinotification'].value}"
+                  (click)="setNotification(false)">
+                  <i class="fa-regular fa-bell-slash"></i> Disable Notifications
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="form-section">
+            <div class="selection-toggle">
+              <h4><i class="fas fa-user-friends mr-2"></i>Participant Selection Mode</h4>
+              <div class="btn-group">
+                <button
+                  [disabled]="data.type === 'edit' && assignmentForm.controls['selectionMode'].value === 'individual'"
+                  type="button" class="btn"
+                  [ngClass]="{'btn-primary': assignmentForm.controls['selectionMode'].value === 'group', 'btn-outline-primary': assignmentForm.controls['selectionMode'].value !== 'group'}"
+                  (click)="setSelectionMode('group')">
+                  <i class="fas fa-users mr-2"></i>Group Selection
+                </button>
+                <button [disabled]="data.type === 'edit' && assignmentForm.controls['selectionMode'].value === 'group'"
+                  type="button" class="btn"
+                  [ngClass]="{'btn-primary': assignmentForm.controls['selectionMode'].value === 'individual', 'btn-outline-primary': assignmentForm.controls['selectionMode'].value !== 'individual'}"
+                  (click)="setSelectionMode('individual')">
+                  <i class="fas fa-user mr-2"></i>Individual Selection
+                </button>
+              </div>
+            </div>
+
+            <div *ngIf="assignmentForm.controls['selectionMode'].value === 'group'">
+              <h4><i class="fas fa-layer-group mr-2"></i>Mandatory Groups</h4>
+              <mat-selection-list class="d-flex flex-row flex-wrap" [multiple]="true"
+                formControlName="mandatorycohortsid" (selectionChange)="updateGroups()">
+                <mat-list-option checkboxPosition="before" *ngFor="let cohorts of data.cohortslist"
+                  style="flex: 1 1 300px; margin: 5px; background-color: #f9f9f9; border-radius: 8px;"
+                  [value]="cohorts.docid">
+                  <div class="d-flex align-items-center">
+                    <span>{{cohorts.name}}</span>
+                  </div>
+                </mat-list-option>
+              </mat-selection-list>
+            </div>
+            <div *ngIf="assignmentForm.controls['selectionMode'].value === 'individual'" class="mb-4">
+              <mat-form-field appearance="outline" class="w-100">
+                <mat-label><i class="fas fa-user-plus mr-2"></i>Add Participants</mat-label>
+                <mat-select multiple [(ngModel)]="selectedParticipantIds" (selectionChange)="onSelectionChange()"
+                  [ngModelOptions]="{standalone: true}">
+                  <ng-container *ngFor="let participant of individualParticipants">
+                    <mat-option [value]="participant"
+                      [disabled]="selectedParticipantIds.includes(participant.participantid)">
+                      {{ mapProfile[participant.participantid] }} - {{ participant.cohortname }}
+                    </mat-option>
+                  </ng-container>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fixed-section" [ngClass]="removedParticipantslist.length > 0 ? 'col-md-6' : 'col-md-4'">
+        <div class="row">
+          <div [ngClass]="removedParticipantslist.length > 0 ? 'col-md-6' : 'col-md-12'">
+            <div class="participants-card">
+              <div class="participants-header">
+                <h4><i class="fas fa-users mr-2"></i>Participants</h4>
+                <span class="badge">{{assignmentForm.controls['participantlist'].value.length}}</span>
+              </div>
+              <div class="participants-body" style="min-height: 200px; overflow-y: auto !important;">
+                <ul class="participants-list">
+                  <li *ngFor="let participant of assignmentForm.controls['participantlist'].value; let i = index"
+                    class="participant-item">
+                    <span>{{i+1}}</span>
+                    <span class="participant-name">{{mapProfile[participant.participantid]}}</span>
+                    <button class="remove-btn" (click)="removeParticipant(i)" title="Remove participant">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </li>
+                </ul>
+
+                <div class="empty-message" *ngIf="assignmentForm.controls['participantlist'].value.length === 0">
+                  <i class="fas fa-user-friends"></i>
+                  <p>No participants added yet</p>
+                  <small class="mt-2 text-muted">Use Group or Individual selection to add participants</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div [ngClass]="removedParticipantslist.length > 0 ? 'col-md-6' : 'd-none'">
+            <div class="participants-card removed-participants">
+              <div class="participants-header" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                <h4><i class="fas fa-user-slash mr-2"></i>Removed</h4>
+                <div class="header-actions">
+                  <span class="badge">{{removedParticipantslist.length}}</span>
+                  <button *ngIf="removedParticipantslist.length > 0" class="restore-btn" (click)="restoreAll()"
+                    title="restore all">
+                    <i class="fas fa-undo"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="participants-body" style="min-height: 200px; overflow-y: auto !important;">
+                <ul class="participants-list">
+                  <li *ngFor="let participant of removedParticipantslist; let i = index" class="participant-item">
+                    <span>{{i+1}}</span>
+                    <span class="participant-name">{{mapProfile[participant.participantid]}}</span>
+                    <button class="remove-btn" (click)="restoreParticipant(i)" title="Restore participant">
+                      <i class="fas fa-undo"></i>
+                    </button>
+                  </li>
+                </ul>
+                <div class="empty-message" *ngIf="removedParticipantslist.length === 0">
+                  <i class="fas fa-user-minus"></i>
+                  <p>No removed participants</p>
+                  <small class="mt-2 text-muted">Removed participants will appear here</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,45 @@
+.textField {
+  width: 100%;
+  margin: 5px;
+}
+
+.btnRow{
+  text-align: right;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red;
+}
+
+.successbtn{
+  color: green;
+  border: 1px solid green;
+  margin-left: 10px;
+}
+
+.formfield{
+  text-align: center;
+}
+.formfield2 {
+  margin:10px;
+  width: 95%;
+}
+
+.card1{
+  overflow-y: scroll;
+  height: 700px;
+}
+
+/* .form{
+width: 300px;
+} */
+
+.mL10{
+  margin-left: 10px;
+}
+
+textarea{
+  resize: none;
+  overflow: hidden;
+}

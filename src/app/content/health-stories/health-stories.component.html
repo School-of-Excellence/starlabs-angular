@@ -1,0 +1,143 @@
+<!-- <div class="mainscreen">
+  <div class="body mat-elevation-z2">
+    <div class="actionbox">
+      <div class="actionitem">
+        <mat-form-field appearance="outline">
+          <mat-label>Filter</mat-label>
+          <input matInput (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off">
+        </mat-form-field>
+      </div>
+      <div class="actionitem">
+        <button class="addbtn" mat-stroked-button (click)="updateStory(null)">Add New Health Story</button>
+      </div>
+    </div>
+    <table mat-table [dataSource]="dataSource" matSort>
+      <ng-container matColumnDef="subject">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Subject</th>
+        <td mat-cell *matCellDef="let row">{{row.subject}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="description">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+        <td mat-cell *matCellDef="let row">{{row.description}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Deleted</th>
+        <td mat-cell *matCellDef="let row">{{row.delete ? 'YES' : 'NO'}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="images">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Images</th>
+        <td mat-cell *matCellDef="let row">
+          <div class="imagebox">
+            <img class="mr-1" *ngFor="let image of row.images" [src]="image" (click)="openImage(image)" height="80" width="80">
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef>Edit</th>
+        <td mat-cell *matCellDef="let row;">
+          <button class="deletebtn" mat-icon-button type="button" (click)="updateStory(row)">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell emptytext" colspan="5">No data matching the filter "{{inputFilter.value}}"</td>
+      </tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+  </div>
+</div> -->
+<div class="audio-dashboard">
+  <!-- Header -->
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Health Stories</h1>
+      <p class="dash-sub">Manage health story content</p>
+    </div>
+    <button class="btn-primary" (click)="updateStory(null)">
+      <mat-icon>add</mat-icon>
+      <span>New Story</span>
+    </button>
+  </div>
+
+  <!-- Filter -->
+  <div class="filters-row">
+    <div class="input-box search-box">
+      <mat-icon class="ib-icon">search</mat-icon>
+      <input type="text" class="ib-input" placeholder="Search stories..."
+        (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-outer">
+    <div class="table-card">
+      <table mat-table [dataSource]="dataSource" matSort>
+
+        <!-- Subject -->
+        <ng-container matColumnDef="subject">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Subject</th>
+          <td mat-cell *matCellDef="let row"><span class="c-name">{{ row.subject }}</span></td>
+        </ng-container>
+
+        <!-- Description -->
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-desc">Description</th>
+          <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.description }}</span></td>
+        </ng-container>
+
+        <!-- Images -->
+        <ng-container matColumnDef="images">
+          <th mat-header-cell *matHeaderCellDef>Images</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="ad-variants" *ngIf="row.images?.length">
+              <img class="ad-img" *ngFor="let image of row.images" [src]="image" (click)="openImage(image)" />
+            </div>
+            <span class="c-size" *ngIf="!row.images?.length">—</span>
+          </td>
+        </ng-container>
+
+        <!-- Deleted -->
+        <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="status-badge" [class.deleted]="row.delete" [class.active]="!row.delete">
+              {{ row.delete ? 'Deleted' : 'Active' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Action -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef class="col-act">Edit</th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-edit" (click)="updateStory(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="empty">
+              <mat-icon>auto_stories</mat-icon>
+              <p>No stories matching "{{ inputFilter.value }}"</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons class="paginator"></mat-paginator>
+  </div>
+</div>

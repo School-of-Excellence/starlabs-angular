@@ -1,0 +1,98 @@
+<div *ngIf="add" class="m-4">
+    <div mat-dialog-title>
+        <h2>Add Episodes</h2>
+    </div>
+    <div mat-dialog-content style="width: auto;height: auto;">
+       <form #myForm="ngForm" style="margin-bottom: 20px;">
+         <mat-form-field>
+            <input type="text" placeholder="Title" matInput [(ngModel)]="title" (keyup)="onSelect()"
+                   ngModel
+                   required
+                   name="name"
+                   #name="ngModel">
+                   <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Title required</mat-error>
+                      <mat-hint *ngIf="crossmatch">
+                        <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
+                      </mat-hint>
+         </mat-form-field>
+         <mat-form-field class="description">
+            <input type="text" placeholder="Description" matInput [(ngModel)]="description"
+                   ngModel
+                   required
+                   name="Description"
+                   #Description="ngModel">
+                   <mat-error *ngIf="!Description.valid && Description.touched" style="color: red;">description required</mat-error>
+         </mat-form-field>
+       </form>
+       <div class="file">
+        <label for="file">Choose a video</label><br>
+        <input type="file" accept="video/*" (change)="previewVideo($event)">
+        <video *ngIf="videoUrl" [src]="videoUrl" controls style="width: 100px;height: 100px;"></video>
+       </div>
+       <div class="file">
+        <label for="file">Choose a thumbnail</label><br>
+        <input type="file" accept="image/*" (change)="previewImage($event)">
+        <img *ngIf="imageUrl" [src]="imageUrl" controls style="width: 100px;height: 100px;">
+       </div>
+    </div>
+    <div mat-dialog-actions class="btn">
+      <button  mat-raised-button color="primary" [disabled]="myForm.invalid ? true :crossmatch ? true: video == null ? true: image == null ? true : false" (click)="onSubmit()">Add</button>
+      &nbsp;&nbsp;&nbsp;&nbsp;
+      <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+    </div>
+    <!-- Video Progress Bar -->
+    <progress [value]="videoProgress$ | async"></progress>
+
+    <!-- Image Progress Bar -->
+    <!-- <progress [value]="imageProgress | async" max="100"></progress> -->
+
+</div>
+
+<div *ngIf="edit" class="m-4">
+    <div mat-dialog-title>
+        <h2>Edit Episodes</h2>
+    </div>
+    <div mat-dialog-content style="width: auto;height: auto;">
+      <form #myForm="ngForm" style="margin-bottom: 20px;">
+        <mat-form-field>
+           <input type="text" placeholder="Title" matInput [(ngModel)]="title"
+                  ngModel
+                  required
+                  name="name"
+                  #name="ngModel">
+        </mat-form-field>
+        <mat-form-field class="description">
+           <input type="text" placeholder="Description" matInput [(ngModel)]="description"
+                  ngModel
+                  required
+                  name="Description"
+                  #Description="ngModel">
+        </mat-form-field>
+      </form>
+      <div class="file">
+       <label for="file">Choose a video</label><br>
+       <input type="file" accept="video/*" (change)="previewVideo($event)">
+       <video *ngIf="videoUrl" [src]="videoUrl" controls style="width: 100px;height: 100px;"></video>
+      </div>
+      <div class="file">
+       <label for="file">Choose a thumbnail</label><br>
+       <input type="file" accept="image/*" (change)="previewImage($event)">
+       <img *ngIf="imageUrl" [src]="imageUrl" controls style="width: 100px;height: 100px;">
+      </div>
+   </div>
+    <div mat-dialog-actions class="btn">
+      <button  mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>
+      <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+    </div>
+</div>
+
+<div *ngIf="delete" class="m-4">
+    <div mat-dialog-title style="width: 350px;">
+        <h3>Are you sure you want to delete?</h3>
+    </div>
+    <div mat-dialog-actions class="btn">
+        <button  mat-raised-button color="primary" (click)="onDelete(data.id,data.videoUrl,data.imageUrl,data.screenshot)">Delete</button>  &nbsp;&nbsp;&nbsp;&nbsp;
+        <button  mat-raised-button color="primary">Cancel</button>
+    </div>
+</div>
+

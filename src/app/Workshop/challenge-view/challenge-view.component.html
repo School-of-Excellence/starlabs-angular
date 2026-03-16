@@ -1,0 +1,50 @@
+
+<!-- <h4 style="text-align: center;margin-top: 20px;">View/Create Workshop Challenges</h4> -->
+
+<div class="m-2">
+  <div class="d-flex flex-row justify-content-between">
+    <mat-form-field appearance="outline" style="min-width: 300px;">
+      <mat-label>Filter</mat-label>
+      <input matInput (keyup)="applyFilter($event)" placeholder="Ex:workshop title" #input>
+    </mat-form-field>
+    <button mat-stroked-button type="button" style="margin-top: 10px;" (click)="onOpenDialog('add',null)">Config Workshop Challenge</button>
+  </div>
+  
+  <div class="mat-elevation-z8 ">
+    <table mat-table [dataSource]="dataSource" matSort>
+  
+      <ng-container matColumnDef="label">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Label</th>
+        <td mat-cell *matCellDef="let row"> {{row.label}} </td>
+      </ng-container>
+  
+      <ng-container matColumnDef="tasks">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Tasks </th>
+        <td mat-cell *matCellDef="let row"> {{row.tasks}} </td>
+      </ng-container>
+  
+      <ng-container matColumnDef="edit">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Edit</th>
+        <td mat-cell *matCellDef="let row">
+          <button mat-stroked-button type="button" (click)="onOpenDialog('edit',row)">Edit</button>
+        </td>
+      </ng-container>
+  
+      <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
+        <td mat-cell *matCellDef="let row">
+          <button mat-stroked-button type="button" (click)="onDeleteDoc(row)">Delete</button>
+        </td>
+      </ng-container>
+  
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+      </tr>
+    </table>
+  
+    <mat-paginator [pageSizeOptions]="[10, 25, 100]" aria-label="Select page of users"></mat-paginator>
+  </div>
+</div>

@@ -1,0 +1,453 @@
+<div *ngIf="!loading" class="app-container">
+    <mat-sidenav-container class="sidenav-container">
+          <mat-sidenav *ngIf="sender === 'admin'" #sidenav mode="side" opened position="end" class="sidenav">
+            <div class="sidenav-content">
+              <div class="marathon-list">
+                <div class="marathon-container">
+                  <div class="marathon-item">
+                    <h4>Admins</h4>
+                  </div>
+                  <div class="nested-assignments">
+                    <div *ngIf="admins.length === 0" class="no-assignments">
+                      No Admins found
+                    </div>
+                    <div *ngIf="admins.length > 0" class="assignments-list">
+                      <div *ngFor="let admin of admins" 
+                          class="assignment-item">
+                        <div class="assignment-id">{{ mapProfile[admin] }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <br><br>
+              <h4>Choose Marathon</h4>
+              <div class="marathon-list">
+                <div *ngFor="let marathon of marathons" class="marathon-container">
+                  <div class="marathon-item"
+                      [class.active]="selectedMarathonId === marathon.id"
+                      (click)="toggleMarathon(marathon.id, marathon.title)">
+                    <span class="marathon-title">{{ marathon.title }}</span>
+                    <span class="marathon-date">{{ marathon.startdate.toDate() | date:'mediumDate' }}</span>
+                    <span class="expand-icon">
+                      <i class="fa-solid" [class.fa-chevron-down]="selectedMarathonId === marathon.id" [class.fa-chevron-right]="selectedMarathonId !== marathon.id"></i>
+                    </span>
+                  </div>
+                  <div *ngIf="selectedMarathonId === marathon.id" class="nested-assignments">
+                    <div *ngIf="loadingAssignments" class="loading-assignments">
+                      <div class="spinner"></div>
+                      <span>Loading assignments...</span>
+                    </div>
+                    <div *ngIf="!loadingAssignments && marathon.assignments?.length === 0" class="no-assignments">
+                      No assignments found
+                    </div>
+                    <div *ngIf="!loadingAssignments && marathon.assignments?.length > 0" class="assignment-count">
+                      <span class="badge">{{ marathon.assignments.length }} Assignments</span>
+                    </div>
+                    
+                    <div *ngIf="!loadingAssignments && marathon.assignments?.length > 0" class="assignments-list">
+                      <div *ngFor="let assignment of marathon.assignments" 
+                          class="assignment-item"
+                          (click)="selectAssignment(assignment)">
+                        <div class="assignment-id">{{ assignment.title }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div *ngIf="marathons.length === 0" class="no-marathons">
+                  No marathons available
+                </div>
+              </div>
+            </div>
+          </mat-sidenav>
+          <mat-sidenav-content class="main-content">
+            <div class="chat-container">
+                <div *ngIf="loading" class="loading-container">
+                  <div class="loading-spinner">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Loading...</span>
+                  </div>  
+                </div>  
+                <div *ngIf="!loading && chatExists" class="chat-interface">
+                  <div class="assignment-header">
+                    <div class="header-left">
+                      <h3 style="color: #4361ee;">
+                        <i style="color: #4361ee;" class="fa-solid fa-comments"></i>
+                        {{assignmentData?.title}}
+                      </h3>
+                    </div>
+                    <div class="header-center">
+                      <div class="center-content">
+                        <span class="assignment-type">{{assignmentData?.assignmenttype}}</span>
+                        <span class="marathon-name">{{marathonmap[assignmentData?.marathonref.id]}}</span>
+                      </div>
+                    </div>
+                    <div class="header-right">
+                      <button *ngIf="sender === 'admin'" class="menu-button" (click)="toggleSidenav()">
+                        <i class="fa-solid fa-person-running"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="chat-main">
+                    <div *ngIf="sender !== 'participant'" class="participants-sidebar">
+                      <!-- <div class="sidebar-header">
+                        <h4>Participants</h4>
+                      </div> -->
+                      <div class="sidebar-header">
+                        <button *ngIf="!isSelectingParticipants" class="new-broadcast-btn" (click)="startParticipantSelection()">
+                          <i class="fa-solid fa-bullhorn"></i> New Broadcast
+                        </button>
+                        <div *ngIf="isSelectingParticipants" class="broadcast-creation-container">
+                          <div class="broadcast-name-field">
+                            <mat-form-field appearance="outline" class="broadcast-name-input">
+                              <mat-label>Broadcast Name</mat-label>
+                              <input matInput [(ngModel)]="broadcastName" placeholder="Enter a broadcast name">
+                            </mat-form-field>
+                          </div>
+                          <div class="broadcast-actions">
+                            <button class="broadcast-create-btn" 
+                                    [disabled]="selectedParticipantIds.length === 0 || !broadcastName?.trim()" 
+                                    (click)="createNewBroadcast()">
+                              <i class="fa-solid fa-check"></i> Create
+                            </button>
+                            <button class="broadcast-cancel-btn" (click)="cancelParticipantSelection()">
+                              <i class="fa-solid fa-times"></i> Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div *ngIf="isSelectingParticipants" class="select-all-container">
+                        <div class="checkbox-wrapper">
+                          <input 
+                            type="checkbox" 
+                            id="selectAllCheckbox" 
+                            [checked]="areAllParticipantsSelected()" 
+                            (change)="toggleSelectAllParticipants()"
+                          >
+                          <label for="selectAllCheckbox">Select All</label>
+                        </div>
+                      </div>
+                    
+                      <div *ngIf="isGroupChat && !isSelectingParticipants" 
+                          class="participant-item" 
+                          [class.active]="selectedParticipant === 'group'"
+                          (click)="selectGroupChat()">
+                        <div class="participant-avatar group-avatar">
+                          <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="participant-info">
+                          <div class="participant-name">
+                            {{ currentBroadcastName }}
+                          </div>
+                        </div>
+                      </div>
+                    
+                      <div class="participants-list">
+                        <div *ngFor="let participant of participants" 
+                             class="participant-item"
+                             [class.active]="selectedParticipant === participant && !isSelectingParticipants"
+                             [class.self]="participant === loggedInProfileId"
+                             [class.group-member]="isGroupChat && groupChatParticipants.includes(participant) && !isSelectingParticipants"
+                             [class.checkbox-enabled]="isSelectingParticipants"
+                             (click)="isSelectingParticipants ? toggleParticipantSelection(participant) : (participant !== loggedInProfileId && selectParticipant(participant))">
+                          <div *ngIf="isSelectingParticipants && participant !== loggedInProfileId" class="participant-checkbox">
+                            <input 
+                              type="checkbox" 
+                              [id]="'participant-' + participant" 
+                              [checked]="isParticipantSelected(participant)"
+                              (change)="toggleParticipantSelection(participant)"
+                              (click)="$event.stopPropagation()"
+                            >
+                          </div>
+                          
+                          <div class="participant-avatar" 
+                               [class.self-avatar]="participant === loggedInProfileId"
+                               [class.group-member-avatar]="isGroupChat && groupChatParticipants.includes(participant) && !isSelectingParticipants">
+                            {{ getInitials(mapProfile[participant] || participant) }}
+                          </div>
+                          <div class="participant-info">
+                            <div class="participant-name">
+                              {{ mapProfile[participant] || participant }}
+                              <span *ngIf="participant === loggedInProfileId" class="self-label">(You)</span>
+                              <span *ngIf="isGroupChat && groupChatParticipants.includes(participant) && !isSelectingParticipants" class="group-label">
+                                <i class="fa-solid fa-bullhorn"></i>
+                              </span>
+                            </div>
+                            <div *ngIf="unreadCounts[participant] > 0 && !isSelectingParticipants" class="unread-badge">
+                              {{ unreadCounts[participant] }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="chat-window" [class.full-width]="sender === 'participant'">
+                      <div class="chat-header">
+                        <div *ngIf="(selectedParticipant && selectedParticipant !== 'group') || sender === 'participant'" class="selected-participant">
+                          <div class="participant-avatar small">
+                            <ng-container *ngIf="sender !== 'participant'">
+                              {{ getInitials(mapProfile[selectedParticipant] || selectedParticipant) }}
+                            </ng-container>
+                            <ng-container *ngIf="sender === 'participant'">
+                              <i class="fa-solid fa-headset"></i>
+                            </ng-container>
+                          </div>
+                          <div class="participant-name">
+                            <ng-container *ngIf="sender !== 'participant'">
+                              {{ mapProfile[selectedParticipant] || selectedParticipant }}
+                            </ng-container>
+                            <ng-container *ngIf="sender === 'participant'">
+                              B!G Support
+                            </ng-container>
+                          </div>
+                        </div>
+                        <div *ngIf="selectedParticipant === 'group'" class="selected-participant group-chat-header">
+                          <div class="participant-avatar small">
+                            <i class="fa-solid fa-users"></i>
+                          </div>
+                          <div class="participant-name">
+                            <span>{{ currentBroadcastName }} ({{ groupChatParticipants.length }})</span>
+                            <div class="group-members">
+                              <ng-container *ngFor="let id of groupChatParticipants; let last = last">
+                                <span>{{ mapProfile[id] || id }}{{!last ? ', ' : ''}}</span>
+                              </ng-container>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div *ngIf="!selectedParticipant && sender !== 'participant'" class="no-selection">
+                          <p>Select a participant to start chatting</p>
+                        </div>
+                      </div>
+                      <div class="chat-messages" #chatMessages>
+                        <div *ngIf="isLoadingMessages" class="message-loading">
+                          <div class="loading-spinner">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>Loading messages...</span>
+                          </div>
+                        </div>
+                        
+                        <div *ngIf="!isLoadingMessages && (selectedParticipant || sender === 'participant')" class="messages-container">
+                          <ng-container *ngIf="messages.length > 0">
+                            <ng-container *ngFor="let group of groupedMessages">
+                              <div class="date-header">
+                                <span><i class="fa-solid fa-calendar-day"></i> {{ getDateHeader(group.date) }}</span>
+                              </div>
+                              <div *ngFor="let msg of group.messages" 
+                                   class="message-item" 
+                                   [class.sent]="msg.senderid === loggedInProfileId"
+                                   [class.received]="msg.senderid !== loggedInProfileId">
+                                <div class="message-content"
+                                     [class.sent-content]="msg.senderid === loggedInProfileId" 
+                                     [class.received-content]="msg.senderid !== loggedInProfileId"
+                                     [class.group-message]="isGroupChat && selectedParticipant === 'group'">
+                                  <div *ngIf="isGroupChat && selectedParticipant === 'group' && msg.senderid !== loggedInProfileId" 
+                                       class="message-sender-name">
+                                    {{ mapProfile[msg.senderid] || msg.senderid }}
+                                  </div>
+                                  <div class="message-text">{{ msg.message }}</div>
+
+                                  <!-- Attachments -->
+                                  <div *ngIf="msg.hasAttachments && msg.attachments && msg.attachments.length > 0" 
+                                       class="message-attachments">
+                                    <div *ngFor="let attachment of msg.attachments" class="attachment-item">
+                                      <!-- Image attachments -->
+                                      <div *ngIf="attachment.type.startsWith('image/')" class="image-attachment">
+                                        <a [href]="attachment.url" target="_blank">
+                                          <img [src]="attachment.url" alt="Image attachment" class="attachment-image">
+                                        </a>
+                                      </div>
+                                      
+                                      <!-- Audio attachments -->
+                                      <div *ngIf="attachment.type.startsWith('audio/')" class="audio-attachment">
+                                        <audio controls>
+                                          <source [src]="attachment.url" [type]="attachment.type">
+                                          Your browser does not support audio playback.
+                                        </audio>
+                                      </div>
+                                      
+                                      <!-- Video attachments -->
+                                      <div *ngIf="attachment.type.startsWith('video/')" class="video-attachment">
+                                        <video controls>
+                                          <source [src]="attachment.url" [type]="attachment.type">
+                                          Your browser does not support video playback.
+                                        </video>
+                                      </div>
+                                      
+                                      <!-- Other file types -->
+                                      <div *ngIf="!attachment.type.startsWith('image/') && 
+                                                 !attachment.type.startsWith('audio/') && 
+                                                 !attachment.type.startsWith('video/')" 
+                                           class="file-attachment">
+                                        <a [href]="attachment.url" target="_blank" class="file-attachment-link">
+                                          <i class="fa-solid fa-file attachment-icon"></i>
+                                          <div class="file-attachment-info">
+                                            <div class="file-attachment-name">{{attachment.name}}</div>
+                                            <div class="file-attachment-size">{{getFileSize(attachment.size)}}</div>
+                                          </div>
+                                          <i class="fa-solid fa-download download-icon"></i>
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  <div class="message-footer">
+                                    <div class="message-time">{{ msg.time.toDate() | date:'short' }}</div>
+                                    <div *ngIf="sender === 'admin' && msg.sender === 'admin' && selectedParticipant !== 'group'" class="read-status">
+                                      <i class="fa-solid"
+                                         [class.fa-check-double]="messageReadStatus[msg.messageid]" 
+                                         [class.fa-check]="!messageReadStatus[msg.messageid]"
+                                         [class.read]="messageReadStatus[msg.messageid]"
+                                         [class.unread]="!messageReadStatus[msg.messageid]"></i>
+                                    </div>
+                                  </div>                                  
+                                  <!-- <div class="message-text">{{ msg.message }}</div>
+                                  <div class="message-footer">
+                                    <div class="message-time">{{ msg.time.toDate() | date:'short' }}</div>
+                                    <div *ngIf="sender === 'admin' && msg.sender === 'admin' && selectedParticipant !== 'group'" class="read-status">
+                                      <i class="fa-solid"
+                                         [class.fa-check-double]="messageReadStatus[msg.messageid]" 
+                                         [class.fa-check]="!messageReadStatus[msg.messageid]"
+                                         [class.read]="messageReadStatus[msg.messageid]"
+                                         [class.unread]="!messageReadStatus[msg.messageid]"></i>
+                                    </div>
+                                  </div> -->
+                                </div>
+                              </div>
+                            </ng-container>
+                          </ng-container>          
+                          
+                          <div *ngIf="!isLoadingMessages && messages.length === 0" class="message-placeholder">
+                            <ng-container *ngIf="sender !== 'participant' && selectedParticipant !== 'group'">
+                              Start a conversation with {{ mapProfile[selectedParticipant] || selectedParticipant }}
+                            </ng-container>
+                            <ng-container *ngIf="sender !== 'participant' && selectedParticipant === 'group'">
+                              Start a group conversation
+                            </ng-container>
+                            <ng-container *ngIf="sender === 'participant'">
+                              Start a conversation with Big Support
+                            </ng-container>
+                          </div>
+                        </div>
+                        
+                        <div *ngIf="!isLoadingMessages && !selectedParticipant && sender !== 'participant'" class="no-selection-message">
+                          <div class="empty-state">
+                            <i class="fa-solid fa-comments"></i>
+                            <p>Select a participant from the list to start a conversation</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div *ngIf="selectedParticipant || sender === 'participant'" class="chat-input">
+                        <!-- Selected files container - only show when there are files -->
+                        <div *ngIf="selectedFiles.length > 0" class="selected-files-container">
+                          <div *ngFor="let file of selectedFiles; let i = index" class="selected-file-item">
+                            <!-- Progress overlay when uploading -->
+                            <div *ngIf="fileUploadProgress[file.name] !== undefined && fileUploadProgress[file.name] < 100" 
+                                 class="file-upload-progress">
+                              <div class="progress-overlay" [style.width.%]="fileUploadProgress[file.name]"></div>
+                              <div class="progress-text">{{fileUploadProgress[file.name].toFixed(0)}}%</div>
+                            </div>
+                            
+                            <!-- Upload complete check mark -->
+                            <div *ngIf="fileUploadProgress[file.name] === 100" class="upload-complete">
+                              <i class="fa-solid fa-check"></i>
+                            </div>
+                            
+                            <!-- Image preview -->
+                            <ng-container *ngIf="file.type.startsWith('image/')">
+                              <img [src]="filePreviewUrls[file.name]" class="file-preview-img" alt="Image preview">
+                            </ng-container>
+                            
+                            <!-- Audio preview -->
+                            <ng-container *ngIf="file.type.startsWith('audio/')">
+                              <audio controls class="file-preview-audio">
+                                <source [src]="filePreviewUrls[file.name]" [type]="file.type">
+                                Your browser does not support audio previews.
+                              </audio>
+                            </ng-container>
+                            
+                            <!-- Video preview -->
+                            <ng-container *ngIf="file.type.startsWith('video/')">
+                              <video controls class="file-preview-video">
+                                <source [src]="filePreviewUrls[file.name]" [type]="file.type">
+                                Your browser does not support video previews.
+                              </video>
+                            </ng-container>
+                            
+                            <!-- File icon for non-media files -->
+                            <ng-container *ngIf="!file.type.startsWith('image/') && !file.type.startsWith('audio/') && !file.type.startsWith('video/')">
+                              <i class="fa-solid fa-file file-icon"></i>
+                            </ng-container>
+                            
+                            <!-- File information -->
+                            <div class="file-info">
+                              <div class="file-name" [title]="file.name">{{file.name}}</div>
+                              <div class="file-size">{{getFileSize(file.size)}}</div>
+                            </div>
+                            
+                            <!-- Remove button - only show when not uploading -->
+                            <span *ngIf="fileUploadProgress[file.name] === undefined" 
+                                  class="remove-file-btn" 
+                                  (click)="removeSelectedFile(i); $event.stopPropagation()">
+                              <i class="fa-solid fa-times"></i>
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <!-- Message input -->
+                        <div class="input-container">
+                          <input type="text" 
+                                #messageInput
+                                placeholder="Type a message..." 
+                                [(ngModel)]="newMessage" 
+                                (keyup.enter)="sendMessage()"
+                                [disabled]="isSending || uploadingAttachments">
+                          
+                          <!-- Attachment button - disabled during upload -->
+                          <button mat-icon-button 
+                                  (click)="attachment()" 
+                                  [disabled]="isSending || uploadingAttachments">
+                            <i class="fa-solid fa-paperclip"></i>
+                          </button>
+                          
+                          <!-- Send button - with loading spinner when uploading -->
+                          <button mat-icon-button 
+                                  (click)="sendMessage()" 
+                                  [disabled]="(!newMessage.trim() && selectedFiles.length === 0) || isSending || uploadingAttachments">
+                            <ng-container *ngIf="!isSending && !uploadingAttachments">
+                              <i class="fa-solid fa-paper-plane"></i>
+                            </ng-container>
+                            <ng-container *ngIf="isSending || uploadingAttachments">
+                              <i class="fa-solid fa-spinner fa-spin"></i>
+                            </ng-container>
+                          </button>
+                        </div>
+                      </div>
+                      <!-- <div *ngIf="selectedParticipant || sender === 'participant'" class="chat-input">
+                        <div class="input-container">
+                          <input type="text" 
+                                #messageInput
+                                placeholder="Type a message..." 
+                                [(ngModel)]="newMessage" 
+                                (keyup.enter)="sendMessage()"
+                                [disabled]="isSending">
+                                <button mat-icon-button 
+                                  (click)="attachment()">
+                                  <i class="fa-solid fa-paperclip"></i>
+                          </button>
+                          <button mat-icon-button 
+                                  (click)="sendMessage()" 
+                                  [disabled]="!newMessage.trim() || isSending">
+                            <i class="fa-solid fa-paper-plane" 
+                              [class.sending-icon]="isSending"></i>
+                          </button>
+                        </div>
+                      </div> -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+          </mat-sidenav-content>
+    </mat-sidenav-container>
+</div>

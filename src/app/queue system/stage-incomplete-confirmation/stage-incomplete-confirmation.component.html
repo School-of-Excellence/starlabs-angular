@@ -1,0 +1,35 @@
+<div class="container-fluid p-3">
+
+  <!-- Message -->
+  <div class="mb-2 mt-1">
+    <p class="text-muted fs-6">
+      The session with <b>{{participantName}}</b> was not fully completed. 
+      When they return to the <b>‘{{currentStage}}’</b> stage, the session can be continued with you. Do you want to assign this participant to yourself?
+    </p>
+  </div>
+
+  <!-- Assignment choice -->
+  <div class="mb-4">
+    <mat-radio-group [(ngModel)]="result.preassign" class="d-flex flex-column gap-2">
+      <mat-radio-button [value]="true">Yes, pre-assign to my studio</mat-radio-button>
+      <mat-radio-button [value]="false">No, do not assign</mat-radio-button>
+    </mat-radio-group>
+  </div>
+
+  <!-- Reason -->
+  <div class="mb-4">
+    <label class="form-label fw-semibold mb-2">Reason for moving this participant (visible to Queue Manager)</label>
+
+    <mat-form-field appearance="outline" class="w-100">
+      <textarea matInput rows="3" placeholder="Enter reason for moving this participant" [(ngModel)]="result.reason"></textarea>
+    </mat-form-field>
+  </div>
+
+  <!-- Actions -->
+  <div class="d-flex justify-content-end gap-2">
+    <button mat-stroked-button (click)="cancel()">Go Back</button>
+
+    <button mat-flat-button color="primary" (click)="onsubmit()">Submit</button>
+  </div>
+
+</div>

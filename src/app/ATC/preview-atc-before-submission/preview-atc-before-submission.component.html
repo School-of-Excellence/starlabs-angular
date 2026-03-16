@@ -1,0 +1,47 @@
+<div class="dialog-container">
+    <h2 class="dialog-title">Preview Adjustment and Procedures</h2>
+
+    
+    <!-- Directive Section -->
+    <div class="directive-section">
+      <h3 class="section-title">Directive</h3>
+      <label class="directive-content">{{dialogData["directive"]}}</label>
+    </div>
+    
+    <!-- Adjustment Section -->
+    <div class="adjustment-section">
+      <h3 class="section-title">Adjustment Order</h3>
+      <div class="adjustment-container" cdkDropList (cdkDropListDropped)="drop($event)">
+        <div class="adjustment-item" *ngFor="let item of adjustmentOrder; let i=index" cdkDrag>
+          <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+          
+          <div class="adjustment-content">
+            <div class="drag-handle">
+              <mat-icon>reorder</mat-icon>
+            </div>
+            <div class="adjustment-details">
+              <div class="adjustment-title">
+                <label>{{item.adjustmentedit || item.adjustment}} <span class="deleteflag" *ngIf="item.adjustmentdelete == true">(Deleted)</span></label>
+              </div>
+              <div class="procedure-list">
+                <div class="procedure-item" *ngFor="let procedure of item.procedure">
+                  • {{mapProcedure[procedure.name] || procedure.name}} <span class="deleteflag" *ngIf="procedure.proceduredelete == true">(Deleted)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <!-- Message -->
+    <div class="messagebox" *ngIf="dialogData['confirmationmessage']">
+      <label> <span class="text-danger">*</span>&nbsp;{{dialogData["confirmationmessage"]}}</label>
+    </div>
+    
+    <!-- Button Section -->
+    <div class="button-section">
+      <button mat-button class="close-button" (click)="onClose()">Close</button>
+      <button mat-button class="confirm-button" (click)="onConfirm()">Submit ATC</button>
+    </div>
+  </div>

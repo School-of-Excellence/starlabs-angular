@@ -1,0 +1,54 @@
+<div class="mainscreen">
+  <div class="heading">Delivery Roles</div>
+  <div class="body mat-elevation-z2">
+    <div class="actionbox">
+      <div class="actionitem">
+        <mat-form-field appearance="outline">
+          <mat-label>Filter</mat-label>
+          <input matInput (keyup)="applyFilter(input.value)" #input autocomplete="off">
+        </mat-form-field>
+      </div>
+      <div class="actionitem">
+        <button class="addbtn" mat-stroked-button (click)="updateRole(null)">Add Delivery Roles</button>
+      </div>
+    </div>
+    <table mat-table [dataSource]="dataSource" matSort>
+      <!-- Appointment role  Column -->
+      <ng-container matColumnDef="role">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Appointment Roles</th>
+        <td mat-cell *matCellDef="let row"> {{row.role}} </td>
+      </ng-container>
+
+       <!-- Experience stage  Column -->
+       <ng-container matColumnDef="experiencestage">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Experience Stage</th>
+        <td mat-cell *matCellDef="let row"> {{row.experiencestage}} </td>
+      </ng-container>
+
+       <!-- Experience level  Column -->
+       <ng-container matColumnDef="experiencelevel">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Experience level</th>
+        <td mat-cell *matCellDef="let row"> {{row.experiencelevel}} </td>
+      </ng-container>
+    
+      <!-- Edit Column -->
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let row;">
+          <button class="deletebtn" mat-icon-button type="button" (click)="updateRole(row)">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  
+      <!-- Row shown when there is no matching data. -->
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell emptytext" colspan="4">No data matching the filter "{{input.value}}"</td>
+      </tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+  </div>
+</div>]

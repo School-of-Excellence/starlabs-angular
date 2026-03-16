@@ -1,0 +1,482 @@
+<div class="fill-form-container">
+  <!-- Header -->
+  <div class="form-header">
+    <button class="back-btn" (click)="onClose()">
+      <i class="material-icons">arrow_back_ios_new</i>
+    </button>
+    <div class="header-content">
+      <h1>{{ formData?.formname || 'Form' }}</h1>
+      <div class="progress-indicator">
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="getCompletionPercentage()"></div>
+        </div>
+        <span class="progress-text">{{ getCompletionPercentage() }}% Complete</span>
+      </div>
+    </div>
+    <button class="save-btn" [disabled]="saving || !hasChanges" (click)="saveForm()">
+      <i class="material-icons" *ngIf="!saving">check</i>
+      <div class="spinner-small" *ngIf="saving"></div>
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <span>Loading form...</span>
+  </div>
+
+  <!-- Form Content -->
+  <div class="form-content" *ngIf="!loading">
+    <div class="form-fields">
+      <ng-container *ngFor="let field of formFields; trackBy: trackByFieldName">
+        <ng-container [ngSwitch]="getFieldType(field)">
+
+          <!-- Text Field -->
+          <div class="field-wrapper" *ngSwitchCase="'text'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <input
+              type="text"
+              class="text-input"
+              [class.error]="getValidationError(field.fieldname)"
+              [placeholder]="field.fieldnotes || 'Enter ' + field.fieldname"
+              [value]="field.value || ''"
+              (input)="onFieldChange(field, $any($event.target).value)"
+            />
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Textarea Field -->
+          <div class="field-wrapper" *ngSwitchCase="'textarea'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <textarea
+              class="textarea-input"
+              [class.error]="getValidationError(field.fieldname)"
+              [placeholder]="field.fieldnotes || 'Enter ' + field.fieldname"
+              [value]="field.value || ''"
+              (input)="onFieldChange(field, $any($event.target).value)"
+              rows="4"
+            ></textarea>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Number Field -->
+          <div class="field-wrapper" *ngSwitchCase="'number'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <input
+              type="number"
+              class="text-input number-input"
+              [class.error]="getValidationError(field.fieldname)"
+              [placeholder]="field.fieldnotes || '0'"
+              [value]="field.value"
+              (input)="onFieldChange(field, +$any($event.target).value)"
+            />
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Checkbox Field -->
+          <div class="field-wrapper checkbox-wrapper" *ngSwitchCase="'checkbox'">
+            <label class="checkbox-container" (click)="onFieldChange(field, !field.value)">
+              <div class="checkbox" [class.checked]="field.value">
+                <i class="material-icons" *ngIf="field.value">check</i>
+              </div>
+              <span class="checkbox-label" [class.required]="field.required">
+                {{ field.fieldname }}
+              </span>
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+          </div>
+
+          <!-- Toggle Field -->
+          <div class="field-wrapper toggle-wrapper" *ngSwitchCase="'toggle'">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <label class="field-label" [class.required]="field.required">
+                  {{ field.fieldname }}
+                </label>
+                <p class="field-description" *ngIf="field.fielddescription">
+                  {{ field.fielddescription }}
+                </p>
+              </div>
+              <div class="toggle" [class.active]="field.value" (click)="onFieldChange(field, !field.value)">
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dropdown Field -->
+          <div class="field-wrapper" *ngSwitchCase="'dropdown'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <select
+              class="select-input"
+              [class.error]="getValidationError(field.fieldname)"
+              [value]="field.value || ''"
+              (change)="onFieldChange(field, $any($event.target).value)"
+            >
+              <option value="" disabled>Select {{ field.fieldname }}</option>
+              <option *ngFor="let option of field.options" [value]="option">
+                {{ option }}
+              </option>
+            </select>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Radio Field -->
+          <div class="field-wrapper" *ngSwitchCase="'radio'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="radio-group">
+              <label
+                class="radio-option"
+                *ngFor="let option of field.options"
+                (click)="onFieldChange(field, option)"
+              >
+                <div class="radio-circle" [class.selected]="field.value === option">
+                  <div class="radio-dot" *ngIf="field.value === option"></div>
+                </div>
+                <span>{{ option }}</span>
+              </label>
+            </div>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Multi-select Field -->
+          <div class="field-wrapper" *ngSwitchCase="'multiselect'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="multiselect-options">
+              <div
+                class="multiselect-chip"
+                *ngFor="let option of field.options"
+                [class.selected]="isOptionSelected(field, option)"
+                (click)="toggleMultiSelectOption(field, option)"
+              >
+                <i class="material-icons" *ngIf="isOptionSelected(field, option)">check</i>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Chips/Tags Field -->
+          <div class="field-wrapper" *ngSwitchCase="'chips'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="chips-container">
+              <div
+                class="chip"
+                *ngFor="let option of field.options"
+                [class.selected]="isOptionSelected(field, option)"
+                (click)="toggleMultiSelectOption(field, option)"
+              >
+                {{ option }}
+              </div>
+            </div>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Date Field -->
+          <div class="field-wrapper" *ngSwitchCase="'date'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="date-input-wrapper">
+              <input
+                type="date"
+                class="text-input date-input"
+                [class.error]="getValidationError(field.fieldname)"
+                [value]="formatDateForInput(field.value)"
+                (change)="onFieldChange(field, $any($event.target).value)"
+              />
+              <i class="material-icons date-icon">calendar_today</i>
+            </div>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- DateTime Field -->
+          <div class="field-wrapper" *ngSwitchCase="'datetime'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="date-input-wrapper">
+              <input
+                type="datetime-local"
+                class="text-input date-input"
+                [class.error]="getValidationError(field.fieldname)"
+                [value]="formatDateTimeForInput(field.value)"
+                (change)="onFieldChange(field, $any($event.target).value)"
+              />
+              <i class="material-icons date-icon">event</i>
+            </div>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Time Field -->
+          <div class="field-wrapper" *ngSwitchCase="'time'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="date-input-wrapper">
+              <input
+                type="time"
+                class="text-input time-input"
+                [class.error]="getValidationError(field.fieldname)"
+                [value]="field.value || ''"
+                (change)="onFieldChange(field, $any($event.target).value)"
+              />
+              <i class="material-icons date-icon">schedule</i>
+            </div>
+            <span class="error-message" *ngIf="getValidationError(field.fieldname)">
+              {{ getValidationError(field.fieldname) }}
+            </span>
+          </div>
+
+          <!-- Slider Field -->
+          <div class="field-wrapper" *ngSwitchCase="'slider'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="slider-container">
+              <input
+                type="range"
+                class="slider-input"
+                min="0"
+                max="100"
+                [value]="field.value || 0"
+                (input)="onFieldChange(field, +$any($event.target).value)"
+              />
+              <span class="slider-value">{{ field.value || 0 }}</span>
+            </div>
+          </div>
+
+          <!-- Rating Field -->
+          <div class="field-wrapper" *ngSwitchCase="'rating'">
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <div class="rating-container">
+              <i
+                class="material-icons star"
+                *ngFor="let star of getRatingArray()"
+                [class.filled]="star <= (field.value || 0)"
+                (click)="setRating(field, star)"
+              >
+                {{ star <= (field.value || 0) ? 'star' : 'star_border' }}
+              </i>
+            </div>
+          </div>
+
+          <!-- Array/Section Field -->
+          <div class="field-wrapper section-wrapper" *ngSwitchCase="'array'">
+            <div class="section-header" (click)="toggleSection(field.fieldname)">
+              <div class="section-info">
+                <i class="material-icons section-icon">folder</i>
+                <span class="section-title">{{ field.fieldname }}</span>
+                <span class="section-count" *ngIf="field.array">{{ field.array.length }} fields</span>
+              </div>
+              <i class="material-icons expand-icon" [class.expanded]="isSectionExpanded(field.fieldname)">
+                expand_more
+              </i>
+            </div>
+            <p class="field-description section-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+
+            <!-- Nested Fields -->
+            <div class="nested-fields" *ngIf="isSectionExpanded(field.fieldname) && field.array">
+              <ng-container *ngFor="let nestedField of field.array; trackBy: trackByFieldName">
+                <ng-container [ngSwitch]="getFieldType(nestedField)">
+
+                  <!-- Nested Text Field -->
+                  <div class="field-wrapper nested" *ngSwitchCase="'text'">
+                    <label class="field-label" [class.required]="nestedField.required">
+                      {{ nestedField.fieldname }}
+                    </label>
+                    <input
+                      type="text"
+                      class="text-input"
+                      [placeholder]="nestedField.fieldnotes || 'Enter ' + nestedField.fieldname"
+                      [value]="nestedField.value || ''"
+                      (input)="onFieldChange(nestedField, $any($event.target).value)"
+                    />
+                  </div>
+
+                  <!-- Nested Textarea -->
+                  <div class="field-wrapper nested" *ngSwitchCase="'textarea'">
+                    <label class="field-label" [class.required]="nestedField.required">
+                      {{ nestedField.fieldname }}
+                    </label>
+                    <textarea
+                      class="textarea-input"
+                      [placeholder]="nestedField.fieldnotes || 'Enter ' + nestedField.fieldname"
+                      [value]="nestedField.value || ''"
+                      (input)="onFieldChange(nestedField, $any($event.target).value)"
+                      rows="3"
+                    ></textarea>
+                  </div>
+
+                  <!-- Nested Number -->
+                  <div class="field-wrapper nested" *ngSwitchCase="'number'">
+                    <label class="field-label" [class.required]="nestedField.required">
+                      {{ nestedField.fieldname }}
+                    </label>
+                    <input
+                      type="number"
+                      class="text-input number-input"
+                      [value]="nestedField.value"
+                      (input)="onFieldChange(nestedField, +$any($event.target).value)"
+                    />
+                  </div>
+
+                  <!-- Nested Checkbox -->
+                  <div class="field-wrapper checkbox-wrapper nested" *ngSwitchCase="'checkbox'">
+                    <label class="checkbox-container" (click)="onFieldChange(nestedField, !nestedField.value)">
+                      <div class="checkbox" [class.checked]="nestedField.value">
+                        <i class="material-icons" *ngIf="nestedField.value">check</i>
+                      </div>
+                      <span class="checkbox-label">{{ nestedField.fieldname }}</span>
+                    </label>
+                  </div>
+
+                  <!-- Nested Dropdown -->
+                  <div class="field-wrapper nested" *ngSwitchCase="'dropdown'">
+                    <label class="field-label" [class.required]="nestedField.required">
+                      {{ nestedField.fieldname }}
+                    </label>
+                    <select
+                      class="select-input"
+                      [value]="nestedField.value || ''"
+                      (change)="onFieldChange(nestedField, $any($event.target).value)"
+                    >
+                      <option value="" disabled>Select {{ nestedField.fieldname }}</option>
+                      <option *ngFor="let option of nestedField.options" [value]="option">
+                        {{ option }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Default nested text -->
+                  <div class="field-wrapper nested" *ngSwitchDefault>
+                    <label class="field-label" [class.required]="nestedField.required">
+                      {{ nestedField.fieldname }}
+                    </label>
+                    <input
+                      type="text"
+                      class="text-input"
+                      [value]="nestedField.value || ''"
+                      (input)="onFieldChange(nestedField, $any($event.target).value)"
+                    />
+                  </div>
+
+                </ng-container>
+              </ng-container>
+            </div>
+          </div>
+
+          <!-- Default Text Field -->
+          <div class="field-wrapper" *ngSwitchDefault>
+            <label class="field-label" [class.required]="field.required">
+              {{ field.fieldname }}
+            </label>
+            <p class="field-description" *ngIf="field.fielddescription">
+              {{ field.fielddescription }}
+            </p>
+            <input
+              type="text"
+              class="text-input"
+              [placeholder]="field.fieldnotes || 'Enter ' + field.fieldname"
+              [value]="field.value || ''"
+              (input)="onFieldChange(field, $any($event.target).value)"
+            />
+          </div>
+
+        </ng-container>
+      </ng-container>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="formFields.length === 0">
+      <i class="material-icons">description</i>
+      <h3>No fields available</h3>
+      <p>This form has no fields to fill out.</p>
+    </div>
+  </div>
+
+  <!-- Bottom Actions -->
+  <div class="bottom-actions" *ngIf="!loading && formFields.length > 0">
+    <button class="reset-btn" [disabled]="!hasChanges" (click)="resetForm()">
+      <i class="material-icons">refresh</i>
+      Reset
+    </button>
+    <button class="submit-btn" [disabled]="saving || !hasChanges" (click)="saveForm()">
+      <span *ngIf="!saving">Save Form</span>
+      <div class="spinner-small" *ngIf="saving"></div>
+    </button>
+  </div>
+</div>

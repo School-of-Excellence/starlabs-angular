@@ -1,0 +1,329 @@
+<mat-progress-bar *ngIf="uploadpercentage > 0" mode="determinate" [value]="uploadpercentage"></mat-progress-bar>
+<div class="audio-dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Community Manager</h1>
+      <p class="dash-sub">{{ operationMode === 'Submit' ? 'Create a Community Post' : 'Update a selected community post' }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-cancel" (click)="onReset()">
+        <mat-icon class="back-icon">refresh</mat-icon> Reset
+      </button>
+      <button class="btn-primary" (click)="onSubmitPost()">
+        <mat-icon>{{ operationMode === 'Submit' ? 'send' : 'save' }}</mat-icon>
+        <span>{{ operationMode === 'Submit' ? 'Submit' : 'Update' }}</span>
+      </button>
+    </div>
+  </div>
+  <div class="content-layout">
+    <div class="content-col">
+      <div class="field-group">
+        <label class="label">Select Ongoing Queue or Event</label>
+        <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect($event.value)"
+          class="cat-select" panelClass="cat-select-panel">
+          <mat-option disabled class="cat-search-option">
+            <div class="cat-search-box" (click)="$event.stopPropagation()">
+              <mat-icon class="ib-icon">search</mat-icon>
+              <input type="text" class="ib-input" placeholder="Search events..."
+                [(ngModel)]="eventSearchText" (keydown)="$event.stopPropagation()" />
+            </div>
+          </mat-option>
+          <mat-option *ngFor="let option of filterEvent()" [value]="option">
+            {{ option['type'] === 'queue' ? option['queuename'] : option['name'] }} ({{ option['type'] }})
+          </mat-option>
+        </mat-select>
+      </div>
+      <div class="field-group">
+        <label class="label">Select a Category</label>
+        <div class="selected-tags">
+          <mat-chip-listbox aria-label="Category selection">
+            <mat-chip-option
+              *ngFor="let option of categorylist; let i = index"
+              [value]="option"
+              [selected]="selectedCategoryDocId === option['docid']"
+              (click)="onCategorySelect(option)">
+              {{ option['categoryname'] }}
+            </mat-chip-option>
+          </mat-chip-listbox>
+        </div>
+      </div>
+      <div class="field-group cm-crud-row">
+        <label class="label">Category (Create / Update / Delete)</label>
+        <div class="cm-crud-inputs">
+          <div class="input-box cm-crud-input">
+            <input type="text" class="ib-input" placeholder="Category name"
+              name="newCategoryName" [(ngModel)]="newCategoryName" />
+          </div>
+          <div class="input-box cm-crud-input">
+            <select class="ib-input ib-select" name="newCategorytype" [(ngModel)]="newCategoryType">
+              <option *ngFor="let option of postTypeList" [value]="option">{{ option }}</option>
+            </select>
+          </div>
+          <div class="cm-crud-actions">
+            <button class="a-btn a-edit" (click)="addnewcategory('new')" title="Add">
+              <mat-icon>add</mat-icon>
+            </button>
+            <button class="a-btn a-edit" (click)="addnewcategory('update')" title="Update">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button class="a-btn a-del" *ngIf="![null,undefined].includes(roles) ? roles['developer'] === true : false"
+              (click)="deletecategory()" title="Delete">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="label">Description</label>
+        <div class="input-box lm-textarea-box">
+          <textarea class="ib-input lm-textarea" placeholder="Enter post description"
+            [(ngModel)]="this.createPost.description" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="label">Select Tags</label>
+        <div class="selected-tags">
+          <!-- <mat-chip-grid #chiptaglist [compareWith]="compareFnt" multiple="true" selectable="true">
+            <mat-chip *ngFor="let option of taglist;let i = index" (click)="onTagSelect(chiptag,i)" #chiptag="matChip" [value]="option">{{option['tag']}}</mat-chip>
+          </mat-chip-grid> -->
+        </div>
+      </div>
+
+      <div class="field-group cm-crud-row">
+        <label class="label">Tag (Create)</label>
+        <div class="cm-crud-inputs">
+          <div class="input-box cm-crud-input">
+            <input type="text" class="ib-input" placeholder="Tag name"
+              name="newTagName" [(ngModel)]="newTagName" />
+          </div>
+          <button class="a-btn a-edit" (click)="addnewtag()" title="Add tag">
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="content-col">
+      <div class="field-group">
+        <label class="label">Add Snippet</label>
+        <div class="cm-snippet-inputs">
+          <div class="cm-snippet-upload">
+            <label class="label" style="font-size: 12px;">Thumbnail</label>
+            <div class="upload-zone cm-upload-sm" (click)="thumbnail.click()">
+              <input #thumbnail type="file" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)" hidden />
+              <div class="upload-zone-content">
+                <mat-icon class="upload-icon">image</mat-icon>
+                <span class="upload-hint">Select thumbnail</span>
+              </div>
+            </div>
+            <img *ngIf="snippet.thumbnail" [src]="snippet.thumbnail['url']"
+              class="cm-snippet-preview" />
+          </div>
+          <div class="cm-snippet-upload">
+            <label class="label" style="font-size: 12px;">Video</label>
+            <div class="upload-zone cm-upload-sm" (click)="video.click()">
+              <input #video type="file" accept=".mp4,.mov,.mkv,.avi" (change)="uploadVideo($event)" hidden />
+              <div class="upload-zone-content">
+                <mat-icon class="upload-icon">videocam</mat-icon>
+                <span class="upload-hint">Select video</span>
+              </div>
+            </div>
+            <video *ngIf="snippet.video" [src]="sanitize(snippet.video['url'])"
+              class="cm-snippet-preview" controls></video>
+          </div>
+          <button class="btn-primary cm-add-btn"
+            (click)="onAddSnippet()"
+            [disabled]="createPost.type === 'post' ? (createPost.videos.length === 1) : false">
+            <mat-icon>add</mat-icon> Add
+          </button>
+        </div>
+      </div>
+
+      <div class="field-group" *ngIf="createPost.videos.length > 0">
+        <label class="label">Snippets ({{ createPost.videos.length }}) — Drag to reorder</label>
+        <div class="cm-snippet-list" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="drop($event)">
+          <div class="cm-snippet-card" *ngFor="let list of createPost.videos; let i = index" cdkDrag>
+            <div class="cm-snippet-media">
+              <img [src]="![null,undefined].includes(list.thumbnail['url']) ? list.thumbnail['url'] : list.thumbnail"
+                class="cm-snippet-thumb" />
+              <video *ngIf="list.video != null" controls class="cm-snippet-vid">
+                <source [src]="![null,undefined].includes(list.video['url']) ? sanitize(list.video['url']) : list.video">
+              </video>
+            </div>
+            <div class="cm-snippet-meta">
+              <input type="text" class="ib-input cm-snippet-title" [(ngModel)]="list.title" placeholder="Title" />
+              <button class="a-btn a-del" (click)="onRemoveSnippet(i)" title="Remove">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+        <span class="upload-hint" style="margin-top: 4px;">You can sort the above videos as per the required order.</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="cm-section-card">
+    <h3 class="cm-section-title">Active Snippet</h3>
+    <div class="content-layout">
+      <div class="content-col">
+        <div class="field-group">
+          <label class="label">Snippet Title</label>
+          <div class="input-box">
+            <mat-icon class="ib-icon">title</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter title"
+              [(ngModel)]="activeSnippet['title']" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Snippet Highlight</label>
+          <div class="input-box">
+            <mat-icon class="ib-icon">highlight</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter highlight"
+              [(ngModel)]="activeSnippet['highlight']" />
+          </div>
+        </div>
+      </div>
+      <div class="content-col">
+        <div class="field-group">
+          <label class="label">Event</label>
+          <mat-select [(ngModel)]="activeSnippet['event']" multiple
+            class="cat-select" panelClass="cat-select-panel">
+            <mat-option disabled class="cat-search-option">
+              <div class="cat-search-box" (click)="$event.stopPropagation()">
+                <mat-icon class="ib-icon">search</mat-icon>
+                <input type="text" class="ib-input" placeholder="Search events..."
+                  [(ngModel)]="eventSearchText" (keydown)="$event.stopPropagation()" />
+              </div>
+            </mat-option>
+            <mat-option *ngFor="let option of filterEvent()" [value]="option['path']">
+              {{ option['type'] === 'queue' ? option['queuename'] : option['name'] }} ({{ option['type'] }})
+            </mat-option>
+          </mat-select>
+        </div>
+        <button class="btn-primary" style="margin-top: 12px;" (click)="enableEventSnippet()">
+          <mat-icon>send</mat-icon>
+          <span>{{ operationMode === 'Submit' ? 'Submit' : 'Update' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 32px;">
+    <h3 class="cm-section-title">Community Post Library</h3>
+    <div class="filters-row" style="flex-wrap: wrap;">
+      <mat-select [(ngModel)]="selectedEventFilter" (selectionChange)="ngAfterViewInit()"
+        class="cat-select cm-filter-select" panelClass="cat-select-panel">
+        <mat-option disabled class="cat-search-option">
+          <div class="cat-search-box" (click)="$event.stopPropagation()">
+            <mat-icon class="ib-icon">search</mat-icon>
+            <input type="text" class="ib-input" placeholder="Search events..."
+              [(ngModel)]="eventSearchText" (keydown)="$event.stopPropagation()" />
+          </div>
+        </mat-option>
+        <mat-option value="all">All Events</mat-option>
+        <mat-option *ngFor="let option of filterEvent()" [value]="option['docid']">
+          {{ option['type'] === 'queue' ? option['queuename'] : option['name'] }} ({{ option['type'] }})
+        </mat-option>
+      </mat-select>
+      <mat-select [(ngModel)]="selectedTypeFilter" (selectionChange)="ngAfterViewInit()"
+        class="cat-select cm-filter-select" panelClass="cat-select-panel">
+        <mat-option value="all">All Types</mat-option>
+        <mat-option *ngFor="let option of filterTypeList" [value]="option['type']">
+          {{ option['label'] }}
+        </mat-option>
+      </mat-select>
+      <div class="input-box search-box">
+        <mat-icon class="ib-icon">search</mat-icon>
+        <input type="text" class="ib-input" placeholder="Search posts..."
+          (keyup)="applyFilter($event)" #input autocomplete="off" />
+      </div>
+    </div>
+    <div class="table-outer">
+      <div class="table-card">
+        <table mat-table [dataSource]="dataSource" multiTemplateDataRows matSort>
+          <ng-container matColumnDef="index">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="sno-cell">#</th>
+            <td mat-cell *matCellDef="let row" class="sno-cell">{{ row.index }}</td>
+          </ng-container>
+          <ng-container matColumnDef="eventref">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="c-name">{{ mapEvent[row.eventref.id] }}</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="categoryname">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="chip chip-sm">{{ row.categoryname }}</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="chip chip-sm">{{ row.type }}</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="created">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="c-size">{{ row.created.toDate() | date:'short' }}</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="edit">
+            <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+            <td mat-cell *matCellDef="let row" class="col-act">
+              <div class="cm-act-group">
+                <button class="a-btn a-edit" (click)="onPatchCommunityPost(row)" title="Edit">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button class="a-btn" [class.cm-available]="row['available'] == true"
+                  (click)="makeAvailable(row)" [title]="row['available'] == true ? 'Make Unavailable' : 'Make Available'">
+                  <mat-icon>{{ row['available'] == true ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="delete">
+            <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+            <td mat-cell *matCellDef="let row" class="col-act">
+              <button class="a-btn a-del" (click)="onDelete(row)" title="Delete">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="expandedDetail">
+            <td mat-cell *matCellDef="let row" [attr.colspan]="displayedColumns.length">
+              <div class="cm-expanded-content">
+                <p class="cm-expanded-desc">{{ row.description }}</p>
+                <div class="cm-expanded-media">
+                  <div *ngFor="let list of row.videos; let i = index" class="cm-expanded-card">
+                    <div class="cm-expanded-visuals">
+                      <img *ngIf="list.thumbnail != null || list.thumbnail != undefined"
+                        [src]="list.thumbnail" class="cm-snippet-thumb" />
+                      <video *ngIf="list.video != null || list.video != undefined"
+                        controls class="cm-snippet-vid">
+                        <source [src]="list.video">
+                      </video>
+                    </div>
+                    <p class="cm-expanded-title">
+                      <strong>{{ list.title }}</strong>
+                      <span class="cm-hls-link" (click)="testHLS(list['hls'])">
+                        (HLS: {{ list['hls'] != null && list['hls'] != undefined }})
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['expandedDetail']"></tr>
+        </table>
+      </div>
+      <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons class="paginator"></mat-paginator>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,375 @@
+<div *ngIf="loading" class="loading">
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
+  
+  <div class="searchprofile" *ngIf="offsetFlag == true">
+    <mat-form-field style="color: white;" appearance="fill">
+      <mat-label>Search profile ...</mat-label>
+      <input type="text" matInput [formControl]="myControl" [matAutocomplete]="auto">
+      <button  matPrefix mat-icon-button>
+        <mat-icon>search</mat-icon>
+      </button>
+      <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn" (optionSelected)="onProfileSelect($event.option.value)">
+        <mat-option *ngFor="let option of filteredOptions | async" [value]="option">
+          {{option.name}}
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+  </div>
+  
+  <div *ngIf="!loading" class="background">
+    <h4 class="title" *ngIf="profileData != null">{{profileData['name']}} Profile Summary</h4>
+  
+    <div style="display: flex;flex-direction: row;justify-content: space-between;">
+      <!-- div 1 -->
+      <div>
+        <h2 style="margin-bottom: 20px; font-size: 20px;">Summary</h2>
+    
+        <div style="display: flex;flex-direction: row;">
+          <h5 style="font-size: 16px;">Active Journey&nbsp;:&nbsp;</h5>
+          <h6 style="padding-top: 3px;font-size: 16px;">{{journey == null || !mapJourney[journey] ? "No Active Journey" : mapJourney[journey]}}</h6>
+        </div>
+    
+        <div style="display: flex;flex-direction: row;">
+          <h5 style="font-size: 16px;">Active Product&nbsp; :&nbsp;</h5>
+          <h6 style="padding-top: 3px;font-size: 16px;">{{product == null || !mapProduct[product] ? "No Active Product" : mapProduct[product]}}</h6>
+        </div>
+    
+        <div style="display: flex;flex-direction: row;">
+            <h5 style="font-size: 16px;">Recent Activity&nbsp;:&nbsp;</h5>
+            <div  style="display: flex;flex-direction: column;margin-left:10px ;">
+                <h6 *ngIf="appoinmentList.length == 0" style="padding-top:3px;font-size: 16px;"> No Recent Activity</h6>
+                <div  *ngFor="let item of appoinmentList">
+                    <h6 *ngIf="appoinmentList.length != 0" style="padding-top:3px;">{{item}}</h6>
+                </div>
+            </div>
+        </div>
+    
+        <div style="display: flex;flex-direction: row;">
+          <h5 style="font-size: 16px;">Products Completed&nbsp;:&nbsp;</h5>
+          <div  style="display: flex;flex-direction: column;margin-left:10px ;">
+              <h6 *ngIf="journeySequenceList.length == 0" style="padding-top:3px;font-size: 16px;"> No Products Completed</h6>
+              <div  *ngFor="let item of journeySequenceList">
+                  <h6 *ngIf="journeySequenceList.length != 0" style="padding-top:3px;">{{item.product}}</h6>
+              </div>
+          </div>
+        </div>
+  
+        <div *ngIf="selectedProfileid != null && selectedProfileid != undefined" class="m-2">
+          <h4>Navigate To:</h4>
+          <button class="me-2" mat-raised-button [routerLink]="'/participantpurchase/' + selectedProfileid">
+            <span>Manage Purchase</span>
+          </button>
+          <button class="me-2" mat-raised-button [routerLink]="'/journeysupport/' + selectedProfileid">
+            <span>Journey Support</span>
+          </button>
+          <button class="me-2" mat-raised-button [routerLink]="'/participantdeliverysequence/' + selectedProfileid">
+            <span>Participant Delivery Sequence</span>
+          </button>
+          <button class="me-2" mat-raised-button [routerLink]="'/userprofile/' + selectedProfileid">
+            <span>Participant Full Profile</span>
+          </button>
+        </div>
+    
+      </div>
+      <!-- div 2 -->
+      <div>
+        <span  *ngIf="![null,undefined].includes(profileData)">
+          <img *ngIf="![null,undefined].includes(profileData['profile'])" style="width:200px;height:200px;" [src]="profileData['profile']">
+        </span>
+        <br>
+        <button style="width: 200px;margin-top: 20px;" mat-raised-button color="legacy" (click)="onNavigateATC()">View ATC</button>
+      </div>
+    </div>
+  
+  <br>
+  
+
+  
+  
+  <!-- fullfillment -->
+  
+  <h4>Fulfillment Challenges : </h4>
+  
+  <div class="mat-elevation-z8">
+    <div class="actionbox">
+        <div>
+          <mat-form-field appearance="outline">
+            <mat-label>Filter</mat-label>
+            <input style="height: 20px;" matInput (keyup)="fullfillmentFilter($event)" placeholder="Search" #input>
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+    
+        </div>
+        <div>
+          <button class="issuebtn" mat-raised-button (click)="addfullfillmentissue()">Add Fullfillment Challenge <mat-icon>add</mat-icon></button>
+          <!-- <button *ngIf="admin['admin']" class="statusbtn" mat-raised-button (click)="editstatus()">Add/Edit status</button> -->
+        </div>
+      </div>
+  
+    <div style="margin: 20px;border: 0.5px solid rgb(201, 201, 201);margin-bottom: 50px;border-radius: 5px;">
+        <table mat-table [dataSource]="fullfillSource" multiTemplateDataRows matSort>    
+          <ng-container  matColumnDef="issueno">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> ISSUE NO </th>
+            <td mat-cell *matCellDef="let row"> {{row.issueno}} </td>
+          </ng-container>    
+          <ng-container matColumnDef="clientname">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> CLIENT NAME </th>
+            <td mat-cell *matCellDef="let row"> {{mapProfile[row.clientid]}}</td>
+          </ng-container>    
+          <ng-container matColumnDef="reporteddate" >
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> REPORTED DATE </th>
+            <td mat-cell *matCellDef="let row"> {{row.reporteddate.toDate() | date}} </td>
+          </ng-container>    
+          <ng-container matColumnDef="reportedby" >
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> REPORTED BY </th>
+            <td mat-cell *matCellDef="let row"> {{mapProfile[row.reportedBy]}} </td>
+          </ng-container>  
+          <ng-container matColumnDef="journey">
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> JOURNEY </th>
+            <td mat-cell *matCellDef="let row"> {{row["journey"] != null ? mapJourney[row["journey"].id] : ""}} </td>
+          </ng-container>    
+          <ng-container matColumnDef="product">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> PRODUCT </th>
+            <td mat-cell *matCellDef="let row"> {{row["product"] != null ? mapProduct[row["product"].id] : ""}} </td>
+          </ng-container>
+          <ng-container matColumnDef="status">
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> STATUS </th>
+            <td mat-cell *matCellDef="let row">
+               {{row.status}} </td>
+          </ng-container>
+          <ng-container matColumnDef="notes">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> NOTES </th>
+            <td mat-cell *matCellDef="let row">
+              <div class="list">
+                <li *ngFor="let notes of row.notes">({{notes.date.toDate() | date}}) - {{notes.remarks}}</li>
+              </div>
+            </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef>ACTION</th>
+            <td mat-cell *matCellDef="let row">
+              <button type="button" mat-mini-fab class="edit" color="legacy" (click)="updatefullfillmentissue(row)" ><mat-icon>edit_note</mat-icon></button>
+            </td>
+          </ng-container>
+        
+      
+          <ng-container matColumnDef="expandedDetail">
+            <td mat-cell *matCellDef="let element" [attr.colspan]="10">
+            <div class="alldata">
+              <div class="example-element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+      
+                <div class="example-element-diagram3"><b>Notes:</b><br>
+                  <ul>
+                  <li *ngFor="let notes of element.notes"> ({{notes.date.toDate() | date}}) - {{notes.remarks}} </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            </td>
+          </ng-container>
+      
+          <tr mat-header-row  *matHeaderRowDef="fullfillmentheader"></tr>
+          <tr mat-row   matRipple *matRowDef="let row; columns: fullfillmentheader;"
+          class="example-element-row"
+          [class.example-expanded-row]="expandedElement === row"
+          (click)="expandedElement = expandedElement === row ? null : row"
+          ></tr>
+          <tr class="expandrow"  mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row" ></tr>
+      
+          <tr class="mat-row"  *matNoDataRow>
+            <td class="mat-cell" colspan="10">No Results</td>
+          </tr>
+        </table>
+      
+        <mat-paginator [pageSize]="10" [pageSizeOptions]="[25,50,100]" aria-label="Select page of users"></mat-paginator>
+      </div>
+      <br>
+  </div>
+  <!-- fullfillment -->
+  <br>
+  <!-- customersupport -->
+  
+  <h4>Customer Support Issues : </h4>
+  
+  <div class="mat-elevation-z8">
+    <div class="actionbox">
+        <div>
+          <mat-form-field appearance="outline">
+            <mat-label>Filter</mat-label>
+            <input style="height: 20px;" matInput (keyup)="customersupportFilter($event)" placeholder="Search" #input>
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+        </div>
+        <div>
+          <button class="issuebtn" mat-raised-button (click)="addcustomersupportissue()">Add Issue <mat-icon>add</mat-icon></button>
+        </div>
+      </div>
+  
+      <div style="margin: 20px;border: 0.5px solid rgb(201, 201, 201);margin-bottom: 50px;border-radius: 5px;">
+    
+        <table mat-table [dataSource]="customersupportSource" multiTemplateDataRows matSort>
+      
+          <ng-container  matColumnDef="issueno">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> ISSUE NO </th>
+            <td mat-cell *matCellDef="let row"> {{row.issueno}} </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="clientname">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> CLIENT NAME </th>
+            <td mat-cell *matCellDef="let row">{{mapProfile[row.clientid]}}</td>
+          </ng-container>
+      
+          <ng-container matColumnDef="reporteddate" >
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> REPORTED DATE </th>
+            <td mat-cell *matCellDef="let row"> {{row.reporteddate.toDate() | date}} </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="reportedby" >
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> REPORTED BY </th>
+            <td mat-cell *matCellDef="let row"> {{mapProfile[row.reportedBy]}} </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="journey">
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> JOURNEY </th>
+            <td mat-cell *matCellDef="let row"> {{row["journey"] != null ? mapJourney[row["journey"].id] : ""}} </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="product">
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> PRODUCT </th>
+            <td mat-cell *matCellDef="let row"> {{row["product"] != null ? mapProduct[row["product"].id] : ""}} </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="assign">
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> ASSIGN TO </th>
+            <td mat-cell *matCellDef="let row">
+              <!-- <ul> -->
+                <div *ngFor="let name of row['assign']">{{mapProfile[name]}}, </div>
+              <!-- </ul> -->
+            </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="status">
+            <th mat-header-cell  *matHeaderCellDef mat-sort-header> STATUS </th>
+            <td mat-cell *matCellDef="let row">
+               {{row.status}} </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="issue">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> ISSUE </th>
+            <td mat-cell *matCellDef="let row">
+            <div class="list1">
+              {{row.issue}}
+            </div>
+            </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="notes">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> NOTES </th>
+            <td mat-cell *matCellDef="let row">
+              <div class="list">
+                <li *ngFor="let notes of row.notes">({{notes.date.toDate() | date}}) - {{notes.remarks}}</li>
+              </div>
+             
+            </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef>ACTION</th>
+            <td mat-cell *matCellDef="let row">
+              <button type="button" mat-mini-fab class="edit" color="legacy" (click)="updatecustomersupportissue(row)" ><mat-icon>edit_note</mat-icon></button>
+            </td>
+          </ng-container>
+        
+      
+          <ng-container matColumnDef="expandedDetail">
+            <td mat-cell *matCellDef="let element" [attr.colspan]="10">
+            <div class="alldata">
+              <div class="example-element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+                <div class="example-element-diagram2"><b>Issue:</b> <br>
+              {{element.issue}} 
+                </div>
+      
+                <div class="example-element-diagram3"><b>Remarks:</b><br>
+                  <ul>
+                  <li *ngFor="let notes of element.notes"> ({{notes.date.toDate() | date}}) - {{notes.remarks}} </li>
+                  </ul>
+                </div>
+                <div id="btnn" class="example-element-diagram4">
+                  <button mat-mini-fab type="button" class="edit" color="legacy" (click)="updatecustomersupportissue(element)"><mat-icon>edit_note</mat-icon></button>
+                </div>
+              </div>
+            </div>
+            </td>
+          </ng-container>
+      
+          <tr mat-header-row  *matHeaderRowDef="customersupportheader"></tr>
+          <tr mat-row   matRipple *matRowDef="let row; columns: customersupportheader;"
+          class="example-element-row"
+          [class.example-expanded-row]="expandedElement === row"
+          (click)="expandedElement = expandedElement === row ? null : row"
+          ></tr>
+          <tr class="expandrow"  mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row" ></tr>
+      
+          <tr class="mat-row"  *matNoDataRow>
+            <td class="mat-cell" colspan="10">No Results</td>
+          </tr>
+        </table>
+      
+        <mat-paginator [pageSizeOptions]="[25,50,100]" aria-label="Select page of users"></mat-paginator>
+      </div>
+      <br>
+  </div>
+  <!-- customersupport -->
+  <br>
+  
+  <div style="display: flex;flex-direction: row;">
+      <!-- general notes -->
+  
+      <div style="width: 50vw;">
+        <div style="display: flex;flex-direction: row;width:50vw;">
+          <h4>General Notes :</h4>
+          <button class="issuebtn" mat-raised-button (click)="addgeneralnotes()"><mat-icon>playlist_add</mat-icon>General Notes</button>
+        </div>
+      <br>
+      <div class="notes">
+  
+        <div style="text-align: center;" *ngIf="generalNotes.length == 0">
+          <h5>No Notes</h5>
+        </div>
+  
+        <div *ngFor="let item of generalNotes,let i = index">
+            <h6>{{i + 1}}. <b>{{mapProfile[item.givenby]}}</b>  :  {{item.generalnotes}}  ({{item.date.toDate() | date:'mediumDate'}}) </h6>
+        </div>
+  
+      </div>
+    </div>
+  
+    <!-- general notes -->
+  
+    <!-- Private notes -->
+  
+    <div style="width: 50vw;">
+      <div style="display: flex;flex-direction: row;">
+        <h4 style="float:left;">Private Notes :</h4>
+        <button class="issuebtn" mat-raised-button (click)="addprivatenotes()"><mat-icon>playlist_add</mat-icon>Private Notes</button>
+      </div>
+      <br>
+      <div class="notes">
+  
+        <div style="text-align: center;" *ngIf="privateNotes.length == 0">
+          <h5>No Notes</h5>
+        </div>
+  
+        <div *ngFor="let item of privateNotes,let i = index">
+            <h6>{{i + 1}}.  {{item.privatenotes}}  ({{item.date.toDate() | date:'mediumDate'}})</h6>
+        </div>
+  
+      </div>
+    </div>
+  
+    <!-- Private notes -->
+  </div>
+  <br><br>
+  </div>

@@ -1,0 +1,67 @@
+
+<div class="mainscreen" >
+  <div class="body mat-elevation-z2">
+    <div class="actionbox">
+      <mat-form-field style="margin-left: 10px;" appearance="outline">
+            <mat-label>Select Event</mat-label>
+            <mat-select   (selectionChange)="onEventSelected()" [(ngModel)]="selectedevent">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filter"  [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let event of returnFilterEvent()" [value]="event.docid">{{event.name}}</mat-option>
+            </mat-select>
+      </mat-form-field>
+      <div class="actionitem" *ngIf="showtable">
+        <button class="addbtn" mat-stroked-button (click)="updateLayer(null)">Add New Layer</button>
+      </div>
+    </div>
+    <div>
+      <div class="actionitem">
+      <mat-form-field appearance="outline" *ngIf="showtable">
+      <mat-label>Filter</mat-label>
+        <input matInput (keyup)="filterTable(input.value)" #input autocomplete="off">
+      </mat-form-field>
+      </div>   
+    </div>
+    <table *ngIf="showtable" mat-table matSort #table [dataSource]="dataSource" cdkDropList (cdkDropListDropped)="onDrop($event)" [cdkDropListDisabled]="dragDisabled">
+      <ng-container matColumnDef="position">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header></th>
+        <td mat-cell *matCellDef="let row; let i = index;">
+          <mat-icon class="dragCursor" (mousedown)="dragDisabled = false;">reorder</mat-icon></td>
+      </ng-container>
+      <ng-container matColumnDef="title">
+        <th  mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
+        <td  mat-cell *matCellDef="let row">{{row["sequence"]}}. {{row["title"]}}</td>
+      </ng-container>
+      <ng-container matColumnDef="description">
+        <th  mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+        <td  mat-cell *matCellDef="let row">
+            <ul>
+                <li *ngFor="let desc of row.description">{{ desc }}</li>
+            </ul>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="event">
+        <th  mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
+        <td  mat-cell *matCellDef="let row">{{row["sequence"]}}. {{mapEvents[row.eventref.id]['name']}}</td>
+      </ng-container>
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef>Edit</th>
+        <td mat-cell *matCellDef="let row;">
+          <button class="deletebtn" mat-icon-button type="button" (click)="updateLayer(row)">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Delete</th>
+        <td mat-cell *matCellDef="let row" >
+            <mat-slide-toggle *ngIf="row['docid'] !== undefined" [checked]="row['delete']" (change)="onToggle($event, row)">Delete</mat-slide-toggle>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" cdkDrag></tr>
+    </table>
+    <mat-paginator *ngIf="showtable" [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+  </div>
+</div>

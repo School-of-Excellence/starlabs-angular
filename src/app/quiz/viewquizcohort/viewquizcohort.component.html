@@ -1,0 +1,260 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="header-content">
+      <div class="header-text">
+        <h1 class="page-title">Quiz Response Dashboard</h1>
+        <p class="page-subtitle">View participant choices by quiz</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-filter" [class.active]="showFilters" (click)="toggleFilters()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          Filters
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="loader"></div>
+    <p>Loading dashboard data...</p>
+  </div>
+
+  <!-- Main Content -->
+  <main *ngIf="!isLoading" class="dashboard-main">
+    
+    <!-- Quiz Selector Dropdown -->
+    <div *ngIf="quizzes.length > 0" class="quiz-selector-wrapper">
+      <mat-form-field appearance="outline" class="quiz-select-field">
+        <mat-label>Select Quiz</mat-label>
+        <mat-select [value]="selectedQuiz?.id" (selectionChange)="onQuizChange($event.value)">
+          <mat-option *ngFor="let quiz of quizzes" [value]="quiz.id">
+            <div class="quiz-option">
+              <span class="quiz-option-text">{{ quiz.question }}</span>
+              <span class="quiz-status-badge" [class.active]="quiz.active" [class.inactive]="!quiz.active">
+                {{ quiz.active ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Filters Panel -->
+    <div *ngIf="showFilters" class="filters-panel">
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label class="filter-label">Profile ID</label>
+          <input 
+            type="text" 
+            class="filter-input"
+            placeholder="Search by profile..."
+            [(ngModel)]="filterProfileId"
+            (ngModelChange)="applyFilters()">
+        </div>
+        
+        <div class="filter-group">
+          <label class="filter-label">Selected Option</label>
+          <select 
+            class="filter-select"
+            [(ngModel)]="filterOptionText"
+            (ngModelChange)="applyFilters()">
+            <option value="">All options</option>
+            <option *ngFor="let opt of selectedQuiz?.options" [value]="opt.text">
+              {{ opt.text }}
+            </option>
+          </select>
+
+        </div>
+        
+        <div class="filter-group">
+          <label class="filter-label">From Date</label>
+          <input 
+            type="date" 
+            class="filter-input"
+            [ngModel]="filterDateFrom | date:'yyyy-MM-dd'"
+            (ngModelChange)="onDateFromChange($event)">
+        </div>
+        
+        <div class="filter-group">
+          <label class="filter-label">To Date</label>
+          <input 
+            type="date" 
+            class="filter-input"
+            [ngModel]="filterDateTo | date:'yyyy-MM-dd'"
+            (ngModelChange)="onDateToChange($event)">
+        </div>
+      </div>
+      
+      <button class="btn-clear-filters" (click)="clearFilters()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+        Clear filters
+      </button>
+    </div>
+
+    <!-- Selected Quiz Card -->
+    <div *ngIf="selectedQuiz" class="quiz-card">
+      <div class="quiz-card-header">
+        <div class="quiz-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="quiz-info">
+          <h2 class="quiz-question">{{ selectedQuiz.question }}</h2>
+          <div class="quiz-meta">
+            <span class="meta-badge">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+              </svg>
+              {{ selectedQuiz.options.length }} Options
+            </span>
+            <span class="meta-badge" [class.active]="selectedQuiz.active" [class.inactive]="!selectedQuiz.active">
+              {{ selectedQuiz.active ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+            <mat-chip-listbox aria-label="Quiz options">
+            <mat-chip *ngFor="let opt of selectedQuiz.options" selectable="false">
+                {{ opt.text }}
+            </mat-chip>
+            </mat-chip-listbox>
+        </div>
+      </div>
+
+      <!-- Stats Bar -->
+      <div class="stats-bar">
+        <div class="stat-item">
+          <span class="stat-value">{{ filteredResponses.length }}</span>
+          <span class="stat-label">Total Responses</span>
+        </div>
+        <div *ngFor="let breakdown of optionBreakdown; let i = index" class="stat-item stat-breakdown">
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar" [style.width.%]="breakdown.percentage" [class.primary]="i === 0" [class.accent]="i === 1" [class.warn]="i === 2"></div>
+          </div>
+          <span class="stat-option">{{ breakdown.option }}</span>
+          <span class="stat-count">{{ breakdown.count }} ({{ breakdown.percentage }}%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Responses Table -->
+    <div *ngIf="selectedQuiz" class="responses-section">
+      <div class="section-header">
+        <h3 class="section-title">Participant Responses</h3>
+        <span class="response-count">{{ filteredResponses.length }} responses</span>
+      </div>
+
+      <!-- Table with Sort -->
+      <div class="table-wrapper" *ngIf="filteredResponses.length > 0">
+        <table mat-table [dataSource]="dataSource" matSort class="responses-table">
+          
+          <!-- Profile ID Column -->
+          <ng-container matColumnDef="profileid">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant Name</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="profile-cell">
+                <div class="profile-avatar">
+                {{ mapProfile[row.profileid]?.charAt(0)?.toUpperCase() || '?' }}
+                </div>
+
+                <span class="profile-id" [matTooltip]="mapProfile[row.profileid]">
+                  {{ mapProfile[row.profileid] }}
+                </span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Selected Option Column -->
+          <ng-container matColumnDef="selectedOption">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Selected Option</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="selected-option">
+                <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span class="option-text">{{ row.selectedOption }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Cohort Column -->
+          <ng-container matColumnDef="cohort">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Cohort</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="cohort-badge">{{ row.selectedCohortName || 'N/A' }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Source Column -->
+          <ng-container matColumnDef="event">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
+            <td mat-cell *matCellDef="let row">
+                <span class="cohort-badge">{{ row.selectedEventName || 'N/A' }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Date Column -->
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="date-text">{{ row.formattedDate || 'N/A' }}</span>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="response-row"></tr>
+        </table>
+
+        <!-- Paginator -->
+        <mat-paginator 
+          [pageSizeOptions]="[5, 10, 25, 50]" 
+          [pageSize]="10"
+          showFirstLastButtons
+          aria-label="Select page">
+        </mat-paginator>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="filteredResponses.length === 0" class="empty-state">
+        <div class="empty-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <line x1="9" y1="9" x2="15" y2="9"></line>
+            <line x1="12" y1="6" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <h3 class="empty-title">No responses available</h3>
+        <p class="empty-text" *ngIf="filterProfileId || filterOptionText || filterDateFrom || filterDateTo">
+          No responses match your current filters. Try adjusting or clearing the filters.
+        </p>
+        <p class="empty-text" *ngIf="!filterProfileId && !filterOptionText && !filterDateFrom && !filterDateTo">
+          No participant responses have been recorded for this quiz yet.
+        </p>
+        <button *ngIf="filterProfileId || filterOptionText || filterDateFrom || filterDateTo" class="btn-clear-filters large" (click)="clearFilters()">
+          Clear all filters
+        </button>
+      </div>
+    </div>
+
+    <!-- No Quizzes State -->
+    <div *ngIf="quizzes.length === 0" class="empty-state">
+      <div class="empty-icon">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <h3 class="empty-title">No quizzes found</h3>
+      <p class="empty-text">There are no quizzes with type "withoutResponse" in your database.</p>
+    </div>
+  </main>
+</div>

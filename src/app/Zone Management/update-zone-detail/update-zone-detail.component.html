@@ -1,0 +1,53 @@
+<div class="zone-dialog">
+  <!-- Header -->
+  <div class="dialog-header">
+    <h2 mat-dialog-title>{{ dialogTitle }}</h2>
+    <button mat-icon-button (click)="onCancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Content -->
+  <mat-dialog-content>
+    <!-- Zone Name -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Zone Name *</mat-label>
+      <input matInput [(ngModel)]="zoneName" placeholder="e.g., Zone A, Main Hall">
+    </mat-form-field>
+
+    <!-- Start Time -->
+    <mat-form-field appearance="outline" class="mt-4 full-width">
+      <mat-label>Start Time</mat-label>
+      <input matInput type="datetime-local" [(ngModel)]="startTime">
+      <mat-icon matPrefix>schedule</mat-icon>
+    </mat-form-field>
+
+    <!-- Coordinator -->
+    <mat-form-field appearance="outline" class="mt-4 full-width">
+      <mat-label>Coordinator</mat-label>
+      <mat-select [(ngModel)]="selectedCoordinators" multiple>
+        <mat-option *ngFor="let coordinator of data.teammemberlist" [value]="coordinator['profileid']">
+          {{ coordinator['name'] }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Mentor -->
+    <mat-form-field appearance="outline" class="mt-4 full-width">
+      <mat-label>Mentor</mat-label>
+      <mat-select [(ngModel)]="selectedMentors" multiple>
+        <mat-option *ngFor="let mentor of data.teammemberlist" [value]="mentor['profileid']">
+          {{ mentor['name'] }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </mat-dialog-content>
+
+  <!-- Actions -->
+  <mat-dialog-actions>
+    <button mat-button (click)="onCancel()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="onSave()">
+      {{ saveButtonText }}
+    </button>
+  </mat-dialog-actions>
+</div>

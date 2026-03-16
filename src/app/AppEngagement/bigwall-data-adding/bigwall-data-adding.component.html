@@ -1,0 +1,318 @@
+<main class="mt-2">
+  <div class="mt-2">
+    <div class="d-flex flex-row justify-content-center"><h4>Big wall & Highlights</h4></div>
+    <div class="d-flex flex-row justify-content-center">
+      <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Select Event</mat-label>
+        <mat-select (selectionChange)="onEventSelect($event)">
+          <mat-option *ngFor="let option of eventList" [value]="option.id">{{option.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+  <div class="mt-2">
+    <mat-tab-group mat-align-tabs="center">
+      <mat-tab label="Achievement Post"><app-select-achievementpost [eventid]="selectedEventId"></app-select-achievementpost></mat-tab>
+      <mat-tab label="Community Post"><app-select-communitypost [eventid]="selectedEventId"></app-select-communitypost></mat-tab>
+      <mat-tab label="Participant Reports"><app-participant-reports [eventid]="selectedEventId"></app-participant-reports></mat-tab>
+      <mat-tab label="Video Ask Transcribe"><app-videoasktranscribe [eventid]="selectedEventId"></app-videoasktranscribe></mat-tab>
+      <mat-tab label="Big wall & Highlights">
+        <div class="d-flex flex-row justify-content-center m-2"><h5>Big wall</h5></div>
+        <!-- participant reports -->
+        <div class="d-flex flex-row justify-content-center m-2"><h6>Participant Reports</h6></div>
+        <div class="example-container mat-elevation-z8">
+          <table mat-table [dataSource]="participantDataSource">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef  > Name </th>
+              <td mat-cell *matCellDef="let row"> {{mapProfile[row.profileid]}} </td>
+            </ng-container>
+            <ng-container matColumnDef="anonymous">
+              <th mat-header-cell *matHeaderCellDef>Anonymous</th>
+              <td mat-cell *matCellDef="let row"> {{row.anonymous ? 'Yes' : 'No'}} </td>
+            </ng-container>
+            <ng-container matColumnDef="created">
+              <th mat-header-cell *matHeaderCellDef  > Date </th>
+              <td mat-cell *matCellDef="let row"> {{row.created != undefined ? (row.created.toDate() | date : "mediumDate") : null}}</td>
+            </ng-container>
+        
+            <ng-container matColumnDef="title">
+              <th mat-header-cell *matHeaderCellDef  >Title</th>
+              <td mat-cell *matCellDef="let row"> {{row.title}} </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="description">
+              <th mat-header-cell *matHeaderCellDef  > Description </th>
+              <td mat-cell *matCellDef="let row"> {{row.description}}</td>
+            </ng-container>
+            <!-- image -->
+            <ng-container matColumnDef="image">
+              <th mat-header-cell *matHeaderCellDef>Image</th>
+              <td mat-cell *matCellDef="let row">
+                  <img *ngFor="let image of row.images" class="image" [src]="image" alt="image">
+              </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="delete">
+              <th mat-header-cell *matHeaderCellDef  >Delete</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-icon-button type="button" (click)="onDelete(row)"><mat-icon>delete</mat-icon></button>
+              </td>
+            </ng-container>
+
+            
+            <tr mat-header-row *matHeaderRowDef="participantDisplayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: participantDisplayedColumns;"></tr>
+            <!-- <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr> -->
+          </table>
+        </div>
+        <!-- pinned Achievement datasource -->
+        <div class="d-flex flex-row justify-content-center m-2"><h6>Favourites Achievement</h6></div>
+        <div class="example-container mat-elevation-z8">
+          <table mat-table [dataSource]="pinnedAchievementDataSource" multiTemplateDataRows>
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef  > Name </th>
+              <td mat-cell *matCellDef="let row"> {{row.name}} </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="created">
+              <th mat-header-cell *matHeaderCellDef  > Date </th>
+              <td mat-cell *matCellDef="let row"> {{row.created != undefined ? (row.created.toDate() | date : "mediumDate") : null}}</td>
+            </ng-container>
+        
+            <ng-container matColumnDef="private">
+              <th mat-header-cell *matHeaderCellDef  >Private/Public</th>
+              <td mat-cell *matCellDef="let row"> {{row.private != undefined ? (row.private ? "Private" : "Public"): "Private"}} </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="postcategory">
+              <th mat-header-cell *matHeaderCellDef  > Post Category </th>
+              <td mat-cell *matCellDef="let row"> {{row.postcategory != undefined && row.postcategory != null ? (mapPostCategory[row.postcategory.id] != undefined ? mapPostCategory[row.postcategory.id]['type'] : null) : null}}</td>
+            </ng-container>
+        
+            <ng-container matColumnDef="paralleltrajectory">
+              <th mat-header-cell *matHeaderCellDef  >Parallel Trajectory</th>
+              <td mat-cell *matCellDef="let row"> {{row.paralleltrajectory != undefined && row.paralleltrajectory != null ? row.paralleltrajectory : null}}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="pinned">
+              <th mat-header-cell *matHeaderCellDef >Mark Favourites</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-stroked-button type="button" (click)="unPinnedDoc(row)">Remove Favourites</button>
+              </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="delete">
+              <th mat-header-cell *matHeaderCellDef  >Delete</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-icon-button type="button" (click)="onDelete(row)"><mat-icon>delete</mat-icon></button>
+              </td>
+            </ng-container>
+
+            <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+            <ng-container matColumnDef="expandedDetail">
+              <td mat-cell *matCellDef="let row" [attr.colspan]="pinnedAchievementDisplayedColumns.length">
+                <section class="d-flex flex-row" style="overflow:auto;">
+                  <div *ngFor="let list of row.postimagelist;let i = index" class="d-flex flex-column m-2">
+                    <div class="d-flex flex-row">
+                      <img *ngIf="list != null || list != undefined" width="170" height="300" [src]="list">
+                    </div>
+                  </div>
+                </section>
+              </td>
+            </ng-container>
+            
+            <tr mat-header-row *matHeaderRowDef="pinnedAchievementDisplayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: pinnedAchievementDisplayedColumns;"></tr>
+            <!-- <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr> -->
+          </table>
+        </div>
+        <!-- non pinned achievement datasource -->
+        <div class="d-flex flex-row justify-content-center m-2"><h6>Achievement</h6></div>
+        <div class="example-container mat-elevation-z8">
+          <table mat-table [dataSource]="unPinnedAchievementDataSource" multiTemplateDataRows>
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef  > Name </th>
+              <td mat-cell *matCellDef="let row"> {{row.name}} </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="created">
+              <th mat-header-cell *matHeaderCellDef  > Date </th>
+              <td mat-cell *matCellDef="let row"> {{row.created != undefined ? (row.created.toDate() | date : "mediumDate") : null}}</td>
+            </ng-container>
+        
+            <ng-container matColumnDef="private">
+              <th mat-header-cell *matHeaderCellDef  >Private/Public</th>
+              <td mat-cell *matCellDef="let row"> {{row.private != undefined ? (row.private ? "Private" : "Public"): "Private"}} </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="postcategory">
+              <th mat-header-cell *matHeaderCellDef  > Post Category </th>
+              <td mat-cell *matCellDef="let row"> {{row.postcategory != undefined && row.postcategory != null ? (mapPostCategory[row.postcategory.id] != undefined ? mapPostCategory[row.postcategory.id]['type'] : null) : null}}</td>
+            </ng-container>
+        
+            <ng-container matColumnDef="paralleltrajectory">
+              <th mat-header-cell *matHeaderCellDef  >Parallel Trajectory</th>
+              <td mat-cell *matCellDef="let row"> {{row.paralleltrajectory != undefined && row.paralleltrajectory != null ? row.paralleltrajectory : null}}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="pinned">
+              <th mat-header-cell *matHeaderCellDef  >Mark Favourites</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-stroked-button type="button" (click)="onPinnedDoc(row)">Add to Favourites</button>
+              </td>
+            </ng-container>
+        
+            <ng-container matColumnDef="delete">
+              <th mat-header-cell *matHeaderCellDef  >Delete</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-icon-button type="button" (click)="onDelete(row)"><mat-icon>delete</mat-icon></button>
+              </td>
+            </ng-container>
+            <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+            <ng-container matColumnDef="expandedDetail">
+              <td mat-cell *matCellDef="let row" [attr.colspan]="pinnedAchievementDisplayedColumns.length">
+                <section class="d-flex flex-row" style="overflow:auto;">
+                  <div *ngFor="let list of row.postimagelist;let i = index" class="d-flex flex-column m-2">
+                    <div class="d-flex flex-row">
+                      <img *ngIf="list != null || list != undefined" width="170" height="300" [src]="list">
+                    </div>
+                  </div>
+                </section>
+              </td>
+            </ng-container>  
+            <tr mat-header-row *matHeaderRowDef="unPinnedAchievementDisplayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: unPinnedAchievementDisplayedColumns;"></tr>
+            <!-- <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr> -->
+          </table>
+        </div>
+        <!-- pinned community post -->
+        <div class="d-flex flex-row justify-content-center m-2"><h6>Arena Highlights</h6></div>
+        <div class="d-flex flex-row justify-content-center m-2"><h6>Favourites Community Post</h6></div>
+        <div class="example-container2 mat-elevation-z8">
+          <table mat-table [dataSource]="pinnedCommunityDataSource" multiTemplateDataRows>
+            <!-- eventref -->
+            <ng-container matColumnDef="eventref">
+              <th mat-header-cell *matHeaderCellDef  > Event </th>
+              <td mat-cell *matCellDef="let row"> {{mapEvent[row.eventref.id]}}</td>
+            </ng-container>
+            <!-- categoryname -->
+            <ng-container matColumnDef="categoryname">
+              <th mat-header-cell *matHeaderCellDef  >Category</th>
+              <td mat-cell *matCellDef="let row"> {{row.categoryname}} </td>
+            </ng-container>
+            <!-- type -->
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef  >Type</th>
+              <td mat-cell *matCellDef="let row"> {{row.type}} </td>
+            </ng-container>
+            <!-- created -->
+            <ng-container matColumnDef="created">
+              <th mat-header-cell *matHeaderCellDef  > Date </th>
+              <td mat-cell *matCellDef="let row"> {{row.created.toDate() | date : 'short'}} </td>
+            </ng-container>
+            <ng-container matColumnDef="pinned">
+              <th mat-header-cell *matHeaderCellDef  >Mark Favourites</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-stroked-button type="button" (click)="unPinnedDoc(row)">Remove Favourites</button>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="delete">
+              <th mat-header-cell *matHeaderCellDef  >Delete</th>
+              <td mat-cell *matCellDef="let row">
+                <button mat-icon-button type="button" (click)="onDelete(row)"><mat-icon>delete</mat-icon></button>
+              </td>
+            </ng-container>
+            <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+            <ng-container matColumnDef="expandedDetail">
+              <td mat-cell *matCellDef="let row" [attr.colspan]="pinnedCommunityDisplayedColumns.length">
+                <p class="m-1">{{row.description}}</p>
+                <section class="d-flex flex-row" style="overflow:auto;">
+                  <div *ngFor="let list of row.videos;let i = index" class="d-flex flex-column m-2">
+                    <div class="d-flex flex-row">
+                      <img *ngIf="list.thumbnail != null && list.thumbnail != undefined" width="170" height="300" [src]="list.thumbnail">
+                      <video *ngIf="list.video != null && list.video != undefined" class="ml-1" width="170" height="300" controls>
+                        <source [src]="list.video">
+                      </video>
+                    </div>
+                    <div class="d-flex justify-content-center">
+                      <p>
+                        <b>{{list.title}}</b> <span class="hlstest" (click)="testHLS(list['hls'])">(HLS: {{list["hls"] != null && list["hls"] != undefined}})</span>
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="pinnedCommunityDisplayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: pinnedCommunityDisplayedColumns;"></tr>
+            <!-- <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr> -->
+          </table>
+        </div>
+        <!-- unpinned community post -->
+        <div class="d-flex flex-row justify-content-center m-2"><h6>Community Post</h6></div>
+        <div class="example-container2 mat-elevation-z8">
+          <table mat-table [dataSource]="unPinnedCommunityDataSource" multiTemplateDataRows>
+              <!-- eventref -->
+              <ng-container matColumnDef="eventref">
+                <th mat-header-cell *matHeaderCellDef  > Event </th>
+                <td mat-cell *matCellDef="let row"> {{mapEvent[row.eventref.id]}}</td>
+              </ng-container>
+              <!-- categoryname -->
+              <ng-container matColumnDef="categoryname">
+                <th mat-header-cell *matHeaderCellDef  >Category</th>
+                <td mat-cell *matCellDef="let row"> {{row.categoryname}} </td>
+              </ng-container>
+              <!-- type -->
+              <ng-container matColumnDef="type">
+                <th mat-header-cell *matHeaderCellDef  >Type</th>
+                <td mat-cell *matCellDef="let row"> {{row.type}} </td>
+              </ng-container>
+              <!-- created -->
+              <ng-container matColumnDef="created">
+                <th mat-header-cell *matHeaderCellDef  > Date </th>
+                <td mat-cell *matCellDef="let row"> {{row.created.toDate() | date : 'short'}} </td>
+              </ng-container>
+
+              <ng-container matColumnDef="pinned">
+                <th mat-header-cell *matHeaderCellDef  >Mark Favourites</th>
+                <td mat-cell *matCellDef="let row">
+                  <button mat-stroked-button type="button" (click)="onPinnedDoc(row)">Add to Favourites</button>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="delete">
+                <th mat-header-cell *matHeaderCellDef  >Delete</th>
+                <td mat-cell *matCellDef="let row">
+                  <button mat-icon-button type="button" (click)="onDelete(row)"><mat-icon>delete</mat-icon></button>
+                </td>
+              </ng-container>
+              <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+              <ng-container matColumnDef="expandedDetail">
+                <td mat-cell *matCellDef="let row" [attr.colspan]="unPinnedCommunityDisplayedColumns.length">
+                  <p class="m-1">{{row.description}}</p>
+                  <section class="d-flex flex-row" style="overflow:auto;">
+                    <div *ngFor="let list of row.videos;let i = index" class="d-flex flex-column m-2">
+                      <div class="d-flex flex-row">
+                        <img *ngIf="list.thumbnail != null && list.thumbnail != undefined" width="170" height="300" [src]="list.thumbnail">
+                        <video *ngIf="list.video != null && list.video != undefined" class="ml-1" width="170" height="300" controls>
+                          <source [src]="list.video">
+                        </video>
+                      </div>
+                      <div class="d-flex justify-content-center">
+                        <p>
+                          <b>{{list.title}}</b> <span class="hlstest" (click)="testHLS(list['hls'])">(HLS: {{list["hls"] != null && list["hls"] != undefined}})</span>
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                </td>
+              </ng-container>
+            <tr mat-header-row *matHeaderRowDef="unPinnedCommunityDisplayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: unPinnedCommunityDisplayedColumns;"></tr>
+            <!-- <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr> -->
+          </table>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</main>

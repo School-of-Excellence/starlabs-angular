@@ -1,0 +1,16 @@
+<div *ngIf="type === 'reactive form'">
+    <mat-form-field appearance="outline" class="w-100">
+      <mat-label>{{label}}</mat-label>
+      <input type="text" matInput (mwlKeydownEnter)="onAddText($event)">
+      <mat-error *ngIf="form.get(controlName).hasError('required')">
+        {{label}} is required
+      </mat-error>
+    </mat-form-field>
+    <div cdkDropList class="example-list" (cdkDropListDropped)="drop($event)">
+      <div class="example-box" *ngFor="let option of form.get(controlName).value;let i = index" cdkDrag>
+        <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+        {{option}}&nbsp;&nbsp;&nbsp;&nbsp;
+        <button mat-icon-button (click)="onRemoveText(i)"><mat-icon>cancel</mat-icon></button>
+      </div>
+    </div>
+</div>

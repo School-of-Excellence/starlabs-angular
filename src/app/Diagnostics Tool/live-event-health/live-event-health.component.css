@@ -1,0 +1,202 @@
+/* ================= PAGE ================= */
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* ================= EVENT SELECT ================= */
+
+.event-select {
+  width: 280px;
+  margin-bottom: 16px;
+}
+
+.event-dropdown {
+  margin-left: 40px;
+}
+
+/* ================= KPI SECTION ================= */
+
+.kpi-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #ffffff; /* light yellow like screenshot */
+  border-radius: 8px;
+  border: 1px solid #ffffff;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
+}
+
+.kpi-list {
+  font-size: 12px;
+  color: #444;
+}
+
+.kpi-list div {
+  line-height: 1.5;
+}
+
+/* ================= TABLE ================= */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.mat-mdc-header-row {
+  background: #f5f5f5;
+}
+
+.mat-mdc-header-cell {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  vertical-align: middle;
+}
+
+.mat-mdc-cell {
+  font-size: 12px;
+  color: #222;
+  padding: 8px;
+}
+
+/* ================= HEADER FILTER ================= */
+
+.header-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-filter span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+}
+
+/* Make dropdown compact inside header */
+.header-filter mat-select {
+  font-size: 11px;
+  min-height: 28px;
+}
+
+/* Remove header gap issue */
+.mat-mdc-header-cell {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+.kpi-bar {
+  display: flex;
+  gap: 12px;
+  margin: 16px 25px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.kpi-card {
+  min-width: 140px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: #666;
+  text-transform: capitalize;
+}
+
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* ================= ROW STATES ================= */
+
+.invalid-row {
+  background-color: #fdecea;
+}
+
+.invalid-row td {
+  color: #b71c1c;
+}
+
+/* ================= VALID / INVALID TEXT ================= */
+
+.valid-text {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.invalid-text {
+  color: #c62828;
+  font-weight: 600;
+}
+
+/* ================= PAGINATOR ================= */
+
+mat-paginator {
+  margin-top: 12px;
+  border-top: 1px solid #ddd;
+  padding-top: 8px;
+}
+
+/* ================= EMPTY STATE ================= */
+
+.empty-state {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #777;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 768px) {
+  .kpi-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-container {
+    grid-template-columns: 1fr;
+  }
+}

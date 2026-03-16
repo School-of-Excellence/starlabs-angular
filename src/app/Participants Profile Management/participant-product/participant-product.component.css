@@ -1,0 +1,164 @@
+table {
+  width: 100%;
+
+}
+
+._container {
+  height: 700px;
+  overflow: scroll;
+}
+
+.name:hover {
+  cursor: pointer;
+  color: rgb(255, 60, 93);
+  text-decoration: underline;
+}
+
+th,
+td {
+  width: 15%;
+}
+
+.card-title {
+  font-size: medium;
+}
+
+.card {
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card.border-primary {
+  border-width: 2px !important;
+  box-shadow: 0 0 10px rgba(13, 110, 253, 0.3);
+}
+
+.gap-3 {
+  gap: 1rem;
+}
+
+.badge {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.8rem;
+}
+/* Date Cell Editing Styles */
+.date-cell {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 48px;
+  padding: 8px 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.date-cell:hover {
+  background-color: #f5f5f5;
+}
+
+.edit-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.edit-icon:hover {
+  opacity: 1;
+  color: #1976d2 !important;
+  transform: scale(1.1);
+}
+
+.date-picker-container {
+  padding: 8px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.date-picker-container mat-form-field {
+  font-size: 0.875rem;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.date-picker-container .mat-mdc-form-field-wrapper {
+  padding-bottom: 8px;
+}
+
+.date-picker-container .mat-mdc-form-field-infix {
+  min-height: 36px;
+}
+
+.date-picker-container button {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  line-height: 32px;
+}
+
+.date-picker-container button:hover {
+  background-color: rgba(0,0,0,0.04);
+}
+
+/* Ensure table cells have enough space */
+.mat-mdc-cell {
+  padding: 12px 8px !important;
+  vertical-align: middle;
+}
+
+/* Fix datepicker positioning */
+.date-picker-container .mat-datepicker-toggle {
+  padding: 0 4px;
+}
+
+.date-picker-container .mat-datepicker-toggle-default-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .date-cell {
+    min-height: 40px;
+    padding: 6px 4px;
+  }
+  
+  .date-picker-container {
+    padding: 6px;
+  }
+  
+  .date-picker-container mat-form-field {
+    font-size: 0.8rem;
+  }
+}
+
+/* Smooth transitions for editing state */
+.date-cell,
+.date-picker-container {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Prevent text overflow */
+.date-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fix for Material table row hover conflict */
+tr.mat-mdc-row:hover .date-cell {
+  background-color: transparent;
+}
+
+tr.mat-mdc-row:hover .date-cell:hover {
+  background-color: #f5f5f5;
+}

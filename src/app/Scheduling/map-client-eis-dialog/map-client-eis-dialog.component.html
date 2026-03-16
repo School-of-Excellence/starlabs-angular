@@ -1,0 +1,56 @@
+<div class="mainscreen">
+  <div class="heading" mat-dialog-title>Map Client - EIS</div>
+  <form [formGroup]="assignEISForm" (ngSubmit)="onformsubmit(assignEISForm.value)">
+    <mat-form-field class="inputfield" appearance="outline">
+      <mat-label>Client Names</mat-label>
+      <mat-select formControlName="profile" required>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filteredProfile" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option class="matOption" *ngFor="let profile of returnProfile()" [value]="profile.id">{{profile["name"]}}</mat-option>
+      </mat-select>
+      <mat-error *ngIf="this.assignEISForm.get('profile').hasError('required')">
+        Profile Name <strong>Required</strong>
+      </mat-error>
+    </mat-form-field>
+    <br><br>
+    <div formArrayName="eisWithRoles">
+      <ul>
+        <li *ngFor="let quantity of eisWithRolesfunction().controls; let i=index" [formGroupName]="i">
+          <mat-form-field class="inputfield" appearance="outline">
+            <mat-label>Delivery Role</mat-label>
+            <mat-select formControlName="role"> <!-- (selectionChange)="onRoleSelect(i)" -->
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredAppointmentRole" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option class="matOption" *ngFor="let role of returnAppointmentRole()" [value]="role.id">{{role.role}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="this.assignEISForm.get('eisWithRoles')['controls'][i].get('role').hasError('required')">
+              Role <strong>Required</strong>
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field class="inputfield" appearance="outline">
+            <mat-label>EIS Name</mat-label>
+            <mat-select formControlName="eis" multiple required>
+              <mat-option class="matOption" *ngFor="let profile of mapRoleEIS[assignEISForm.get('eisWithRoles')['controls'][i].get('role').value]" [value]="profile">{{mapProfiles[profile]}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="this.assignEISForm.get('eisWithRoles')['controls'][i].get('eis').hasError('required')">
+              EIS Name <strong>Required</strong>
+            </mat-error>
+          </mat-form-field>
+          <button class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeEisRole(i)">
+            <mat-icon class="icon">remove</mat-icon>
+          </button>
+          <button class="addremovebtn" *ngIf="i+1 == eisWithRolesfunction().controls.length" mat-icon-button type="button" (click)="addEisRole()">
+            <mat-icon class="icon">add</mat-icon>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <button mat-stroked-button class="cancelbtn" type="button" (click)="onCancel()"> Cancel </button>
+      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="assignEISForm.invalid" mat-raised-button >Submit</button>
+    </div>
+  </form>
+</div>
+

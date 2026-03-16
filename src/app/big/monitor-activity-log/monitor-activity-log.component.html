@@ -1,0 +1,191 @@
+<main class="d-flex flex-column">
+  <div class="d-flex flex-row justify-content-center mt-4">
+    <h4>Big Activity Monitor Dashboard&nbsp;&nbsp; - &nbsp;&nbsp; 
+      <span>{{this.filteredTokenData.length}}</span>&nbsp;&nbsp;Participants
+    </h4>
+  </div>
+  <div class="d-flex flex-row justify-content-center w-100 flex-wrap">
+    <mat-form-field appearance="outline" style="width:40%">
+      <mat-label>Select Queue</mat-label>
+      <mat-select [(ngModel)]="selectedQueueDoc" (selectionChange)="onSelectQueue($event.value)">
+        <mat-option *ngFor="let queue of queueGenerationList" [value]="queue">{{queue.queuename}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+    <mat-form-field appearance="outline" class="w-25">
+      <mat-label>Filter by completed or incompleted activity</mat-label>
+      <mat-select multiple [(ngModel)]="bigActivityLogged" (selectionChange)="onFilterTokenData()">
+        <!-- <mat-option *ngFor="let bigactivitylogged of ['none',true,false]" [value]="bigactivitylogged">
+          {{!["none",null,undefined].includes(bigactivitylogged) ?  bigactivitylogged === true  ? 'Show Completed Activity' : "Show UnCompleted Activity" : "Others"}}
+        </mat-option> -->
+        <mat-option [value]="true">Show Completed Activity</mat-option>
+        <mat-option [value]="false">Show UnCompleted Activity</mat-option>
+        <mat-option [value]="'none'">Others</mat-option>
+      </mat-select>
+    </mat-form-field>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <mat-form-field appearance="outline" class="w-25">
+      <mat-label>Filter by Big Activity Review</mat-label>
+      <mat-select multiple [(ngModel)]="bigActivityReview" (selectionChange)="onFilterTokenData()">
+        <!-- <mat-option *ngFor="let bigactivityreview of ['none',true,false]" [value]="bigactivityreview">
+          {{ !["none",null,undefined].includes(bigactivityreview) ?  bigactivityreview === true  ? 'Review Done' : "Review Not Done" : "Others"}}
+        </mat-option> -->
+        <mat-option [value]="true">Review Done</mat-option>
+        <mat-option [value]="false">Review Not Done</mat-option>
+        <mat-option [value]="'none'">Others</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <!-- [ngModelOptions]="{standalone: true}" 
+    ngDefaultControl -->
+    <mat-form-field appearance="outline" class="w-25">
+      <mat-label>Search Participants</mat-label>
+      <mat-select [(ngModel)]="filterText" (selectionChange)="onFilterTokenData()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="participantSearchText" (keyup)="onSearchTokenData()" 
+          [placeholderLabel]="'Search'" 
+          [noEntriesFoundLabel]="'No matching records found'" 
+        >
+        </ngx-mat-select-search>
+        </mat-option>
+        <mat-option [value]="null">None</mat-option>
+        <mat-option *ngFor="let doc of filteredProfiles" [value]="doc['profile_id']">{{doc['profile_name']}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button class="ms-2" mat-stroked-button (click)="exportLog()">Export</button>
+  </div>
+</main>
+<!-- monitor-activity-log.component.html -->
+<div class="ml-4 mr-4 mb-4">
+  <!-- Pagination controls: top -->
+  <div class="pagination-controls" *ngIf="filteredTokenData.length">
+    <div class="page-size-selector">
+      <label>Items per page:</label>
+      <select (change)="onPageSizeChange(+$event)">
+        <option *ngFor="let size of pageSizeOptions" [value]="size" [selected]="size === pageSize">
+          {{ size }}
+        </option>
+      </select>
+    </div>
+    
+    <div class="page-navigation">
+      <button [disabled]="currentPage === 1" (click)="goToPage(1)">First</button>
+      <button [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+      <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+      <button [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">Last</button>
+    </div>
+  </div>
+
+  <!-- Timeline container -->
+  <div class="timeline-container">
+    <div class="timeline-wrapper">
+      <!-- Loop through each paginated participant -->
+      <div class="participant-container" *ngFor="let token of paginatedTokenData">
+        <!-- Main participant row -->
+        <div class="participant-row" [class.expanded]="isRowExpanded(token.profile_id)">
+          <!-- Sticky participant name column -->
+          <div class="participant-name flex-column">
+            <span>{{mapProfile[token.profile_id]}}</span>
+            <span>{{token['tokennumber']}}</span>
+            <span>Current Stage: &nbsp;&nbsp;{{token['currentstage']}}</span>
+            <span>Status : &nbsp;&nbsp;{{ [null,'queued','invited'].includes(token['status']) ? "Queued" : (token['status'] === 'ready' ? "Waiting" : "Live") }}</span>
+            <button class="expand-button" (click)="toggleRow(token.profile_id)">
+              {{ isRowExpanded(token.profile_id) ? 'Collapse' : 'Expand' }}
+            </button>
+            <mat-checkbox 
+              [checked]="token['bigactivityreview'] != undefined ? token['bigactivityreview'] : false" 
+              (change)="onValidateBigActivityByParticipant($event,token)"
+            >
+              Big Activity Review
+            </mat-checkbox>
+          </div>
+          
+          <!-- Scrollable timeline section -->
+          <div class="timeline-scroll">
+            <div class="timeline-stages">
+              <!-- Loop through each stage for this participant -->
+              <!-- 'active': isProfileInAssignment(token.profile_id, stage.liveassignmentid), -->
+
+              <div 
+                class="stage-item" 
+                *ngFor="let stage of mapParticipantStageLog[token.profile_id]" 
+                [ngClass]="{
+                  'has-activity': hasActivityLogs(stage.liveassignmentid)
+                }"
+              >
+                <div class="stage-content">
+                  <div class="d-flex flex-column">
+                    <div class="stage-name">{{ stage.previousstage }} → {{ stage.currentstage }}</div>
+                    <!-- Show participants involved in this assignment -->
+                    <div class="stage-participants" *ngIf="mapLiveAssignment[stage.liveassignmentid] && mapLiveAssignment[stage.liveassignmentid]['participantsactivity']">
+                      <div class="participants-list">
+                        <span *ngFor="let activity of mapLiveAssignment[stage.liveassignmentid].participantsactivity | keyvalue;">
+                          {{mapProfile[$any(activity.key)]}}&nbsp;--&nbsp;{{mapBigActivity[$any(activity.value)]}}
+                        </span>
+                        <span *ngFor="let activity of mapLiveAssignment[stage.liveassignmentid].bonusactivity | keyvalue;">
+                          <strong>Bonus : </strong> {{mapProfile[$any(activity.key)]}}&nbsp;--&nbsp;{{mapBigActivity[$any(activity.value)]}}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- button to add & remove queueActivityLog -->
+                  <div *ngIf="editrole">
+                    <button mat-stroked-button type="button" (click)="onManageQueueActivityLog( hasActivityLogs(stage.liveassignmentid) ? 'remove' : 'add',stage)">
+                      {{ hasActivityLogs(stage.liveassignmentid) ? 'Remove' : 'Add'}}
+                    </button>
+                  </div>
+                  <!-- <div *ngIf="!hasActivityLogs(stage.liveassignmentid)">
+                    <button mat-stroked-button type="button" 
+                    (click)="onManageQueueActivityLog('add',stage)"
+                    >
+                      {{'Add'}}
+                    </button>
+                  </div> -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Expandable detail section -->
+        <div class="expanded-content" *ngIf="isRowExpanded(token.profile_id)">
+          <div class="expanded-container single-list">
+            <!-- Stage logs as list view -->
+            <div class="detailed-logs stage-logs">
+              <h4>Stage Logs</h4>
+              <div class="logs-list-container">
+                <ul class="logs-list">
+                  <li *ngFor="let log of allParticipantStageLog[token.profile_id]" class="log-item">
+                    {{ log['logdate'] ? (log['logdate'].toDate() | date:'MMM d, h:mm a') : ""}} - 
+                    {{ log.currentstage }} --
+                    <span *ngFor="let name of log['people_involved'] || []">({{ mapProfile[name] }})</span>&nbsp;&nbsp;&nbsp;&nbsp;
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination controls: bottom -->
+  <div class="pagination-controls" *ngIf="filteredTokenData.length">
+    <div class="page-size-selector">
+      <label>Items per page:</label>
+      <select (change)="onPageSizeChange(+$event)">
+        <option *ngFor="let size of pageSizeOptions" [value]="size" [selected]="size === pageSize">
+          {{ size }}
+        </option>
+      </select>
+    </div>
+    
+    <div class="page-navigation">
+      <button [disabled]="currentPage === 1" (click)="goToPage(1)">First</button>
+      <button [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+      <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+      <button [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">Last</button>
+    </div>
+  </div>
+</div>

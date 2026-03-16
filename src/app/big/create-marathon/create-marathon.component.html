@@ -1,0 +1,39 @@
+<main class="m-4">
+  <h3 mat-dialog-title class="d-flex justify-content-center">Create/update Big Marathon</h3>
+  <div mat-dialog-content>
+    <form [formGroup]="bigMarathonForm">
+      <app-text [form]="bigMarathonForm" controlName="title" label="Title"></app-text>&nbsp;&nbsp;
+      <app-mat-datepicker [form]="bigMarathonForm" controlName="startdate" label="Start Date"></app-mat-datepicker>&nbsp;&nbsp;
+      <app-mat-datepicker [form]="bigMarathonForm" controlName="tentativeenddate" label="Tentative End Date"></app-mat-datepicker>&nbsp;&nbsp;
+      <app-mat-datepicker [form]="bigMarathonForm" controlName="enddate" label="End Date"></app-mat-datepicker>&nbsp;&nbsp;
+      <!-- <app-auto-complete-with-chip 
+        label="Select Event"
+        [form]="bigMarathonForm"
+        controlName="eventcollectionref"
+        [data]="eventCollectionList"
+        datatype="arrayofmap"
+        displayname="name"
+        valuetype="ref"
+        valuelabel="ref"  
+        [multiple]="false"
+      >
+      </app-auto-complete-with-chip> -->
+      <app-auto-complete-with-chip 
+      label="Status"
+      [form]="bigMarathonForm"
+      controlName="status"
+      [data]="['live','completed']"
+      datatype="arrayofstring"
+      displayname=""
+      valuetype=""
+      valuelabel=""
+      [multiple]="false"
+    >
+    </app-auto-complete-with-chip>
+    </form>
+  </div>
+  <div mat-dialog-actions class="d-flex justify-content-center">
+    <button mat-stroked-button (click)="onCancel()" >cancel</button>&nbsp;&nbsp;&nbsp;&nbsp;
+    <button mat-stroked-button (click)="onSubmit()" [disabled]="bigMarathonForm.invalid">Submit</button>
+  </div>
+</main>

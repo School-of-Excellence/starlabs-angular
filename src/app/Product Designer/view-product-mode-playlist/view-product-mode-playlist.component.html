@@ -1,0 +1,60 @@
+<div class="d-flex flex-row justify-content-center mt-2">
+  <h3>View Product Mode mapped Playlist</h3>
+</div>
+<main>
+  <mat-form-field appearance="outline">
+    <mat-label>Filter</mat-label>
+    <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Mia" #input>
+  </mat-form-field>
+  <span style="float: right;">
+    <button mat-stroked-button type="button" (click)="onEdit(null)">Create new playlist</button>
+  </span>
+  <div class="mat-elevation-z8">
+    <table mat-table [dataSource]="dataSource" matSort>
+      <ng-container matColumnDef="productref">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Product</th>
+        <td mat-cell *matCellDef="let row"> {{mapProduct[row.productref?.id]}} </td>
+      </ng-container>
+      <ng-container matColumnDef="mode">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Mode</th>
+        <td mat-cell *matCellDef="let row"> {{row.mode}} </td>
+      </ng-container>
+      <ng-container matColumnDef="eiflix">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Eiflix Series</th>
+        <td mat-cell *matCellDef="let row">
+          <li *ngFor="let list of row.eiflix">{{mapEiflix[list?.id]}}</li>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="solarvoice">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Solar Voice Playlist</th>
+        <td mat-cell *matCellDef="let row"> 
+          <li *ngFor="let list of row.solarvoice">{{mapSolarVoice[list?.id]}}</li>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="generalcontent">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>General Content</th>
+        <td mat-cell *matCellDef="let row"> 
+          <li *ngFor="let list of row.generalcontent">{{mapGeneralContent[list?.id]}}</li>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="messages">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Messages</th>
+        <td mat-cell *matCellDef="let row"> 
+          <li *ngFor="let text of row.messages">{{text}}</li>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="edit">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Edit</th>
+        <td mat-cell *matCellDef="let row"> 
+            <button mat-mini-fab type="button" (click)="onEdit(row)"><mat-icon>edit</mat-icon></button>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+      </tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" aria-label="Select page of users"></mat-paginator>
+  </div>
+</main>

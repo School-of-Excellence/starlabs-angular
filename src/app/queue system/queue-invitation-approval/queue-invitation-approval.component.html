@@ -1,0 +1,107 @@
+<div class="dialog-container">
+  <div class="container">
+
+    <!-- LEFT PANEL -->
+    <div class="left">
+      <div class="icon-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      </div>
+
+      <h2>Queue Invitation</h2>
+
+      <p class="message">
+        You have invited participant <span class="participant-name">{{ data.participantname }}</span> for a <span class="stage-info">
+       <strong>{{ data.stage }}</strong> session
+      </span>
+
+      <div class="timer-container">
+        <svg class="timer-circle" viewBox="0 0 200 200">
+          <circle class="timer-circle-bg" cx="100" cy="100" r="90"></circle>
+          <circle 
+            class="timer-circle-progress" 
+            cx="100" cy="100" r="90"
+            [class.warning]="expiryInSeconds <= 30"
+            [style.stroke-dashoffset]="565.48 * (1 - expiryInSeconds / 120)">
+          </circle>
+        </svg>
+        <div class="timer-text">
+          <span class="time" [class.warning]="expiryInSeconds <= 30">{{ expiryInSeconds }}</span>
+          <span class="label">SECONDS</span>
+        </div>
+      </div>
+
+      <div class="status-box">
+        <p *ngIf="expiryInSeconds > 0">⏳ Waiting for <b>{{ data.participantname }}</b> to respond...</p>
+        <p *ngIf="expiryInSeconds <= 0">⏱️ Time expired</p>
+      </div>
+
+      <button mat-stroked-button color="warn" class="cancel-btn" (click)="cancel()">
+        Cancel Invitation
+      </button>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right">
+
+      <div class="top">
+        <h3>🎮 Play While You Wait</h3>
+        <div class="score">{{ score }}</div>
+      </div>
+
+      <div class="tabs">
+        <button
+          mat-button
+          [class.active]="activeGame === 'target'"
+          (click)="switchGame('target')">
+          🎯 Quick Tap
+        </button>
+
+        <button
+          mat-button
+          [class.active]="activeGame === 'memory'"
+          (click)="switchGame('memory')">
+          🧠 Memory
+        </button>
+      </div>
+
+      <!-- GAME AREA -->
+      <div class="game" [class.target-cursor]="activeGame === 'target'">
+
+        <!-- TARGET GAME -->
+        <div
+          *ngIf="activeGame === 'target'"
+          class="target"
+          [style.left.%]="target.x"
+          [style.top.%]="target.y"
+          (click)="hitTarget()">
+          🎯
+        </div>
+
+        <div
+          *ngFor="let effect of effects"
+          class="click-effect"
+          [style.left.%]="effect.x"
+          [style.top.%]="effect.y">
+          {{ effect.text }}
+        </div>
+
+
+        <!-- MEMORY GAME -->
+        <div *ngIf="activeGame === 'memory'" class="memory">
+          <div
+            class="card"
+            *ngFor="let card of cards"
+            [class.flipped]="card.flipped || card.matched"
+            [class.matched]="card.matched"
+            (click)="flipCard(card)">
+            <span class="card-content">{{ card.flipped || card.matched ? card.emoji : '?' }}</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>

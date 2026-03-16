@@ -1,0 +1,64 @@
+
+.heading{
+  background-color: #126e82;
+  color: white;
+  text-align: center;
+  padding: 15px;
+}
+
+.adjustmentbox{
+  width: 50%;
+  padding: 15px;
+  box-sizing: content-box;
+}
+
+.procedurebox{
+  padding: 15px;
+  width: 50%;
+}
+
+.strikeDelete{
+  text-decoration: line-through;
+}
+
+.title{
+  color: rgb(3, 48, 63);
+  font-weight: bold;
+}
+
+.atcdetail{
+  margin-top: 20px;
+  padding-top: 20px;
+  padding-bottom: 15px;
+  padding-left: 30px;
+  padding-right: 30px;
+  border-top-right-radius: 10px;
+  border-top-left-radius: 10px;
+  background-color: #99bbad;
+  color: white;
+}
+
+.highlight{
+  font-weight: bold;
+  display: inline-block;
+  margin-right: 5px;
+  color: white;
+}
+
+.yellow{
+  color:#bd8d06;
+  font-size: 1.25rem;
+  margin: 0px;
+  margin-left:10px;
+}
+
+.green{
+  color:#228B22;
+  font-size: 1.25rem;
+  margin: 0px;
+  margin-left:10px;
+}
+
+tr:nth-child(even){
+  background-color: #f6fcff; 
+}

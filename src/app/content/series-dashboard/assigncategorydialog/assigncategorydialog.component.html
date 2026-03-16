@@ -1,0 +1,79 @@
+<div class="dialog-wrap" style="display: flex; flex-direction: column; max-height: 90vh;">  
+     <div class="dialog-header">
+    <h2 class="dialog-title">
+      <mat-icon class="dialog-title-icon">category</mat-icon>
+      {{ categoryName || 'Assign Category' }}
+    </h2>
+    <button class="a-btn" mat-dialog-close>
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-body"style="flex: 1 1 auto; overflow-y: auto;">    
+     <div class="field-group">
+      <label class="label">Category <span class="required">*</span></label>
+      <div class="input-box" *ngIf="isCategoryLocked">
+        <mat-icon class="ib-icon">category</mat-icon>
+        <input type="text" class="ib-input" [value]="categoryName" disabled />
+      </div>
+      <div class="input-box" *ngIf="!isCategoryLocked" [class.error]="duplicateError">
+        <mat-icon class="ib-icon">category</mat-icon>
+        <input type="text" class="ib-input" placeholder="Type a new category name..."
+          [(ngModel)]="newCategoryName" (keyup)="onCategoryNameType()" />
+      </div>
+      <span class="field-error" *ngIf="duplicateError">This category already exists</span>
+    </div>
+    <br>
+    <div class="field-group" *ngIf="isCategoryLocked || newCategoryName.trim()">
+      <label class="label">Assign Series</label>
+      <mat-select
+        [(ngModel)]="selectedSeriesIds"
+        multiple
+        class="cat-select"
+        panelClass="cat-select-panel"
+        (selectionChange)="onSelectionChange()">
+        <div class="cat-search-box">
+          <mat-icon class="ib-icon">search</mat-icon>
+          <input type="text" class="ib-input" placeholder="Search series..."
+            (keyup)="onSeriesSearch($event)" (keydown)="$event.stopPropagation()" />
+        </div>
+        <mat-option *ngFor="let s of filteredSeriesList" [value]="s.id">
+          {{ s.seriesName }}
+        </mat-option>
+        <div class="cat-no-result" *ngIf="filteredSeriesList.length === 0">
+          No series found
+        </div>
+      </mat-select>
+    </div>
+    <br>
+    <div class="field-group" *ngIf="selectedSeriesIds.length > 0">
+      <label class="label">Selected Series ({{ selectedSeriesIds.length }}) — Drag to reorder</label>
+      <div class="drag-list" cdkDropList (cdkDropListDropped)="drop($event)">
+        <div class="drag-item" *ngFor="let id of selectedSeriesIds; let i = index" cdkDrag>
+          <div class="drag-handle" cdkDragHandle>
+            <mat-icon>drag_indicator</mat-icon>
+          </div>
+          <span class="drag-index">{{ i + 1 }}</span>
+          <span class="c-name">{{ seriesMap[id]?.seriesName }}</span>
+          <button class="a-btn a-del" (click)="removeSeries(id)" style="margin-left: auto;">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="cat-empty-hint" *ngIf="(isCategoryLocked || newCategoryName.trim()) && selectedSeriesIds.length === 0">
+      <mat-icon>playlist_add</mat-icon>
+      <span>No series assigned to this category yet</span>
+    </div>
+
+  </div>
+  <div class="dialog-footer">
+    <button class="btn-cancel" mat-dialog-close>Cancel</button>
+    <button class="btn-primary" (click)="onSave()"
+      [disabled]="saving || (!isCategoryLocked && !newCategoryName.trim()) || duplicateError">
+      <mat-icon *ngIf="!saving">save</mat-icon>
+      <mat-icon *ngIf="saving" class="spin-icon">sync</mat-icon>
+      {{ saving ? 'Saving...' : 'Save' }}
+    </button>
+  </div>
+</div>

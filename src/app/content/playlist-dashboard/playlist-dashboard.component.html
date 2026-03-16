@@ -1,0 +1,98 @@
+<div class="audio-dashboard" *ngIf="showParent">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Playlists</h1>
+      <p class="dash-sub">Manage solar voice playlists</p>
+    </div>
+    <button class="btn-primary" (click)="onClick()">
+      <mat-icon>add</mat-icon>
+      <span>New Playlist</span>
+    </button>
+  </div>
+
+  <div class="filters-row">
+    <div class="input-box search-box">
+      <mat-icon class="ib-icon">search</mat-icon>
+      <input type="text" class="ib-input" placeholder="Filter by name..."
+        #input (keyup)="ApplyFilter($event)" autocomplete="off" />
+    </div>
+  </div>
+
+  <div class="table-outer">
+    <div class="table-card">
+      <table mat-table [dataSource]="dataSource">
+        <ng-container matColumnDef="Name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="sno-cell-big">
+              <span class="c-name">{{ row.name }}</span>
+              <!-- <button class="a-btn" (click)="copyToClipboard(row)" title="Copy link">
+                <mat-icon>content_copy</mat-icon>
+              </button> -->
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="tags">
+          <th mat-header-cell *matHeaderCellDef class="col-tags">Taxonomy</th>
+          <td mat-cell *matCellDef="let row" class="col-tags">
+            <div class="tags-wrap">
+              <span class="chip chip-sm" *ngFor="let option of row.tags || []">{{ mapTaxonomy[option] }}</span>
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="Copy">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn" (click)="copyToClipboard(row)" title="Copy link">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="Edit">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-edit" (click)="onedit(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="Delete">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-del" (click)="ondelete(row.id)">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="empty">
+              <mat-icon>queue_music</mat-icon>
+              <p>No playlists found</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[15, 30, 60, 120]" showFirstLastButtons class="paginator"></mat-paginator>
+  </div>
+</div>
+<router-outlet></router-outlet>
+
+<!-- <router-outlet *ngIf="showchild"></router-outlet> -->
+<!-- <div *ngIf="showchild">
+  <div class="audio-dashboard">
+    <div *ngIf="mode === 'edit'"><app-edit></app-edit></div>
+    <div *ngIf="mode === 'add'"><app-solar-playlist></app-solar-playlist></div>
+    <div class="back-row">
+      <button class="btn-cancel" (click)="navigateToParentDiv()">
+        <mat-icon class="back-icon">arrow_back</mat-icon>
+        Back to Dashboard
+      </button>
+    </div>
+  </div>
+</div> -->

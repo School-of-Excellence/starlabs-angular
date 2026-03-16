@@ -1,0 +1,6 @@
+table {
+    width: 100%;
+  }
+  ::ng-deep .mat-menu-panel{
+    max-width: max-content!important;
+  }

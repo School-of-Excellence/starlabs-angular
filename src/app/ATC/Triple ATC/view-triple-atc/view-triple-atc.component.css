@@ -1,0 +1,246 @@
+label{
+  font-size: 16px;
+}
+
+.mainscreen{
+  padding: 20px;
+  padding-bottom: 0;
+  width: 100%;
+}
+
+.heading{
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  color: rgb(3, 48, 63);
+}
+
+.filterrow{
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  background-color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-top: 15px;
+}
+
+.filterrow .filterfield{
+  margin-right: 10px;
+  width: 400px;
+}
+
+.updatebtn{
+  color: green;
+  border: 1px solid green;
+  padding-left: 30px;
+  padding-right: 30px;
+  margin-right: 20px;
+}
+
+.clearbtn{
+  color: red;
+  border: 1px solid red;
+  padding-left: 30px;
+  padding-right: 30px;
+}
+
+.atcheading{
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.atccount{
+  margin: 0;
+  padding: 0;
+  color: rgb(3, 48, 63);
+  font-size: 17px;
+  font-weight: bold;
+}
+
+.editatc{
+  color: grey;
+  vertical-align: bottom;
+  margin-left: 20px;
+}
+
+.editatc:hover{
+  color: rgb(89, 89, 89);
+  cursor: pointer;
+}
+
+/* .atcbody{
+  margin-left: 20px;
+  margin-right: 50px;
+  padding-left: 30px;
+  padding-top: 20px;
+  padding-bottom: 30px;
+  border-left: 1px solid gray;
+  width: fit-content;
+} */
+
+.highlight{
+  font-weight: bold;
+  display: inline-block;
+  margin-right: 5px;
+  color: black;
+}
+
+.atcdetail{
+  margin-top: 15px;
+  /*
+  margin-bottom: 10px;
+  padding-top: 20px;
+  padding-bottom: 15px;
+  padding-left: 30px;
+  padding-right: 30px;
+  border-radius: 16px;
+  background-color: #99bbad;
+  color: white; */
+}
+
+.profilename{
+  background-color: yellow;
+}
+
+.profilename:hover{
+  color: red;
+  cursor: pointer;
+}
+
+.divider{
+  margin-bottom: 10px;
+  border-top-color: rgb(179, 179, 179);
+}
+
+/* .transcription{
+  margin-top: 30px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  padding-left: 30px;
+  padding-right: 30px;
+  border-radius: 16px;
+  background-color: #c6a9a3;
+} */
+
+.adjustment{
+  margin-bottom: 7px;
+}
+
+.procedurebox{
+  margin-left: 10px;
+  vertical-align: center;
+  margin-bottom: 15px;
+}
+
+.procedureedit{
+  color: gray;
+}
+
+.procedureedit:hover{
+  color: black;
+  background-color: rgba(128, 128, 128, 0.083);
+}
+
+.procedureinputbox{
+  display: inline;
+}
+
+/* .procedureitem{
+  margin-right: 20px;
+} */
+
+.mandatory{
+  color: red;
+  font-weight: bold;
+}
+
+.proceduredone{
+  color: green;
+  vertical-align: middle;
+  margin-left: 10px;
+  display: inline;
+}
+
+.changeagent{
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.addednew{
+  /* margin-left: 10px; */
+  color: rgb(255, 98, 98);
+}
+
+.validated{
+  color: white;
+  background: green;
+  margin-right: 15px;
+}
+
+.tovalidate{
+  color: green;
+  border: 1px solid green;
+  margin-right: 15px;
+}
+
+.notesbox{
+  padding-top: 10px;
+  padding-bottom: 15px;
+}
+
+.previousbtn, .nextbtn{
+  margin-bottom: 20px;
+  border: none;
+  border-radius: 5px;
+  /* padding-left: 20px;
+  padding-right: 20px;
+  padding-top: 15px;
+  padding-bottom: 15px; */
+  color: white;
+  background-color: rgb(0, 146, 194);
+}
+
+.previousbtn{
+  margin-right: 20px;
+}
+
+table{
+  width: 100%;
+  /* border-collapse: separate;
+  border-spacing: 0px 0.5em; */
+  margin-bottom: 15px;
+}
+
+.tableheading{
+  /* background-color: #126e82;
+  color: white; */
+  border: 1px solid black;
+}
+
+.tabledata{
+  /* background-color: #b4e6ff; */
+  border: 1px solid black;
+}
+
+th, td{
+  padding: 10px;
+  text-align: left;
+}
+
+.yellow{
+  color:#bd8d06;
+  font-size: large;
+  margin: 0px;
+  margin-left:10px;
+}
+
+.green{
+  color:#228B22;
+  font-size: large;
+  margin: 0px;
+  margin-left:10px;
+}

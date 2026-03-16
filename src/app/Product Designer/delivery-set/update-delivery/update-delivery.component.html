@@ -1,0 +1,345 @@
+<div class="m-4">
+  <span class="d-flex justify-content-center">
+    <h1>{{dialogdata == null ? 'Add' : 'Edit'}} Delivery Activities</h1>
+    <div *ngIf="data != null && selectedType == 'Form'">
+      <button type="button" mat-stroked-button style="left: 200px;" class="cancelbtn" (click)="deleteForm()">Delete</button>
+    </div>
+  </span>
+  <div class="d-flex flex-row justify-content-between">
+    <mat-form-field appearance="outline">
+      <mat-label>Type</mat-label>
+      <mat-select [(ngModel)]="selectedType" [disabled]="dialogdata != null">
+        <mat-option *ngFor="let type of typeList" [value]="type">{{type}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <button *ngIf="selectedType == null" mat-stroked-button class="cancelbtn" (click)="closeDialog()">Close</button>
+  </div>
+  <div [ngSwitch]="selectedType">
+    <!-- Appointment type -->
+    <div *ngSwitchCase="'Appointment'">
+      <form [formGroup]="appointmentform" mat-dialog-content>
+
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Appointment Type</mat-label>
+          <input type="text" matInput placeholder="Appointment Name" formControlName="appointmentname">
+          <mat-error *ngIf="appointmentform.get('appointmentname').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Duration(mins)</mat-label>
+          <input type="number" matInput placeholder="Minutes" formControlName="duration">
+          <mat-error *ngIf="appointmentform.get('duration').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <br>
+
+        <mat-checkbox formControlName="ischangeworkrequired">Is Changework Required</mat-checkbox>
+        <br>
+
+        <mat-checkbox formControlName="groupappointment">Mark as Group Appointment</mat-checkbox>
+        <div *ngIf="appointmentform.get('groupappointment').value">
+          <mat-form-field class="textField" appearance="outline">
+            <mat-label>Maximum Slots</mat-label>
+            <input type="number" matInput placeholder="Total Slots" formControlName="maxbooking">
+            <mat-error *ngIf="appointmentform.get('maxbooking').hasError('required')">
+              <strong>Required</strong>
+            </mat-error>
+          </mat-form-field>
+        </div>
+        <div class="btnRow">
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.value)" [disabled]="loading">Submit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Form type -->
+    <!-- *ngSwitchCase=" ['Form','Report'].includes(selectedType) ? selectedType : '' " -->
+    <div *ngSwitchCase="'Form'">
+      <form [formGroup]="formform">
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Form For</mat-label>
+          <mat-select formControlName="formfor">
+            <mat-option *ngFor="let option of ['workshop']" [value]="option">{{option}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Form Names</mat-label>
+          <input type="text" matInput formControlName="formname">
+          <mat-error *ngIf="formform.get('formname').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field><br>
+        <!--  (input)="autoGrowTextZone($event)" -->
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Form Description</mat-label>
+          <textarea id="fd" matInput formControlName="formdescription"></textarea>
+        </mat-form-field><br>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Form Type</mat-label>
+          <mat-select formControlName="formtype">
+            <mat-option *ngFor="let option of ['stepper','normal']" [value]="option">{{option}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="formform.get('formtype').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <div formArrayName="formarray">
+          <ul>
+            <li style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded" 
+              *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i" 
+            >
+              <mat-form-field class="formfield2" appearance="fill">
+                <mat-label>Field Name</mat-label>
+                <textarea #textarea0 (input)="adjustHeight0(i)" matInput formControlName="fieldname" required></textarea>
+              </mat-form-field><br>
+
+              <mat-form-field class="formfield2" appearance="fill">
+                <mat-label>Field Description</mat-label>
+                <textarea  #textarea1 (input)="adjustHeight1(i)" matInput formControlName="fielddescription"></textarea>
+              </mat-form-field><br>
+
+              <mat-form-field class="formfield2" appearance="fill">
+                <mat-label>Field Notes</mat-label>
+                <textarea #textarea2 (input)="adjustHeight2(i)" matInput formControlName="fieldnotes"></textarea>
+              </mat-form-field><br>
+
+              <mat-form-field class="formfield2" appearance="fill" >
+                <mat-label>Field Type</mat-label>
+                <mat-select formControlName="type" required (selectionChange)="onTypeSelect($event.value,i)">
+                  <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
+                </mat-select>
+              </mat-form-field><br>
+
+              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true && maxMinFor.includes(formarray.controls[i].get('type')?.value)" class="formfield2" appearance="fill">
+                <mat-label>Maximum Count (ex:maximum how many options user can select)</mat-label>
+                <input type="number" matInput formControlName="maxcount" >
+              </mat-form-field>
+
+              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true && maxMinFor.includes(formarray.controls[i].get('type')?.value)" class="formfield2" appearance="fill">
+                <mat-label>Minimum Count (ex:minimum how many options user can select)</mat-label>
+                <input type="number" matInput formControlName="mincount" >
+              </mat-form-field>
+
+              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true" class="formfield2" appearance="fill">
+                <mat-label>Options for {{formarray.controls[i].get('type')?.value}}</mat-label>
+                <mat-chip-grid #chipList formControlName="options">
+                  <mat-chip-row 
+                    *ngFor="let Options of formarray.controls[i].get('options').value;let j =index" 
+                    [value]="Options" 
+                    [editable]="editable" 
+                    (removed)="remove(i,j )"
+                  >
+                    {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
+                  </mat-chip-row>
+                  <input placeholder=" Type New Option...and Press Enter"
+                          [matChipInputFor]="chipList"
+                          (matChipInputTokenEnd)="add($event,i,formarray.controls[i].get('type')?.value)">
+                </mat-chip-grid>
+                <mat-hint *ngIf="formarray.controls[i].get('type')?.value == 'video'">If youtube url use syntax as shown here : "https://www.youtube.com/embed/placeholder_id"</mat-hint>
+              </mat-form-field><br>
+
+              <span *ngIf="!['array','video','audio'].includes(formarray.controls[i].get('type')?.value)">
+                <mat-slide-toggle  formControlName="required">Required</mat-slide-toggle>&nbsp;&nbsp;&nbsp;
+              </span><br>
+              <br>
+
+              <p class="ml-4" *ngIf="values[formarray.controls[i].get('type')?.value] == true && flippingFor.includes(formarray.controls[i].get('type')?.value)">
+                <mat-checkbox formControlName="flipping" (change)="onFlippingValueChange(i)">Enable Flipping (means:answer is flipped to questions)</mat-checkbox>
+              </p>
+
+              <div *ngIf="formarray.controls[i].get('flipping')?.value" class="ml-4" >
+                <span class="mt-2 mb-2"><mat-divider></mat-divider></span>
+                <span class="d-flex justify-content-center font-weight-bold mt-1">Flipping Question</span>
+                <div formGroupName="flippingquestion">
+                  <mat-form-field class="formfield2" appearance="fill">
+                    <mat-label>Field Name</mat-label>
+                    <textarea #textarea3 (input)="adjustHeight3(i)" matInput formControlName="fieldname" required></textarea>
+                  </mat-form-field><br>
+                  <mat-form-field class="formfield2" appearance="fill">
+                    <mat-label>Field Description</mat-label>
+                    <textarea  #textarea4 (input)="adjustHeight4(i)" matInput formControlName="fielddescription"></textarea>
+                  </mat-form-field><br>
+                  <mat-form-field class="formfield2" appearance="fill" >
+                    <mat-label>Field Type</mat-label>
+                    <mat-select formControlName="type" required >
+                      <mat-option *ngFor="let value of ['slider','Text']" [value]="value">{{value}}</mat-option>
+                    </mat-select>
+                  </mat-form-field><br>
+                  <mat-form-field class="formfield2" appearance="fill">
+                    <mat-label>Options </mat-label>
+                    <mat-chip-grid #chipList2 formControlName="options">
+                      <mat-chip-row
+                        *ngFor="let Options of formarray.controls[i].get('flippingquestion').get('options').value;let j =index" 
+                        [value]="Options" 
+                        [editable]="editable" 
+                        (removed)="removeFlippingQuestionOption(i,j )"
+                      >
+                        {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
+                      </mat-chip-row>
+                      <input placeholder=" Type New Option...and Press Enter"
+                            [matChipInputFor]="chipList2"
+                            (matChipInputTokenEnd)="addFlippingQuestionOption($event,i)">
+                    </mat-chip-grid>
+                  </mat-form-field><br>
+                  <mat-slide-toggle  formControlName="required">Required</mat-slide-toggle>
+                </div>
+              </div><br>
+              <div class="ml-6" *ngIf="formarray.controls[i].get('type')?.value === 'array'" >
+                <mat-divider class="mt-2 mb-2"></mat-divider>
+                <span class="d-flex justify-content-center font-weight-bold mt-1">Array</span>
+                <div formArrayName="array">
+                  <ul>
+                    <li *ngFor="let list of getSubFormArray(i).controls;let subindex = index" [formGroupName]="subindex">
+                      <mat-form-field class="formfield2" appearance="fill">
+                        <mat-label>Field Name</mat-label>
+                        <input type="text" formControlName="fieldname" matInput required>
+                      </mat-form-field><br>
+
+                      <mat-form-field class="formfield2" appearance="fill" >
+                        <mat-label>Field Type</mat-label>
+                        <mat-select  formControlName="type" required >
+                          <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
+                        </mat-select>
+                        <mat-hint style="color: crimson;" *ngIf="getSubFormArray(i).controls[subindex].get('type').value == 'array'">Type Array won't work here.</mat-hint>
+                      </mat-form-field><br>
+
+                      <mat-form-field *ngIf="values[getSubFormArray(i).controls[subindex].get('type')?.value] == true" class="formfield2" appearance="fill">
+                        <mat-label>Options for {{getSubFormArray(i).controls[subindex].get('type')?.value}}</mat-label>
+                        <mat-chip-grid #chipList3 formControlName="options">
+                          <mat-chip-row 
+                            *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k =index" 
+                            [value]="Options" 
+                            [editable]="editable" 
+                            (removed)="removeSubFormOption(i,subindex,k )"
+                          >
+                            {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
+                          </mat-chip-row>
+                          <input placeholder=" Type New Option...and Press Enter"
+                                  [matChipInputFor]="chipList3"
+                                  (matChipInputTokenEnd)="addSubFormOption($event,i,subindex)">
+                        </mat-chip-grid>
+                      </mat-form-field><br>
+
+                      <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
+
+                      &nbsp;&nbsp;&nbsp;<button *ngIf="subindex == (getSubFormArray(i).length -1)" mat-mini-fab color="primary" class="formfield ml10" (click)=" addSubFormControl(i)" type="button"> <mat-icon>add</mat-icon></button>
+                      &nbsp;&nbsp;&nbsp;<button *ngIf="subindex == (getSubFormArray(i).length -1)" mat-mini-fab class="formfield ml10" (click)="removeSubFormControl(i,subindex)" type="button"> <mat-icon>remove</mat-icon></button>
+                    </li>
+                  </ul>
+                </div>
+                <mat-divider class="mt-2 mb-2"></mat-divider>
+              </div>
+              <button  mat-mini-fab color="primary" (click)="addarray(i)" type="button"> <mat-icon>add</mat-icon></button>&nbsp;&nbsp;&nbsp;
+              <button  mat-mini-fab (click)="removearray(i)" type="button"> <mat-icon>remove</mat-icon></button>
+            </li>
+          </ul>
+        </div>
+        <div class="btnRow">
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button type="submit" mat-stroked-button class="successbtn" (click)="submitForm(formform.value)" [disabled]="loading">Submit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Report type -->
+    <div *ngSwitchCase="'Report'">
+      <form [formGroup]="reportform" mat-dialog-content>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Report Name</mat-label>
+          <input type="text" matInput formControlName="reportname">
+          <mat-error *ngIf="reportform.get('reportname').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <div class="btnRow">
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="submit" mat-stroked-button class="successbtn" (click)="submitReport(reportform.value)" [disabled]="loading">Submit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Event type -->
+    <div *ngSwitchCase="'Events'">
+      <form [formGroup]="eventform" mat-dialog-content>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Event Name</mat-label>
+          <input type="text" matInput formControlName="eventname">
+          <mat-error *ngIf="eventform.get('eventname').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <!-- <mat-form-field class="textField" appearance="outline">
+          <mat-label>Events</mat-label>
+          <mat-select formControlName="events" multiple>
+            <mat-option *ngFor="let event of eventlists" [value]="event.path">{{event.name}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="eventform.get('events').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field> -->
+        <div class="btnRow">
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="submit" mat-stroked-button class="successbtn" (click)="submitEvents(eventform.value)" [disabled]="loading">Submit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Queue type -->
+    <div *ngSwitchCase="'Queue'">
+      <form [formGroup]="queueform" mat-dialog-content>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Queue Name</mat-label>
+          <input type="text" matInput formControlName="queuename">
+          <mat-error *ngIf="queueform.get('queuename').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+
+        <!-- <mat-form-field class="textField" appearance="outline">
+          <mat-label>Queue</mat-label>
+          <mat-select formControlName="queue">
+            <mat-option *ngFor="let event of queueLists" [value]="event.path">{{event.name}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="queueform.get('queue').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Queue List</mat-label>
+          <mat-select formControlName="queuelist" multiple>
+            <mat-option *ngFor="let event of queueLists" [value]="event.path">{{event.name}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="queueform.get('queuelist').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field> -->
+
+        <div class="btnRow">
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="submit" mat-stroked-button class="successbtn" (click)="submitQueue(queueform.value)" [disabled]="loading">Submit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Fieldwork type -->
+    <div *ngSwitchCase="'Fieldwork'">
+      <form [formGroup]="fieldworkform" mat-dialog-content>
+        <mat-form-field class="textField" appearance="outline">
+          <mat-label>Fieldwork Type</mat-label>
+          <input type="text" matInput placeholder="Fieldwork Name" formControlName="fieldworkname">
+          <mat-error *ngIf="fieldworkform.get('fieldworkname').hasError('required')">
+            <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <div class="btnRow">
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="submit" mat-stroked-button class="successbtn" (click)="submitFieldwork(fieldworkform.value)" [disabled]="loading">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

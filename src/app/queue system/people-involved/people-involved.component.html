@@ -1,0 +1,31 @@
+<div class="mainscreen">
+    <h5 class="title">Update {{option.type == "eis" ? 'EIS' : option.type == "general" ? '' : 'Changeagent'}} Specialist</h5>
+    <div>
+      <form [formGroup]="specialist" (ngSubmit)="submit(specialist.value)">
+        <mat-form-field appearance="outline">
+          <mat-label>Specialist</mat-label>
+          <mat-select formControlName="person" [multiple]="option.multiperson">
+            <mat-option *ngFor="let specialist of option.personoption" [value]="specialist.value">{{specialist.name}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <br>
+        <!-- <mat-form-field appearance="outline">
+          <mat-label>{{option.type == "eis" ? 'EIS' : option.type == "general" ? '' : 'Changework'}} Mentor</mat-label>
+          <mat-select formControlName="mentor" multiple>
+            <mat-option *ngFor="let specialist of option.mentoroption" [value]="specialist.value">{{specialist.name}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <br>
+        <mat-form-field appearance="outline">
+          <mat-label>{{option.type == "eis" ? 'EIS' : option.type == "general" ? '' : 'Changework'}} Shadow</mat-label>
+          <mat-select formControlName="shadow" multiple>
+            <mat-option *ngFor="let specialist of option.shadowoption" [value]="specialist.value">{{specialist.name}}</mat-option>
+          </mat-select>
+        </mat-form-field> -->
+        <div class="actionbox">
+          <button type="button" class="btn btn-outline-primary me-3" (click)="submit(null)">Close</button>
+          <button type="submit" class="btn btn-outline-success">submit</button>
+        </div>
+      </form>
+    </div>
+</div>

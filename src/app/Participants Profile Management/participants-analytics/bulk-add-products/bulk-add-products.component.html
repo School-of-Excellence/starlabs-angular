@@ -1,0 +1,54 @@
+<div class="bulk-products-container">
+    <!-- Dialog Header -->
+    <div class="dialog-header">
+        <h2 class="dialog-title">Bulk Add Products</h2>
+        <button mat-icon-button class="close-button" (click)="dialogRef.close()">
+            <mat-icon>close</mat-icon>
+        </button>
+    </div>
+
+    <mat-form-field class="product-select-field" appearance="outline">
+        <mat-label>Select Product</mat-label>
+        <mat-select [(ngModel)]="selectedProduct" (selectionChange)="addProduct()">
+            <mat-option *ngFor="let product of productsList" [value]="product.id">
+                {{product.product}}
+            </mat-option>
+        </mat-select>
+    </mat-form-field>
+
+    <div *ngIf="selectedProduct != null" class="products-form-section">
+        <div [formGroup]="productForm" class="form-container">
+            <div formArrayName="products" class="products-array">
+                <div *ngFor="let productsGroup of productsArray.controls; let i = index" 
+                     [formGroupName]="i" 
+                     class="product-item">
+                    <div class="product-fields">
+                        <p>{{i+1}}. </p>
+                        <mat-form-field class="name-field" appearance="outline">
+                            <mat-label>Name</mat-label>
+                            <input matInput formControlName="name" readonly>
+                        </mat-form-field>
+                        <mat-form-field class="package-field" appearance="outline">
+                            <mat-label>Package</mat-label>
+                            <mat-select formControlName="packageref">
+                                <mat-option *ngFor="let option of allpackageList" [value]="option.docid">
+                                    {{option.package}}
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                        <mat-form-field class="payment-field" appearance="outline">
+                            <mat-label>Minimum Payment</mat-label>
+                            <input matInput type="number" formControlName="minimumpayment" autocomplete="off">
+                        </mat-form-field>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button mat-stroked-button color="primary" [disabled]="!productForm.valid"
+            (click)="updateProduct(productForm.value)">
+            SUBMIT
+        </button>
+    </div>
+</div>

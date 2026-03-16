@@ -1,0 +1,8 @@
+{
+    "/api": {
+      "target": "https://api.wati.io/v1",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    }
+}

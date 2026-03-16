@@ -1,0 +1,74 @@
+<div class="page-container">
+
+<button mat-raised-button color="primary" (click)="openQuizDialog()">
+  Create Quiz 
+</button>&nbsp;&nbsp;
+<button mat-raised-button color="primary" (click)="viewQuiz()">
+  View
+</button>
+
+
+<mat-form-field appearance="outline" class="full-width mt-16">
+  <mat-label>Search Quiz</mat-label>
+  <input
+    matInput
+    (keyup)="applyFilter($event)"
+    placeholder="Search by question or type">
+  <mat-icon matSuffix>search</mat-icon>
+</mat-form-field>
+
+<div class="table-container">
+  <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z2 full-width">
+    <ng-container matColumnDef="question">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Question</th>
+      <td mat-cell *matCellDef="let quiz">{{ quiz.question }}</td>
+    </ng-container>
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+      <td mat-cell *matCellDef="let quiz">
+        {{ quiz.type === 'withoutResponse' ? 'Response' : 'No Response' }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="active">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
+      <td mat-cell *matCellDef="let quiz">
+        <mat-icon color="primary" *ngIf="quiz.active">check_circle</mat-icon>
+        <mat-icon color="warn" *ngIf="!quiz.active">cancel</mat-icon>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="options">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Options</th>
+      <td mat-cell *matCellDef="let quiz">
+        {{ quiz.options?.length || 0 }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef>Actions</th>
+      <td mat-cell *matCellDef="let quiz">
+        <button
+        mat-icon-button
+        color="accent"
+        (click)="$event.stopPropagation(); openEditDialog(quiz)">
+        <mat-icon>edit</mat-icon>
+        </button>
+
+        <button mat-icon-button color="warn">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+  <mat-paginator
+    [pageSize]="5"
+    [pageSizeOptions]="[5, 10, 20]"
+    showFirstLastButtons>
+  </mat-paginator>
+</div>
+
+</div>

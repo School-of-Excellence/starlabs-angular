@@ -1,0 +1,181 @@
+<mat-card class="card">
+  <h2><i class="fa-solid fa-film"></i> EiFlix Banner</h2>
+
+<mat-tab-group #tabGroup>
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <i class="fa-solid fa-plus"></i>&nbsp; Add Banner
+      </ng-template>
+
+      <div class="tab-content">
+        <form [formGroup]="form">
+          <mat-form-field appearance="outline" class="full">
+            <mat-label>Title</mat-label>
+            <input matInput formControlName="title">
+            <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full">
+            <mat-label>Description</mat-label>
+            <textarea rows="3" matInput formControlName="description"></textarea>
+            <mat-error *ngIf="form.get('description')?.hasError('required')">Description is required</mat-error>
+          </mat-form-field>
+            <div style="display: flex;gap: 10px;">
+              <mat-form-field appearance="outline" class="full">
+              <mat-label>Select Mode</mat-label>
+              <mat-select formControlName="path" (selectionChange)="onPathChange()">
+                  <mat-option value="DeepLink">DeepLink</mat-option>
+                  <mat-option value="External Link">External Link</mat-option>
+              </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full" *ngIf="form.get('path')?.value === 'DeepLink'">
+              <mat-label>Select Series</mat-label>
+              <mat-select formControlName="seriesId">
+                  <mat-option *ngFor="let s of seriesList" [value]="s.id">
+                  {{ s.seriesName }}
+                  </mat-option>
+              </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full" *ngIf="form.get('path')?.value === 'External Link'">
+              <mat-label>External Link</mat-label>
+              <input matInput formControlName="externallink">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Button Name</mat-label>
+                <input matInput formControlName="buttonname">
+              </mat-form-field>
+              <mat-slide-toggle formControlName="enable">
+                  Enable Banner
+              </mat-slide-toggle>
+            </div>
+            <!-- <div style="margin: 15px 0;display: flex;gap:10px;">
+
+            </div> -->
+
+          <div class="upload-row">
+            <label class="upload-btn">
+              <i class="fa-solid fa-image"></i> Select Image
+              <input type="file" accept="image/*" hidden (change)="onImageSelected($event)">
+            </label>
+
+            <label class="upload-btn">
+              <i class="fa-solid fa-video"></i> Select Video
+              <input type="file" accept="video/*" hidden (change)="onVideoSelected($event)">
+            </label>
+          </div>
+
+          <div class="preview-container">
+            <img *ngIf="imagePreview" [src]="imagePreview" class="preview-img">
+            <video *ngIf="videoPreview" [src]="videoPreview" class="preview-video" controls></video>
+          </div>
+
+          <button mat-raised-button color="primary" 
+                  (click)="submit()" 
+                  class="submit"
+                  [disabled]="isUploading">
+            <ng-container *ngIf="!isUploading">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Submit
+            </ng-container>
+            <ng-container *ngIf="isUploading">
+              <i class="fa-solid fa-spinner fa-spin"></i> Uploading {{ uploadProgress }}%
+            </ng-container>
+          </button>
+        </form>
+      </div>
+    </mat-tab>
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <i class="fa-solid fa-list"></i>&nbsp; Banner List
+      </ng-template>
+      <div class="tab-content">
+        <div style="display: flex;gap: 10px;">
+          <mat-form-field appearance="outline" class="search-field">
+            <input matInput [(ngModel)]="searchText" (keyup)="applyFilter()" placeholder="Search by title, description...">
+            <button *ngIf="searchText" matSuffix mat-icon-button (click)="clearSearch()">
+              <mat-icon>close</mat-icon>
+            </button>
+            <mat-icon matPrefix>search</mat-icon>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Banner Priority</mat-label>
+            <mat-select [(ngModel)]="priority" (selectionChange)="workshopPriority()">
+                <mat-option value="workshop">Workshop</mat-option>
+                <mat-option value="eiflix">EiFlix</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div class="table-container">
+          <table mat-table [dataSource]="dataSource" matSort class="banner-table" cdkDropList (cdkDropListDropped)="dropTable($event)">
+            <ng-container matColumnDef="image">
+              <th mat-header-cell *matHeaderCellDef>Image</th>
+              <td mat-cell *matCellDef="let element">
+                <img [src]="element.imageUrl" class="table-img">
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="title">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
+              <td mat-cell *matCellDef="let element">{{ element.title }}</td>
+            </ng-container>
+            <ng-container matColumnDef="description">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+              <td mat-cell *matCellDef="let element">
+                <span class="description-cell" [matTooltip]="element.description">
+                  {{ element.description | slice:0:50 }}{{ element.description.length > 50 ? '...' : '' }}
+                </span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="seriesName">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Navigate</th>
+              <td mat-cell *matCellDef="let element">{{ element.seriesName != null ? element.seriesName : element.externallink  }}</td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>Actions</th>
+              <td mat-cell *matCellDef="let element; let i = index">
+                <button mat-icon-button color="primary" [matTooltip]="'View Video'" 
+                        (click)="openVideo(element.videoUrl)">
+                  <mat-icon>play_circle</mat-icon>
+                </button>
+                <mat-slide-toggle 
+                [matTooltip]="element.enable ? 'Disable' : 'Enable'"
+                [checked]="element.enable"
+                (change)="toggleEnable(element)">
+                </mat-slide-toggle>
+
+                <button mat-icon-button color="accent" [matTooltip]="'Edit Video'" 
+                        (click)="editBanner(element, i)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" [matTooltip]="'Delete Banner'" 
+                        (click)="deleteBanner(element, i)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <!-- <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr> -->
+            <tr
+              mat-row
+              *matRowDef="let row; columns: displayedColumns"
+              cdkDrag
+            ></tr>
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell no-data" [attr.colspan]="displayedColumns.length">
+                <div class="no-data-content">
+                  <i class="fa-solid fa-inbox fa-2x"></i>
+                  <p>No banners found</p>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <mat-paginator [pageSizeOptions]="[5, 10, 25, 50]" 
+                       showFirstLastButtons
+                       aria-label="Select page of banners">
+        </mat-paginator>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</mat-card>

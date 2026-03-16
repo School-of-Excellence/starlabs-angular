@@ -1,0 +1,150 @@
+<div *ngIf="loading" class="loading-container">
+    <mat-progress-spinner class="spinner" [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+    <span class="loading-text">Fetching Data...</span>
+</div>
+
+<div *ngIf="!loading">
+    
+    <header class="header">
+      <h1 class="title">Journey Completed - {{data['completed'].length}}</h1>
+      <button mat-icon-button mat-dialog-close class="close-button">
+        <mat-icon>close</mat-icon>
+      </button>
+    </header>
+  
+    <div class="main-content">
+
+        <!-- Filter Section -->
+        <div [formGroup]="filterForm">
+        
+            <div class="filter-row">
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Search Name</mat-label>
+                    <input type="text" matInput formControlName="name" placeholder="Search">
+                </mat-form-field>
+                
+                <mat-form-field appearance="outline">
+                    <mat-label>Onboarded By</mat-label>
+                    <mat-select formControlName="onboardedby">
+                    <mat-option value="">All Coaches</mat-option>
+                    <mat-option *ngFor="let coach of coachesList" [value]="mapProfile[coach]">
+                        {{mapProfile[coach]}}
+                    </mat-option>
+                    </mat-select>
+                </mat-form-field>
+        
+                <div formGroupName="dateRange" class="date-range-picker">
+                    <mat-form-field appearance="outline">
+                    <mat-label>Completed Date</mat-label>
+                    <mat-date-range-input [rangePicker]="rangePicker">
+                        <input matStartDate formControlName="start" placeholder="Start date">
+                        <input matEndDate formControlName="end" placeholder="End date">
+                    </mat-date-range-input>
+                    <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+                    <mat-date-range-picker #rangePicker></mat-date-range-picker>
+                    </mat-form-field>
+                </div>
+                <button mat-raised-button color="primary" (click)="resetFilters()" class="reset-button">
+                    <mat-icon>filter_alt_off</mat-icon> Reset
+                </button>
+            </div>
+        </div>
+    
+        <!-- Table Section -->
+        <div class="table-container mat-elevation-z2">
+            <div *ngIf="loading" class="loading-overlay">
+            <mat-spinner diameter="50"></mat-spinner>
+            </div>
+
+            <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+            <!-- Name Column -->
+            <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+                <td mat-cell *matCellDef="let element"> 
+                {{mapProfile[element.profileid] || 'N/A'}} 
+                </td>
+            </ng-container>
+
+            <!-- Mobile Number Column -->
+            <ng-container matColumnDef="mobileNumber">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Mobile Number </th>
+                <td mat-cell *matCellDef="let element"> 
+                {{mapPhone[element.profileid]|| 'N/A'}} 
+                </td>
+            </ng-container>
+
+            <!-- Journey Column -->
+            <ng-container matColumnDef="journey">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Journey </th>
+                <td mat-cell *matCellDef="let element"> 
+                {{![null,undefined,''].includes(element['journeyref']) ? (mapjourneyname[element['journeyref'].id]['journey'] || 'N/A') : 'ADDON'}} 
+                </td>
+            </ng-container>
+
+            <!-- Purchase Date Column -->
+            <ng-container matColumnDef="purchasedate">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Purchase Date </th>
+                <td mat-cell *matCellDef="let element"> 
+                {{![null,undefined,''].includes(element.purchasedate) ? (element.purchasedate?.toDate() | date:'medium') : 'N/A'}} 
+                </td>
+            </ng-container>
+
+            <!-- Onboarded By Column -->
+            <ng-container matColumnDef="onboardedby">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Onboarded By </th>
+                <td mat-cell *matCellDef="let element"> 
+                {{element.onboardedby && element.onboardedby[0] ? mapProfile[element.onboardedby[0].id] : 'N/A'}} 
+                </td>
+            </ng-container>
+
+            <!-- Onboarded Date Column -->
+            <ng-container matColumnDef="onboardeddate">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Onboarded Date </th>
+                <td mat-cell *matCellDef="let element">
+                {{![null,undefined].includes(element.onboardedtime) ? (element.onboardedtime | date:'medium') : 'N/A'}} 
+                </td>
+            </ng-container>
+
+            <!-- Opportunity Status Column -->
+            <ng-container matColumnDef="completeddate">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> CompletedDate </th>
+                <td mat-cell *matCellDef="let element"> 
+                    {{![null,undefined].includes(element.subscriptionend) ? (element.subscriptionend | date:'medium') : 'N/A'}} 
+                </td>
+            </ng-container>
+            
+            <!-- Action Column -->
+            <!-- <ng-container matColumnDef="action">
+                <th mat-header-cell *matHeaderCellDef> Onboarding Report </th>
+                <td mat-cell *matCellDef="let element">
+                <span *ngIf="element['onboardingreportlog']" style="cursor: pointer;" >
+                    <div class="notes-container">
+                    <div *ngIf="element['onboardingreportlog']?.length > 0;">
+                        <div (click)="viewReport(element)">
+                        <span class="note-text" matTooltip="{{ element['onboardingreportlog'][element['onboardingreportlog'].length - 1].report }}">
+                            {{ element['onboardingreportlog'][element['onboardingreportlog'].length - 1].report | slice:0:20 }}...
+                        </span>
+                        </div>
+                    </div>
+                    </div>
+                </span>
+                </td>
+            </ng-container> -->
+
+            <!-- Row definitions -->
+            <tr mat-header-row *matHeaderRowDef="displayedColumns;"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+            <!-- No data row -->
+            <tr class="mat-row" *matNoDataRow>
+                <td class="mat-cell" colspan="7">No data matching the filter</td>
+            </tr>
+            
+            </table>
+
+            <!-- Pagination -->
+            <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
+        </div>
+    </div>
+</div>

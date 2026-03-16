@@ -1,0 +1,86 @@
+.flex-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.flex-item {
+  flex: 1; 
+  min-width: 200px;
+}
+
+.full-width {
+  width: 100%;
+  margin-top: 16px;
+}
+
+table {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: collapse;
+}
+
+th.mat-header-cell, td.mat-cell {
+  padding: 12px; 
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+th.mat-header-cell {
+  background-color: #f5f5f5; 
+  font-weight: bold;
+}
+
+.hint-text {
+  display: block;
+  color: rgb(193, 193, 193);
+  font-size: 12px; 
+  margin-top: 4px; 
+}
+
+.radio-options-container {
+  margin: 10px 0; 
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px; 
+  background-color: #fafafa; 
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; 
+  margin: 10px 0;
+}
+
+.mat-form-field {
+  flex: 1;
+}
+
+.mat-icon-button {
+  margin-left: 10px;
+}
+.video-url-container {
+  margin: 20px 0;
+  width: 100%;
+}
+
+.video-url-container .mat-form-field {
+  width: 100%;
+}
+
+/* If you want to show a preview of the video URL */
+.video-preview {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}

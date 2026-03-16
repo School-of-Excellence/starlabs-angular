@@ -1,0 +1,14 @@
+<form style="padding: 20px;" class="statusform" [formGroup] = "notesform" (ngSubmit)="onsubmit(notesform.value)">
+    <mat-form-field class="formfield1" appearance="outline">
+        <mat-label>Notes</mat-label>
+        <textarea class="field2"  matInput formControlName="notes"></textarea>
+        <!-- <mat-hint>(For office use)</mat-hint> -->
+        <!-- <mat-error *ngIf="!addissue.controls['notes'].valid">Notes name is required </mat-error> -->
+    </mat-form-field>
+
+    <div mat-dialog-actions style="display: flex;align-items: center;justify-content: center;">
+        <button mat-raised-button color="secondary" class="sub" type="button" (click)="close(notesform.value)">Close</button>
+        <button mat-raised-button color="primary" class="sub" type="submit">Submit</button>
+    </div>
+</form>
+

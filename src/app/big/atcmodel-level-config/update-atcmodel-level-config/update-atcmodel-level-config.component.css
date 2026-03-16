@@ -1,0 +1,31 @@
+.mainscreen{
+  width: 100%;
+}
+
+.title{
+  color: rgb(0, 45, 60);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.inputfields{
+  min-width: 400px;
+  max-width: 500px;
+  background-color: transparent;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red;
+  margin-right: 10px;
+}
+
+.submitbtn{
+  color: white;
+  background: green;
+}
+
+.subtitle{
+  color: rgb(0, 45, 60);
+  text-align: left;
+}

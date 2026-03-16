@@ -1,0 +1,245 @@
+<!-- <div style="padding: 20px;"> -->
+  <!-- <div class="flex-container" style="align-items: center;">
+    <mat-form-field appearance="outline" class="flex-item">
+      <mat-label>Enter a Question</mat-label>
+      <input matInput [(ngModel)]="Question" placeholder="Enter a Question" [disabled]="disableQuestion">
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="width: 100px; margin-left: 10px;">
+      <mat-label>S.No</mat-label>
+      <input matInput 
+             [ngModel]="sno" 
+             [readonly]="true" 
+             type="number" 
+             placeholder="S.No">
+    </mat-form-field>
+    <button 
+      mat-fab 
+      color="primary" 
+      aria-label="Add Icon Button" 
+      (click)="addEvolution()"
+      [disabled]="disableButton || disableQuestion|| Question == ''"
+      style="margin-left: 10px;"
+    >
+      <mat-icon>save</mat-icon>
+    </button>
+  </div> -->
+    <!-- <div class="flex-container" style="align-items: center;">
+      <mat-form-field appearance="outline" class="flex-item">
+        <mat-label>Enter a Question</mat-label>
+        <input matInput [(ngModel)]="Question" placeholder="Enter a Question" [disabled]="disableQuestion">
+        <span class="hint-text">{{hintforname}}</span>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width: 100px; margin-left: 10px;">
+        <mat-label>S.No</mat-label>
+        <input matInput 
+              [ngModel]="sno" 
+              [readonly]="true" 
+              type="number" 
+              placeholder="S.No">
+      </mat-form-field>
+      <button 
+        mat-fab 
+        color="primary" 
+        aria-label="Add Icon Button" 
+        (click)="addEvolution()"
+        [disabled]="disableButton || disableQuestion || Question == ''"
+        style="margin-left: 10px;"
+      >
+        <mat-icon>save</mat-icon>
+      </button>
+    </div>
+    <div style="margin-top: 20px;">
+        <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8"
+          cdkDropList
+          (cdkDropListDropped)="dropTable($event)"
+        >
+          <ng-container matColumnDef="drag">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let element" cdkDrag>
+              <mat-icon>drag_handle</mat-icon>
+            </td>
+          </ng-container>
+      
+          <ng-container matColumnDef="sno">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>S.No</th>
+            <td mat-cell *matCellDef="let element">{{ element.sno }}</td>
+          </ng-container>
+      
+          <ng-container matColumnDef="question">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Question</th>
+            <td mat-cell *matCellDef="let element">{{ element.question }}</td>
+          </ng-container>
+      
+          <ng-container matColumnDef="disable">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let element">
+              <mat-slide-toggle 
+                [checked]="element.enabled"
+                (change)="toggleQuestionStatus(element)"
+              >
+                {{ element.enabled ? 'Enabled' : 'Disabled' }}
+              </mat-slide-toggle>
+            </td>
+          </ng-container>
+      
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" cdkDrag></tr>
+        </table>
+      </div>      
+</div> -->
+<!-- evolution-questions.component.html -->
+<div style="padding: 20px;">
+  <form [formGroup]="questionForm" class="flex-container" style="align-items: start;">
+    <div class="question-input-container">
+      <mat-form-field appearance="outline" style="width: 80%;">
+        <mat-label>Enter a Question</mat-label>
+        <input matInput formControlName="question" placeholder="Enter a Question" [disabled]="disableQuestion">
+        <span class="hint-text">{{hintforname}}</span>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" style="width: 150px; margin-left: 10px;">
+        <mat-label>Question Type</mat-label>
+        <mat-select formControlName="type">
+          <mat-option value="textarea">Text Area</mat-option>
+          <mat-option value="input">Input Field</mat-option>
+          <mat-option value="email">Email</mat-option>
+          <mat-option value="radio">Radio Buttons</mat-option>
+          <mat-option value="checkbox">Checkboxes</mat-option>
+          <mat-option value="video">Video</mat-option>
+          <mat-option value="audio">Audio</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" style="width: 100px; margin-left: 10px;">
+        <mat-label>S.No</mat-label>
+        <input matInput formControlName="sno" type="number" placeholder="S.No">
+      </mat-form-field>
+    </div>
+    <div *ngIf="questionForm.get('type').value === 'video'" class="video-url-container">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Video URL</mat-label>
+        <input matInput formControlName="videoUrl" placeholder="Enter video URL">
+        <mat-icon matSuffix>video_library</mat-icon>
+        <mat-error *ngIf="questionForm.get('videoUrl').hasError('required')">
+          Video URL is required
+        </mat-error>
+      </mat-form-field>      
+      <mat-checkbox formControlName="askanswer" class="need-answer-checkbox">
+        Need answer for this video
+      </mat-checkbox>
+    </div>
+    <div *ngIf="questionForm.get('type').value === 'audio'" class="video-url-container">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Audio URL</mat-label>
+        <input matInput formControlName="audioUrl" placeholder="Enter audio URL">
+        <mat-icon matSuffix>audiotrack</mat-icon>
+        <mat-error *ngIf="questionForm.get('audioUrl').hasError('required')">
+          Audio URL is required
+        </mat-error>
+      </mat-form-field>    
+      <mat-checkbox formControlName="askanswer" class="need-answer-checkbox">
+        Need answer for this Audio
+      </mat-checkbox>
+    </div>
+    <!-- <div *ngIf="questionForm.get('type').value === 'radio' || questionForm.get('type').value === 'checkbox'" class="radio-options-container">
+      <div formArrayName="options">
+        <div *ngFor="let option of options.controls; let i=index" class="option-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Option {{i + 1}}</mat-label>
+            <input matInput [formControlName]="i" placeholder="Enter option">
+          </mat-form-field>
+          <button mat-icon-button color="warn" (click)="removeOption(i)" *ngIf="options.length > 1">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+      <button mat-button color="primary" (click)="addOption()">
+        <mat-icon>add</mat-icon> Add Option
+      </button>
+    </div> -->
+    <div *ngIf="questionForm.get('type').value === 'radio' || questionForm.get('type').value === 'checkbox'" class="radio-options-container">
+      <div formArrayName="options">
+        <div *ngFor="let option of options.controls; let i=index" class="option-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Option {{i + 1}}</mat-label>
+            <input matInput [formControlName]="i" placeholder="Enter option">
+          </mat-form-field>
+          <button mat-icon-button color="warn" (click)="removeOption(i)" *ngIf="options.length > 1">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+      <button mat-button color="primary" (click)="addOption()">
+        <mat-icon>add</mat-icon> Add Option
+      </button>
+    
+      <mat-checkbox formControlName="needAdditionalInput">
+        Need additional input field
+      </mat-checkbox>
+    
+      <div *ngIf="questionForm.get('needAdditionalInput').value" class="additional-input-container">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Additional Input Label</mat-label>
+          <input matInput formControlName="additionalInputLabel" placeholder="Enter label for additional input">
+        </mat-form-field>
+      </div>
+    </div>
+    <button mat-fab color="primary" aria-label="Add Icon Button" 
+      (click)="addEvolution()"
+      [disabled]="disableButton || disableQuestion || questionForm.invalid"
+      style="margin-left: 10px;">
+      <mat-icon>save</mat-icon>
+    </button>
+  </form>
+
+  <div style="margin-top: 20px;">
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8"
+      cdkDropList
+      (cdkDropListDropped)="dropTable($event)">
+      
+      <ng-container matColumnDef="sno">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>S.No</th>
+        <td mat-cell *matCellDef="let element">{{ element.sno }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="question">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Question</th>
+        <td mat-cell *matCellDef="let element">{{ element.question }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Type</th>
+        <td mat-cell *matCellDef="let element">{{ element.type | titlecase }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="options">
+        <th mat-header-cell *matHeaderCellDef>Options</th>
+        <td mat-cell *matCellDef="let element">
+          <span *ngIf="element.type === 'radio' || element.type ==='checkbox'">
+            {{ element.options.join(', ') }}
+          </span>
+          <span *ngIf="element.type === 'video'">
+            Video URL: {{ element.videoUrl }}
+          </span>
+          <span *ngIf="element.type === 'audio'">
+            Audio URL: {{ element.audioUrl }}
+          </span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="disable">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let element">
+          <mat-slide-toggle 
+            [checked]="element.enabled"
+            (change)="toggleQuestionStatus(element)">
+            {{ element.enabled ? 'Enabled' : 'Disabled' }}
+          </mat-slide-toggle>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" cdkDrag></tr>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,893 @@
+<!-- <app-template-creator></app-template-creator> -->
+<div *ngIf="!isLoading" class="email-template-container">
+  <!-- Navigation Header -->
+  <mat-card class="navigation-header">
+    <mat-card-content>
+      <div class="nav-buttons">
+        <button mat-raised-button [color]="viewMode === 'list' ? 'primary' : ''" (click)="switchToListView()">
+          <mat-icon>list</mat-icon>
+          View Templates
+        </button>
+        <button mat-raised-button [color]="viewMode === 'create' ? 'primary' : ''" (click)="switchToCreateView()">
+          <mat-icon>add</mat-icon>
+          {{isEditMode ? 'Edit Template' : 'Create Template'}}
+        </button>
+        <button mat-button *ngIf="viewMode === 'preview'" (click)="switchToListView()">
+          <mat-icon>arrow_back</mat-icon>
+          Back to List
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Template List View -->
+  <div *ngIf="viewMode === 'list'" class="templates-list-section">
+    <mat-card class="templates-list-card">
+      <mat-card-header class="templates-header">
+        <div class="header-left">
+          <mat-card-title>
+            <mat-icon>email</mat-icon>
+            Email Templates
+          </mat-card-title>
+        </div>
+        <!-- <div class="header-actions">
+          <button mat-raised-button color="primary" (click)="switchToCreateView()">
+            <mat-icon>add</mat-icon>
+            Create New Template
+          </button>
+        </div> -->
+        <mat-chip class="template-count"><b>{{getFilteredResultsCount()}}</b> of <b>{{existingTemplates.length}}</b></mat-chip>
+      </mat-card-header>
+
+      <!-- Search and Filters Section -->
+      <mat-card-content class="filters-section">
+        <!-- Advanced Filters -->
+        <div class="advanced-filters">
+          <div class="filters-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Search templates...</mat-label>
+              <input matInput [(ngModel)]="searchTerm" (input)="onSearchChange()"
+                placeholder="Search by name, alias, subject, or notes">
+              <mat-icon matPrefix>search</mat-icon>
+              <button matSuffix mat-icon-button *ngIf="searchTerm" (click)="searchTerm=''; onSearchChange()">
+                <mat-icon>clear</mat-icon>
+              </button>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Category</mat-label>
+              <mat-select [(value)]="selectedCategory" (selectionChange)="onCategoryFilterChange()">
+                <mat-option value="">All Categories</mat-option>
+                <mat-option *ngFor="let category of categories" [value]="category">
+                  {{category}}
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>category</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Sub-Category</mat-label>
+              <mat-select [(value)]="selectedSubCategory" (selectionChange)="onFilterChange()"
+                [disabled]="!selectedCategory">
+                <mat-option value="">All Sub-Categories</mat-option>
+                <mat-option *ngFor="let subCategory of getFilteredSubCategories()" [value]="subCategory">
+                  {{subCategory}}
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>label</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Status</mat-label>
+              <mat-select [(value)]="selectedStatus" (selectionChange)="onFilterChange()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option *ngFor="let status of getUniqueStatuses()" [value]="status">
+                  {{status | titlecase}}
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>assignment</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Validation</mat-label>
+              <mat-select [(value)]="selectedValidation" (selectionChange)="onFilterChange()">
+                <mat-option value="">All Templates</mat-option>
+                <mat-option value="validated">Validated Only</mat-option>
+                <mat-option value="pending">Pending Validation</mat-option>
+              </mat-select>
+              <mat-icon matSuffix>verified</mat-icon>
+            </mat-form-field>
+            <button mat-mini-fab (click)="clearFilters()" matTooltip="Clear Filters">
+              <mat-icon>refresh</mat-icon>
+            </button>
+          </div>
+
+          <div class="filter-actions">
+            <span class="filter-info">
+              <b>({{getFilteredResultsCount()}})</b> template{{getFilteredResultsCount() !== 1 ? 's' : ''}} found
+              <span *ngIf="paginator" class="page-info"> | Showing {{getPageInfo()}}</span>
+            </span>
+          </div>
+        </div>
+      </mat-card-content>
+
+      <!-- Templates Table -->
+      <mat-card-content class="table-container">
+        <div class="templates-table-wrapper" *ngIf="!isLoading; else loadingTemplate">
+          <table mat-table [dataSource]="dataSource" matSort class="templates-table mat-elevation-0">
+
+            <!-- Template Name Column -->
+            <ng-container matColumnDef="templatename">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="name-header">
+                <div class="header-content">
+                  <mat-icon>title</mat-icon>
+                  Template Details
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="name-cell">
+                <div class="template-info">
+                  <div class="d-flex flex-row g-2">
+                    <div class="template-name">{{template.templatename}}</div>&nbsp;
+                    <div class="template-alias">{{template.templatealias}}</div>
+                  </div>
+                  <div class="template-subject">{{template.subject}}</div>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Category Column -->
+            <ng-container matColumnDef="category">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="category-header">
+                <div class="header-content">
+                  <mat-icon>category</mat-icon>
+                  Category
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="category-cell">
+                <div class="category-info">
+                  <mat-chip color="primary" selected class="category-chip">{{template.category}}</mat-chip>
+                </div>
+              </td>
+            </ng-container>
+            
+            <!-- Sub Category Column -->
+            <ng-container matColumnDef="subcategory">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="category-header">
+                <div class="header-content">
+                  <mat-icon>category</mat-icon>
+                  Sub-Category
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="category-cell">
+                <div class="category-info">
+                  <mat-chip color="primary" selected class="category-chip">{{template.subcategory}}</mat-chip>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Status Column -->
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+                <div class="header-content">
+                  <mat-icon>assignment</mat-icon>
+                  Status
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="status-cell">
+                <div class="status-info">
+                  <mat-chip [color]="getStatusColor(template)" selected class="status-chip">
+                    <mat-icon class="chip-icon">{{template.templatevalidated ? 'check_circle' : 'schedule'}}</mat-icon>
+                    {{getStatusText(template)}}
+                  </mat-chip>
+                  <div class="status-details" *ngIf="template.templatestatus !== 'created'">
+                    {{template.templatestatus | titlecase}}
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Validated Column -->
+            <ng-container matColumnDef="validated">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="validated-header">
+                <div class="header-content">
+                  <mat-icon>verified</mat-icon>
+                  Validation
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="validated-cell">
+                <div class="validation-status" [class.validated]="template.templatevalidated">
+                  <mat-icon [color]="template.templatevalidated ? 'primary' : 'warn'" class="validation-icon">
+                    {{template.templatevalidated ? 'check_circle' : 'pending'}}
+                  </mat-icon>
+                  <span class="validation-text">
+                    {{template.templatevalidated ? 'Validated' : 'Pending'}}
+                  </span>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Date Column -->
+            <ng-container matColumnDef="date">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="date-header">
+                <div class="header-content">
+                  <mat-icon>schedule</mat-icon>
+                  Created
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="date-cell">
+                <div class="date-info">
+                  <div class="date">{{formatDate(template.date)}}</div>
+                  <div class="creator" *ngIf="template.createdby && mapprofileuid[template.createdby]">
+                    by {{mapprofileuid[template.createdby]['name']}}
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef class="actions-header">
+                <div class="header-content">
+                  <mat-icon>settings</mat-icon>
+                  Actions
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let template" class="actions-cell">
+                <div class="action-buttons">
+                  <button mat-icon-button (click)="switchToPreviewView(template)" matTooltip="Preview Template"
+                    class="action-btn preview-btn">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="editTemplate(template)" matTooltip="Edit Template"
+                    class="action-btn edit-btn">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="duplicateTemplate(template)" matTooltip="Duplicate Template"
+                    class="action-btn duplicate-btn">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                  <button mat-icon-button *ngIf="!template.templatevalidated" (click)="approveTemplate(template)"
+                    matTooltip="Approve Template" class="action-btn approve-btn">
+                    <mat-icon>check</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="deleteTemplate(template)" matTooltip="Delete Template"
+                    class="action-btn delete-btn">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns" class="table-header-row"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"
+              [class.validated-row]="row.templatevalidated"></tr>
+          </table>
+
+          <!-- Pagination -->
+          <mat-paginator #paginator [pageSizeOptions]="pageSizeOptions" [pageSize]="pageSize" [showFirstLastButtons]="true" [length]="dataSource.filteredData.length" class="templates-paginator"></mat-paginator>
+
+          <!-- Empty State -->
+          <div class="empty-state" *ngIf="dataSource.filteredData.length === 0 && !isLoading">
+            <mat-icon class="empty-icon">inbox</mat-icon>
+            <h3>No templates found</h3>
+            <p *ngIf="searchTerm || selectedCategory || selectedStatus || selectedValidation">
+              Try adjusting your search criteria or filters
+            </p>
+            <p *ngIf="!searchTerm && !selectedCategory && !selectedStatus && !selectedValidation">
+              Create your first email template to get started
+            </p>
+            <button mat-raised-button color="primary" (click)="switchToCreateView()"
+              *ngIf="existingTemplates.length === 0">
+              <mat-icon>add</mat-icon>
+              Create First Template
+            </button>
+            <button mat-stroked-button (click)="clearFilters()" *ngIf="existingTemplates.length > 0">
+              <mat-icon>clear_all</mat-icon>
+              Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading Template -->
+        <ng-template #loadingTemplate>
+          <div class="loading-container">
+            <mat-spinner diameter="40"></mat-spinner>
+            <p>Loading templates...</p>
+          </div>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Template Preview View -->
+  <div *ngIf="viewMode === 'preview' && previewTemplate" class="preview-view-section">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>visibility</mat-icon>
+          Preview: {{previewTemplate.templatename}}
+        </mat-card-title>
+        <div class="preview-actions">
+          <button mat-button (click)="editTemplate(previewTemplate)">
+            <mat-icon>edit</mat-icon>
+            Edit Template
+          </button>
+          <button mat-raised-button *ngIf="!previewTemplate.templatevalidated" color="primary"
+            (click)="approveTemplate(previewTemplate)">
+            <mat-icon>check</mat-icon>
+            Approve Template
+          </button>
+        </div>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="preview-details">
+          <div class="template-info">
+            <p><strong>Subject:</strong> {{previewTemplate.subject}}</p>
+            <p><strong>Category:</strong> {{previewTemplate.category}} / {{previewTemplate.subcategory}}</p>
+            <p><strong>Status:</strong>
+              <mat-chip [color]="getStatusColor(previewTemplate)" selected>
+                {{getStatusText(previewTemplate)}}
+              </mat-chip>
+            </p>
+            <p><strong>Created:</strong> {{formatDate(previewTemplate.date)}}</p>
+            <p *ngIf="previewTemplate.notes"><strong>Notes:</strong> {{previewTemplate.notes}}</p>
+          </div>
+        </div>
+
+        <mat-divider style="margin: 20px 0;"></mat-divider>
+
+        <!-- Preview Panel for Preview View -->
+        <div class="preview-container">
+          <div class="preview-toggle-container">
+            <mat-button-toggle-group value="desktop" aria-label="Preview Mode">
+              <mat-button-toggle value="desktop" (click)="isMobilePreview = false" [class.active]="!isMobilePreview">
+                <mat-icon>desktop_mac</mat-icon>
+              </mat-button-toggle>
+              <mat-button-toggle value="mobile" (click)="isMobilePreview = true" [class.active]="isMobilePreview">
+                <mat-icon>phone_android</mat-icon>
+              </mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          <div class="email-preview" [class.mobile-preview]="isMobilePreview">
+            <div class="email-header">
+              <div class="gmail-logo">
+                <mat-icon>email</mat-icon>
+                <span *ngIf="!isMobilePreview">Gmail</span>
+              </div>
+              <div class="email-time">{{getCurrentTime()}}</div>
+            </div>
+
+            <div class="email-subject">{{getPreviewSubject()}}</div>
+
+            <div class="email-sender">
+              <div class="sender-avatar">A&H</div>
+              <div class="sender-info">
+                <div class="sender-name">Team Antano & Harini</div>
+                <div class="sender-email" *ngIf="!isMobilePreview">&lt;soexcellence.com&gt;</div>
+                <div class="sender-email">to me</div>
+              </div>
+              <div class="email-actions" *ngIf="!isMobilePreview">
+                <button mat-icon-button class="action-btn">
+                  <mat-icon>reply</mat-icon>
+                </button>
+                <button mat-icon-button class="action-btn">
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <div class="email-content" [innerHTML]="getPreviewContent()">
+            </div>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Create/Edit Template Form -->
+  <form *ngIf="viewMode === 'create'" [formGroup]="templateForm" class="template-form">
+    <!-- Header Section -->
+    <mat-card class="form-header">
+      <mat-card-header>
+        <mat-card-title>
+          {{isEditMode ? 'Edit Email Template' : 'Email Template Configuration'}}
+        </mat-card-title>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Template Name *</mat-label>
+            <input matInput formControlName="templateName" (input)="onTemplateNameChange()"
+              placeholder="Enter template name">
+            <mat-icon matSuffix>title</mat-icon>
+            <mat-spinner matSuffix diameter="16" *ngIf="isCheckingName"></mat-spinner>
+            <mat-error *ngIf="templateName?.hasError('required')">Template name is required</mat-error>
+            <mat-error *ngIf="templateName?.hasError('pattern')">Only letters, numbers, spaces, '.', '-', '_'
+              allowed</mat-error>
+            <mat-error *ngIf="templateName?.hasError('templateNameExists')">Template name already exists</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Template Alias *</mat-label>
+            <input matInput formControlName="templateAlias" placeholder="template_alias">
+            <mat-icon matSuffix>alternate_email</mat-icon>
+            <mat-spinner matSuffix diameter="16" *ngIf="isCheckingAlias"></mat-spinner>
+            <mat-hint>Only letters, numbers, '.', '-', '_' allowed</mat-hint>
+            <mat-error *ngIf="templateAlias?.hasError('required')">Template alias is required</mat-error>
+            <mat-error *ngIf="templateAlias?.hasError('pattern')">Only letters, numbers, '.', '-', '_'
+              allowed</mat-error>
+            <mat-error *ngIf="templateAlias?.hasError('templateAliasExists')">Template alias already exists</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Category *</mat-label>
+            <mat-select formControlName="category" [disabled]="isLoading">
+              <mat-option value="">{{isLoading ? 'Loading...' : 'Select Category'}}</mat-option>
+              <mat-option *ngFor="let cat of categories" [value]="cat">{{cat}}</mat-option>
+            </mat-select>
+            <mat-icon matSuffix>category</mat-icon>
+            <mat-error *ngIf="category?.hasError('required')">Category is required</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Sub-Category *</mat-label>
+            <mat-select formControlName="subCategory" [disabled]="isLoading">
+              <mat-option value="">{{isLoading ? 'Loading...' : 'Select Sub-Category'}}</mat-option>
+              <mat-option *ngFor="let subCat of subCategories" [value]="subCat">{{subCat}}</mat-option>
+            </mat-select>
+            <mat-icon matSuffix>label</mat-icon>
+            <mat-error *ngIf="subCategory?.hasError('required')">Sub-category is required</mat-error>
+          </mat-form-field>
+
+          <button mat-fab color="primary" type="button" (click)="refreshForm()" matTooltip="Refresh Form"
+            aria-label="Refresh">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Action Buttons -->
+    <mat-card class="form-actions">
+      <mat-card-actions align="end">
+        <button mat-stroked-button type="button" (click)="onReset()">
+          <mat-icon>refresh</mat-icon>
+          Reset
+        </button>
+        &nbsp;&nbsp;
+        <button mat-raised-button (click)="onSubmit()" color="primary" type="submit"
+          [disabled]="!templateForm.valid || isCheckingName || isCheckingAlias">
+          <mat-icon>save</mat-icon>
+          {{isEditMode ? 'Update Template' : 'Create Template'}}
+        </button>
+      </mat-card-actions>
+    </mat-card>
+
+    <!-- Main Content Section -->
+    <div class="content-section">
+      <div class="left-panel">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{isEditMode ? 'Edit' : 'Create'}} Email Template</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <!-- Subject Field -->
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Subject *</mat-label>
+              <input matInput formControlName="subject" placeholder="Enter email subject">
+              <mat-icon matSuffix>subject</mat-icon>
+              <mat-error *ngIf="subject?.hasError('required')">Subject is required</mat-error>
+            </mat-form-field>
+
+            <!-- Angular Editor -->
+            <div class="editor-container">
+              <label class="editor-label">Email Content *</label>
+              <angular-editor formControlName="body" [config]="editorConfig" placeholder="Enter email content here..."
+                class="email-editor" (contentChanged)="onEditorContentChange($event)">
+              </angular-editor>
+              <mat-error *ngIf="body?.invalid && body?.touched" class="editor-error">
+                <span *ngIf="body?.errors?.['required']">Content is required</span>
+              </mat-error>
+            </div>
+
+            <!-- Button Actions for Editor -->
+            <div class="editor-actions">
+              <button mat-raised-button color="accent" type="button" (click)="addCTAButton()">
+                <mat-icon>link</mat-icon>
+                Add CTA Button
+              </button>
+              <button mat-raised-button color="warn" type="button" (click)="addImage()">
+                <mat-icon>image</mat-icon>
+                Add Image
+              </button>
+            </div>
+
+            <!-- Image Edit Form (Inline) -->
+            <mat-card *ngIf="showImageEditForm" class="input-form image-edit-form">
+              <mat-card-header>
+                <mat-card-title>
+                  <mat-icon>photo_size_select_large</mat-icon>
+                  Edit Selected Image
+                </mat-card-title>
+                <mat-card-subtitle>
+                  Click and edit the selected image properties
+                </mat-card-subtitle>
+              </mat-card-header>
+
+              <mat-card-content>
+                <!-- Current Image Preview -->
+                <div class="current-image-preview" *ngIf="editingImageElement">
+                  <div class="image-info-section">
+                    <div class="current-image">
+                      <h4>Current Image</h4>
+                      <img [src]="editingImageElement.src" [alt]="editingImageElement.alt"
+                        style="max-width: 150px; max-height: 100px; object-fit: contain; border-radius: 4px; border: 1px solid #ddd;">
+                    </div>
+
+                    <div class="image-info">
+                      <p><strong>Current Size:</strong> {{originalImageData?.width}}px × {{originalImageData?.height ===
+                        'auto' ? 'auto' : originalImageData?.height + 'px'}}</p>
+                      <p><strong>Alignment:</strong> {{originalImageData?.alignment | titlecase}}</p>
+                      <p><strong>Responsive:</strong> {{originalImageData?.isResponsive ? 'Yes' : 'No'}}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <mat-divider style="margin: 16px 0;"></mat-divider>
+
+                <form [formGroup]="imageEditForm" class="form-grid">
+                  <!-- Image URL and Alt Text -->
+                  <mat-form-field appearance="outline">
+                    <mat-label>Image URL *</mat-label>
+                    <input matInput type="url" formControlName="imageUrl" placeholder="https://example.com/image.jpg">
+                    <mat-icon matSuffix>link</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Alt Text *</mat-label>
+                    <input matInput formControlName="imageAlt" placeholder="Image description">
+                    <mat-icon matSuffix>description</mat-icon>
+                  </mat-form-field>
+
+                  <!-- Width and Height -->
+                  <mat-form-field appearance="outline" *ngIf="!imageEditForm.get('isResponsive')?.value">
+                    <mat-label>Width (px) *</mat-label>
+                    <input matInput type="number" formControlName="imageWidth" placeholder="400" min="50" max="1200">
+                    <mat-icon matSuffix>photo_size_select_large</mat-icon>
+                    <mat-hint>Width in pixels (50-1200)</mat-hint>
+                    <mat-error *ngIf="imageEditForm.get('imageWidth')?.hasError('min')">Minimum width is
+                      50px</mat-error>
+                    <mat-error *ngIf="imageEditForm.get('imageWidth')?.hasError('max')">Maximum width is
+                      1200px</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" *ngIf="!imageEditForm.get('isResponsive')?.value">
+                    <mat-label>Height (px)</mat-label>
+                    <input matInput formControlName="imageHeight" placeholder="auto or number">
+                    <mat-icon matSuffix>height</mat-icon>
+                    <mat-hint>Height in pixels or 'auto'</mat-hint>
+                  </mat-form-field>
+
+                  <!-- Alignment -->
+                  <mat-form-field appearance="outline">
+                    <mat-label>Alignment *</mat-label>
+                    <mat-select formControlName="imageAlignment">
+                      <mat-option value="left">
+                        <mat-icon>format_align_left</mat-icon>
+                        Left
+                      </mat-option>
+                      <mat-option value="center">
+                        <mat-icon>format_align_center</mat-icon>
+                        Center
+                      </mat-option>
+                      <mat-option value="right">
+                        <mat-icon>format_align_right</mat-icon>
+                        Right
+                      </mat-option>
+                    </mat-select>
+                    <mat-icon matSuffix>format_align_center</mat-icon>
+                  </mat-form-field>
+
+                  <!-- Responsive Checkbox -->
+                  <div class="checkbox-section">
+                    <mat-checkbox formControlName="isResponsive">
+                      <mat-icon>devices</mat-icon>
+                      Make image responsive (recommended for emails)
+                    </mat-checkbox>
+                    <p class="checkbox-hint">Responsive images automatically adjust to screen size</p>
+                  </div>
+
+                  <!-- Quick Size Presets -->
+                  <div class="size-presets-section">
+                    <h4>Quick Size Presets:</h4>
+                    <div class="preset-buttons">
+                      <button mat-stroked-button type="button" (click)="setImagePresetSize(200, 'auto')"
+                        color="primary">
+                        <mat-icon>smartphone</mat-icon>
+                        Small (200px)
+                      </button>
+                      <button mat-stroked-button type="button" (click)="setImagePresetSize(400, 'auto')"
+                        color="primary">
+                        <mat-icon>tablet</mat-icon>
+                        Medium (400px)
+                      </button>
+                      <button mat-stroked-button type="button" (click)="setImagePresetSize(600, 'auto')"
+                        color="primary">
+                        <mat-icon>desktop_mac</mat-icon>
+                        Large (600px)
+                      </button>
+                      <button mat-stroked-button type="button" (click)="setImageResponsive()" color="accent">
+                        <mat-icon>devices</mat-icon>
+                        Full Width
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Live Preview -->
+                  <div class="preview-section-inline" *ngIf="imageEditForm.value.imageWidth">
+                    <h4>Preview:</h4>
+                    <div class="size-preview" [style.text-align]="imageEditForm.value.imageAlignment"
+                      [style.border]="'1px dashed #ccc'" [style.padding]="'10px'" [style.border-radius]="'4px'"
+                      [style.background]="'#fafafa'">
+                      <div class="preview-box"
+                        [style.width.px]="imageEditForm.value.isResponsive ? null : imageEditForm.value.imageWidth"
+                        [style.height.px]="imageEditForm.value.imageHeight !== 'auto' ? imageEditForm.value.imageHeight : null"
+                        [style.background]="'linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)'"
+                        [style.background-size]="'10px 10px'"
+                        [style.background-position]="'0 0, 0 5px, 5px -5px, -5px 0px'" [style.border]="'1px solid #ddd'"
+                        [style.border-radius]="'4px'" [style.display]="'inline-block'" [style.min-height.px]="60"
+                        [style.max-width]="'100%'">
+                        <span
+                          style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 12px; padding: 10px;">
+                          {{getImagePreviewText()}}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </mat-card-content>
+
+              <mat-card-actions align="end">
+                <button mat-button (click)="cancelImageEdit()">
+                  <mat-icon>close</mat-icon>
+                  Cancel
+                </button>
+                <button mat-button (click)="resetImageToOriginal()" color="warn">
+                  <mat-icon>restore</mat-icon>
+                  Reset
+                </button>
+                <button mat-raised-button color="primary" (click)="updateImageInline()"
+                  [disabled]="!imageEditForm.valid">
+                  <mat-icon>save</mat-icon>
+                  Update Image
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
+            <!-- Button Form -->
+            <mat-card *ngIf="showButtonForm" class="input-form">
+              <mat-card-header>
+                <mat-card-title>
+                  <mat-icon>link</mat-icon>
+                  Add Call to Action Button
+                </mat-card-title>
+              </mat-card-header>
+
+              <mat-card-content>
+                <form [formGroup]="buttonForm" class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Button Text *</mat-label>
+                    <input matInput formControlName="buttonText" placeholder="Call to Action">
+                    <mat-icon matSuffix>text_fields</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Button URL *</mat-label>
+                    <input matInput type="url" formControlName="buttonUrl" placeholder="https://example.com">
+                    <mat-icon matSuffix>link</mat-icon>
+                    <mat-error *ngIf="buttonForm.get('buttonUrl')?.hasError('required')">URL is required</mat-error>
+                    <mat-error *ngIf="buttonForm.get('buttonUrl')?.hasError('pattern')">Please enter a valid URL
+                      starting with http:// or https://</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Background Color *</mat-label>
+                    <input matInput formControlName="buttonColor" placeholder="#28a745">
+                    <input matInput type="color" formControlName="buttonColor"
+                      style="position: absolute; right: 40px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border: none; background: none; cursor: pointer;">
+                    <mat-icon matSuffix>palette</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Text Color *</mat-label>
+                    <input matInput formControlName="buttonTextColor" placeholder="#ffffff">
+                    <input matInput type="color" formControlName="buttonTextColor"
+                      style="position: absolute; right: 40px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border: none; background: none; cursor: pointer;">
+                    <mat-icon matSuffix>format_color_text</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Button Size *</mat-label>
+                    <mat-select formControlName="buttonSize">
+                      <mat-option value="small">Small</mat-option>
+                      <mat-option value="medium">Medium</mat-option>
+                      <mat-option value="large">Large</mat-option>
+                    </mat-select>
+                    <mat-icon matSuffix>photo_size_select_large</mat-icon>
+                  </mat-form-field>
+                </form>
+              </mat-card-content>
+
+              <mat-card-actions align="end">
+                <button mat-button (click)="cancelButtonForm()">
+                  <mat-icon>close</mat-icon>
+                  Cancel
+                </button>
+                <button mat-raised-button color="primary" (click)="insertButton()" [disabled]="!buttonForm.valid">
+                  <mat-icon>add</mat-icon>
+                  Insert Button
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
+            <!-- Image Form -->
+            <mat-card *ngIf="showImageForm" class="input-form">
+              <mat-card-header>
+                <mat-card-title>
+                  <mat-icon>image</mat-icon>
+                  Add Image
+                </mat-card-title>
+              </mat-card-header>
+
+              <mat-card-content>
+                <form [formGroup]="imageForm" class="form-grid">
+                  <!-- File Upload Section -->
+                  <div class="upload-section">
+                    <mat-label>Upload Image</mat-label>
+                    <div class="upload-area">
+                      <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*"
+                        style="display: none;">
+                      <button mat-stroked-button (click)="fileInput.click()" [disabled]="isUploadingImage">
+                        <mat-icon>upload</mat-icon>
+                        Choose Image
+                      </button>
+                      <span class="file-info" *ngIf="selectedFile">{{selectedFile.name}}</span>
+                      <button mat-raised-button color="accent" (click)="uploadImage()"
+                        [disabled]="!selectedFile || isUploadingImage">
+                        <mat-spinner diameter="16" *ngIf="isUploadingImage"></mat-spinner>
+                        <mat-icon *ngIf="!isUploadingImage">cloud_upload</mat-icon>
+                        {{isUploadingImage ? 'Uploading...' : 'Upload'}}
+                      </button>
+                    </div>
+                    <mat-hint>Or enter image URL manually below</mat-hint>
+                  </div>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Image URL *</mat-label>
+                    <input matInput type="url" formControlName="imageUrl" placeholder="https://example.com/image.jpg">
+                    <mat-icon matSuffix>link</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Alt Text *</mat-label>
+                    <input matInput formControlName="imageAlt" placeholder="Image description">
+                    <mat-icon matSuffix>description</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" *ngIf="!imageForm.get('isResponsive')?.value">
+                    <mat-label>Width (px) *</mat-label>
+                    <input matInput type="number" formControlName="imageWidth" placeholder="400" min="50" max="1200">
+                    <mat-icon matSuffix>photo_size_select_large</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" *ngIf="!imageForm.get('isResponsive')?.value">
+                    <mat-label>Height (px)</mat-label>
+                    <input matInput formControlName="imageHeight" placeholder="auto or number">
+                    <mat-icon matSuffix>height</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Alignment *</mat-label>
+                    <mat-select formControlName="imageAlignment">
+                      <mat-option value="left">Left</mat-option>
+                      <mat-option value="center">Center</mat-option>
+                      <mat-option value="right">Right</mat-option>
+                    </mat-select>
+                    <mat-icon matSuffix>format_align_center</mat-icon>
+                  </mat-form-field>
+
+                  <div class="checkbox-section">
+                    <mat-checkbox formControlName="isResponsive">
+                      Make image responsive (recommended for emails)
+                    </mat-checkbox>
+                  </div>
+                </form>
+              </mat-card-content>
+
+              <mat-card-actions align="end">
+                <button mat-button (click)="cancelImageForm()">
+                  <mat-icon>close</mat-icon>
+                  Cancel
+                </button>
+                <button mat-raised-button color="primary" (click)="insertImage()" [disabled]="!imageForm.valid">
+                  <mat-icon>add</mat-icon>
+                  Insert Image
+                </button>
+              </mat-card-actions>
+            </mat-card>
+
+            <!-- Notes Section -->
+            <mat-form-field appearance="outline" class="full-width notes-section">
+              <mat-label>Notes for creating these emails to Participants</mat-label>
+              <textarea matInput formControlName="notes" rows="4"
+                placeholder="Enter any notes or instructions..."></textarea>
+              <mat-icon matSuffix>notes</mat-icon>
+            </mat-form-field>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="right-panel">
+        <mat-card class="preview-section">
+          <mat-card-header class="preview-header">
+            <mat-card-title>Preview</mat-card-title>
+            <div class="preview-toggle">
+              <mat-button-toggle-group value="desktop" aria-label="Preview Mode">
+                <mat-button-toggle value="desktop" (click)="isMobilePreview = false" [class.active]="!isMobilePreview">
+                  <mat-icon>desktop_mac</mat-icon>
+                </mat-button-toggle>
+                <mat-button-toggle value="mobile" (click)="isMobilePreview = true" [class.active]="isMobilePreview">
+                  <mat-icon>phone_android</mat-icon>
+                </mat-button-toggle>
+              </mat-button-toggle-group>
+            </div>
+          </mat-card-header>
+
+          <mat-card-content>
+            <div class="email-preview" [class.mobile-preview]="isMobilePreview">
+              <div class="email-header">
+                <div class="gmail-logo">
+                  <mat-icon>email</mat-icon>
+                  <span *ngIf="!isMobilePreview">Gmail</span>
+                </div>
+                <div class="email-time">{{getCurrentTime()}}</div>
+              </div>
+
+              <div class="email-subject">{{getPreviewSubject()}}</div>
+
+              <div class="email-sender">
+                <div class="sender-avatar">A&H</div>
+                <div class="sender-info">
+                  <div class="sender-name">Team Antano & Harini</div>
+                  <div class="sender-email" *ngIf="!isMobilePreview">&lt;soexcellence.com&gt;</div>
+                  <div class="sender-email">to me</div>
+                </div>
+                <div class="email-actions" *ngIf="!isMobilePreview">
+                  <button mat-icon-button class="action-btn">
+                    <mat-icon>reply</mat-icon>
+                  </button>
+                  <button mat-icon-button class="action-btn">
+                    <mat-icon>more_vert</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <div class="email-content" [innerHTML]="getPreviewContent()" (click)="onImageClick($event)"
+                style="cursor: pointer;">
+                <div class="empty-content" *ngIf="!getPreviewContent()">
+                  <mat-icon>drafts</mat-icon>
+                  <p>Your email content will appear here...</p>
+                  <small>Click on images to resize them</small>
+                </div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+  </form>
+</div>

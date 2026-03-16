@@ -1,0 +1,470 @@
+<div class="dialog-container">
+  <!-- Dialog Header -->
+  <div class="dialog-header">
+    <div class="dialog-header-content">
+      <mat-icon class="dialog-icon">people</mat-icon>
+      <h1 class="dialog-title">Manage Participant Lists</h1>
+    </div>
+    <button 
+      mat-icon-button 
+      class="close-button"
+      (click)="closeDialog()"
+      matTooltip="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Dialog Content -->
+  <div class="management-container">
+    <mat-tab-group 
+      [(selectedIndex)]="selectedTabIndex" 
+      (selectedIndexChange)="onTabChange($event)"
+      class="management-tabs">
+      
+      <!-- Participant Lists Tab -->
+      <mat-tab label="Participant List">
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">folder_special</mat-icon>
+          <span class="tab-label">Participant Lists</span>
+        </ng-template>
+        <div class="tab-content">
+          <div class="lists-container">
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" *ngIf="loading">
+              <mat-spinner diameter="50"></mat-spinner>
+              <p>Loading participant lists...</p>
+            </div>
+
+            <!-- Main Content -->
+            <div class="content-wrapper" [class.side-panel-open]="sidePanelOpen">
+              <!-- Header Section -->
+              <div class="header-section">
+                <div class="header-content">
+                  <div class="header-left">
+                    <mat-icon class="header-icon">people</mat-icon>
+                    <h1 class="page-title">Participant Lists Management</h1>
+                    <span class="list-count">{{ filteredParticipantLists.length }} list(s)</span>
+                  </div>
+                  <button 
+                    mat-raised-button 
+                    color="primary" 
+                    (click)="toggleCreateForm()"
+                    [disabled]="loading">
+                    <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
+                    {{ showCreateForm ? 'Cancel' : 'Create List' }}
+                  </button>
+                </div>
+
+                <!-- Filter Section -->
+                <div class="filter-section">
+                  <form [formGroup]="filterForm" class="filter-form">
+                    <div class="filter-row">
+                      <mat-form-field appearance="outline" class="filter-type-field">
+                        <mat-label>Filter By</mat-label>
+                        <mat-select formControlName="filterType">
+                          <mat-option value="all">
+                            <mat-icon>filter_list</mat-icon>
+                            All Fields
+                          </mat-option>
+                          <mat-option value="profileid">
+                            <mat-icon>fingerprint</mat-icon>
+                            Profile ID
+                          </mat-option>
+                          <mat-option value="name">
+                            <mat-icon>person</mat-icon>
+                            Name
+                          </mat-option>
+                          <mat-option value="email">
+                            <mat-icon>email</mat-icon>
+                            Email
+                          </mat-option>
+                          <mat-option value="phone">
+                            <mat-icon>phone</mat-icon>
+                            Phone
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="search-field">
+                        <mat-label>Search profiles</mat-label>
+                        <input 
+                          matInput 
+                          formControlName="searchTerm" 
+                          placeholder="Enter profile ID, name, email, or phone..."
+                          autocomplete="off">
+                        <mat-icon matPrefix>search</mat-icon>
+                        <button 
+                          mat-icon-button 
+                          matSuffix 
+                          *ngIf="filterForm.get('searchTerm')?.value"
+                          (click)="clearFilter()"
+                          matTooltip="Clear search">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      </mat-form-field>
+                    </div>
+                  </form>
+
+                  <!-- Filter Results Info -->
+                  <div class="filter-results-banner" *ngIf="isFiltering">
+                    <mat-icon class="banner-icon">filter_alt</mat-icon>
+                    <div class="banner-content">
+                      <strong>{{ matchedProfiles.length }} profile(s) matched</strong>
+                      <span>Found in {{ filteredParticipantLists.length }} participant list(s)</span>
+                    </div>
+                    <button 
+                      mat-stroked-button 
+                      color="primary" 
+                      (click)="clearFilter()"
+                      class="clear-filter-btn">
+                      <mat-icon>clear</mat-icon>
+                      Clear Filter
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- Profile Selection Info Banner -->
+                <div class="profile-selection-banner" *ngIf="hasExternalProfiles()">
+                  <mat-icon class="banner-icon">info</mat-icon>
+                  <div class="banner-content">
+                    <strong>{{ externalProfileIds.length }} profile(s) selected</strong>
+                    <span>You can create a new list or merge these profiles into an existing list</span>
+                  </div>
+                </div>
+                
+                <div class="profile-selection-banner warning" *ngIf="!hasExternalProfiles()">
+                  <mat-icon class="banner-icon">warning</mat-icon>
+                  <div class="banner-content">
+                    <strong>No profiles selected</strong>
+                    <span>Create lists will be empty. Merge is disabled.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Create List Form -->
+              <mat-card class="create-form-card" *ngIf="showCreateForm">
+                <mat-card-content>
+                  <form [formGroup]="createListForm" class="create-form">
+                    <mat-form-field appearance="outline" class="form-field">
+                      <mat-label>List Name</mat-label>
+                      <input 
+                        matInput 
+                        formControlName="listname" 
+                        placeholder="Enter participant list name"
+                        autocomplete="off">
+                      <mat-icon matPrefix>label</mat-icon>
+                      <mat-error *ngIf="createListForm.get('listname')?.invalid && !isListNameDuplicate">
+                        {{ getErrorMessage('listname', createListForm) }}
+                      </mat-error>
+                      <mat-error *ngIf="isListNameDuplicate">
+                        This list name already exists. Please choose a different name.
+                      </mat-error>
+                      <mat-hint *ngIf="!isListNameDuplicate && createListForm.get('listname')?.value?.trim()">
+                        <span class="success-hint">✓ List name is available</span>
+                      </mat-hint>
+                    </mat-form-field>
+
+                    <div class="form-actions">
+                      <div class="selection-info" *ngIf="hasExternalProfiles()">
+                        <mat-icon>check_circle</mat-icon>
+                        <span>{{ externalProfileIds.length }} profile(s) will be added to this list</span>
+                      </div>
+                      <div class="selection-info warning" *ngIf="!hasExternalProfiles()">
+                        <mat-icon>warning</mat-icon>
+                        <span>No profiles selected. List will be created empty.</span>
+                      </div>
+                      <button 
+                        mat-raised-button 
+                        color="primary" 
+                        (click)="onCreateList()"
+                        [disabled]="createListForm.invalid || submitting || isListNameDuplicate">
+                        <mat-spinner diameter="20" *ngIf="submitting" class="button-spinner"></mat-spinner>
+                        <mat-icon *ngIf="!submitting">save</mat-icon>
+                        <span>{{ submitting ? 'Creating...' : 'Create List' }}</span>
+                      </button>
+                    </div>
+                  </form>
+                </mat-card-content>
+              </mat-card>
+
+              <!-- Participant Lists Table -->
+              <mat-card class="table-card">
+                <mat-card-content>
+                  <div class="table-container">
+                    <table mat-table [dataSource]="filteredParticipantLists" class="lists-table">
+                      <!-- List Name Column -->
+                      <ng-container matColumnDef="listname">
+                        <th mat-header-cell *matHeaderCellDef>
+                          <div class="header-cell">
+                            <mat-icon>label</mat-icon>
+                            <span>List Name</span>
+                          </div>
+                        </th>
+                        <td mat-cell *matCellDef="let list" class="list-name-cell">
+                          <div class="list-name">
+                            <mat-icon class="list-icon">folder</mat-icon>
+                            <div class="list-name-wrapper">
+                              <strong>{{ list.name }}</strong>
+                              <!-- Show matched profiles indicator when filtering -->
+                              <div class="matched-profiles-indicator" *ngIf="isFiltering && getMatchedProfilesInList(list).length > 0">
+                                <mat-icon>person_search</mat-icon>
+                                <span>{{ getMatchedProfilesInList(list).length }} match(es)</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </ng-container>
+
+                      <!-- Participants Column -->
+                      <ng-container matColumnDef="participants">
+                        <th mat-header-cell *matHeaderCellDef>
+                          <div class="header-cell">
+                            <mat-icon>group</mat-icon>
+                            <span>No. of Participants</span>
+                          </div>
+                        </th>
+                        <td mat-cell *matCellDef="let list" class="participants-cell">
+                          <div class="participants-count">
+                            <mat-icon class="count-icon" [matBadge]="list.profileids?.length || 0" matBadgeColor="primary">
+                              people
+                            </mat-icon>
+                            <span class="count-text">
+                              {{ list.profileids?.length || 0 }} participant(s)
+                            </span>
+                          </div>
+                          <!-- Show matched profiles chips when filtering -->
+                          <div class="matched-profiles-chips" *ngIf="isFiltering && getMatchedProfilesInList(list).length > 0">
+                            <mat-chip-set>
+                              <mat-chip 
+                                *ngFor="let profile of getMatchedProfilesInList(list).slice(0, 3)"
+                                class="matched-chip"
+                                [matTooltip]="profile.email || profile.id">
+                                {{ profile.name }}
+                              </mat-chip>
+                              <mat-chip 
+                                *ngIf="getMatchedProfilesInList(list).length > 3"
+                                class="more-chip">
+                                +{{ getMatchedProfilesInList(list).length - 3 }} more
+                              </mat-chip>
+                            </mat-chip-set>
+                          </div>
+                        </td>
+                      </ng-container>
+
+                      <!-- Actions Column -->
+                      <ng-container matColumnDef="actions">
+                        <th mat-header-cell *matHeaderCellDef>
+                          <div class="header-cell">
+                            <mat-icon>settings</mat-icon>
+                            <span>Actions</span>
+                          </div>
+                        </th>
+                        <td mat-cell *matCellDef="let list" class="actions-cell">
+                          <button 
+                            mat-raised-button
+                            color="accent"
+                            class="merge-btn"
+                            (click)="mergeProfiles(list, $event)"
+                            [disabled]="getMergeableProfileCount(list) === 0"
+                            [matTooltip]="getMergeableProfileCount(list) > 0 ? 
+                              'Merge ' + getMergeableProfileCount(list) + ' new profile(s)' : 
+                              'No new profiles to merge'">
+                            <mat-icon>merge</mat-icon>
+                            Merge
+                            <span class="merge-count" *ngIf="getMergeableProfileCount(list) > 0">
+                              ({{ getMergeableProfileCount(list) }})
+                            </span>
+                          </button>
+                          <button 
+                            mat-icon-button 
+                            color="primary"
+                            (click)="onSelectList(list)"
+                            matTooltip="View and edit list">
+                            <mat-icon>edit</mat-icon>
+                          </button>
+                          <button 
+                            mat-icon-button 
+                            color="warn"
+                            (click)="deleteList(list, $event)"
+                            matTooltip="Delete list">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </ng-container>
+
+                      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                      <tr 
+                        mat-row 
+                        *matRowDef="let row; columns: displayedColumns;"
+                        [class.selected-row]="selectedList?.docid === row.docid"
+                        [class.has-matches]="isFiltering && getMatchedProfilesInList(row).length > 0"
+                        (click)="onSelectList(row)">
+                      </tr>
+
+                      <!-- No Data Row -->
+                      <tr class="mat-row no-data-row" *matNoDataRow>
+                        <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+                          <div class="no-data">
+                            <mat-icon class="no-data-icon">{{ isFiltering ? 'search_off' : 'folder_off' }}</mat-icon>
+                            <p class="no-data-title">
+                              {{ isFiltering ? 'No matching participant lists found' : 'No participant lists found' }}
+                            </p>
+                            <p class="no-data-subtitle">
+                              {{ isFiltering ? 'Try adjusting your search criteria' : 'Create your first participant list to get started' }}
+                            </p>
+                            <button 
+                              mat-stroked-button 
+                              color="primary" 
+                              *ngIf="isFiltering"
+                              (click)="clearFilter()"
+                              class="no-data-action">
+                              <mat-icon>clear</mat-icon>
+                              Clear Filter
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+
+            <!-- Side Panel for Editing -->
+            <div class="side-panel" [class.open]="sidePanelOpen">
+              <div class="side-panel-header">
+                <div class="panel-title-section">
+                  <mat-icon class="panel-icon">edit</mat-icon>
+                  <h2 class="panel-title">Manage Participant List</h2>
+                </div>
+                <button mat-icon-button (click)="closeSidePanel()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="side-panel-content" *ngIf="selectedList">
+                <!-- List Info -->
+                <div class="list-info-section">
+                  <div class="info-item">
+                    <mat-icon class="info-icon">label</mat-icon>
+                    <div class="info-content">
+                      <span class="info-label">List Name</span>
+                      <span class="info-value">{{ selectedList.name }}</span>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <mat-icon class="info-icon">people</mat-icon>
+                    <div class="info-content">
+                      <span class="info-label">Total Participants</span>
+                      <span class="info-value">{{ selectedList.profiles?.length || 0 }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <mat-divider></mat-divider>
+
+                <!-- Current Participants -->
+                <div class="panel-section">
+                  <h3 class="section-title">
+                    <mat-icon>list</mat-icon>
+                    Current Participants ({{ selectedList.profiles?.length || 0 }})
+                  </h3>
+                  
+                  <div class="current-participants" *ngIf="selectedList.profiles && selectedList.profiles.length > 0">
+                    <div 
+                      class="participant-item" 
+                      *ngFor="let profile of selectedList.profiles; let i = index"
+                      [class.matched]="isFiltering && filterProfile(profile.id)">
+                      <div class="participant-info">
+                        <div class="participant-number">{{ i + 1 }}</div>
+                        <mat-icon class="participant-icon">person</mat-icon>
+                        <div class="participant-details">
+                          <span class="participant-name">{{ profile.name }}</span>
+                          <span class="participant-email" *ngIf="profile.email">{{ profile.email }}</span>
+                          <span class="participant-phone" *ngIf="profile.phone">{{ profile.phone }}</span>
+                          <span class="participant-id">ID: {{ profile.id }}</span>
+                        </div>
+                      </div>
+                      <button 
+                        mat-icon-button 
+                        color="warn"
+                        (click)="removeProfileFromList(profile.id)"
+                        [disabled]="updatingList"
+                        matTooltip="Remove from list">
+                        <mat-icon>remove_circle</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="empty-state" *ngIf="!selectedList.profiles || selectedList.profiles.length === 0">
+                    <mat-icon class="empty-icon">inbox</mat-icon>
+                    <p>No participants in this list</p>
+                    <p class="empty-subtitle">Add participants using the form below</p>
+                  </div>
+                </div>
+
+                <mat-divider></mat-divider>
+
+                <!-- Add Participant -->
+                <!-- <div class="panel-section">
+                  <h3 class="section-title">
+                    <mat-icon>person_add</mat-icon>
+                    Add Participant
+                  </h3>
+                  
+                  <div [formGroup]="addProfileForm" class="add-profile-form" *ngIf="availableProfilesForSelected.length > 0">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Select Profile to Add</mat-label>
+                      <mat-select formControlName="profile" multiple placeholder="Choose a profile">
+                        <mat-option *ngFor="let profile of availableProfilesForSelected" [value]="profile.id">
+                          <div class="profile-option">
+                            <span class="profile-option-name">{{ profile.name }}</span>
+                            <span class="profile-option-email" *ngIf="profile.email">{{ profile.email }}</span>
+                          </div>
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    
+                    <button 
+                      mat-raised-button 
+                      color="primary" 
+                      (click)="addProfileToList()"
+                      [disabled]="addProfileForm.invalid || updatingList"
+                      class="add-button">
+                      <mat-spinner diameter="20" *ngIf="updatingList" class="button-spinner"></mat-spinner>
+                      <mat-icon *ngIf="!updatingList">add</mat-icon>
+                      <span>{{ updatingList ? 'Adding...' : 'Add to List' }}</span>
+                    </button>
+                  </div>
+
+                  <div class="empty-state" *ngIf="availableProfilesForSelected.length === 0">
+                    <mat-icon class="empty-icon">check_circle</mat-icon>
+                    <p>All available profiles are already in this list</p>
+                  </div>
+                </div> -->
+              </div>
+            </div>
+
+            <!-- Backdrop -->
+            <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Segments Tab -->
+      <mat-tab label="Segments">
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">people</mat-icon>
+          <span class="tab-label">Segments</span>
+        </ng-template>
+        <div class="tab-content">
+          <app-create-segments-dialog></app-create-segments-dialog>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</div>

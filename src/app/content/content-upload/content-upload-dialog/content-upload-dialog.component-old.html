@@ -1,0 +1,166 @@
+
+<main style="padding: 20px;">
+	<h4 class="d-flex justify-content-center">Add (or) Modify Content</h4>
+    <div class="d-flex flex-row flex-wrap">
+        <section style="width:40%">
+			<form [formGroup]="contentform">
+				<mat-form-field style="width: 300px;" appearance="outline">
+					<mat-label>Title</mat-label>
+					<input type="text" matInput formControlName="title" placeholder="enter a name">
+					<mat-error *ngIf="contentform.get('title').hasError('required')">Enter a title</mat-error>
+				</mat-form-field>
+				<br>
+				Available : <mat-slide-toggle formControlName="available"></mat-slide-toggle>
+			</form>
+			<div class="m10 mt-4">
+				<label for="file"> Upload Video </label>
+				<div *ngIf="Videourl.length == 0">
+					<input 
+					type="file" 
+					id="file" 
+					(change)="uploadVideo($event)"
+					required
+					mat-stroked-button
+					accept=".mp4,.mov,.mkv,.avi"
+					>
+				</div>
+			</div>
+			<div style="margin-top: 10px;" *ngIf="Videourl.length != 0">
+				<p *ngFor="let doc of Videourl;let i = index">
+					<video controls name="media" height="250" width="350">
+						<source [src]="sanitize(doc.url)" >
+					</video>
+					<mat-card style="height: 65px;display: flex;flex-direction: row;justify-content: space-between;background-color: darkgrey;color: white;border-radius: 0;">
+						<div>
+							<button style="float: left;" mat-icon-button type="button"><mat-icon >image</mat-icon></button>
+						</div>
+						<div>
+							<p>{{doc.filename}}</p>
+						</div>
+						<div style="left:10px;">   
+							<button style="float: right;" mat-icon-button type="button" (click)="cancelVideo(i)"><mat-icon>close</mat-icon></button>
+						</div>
+					</mat-card>                    
+				</p>
+			</div>
+			<div class="m10">
+				<label> Upload thumbnail </label>
+				<div *ngIf="Thumbnailurl.length == 0">
+					<input 
+					type="file" 
+					multiple="false"
+					accept=".png,.jpg,.jpeg"
+					(change)="uploadThumbnail($event)"
+					required
+					mat-stroked-button
+					>
+				</div>
+			</div>
+			<div style="margin-top: 10px;" *ngIf="Thumbnailurl.length != 0">
+				<p *ngFor="let doc of Thumbnailurl;let i = index" >
+					<img [src]="doc.url" height="250" width="350">
+					<mat-card style="display: flex;flex-direction: row;justify-content: space-between;background-color: darkgrey;color: white;border-radius: 0;">
+					<div>
+						<button style="float: left;" mat-icon-button type="button"><mat-icon >image</mat-icon></button>
+					</div>
+					<div>
+						<p>{{doc.filename}}</p>
+					</div>
+					<div>
+						<button style="float: right;" mat-icon-button type="button" (click)="cancelthumbnail(i)"><mat-icon>close</mat-icon></button>
+					</div>
+					</mat-card>                    
+				</p>
+			</div>
+			<form #myForm="ngForm" style="margin-bottom: 20px;">
+				<div style="margin-top: 10px;">
+					<label style="margin-top: 10px;">Type</label><br>
+					<mat-radio-group aria-label="Type" [(ngModel)]="type" 
+					  ngModel
+					  required
+					  name="name"
+					  #name="ngModel"> 
+						<mat-radio-button value='testimonial'>testimonial</mat-radio-button>
+						<mat-radio-button  style="margin-left: 10px;" value='event'>event</mat-radio-button>
+						<mat-error *ngIf="!name.valid && name.touched" style="color: red;">Type required</mat-error>
+					</mat-radio-group>
+				</div>
+				<div style="margin-top: 10px;">
+					<mat-form-field appearance="outline" class="w-50">
+						<mat-label>Publish Date</mat-label>
+						<input matInput [matDatepicker]="datepicker" [(ngModel)]="publishdate" ngModel
+						required
+						name="date"
+						#date="ngModel">
+						<mat-hint>MM/DD/YYYY</mat-hint>
+						<mat-datepicker-toggle matSuffix [for]="datepicker"></mat-datepicker-toggle>
+						<mat-datepicker #datepicker>
+						  <mat-datepicker-actions>
+							<button mat-button matDatepickerCancel>Cancel</button>
+							<button mat-raised-button color="primary" matDatepickerApply>Apply</button>
+						  </mat-datepicker-actions>
+						</mat-datepicker>
+					</mat-form-field>
+				</div>
+				<!-- <div style="margin-top: 10px;">
+					<label style="margin-top: 10px;">Hero</label><br>
+					<mat-radio-group [(ngModel)]="hero">
+						<mat-radio-button [value]="true">true</mat-radio-button>
+						<mat-radio-button style="margin-left: 10px;" [value]="false">false</mat-radio-button>
+					</mat-radio-group>
+				</div> -->
+				<section class="example-section mt-4">
+					<mat-checkbox class="example-margin" [(ngModel)]="hero" name="heroCheckbox">Hero</mat-checkbox>
+				</section>
+			</form>
+        </section>
+		<mat-divider [vertical]="true" style="margin-left:20px;margin-right:20px"></mat-divider>
+        <section style="width:50%">
+			<!-- <div style="margin-top: 10px;">
+				<mat-form-field appearance="outline">
+					<mat-label>Select Tags</mat-label>
+					<mat-select [(ngModel)]="tags" multiple>
+						<mat-option *ngFor="let option of taxonomyList" [value]="option.id">{{option.name}}</mat-option>
+					</mat-select>
+				</mat-form-field>
+			</div> -->
+			<h6>Update Tag :-</h6>
+			<mat-chip-set>
+				<mat-chip 
+					*ngFor="let tag of tags;let i = index" 
+					color="primary"
+					>
+						{{mapTaxonomy[tag]}}
+            <button matChipRemove (click)="onTagRemove(i)">
+                <mat-icon>cancel</mat-icon>
+            </button>				
+        </mat-chip>
+			</mat-chip-set>
+			<div>
+				<mat-form-field appearance="outline" class="w-100">
+					<mat-label>Search Tag</mat-label>
+					<input type="text" matInput (keyup)="onTagSearch($event)">
+				</mat-form-field>
+			</div>
+			<!-- [selected]="tags.includes(tag.id)"
+			#chiptaglist
+			#chiptag="matChip" 
+			selectable="true" multiple -->
+			<mat-chip-set >
+				<mat-chip-option
+					*ngFor="let tag of filteredTaxonomyList;" 
+					[value]="tag.id"
+					color="primary"
+					(click)="onTagSelect(tag.id)"
+					>
+						{{tag['name']}}
+				</mat-chip-option>
+			</mat-chip-set>
+        </section>
+    </div>
+	<mat-divider style="margin-top: 20px;"></mat-divider>
+	<section style="margin-top: 20px;" class="d-flex flex-row justify-content-center">
+		<button type="button" mat-stroked-button (click)="dialogClose()">Back</button>&nbsp;&nbsp;&nbsp;&nbsp;
+		<button type="submit" mat-stroked-button color="primary" (click)="submit(contentform.value)" [disabled]="contentform.invalid || myForm.invalid" >Submit</button>
+	</section>
+</main>

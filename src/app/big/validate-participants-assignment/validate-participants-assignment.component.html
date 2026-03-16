@@ -1,0 +1,394 @@
+<!-- Loading State -->
+<div *ngIf="loading" class="loading-container">
+  <div class="spinner"></div>
+  <p>Loading...</p>
+</div>
+
+<div *ngIf="!loading" class="app-container" [style.--theme-color]="themeColor">
+  
+  <!-- Left Sidebar - Marathon & Assignments -->
+  <aside class="left-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <mat-icon class="brand-icon">assignment_turned_in</mat-icon>
+        <span class="sidebar-title">Validator</span>
+      </div>
+    </div>
+
+    <!-- Marathon Dropdown -->
+    <div class="filter-section">
+      <label class="filter-label">Marathon</label>
+      <div class="select-wrapper">
+        <select 
+          class="select-input"
+          [ngModel]="selectedMarathonId"
+          (ngModelChange)="onMarathonChange($event)">
+          <option [ngValue]="null" disabled>Select Marathon</option>
+          <option *ngFor="let marathon of marathons" [ngValue]="marathon.id">
+            {{ marathon.title }}
+          </option>
+        </select>
+        <mat-icon class="select-arrow">expand_more</mat-icon>
+      </div>
+    </div>
+
+    <!-- Cohorts Filter Dropdown -->
+    <div class="filter-section" *ngIf="selectedMarathonId && filteredCohorts.length > 0">
+      <label class="filter-label">Filter by Cohort</label>
+      <div class="select-wrapper">
+        <select 
+          class="select-input"
+          [ngModel]="selectedFilterCohortId"
+          (ngModelChange)="onCohortFilterChange($event)">
+          <option [ngValue]="null">All Cohorts</option>
+          <option *ngFor="let cohort of filteredCohorts" [ngValue]="cohort.id">
+            {{ cohort.name }}
+          </option>
+        </select>
+        <mat-icon class="select-arrow">expand_more</mat-icon>
+      </div>
+    </div>
+
+    <!-- Assignment Search -->
+    <div class="search-section" *ngIf="selectedMarathonId">
+      <div class="search-box">
+        <mat-icon class="search-icon">search</mat-icon>
+        <input 
+          type="text" 
+          placeholder="Search assignments..."
+          [value]="assignmentSearchText"
+          (input)="onAssignmentSearch($event)">
+      </div>
+    </div>
+
+    <!-- Loading Assignments -->
+    <div *ngIf="loadingAssignments" class="loading-inline">
+      <div class="spinner-small"></div>
+      <span>Loading...</span>
+    </div>
+
+    <!-- Assignments List -->
+    <div class="assignments-list" *ngIf="selectedMarathonId && !loadingAssignments">
+      <div 
+        *ngFor="let assignment of filteredAssignments"
+        class="assignment-item"
+        [class.active]="selectedAssignmentId === assignment.id"
+        (click)="onAssignmentChange(assignment.id)">
+        <div class="assignment-indicator" [style.background]="themeColor"></div>
+        <div class="assignment-content">
+          <span class="assignment-title">{{ assignment.title }}</span>
+          <div class="assignment-meta">
+            <span class="assignment-type">{{ assignment.assignmenttype }}</span>
+            <span class="assignment-status" [class]="assignment.status || 'initiated'">
+              {{ assignment.status || 'initiated' }}
+            </span>
+          </div>
+          <div class="assignment-cohort" *ngIf="assignment.cohortsref && mapCohorts[assignment.cohortsref.id]">
+            <mat-icon class="cohort-icon">group</mat-icon>
+            <span>{{ mapCohorts[assignment.cohortsref.id]?.name }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="filteredAssignments.length === 0" class="empty-message">
+        <mat-icon>search_off</mat-icon>
+        <span>No assignments found</span>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!selectedMarathonId" class="empty-state">
+      <mat-icon>folder_open</mat-icon>
+      <p>Select a marathon to view assignments</p>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    
+    <!-- Top Bar -->
+    <header class="top-bar" *ngIf="selectedAssignment">
+      <div class="top-bar-left">
+        <h1 class="page-title">{{ selectedAssignment.title }}</h1>
+        <span class="assignment-badge" [style.borderColor]="themeColor" [style.color]="themeColor">
+          {{ selectedAssignment.assignmenttype }}
+        </span>
+        <span class="selected-count" *ngIf="getTotalSelectedCount() > 0">
+          {{ getTotalSelectedCount() }} selected
+        </span>
+      </div>
+      <div class="top-bar-right">
+        <!-- Communication Buttons -->
+        <div class="comm-buttons">
+          <button 
+            class="comm-btn" 
+            (click)="sendNotification()" 
+            [matTooltip]="getTotalSelectedCount() > 0 ? 'Send notification to ' + getTotalSelectedCount() + ' selected' : 'Send notification to all'">
+            <mat-icon>notifications</mat-icon>
+          </button>
+          <button 
+            class="comm-btn" 
+            (click)="sendEmail()" 
+            [matTooltip]="getTotalSelectedCount() > 0 ? 'Send email to ' + getTotalSelectedCount() + ' selected' : 'Send email to all'">
+            <mat-icon>email</mat-icon>
+          </button>
+          <button 
+            class="comm-btn whatsapp" 
+            (click)="sendWhatsApp()" 
+            [matTooltip]="getTotalSelectedCount() > 0 ? 'Send WhatsApp to ' + getTotalSelectedCount() + ' selected' : 'Send WhatsApp to all'">
+            <mat-icon>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+            </mat-icon>
+          </button>
+        </div>
+        
+        <div class="divider-vertical"></div>
+        
+        <button class="icon-btn primary" (click)="bigChat()" matTooltip="Support Chat">
+          <mat-icon>support_agent</mat-icon>
+        </button>
+        <button class="icon-btn" (click)="toggleDetailsPanel()" matTooltip="Toggle Details">
+          <mat-icon>{{ showDetailsPanel ? 'chevron_right' : 'info' }}</mat-icon>
+        </button>
+      </div>
+    </header>
+
+    <!-- Cohort Queue Filter (Horizontal Chips) -->
+    <!-- <div class="cohort-queue" *ngIf="selectedAssignment && cohortQueues.length > 0">
+      <span class="queue-label">Participants:</span>
+      <div class="cohort-chips">
+        <button 
+          class="cohort-chip"
+          [class.active]="!selectedCohortQueueId"
+          (click)="onCohortQueueFilter(null)">
+          <span>All</span>
+          <span class="chip-count">{{ getTotalParticipants() }}</span>
+        </button>
+        <button 
+          *ngFor="let cohort of cohortQueues"
+          class="cohort-chip"
+          [class.active]="selectedCohortQueueId === cohort.id"
+          [style.--cohort-color]="cohort.color || themeColor"
+          (click)="onCohortQueueFilter(cohort.id)">
+          <span>{{ cohort.name }}</span>
+          <span class="chip-count">{{ cohort.participantCount }}</span>
+        </button>
+      </div>
+    </div> -->
+
+    <!-- Loading Participants -->
+    <div *ngIf="loadingParticipants" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading participants...</p>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="kanban-wrapper" *ngIf="selectedAssignment && !loadingParticipants">
+      <div class="kanban-board">
+        <div *ngFor="let status of statusList" class="kanban-column">
+          
+          <!-- Column Header -->
+          <div class="column-header" [style.borderColor]="themeColor">
+            <div class="column-title-group">
+              <mat-icon class="column-icon">{{ statusIcons[status] }}</mat-icon>
+              <span class="column-title">{{ status }}</span>
+            </div>
+            <span class="column-count" [style.background]="themeColor">{{ getStatusCount(status) }}</span>
+          </div>
+
+          <!-- Search -->
+          <div class="column-search">
+            <mat-icon class="search-icon-sm">search</mat-icon>
+            <input 
+              type="text" 
+              placeholder="Search..."
+              (keyup)="onSearchParticipant($event, status)">
+          </div>
+
+          <!-- Select All & Move Bar -->
+          <div class="column-actions-bar">
+            <button 
+              class="select-all-btn"
+              [class.active]="isAllSelected(status)"
+              (click)="toggleSelectAll(status)">
+              <mat-icon>{{ isAllSelected(status) ? 'check_box' : isAnySelected(status) ? 'indeterminate_check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span>Select All</span>
+            </button>
+            <button 
+              class="move-all-btn"
+              [matMenuTriggerFor]="bulkMoveMenu"
+              [disabled]="getSelectedCount(status) === 0"
+              matTooltip="Move selected">
+              <mat-icon>drive_file_move</mat-icon>
+              <span *ngIf="getSelectedCount(status) > 0">({{ getSelectedCount(status) }})</span>
+            </button>
+            <mat-menu #bulkMoveMenu="matMenu" class="move-menu">
+              <div class="menu-header">Move to</div>
+              <button mat-menu-item *ngFor="let s of filteredStatus(status)" (click)="moveParticipant(status, s)">
+                <mat-icon>{{ statusIcons[s] }}</mat-icon>
+                <span>{{ s }}</span>
+              </button>
+            </mat-menu>
+          </div>
+
+          <!-- Participants -->
+          <div class="participants-list">
+            <div 
+              *ngFor="let p of filteredParticipantAssignmentsByStatus[status] || []"
+              class="participant-card"
+              [class.selected]="selectedParticipantAssignments[status]?.[p.docid]">
+              
+              <mat-checkbox 
+                [checked]="selectedParticipantAssignments[status]?.[p.docid] || false"
+                (change)="onSelectParticipantAssignment(status, p.docid, $event)"
+                class="participant-checkbox">
+              </mat-checkbox>
+              
+              <div class="participant-avatar" [style.background]="themeColor">
+                {{ (mapProfile[p.profileid]?.name || 'U').charAt(0).toUpperCase() }}
+              </div>
+              
+              <div class="participant-info">
+                <span class="participant-name">{{ mapProfile[p.profileid]?.name || 'Unknown' }}</span>
+                <span class="participant-cohort" *ngIf="mapCohorts[p.cohortsref?.id]">
+                  {{ mapCohorts[p.cohortsref?.id]?.name }}
+                </span>
+              </div>
+              
+              <div class="participant-actions">
+                <!-- Review Button -->
+                <button 
+                  *ngIf="status === 'review'"
+                  class="action-btn-sm review"
+                  (click)="review(p)"
+                  matTooltip="Review">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+                
+                <!-- Move Button -->
+                <button 
+                  class="action-btn-sm move"
+                  [matMenuTriggerFor]="singleMoveMenu"
+                  matTooltip="Move">
+                  <mat-icon>arrow_forward</mat-icon>
+                </button>
+                <mat-menu #singleMoveMenu="matMenu" class="move-menu">
+                  <div class="menu-header">Move to</div>
+                  <button mat-menu-item *ngFor="let s of filteredStatus(status)" (click)="moveSingleParticipant(p.docid, status, s)">
+                    <mat-icon>{{ statusIcons[s] }}</mat-icon>
+                    <span>{{ s }}</span>
+                  </button>
+                </mat-menu>
+              </div>
+            </div>
+
+            <div *ngIf="!filteredParticipantAssignmentsByStatus[status]?.length" class="empty-column">
+              <mat-icon>inbox</mat-icon>
+              <span>No participants</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Assignment Selected -->
+    <div *ngIf="!selectedAssignment && !loading" class="no-selection">
+      <div class="no-selection-icon">
+        <mat-icon>touch_app</mat-icon>
+      </div>
+      <h2>Select an Assignment</h2>
+      <p>Choose an assignment from the left panel to manage participants</p>
+    </div>
+  </main>
+
+  <!-- Right Sidebar - Assignment Details -->
+  <aside class="right-sidebar" *ngIf="selectedAssignment && showDetailsPanel">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Details</span>
+      <button class="close-btn" (click)="toggleDetailsPanel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="details-content">
+      <!-- Status -->
+      <div class="detail-card">
+        <div class="detail-group">
+          <label class="detail-label">Status</label>
+          <span class="status-badge" [class]="selectedAssignment.status || 'initiated'">
+            {{ selectedAssignment.status || 'initiated' }}
+          </span>
+        </div>
+
+        <!-- Participants Count -->
+        <div class="detail-group">
+          <label class="detail-label">Total Participants</label>
+          <span class="detail-value large" [style.color]="themeColor">{{ getTotalParticipants() }}</span>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="detail-card" *ngIf="selectedAssignment['description']">
+        <label class="detail-label">Description</label>
+        <p class="detail-text">{{ selectedAssignment['description'] }}</p>
+      </div>
+
+      <!-- Dates -->
+      <div class="detail-card">
+        <div class="detail-row">
+          <div class="detail-group">
+            <label class="detail-label">Start Date</label>
+            <span class="detail-value">
+              {{ selectedAssignment['startdate'] ? (selectedAssignment['startdate'].toDate() | date:'mediumDate') : '-' }}
+            </span>
+          </div>
+          <div class="detail-group">
+            <label class="detail-label">End Date</label>
+            <span class="detail-value">
+              {{ selectedAssignment['enddate'] ? (selectedAssignment['enddate'].toDate() | date:'mediumDate') : '-' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mark Complete -->
+      <div class="detail-card">
+        <mat-checkbox 
+          [checked]="selectedAssignment.status === 'completed'" 
+          (change)="markAssignmentCompletion($event)"
+          class="completion-checkbox">
+          Mark as Completed
+        </mat-checkbox>
+      </div>
+
+      <!-- Admins -->
+      <div class="detail-card" *ngIf="admins.length > 0">
+        <label class="detail-label">Admins</label>
+        <div class="admin-list">
+          <div *ngFor="let id of admins" class="admin-item">
+            <div class="admin-avatar" [style.background]="themeColor">
+              {{ (mapProfile[id]?.name || 'A').charAt(0).toUpperCase() }}
+            </div>
+            <span>{{ mapProfile[id]?.name || 'Unknown' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="detail-card">
+        <label class="detail-label">Summary Notes</label>
+        <textarea 
+          class="summary-input"
+          [(ngModel)]="summary"
+          placeholder="Add notes..."
+          rows="4"></textarea>
+        <button class="save-btn" [style.background]="themeColor" (click)="onUpdateSummary()">
+          <mat-icon>save</mat-icon>
+          Save Notes
+        </button>
+      </div>
+    </div>
+  </aside>
+</div>

@@ -1,0 +1,97 @@
+<div class="mainscreen">
+  <h5 class="heading">App Action Pending</h5>
+  <div class="body mat-elevation-z2">
+    <div class="actionbox">
+      <div class="actionitem">
+        <mat-form-field appearance="outline">
+          <mat-label>Filter</mat-label>
+          <input matInput #input autocomplete="off" (keyup)="filterTable(input.value)">
+        </mat-form-field>
+      </div>
+      <div class="actionitem">
+        <button class="addbtn" mat-stroked-button (click)="updatePendingAction(null)">Add New</button>
+      </div>
+    </div>
+    <table mat-table [dataSource]="appPendingActionList" matSort>
+      <!-- participant -->
+      <ng-container matColumnDef="profilename">
+       <th mat-header-cell *matHeaderCellDef mat-sort-header> Participant </th>
+       <td mat-cell *matCellDef="let row"> {{row["profilename"]}}</td>
+      </ng-container>
+      <!-- Video Ask -->
+      <ng-container matColumnDef="videoaskname">
+       <th mat-header-cell *matHeaderCellDef mat-sort-header>VideoAsk Pending</th>
+       <td mat-cell *matCellDef="let row"> 
+        <div *ngIf="row['videoaskname'] != null && row['videoaskname'] != undefined">
+          <ul>
+            <li *ngFor="let item of row['videoaskname']">{{item}}</li>
+          </ul>
+        </div>
+      </td>
+     </ng-container>
+      <!-- Forms -->
+      <ng-container matColumnDef="formname">
+       <th mat-header-cell *matHeaderCellDef mat-sort-header>Forms Pending</th>
+       <td mat-cell *matCellDef="let row"> 
+        <div *ngIf="row['formname'] != null && row['formname'] != undefined">
+          <ul>
+            <li *ngFor="let item of row['formname']">{{item}}</li>
+          </ul>
+        </div>
+      </td>
+     </ng-container>
+      <!-- mandatory -->
+      <ng-container matColumnDef="mandatory">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Mandatory</th>
+          <td mat-cell *matCellDef="let row">
+            <div *ngIf="row['mandatoryaction'] != null && row['mandatoryaction'] != undefined">
+              <ul>
+                <li *ngFor="let item of row['mandatoryaction']">{{mapMandatoryActions[item]}}</li>
+              </ul>
+            </div>
+          </td>
+        </ng-container>
+      <!-- quiz -->
+      <ng-container matColumnDef="quizquestion">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          Quiz Pending
+        </th>
+
+        <td mat-cell *matCellDef="let row">
+          <ng-container *ngIf="row['quizquestion']?.length; else noQuiz">
+            <ul style="margin: 0; padding-left: 18px;">
+              <li *ngFor="let item of row['quizquestion']">
+                {{ item }}
+              </li>
+            </ul>
+          </ng-container>
+
+          <ng-template #noQuiz>
+            <span class="text-muted">—</span>
+          </ng-template>
+        </td>
+      </ng-container>
+
+      <!-- lastupdate -->
+      <ng-container matColumnDef="lastupdate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
+          <td mat-cell *matCellDef="let row"> 
+              {{row.lastupdate != null && row.lastupdate != undefined ? (row.lastupdate.toDate() | date: 'short') : '' }} 
+          </td>
+      </ng-container>
+                
+      <!-- Edit button -->
+      <ng-container matColumnDef="edit">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let row">
+          <button mat-icon-button color="primary" (click)="updatePendingAction(row)">
+              <mat-icon>edit</mat-icon>
+          </button>
+          </td>
+      </ng-container>
+     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+     <tr mat-row *matRowDef="let row; columns: displayedColumns" ></tr>
+   </table>
+   <mat-paginator [pageSizeOptions]="[25, 50, 100, 200]" aria-label="Select page of users"></mat-paginator> 
+  </div>
+</div>

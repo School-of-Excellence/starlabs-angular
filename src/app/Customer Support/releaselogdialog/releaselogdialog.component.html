@@ -1,0 +1,74 @@
+<div class="dialog-container">
+    <div class="form-actions" *ngIf="developer">
+        <p>Version Number : <b>{{logNumber}}</b></p>
+
+        <button mat-raised-button color="primary" type="submit" [disabled]="!logform.valid" (click)="addLog()">
+            Submit
+        </button>
+    </div>
+
+    <div class="dialog-content">
+        <form [formGroup]="logform">
+            <div formArrayName="notes" class="notes-container" *ngIf="developer">
+                <div *ngFor="let item of itemsArray.controls; let i=index" [formGroupName]="i" class="note-row">
+                    <mat-form-field appearance="outline" class="log-input">
+                        <mat-label>Log {{i+1}}</mat-label>
+                        <input matInput placeholder="Enter the update" formControlName="log">
+                        <mat-error *ngIf="item.get('log')?.invalid && item.get('log')?.touched">
+                            Log entry is required
+                        </mat-error>
+                    </mat-form-field>
+            
+                    <div class="action-buttons">
+                        <button mat-icon-button color="primary" type="button" 
+                                (click)="addItem()" 
+                                *ngIf="i === itemsArray.length - 1"
+                                matTooltip="Add new log">
+                            <mat-icon>add_circle</mat-icon>
+                        </button>
+                
+                        <button mat-icon-button color="warn" type="button" 
+                                (click)="removeItem(i)"
+                                *ngIf="itemsArray.length > 1"
+                                matTooltip="Remove log">
+                            <mat-icon>remove_circle</mat-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+       <div style="overflow: auto;">
+            <div *ngFor="let log of logArray; let i=index" style="border: 1px solid grey; padding: 10px; margin-bottom: 10px;">
+                <div class="header-info">
+                    <p><strong>Version:</strong> {{ log.versionno }}</p>
+                    <p><strong>Developer:</strong> {{ log.developer_name }}</p>
+                    <p><strong>Screen Name:</strong> {{ log.screen_name }}</p>
+                    <p><strong>Date:</strong> {{ log.date.toDate() | date:'short'}}</p>
+                </div>
+            
+                <div class="content-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S.No</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let notes of log.notes; let i = index">
+                                <td>{{ i + 1 }}</td>
+                                <td>{{ notes }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+       </div>
+    </div>
+  
+    <div mat-dialog-actions>
+      <button mat-button (click)="dialogRef.close()">Close</button>
+    </div>
+  </div>
+  

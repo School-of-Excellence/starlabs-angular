@@ -1,0 +1,106 @@
+<!-- <h2 mat-dialog-title>Add Product</h2>
+
+<div mat-dialog-content>
+  <form [formGroup]="productForm" class="form-container">
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Product Name</mat-label>
+      <input matInput formControlName="productnameeeee" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Short Description</mat-label>
+      <textarea matInput formControlName="shortdescription" rows="2"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="4"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Claim Link</mat-label>
+      <input matInput formControlName="claimlink" />
+    </mat-form-field>
+    <img [src]="productForm.value.productimage" width="80" *ngIf="isEditMode && productForm.value.productimage">
+
+    <div class="file-upload">
+      <label for="fileInput">Product Image:</label>
+      <input
+        type="file"
+        id="fileInput"
+        accept="image/*"
+        (change)="onFileSelected($event)"
+      />
+    </div>
+    
+  </form>
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-stroked-button color="warn" (click)="closeDialog()">Cancel</button>
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="saveProduct()"
+    [disabled]="uploading"
+  >
+    {{ uploading ? 'Uploading...' : 'Save Product' }}
+  </button>
+</div> -->
+
+<h2 mat-dialog-title>Add Product</h2>
+
+<div mat-dialog-content>
+  <form [formGroup]="productForm" class="form-container">
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Product Name</mat-label>
+      <input matInput formControlName="productname" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Short Description</mat-label>
+      <textarea matInput formControlName="shortdescription" rows="2"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="4"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Claim Link</mat-label>
+      <input matInput formControlName="claimlink" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+  <mat-label>Button Name</mat-label>
+  <input matInput formControlName="buttonname" />
+</mat-form-field>
+
+
+    <img [src]="productForm.value.productimage" width="80" *ngIf="isEditMode && productForm.value.productimage">
+
+    <div class="file-upload">
+      <label for="fileInput">Product Image:</label>
+      <input
+        type="file"
+        id="fileInput"
+        accept="image/*"
+        (change)="onFileSelected($event)"
+      />
+    </div>
+    
+  </form>
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-stroked-button color="warn" (click)="closeDialog()">Cancel</button>
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="saveProduct()"
+    [disabled]="uploading"
+  >
+    {{ uploading ? 'Uploading...' : 'Save Product' }}
+  </button>
+</div>

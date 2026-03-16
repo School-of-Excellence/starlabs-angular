@@ -1,0 +1,236 @@
+<mat-drawer-container class="drawer-container" hasBackdrop="true">
+  <mat-drawer #drawer mode="over" position="end" class="participant-drawer" autoFocus="false">
+    <div class="drawer-header">
+      <h3><i class="fa-solid fa-users"></i>&nbsp;&nbsp;{{drawerTitle}}</h3>
+      <button mat-icon-button (click)="drawer.close()"><mat-icon>close</mat-icon></button>
+    </div>
+    <mat-divider></mat-divider>
+    <div class="drawer-list">
+      <div class="drawer-list-item" *ngFor="let p of drawerParticipants; let i = index" [matMenuTriggerFor]="profileMenu">
+        <span class="participant-index">{{ i + 1 }}.</span>
+        <span class="participant-name">{{ p.name }}</span>
+        <span class="participant-count" *ngIf="p.count > 1">({{ p.count }})</span>
+        <span class="atc-tags" *ngIf="p.atcModels?.length">
+          <span class="atc-tag" *ngFor="let atc of p.atcModels">{{ atc }}</span>
+        </span>
+        <mat-menu #profileMenu="matMenu">
+          <button mat-menu-item (click)="openProfile(p.profileId,'userprofile')"><mat-icon>person</mat-icon><span>{{ p.name }}'s User Profile</span></button>
+          <button mat-menu-item (click)="openProfile(p.profileId,'profilesummary')"><mat-icon>person</mat-icon><span>{{ p.name }}'s Profile Summary</span></button>
+        </mat-menu>
+      </div>
+      <div class="drawer-list-item empty" *ngIf="!drawerParticipants.length">
+        <i class="fa-regular fa-folder-open"></i>&nbsp;&nbsp;No participants found
+      </div>
+    </div>
+  </mat-drawer>
+  <mat-drawer-content>
+    <div class="mainscreen">
+      <div class="page-header"><h1 class="page-title">B!G Engagement Dashboard</h1></div>
+      <div class="summary-cards-grid">
+        <div class="summary-card-wrapper">
+          <div class="summary-card-header">
+            <div class="summary-card-icon participants"><i class="fa-solid fa-users"></i></div>
+            <span class="summary-card-title">B!G Participants</span>
+          </div>
+          <div class="summary-card-body">
+            <div class="participant-badges">
+              <span class="summary-badge active clickable" (click)="openParticipantDrawer(drawer, 'active')"><span class="badge-label">Active</span><span class="badge-value">{{ activeCount }}</span></span>
+              <span class="summary-badge nonactive clickable" (click)="openParticipantDrawer(drawer, 'nonactive')"><span class="badge-label">Non-Active</span><span class="badge-value">{{ nonActiveCount }}</span></span>
+              <span class="summary-badge total clickable" (click)="openParticipantDrawer(drawer, 'total')"><span class="badge-label">Total</span><span class="badge-value">{{ activeCount + nonActiveCount }}</span></span>
+            </div>
+            <div class="journey-list">
+              <div class="stat-row stat-row-header"><span class="stat-label"></span><span class="stat-header-label">Active</span><span class="stat-header-label">Non-Active</span><span class="stat-header-label">Total</span></div>
+              <div class="journey-item" *ngFor="let j of journeySummary | keyvalue">
+                <span class="journey-label">{{ journeydata[j.key]['journey'] }}</span>
+                <div class="journey-badges">
+                  <span class="mini-badge active clickable" (click)="openJourneyDrawer(drawer, j.key, 'active')">{{ j.value.active }}</span>
+                  <span class="mini-badge nonactive clickable" (click)="openJourneyDrawer(drawer, j.key, 'nonactive')">{{ j.value.nonactive }}</span>
+                  <span class="mini-badge total clickable" (click)="openJourneyDrawer(drawer, j.key, 'total')">{{ j.value.total }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="summary-card-wrapper">
+          <div class="summary-card-header">
+            <div class="summary-card-icon atc"><i class="fa-solid fa-layer-group"></i></div>
+            <span class="summary-card-title">ATC Model Level Up</span>
+          </div>
+          <div class="summary-card-body">
+            <div class="stat-list">
+              <div class="stat-row stat-row-header"><span class="stat-label"></span><span class="stat-header-label">All</span><span class="stat-header-label">Unique</span></div>
+              <div class="stat-row clickable-row" *ngFor="let model of filteredAtcModelLevelup | keyvalue">
+                <span class="stat-label">{{ model.key }}</span>
+                <span class="stat-value">{{ model.value }}</span>
+                <span class="stat-value-unique clickable" (click)="openAtcModelDrawer(drawer, model.key)">{{ filteredAtcModelUniqueParticipants[model.key]?.size || 0 }}</span>
+              </div>
+              <div class="stat-row total-row">
+                <span class="stat-label">Total</span>
+                <span class="stat-value highlight">{{ filteredTotalRecords }}</span>
+                <span class="stat-value-unique highlight clickable" (click)="openAtcModelDrawer(drawer, null)">{{ filteredTotalUniqueParticipants.size }}</span>
+              </div>
+              <div class="stat-row not-started-row">
+                <span class="stat-label">Not Started</span>
+                <span class="stat-value"></span>
+                <span class="stat-value-notstarted clickable" (click)="openNotStartedDrawer(drawer)">{{ filteredNotStartedParticipants.size }}</span>
+              </div>
+              <!-- <div class="stat-row not-started-row">
+                <span class="stat-label">Not Started</span>
+                <span class="stat-value"></span>
+                <span class="stat-value-notstarted clickable" (click)="openNotStartedDrawer(drawer)">{{ notStartedParticipants.size }}</span>
+              </div> -->
+            </div>
+          </div>
+        </div>
+        <div class="summary-card-wrapper">
+          <div class="summary-card-header before">
+            <div class="summary-card-icon before"><i class="fa-solid fa-clipboard-list"></i></div>
+            <span class="summary-card-title">Before Diagnostics</span>
+          </div>
+          <div class="summary-card-body">
+            <div class="stat-list">
+              <div class="stat-row stat-row-header"><span class="stat-label"></span><span class="stat-header-label">All</span><span class="stat-header-label">Unique</span></div>
+              <div class="stat-row clickable-row" *ngFor="let model of filteredBeforeDiagnosticCounts | keyvalue">
+                <span class="stat-label">{{ model.key }}</span>
+                <span class="stat-value">{{ model.value }}</span>
+                <span class="stat-value-unique clickable" (click)="openBeforeDiagnosticDrawer(drawer, model.key)">{{ filteredBeforeDiagnosticUniqueParticipants[model.key]?.size || 0 }}</span>
+              </div>
+              <div class="stat-row total-row">
+                <span class="stat-label">Total</span>
+                <span class="stat-value highlight-before">{{ filteredBeforeDiagnosticTotal }}</span>
+                <span class="stat-value-unique highlight-before clickable" (click)="openBeforeDiagnosticDrawer(drawer, null)">{{ filteredBeforeDiagnosticTotalUnique.size }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="summary-card-wrapper">
+          <div class="summary-card-header after">
+            <div class="summary-card-icon after"><i class="fa-solid fa-clipboard-check"></i></div>
+            <span class="summary-card-title">After Diagnostics</span>
+          </div>
+          <div class="summary-card-body">
+            <div class="stat-list">
+              <div class="stat-row stat-row-header"><span class="stat-label"></span><span class="stat-header-label">All</span><span class="stat-header-label">Unique</span></div>
+              <div class="stat-row clickable-row" *ngFor="let model of filteredAfterDiagnosticCounts | keyvalue">
+                <span class="stat-label">{{ model.key }}</span>
+                <span class="stat-value">{{ model.value }}</span>
+                <span class="stat-value-unique clickable" (click)="openAfterDiagnosticDrawer(drawer, model.key)">{{ filteredAfterDiagnosticUniqueParticipants[model.key]?.size || 0 }}</span>
+              </div>
+              <div class="stat-row total-row">
+                <span class="stat-label">Total</span>
+                <span class="stat-value highlight-after">{{ filteredAfterDiagnosticTotal }}</span>
+                <span class="stat-value-unique highlight-after clickable" (click)="openAfterDiagnosticDrawer(drawer, null)">{{ filteredAfterDiagnosticTotalUnique.size }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-row">
+          <div class="filter-field">
+            <mat-form-field appearance="outline">
+              <mat-label><i class="fa-solid fa-user"></i>&nbsp;&nbsp;Participants</mat-label>
+              <mat-select [(ngModel)]="filter['participant']" (selectionChange)="onFilter()" multiple>
+                <mat-option><ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onSearchText('participant')" placeholderLabel="Search participants..." noEntriesFoundLabel="No matching participants" ngDefaultControl></ngx-mat-select-search></mat-option>
+                <mat-option *ngFor="let o of filteredProfilelist" [value]="o['profileid']">{{o['name']}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="filter-field">
+            <mat-form-field appearance="outline">
+              <mat-label><i class="fa-solid fa-toggle-on"></i>&nbsp;&nbsp;Status</mat-label>
+              <mat-select [(ngModel)]="filter['status']" (selectionChange)="onFilter()">
+                <mat-option value="total">Total</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="nonactive">Non-Active</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="filter-field">
+            <mat-form-field appearance="outline">
+              <mat-label><i class="fa-solid fa-cube"></i>&nbsp;&nbsp;ATC Model</mat-label>
+              <mat-select [(ngModel)]="filter['atcmodel']" (selectionChange)="onFilter()" multiple>
+                <mat-option *ngFor="let o of atcModelList" [value]="o">{{o}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="filter-field">
+            <mat-form-field appearance="outline">
+              <mat-label><i class="fa-solid fa-layer-group"></i>&nbsp;&nbsp;Category</mat-label>
+              <mat-select [(ngModel)]="filter['category']" (selectionChange)="onFilter()" multiple>
+                <mat-option *ngFor="let o of categoryList" [value]="o">{{o}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <button mat-stroked-button class="clear-btn" (click)="onClearFilter()"><i class="fa-solid fa-rotate-left"></i>&nbsp;&nbsp;Clear Filters</button>
+        </div>
+      </div>
+      <div class="category-cards" *ngIf="displayCategories.length">
+        <mat-card *ngFor="let cat of displayCategories" class="category-card" appearance="outlined">
+          <mat-card-header>
+            <mat-card-title><span class="category-icon"><i class="fa-solid fa-chart-pie"></i></span>{{cat}}<span class="category-total">{{categoryUniqueParticipants[cat] || 0}}</span></mat-card-title>
+            <mat-card-subtitle>
+              <div class="header-chips">
+                <span class="chip-badge fasttrack" (click)="openDrawer(drawer, cat, null, 'fasttrack')"><i class="fa-solid fa-bolt"></i> Fast Track: {{categoryTotals[cat]?.fasttrack || 0}}</span>
+                <span class="chip-badge regular" (click)="openDrawer(drawer, cat, null, 'regular')"><i class="fa-solid fa-clock"></i> Regular: {{categoryTotals[cat]?.regular || 0}}</span>
+                <span class="chip-badge total" (click)="openDrawer(drawer, cat, null, 'total')"><i class="fa-solid fa-users"></i> Total: {{categoryTotals[cat]?.total || 0}}</span>
+              </div>
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="level-grid">
+              <div *ngFor="let lvl of allLevelsPerCategory[cat] || []" class="level-row">
+                <span class="level-name">{{lvl.levelName}}</span>
+                <div class="level-counts">
+                  <span class="count-badge fasttrack" (click)="openDrawer(drawer, cat, lvl.levelName, 'fasttrack')" title="Fast Track">{{categoryLevelCounts[cat]?.[lvl.levelName]?.fasttrack || 0}}</span>
+                  <span class="count-badge regular" (click)="openDrawer(drawer, cat, lvl.levelName, 'regular')" title="Regular">{{categoryLevelCounts[cat]?.[lvl.levelName]?.regular || 0}}</span>
+                  <span class="count-badge total" (click)="openDrawer(drawer, cat, lvl.levelName, 'total')" title="Total">{{categoryLevelCounts[cat]?.[lvl.levelName]?.total || 0}}</span>
+                </div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+      <div class="table-section">
+        <div class="table-header"><span class="table-title"><i class="fa-solid fa-table-list"></i> Participant Details</span></div>
+        <table mat-table [dataSource]="dataSource" matSort>
+          <ng-container matColumnDef="participant">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant (Activity) ({{totalActivityCount}})</th>
+            <td mat-cell *matCellDef="let row"><strong>{{mapparticipant[row['profileid']]}}</strong><span class="text-muted">&nbsp;({{getActivity(row['profileid'], row['atcmodel'])}})</span></td>
+          </ng-container>
+          <ng-container matColumnDef="atcmodel">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>ATC Model</th>
+            <td mat-cell *matCellDef="let row">{{row["atcmodel"]}}</td>
+          </ng-container>
+          <ng-container matColumnDef="currentlevel">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Current Level</th>
+            <td mat-cell *matCellDef="let row">{{maplevels[row['level'].id]}}</td>
+          </ng-container>
+          <ng-container matColumnDef="regular">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Regular</th>
+            <td mat-cell *matCellDef="let row"><ul><li *ngFor="let l of row['regular'] || []">{{mapBigActivity[l['activity'].id]}} - <span [ngClass]="l['completed'] > 0 ? 'text-success font-weight-bold' : ''">{{l['completed']}}</span>&nbsp;/&nbsp;{{l['metric']}}</li></ul></td>
+          </ng-container>
+          <ng-container matColumnDef="fasttrack">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Fast Track</th>
+            <td mat-cell *matCellDef="let row"><ul><li *ngFor="let l of row['fasttrack'] || []"><strong>{{maplevels[l['level'].id]}}</strong><br><span style="margin-left:12px">Validation - <span [ngClass]="l['validation'][0]['completed'] > 0 ? 'text-success font-weight-bold' : ''">{{l['validation'][0]['completed']}}</span>&nbsp;/&nbsp;{{l['validation'][0]['metric']}}</span><br><span style="margin-left:12px">Stabilization - {{l['stabilization'][0]['completed']}}&nbsp;/&nbsp;{{l['stabilization'][0]['metric']}}</span></li></ul></td>
+          </ng-container>
+          <ng-container matColumnDef="warmup">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Warm Up</th>
+            <td mat-cell *matCellDef="let row"><ul><li *ngFor="let l of row['warmup'] || []">{{mapBigActivity[l['activity'].id]}} - {{l['completed']}}</li></ul></td>
+          </ng-container>
+          <ng-container matColumnDef="specialactivity">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Special Activity</th>
+            <td mat-cell *matCellDef="let row"><ul><li *ngFor="let l of row['specialactivity'] || []">{{mapBigActivity[l['activity'].id]}} - {{l['completed']}}</li></ul></td>
+          </ng-container>
+          <ng-container matColumnDef="boosteractivity">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Booster Activity</th>
+            <td mat-cell *matCellDef="let row"><ul><li *ngFor="let l of row['boosteractivity'] || []">{{mapBigActivity[l['activity'].id]}} - {{l['completed']}}</li></ul></td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+        <mat-paginator [pageSizeOptions]="[25, 50, 100, 1000]" showFirstLastButtons></mat-paginator>
+      </div>
+    </div>
+  </mat-drawer-content>
+</mat-drawer-container>

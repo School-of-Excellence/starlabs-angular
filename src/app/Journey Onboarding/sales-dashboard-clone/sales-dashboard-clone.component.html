@@ -1,0 +1,2427 @@
+<div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+        <div class="loading-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── TOPBAR ── -->
+<div class="whole-container">
+    <!-- <mat-toolbar class="topbar">
+        <div class="tb-left">
+            <div class="tb-logo">
+                <div class="tb-icon">📊</div>
+                <span>Sales Report</span>
+            </div>
+            <div class="tb-filters">
+                <div class="tb-fg">
+                    <span class="tb-fl">Journey</span>
+                    <button class="fchip" [class.on]="true">EcoSystem</button>
+                    <button class="fchip" [class.on]="false">DFU</button>
+                    <button class="fchip" [class.on]="false">Gifts</button>
+                </div>
+                <div class="tb-fg">
+                    <span class="tb-fl">Period</span>
+                    <button class="fchip" [class.on]="true">Last 7 Days</button>
+                    <button class="fchip" [class.on]="true">Last 30 Days</button>
+                </div>
+            </div>
+        </div>
+        <div class="tb-right">
+            <span class="tb-date">10/1/2025 → 3/17/2026</span>
+            <button mat-stroked-button class="tb-btn">Switch to Month</button>
+        </div>
+    </mat-toolbar> -->
+    <mat-toolbar class="topbar">
+        <div class="tb-left">
+            <!-- Logo -->
+            <div class="tb-logo">
+                <div class="tb-icon">📊</div>
+                <span>Sales Report</span>
+            </div>
+
+            <!-- Filters -->
+            <div class="tb-filters">
+                <!-- Journey Filter Group -->
+                <div class="tb-fg">
+                    <span class="tb-fl">Journey</span>
+                    <button class="fchip" [class.on]="selectedFilter === 'ecosystem'"
+                        (click)="onJourneyClick('ecosystem')">EcoSystem</button>
+                    <button class="fchip" [class.on]="selectedFilter === 'dfu'"
+                        (click)="onJourneyClick('dfu')">DFU</button>
+                    <button class="fchip" [class.on]="selectedFilter === 'gifts'"
+                        (click)="onJourneyClick('gifts')">Gifts</button>
+                </div>
+
+                <!-- Assured Date Filter Group -->
+                <div class="tb-fg">
+                    <span class="tb-fl">Assured</span>
+                    <button class="fchip" [class.on]="selectedAssuredDateFilter === 'last7days'"
+                        (click)="onAssuredDateFilterClick('last7days')">Last 7 Days</button>
+                    <button class="fchip" [class.on]="selectedAssuredDateFilter === 'last30days'"
+                        (click)="onAssuredDateFilterClick('last30days')">Last 30 Days</button>
+                </div>
+
+                <!-- Assured Active Filter Info -->
+            </div>
+        </div>
+
+        <div class="tb-right" *ngIf="!selectedAssuredDateFilter">
+            <!-- Month Picker Mode -->
+            <ng-container *ngIf="pickerMode === 'month'">
+                <button class="tb-nav-btn" (click)="goToPreviousMonth()">
+                    <mat-icon>chevron_left</mat-icon>
+                </button>
+                <span class="tb-date">
+                    <mat-icon class="tb-cal-icon">calendar_month</mat-icon>
+                    {{ displayMonth }}
+                </span>
+                <button class="tb-nav-btn" (click)="goToNextMonth()">
+                    <mat-icon>chevron_right</mat-icon>
+                </button>
+            </ng-container>
+
+            <!-- Range Picker Mode -->
+            <ng-container *ngIf="pickerMode === 'range'">
+                <div class="date-rng-container">
+                    <mat-form-field appearance="outline" class="compact-field">
+                        <mat-date-range-input [rangePicker]="picker">
+                            <input matStartDate [(ngModel)]="customStartDate" placeholder="Start date">
+                            <input matEndDate [(ngModel)]="customEndDate" placeholder="End date">
+                        </mat-date-range-input>
+                        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                        <mat-date-range-picker #picker (closed)="onCustomDateChange()"></mat-date-range-picker>
+                    </mat-form-field>
+                </div>
+            </ng-container>
+
+            <!-- Toggle Mode Button -->
+            <button mat-stroked-button class="tb-btn" (click)="toggleDateMode()">
+                <mat-icon>{{ pickerMode === 'month' ? 'date_range' : 'calendar_view_month' }}</mat-icon>
+                {{ pickerMode === 'month' ? 'Switch to Range' : 'Switch to Month' }}
+            </button>
+        </div>
+        <div class="tb-fg tb-filter-info" *ngIf="selectedAssuredDateFilter">
+            <mat-icon class="tb-info-icon">info</mat-icon>
+            <span class="tb-info-text">
+                Filtering by {{ selectedAssuredDateFilter === 'last7days' ? 'Last 7 Days' : 'Last 30 Days' }}
+                · {{ assuredFilterStartDate }} → {{ assuredFilterEndDate }}
+            </span>
+            <button class="fchip fchip-clear" (click)="onAssuredDateFilterClick(selectedAssuredDateFilter)">✕
+                Clear</button>
+        </div>
+    </mat-toolbar>
+
+    <!-- ── SECTION NAV ── -->
+    <nav class="secnav">
+        <a *ngFor="let link of navLinks" class="sn-link" [class.active]="activeSection === link.href"
+            (click)="scrollTo(link.href)">{{ link.label }}</a>
+    </nav>
+
+    <div class="main">
+    
+        <!-- ── OVERVIEW ── -->
+        <!-- ── METRICS GRID ─────────────────────────────────────────── -->
+        <div class="metrics-grid" id="overview">
+    
+            <div class="metric-card">
+    
+                <!-- ── Tabs ── -->
+                <div class="metric-card-header">
+    
+                    <!-- Gross Sales tab -->
+                    <div class="metric-tab metric-tab--gross" [class.metric-tab--active-gross]="activeGrossType === ''">
+                    
+                        <div class="metric-tab-top">
+                            <span class="metric-title">Gross Sales</span>
+                            <div class="metric-radio" (click)="setActiveGrossType('')" ></div>
+                        </div>
+                        <div class="metric-value" (click)="onBoxClick('grossSales');">
+                            {{ metric['gross'].data.length }} + {{ metric.grosspending.length }}
+                        </div>
+                        <div class="metric-subvalue">
+                            ₹{{ formatIndianCurrency(metric['gross'].totalValue) }} Value &nbsp;|&nbsp;
+                            ₹{{ formatIndianCurrency(metric['gross'].totalEMI) }} EMI
+                        </div>
+                    </div>
+    
+                    <!-- Actual Gross Sales tab -->
+                    <div class="metric-tab metric-tab--actual" [class.metric-tab--active-actual]="activeGrossType === 'actual'">
+                        <div class="metric-tab-top">
+                            <span class="metric-title">Actual Gross Sales</span>
+                            <div class="metric-radio" (click)="setActiveGrossType('actual')" ></div>
+                        </div>
+                        <div class="metric-value" (click)="onBoxClick('actualGrossSales');">
+                            {{ metric['actualgross'].data.length }}
+                        </div>
+                        <div class="metric-subvalue">
+                            ₹{{ formatIndianCurrency(metric['actualgross'].totalValue) }} Value &nbsp;|&nbsp;
+                            ₹{{ formatIndianCurrency(metric['actualgross'].totalEMI) }} EMI
+                        </div>
+                    </div>
+    
+                </div>
+    
+                <!-- ── Breakdown panel driven by activeGrossType ── -->
+                <div class="metric-breakdown-panel" [class.metric-breakdown-panel--gross]="activeGrossType === ''"
+                    [class.metric-breakdown-panel--actual]="activeGrossType === 'actual'">
+    
+                    <div class="metric-breakdown">
+    
+                        <!-- New -->
+                        <div class="breakdown-item new"
+                            (click)="onGrossSplitClick($event, activeGrossType === '' ? 'grossNewSales' : 'actualNewSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">New</div>
+                            <div class="breakdown-value" style="color:#3b82f6">
+                                {{ metric[`${activeGrossType}grossnew`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeGrossType}grossnew`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Upgrades -->
+                        <div class="breakdown-item upgrade"
+                            (click)="onGrossSplitClick($event, activeGrossType === '' ? 'grossUpgradeSales' : 'actualUpgradeSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Upgrades</div>
+                            <div class="breakdown-value" style="color:#8b5cf6">
+                                {{ metric[`${activeGrossType}grossupgrade`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeGrossType}grossupgrade`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Add-On -->
+                        <div class="breakdown-item addon"
+                            (click)="onGrossSplitClick($event, activeGrossType === '' ? 'grossAddonSales' : 'actualAddonSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Add-On</div>
+                            <div class="breakdown-value" style="color:#f59e0b">
+                                {{ metric[`${activeGrossType}grossaddons`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeGrossType}grossaddons`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Cancelled -->
+                        <div class="breakdown-item cancelled"
+                            (click)="onCancelledClick($event, activeGrossType === '' ? 'grossCancelledSales' : 'actualGrossCancelledSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Cancelled</div>
+                            <div class="breakdown-value" style="color:#ef4444">
+                                {{ metric[`${activeGrossType}grosscancelled`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeGrossType}grosscancelled`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Downgrade To Old -->
+                        <div class="breakdown-item downgrade-old"
+                            (click)="onDowngradeClick($event, activeGrossType === '' ? 'grossDowngradeToOldSales' : 'actualGrossDowngradeToOldSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Downgrade To Old</div>
+                            <div class="breakdown-value" style="color:#f97316">
+                                {{ metric[`${activeGrossType}grossdowngradetoold`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeGrossType}grossdowngradetoold`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Downgrade To New -->
+                        <div class="breakdown-item downgrade-new"
+                            (click)="onDowngradeClick($event, activeGrossType === '' ? 'grossDowngradeToNewSales' : 'actualGrossDowngradeToNewSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Downgrade To New</div>
+                            <div class="breakdown-value" style="color:#10b981">
+                                {{ metric[`${activeGrossType}grossdowngradetonew`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeGrossType}grossdowngradetonew`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                    </div>
+                </div>
+    
+            </div>
+    
+            <!-- Assured Sales Card -->
+            <div class="metric-card">
+    
+                <!-- ── Tabs ── -->
+                <div class="metric-card-header">
+    
+                    <!-- Assured Sales -->
+                    <div class="metric-tab metric-tab--gross" [class.metric-tab--active-gross]="activeAssuredType === ''">
+                        <div class="metric-tab-top">
+                            <span class="metric-title">Assured Sales</span>
+                            <div class="metric-radio" (click)="setActiveAssuredType('')" ></div>
+                        </div>
+                        <div class="metric-value" (click)="onBoxClick('assuredSales'); $event.stopPropagation()">
+                            {{ metric['assured'].data.length }}
+                        </div>
+                        <div class="metric-subvalue">
+                            ₹{{ formatIndianCurrency(metric['assured'].totalValue) }} Value &nbsp;|&nbsp;
+                            ₹{{ formatIndianCurrency(metric['assured'].totalEMI) }} EMI
+                        </div>
+                    </div>
+    
+                    <!-- Actual Assured Sales -->
+                    <div class="metric-tab metric-tab--actual" [class.metric-tab--active-actual]="activeAssuredType === 'actual'">
+                        <div class="metric-tab-top">
+                            <span class="metric-title">Actual Assured Sales</span>
+                            <div class="metric-radio" (click)="setActiveAssuredType('actual')" ></div>
+                        </div>
+                        <div class="metric-value" (click)="onBoxClick('actualAssuredSales'); $event.stopPropagation()">
+                            {{ metric['actualassured'].data.length }}
+                        </div>
+                        <div class="metric-subvalue">
+                            ₹{{ formatIndianCurrency(metric['actualassured'].totalValue) }} Value &nbsp;|&nbsp;
+                            ₹{{ formatIndianCurrency(metric['actualassured'].totalEMI) }} EMI
+                        </div>
+                    </div>
+    
+                </div>
+    
+                <!-- ── Breakdown — always visible, data driven by activeAssuredType ── -->
+                <!-- metric[`${activeAssuredType}new`], metric[`${activeAssuredType}upgrade`] etc. -->
+                <div class="metric-breakdown-panel" 
+                [class.metric-breakdown-panel--gross]="activeAssuredType === ''"
+                    [class.metric-breakdown-panel--actual]="activeAssuredType === 'actual'"
+                >
+    
+                    <div class="metric-breakdown">
+    
+                        <!-- New -->
+                        <div class="breakdown-item new"
+                            (click)="onAssuredSplitClick($event, activeAssuredType === '' ? 'assuredNewSales' : 'actualAssuredNewSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">New</div>
+                            <div class="breakdown-value" style="color:#3b5bdb">
+                                {{ metric[`${activeAssuredType}assurednew`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeAssuredType}assurednew`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Upgrades -->
+                        <div class="breakdown-item upgrade"
+                            (click)="onAssuredSplitClick($event, activeAssuredType === '' ? 'assuredUpgradeSales' : 'actualAssuredUpgradeSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Upgrades</div>
+                            <div class="breakdown-value" style="color:#7048e8">
+                                {{ metric[`${activeAssuredType}assuredupgrade`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeAssuredType}assuredupgrade`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Add-On -->
+                        <div class="breakdown-item addon"
+                            (click)="onAssuredSplitClick($event, activeAssuredType === '' ? 'assuredAddonSales' : 'actualAssuredAddonSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Add-On</div>
+                            <div class="breakdown-value" style="color:#f59e0b">
+                                {{ metric[`${activeAssuredType}assuredaddons`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeAssuredType}assuredaddons`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Cancelled -->
+                        <div class="breakdown-item cancelled"
+                            (click)="onCancelledClick($event, activeAssuredType === '' ? 'assuredCancelledSales' : 'actualAssuredCancelledSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Cancelled</div>
+                            <div class="breakdown-value" style="color:#e03131">
+                                {{ metric[`${activeAssuredType}assuredcancelled`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeAssuredType}assuredcancelled`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Downgrade To Old -->
+                        <div class="breakdown-item downgrade-old"
+                            (click)="onDowngradeClick($event, activeAssuredType === '' ? 'assuredDowngradeToOldSales' : 'actualAssuredDowngradeToOldSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Downgrade To Old</div>
+                            <div class="breakdown-value" style="color:#f97316">
+                                {{ metric[`${activeAssuredType}assureddowngradetoold`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeAssuredType}assureddowngradetoold`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                        <!-- Downgrade To New -->
+                        <div class="breakdown-item downgrade-new"
+                            (click)="onDowngradeClick($event, activeAssuredType === '' ? 'assuredDowngradeToNewSales' : 'actualAssuredDowngradeToNewSales')"
+                            style="cursor:pointer">
+                            <div class="breakdown-label">Downgrade To New</div>
+                            <div class="breakdown-value" style="color:#2f9e44">
+                                {{ metric[`${activeAssuredType}assureddowngradetonew`]?.data?.length ?? 0 }}
+                            </div>
+                            <div class="metric-subvalue">
+                                ₹{{ formatIndianCurrency(metric[`${activeAssuredType}assureddowngradetonew`]?.totalValue) }}
+                            </div>
+                        </div>
+    
+                    </div>
+                </div>
+    
+            </div>
+        </div>
+
+        <div class="table-section2" *ngIf="showTable">
+            <div class="filter-row">
+                <form [formGroup]="filterForm">
+                    <div class="filter-container">
+                        <!-- Search Box -->
+                        <div class="search-box" *ngIf="currentTableConfig?.filters?.includes('search')">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text" class="search-input" placeholder="Search by Name, Mobile, Email..."
+                                formControlName="search" (input)="filterTableData(filterForm.value)" />
+                        </div>
+
+                        <div class="date-search-box" *ngIf="currentTableConfig?.filters?.includes('purchasedate')">
+                            <mat-form-field appearance="outline" class="date-range-field">
+                                <mat-label class="date-label">Purchase Date</mat-label>
+                                <mat-date-range-input [rangePicker]="picker2" class="date-range-input">
+                                    <input matStartDate formControlName="purchaseStart" placeholder="MM/DD/YYYY" />
+                                    <input matEndDate formControlName="purchaseEnd" placeholder="MM/DD/YYYY" />
+                                </mat-date-range-input>
+                                <mat-datepicker-toggle matSuffix [for]="picker2" class="date-toggle">
+                                    <mat-icon matDatepickerToggleIcon>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                                        </svg>
+                                    </mat-icon>
+                                </mat-datepicker-toggle>
+                                <mat-date-range-picker #picker2
+                                    (closed)="filterTableData(filterForm.value)"></mat-date-range-picker>
+                            </mat-form-field>
+                        </div>
+
+                        <div *ngIf="currentTableConfig?.filters?.includes('journey')">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Journey</mat-label>
+                                <mat-select placeholder="Select Journey" formControlName="journey"
+                                    (selectionChange)="filterTableData(filterForm.value)" multiple>
+                                    <mat-option *ngFor="let journey of journeyList" [value]="journey.id">
+                                        {{ journey.name }}
+                                    </mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <div *ngIf="currentTableConfig?.filters?.includes('journeycoach')">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Journey Coach</mat-label>
+                                <mat-select placeholder="Select Journey Coach" formControlName="journeycoach"
+                                    (selectionChange)="filterTableData(filterForm.value)">
+                                    <mat-option *ngFor="let coach of coachesList" [value]="coach.profile_ref.id">{{
+                                        mapprofile[coach.profile_ref.id]}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <div *ngIf="currentTableConfig?.filters?.includes('assured')">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Assured</mat-label>
+                                <mat-select placeholder="FIlter Assured Data" formControlName="assured"
+                                    (selectionChange)="filterTableData(filterForm.value)">
+                                    <mat-option *ngFor="let assured of assuredList"
+                                        [value]="assured">{{assured.toLocaleUpperCase()}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <div *ngIf="currentTableConfig?.filters?.includes('status')">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Status</mat-label>
+                                <mat-select placeholder="Filter Status" formControlName="status"
+                                    (selectionChange)="filterTableData(filterForm.value)">
+                                    <mat-option *ngFor="let status of statusList"
+                                        [value]="status">{{status.toLocaleUpperCase()}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <div *ngIf="currentTableConfig?.filters?.includes('saleType')">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Sale Type</mat-label>
+                                <mat-select placeholder="Filter Sale Type" formControlName="saleType"
+                                    (selectionChange)="filterTableData(filterForm.value)">
+                                    <mat-option *ngFor="let saleType of saleTypeList"
+                                        [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <div *ngIf="currentTableConfig?.filters?.includes('customerStatus')">
+                            <mat-form-field appearance="outline">
+                                <mat-label>Customer Status</mat-label>
+                                <mat-select placeholder="Filter Customer Status" formControlName="customerStatus"
+                                    (selectionChange)="filterTableData(filterForm.value)">
+                                    <mat-option *ngFor="let status of customerStatusList"
+                                        [value]="status">{{status}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+
+                        <button mat-mini-fab color="primary"
+                            (click)="refreshFilter()"><mat-icon>refresh</mat-icon></button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table Container -->
+            <div class="table-container2">
+                <div class="table-header2">
+                    <h2>{{ currentTableConfig?.title }}</h2>
+                    <div class="table-actions2">
+                        <div *ngIf="tableType == 'grossSales'"
+                            style="display: flex; flex-direction: row; background-color: white; padding: 12px 20px; gap: 24px; border-radius: 8px; align-items: center; color: grey; font-size: 14px; font-weight: 500;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                                <span
+                                    style="width: 14px; height: 14px; border-radius: 50%; background-color: #dc3545; display: inline-block;"></span>
+                                <span>Pending : <span style="color:#dc3545;">{{getPendingCount()}}</span></span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                                <span
+                                    style="width: 14px; height: 14px; border-radius: 50%; background-color: #4CAF50; display: inline-block;"></span>
+                                <span>Assured : <span style="color: #4CAF50;">{{getAssuredCount()}}</span></span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                                <span
+                                    style="width: 14px; height: 14px; border-radius: 50%; background-color: #9E9E9E; display: inline-block;"></span>
+                                <span>Not Assured : <span style="color:#9E9E9E;">{{getNotAssuredCount()}}</span></span>
+                            </div>
+                        </div>
+
+                        <div *ngIf="tableType == 'overallParticipants'"
+                            style="display: flex; flex-direction: row; background-color: white; padding: 12px 20px; gap: 24px; border-radius: 8px; align-items: center; color: grey; font-size: 14px; font-weight: 500;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                                <span
+                                    style="width: 14px; height: 14px; border-radius: 50%; background-color: #4CAF50; display: inline-block;"></span>
+                                <span>Active : <span style="color: #4CAF50;">{{getActiveCount()}}</span></span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                                <span
+                                    style="width: 14px; height: 14px; border-radius: 50%; background-color: #dc3545; display: inline-block;"></span>
+                                <span>Non-Active : <span style="color:#dc3545;">{{getNonactiveCount()}}</span></span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                                <span
+                                    style="width: 14px; height: 14px; border-radius: 50%; background-color: #9E9E9E; display: inline-block;"></span>
+                                <span>Discontinued : <span
+                                        style="color:#9E9E9E;">{{getDiscontinuedCount()}}</span></span>
+                            </div>
+                        </div>
+
+                        <button class="export-btn" (click)="exportTableData()">
+                            <span>Export</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </button>
+                        <button class="close-btn" (click)="closeTable()">×</button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>S.No</th>
+                                <th *ngFor="let column of currentTableConfig?.columns" [style.width]="column.width"
+                                    [class.sortable]="isSortable(column)"
+                                    (click)="isSortable(column) && sortTable(column.key)">
+                                    <span class="th-content">
+                                        {{ column.header }}
+                                        <span class="sort-icon" *ngIf="isSortable(column)">
+                                            {{ getSortIcon(column.key) }}
+                                        </span>
+                                    </span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let row of getSalesData(updatePaginatedData); let i = index"
+                                [ngClass]="highlightRow(row)" [class.even-row]="i % 2 === 0">
+                                <td>{{ (currentPage - 1) * itemsPerPage + i + 1 }}.</td>
+                                <td *ngFor="let column of currentTableConfig?.columns"
+                                    [class.highlight-cell]="shouldHighlightCell(column.key)">
+
+                                    <span [class.badge-cell]="isBadgeColumn(column.key)"
+                                        *ngIf="column.header !== 'Name' && !['schedule', 'schedulefor', 'action', 'notes', 'journeyplan', 'addnotes', 'generalnotes', 'waitingperiod', 'delayeddays', 'menubutton', 'salenotes'].includes(column.key)">
+                                        {{ formatCellValue(row, column) }}
+                                    </span>
+
+                                    <span *ngIf="column.header === 'Name'" class="clickable-name"
+                                        (click)="navigatetoprofile(row['profileid'])">
+                                        {{ formatCellValue(row, column) }}
+                                    </span>
+
+                                    <span *ngIf="column.key === 'addnotes'">
+                                        <div (click)="addNotes(row)">
+                                            <mat-icon class="edit-icon">edit_note</mat-icon>
+                                        </div>
+                                    </span>
+
+                                    <span *ngIf="column.key === 'menubutton'">
+                                        <div (click)="showParticipantMenu(row, $event)"
+                                            [matMenuTriggerFor]="participantMenu">
+                                            <mat-icon class="edit-icon">menu</mat-icon>
+                                        </div>
+
+                                        <mat-menu #participantMenu="matMenu">
+                                            <span *ngFor="let tableName of participantTableLocations" mat-menu-item
+                                                style="color: black; background: white;">
+                                                {{ tableName }}
+                                            </span>
+                                            <span *ngIf="participantTableLocations.length === 0" mat-menu-item
+                                                style="color: black; background: white;">
+                                                No tables found
+                                            </span>
+                                        </mat-menu>
+                                    </span>
+
+                                    <span *ngIf="column.key === 'waitingperiod'">
+                                        {{ formatCellValue(row, column) }} days
+                                    </span>
+
+                                    <span *ngIf="column.key === 'delayeddays'">
+                                        {{ formatCellValue(row, column) }} days
+                                    </span>
+
+                                    <span *ngIf="column.key === 'generalnotes'" #notesContainer
+                                        (mouseenter)="showPopup(row, $event, notesContainer)"
+                                        (mouseleave)="hidePopupWithDelay()">
+                                        <div class="notes-container">
+                                            <div *ngIf="row['generalnotes']?.length > 0">
+                                                <div>
+                                                    <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                        matTooltip="{{ row['generalnotes'][row['generalnotes'].length - 1].note }}">
+                                                        {{ row['generalnotes'][row['generalnotes'].length - 1].note |
+                                                        slice:0:20 }}...
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </span>
+
+                                    <span *ngIf="column.key === 'salenotes'" #saleNotesContainer
+                                        (mouseenter)="showPopup(row, $event, saleNotesContainer)"
+                                        (mouseleave)="hidePopupWithDelay()">
+                                        <div class="notes-container">
+                                            <div *ngIf="row['salenotes'] && row['salenotes'].length > 0">
+                                                <div>
+                                                    <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                        matTooltip="{{ row['salenotes'] }}">
+                                                        {{ row['salenotes'] | slice:0:40 }}...
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </span>
+
+                                    <span *ngIf="column.key === 'notes'" #notesContainer
+                                        (mouseenter)="showPopup(row, $event, notesContainer)"
+                                        (mouseleave)="hidePopupWithDelay()">
+                                        <div class="notes-container">
+                                            <div *ngIf="row['notes'] && row['notes'].length > 0">
+                                                <div>
+                                                    <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                        matTooltip="{{ row['notes'] }}">
+                                                        {{ row['notes'] | slice:0:50 }}...
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </span>
+                                </td>
+                            </tr>
+
+                            <!-- No data row -->
+                            <tr *ngIf="currentTableConfig?.data.length === 0">
+                                <td [attr.colspan]="(currentTableConfig?.columns?.length || 0) + 1" class="no-data">
+                                    <div class="no-data-message">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="1">
+                                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                            <path d="M2 17l10 5 10-5"></path>
+                                            <path d="M2 12l10 5 10-5"></path>
+                                        </svg>
+                                        <p>{{ tableSearchText ? 'No matching records found' : 'No data available' }}</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-footer">
+                    <div class="row-info">
+                        Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to
+                        {{ Math.min(currentPage * itemsPerPage, currentTableConfig?.data.length) }} of
+                        {{ filteredTableData.length }} entries
+                        <span *ngIf="filteredTableData.length !== currentTableConfig?.data?.length">
+                            (filtered from {{ filteredTableData?.length }} total entries)
+                        </span>
+                    </div>
+
+                    <div class="pagination">
+                        <!-- First page button -->
+                        <button class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1"
+                            title="First Page">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
+                            </svg>
+                        </button>
+
+                        <!-- Previous button -->
+                        <button class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
+                            Previous
+                        </button>
+
+                        <!-- Page numbers -->
+                        <div class="page-numbers">
+                            <button *ngFor="let page of getPageNumbers()" class="page-number"
+                                [class.active]="page === currentPage" (click)="goToPage(page)">
+                                {{ page }}
+                            </button>
+                        </div>
+
+                        <!-- Next button -->
+                        <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                            Next
+                        </button>
+
+                        <!-- Last page button -->
+                        <button class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages"
+                            title="Last Page">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="items-per-page">
+                        <label>Show:</label>
+                        <select [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+                            <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{option}}</option>
+                        </select>
+                        <span>entries</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SALES DATA ── -->
+        <div class="section" id="sales-data">
+            <div class="sec-head">
+                <div class="sec-title"><span class="ic">📋</span>Sales Data by Person</div>
+            </div>
+            <div class="two-col">
+
+                <!-- Pre-Sale Table -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div class="panel-title">By Pre-Sale Person</div>
+                        <div class="panel-tools">
+                            <!-- <div class="search-box">
+                                <mat-icon
+                                    style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
+                                <input class="search-input" placeholder="Search…" [(ngModel)]="preSearch">
+                            </div> -->
+                            <span class="panel-badge">{{ preSalesDataSource.data.length }} records</span>
+                        </div>
+                    </div>
+
+                    <mat-card-content style="padding:0 20px;">
+                        <div style="overflow-x: auto;">
+                            <table mat-table [dataSource]="preSalesDataSource" matSort #preSalesSort="matSort"
+                                class="dt">
+
+                                <!-- Rank -->
+                                <!-- <ng-container matColumnDef="rank">
+                                      <th mat-header-cell *matHeaderCellDef style="width:32px"></th>
+                                      <td mat-cell *matCellDef="let element">
+                                        <div class="rank" [ngClass]="element.rankClass">{{ element.rank }}</div>
+                                      </td>
+                                    </ng-container> -->
+
+                                <!-- Person -->
+                                <ng-container matColumnDef="person" sticky>
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Pre-Sale Person</th>
+                                    <td mat-cell *matCellDef="let element">
+                                        <div class="pc">
+                                            <div class="av pre">{{ element.person.charAt(0) }}
+                                            </div>
+                                            {{ element.person }}
+                                        </div>
+                                    </td>
+                                </ng-container>
+
+                                <!-- Gross Count -->
+                                <ng-container matColumnDef="grossCount">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross</th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                        (click)="onCellClick(element, 'grossCount', true)" style="cursor:pointer;">
+                                        {{ element.grossCount }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Assured Count -->
+                                <ng-container matColumnDef="assuredCount">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured</th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                        (click)="onCellClick(element, 'assuredCount', true)" style="cursor:pointer;">
+                                        {{ element.assuredCount }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Gross Cancelled -->
+                                <ng-container matColumnDef="grossCancelledNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Cancelled
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                        (click)="onCellClick(element, 'grossCancelled', true)" style="cursor:pointer;">
+                                        {{ element.grossCancelledNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Assured Cancelled -->
+                                <ng-container matColumnDef="assuredCancelledNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Cancelled
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                        (click)="onCellClick(element, 'assuredCancelled', true)"
+                                        style="cursor:pointer;">
+                                        {{ element.assuredCancelledNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Gross Downgrade -->
+                                <ng-container matColumnDef="grossDowngradeNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Downgrade
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                        (click)="onCellClick(element, 'grossDowngrade', true)" style="cursor:pointer;">
+                                        {{ element.grossDowngradeNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Assured Downgrade -->
+                                <ng-container matColumnDef="assuredDowngradeNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Downgrade
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                        (click)="onCellClick(element, 'assuredDowngrade', true)"
+                                        style="cursor:pointer;">
+                                        {{ element.assuredDowngradeNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Actual Gross -->
+                                <ng-container matColumnDef="actualGrossNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Gross</th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                        (click)="onCellClick(element, 'actualGross', true)" style="cursor:pointer;">
+                                        {{ element.actualGrossNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Actual Assured -->
+                                <ng-container matColumnDef="actualAssuredNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Assured
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                        (click)="onCellClick(element, 'actualAssured', true)" style="cursor:pointer;">
+                                        {{ element.actualAssuredNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <!-- Expanded Detail Row -->
+                                <ng-container matColumnDef="expandedDetail">
+                                    <td mat-cell *matCellDef="let element" [attr.colspan]="preSalesColumns.length">
+                                        <div class="detail-container"
+                                            [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                            <div class="detail-header">
+                                                <h4 class="detail-title">
+                                                    <mat-icon>info</mat-icon>
+                                                    Details for {{ element.person }}
+                                                </h4>
+                                                <button class="export-btn" (click)="exportTableData()">
+                                                    <span>Export</span>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor">
+                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                    </svg>
+                                                </button>
+                                                <button mat-icon-button (click)="closeExpandedRow(element, true)"
+                                                    class="close-btn2" title="Close">
+                                                    <mat-icon>close</mat-icon>
+                                                </button>
+                                            </div>
+                                            <table class="detail-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Journey</th>
+                                                        <th>Type</th>
+                                                        <th>Purchase Value</th>
+                                                        <th>Purchase Date</th>
+                                                        <th>Sales Person</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                        <td>{{ detail.name }}</td>
+                                                        <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                        <td>{{ detail.journeytype }}</td>
+                                                        <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                        <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}
+                                                        </td>
+                                                        <td>{{ detail.salespersonname }}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </ng-container>
+
+                                <tr mat-header-row *matHeaderRowDef="preSalesColumns; sticky: true"></tr>
+                                <tr mat-row *matRowDef="let row; columns: preSalesColumns;" class="table-row"
+                                    [class.expanded-row]="row.expanded"></tr>
+                                <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                                    class="detail-row"></tr>
+                                <tr class="mat-row" *matNoDataRow>
+                                    <td class="mat-cell no-data-cell" [attr.colspan]="preSalesColumns.length">
+                                        <div class="no-data-message">
+                                            <mat-icon>info</mat-icon>
+                                            <span>No data available</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </mat-card-content>
+
+                    <div class="pager">
+                        <mat-paginator #preSalesPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                            showFirstLastButtons></mat-paginator>
+                    </div>
+                </mat-card>
+
+                <!-- Sales Table -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div class="panel-title">Sales Data by Sales Person</div>
+                        <div class="panel-tools">
+                            <!-- <div class="search-box">
+                                <mat-icon
+                                    style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
+                                <input class="search-input" placeholder="Search…" [(ngModel)]="salSearch">
+                            </div> -->
+                            <span class="panel-badge">{{ salesPersonDataSource.data.length }} records</span>
+                        </div>
+                    </div>
+
+                    <mat-card-content style="padding:0 20px;">
+                        <div style="overflow-x: scroll;">
+                            <table mat-table [dataSource]="salesPersonDataSource" matSort #salesPersonSort="matSort"
+                                class="dt">
+
+                                <ng-container matColumnDef="person" sticky>
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+                                    <td mat-cell *matCellDef="let element">
+                                        <div class="pc">
+                                            <div class="av sal">{{ element.person.charAt(0) }}
+                                            </div>
+                                            {{ element.person }}
+                                        </div>
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="grossCount">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                        (click)="onCellClick(element, 'grossCount', false)" style="cursor:pointer;">
+                                        {{ element.grossCount }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="assuredCount">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                        (click)="onCellClick(element, 'assuredCount', false)" style="cursor:pointer;">
+                                        {{ element.assuredCount }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="grossCancelledNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Cancelled
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                        (click)="onCellClick(element, 'grossCancelled', false)" style="cursor:pointer;">
+                                        {{ element.grossCancelledNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="assuredCancelledNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Cancelled
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                        (click)="onCellClick(element, 'assuredCancelled', false)"
+                                        style="cursor:pointer;">
+                                        {{ element.assuredCancelledNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="grossDowngradeNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Downgrade
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                        (click)="onCellClick(element, 'grossDowngrade', false)" style="cursor:pointer;">
+                                        {{ element.grossDowngradeNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="assuredDowngradeNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Downgrade
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                        (click)="onCellClick(element, 'assuredDowngrade', false)"
+                                        style="cursor:pointer;">
+                                        {{ element.assuredDowngradeNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="actualGrossNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Gross</th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                        (click)="onCellClick(element, 'actualGross', false)" style="cursor:pointer;">
+                                        {{ element.actualGrossNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="actualAssuredNumber">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Assured
+                                    </th>
+                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                        (click)="onCellClick(element, 'actualAssured', false)" style="cursor:pointer;">
+                                        {{ element.actualAssuredNumber }}
+                                    </td>
+                                </ng-container>
+
+                                <ng-container matColumnDef="expandedDetail">
+                                    <td mat-cell *matCellDef="let element" [attr.colspan]="salesPersonColumns.length">
+                                        <div class="detail-container"
+                                            [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                            <div class="detail-header">
+                                                <h4 class="detail-title">
+                                                    <mat-icon>info</mat-icon>
+                                                    Details for {{ element.person }}
+                                                </h4>
+                                                <button class="export-btn"
+                                                    (click)="exportExpandedData(element.expandedData, element.person, false)">
+                                                    <span>Export</span>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor">
+                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                    </svg>
+                                                </button>
+                                                <button mat-icon-button (click)="closeExpandedRow(element, false)"
+                                                    class="close-btn2" title="Close">
+                                                    <mat-icon>close</mat-icon>
+                                                </button>
+                                            </div>
+                                            <table class="detail-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Journey</th>
+                                                        <th>Type</th>
+                                                        <th>Purchase Value</th>
+                                                        <th>Purchase Date</th>
+                                                        <th>Pre-Sales Person</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                        <td>{{ detail.name }}</td>
+                                                        <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                        <td>{{ detail.journeytype }}</td>
+                                                        <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                        <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}
+                                                        </td>
+                                                        <td>{{ detail.presalespersonname }}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </ng-container>
+
+                                <tr mat-header-row *matHeaderRowDef="salesPersonColumns; sticky: true"></tr>
+                                <tr mat-row *matRowDef="let row; columns: salesPersonColumns;" class="table-row"
+                                    [class.expanded-row]="row.expanded"></tr>
+                                <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                                    class="detail-row"></tr>
+                                <tr class="mat-row" *matNoDataRow>
+                                    <td class="mat-cell no-data-cell" [attr.colspan]="salesPersonColumns.length">
+                                        <div class="no-data-message"><mat-icon>info</mat-icon><span>No data
+                                                available</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </mat-card-content>
+
+                    <div class="pager">
+                        <mat-paginator #salesPersonPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                            showFirstLastButtons></mat-paginator>
+                    </div>
+                </mat-card>
+
+            </div>
+        </div>
+
+        <!-- ── NEW SALES ── -->
+        <div class="section" id="new-sales">
+            <div class="sec-head">
+                <div class="sec-title"><span class="ic">✨</span>New Sales</div>
+            </div>
+            <div class="two-col">
+
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div class="panel-title">New Sales by Pre-Sale Person</div>
+                        <div class="panel-tools">
+                            <!-- <div class="search-box">
+                                <mat-icon
+                                    style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
+                                <input class="search-input" placeholder="Search…" [(ngModel)]="nsPreSearch">
+                            </div> -->
+                            <span class="panel-badge">{{ newSalesPreSalesDataSource.data.length }} records</span>
+                        </div>
+                    </div>
+
+                    <mat-card-content style="padding:0 20px">
+                        <table mat-table [dataSource]="newSalesPreSalesDataSource" matSort
+                            #newSalesPreSalesSort="matSort" class="dt">
+
+                            <ng-container matColumnDef="rank">
+                                <th mat-header-cell *matHeaderCellDef style="width:32px"></th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="rank" [ngClass]="element.rankClass">{{ element.rank }}</div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="person">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Pre-Sale Person</th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="pc">
+                                        <div class="av" [ngClass]="element.avatarClass">{{ element.person.charAt(0) }}
+                                        </div>
+                                        {{ element.person }}
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="grossCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                    (click)="onCellClickJourneyType(element, 'grossCount', true, 'new')"
+                                    style="cursor:pointer;">
+                                    {{ element.grossCount }}
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="assuredCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                    (click)="onCellClickJourneyType(element, 'assuredCount', true, 'new')"
+                                    style="cursor:pointer;">
+                                    {{ element.assuredCount }}
+                                </td>
+                            </ng-container>
+
+                            <!-- ASSURED % COLUMN — uncomment the ng-container below AND add 'assuredPct' to newSalesColumns in your component -->
+                            <!--
+                                  <ng-container matColumnDef="assuredPct">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured %</th>
+                                    <td mat-cell *matCellDef="let element">
+                                      <div class="ratio-cell">
+                                        <div class="ratio-track">
+                                          <div class="ratio-fill" [ngClass]="element.fillClass"
+                                              [style.width.%]="element.assuredPct"></div>
+                                        </div>
+                                        <span class="ratio-pct" [ngClass]="element.pctClass">{{ element.assuredPct }}%</span>
+                                      </div>
+                                    </td>
+                                  </ng-container>
+                                  -->
+
+                            <ng-container matColumnDef="expandedDetail">
+                                <td mat-cell *matCellDef="let element" [attr.colspan]="newSalesColumns.length">
+                                    <div class="detail-container"
+                                        [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                        <div class="detail-header">
+                                            <h4 class="detail-title">
+                                                <mat-icon>info</mat-icon>
+                                                Details for {{ element.person }}
+                                            </h4>
+                                            <button class="export-btn" (click)="exportTableData()">
+                                                <span>Export</span>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                </svg>
+                                            </button>
+                                            <button mat-icon-button
+                                                (click)="closeExpandedRowJourneyType(element, true, 'new')"
+                                                class="close-btn2" title="Close">
+                                                <mat-icon>close</mat-icon>
+                                            </button>
+                                        </div>
+                                        <table class="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Journey</th>
+                                                    <th>Purchase Value</th>
+                                                    <th>Purchase Date</th>
+                                                    <th>Sales Person</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                    <td>{{ detail.name }}</td>
+                                                    <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                    <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                    <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                    <td>{{ detail.salespersonname }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <tr mat-header-row *matHeaderRowDef="newSalesColumns; sticky: true"></tr>
+                            <tr mat-row *matRowDef="let row; columns: newSalesColumns;" class="table-row"
+                                [class.expanded-row]="row.expanded"></tr>
+                            <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                                class="detail-row"></tr>
+                        </table>
+                    </mat-card-content>
+
+                    <div class="pager">
+                        <mat-paginator #newSalesPreSalesPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                            showFirstLastButtons></mat-paginator>
+                    </div>
+                </mat-card>
+
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div class="panel-title">New Sales by Sales Person</div>
+                        <div class="panel-tools">
+                            <!-- <div class="search-box">
+                                <mat-icon
+                                    style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
+                                <input class="search-input" placeholder="Search…" [(ngModel)]="nsSalSearch">
+                            </div> -->
+                            <span class="panel-badge">{{ newSalesSalesPersonDataSource.data.length }} records</span>
+                        </div>
+                    </div>
+
+                    <mat-card-content style="padding:0 20px">
+                        <table mat-table [dataSource]="newSalesSalesPersonDataSource" matSort
+                            #newSalesSalesPersonSort="matSort" class="dt">
+
+                            <ng-container matColumnDef="rank">
+                                <th mat-header-cell *matHeaderCellDef style="width:32px"></th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="rank" [ngClass]="element.rankClass">{{ element.rank }}</div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="person">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="pc">
+                                        <div class="av" [ngClass]="element.avatarClass">{{ element.person.charAt(0) }}
+                                        </div>
+                                        {{ element.person }}
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="grossCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                    (click)="onCellClickJourneyType(element, 'grossCount', false, 'new')"
+                                    style="cursor:pointer;">
+                                    {{ element.grossCount }}
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="assuredCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                    (click)="onCellClickJourneyType(element, 'assuredCount', false, 'new')"
+                                    style="cursor:pointer;">
+                                    {{ element.assuredCount }}
+                                </td>
+                            </ng-container>
+
+                            <!-- ASSURED % COLUMN — uncomment the ng-container below AND add 'assuredPct' to newSalesColumns in your component -->
+                            <!--
+                                  <ng-container matColumnDef="assuredPct">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured %</th>
+                                    <td mat-cell *matCellDef="let element">
+                                      <div class="ratio-cell">
+                                        <div class="ratio-track">
+                                          <div class="ratio-fill" [ngClass]="element.fillClass"
+                                              [style.width.%]="element.assuredPct"></div>
+                                        </div>
+                                        <span class="ratio-pct" [ngClass]="element.pctClass">{{ element.assuredPct }}%</span>
+                                      </div>
+                                    </td>
+                                  </ng-container>
+                                  -->
+
+                            <ng-container matColumnDef="expandedDetail">
+                                <td mat-cell *matCellDef="let element" [attr.colspan]="newSalesColumns.length">
+                                    <div class="detail-container"
+                                        [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                        <div class="detail-header">
+                                            <h4 class="detail-title">
+                                                <mat-icon>info</mat-icon>
+                                                Details for {{ element.person }}
+                                            </h4>
+                                            <button class="export-btn" (click)="exportTableData()">
+                                                <span>Export</span>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                </svg>
+                                            </button>
+                                            <button mat-icon-button
+                                                (click)="closeExpandedRowJourneyType(element, false, 'new')"
+                                                class="close-btn2" title="Close">
+                                                <mat-icon>close</mat-icon>
+                                            </button>
+                                        </div>
+                                        <table class="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Journey</th>
+                                                    <th>Purchase Value</th>
+                                                    <th>Purchase Date</th>
+                                                    <th>Pre-Sales Person</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                    <td>{{ detail.name }}</td>
+                                                    <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                    <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                    <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                    <td>{{ detail.presalespersonname }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <tr mat-header-row *matHeaderRowDef="newSalesColumns; sticky: true"></tr>
+                            <tr mat-row *matRowDef="let row; columns: newSalesColumns;" class="table-row"
+                                [class.expanded-row]="row.expanded"></tr>
+                            <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                                class="detail-row"></tr>
+                        </table>
+                    </mat-card-content>
+
+                    <div class="pager">
+                        <mat-paginator #newSalesSalesPersonPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                            showFirstLastButtons></mat-paginator>
+                    </div>
+                </mat-card>
+
+            </div>
+        </div>
+
+        <!-- ── UPGRADES ── -->
+        <div class="section" id="upgrades">
+            <div class="sec-head">
+                <div class="sec-title"><span class="ic">⬆️</span>Upgrades</div>
+            </div>
+            <div class="two-col">
+
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div class="panel-title">Upgrades by Pre-Sale Person</div>
+                        <div class="panel-tools">
+                            <!-- <div class="search-box">
+                                <mat-icon
+                                    style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
+                                <input class="search-input" placeholder="Search…" [(ngModel)]="upPreSearch">
+                            </div> -->
+                            <span class="panel-badge">{{ upgradePreSalesDataSource.data.length }} records</span>
+                        </div>
+                    </div>
+
+                    <mat-card-content style="padding:0 20px">
+                        <table mat-table [dataSource]="upgradePreSalesDataSource" matSort #upgradePreSalesSort="matSort"
+                            class="dt">
+
+                            <ng-container matColumnDef="rank">
+                                <th mat-header-cell *matHeaderCellDef style="width:32px"></th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="rank" [ngClass]="element.rankClass">{{ element.rank }}</div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="person">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Pre-Sale Person</th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="pc">
+                                        <div class="av" [ngClass]="element.avatarClass">{{ element.person.charAt(0) }}
+                                        </div>
+                                        {{ element.person }}
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="grossCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                    (click)="onCellClickJourneyType(element, 'grossCount', true, 'upgrade')"
+                                    style="cursor:pointer;">
+                                    {{ element.grossCount }}
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="assuredCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                    (click)="onCellClickJourneyType(element, 'assuredCount', true, 'upgrade')"
+                                    style="cursor:pointer;">
+                                    {{ element.assuredCount }}
+                                </td>
+                            </ng-container>
+
+                            <!-- ASSURED % COLUMN — uncomment below AND add 'assuredPct' to upgradeColumns in your component -->
+                            <!--
+                                  <ng-container matColumnDef="assuredPct">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured %</th>
+                                    <td mat-cell *matCellDef="let element">
+                                      <div class="ratio-cell">
+                                        <div class="ratio-track">
+                                          <div class="ratio-fill" [ngClass]="element.fillClass" [style.width.%]="element.assuredPct"></div>
+                                        </div>
+                                        <span class="ratio-pct" [ngClass]="element.pctClass">{{ element.assuredPct }}%</span>
+                                      </div>
+                                    </td>
+                                  </ng-container>
+                                  -->
+
+                            <ng-container matColumnDef="expandedDetail">
+                                <td mat-cell *matCellDef="let element" [attr.colspan]="upgradeColumns.length">
+                                    <div class="detail-container"
+                                        [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                        <div class="detail-header">
+                                            <h4 class="detail-title"><mat-icon>info</mat-icon>Details for {{
+                                                element.person }}</h4>
+                                            <button class="export-btn" (click)="exportTableData()">
+                                                <span>Export</span>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                </svg>
+                                            </button>
+                                            <button mat-icon-button
+                                                (click)="closeExpandedRowJourneyType(element, true, 'upgrade')"
+                                                class="close-btn2" title="Close">
+                                                <mat-icon>close</mat-icon>
+                                            </button>
+                                        </div>
+                                        <table class="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Journey</th>
+                                                    <th>Purchase Value</th>
+                                                    <th>Purchase Date</th>
+                                                    <th>Sales Person</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                    <td>{{ detail.name }}</td>
+                                                    <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                    <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                    <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                    <td>{{ detail.salespersonname }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <tr mat-header-row *matHeaderRowDef="upgradeColumns; sticky: true"></tr>
+                            <tr mat-row *matRowDef="let row; columns: upgradeColumns;" class="table-row"
+                                [class.expanded-row]="row.expanded"></tr>
+                            <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                                class="detail-row"></tr>
+                        </table>
+                    </mat-card-content>
+
+                    <div class="pager">
+                        <mat-paginator #upgradePreSalesPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                            showFirstLastButtons></mat-paginator>
+                    </div>
+                </mat-card>
+
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div class="panel-title">Upgrades by Sales Person</div>
+                        <div class="panel-tools">
+                            <!-- <div class="search-box">
+                                <mat-icon
+                                    style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
+                                <input class="search-input" placeholder="Search…" [(ngModel)]="upSalSearch">
+                            </div> -->
+                            <span class="panel-badge">{{ upgradeSalesPersonDataSource.data.length }} records</span>
+                        </div>
+                    </div>
+
+                    <mat-card-content style="padding:0 20px">
+                        <table mat-table [dataSource]="upgradeSalesPersonDataSource" matSort
+                            #upgradeSalesPersonSort="matSort" class="dt">
+
+                            <ng-container matColumnDef="rank">
+                                <th mat-header-cell *matHeaderCellDef style="width:32px"></th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="rank" [ngClass]="element.rankClass">{{ element.rank }}</div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="person">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+                                <td mat-cell *matCellDef="let element">
+                                    <div class="pc">
+                                        <div class="av" [ngClass]="element.avatarClass">{{ element.person.charAt(0) }}
+                                        </div>
+                                        {{ element.person }}
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="grossCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                    (click)="onCellClickJourneyType(element, 'grossCount', false, 'upgrade')"
+                                    style="cursor:pointer;">
+                                    {{ element.grossCount }}
+                                </td>
+                            </ng-container>
+
+                            <ng-container matColumnDef="assuredCount">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
+                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                    (click)="onCellClickJourneyType(element, 'assuredCount', false, 'upgrade')"
+                                    style="cursor:pointer;">
+                                    {{ element.assuredCount }}
+                                </td>
+                            </ng-container>
+
+                            <!-- ASSURED % COLUMN — uncomment below AND add 'assuredPct' to upgradeColumns in your component -->
+                            <!--
+                                  <ng-container matColumnDef="assuredPct">
+                                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured %</th>
+                                    <td mat-cell *matCellDef="let element">
+                                      <div class="ratio-cell">
+                                        <div class="ratio-track">
+                                          <div class="ratio-fill" [ngClass]="element.fillClass" [style.width.%]="element.assuredPct"></div>
+                                        </div>
+                                        <span class="ratio-pct" [ngClass]="element.pctClass">{{ element.assuredPct }}%</span>
+                                      </div>
+                                    </td>
+                                  </ng-container>
+                                  -->
+
+                            <ng-container matColumnDef="expandedDetail">
+                                <td mat-cell *matCellDef="let element" [attr.colspan]="upgradeColumns.length">
+                                    <div class="detail-container"
+                                        [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                        <div class="detail-header">
+                                            <h4 class="detail-title"><mat-icon>info</mat-icon>Details for {{
+                                                element.person }}</h4>
+                                            <button class="export-btn" (click)="exportTableData()">
+                                                <span>Export</span>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                </svg>
+                                            </button>
+                                            <button mat-icon-button
+                                                (click)="closeExpandedRowJourneyType(element, false, 'upgrade')"
+                                                class="close-btn2" title="Close">
+                                                <mat-icon>close</mat-icon>
+                                            </button>
+                                        </div>
+                                        <table class="detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Journey</th>
+                                                    <th>Purchase Value</th>
+                                                    <th>Purchase Date</th>
+                                                    <th>Pre-Sales Person</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                    <td>{{ detail.name }}</td>
+                                                    <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                    <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                    <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                    <td>{{ detail.presalespersonname }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <tr mat-header-row *matHeaderRowDef="upgradeColumns; sticky: true"></tr>
+                            <tr mat-row *matRowDef="let row; columns: upgradeColumns;" class="table-row"
+                                [class.expanded-row]="row.expanded"></tr>
+                            <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                                class="detail-row"></tr>
+                        </table>
+                    </mat-card-content>
+
+                    <div class="pager">
+                        <mat-paginator #upgradeSalesPersonPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                            showFirstLastButtons></mat-paginator>
+                    </div>
+                </mat-card>
+
+            </div>
+        </div>
+
+        <!-- ── TOP PERFORMERS ── -->
+        <div class="section" id="spotlight">
+            <div class="sec-head">
+                <div class="sec-title"><span class="ic">🏆</span>Top Performers This Period</div>
+            </div>
+            <div class="spotlight-row">
+
+                <mat-card class="sp-card pre">
+                    <div class="sp-eyebrow">
+                        👑 Top Pre-Sales Person
+                        <span class="sp-counter">{{ slider['pre'].currentPage + 1 }} /
+                            {{this.topPreSalesPerson.length}}</span>
+                    </div>
+
+                    <div class="sp-track-outer" (mousedown)="onDragStart($event, 'pre')"
+                        (touchstart)="onTouchStart($event, 'pre')" (touchmove)="onTouchMove($event, 'pre')"
+                        (touchend)="onTouchEnd('pre')">
+
+                        <div class="sp-track" [class.dragging]="slider['pre'].isDragging"
+                            [style.transform]="getTransform('pre')">
+
+                            <div class="sp-slide" *ngFor="let p of this.topPreSalesPerson">
+                                <div class="sp-person">
+                                    <div class="sp-av">{{ p.person.charAt(0) }}</div>
+                                    <div class="sp-name">{{ p.person }}</div>
+                                </div>
+                                <div class="sp-stats">
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Gross</div>
+                                        <div class="sp-stat-val">{{ p.gross }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Assured</div>
+                                        <div class="sp-stat-val">{{ p.assured }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured%</div>
+                                        <div class="sp-stat-val">{{ getPercentage(p.assured, p.gross) }}%</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured New</div>
+                                        <div class="sp-stat-val">{{ p.assurednew }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured Upgrades</div>
+                                        <div class="sp-stat-val">{{ p.assuredupgrades }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Gross Cancelled</div>
+                                        <div class="sp-stat-val" [style.color]="'var(--red)'">{{ p.grosscancelled }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="sp-dots">
+                        <span class="sp-dot" *ngFor="let p of this.topPreSalesPerson; let i = index"
+                            [class.active]="slider['pre'].currentPage === i" (click)="goTo('pre', i)">
+                        </span>
+                    </div>
+
+                    <div class="sp-nav">
+                        <button class="sp-arrow" (click)="goTo('pre', slider['pre'].currentPage - 1)"
+                            [disabled]="slider['pre'].currentPage === 0">&#8592;</button>
+                        <button class="sp-arrow" (click)="goTo('pre', slider['pre'].currentPage + 1)"
+                            [disabled]="slider['pre'].currentPage >= this.topPreSalesPerson.length - 1">&#8594;</button>
+                    </div>
+                </mat-card>
+
+                <mat-card class="sp-card sal">
+                    <div class="sp-eyebrow">
+                        👑 Top Sales Person
+                        <span class="sp-counter">{{ slider['sal'].currentPage + 1 }} / {{ topSalesPerson.length
+                            }}</span>
+                    </div>
+
+                    <div class="sp-track-outer" (mousedown)="onDragStart($event, 'sal')"
+                        (touchstart)="onTouchStart($event, 'sal')" (touchmove)="onTouchMove($event, 'sal')"
+                        (touchend)="onTouchEnd('sal')">
+
+                        <div class="sp-track" [class.dragging]="slider['sal'].isDragging"
+                            [style.transform]="getTransform('sal')">
+
+                            <div class="sp-slide" *ngFor="let personMetrics of topSalesPerson">
+                                <div class="sp-person-list">
+                                    <div class="sp-person">
+                                        <div class="sp-av">{{ personMetrics.person.at(0) }}</div>
+                                        <div>
+                                            <div class="sp-name">{{ personMetrics.person }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="sp-stats">
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Gross</div>
+                                        <div class="sp-stat-val">{{ personMetrics.gross }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Assured</div>
+                                        <div class="sp-stat-val">{{ personMetrics.assured }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured%</div>
+                                        <div class="sp-stat-val">{{ getPercentage(personMetrics.assured,
+                                            personMetrics.gross) }}%</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured New</div>
+                                        <div class="sp-stat-val">{{ personMetrics.assurednew }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured Upgrades</div>
+                                        <div class="sp-stat-val">{{ personMetrics.assuredupgrades }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Gross Cancelled</div>
+                                        <div class="sp-stat-val" [style.color]="'var(--red)'">{{
+                                            personMetrics.grosscancelled
+                                            }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="sp-dots">
+                        <span class="sp-dot" *ngFor="let p of topSalesPerson; let i = index"
+                            [class.active]="slider['sal'].currentPage === i" (click)="goTo('sal', i)">
+                        </span>
+                    </div>
+
+                    <div class="sp-nav">
+                        <button class="sp-arrow" (click)="goTo('sal', slider['sal'].currentPage - 1)"
+                            [disabled]="slider['sal'].currentPage === 0">&#8592;</button>
+                        <button class="sp-arrow" (click)="goTo('sal', slider['sal'].currentPage + 1)"
+                            [disabled]="slider['sal'].currentPage >= topSalesPerson.length - 1">&#8594;</button>
+                    </div>
+                </mat-card>
+
+                <mat-card class="sp-card pair">
+                    <div class="sp-eyebrow">
+                        🔥 Top Performing Pair
+                        <span class="sp-counter">{{ slider['presalepair'].currentPage + 1 }} / {{
+                            topSalesPersonPair.length }}</span>
+                    </div>
+
+                    <div class="sp-track-outer" (mousedown)="onDragStart($event, 'presalepair')"
+                        (touchstart)="onTouchStart($event, 'presalepair')"
+                        (touchmove)="onTouchMove($event, 'presalepair')" (touchend)="onTouchEnd('presalepair')">
+
+                        <div class="sp-track" [class.dragging]="slider['presalepair'].isDragging"
+                            [style.transform]="getTransform('presalepair')">
+
+                            <div class="sp-slide" *ngFor="let pair of topSalesPersonPair">
+                                <div class="sp-person">
+                                    <div class="sp-av">{{ getPairAvatar(pair) }}</div>
+                                    <div>
+                                        <div class="sp-name" style="font-size: 16px;">
+                                            {{ pair.preSalesPerson }}
+                                            <br><span class="pair-sub">× {{ pair.salesPerson }}</span>
+                                        </div>
+                                        <div class="sp-role">Pre-Sales + Sales combo</div>
+                                    </div>
+                                </div>
+                                <div class="sp-stats">
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Win Rate</div>
+                                        <div class="sp-stat-val">{{ getPercentage(pair.assured , pair.gross) }}%</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Gross</div>
+                                        <div class="sp-stat-val">{{ pair.gross }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Assured</div>
+                                        <div class="sp-stat-val">{{ pair.assured }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Assured Value</div>
+                                        <div class="sp-stat-val">₹{{formatIndianCurrency(pair.assuredValue)}}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual New</div>
+                                        <div class="sp-stat-val">{{ pair.assurednew }}</div>
+                                    </div>
+                                    <div class="sp-stat">
+                                        <div class="sp-stat-label">Actual Upgrades</div>
+                                        <div class="sp-stat-val">{{ pair.assuredupgrades }}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="sp-dots">
+                        <span class="sp-dot" *ngFor="let p of topSalesPersonPair; let i = index"
+                            [class.active]="slider['presalepair'].currentPage === i" (click)="goTo('presalepair', i)">
+                        </span>
+                    </div>
+
+                    <div class="sp-nav">
+                        <button class="sp-arrow" (click)="goTo('presalepair', slider['presalepair'].currentPage - 1)"
+                            [disabled]="slider['presalepair'].currentPage === 0">&#8592;</button>
+                        <button class="sp-arrow" (click)="goTo('presalepair', slider['presalepair'].currentPage + 1)"
+                            [disabled]="slider['presalepair'].currentPage >= topSalesPersonPair.length - 1">&#8594;</button>
+                    </div>
+                </mat-card>
+
+            </div>
+        </div>
+
+        <!-- ── ANALYSIS ── -->
+        <div class="section" id="analysis">
+            <div class="sec-head">
+                <div class="sec-title"><span class="ic">🔍</span>Analysis</div>
+            </div>
+
+            <!-- Row 1 -->
+            <div class="three-col">
+
+                <!-- Sales Mix Donut -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">Sales Mix</div>
+                            <div class="panel-sub">Breakdown by type</div>
+                        </div>
+                    </div>
+                    <mat-card-content class="panel-body">
+                        <div class="donut-chart-container">
+                            <apx-chart #salesDonutChart [series]="donutChartOptions.series"
+                                [chart]="donutChartOptions.chart" [labels]="donutChartOptions.labels"
+                                [colors]="donutChartOptions.colors" [legend]="donutChartOptions.legend"
+                                [tooltip]="donutChartOptions.tooltip">
+                            </apx-chart>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+
+                <!-- Pipeline Funnel -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">Conversion Funnel</div>
+                            <div class="panel-sub">Gross → Assured pipeline</div>
+                        </div>
+                    </div>
+                    <mat-card-content class="panel-body">
+                        <div class="funnel">
+                            <div class="funnel-container">
+                                <!-- Total Gross -->
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Total Gross</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" [style]="{
+                                            width : `${getPercentage(metric.gross.data.length,metric.gross.data.length)}%`,
+                                            background: '#18161f'
+                                        }"><span>{{metric.gross.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.gross.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #18161f;">—</div>
+                                </div>
+
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Assured</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" [style]="{
+                                            width : `${getPercentage(metric.assured.data.length,metric.gross.data.length)}%`,
+                                            background: '#18161f'
+                                        }"><span>{{metric.assured.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.assured.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #18161f;">
+                                        {{getPercentage(metric.assured.data.length,metric.gross.data.length)}}%</div>
+                                </div>
+
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Actual Assured</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" [style]="{
+                                            width : `${getPercentage(metric.actualassured.data.length,metric.actualgross.data.length)}%`,
+                                            background: '#18161f'
+                                        }"><span>{{metric.actualassured.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.actualassured.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #18161f;">
+                                        {{getPercentage(metric.actualassured.data.length,metric.actualgross.data.length)}}%
+                                    </div>
+                                </div>
+
+                                <!-- New -->
+                                <div class="funnel-row">
+                                    <div class="funnel-label">New</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" style="width: 54%; background: #16a34a;" [style]="{
+                                            width : `${getPercentage(metric.assurednew.data.length,metric.assured.data.length)}%`,
+                                            background: '#16a34a'
+                                        }"><span>{{metric.assurednew.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.assurednew.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #16a34a;">
+                                        {{getPercentage(metric.assurednew.data.length,metric.assured.data.length)}}%
+                                    </div>
+                                </div>
+
+                                <!-- Upgrades -->
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Upgrades</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" style="width: 24%; background: #b45309;" [style]="{
+                                            width : `${getPercentage(metric.assuredupgrade.data.length,metric.assured.data.length)}%`,
+                                            background: '#b45309'
+                                        }"><span>{{metric.assuredupgrade.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.assuredupgrade.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #b45309;">
+                                        {{getPercentage(metric.assuredupgrade.data.length,metric.assured.data.length)}}%
+                                    </div>
+                                </div>
+
+                                <!-- Assured -->
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Addons</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" [style]="{
+                                            width : `${getPercentage(metric.assuredaddons.data.length,metric.assured.data.length)}%`,
+                                            background: '#2563eb'
+                                        }"><span>{{metric.assuredaddons.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.assuredaddons.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #2563eb;">
+                                        {{getPercentage(metric.assuredaddons.data.length,metric.assured.data.length)}}%
+                                    </div>
+                                </div>
+
+                                <!-- Cancelled -->
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Cancelled</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" [style]="{
+                                            width : `${getPercentage(metric.assuredcancelled.data.length,metric.assured.data.length)}%`,
+                                            background: '#dc2626'
+                                        }"><span>{{metric.assuredcancelled.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.assuredcancelled.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #dc2626;">
+                                        {{getPercentage(metric.assuredcancelled.data.length,metric.assured.data.length)}}%
+                                    </div>
+                                </div>
+
+                                <!-- Downgrade -->
+                                <div class="funnel-row">
+                                    <div class="funnel-label">Downgrade</div>
+                                    <div class="funnel-track">
+                                        <div class="funnel-fill" [style]="{
+                                            width : `${getPercentage(metric.assureddowngradetoold.data.length + metric.assureddowngradetonew.data.length,metric.assured.data.length)}%`,
+                                            background: '#dc2626'
+                                        }"><span>{{metric.assureddowngradetoold.data.length +
+                                                metric.assureddowngradetonew.data.length}}</span></div>
+                                    </div>
+                                    <div class="funnel-count">{{metric.assureddowngradetoold.data.length +
+                                        metric.assureddowngradetonew.data.length}}</div>
+                                    <div class="funnel-pct" style="color: #9333ea;">
+                                        {{getPercentage(metric.assureddowngradetoold.data.length +
+                                        metric.assureddowngradetonew.data.length,metric.assured.data.length)}}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+
+                <!-- Assured Rate -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">Assured Rate by Person</div>
+                            <div class="panel-sub">% of gross that became assured</div>
+                        </div>
+                        <div class="seg-btns">
+                            <button class="seg-btn" [class.on]="assuredChartType === 'pre'"
+                                (click)="switchAssuredChart('pre')">Pre-Sales</button>
+                            <button class="seg-btn" [class.on]="assuredChartType === 'sal'"
+                                (click)="switchAssuredChart('sal')">Sales</button>
+                        </div>
+                    </div>
+                    <mat-card-content class="panel-body">
+                        <div class="perfor-container">
+                            <apx-chart #performanceChart [series]="performanceChartOptions.series"
+                                [chart]="performanceChartOptions.chart" [xaxis]="performanceChartOptions.xaxis"
+                                [yaxis]="performanceChartOptions.yaxis"
+                                [plotOptions]="performanceChartOptions.plotOptions"
+                                [dataLabels]="performanceChartOptions.dataLabels"
+                                [colors]="performanceChartOptions.colors" [grid]="performanceChartOptions.grid"
+                                [tooltip]="performanceChartOptions.tooltip">
+                            </apx-chart>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+
+            </div>
+
+            <!-- Row 2 -->
+            <div class="col-6040">
+                <div class="chart-section"
+                    style="margin: 20px 0; padding: 24px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #1d1d1f;">Sales Performance
+                            Comparison</h3>
+
+                        <div style="display: flex; gap: 8px; background: #f5f5f7; padding: 4px; border-radius: 8px;">
+                            <button [class.active]="selectedPersonType === 'presales'"
+                                (click)="togglePersonType('presales')"
+                                style="padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+                                [style.background]="selectedPersonType === 'presales' ? '#007AFF' : 'transparent'"
+                                [style.color]="selectedPersonType === 'presales' ? 'white' : '#86868b'">
+                                Pre-Sales Person
+                            </button>
+                            <button [class.active]="selectedPersonType === 'sales'" (click)="togglePersonType('sales')"
+                                style="padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+                                [style.background]="selectedPersonType === 'sales' ? '#007AFF' : 'transparent'"
+                                [style.color]="selectedPersonType === 'sales' ? 'white' : '#86868b'">
+                                Sales Person
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="chart">
+                        <apx-chart [series]="barChartOptions.series!" [chart]="barChartOptions.chart!"
+                            [xaxis]="barChartOptions.xaxis!" [yaxis]="barChartOptions.yaxis!"
+                            [dataLabels]="barChartOptions.dataLabels!" [plotOptions]="barChartOptions.plotOptions!"
+                            [grid]="barChartOptions.grid!" [stroke]="barChartOptions.stroke!"
+                            [colors]="barChartOptions.colors!" [tooltip]="barChartOptions.tooltip!"
+                            [legend]="barChartOptions.legend!">
+                        </apx-chart>
+                    </div>
+                </div>
+
+                <!-- Cancel Donut -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">Cancellations by Person</div>
+                            <div class="panel-sub">Who is driving churn</div>
+                        </div>
+                        <!-- <span class="panel-badge">132 total</span> -->
+                        <div class="seg-btns">
+                            <button class="seg-btn" [class.on]="cancellationChartType === 'pre'"
+                                (click)="switchCancellationChart('pre')">Pre-Sales</button>
+                            <button class="seg-btn" [class.on]="cancellationChartType === 'sal'"
+                                (click)="switchCancellationChart('sal')">Sales</button>
+                        </div>
+                    </div>
+                    <mat-card-content class="panel-body">
+                        <div class="donut-chart-container">
+                            <apx-chart #cancellationDonutChart [series]="cancellationChartOptions.series"
+                                [chart]="cancellationChartOptions.chart" [labels]="cancellationChartOptions.labels"
+                                [colors]="cancellationChartOptions.colors" [legend]="cancellationChartOptions.legend"
+                                [tooltip]="cancellationChartOptions.tooltip">
+                            </apx-chart>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+
+            </div>
+
+            <!-- Row 3 -->
+            <div class="col-4060">
+
+                <!-- Pair Win Rate Bar -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">Pair Win Rates</div>
+                            <div class="panel-sub">Pre + Sales combos</div>
+                        </div>
+                    </div>
+                    <mat-card-content class="panel-body">
+                        <div class="pair-perfor-container">
+                            <apx-chart #pairPerformanceChart [series]="performanceChartOptions.series"
+                                [chart]="performanceChartOptions.chart" [xaxis]="performanceChartOptions.xaxis"
+                                [yaxis]="performanceChartOptions.yaxis"
+                                [plotOptions]="performanceChartOptions.plotOptions"
+                                [dataLabels]="performanceChartOptions.dataLabels"
+                                [colors]="performanceChartOptions.colors" [grid]="performanceChartOptions.grid"
+                                [tooltip]="performanceChartOptions.tooltip">
+                            </apx-chart>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+
+                <!-- Stacked Bar -->
+                <mat-card class="panel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">New / Upgrades / Cancelled</div>
+                            <div class="panel-sub">Stacked breakdown per rep</div>
+                        </div>
+                        <div class="seg-btns">
+                            <button class="seg-btn" [class.on]="stackChartType === 'pre'"
+                                (click)="switchStackChart('pre')">Pre-Sales</button>
+                            <button class="seg-btn" [class.on]="stackChartType === 'sal'"
+                                (click)="switchStackChart('sal')">Sales</button>
+                        </div>
+                    </div>
+                    <mat-card-content class="panel-body">
+                        <div class="stacked-chart">
+                            <apx-chart #saleTypeBarChart [series]="saleTypeBarChartOptions.series"
+                                [chart]="saleTypeBarChartOptions.chart" [xaxis]="saleTypeBarChartOptions.xaxis"
+                                [dataLabels]="saleTypeBarChartOptions.dataLabels"
+                                [plotOptions]="saleTypeBarChartOptions.plotOptions"
+                                [legend]="saleTypeBarChartOptions.legend" [fill]="saleTypeBarChartOptions.fill"
+                                [tooltip]="saleTypeBarChartOptions.tooltip" [colors]="saleTypeBarChartOptions.colors">
+                            </apx-chart>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+
+            </div>
+        </div>
+
+
+
+        <!-- ── PAIR PERFORMANCE ── -->
+        <div class="section" id="pairs">
+            <div class="sec-head">
+                <div class="sec-title"><span class="ic">🤝</span>Pair Performance</div>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <span style="font-size:11px;color:var(--ink3)">Sort by:</span>
+                    <div class="seg-btns">
+                        <button class="seg-btn" [class.on]="pairSortBy === ''" (click)="switchPairSortBy()">Win
+                            Rate</button>
+                        <button class="seg-btn" [class.on]="pairSortBy === 'new'"
+                            (click)="switchPairSortBy('new')">New</button>
+                        <button class="seg-btn" [class.on]="pairSortBy === 'upgrades'"
+                            (click)="switchPairSortBy('upgrades')">Upgrades</button>
+                    </div>
+                </div>
+            </div>
+
+            <mat-card class="panel sp-card pairs">
+
+                <div class="sp-track-outer" (mousedown)="onDragStart($event, 'pairs')"
+                    (touchstart)="onTouchStart($event, 'pairs')" (touchmove)="onTouchMove($event, 'pairs')"
+                    (touchend)="onTouchEnd('pairs')">
+
+                    <div class="sp-track" [class.dragging]="slider['pairs'].isDragging"
+                        [style.transform]="getTransform('pairs')">
+
+                        <!-- Each slide = one chunk of 8 pair cards -->
+                        <div class="sp-slide" *ngFor="let chunk of getTopPairPerformance()">
+
+                            <div class="pair-grid">
+                                <div class="pair-item" *ngFor="let p of chunk">
+                                    <div class="pair-names">
+                                        <span class="pn-pre">{{ p.preSalesPerson }}</span>
+                                        <span class="pn-x">×</span>
+                                        <span class="pn-sal">{{ p.salesPerson }}</span>
+                                    </div>
+                                    <div class="pair-wr">{{ p.percentage }}%</div>
+                                    <div class="pair-meta">
+                                        {{ p[`gross${pairSortBy}`] }} gross · {{ p[`assured${pairSortBy}`] }} assured
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+
+
+                <div class="sp-nav">
+                    <button class="sp-arrow" (click)="goTo('pairs', slider['pairs'].currentPage - 1)"
+                        [disabled]="slider['pairs'].currentPage === 0">&#8592;</button>
+                    <div class="sp-dots">
+                        <span class="sp-dot" *ngFor="let chunk of getTopPairPerformance(); let i = index"
+                            [class.active]="slider['pairs'].currentPage === i" (click)="goTo('pairs', i)">
+                        </span>
+                    </div>
+                    <button class="sp-arrow" (click)="goTo('pairs', slider['pairs'].currentPage + 1)"
+                        [disabled]="slider['pairs'].currentPage >= getTopPairPerformance().length - 1">&#8594;</button>
+                </div>
+
+            </mat-card>
+        </div>
+
+
+        <!-- ── TRENDS ── -->
+        <div class="section" id="trends">
+            <div class="sec-head">
+                <div class="range-buttons">
+                    <div class="sec-title"><span class="ic">📅</span>Monthly Trends</div>
+                    <button class="range-btn" [class.active]="chosenDuration === 3" (click)="setMonthlyTrendsRange(3)">Last 3 Months</button>
+                    <button class="range-btn" [class.active]="chosenDuration === 6" (click)="setMonthlyTrendsRange(6)">Last 6 Months</button>
+                    <button class="range-btn" [class.active]="chosenDuration === 12" (click)="setMonthlyTrendsRange(12)">Last 12 Months</button>
+                    <div class="seg-btns">
+                        <button class="seg-btn" [class.on]="monthlyTrendsType === 'split'" (click)="setMonthlyTrendsType('split')">Split</button>
+                        <button class="seg-btn" [class.on]="monthlyTrendsType === 'combine'" (click)="setMonthlyTrendsType('combine')">Combine</button>
+                    </div>
+                </div>
+                <div class="monthly-trends-actions">
+                    <div class="label">
+                        <p>Select Month</p>
+                        <div class="month-picker" (click)="$event.stopPropagation()">
+
+                            <div class="trigger" [class.open]="isOpen" [class.has-value]="selectedMonth"
+                                (click)="toggle($event)">
+                                <span>{{ label }}</span>
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+
+                            <div class="dropdown" [class.open]="isOpen">
+                                <div class="year-nav">
+                                    <button class="nav-btn" (click)="changeYear(-1)">&#8592;</button>
+                                    <span class="year-label">{{ currentYear }}</span>
+                                    <button class="nav-btn" (click)="changeYear(1)">&#8594;</button>
+                                </div>
+
+                                <div class="months-grid">
+                                    <button *ngFor="let month of months; let i = index" class="month-btn"
+                                        [class.selected]="selectedMonth?.month === i && selectedMonth?.year === currentYear"
+                                        [class.today]="i === now.getMonth() && currentYear === now.getFullYear()"
+                                        (click)="selectMonth(i)">
+                                        {{ month }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <mat-hint>Click to Select Month</mat-hint>
+                    </div>
+                    <div class="label">
+                        <p>Select Month Duration</p>
+                        <div class="duration-wrapper">
+                            <select (change)="onDurationChange(+$any($event.target).value)">
+                                <option value="" disabled [selected]="!chosenDuration">Select duration</option>
+                                <option *ngFor="let item of monthOptions" [value]="item"
+                                    [selected]="chosenDuration === item">
+                                    {{ item }} {{ item === 1 ? 'Month' : 'Months' }}
+                                </option>
+                            </select>
+                        </div>
+                        <mat-hint>Click to select the Duration</mat-hint>
+                    </div>
+                    <button mat-raised-button color="primary" class="fetch-btn" (click)="fetchMonthTrendsData()"> Fetch
+                        Data </button>
+                </div>
+            </div>
+            <div class="monthly-charts-container">
+                <div class="two-col" [class.disable-card]="monthlyTrendsType=='combine'">
+                        <mat-card class="panel">
+                            <div class="panel-top">
+                                <div>
+                                    <div class="panel-title">Monthly Gross vs Assured</div>
+                                    <div class="panel-sub">{{selectedMonthyTrends}}</div>
+                                </div>
+                                <div class="seg-btns">
+                                    <button class="seg-btn" [class.on]="monthlySaleType === ''"
+                                        (click)="switchMonthlySaleType('')">All</button>
+                                    <button class="seg-btn" [class.on]="monthlySaleType === 'actual'"
+                                        (click)="switchMonthlySaleType('actual')">Actual</button>
+                                </div>
+                            </div>
+                            <mat-card-content class="panel-body">
+                                <div class="trend-chart-container">
+                                    <apx-chart #salesTrendChart [series]="salesTrendChartOptions.series"
+                                        [chart]="salesTrendChartOptions.chart" [stroke]="salesTrendChartOptions.stroke"
+                                        [colors]="salesTrendChartOptions.colors" [markers]="salesTrendChartOptions.markers"
+                                        [fill]="salesTrendChartOptions.fill" [xaxis]="salesTrendChartOptions.xaxis"
+                                        [yaxis]="salesTrendChartOptions.yaxis" [grid]="salesTrendChartOptions.grid"
+                                        [legend]="salesTrendChartOptions.legend" [tooltip]="salesTrendChartOptions.tooltip">
+                                    </apx-chart>
+                                </div>
+                            </mat-card-content>
+                        </mat-card>
+    
+                        <mat-card class="panel">
+                            <div class="panel-top">
+                                <div>
+                                    <div class="panel-title">Monthly Cancellation Rate</div>
+                                    <div class="panel-sub">Churn trend over time</div>
+                                </div>
+                                <div class="seg-btns">
+                                    <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'gross'"
+                                        (click)="switchMonthlyCancelledSaleType('gross')">Gross</button>
+                                    <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'assured'"
+                                        (click)="switchMonthlyCancelledSaleType('assured')">Assured</button>
+                                </div>
+                            </div>
+                            <mat-card-content class="panel-body">
+                                <apx-chart #cancellationTrendChart [series]="cancellationTrendChartOptions.series"
+                                    [chart]="cancellationTrendChartOptions.chart"
+                                    [stroke]="cancellationTrendChartOptions.stroke"
+                                    [markers]="cancellationTrendChartOptions.markers"
+                                    [xaxis]="cancellationTrendChartOptions.xaxis"
+                                    [yaxis]="cancellationTrendChartOptions.yaxis"
+                                    [dataLabels]="cancellationTrendChartOptions.dataLabels"
+                                    [tooltip]="cancellationTrendChartOptions.tooltip"
+                                    [fill]="cancellationTrendChartOptions.fill"
+                                    [legend]="cancellationTrendChartOptions.legend"
+                                    [grid]="cancellationTrendChartOptions.grid"
+                                    [colors]="cancellationTrendChartOptions.colors">
+                                </apx-chart>
+                            </mat-card-content>
+                        </mat-card>
+                    </div>
+                    <div [class.disable-card]="monthlyTrendsType == 'split'">
+                        <mat-card class="panel">
+                            <div class="panel-top">
+                                <div class="panel-title">Monthly Trends Graph</div>
+                                <div class="panel-top-actions">
+                                    <div>
+                                        <p class="panel-action-label">Gross VS Assured</p>
+                                        <div class="seg-btns">
+                                        <button class="seg-btn" [class.on]="monthlySaleType === ''"
+                                            (click)="switchMonthlySaleType('')">All</button>
+                                        <button class="seg-btn" [class.on]="monthlySaleType === 'actual'"
+                                            (click)="switchMonthlySaleType('actual')">Actual</button>
+                                    </div>
+                                    </div>
+                                    <div>
+                                        <p class="panel-action-label">Cancellation</p>
+                                        <div class="seg-btns">
+                                        <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'gross'"
+                                            (click)="switchMonthlyCancelledSaleType('gross')">Gross</button>
+                                        <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'assured'"
+                                            (click)="switchMonthlyCancelledSaleType('assured')">Assured</button>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <mat-card-content class="panel-body">
+                                <apx-chart #monthlyTrendChart [series]="monthlyTrendChartOptions.series"
+                                        [chart]="monthlyTrendChartOptions.chart" [stroke]="monthlyTrendChartOptions.stroke"
+                                        [colors]="monthlyTrendChartOptions.colors" [markers]="monthlyTrendChartOptions.markers"
+                                        [fill]="monthlyTrendChartOptions.fill" [xaxis]="monthlyTrendChartOptions.xaxis"
+                                        [yaxis]="monthlyTrendChartOptions.yaxis" [grid]="monthlyTrendChartOptions.grid"
+                                        [legend]="monthlyTrendChartOptions.legend" [tooltip]="monthlyTrendChartOptions.tooltip">
+                                </apx-chart>
+                            </mat-card-content>
+                        </mat-card>
+                    </div>
+                <div class="monthly-loader" [class.disable]="!isMonthlyTrendsLoading">
+                    <div class="loader-wrap">
+                        <div class="spinner"></div>
+                        <div class="dots">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scroll to Top -->
+    <!-- <button class="scroll-top" [class.visible]="showScrollTop" (click)="scrollToTop()">↑</button> -->

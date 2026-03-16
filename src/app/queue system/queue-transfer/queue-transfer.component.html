@@ -1,0 +1,226 @@
+<main class="ms-4 mt-4">
+    <div class="container-fluid">
+      <!-- Header with better spacing -->
+      <div class="row">
+        <div class="col-12 text-center">
+          <h4 class="fw-bold text-primary">Transfer Participants From Queue</h4>
+        </div>
+      </div>
+      
+      <!-- Main content with improved grid system -->
+      <div class="row mt-4">
+        <div class="col-12">
+          
+          <!-- Selection of product & queue with responsive grid -->
+          <div class="row g-3 align-items-center justify-content-center mb-4">
+            
+            <!-- Transfer From -->
+            <div class="col-auto">
+              <span class="fw-medium">Transfer From:</span>
+            </div>
+            <div class="col-12 col-md-auto">
+              <mat-form-field appearance="outline" class="w-100" style="min-width: 250px;">
+                <mat-label>Select Queue</mat-label>
+                <mat-select [(ngModel)]="queueTransfer.queuefrom" (selectionChange)="selection.clear();queueTransfer.selectedparticipants = [];onQueueTransferChange()">
+                  <mat-option *ngFor="let queue of queueGenerationList" [value]="queue.docid">{{queue.queuename}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            
+            <!-- Transfer To -->
+            <div class="col-auto" *ngIf="queueTransfer.queuefrom != null">
+              <span class="fw-medium">Transfer To:</span>
+            </div>
+            <div class="col-12 col-md-auto" *ngIf="queueTransfer.queuefrom != null">
+              <mat-form-field appearance="outline" class="w-100" style="min-width: 250px;">
+                <mat-label>Select Queue</mat-label>
+                <mat-select [(ngModel)]="queueTransfer.queueto" (selectionChange)="onQueueToChange()">
+                  <mat-option [value]="null">None</mat-option>
+                  <mat-option *ngFor="let queue of filterQueue()" [value]="queue.docid">{{queue.queuename}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            
+            <!-- Select Product -->
+            <div class="col-12 col-md-auto" *ngIf="queueTransfer.queueto != null">
+              <mat-form-field appearance="outline" class="w-100" style="min-width: 250px;">
+                <mat-label>Select Product</mat-label>
+                <mat-select [(ngModel)]="queueTransfer.productto" (selectionChange)="selection.clear();queueTransfer.selectedparticipants = [] ;onQueueTransferChange()">
+                  <mat-option [value]="null">None</mat-option>
+                  <mat-option *ngFor="let product of productList" [value]="product">{{mapProduct[product]}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            
+          </div>
+          
+          <!-- Participants Table Section -->
+          <div class="row" *ngIf="this.queueTransfer.queuefrom != null">
+            <div class="col-12">
+              
+              <!-- Filter Input -->
+              <div class="mb-3">
+                <mat-form-field appearance="outline" class="w-100 w-md-50">
+                  <mat-label>Filter</mat-label>
+                  <input matInput (keyup)="applyFilter($event)" placeholder="Search participants..." #input>
+                </mat-form-field>
+              </div>
+              
+              <!-- Data Table -->
+              <div class="table-responsive">
+                <table mat-table [dataSource]="dataSource" class="mat-elevation-z2 w-100" matSort>
+        
+                  <!-- Checkbox Column -->
+                  <ng-container matColumnDef="select">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                      <mat-checkbox (change)="$event ? masterToggle() : null"
+                                    [checked]="selection.hasValue() && isAllSelected()"
+                                    [indeterminate]="selection.hasValue() && !isAllSelected()"
+                                    [aria-label]="checkboxLabel()">
+                      </mat-checkbox>
+                    </th>
+                    <td mat-cell *matCellDef="let row;let i = index;">
+                      <mat-checkbox *ngIf="row.transferproducteligibility != 'Not Available'" (click)="$event.stopPropagation()"
+                                    (change)="$event ? selection.toggle(row): null;onSelect(row,i);"
+                                    [checked]="selection.isSelected(row)"
+                                    [aria-label]="checkboxLabel(row)">
+                      </mat-checkbox>
+                    </td>
+                  </ng-container>
+                
+                  <!-- Profile Name Column -->
+                  <ng-container matColumnDef="profile_name">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+                    <td mat-cell *matCellDef="let element"> {{element.profile_name}} </td>
+                  </ng-container>
+                
+                  <!-- Journey Column -->
+                  <ng-container matColumnDef="profile_id">
+                    <th mat-header-cell *matHeaderCellDef>Journey</th>
+                    <td mat-cell *matCellDef="let element"> 
+                      {{mapParticipantDashboardData[element.profile_id] != undefined ? mapParticipantDashboardData[element.profile_id]['activejourney'] || null : null}} 
+                    </td>
+                  </ng-container>
+                
+                  <!-- Product Column -->
+                  <ng-container matColumnDef="productname">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Product</th>
+                    <td mat-cell *matCellDef="let element"> {{element.productname}} </td>
+                  </ng-container>
+                
+                  <!-- Current Stage Column -->
+                  <ng-container matColumnDef="currentstage">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Current Stage</th>
+                    <td mat-cell *matCellDef="let element"> {{element.currentstage}} </td>
+                  </ng-container>
+        
+                  <!-- Variation Column -->
+                  <ng-container matColumnDef="variationid">
+                    <th mat-header-cell *matHeaderCellDef>Variation</th>
+                    <td mat-cell *matCellDef="let element"> {{mapQueueVariation[element.variationid] != undefined ? mapQueueVariation[element.variationid] : null}} </td>
+                  </ng-container>
+        
+                  <!-- Transfer Eligibility Column -->
+                  <ng-container matColumnDef="transferproducteligibility">
+                    <th mat-header-cell *matHeaderCellDef>Transfer Product Status</th>
+                    <td mat-cell *matCellDef="let element"> 
+                      <span class="badge" 
+                            [ngClass]="{
+                              'bg-success': element.transferproducteligibility === 'Available',
+                              'bg-danger': element.transferproducteligibility === 'Not Available',
+                              'bg-secondary': !element.transferproducteligibility
+                            }">
+                        {{element.transferproducteligibility || 'Unknown'}}
+                      </span>
+                    </td>
+                  </ng-container>
+        
+                  <!-- Logs Column -->
+                  <ng-container matColumnDef="logs">
+                    <th mat-header-cell *matHeaderCellDef>Logs</th>
+                    <td mat-cell *matCellDef="let element;let i = index">
+                      <button mat-button [matMenuTriggerFor]="menu" class="btn btn-outline-primary btn-sm">
+                        View Stage Log
+                      </button>
+                      <mat-menu #menu="matMenu" class="shadow">
+                        <li mat-menu-item *ngFor="let list of mapSelectedQueueLog[element['profile_id']] || []" class="small">
+                          {{list['logdate'].toDate() | date : 'MMM d,h:mm:ss a'}} - {{list['currentstage']}} -
+                          (<span *ngFor="let peopleInvoled of list['people_involved']">{{mapParticipantDashboardData[peopleInvoled] != undefined ? mapParticipantDashboardData[peopleInvoled]['name'] : null}},</span>)
+                        </li>
+                      </mat-menu>
+                    </td>
+                  </ng-container>
+                
+                  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        
+                  <!-- Row shown when there is no matching data -->
+                  <tr class="mat-row" *matNoDataRow>
+                    <td class="mat-cell text-center py-4" colspan="7">
+                      <div class="text-muted">
+                        <i class="bi bi-search"></i>
+                        No data matching the filter "{{input.value}}"
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Pagination -->
+              <mat-paginator [pageSizeOptions]="[15, 25, 50, 100, this.dataSource.data.length]" 
+                           aria-label="Select page of users" 
+                           class="mt-3">
+              </mat-paginator>
+            </div>
+          </div>
+          
+          <!-- Selection Options -->
+          <div class="row mt-4" *ngIf="this.queueTransfer.selectedparticipants.length != 0">
+            
+            <!-- Select Variation -->
+            <div class="col-12 mb-3">
+              <div class="d-flex justify-content-center">
+                <mat-form-field appearance="outline" class="w-100" style="max-width: 400px;">
+                  <mat-label>Select Variation</mat-label>
+                  <mat-select [(ngModel)]="queueTransfer.variationid">
+                    <mat-option *ngFor="let variation of mapQueueVariation[queueTransfer.queueto] | keyvalue" [value]="variation.key">
+                      {{variation.value}}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
+            
+            <!-- Select Delivery Type -->
+            <div class="col-12 mb-3">
+              <div class="d-flex justify-content-center">
+                <mat-form-field appearance="outline" class="w-100" style="max-width: 400px;">
+                  <mat-label>Select Delivery Type</mat-label>
+                  <mat-select [(ngModel)]="queueTransfer.deliverytype">
+                    <mat-option *ngFor="let type of deliveryOptionList" [value]="type.deliverytype">
+                      {{type.deliverytype}}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="col-12">
+              <div class="d-flex justify-content-center">
+                <button mat-raised-button 
+                        color="primary" 
+                        type="button" 
+                        (click)="onSubmit()"
+                        class="px-5">
+                  Transfer Participants
+                </button>
+              </div>
+            </div>
+            
+          </div>
+          
+        </div>
+      </div>
+    </div>
+</main>

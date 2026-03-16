@@ -1,0 +1,156 @@
+<form [formGroup]="filterform">
+    <div class="row" style="justify-content: space-evenly">
+        <mat-form-field appearance="outline">
+            <mat-label>Profile</mat-label>
+            <mat-select multiple formControlName="profile" (selectionChange)="formfilter(filterform.value)">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredProfile" [ngModelOptions]="{standalone: true}"
+                      [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                      ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let participant of returnFilterProflie()" [value]="participant.profileid">
+                    {{participant.name}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+    
+        <mat-form-field appearance="outline">
+            <mat-label>A&H Space</mat-label>
+            <mat-select formControlName="space" (selectionChange)="formfilter(filterform.value)" multiple>
+                <mat-option *ngFor="let space of spaceArray" [value]="space.spacename">
+                    {{space.spacename}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>Engagement</mat-label>
+            <mat-select formControlName="type" (selectionChange)="formfilter(filterform.value)" multiple>
+                <mat-option *ngFor="let type of typeArray" [value]="type.typename">
+                    {{type.typename}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>Events</mat-label>
+            <mat-select formControlName="event" (selectionChange)="formfilter(filterform.value)" multiple>
+                <mat-option *ngFor="let event of eventsArray" [value]="event.docid">
+                    {{event.name}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>Marathon</mat-label>
+            <mat-select formControlName="marathon" (selectionChange)="formfilter(filterform.value)" multiple>
+                <mat-option *ngFor="let marathon of marathonArray" [value]="marathon.docid">
+                    {{marathon.title}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>Cohorts</mat-label>
+            <mat-select formControlName="cohorts" (selectionChange)="formfilter(filterform.value)" multiple>
+                <mat-option *ngFor="let cohorts of cohortsArray" [value]="cohorts.docid">
+                    {{cohorts.name}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>Assignment</mat-label>
+            <mat-select formControlName="assignment" (selectionChange)="formfilter(filterform.value)" multiple>
+                <mat-option *ngFor="let assignment of assignmentArray" [value]="assignment.docid">
+                    {{assignment.title}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <button type="button" mat-mini-fab color="primary" #tooltip="matTooltip" (click)="exportCSV()"
+          matTooltip="clear filter"
+          aria-label="Button that displays a tooltip that can be programmatically disabled"><mat-icon>ios_share</mat-icon>
+        </button>    
+    </div>
+</form>
+
+
+<div class="table-container">
+    <!-- Table -->
+    <table class="native-table">
+      <thead class="table-head">
+        <tr>
+          <th>S.No</th>
+          <ng-container *ngFor="let fields of tableFields">
+            <th *ngIf="fileds != 'docid'"><b>{{ fields }}</b></th>
+          </ng-container>
+          <th>Action</th>
+        </tr>
+      </thead>
+  
+      <tbody class="table-body">
+        <tr *ngFor="let data of paginatedData; let i = index" [ngClass]="data['validation'] == true ? 'error' : ''">
+          <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+          <ng-container *ngFor="let fields of tableFields">
+            <td *ngIf="fileds != 'docid'">{{fields != 'Timing' ? data[fields] : data[fields].toDate() | date: 'short'}}</td>
+          </ng-container>
+          <td>
+            <button type="button" mat-raised-button (click)="openDialog(data,i)">Edit</button>
+            <button type="button" mat-raised-button color="primary" *ngIf="!data['validated']" (click)="validateArenaSpace(data,i)">Validate</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  
+    <!-- Pagination Controls -->
+    <div class="pagination-container">
+      <div class="pagination-info">
+        Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} entries
+      </div>
+      
+      <div class="pagination-controls">
+        <button class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">
+          Previous
+        </button>
+        
+        <button class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">
+          1
+        </button>
+        
+        <span class="ellipsis" *ngIf="pageNumbers[0] > 2">...</span>
+        
+        <button 
+          *ngFor="let page of pageNumbers" 
+          class="pagination-button page-number" 
+          [class.active]="currentPage === page"
+          (click)="goToPage(page)">
+          {{ page }}
+        </button>
+        
+        <span class="ellipsis" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages - 1">...</span>
+        
+        <button 
+          class="pagination-button page-number" 
+          *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" 
+          (click)="goToPage(totalPages)">
+          {{ totalPages }}
+        </button>
+        
+        <button class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">
+          Next
+        </button>
+      </div>
+      
+      <div class="pagination-size">
+        <label for="page-size">Items per page:</label>
+        <select id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+</div>

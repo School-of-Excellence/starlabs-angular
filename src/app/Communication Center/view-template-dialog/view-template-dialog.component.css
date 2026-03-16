@@ -1,0 +1,54 @@
+/* IN APP MESSAGE */
+
+.inappcontainer {
+    border: 2px solid rgb(197, 195, 195);
+    border-radius: 15px;
+    background-color: white;
+    min-width: 100%;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    line-height: 0.7;
+    font-weight: bold;
+    min-height: 50vh;
+  }
+
+  .inappcontent{
+    background-color: rgb(66, 170, 66);
+    color: white;
+    border-radius: 15px;
+    font-weight: bold;
+    padding: 8px;
+    text-align: center;
+    width: 98%;
+    min-height: 49vh;    
+    align-items: center;
+  }
+
+
+/* NOTIFICATION */
+
+.notificationcontainer {
+    background-color: #333;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding-left: 30px;
+    padding-top: 5px;
+    border-radius: 15px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+th {
+    background-color: #f4f4f4;
+    text-align: left;
+}

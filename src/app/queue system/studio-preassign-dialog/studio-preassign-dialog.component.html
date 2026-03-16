@@ -1,0 +1,125 @@
+<div class="dialog-content">
+  <!-- Dialog Header -->
+  <div class="dialog-header p-3 border-bottom">
+    <h2 mat-dialog-title>Studio Pairing List</h2>
+  </div>
+
+  <div *ngIf="loading" class="loading-overlay">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p class="mt-3">Loading data...</p>
+  </div>
+
+  <!-- Search Filter Section -->
+  <div class="filter-section p-3">
+    <mat-form-field appearance="outline" class="participant-search-field">
+      <mat-label>Search Participants</mat-label>
+      <input matInput 
+             [(ngModel)]="participantFilter" 
+             (ngModelChange)="onParticipantFilterChange($event)"
+             placeholder="Type participant name...">
+      <mat-icon matPrefix>search</mat-icon>
+      <button *ngIf="participantFilter" 
+              matSuffix 
+              mat-icon-button 
+              aria-label="Clear" 
+              (click)="clearParticipantFilter()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-form-field>
+    <span class="result-count" *ngIf="filteredStudioPairingList">
+      {{ filteredStudioPairingList.filteredData?.length || 0 }} result(s)
+    </span>
+  </div>
+
+  <!-- Scrollable Table Container -->
+  <div class="table-container mat-elevation-z0">
+    <table mat-table [dataSource]="filteredStudioPairingList" class="roles-table" matSort>
+
+      <!-- Participants Column -->
+      <ng-container matColumnDef="participants">
+        <th mat-header-cell *matHeaderCellDef>Participants</th>
+        <td mat-cell *matCellDef="let studio">
+          <div *ngFor="let participant of studio.participants; trackBy: trackByParticipant" class="participant-cell">
+            {{mapProfile[participant]}}
+          </div>
+          <div class="w-100 mt-1">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Pre-Assign Token</mat-label>
+              <mat-select [(ngModel)]="studioPreAssign[studio['docid']]"
+                (selectionChange)="updatePreAssigned(studio['docid'], $event.value)" multiple>
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="filterText" 
+                    (ngModelChange)="onTokenFilterChange($event)"
+                    [placeholderLabel]="'Search'"
+                    [noEntriesFoundLabel]="'No matching records found'" 
+                    ngDefaultControl>
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let token of filteredTokenList; trackBy: trackByDocId" [value]="token">
+                  {{token["profile_name"]}} ({{token["tokennumber"]}})
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="preassign">
+        <th mat-header-cell *matHeaderCellDef>PreAssigned-To</th>
+        <td mat-cell *matCellDef="let studio">
+          <div *ngIf="studioPreAssign[studio['docid']]?.length > 0" class="pre-assign-info">
+            <span class="primarylabel">Pre-Assigned to:</span>
+            <div *ngFor="let token of getUniquePreAssignedTokens(studio['docid']); trackBy: trackByDocId">
+              <strong>{{ mapProfile[token["profile_id"]] }}</strong> - {{ getStageName(token, studio['docid']) }}
+            </div>
+          </div>
+        </td>
+      </ng-container> 
+
+      <!-- Activities Column -->
+      <ng-container matColumnDef="activities">
+        <th mat-header-cell *matHeaderCellDef>Activities</th>
+        <td mat-cell *matCellDef="let studio">
+          <div *ngFor="let participant of studio.participants; trackBy: trackByParticipant" class="activity-cell">
+            <span class="activity-name">
+              {{mapBigActivity[studio.participantsactivity[participant]]}}
+            </span>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- ATC Model Column -->
+      <ng-container matColumnDef="atcModel">
+        <th mat-header-cell *matHeaderCellDef>ATC Model</th>
+        <td mat-cell *matCellDef="let studio">
+          <div>
+            <ng-container *ngFor="let atcmodel of studio['atcmodel'] || []; let last = last">
+              {{ atcmodel }}<span *ngIf="!last">, </span>
+            </ng-container>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+      <!-- No data row -->
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell no-data-cell" [attr.colspan]="displayedColumns.length">
+          <div class="no-data-message">
+            <mat-icon>search_off</mat-icon>
+            <p>No participants found matching "{{ participantFilter }}"</p>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Sticky Paginator at Bottom -->
+  <mat-paginator [pageSizeOptions]="[10, 20, 50, 1000]" aria-label="Select page of users"></mat-paginator>
+
+  <!-- Dialog Actions -->
+  <div class="dialog-actions p-3 border-top">
+    <button mat-button mat-dialog-close (click)="dialogRef.close()">Close</button>
+  </div>
+</div>

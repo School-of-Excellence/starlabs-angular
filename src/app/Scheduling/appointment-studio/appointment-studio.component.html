@@ -1,0 +1,350 @@
+<div class="mainscreen">
+  <div class="row">
+    <div class="col-sm"></div>
+    <div class="col-sm">
+      <div class="title">My Appointment Studio</div>
+    </div>
+    <div class="col-sm text-end">
+      <span class="mycalendarbtn" (click)="openMyCalendar()">Go to My Calendar</span>
+      <span *ngIf="lastUnmarkedAppointment" class="mycalendarbtn" (click)="updateStatus(lastUnmarkedAppointment)">Action Required</span>
+    </div>
+  </div>
+
+  <!-- Flex Container for Left and Right Sections -->
+  <div class="appointment-wrapper">
+    <!-- Left Side: Main Appointments -->
+    <div class="left-section">
+      <div class="noappointment" *ngIf="currentAppointments.length == 0">
+        {{loading ? "Loading..." : "No appointment scheduled for you today."}}
+      </div>
+
+      <div *ngIf="currentAppointments.length != 0">
+        <div class="liveappointment" *ngIf="currentAppointments[0] as liveAppointment">
+          <div class="livestatus" *ngIf="liveAppointmentStatus == 'LIVE'">
+            LIVE
+          </div>
+          <div class="countdownstatus" *ngIf="liveAppointmentStatus != 'LIVE' && liveAppointmentStatus != 'ENDED' && Array.isArray(liveAppointmentStatus)">
+            Starts in:
+            <span>{{ liveAppointmentStatus[0] }}H</span>
+            <span>{{ liveAppointmentStatus[1] }}M</span>
+            <span>{{ liveAppointmentStatus[2] }}S</span>
+          </div>
+
+          <div>
+            <!-- <div class="appointmenttitle">{{liveAppointment.title}}</div> -->
+            <div class="appointmenttitle">
+              <span>{{mapAppointment[liveAppointment.meta.appointment.id]}} -&nbsp;</span>
+              <span (click)="openProfile(liveAppointment.meta.bookedby.id)" class="openprofile"> 
+                {{liveAppointment.meta.clientname}}
+                <mat-icon class="text-success">arrow_outward</mat-icon>
+              </span>
+            </div>
+            <div class="appointmenttime">
+              {{liveAppointment.start | date:'MMM d, y, h:mm a'}} - {{(liveAppointment.start | date:'shortDate') == (liveAppointment.end | date:'shortDate') ? (liveAppointment.end | date:'h:mm a') : (liveAppointment.end | date:'MMM d, y, h:mm a')}}
+            </div>
+            <div class="appointmentdetails">
+              <p>
+                <strong>Client:</strong> 
+                <span (click)="openProfile(liveAppointment.meta.bookedby.id)" class="openprofile">{{liveAppointment.meta.clientname}}</span>
+              </p>
+              <p>
+                <strong>Active journey:</strong> 
+                <span>{{liveAppointment.meta.activejourney || "None"}}</span>
+              </p>
+              <p *ngFor="let host of liveAppointment.meta.hostRole | keyvalue">
+                <strong>{{mapRoles[$any(host.key)]}}:</strong> <span *ngFor="let specialist of $any(host.value); let isLast = last">{{mapProfile[specialist.id]}}{{!isLast ? ", " : ""}}</span>
+              </p>
+            </div>
+
+            <div class="actionbox">
+              <div class="zoomcontent" *ngIf="liveAppointmentStatus != 'LIVE' && liveAppointmentStatus != 'ENDED' && Array.isArray(liveAppointmentStatus) && ((liveAppointmentStatus[0] != 0) || (liveAppointmentStatus[0] == 0 && liveAppointmentStatus[1] >= 15))">
+                <div *ngIf="liveAppointmentStatus[0] >= 24">
+                  The Zoom link will be generated 24 hours before the appointment start time.
+                </div>
+                <div *ngIf="(liveAppointmentStatus[0] == 0 && liveAppointmentStatus[1] > 15) || (liveAppointmentStatus[0] != 0 && liveAppointmentStatus[0] < 24)">
+                  <div *ngIf="liveAppointment.meta.zoomdata; else retryzoom">
+                    The Zoom link has been successfully generated. It will open 15 minutes before the appointment start time.
+                  </div>
+                  <ng-template #retryzoom>
+                    Unable to Create Meeting URL. <span class="retryzoom" (click)="regenerateZoomLink(liveAppointment.meta)">Retry</span>
+                  </ng-template>
+                </div>
+              </div>
+
+              <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 15">
+                <div *ngIf="liveAppointment.meta.zoomdata; else retryzoom">
+                  <button class="zoomlaunchbtn" mat-button (click)="startMeeting(liveAppointment)">Lauch Meeting Now</button>
+                </div>
+                <ng-template #retryzoom>
+                  Meeting URL not Found. <span class="retryzoom" (click)="regenerateZoomLink(liveAppointment.meta)">Retry</span>
+                </ng-template>
+              </div>
+
+              <div class="zoomcontent" *ngIf="liveAppointment.meta.zoomerror">
+                <span class="d-flex align-items-center">
+                  <mat-icon class="text-danger me-2">warning</mat-icon> {{liveAppointment.meta.zoomerror}}
+                </span>
+              </div>
+
+              <div class="zoomcontent" *ngIf="liveAppointment.meta.zoomdata && liveAppointmentStatus == 'LIVE' && !liveAppointment.meta.attended  && !liveAppointment.meta.cancelled">
+                <span class="retryzoom" (click)="regenerateZoomLink(liveAppointment.meta)">Generate New Link </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngFor="let appointment of currentAppointments.slice(1)">
+          <div class="nextappointment">
+            <div class="upcomingstatus">
+              Upcoming
+            </div>
+            <div>
+              <!-- <div class="appointmenttitle">{{appointment.title}}</div> -->
+              <div class="appointmenttitle">
+                <span>{{mapAppointment[appointment.meta.appointment.id]}} -&nbsp;</span>
+                <span (click)="openProfile(appointment.meta.bookedby.id)" class="openprofile"> 
+                  {{appointment.meta.clientname}}
+                  <mat-icon class="text-success">arrow_outward</mat-icon>
+                </span>
+              </div>
+              <div class="appointmenttime">
+              {{appointment.start | date:'MMM d, y, h:mm a'}} - {{(appointment.start | date:'shortDate') == (appointment.end | date:'shortDate') ? (appointment.end | date:'h:mm a') : (appointment.end | date:'MMM d, y, h:mm a')}}
+              </div>
+              <div class="appointmentdetails">
+                <p>
+                  <strong>Client:</strong>
+                  <span (click)="openProfile(appointment.meta.bookedby.id)" class="openprofile">{{appointment.meta.clientname}}</span>
+                </p>
+                <p>
+                  <strong>Active journey:</strong> 
+                  <span>{{appointment.meta.activejourney || "None"}}</span>
+                </p>
+                <p *ngFor="let host of appointment.meta.hostRole | keyvalue">
+                  <strong>{{mapRoles[$any(host.key)]}}:</strong> <span *ngFor="let specialist of $any(host.value); let isLast = last">{{mapProfile[specialist.id]}}{{!isLast ? ", " : ""}}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Owner Appointments -->
+    <div *ngIf="productOwnerAppointments.length != 0" class="right-section">
+      <div class="section-header">
+        <mat-icon class="header-icon">event_available</mat-icon>
+        <span>Other <i>'{{upcomingAppointmentModel.join(", ")}}'</i> Appointments</span>
+      </div>
+
+      <div *ngFor="let matched of productOwnerAppointments; let i = index" class="po-card">
+        <div class="card-header">
+          <div class="appointment-badge">Appointment {{i + 1}}</div>
+          <!-- <mat-icon class="card-icon">arrow_forward</mat-icon> -->
+        </div>
+        
+        <div class="card-body">
+          <!-- <h3 class="appointment-title">{{matched.title}}</h3> -->
+          <h3 class="appointment-title">
+            <span>{{mapAppointment[matched.meta.appointment.id]}} -&nbsp;</span>
+            <span (click)="openProfile(matched.meta.bookedby.id)" class="openprofile"> 
+              {{mapProfile[matched.meta.bookedby.id]}}
+              <mat-icon class="text-success">arrow_outward</mat-icon>
+            </span>
+          </h3>
+          
+          <div class="info-row">
+            <mat-icon class="info-icon">schedule</mat-icon>
+            <span class="info-text">
+              {{matched.start | date:'MMM d, h:mm a'}} - {{matched.end | date:'h:mm a'}}
+            </span>
+          </div>
+
+          <div class="info-row">
+            <mat-icon class="info-icon">person</mat-icon>
+            <span class="info-text">{{matched.meta.clientname}}</span>
+          </div>
+
+          <div class="info-row">
+            <mat-icon class="info-icon">golf_course</mat-icon>
+            <span class="info-text">{{matched.meta.activejourney ? `${matched.meta.activejourney} Journey` : "No active Journey"}}</span>
+          </div>
+
+          <div class="specialists-section" *ngIf="matched.meta.hostRole">
+            <div class="specialists-label">
+              <mat-icon class="info-icon">group</mat-icon>
+              <span>Specialists</span>
+            </div>
+            <div *ngFor="let host of matched.meta.hostRole | keyvalue" class="specialist-item">
+              <span class="role-badge">{{mapRoles[$any(host.key)]}}</span>
+              <span class="specialist-names">
+                <span *ngFor="let specialist of $any(host.value); let isLast = last">
+                  {{mapProfile[specialist.id]}}{{!isLast ? ", " : ""}}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <a *ngIf="matched.meta.zoomdata?.join_url" 
+            class="join-button" 
+            [href]="matched.meta.zoomdata.join_url" 
+            target="_blank"
+            mat-raised-button
+            color="primary">
+            <mat-icon>videocam</mat-icon>
+            Join Now
+          </a>
+          <button *ngIf="!matched.meta.zoomdata?.join_url"
+              class="join-button disabled"
+              mat-stroked-button
+              disabled>
+            <mat-icon>link_off</mat-icon>
+            Link Unavailable
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Current Appointments Section -->
+<!-- <div class="current-appointments" *ngIf="currentAppointments && currentAppointments.length > 0">
+  <h3 class="section-title">
+    <mat-icon>videocam</mat-icon>
+    Current Meetings
+  </h3>
+  <mat-card *ngFor="let appointment of currentAppointments" class="appointment-card current">
+    <mat-card-header>
+      <mat-card-title>{{ appointment.title }}</mat-card-title>
+      <mat-card-subtitle>
+        {{ appointment.start | date:'short' }} - {{ appointment.end | date:'short' }}
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="appointment-details">
+        <p><strong>Client:</strong> {{ appointment.meta.clientname }}</p>
+        <p><strong>Type:</strong> {{ appointment.meta.appointmenttype }}</p>
+        <p><strong>Hosts:</strong> {{ appointment.meta.hostdata.join(', ') }}</p>
+      </div>
+
+      <div class="inline-messages" 
+          *ngIf="appointmentMessages[appointment.meta.bookingid]?.error || 
+                appointmentMessages[appointment.meta.bookingid]?.success || 
+                appointmentMessages[appointment.meta.bookingid]?.isLoading">
+      
+        <!-- Loading Message -- >
+        <div class="inline-message loading" *ngIf="appointmentMessages[appointment.meta.bookingid]?.isLoading">
+          <span>Generating Zoom link, please wait...</span>
+        </div>
+
+        <!-- Success Message -- >
+        <div class="inline-message success" *ngIf="appointmentMessages[appointment.meta.bookingid]?.success">
+          <!-- <mat-icon>check_circle</mat-icon> -- >
+          <span>{{ appointmentMessages[appointment.meta.bookingid].success }}</span>
+          <button mat-icon-button 
+                  (click)="clearAppointmentMessage(appointment.meta.bookingid)" 
+                  class="close-btn"
+                  title="Close message">
+            <!-- <mat-icon>close</mat-icon> -- >
+          </button>
+        </div>
+
+        <!-- Error Message -- >
+        <div class="inline-message error" *ngIf="appointmentMessages[appointment.meta.bookingid]?.error">
+          <!-- <mat-icon>error</mat-icon> -- >
+          <div class="error-content">
+            <span>{{ appointmentMessages[appointment.meta.bookingid].error }}</span>
+          </div>
+        </div>  
+            
+      </div>
+    </mat-card-content>
+    <mat-card-actions>
+      <button *ngIf="appointment.meta.zoomdata != null && appointment.meta.zoomdata != undefined && !appointment.meta.attended  && !appointment.meta.cancelled"
+              mat-raised-button color="primary" 
+              (click)="startMeeting(appointment.meta)" 
+              class="start-meeting-btn">
+        <mat-icon>videocam</mat-icon>
+        Start Meeting
+      </button>
+      
+      <button class="ml-2" style="margin-right: 20px;"
+        *ngIf="appointment.meta.zoomdata == null || appointment.meta.zoomdata == undefined" 
+        mat-raised-button 
+        (click)="regenerateZoomLink(appointment.meta)">
+        <mat-icon>warning</mat-icon>
+        <span *ngIf="!appointmentMessages[appointment.meta.bookingid]?.isLoading">
+          No Zoom Link - Generate Now
+        </span>
+        <span *ngIf="appointmentMessages[appointment.meta.bookingid]?.isLoading">
+          Generating...
+        </span>
+      </button>
+
+        <button class="ml-2" 
+        *ngIf="appointment.meta.zoomdata?.start_url != null" 
+        mat-raised-button 
+        (click)="regenerateZoomLink(appointment.meta)">
+        <mat-icon>warning</mat-icon>
+        <span *ngIf="!appointmentMessages[appointment.meta.bookingid]?.isLoading && !appointment.meta.attended  && !appointment.meta.cancelled">
+          Generate New Link
+        </span>
+        <span *ngIf="appointment.meta.attended || appointment.meta.cancelled">
+          This Appointment Ended
+        </span>
+        <span *ngIf="appointmentMessages[appointment.meta.bookingid]?.isLoading">
+          Generating...
+        </span>
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div> -->
+
+<!-- Upcoming Appointments Section -->
+<!-- <div class="upcoming-appointments">
+  <h3 class="section-title">
+    <mat-icon>schedule</mat-icon>
+    Upcoming Appointments
+  </h3>
+  
+  <div *ngIf="upcomingAppointments && upcomingAppointments.length > 0 || currentAppointments && currentAppointments.length > 0; else noUpcoming">
+    <mat-card *ngFor="let appointment of upcomingAppointments" class="appointment-card upcoming">
+      <mat-card-header>
+        <mat-card-title>{{ appointment.title }}</mat-card-title>
+        <mat-card-subtitle>
+          {{ appointment.start | date:'short' }} - {{ appointment.end | date:'short' }}
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="appointment-details">
+          <p><strong>Client:</strong> {{ appointment.meta.clientname }}</p>
+          <p><strong>Type:</strong> {{ appointment.meta.appointmenttype }}</p>
+          <p><strong>Hosts:</strong> {{ appointment.meta.hostdata.join(', ') }}</p>
+          <p><strong>Time until start:</strong> 
+            <span class="time-until">{{ getTimeUntilStart(appointment.start) }}</span>
+          </p>
+          <mat-icon style="line-height: 0.7;">info</mat-icon><span><strong>Zoom link will be generated automatically 15 minutes before start time.Click start meeting to start</strong></span>
+        </div>
+      </mat-card-content>
+      <!-- <mat-card-actions>
+        <button mat-button color="accent" 
+                (click)="viewAppointmentDetails(appointment)">
+          <mat-icon>info</mat-icon>
+          View Details
+        </button>
+      </mat-card-actions> -- >
+    </mat-card>
+  </div>
+  
+  <ng-template #noUpcoming>
+    <mat-card class="no-appointments">
+      <mat-card-content>
+        <div class="no-appointments-content">
+          <mat-icon class="large-icon">event_available</mat-icon>
+          <p>No upcoming appointments</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </ng-template>
+</div> -->

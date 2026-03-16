@@ -1,0 +1,207 @@
+:host {
+  display: block;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: white;
+  gap: 20px;
+}
+
+.loading-text {
+  font-size: 16px;
+  color: #5D3D97;
+}
+
+.spinner {
+  color: #5D3D97;
+}
+
+.container {
+  background: linear-gradient(0deg, rgba(93, 61, 151, 0.08), rgba(93, 61, 151, 0.12));
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.header {
+  background: linear-gradient(135deg, #59359A, #4A2B82);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.title {
+  color: white;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.close-button {
+  color: white;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.close-button:hover {
+  opacity: 1;
+}
+
+.main-content {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.journey-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 40vw;
+}
+
+.journey-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journey-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 4px rgba(93, 61, 151, 0.1);
+}
+
+.journey-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(93, 61, 151, 0.2);
+}
+
+.journey-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.journey-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2C1810;
+  margin: 0;
+}
+
+.journey-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: capitalize;
+  background: #E3F2FD;
+  color: #1976D2;
+}
+
+.products-section {
+  padding: 16px;
+  margin-left: 24px;
+  border-left: 2px solid rgba(93, 61, 151, 0.2);
+}
+
+.products-section h5 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #59359A;
+}
+
+.products-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.product-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(93, 61, 151, 0.1);
+}
+
+.product-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.product-name {
+  font-size: 16px;
+  color: #2C1810;
+  font-weight: 500;
+}
+
+.product-status {
+  color: black;
+  text-transform: capitalize;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+}
+
+/* Different background colors based on status */
+.product-status.completed {
+  background-color: #E6F4EA; /* Light green */
+  color: #0F703E;
+}
+
+.product-status.initiated {
+  background-color: #E8F0FE; /* Light blue */
+  color: #1A73E8;
+}
+
+.product-status.ongoing {
+  background-color: #FEF7E0; /* Light yellow */
+  color: #B06000;
+}
+
+.product-status.shifted {
+  background-color: #F3E5F5; /* Light purple */
+  color: #7B1FA2;
+}
+
+.product-status.no-status {
+  background-color: #F5F5F5; /* Light gray - original */
+  color: rgb(253, 70, 70);
+}
+
+.product-status.no-status {
+  background-color: #F5F5F5; /* Light gray - original */
+  color: #5F6368;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px;
+  }
+
+  .products-section {
+    margin-left: 16px;
+  }
+
+  .journey-card, .product-card {
+    padding: 16px;
+  }
+}

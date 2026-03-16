@@ -1,0 +1,30 @@
+{
+  "projects": {
+    "default": "fir-sample-aae4a",
+    "testproject": "starlabs-test",
+    "staging": "launch-your-legacy-development"
+  },
+  "targets": {
+    "launch-your-legacy-development": {
+      "hosting": {
+        "staging": [
+          "launch-your-legacy-development"
+        ]
+      }
+    },
+    "starlabs-test": {
+      "hosting": {
+        "testproject": [
+          "starlabs-test"
+        ]
+      }
+    },
+    "fir-sample-aae4a": {
+      "hosting": {
+        "default": [
+          "fir-sample-aae4a"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+<div class="mainscreen">
+  <h4 class="title">Update Action</h4>
+  <div [formGroup]="activityForm">
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Profile Name</mat-label>
+        <mat-select formControlName="selectedprofile" >
+          <mat-option *ngFor="let option of profileList" [value]="option['id']">{{option['name']}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Mandatory Forms</mat-label>
+        <mat-select formControlName="selectedform" multiple>
+          <mat-option>
+            <ngx-mat-select-search [formControl]="searchdeliveryform" [placeholderLabel]="'Search Arena VideoAsk'"
+              [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filteredDeliveryFormList" [value]="option['docid']">{{option['formname']}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Mandatory Action</mat-label>
+        <mat-select formControlName="selectedaction" multiple>
+          <mat-option *ngFor="let option of mandatoryAction | keyvalue" [value]="option.key">{{option.value}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Arena VideoAsk</mat-label>
+        <mat-select formControlName="videoaskpending" multiple>
+          <mat-option>
+            <ngx-mat-select-search [formControl]="searchvideoask" [placeholderLabel]="'Search Arena VideoAsk'"
+              [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filteredArenaVideoAskList" [value]="option['docid']">
+            {{option['title'] || option['description'] || 'Untitled'}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Quiz to Cohort</mat-label>
+        <mat-select formControlName="quiz" multiple>
+          <mat-option>
+            <ngx-mat-select-search [formControl]="searchQuiz" [placeholderLabel]="'Search quiz'"
+              [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filteredQuizList" [value]="option['docId']">{{option['question']}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <button mat-stroked-button class="cancelbtn" type="button" (click)="close()">Close</button>
+      <button mat-stroked-button class="submitbtn" type="submit" (click)="onSubmit()">Update Activity</button>
+    </div>
+  </div>
+</div>

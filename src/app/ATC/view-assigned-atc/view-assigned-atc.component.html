@@ -1,0 +1,190 @@
+<div *ngIf="loading | async">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <h3 class="heading">Mark Changework Status</h3>
+
+  <div class="filterbox">
+    <div class="filterrow">
+      <mat-form-field class="filteritem mr-3" appearance="outline">
+        <mat-label>Filter by Change Agent</mat-label>
+        <mat-select [(ngModel)]="selectedChangeagent" (selectionChange)="onChangeagentSelect()" [disabled]="!superRoles">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let author of filterChangeAgentList(); trackBy: trackByAuthorId" [value]="author.authorid">{{author.authorname}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="filteritem" appearance="outline">
+        <mat-label>Filter by Participant</mat-label>
+        <mat-select [(ngModel)]="selectedParticipant" (selectionChange)="onParticipantSelect()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let participant of filterParticipantList(); trackBy: trackByAuthorId" [value]="participant.profileid">{{participant.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <button class="clearbtn" *ngIf="(selectedChangeagent != null && superRoles) || selectedParticipant != null" mat-stroked-button (click)="resetFilter()">Clear Filter</button>
+  </div>
+
+  <div class="mat-elevation-z3">
+    <mat-list>
+      <mat-list-item *ngFor="let atc of reportATC.slice(pageIndex * pageSize, (pageIndex * pageSize) + pageSize); trackBy: trackByAtcId; let i = index">
+        <div class="w-100" *ngIf="atc.data() as atcData">
+          <div class="atc-header-container">
+            <!-- ATC Meta Data -->
+            <div class="atc-meta">
+              <div class="atcdate">{{(i + 1) + (pageIndex * pageSize)}}. <u>{{atcData['prescription_date']?.toDate() | date:'medium'}}</u></div>
+              <div class="atcdetail">
+                <!-- Participant Name -->
+                <div>
+                  <label class="info-label">Participant Name:</label>
+                  <label class="info-value">
+                    <span class="hoverprofile" (click)="selectedParticipant = atcData['profileid']; onParticipantSelect()">
+                      {{(profileMap[atcData['profileid']] || {})['name']}}
+                    </span>
+                  </label>
+                </div>
+                
+                <!-- Author Name -->
+                <div *ngIf="(atcData['author'] || []).length != 0">
+                  <label class="info-label">Prescribed By:</label>
+                  <label class="info-value">
+                    <span *ngFor="let author of atcData['author']; trackBy: trackByAuthorId; let isLast = last">
+                      {{(profileMap[author.id] || {})['name']}}<span *ngIf="!isLast">,</span>
+                    </span>
+                  </label>
+                </div>
+                
+                <!-- Product -->
+                <div>
+                  <label class="info-label">Product:</label>
+                  <label class="info-value">{{atcData['product'] ? atcData['product'] : 'No Product Mentioned'}}</label>
+                </div>
+
+                <!-- ATC Directive -->
+                <div>
+                  <label class="info-value"><span class="info-label">ATC Directive:</span>{{atcData['directive']}}</label>
+                </div>
+              </div>
+            </div>
+            <!-- Profile Image -->
+            <div class="profile-image-container">
+              <div *ngIf="profileMap[atcData['profileid']] && (profileMap[atcData['profileid']]['profileimg'] || profileMap[atcData['profileid']]['profile'])">
+                <img class="profile-image" [src]="profileMap[atcData['profileid']]['profileimg'] || profileMap[atcData['profileid']]['profile']">
+              </div>
+            </div>
+          </div>
+
+          <!-- Adjustment & Procedure -->
+          <div *ngIf="((mapATCtranscription[atc.id] || {})['view'])" class="full-atc-view">
+
+            <!-- Loading Adjustment -->
+             <div *ngIf="mapATCtranscription[atc.id]['transcription'].length == 0" class="loading-atc">
+              Loading Full ATC...
+             </div>
+
+            <div *ngFor="let transcription of mapATCtranscription[atc.id]['transcription']; trackBy: trackByAdjustmentID; let j = index;" class="transcription-item">
+              <div *ngIf="transcription.adjustment.data() as adjustmentData">
+                <div [ngClass]="{'deleteStyle' : adjustmentData['isdelete']}" class="adjustment-container">
+                  <!-- Adjustment Data -->
+                  <div class="adjustment-header">
+                    <label class="adjustment">
+                      <b>{{j+1}}. Adjustment</b>:&nbsp;
+                      {{adjustmentData["name"]}}
+                    </label>
+                  </div>
+
+                  <!-- Procedure -->
+                  <div class="procedures-section">
+                    <div *ngFor="let procedure of transcription['procedure']  trackBy: trackByProcedureId; let k = index" class="procedure-item">
+                      <div *ngIf="procedure.data() as procedureData">
+                        <!-- View Procedure - Inline View-->
+                        <div class="procedure-view">
+                          <div class="procedure-row">
+                            <!-- Procedure Name -->
+                            <label class="procedure-name">
+                              * {{procedureMap[procedureData["name"].path]}}
+                            </label>
+                            <!-- Mandatory -->
+                            <label *ngIf="procedureData['mandatory']" class="mandatory-icon">( Mandatory )</label>
+                            
+                            <!-- Procedure Status -->
+                            <button [ngClass]="procedureData['autogeneralized'] ? 'successbtn' : 'todobtn'"  *ngIf="updateProcedurePath != procedure.ref.path" mat-stroked-button 
+                              (click)="procedureData['autogeneralized'] ? undoProcedureComplete(procedure, 'autogeneralized') : onSelectProcedureEdit(procedure, 'autogeneralized')">
+                              {{procedureData['autogeneralized'] ? '' : 'Mark as'}} Auto-Generalized
+                              <mat-icon *ngIf="procedureData['autogeneralized']" class="completed-icon">done</mat-icon>
+                            </button>
+                            <button [ngClass]="procedureData['status'] == 'completed' ? 'successbtn' : 'todobtn'" *ngIf="updateProcedurePath != procedure.ref.path" mat-stroked-button 
+                              (click)="procedureData['status'] == 'completed' ? undoProcedureComplete(procedure, 'completed') : onSelectProcedureEdit(procedure, 'completed')">
+                              {{procedureData['status'] == 'completed' ? '' : 'Mark as'}} Completed
+                              <mat-icon *ngIf="procedureData['status'] == 'completed'" class="completed-icon">done</mat-icon>
+                            </button>
+                            <label *ngIf="procedureData['status'] == 'completed' && procedureData['last_activity']">&nbsp;<b>On</b> {{returnProcedureTime(procedureData["last_activity"]) | date: 'medium'}}</label>
+
+                            <!-- Update Changework Status -->
+                            <div *ngIf="updateProcedurePath == procedure.ref.path">
+                              <mat-label>Assign Change Agent:&nbsp;&nbsp;</mat-label>
+                              <mat-form-field class="w-25 me-3 agentfield" *ngFor="let activity of assignedToActivity; trackBy: trackByActivityId" appearance="outline">
+                                <mat-label>{{activity.activity}}</mat-label>
+                                <mat-select [(ngModel)]="newProcedureValue['bigactivity'][activity.docid]" multiple>
+                                  <mat-option>
+                                    <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                  </mat-option>
+                                  <mat-option *ngFor="let author of filterChangeAgentList(); trackBy: trackByAuthorId" [value]="author.authorid">{{author.authorname}}</mat-option>
+                                </mat-select>
+                              </mat-form-field>
+                              <mat-form-field class="w-25 agentfield" appearance="outline">
+                                <mat-label>Activity Date</mat-label>
+                                <input matInput class="dateinput" [(ngModel)]="newProcedureValue['lastactivity']" type="datetime-local">
+                              </mat-form-field>
+                              <br><br>
+                              <button class="cancelbtn" (click)="clearUpdateEdit()">Cancel</button>
+                              <button class="submitbtn" (click)="markProcedureComplete(procedure)">Update</button>
+                            </div>
+
+                            <!-- Assigned Author -->
+                            <div style="margin-top: 15px !important;">
+                              <label class="font-weight-bold">Change Agent(s):&nbsp;</label>
+                              <label class="assigned-authors" *ngIf="(procedureData['assigned_to'] || []).length == 0">Not Assigned!</label>
+                              <label class="assigned-authors" *ngIf="(procedureData['assigned_to'] || []).length != 0">
+                                - <label class="hoverprofile" *ngFor="let author of procedureData['assigned_to']; trackBy: trackByAuthorId; let isLast = last" (click)="selectedChangeagent = author.id; onChangeagentSelect()">
+                                  {{(profileMap[author.id] || {})['name']}}<span *ngIf="!isLast">,</span>
+                                </label>
+                              </label>
+                            </div>
+                            
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ATC Notes -->
+            <div *ngIf="![null, undefined].includes(atcData['notesid'])">
+              <div *ngIf="mapATCnotes[atcData['notesid']] as notesData">
+                <div *ngIf="(notesData['changeworkbrief'] || []).length != 0" class="comment-container">
+                  <label class="info-label">Changework Brief:</label>
+                  <div>
+                    <div *ngFor="let audio of notesData['changeworkbrief']; let i = index">
+                      <audio class="audio-container" controls>
+                        <source [src]="audio" type="audio/wav">
+                      </audio>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-list-item>
+      <mat-paginator #paginator [length]="reportATC.length" [pageSize]="pageSize" [pageSizeOptions]="[10]" (page)="handlePageEvent($event)"></mat-paginator>
+    </mat-list>
+  </div>
+</div>

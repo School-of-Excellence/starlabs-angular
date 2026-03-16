@@ -1,0 +1,26 @@
+  <!-- label -->
+  <!-- <div class="d-flex flex-row justify-content-center mt-4 mb-2">  
+    <h4>Accelerated Evolution Level</h4>
+  </div> -->
+  <!-- form -->
+  <div class="d-flex justify-content-center w-100 mt-4 mb-4">
+    <form [formGroup]="form" class="d-flex flex-row">
+      <mat-label class="pt-4">Create Evolution Level : </mat-label>&nbsp;&nbsp;&nbsp;&nbsp;
+      <app-text [form]="form" controlName="startpoint" label="Start Point"></app-text>&nbsp;&nbsp;&nbsp;&nbsp;
+      <app-text [form]="form" controlName="endpoint" label="End Point"></app-text>&nbsp;&nbsp;&nbsp;&nbsp;
+      <button style="height:40px;margin-top:10px;" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>&nbsp;&nbsp;
+      <button style="height:40px;margin-top:10px;" mat-stroked-button type="button" (click)="onRemove()" [disabled]="form.value['docid'] === null">Remove</button>
+    </form>
+  </div>
+  <!-- list -->
+    <h4 class="d-flex flex-row justify-content-center mt-2 mb-2">Listed Evolution level</h4>
+    <div class="d-flex flex-row justify-content-center w-100 mt-2 mb-4">
+      <span class="mat-elevation-z8 w-50">
+        <mat-selection-list #evolutionlevel [multiple]="false" (selectionChange)="onedit($event)">
+          <mat-list-option *ngFor="let option of evolutionData;let i = index" [value]="option">
+            {{i+1}}&nbsp;&nbsp;{{option['startpoint']}}&nbsp;&nbsp;to &nbsp;&nbsp;{{option['endpoint']}}
+          </mat-list-option>
+        </mat-selection-list>
+      </span>
+    </div>
+    <mat-hint class="d-flex flex-row justify-content-center mt-2 mb-2">Select to edit.</mat-hint>

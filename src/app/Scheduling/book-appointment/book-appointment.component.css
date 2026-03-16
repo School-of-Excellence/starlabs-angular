@@ -1,0 +1,80 @@
+.mainscreen{
+  padding: 20px;
+  background-color: white;
+  width: 100%;
+  font-size: 16px !important;
+}
+
+.title{
+  font-size: x-large;
+  text-align: center;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 15px;
+  color: rgb(0, 50, 67);
+}
+
+.journeytitle{
+  margin-top: 20px;
+  margin-bottom: 5px;
+  text-decoration: underline;
+  color: rgb(0, 50, 67);
+}
+
+.productbox{
+  margin-left: 15px;
+}
+
+.producttitle{
+  margin-top: 15px;
+  margin-bottom: 5px;
+}
+
+.noappointment{
+  color: rgb(175, 175, 175);
+}
+
+.selectbox{
+  margin-bottom: 5px;
+}
+
+.appointmentbox{
+  margin-bottom: 25px;
+}
+
+.notready{
+  opacity: 0.5;
+}
+
+.radionbtn{
+  margin-right: 15px;
+}
+
+.slotheading{
+  margin-bottom: 15px;
+  text-decoration: underline;
+  color: rgb(0, 50, 67);
+  font-size: 16;
+  font-weight: bold;
+}
+
+.bookbtn{
+  margin-top: 20px;
+  color: green;
+  border: 1px solid green;
+}
+
+:host ::ng-deep mat-chip {
+  border-radius: 5px;
+  padding: 30px;
+}
+
+.hyperlink{
+  color: rgb(35, 35, 228);
+}
+
+.hyperlink:hover{
+  color: rgb(24, 24, 199);
+  cursor: pointer;
+  text-decoration: underline;
+}

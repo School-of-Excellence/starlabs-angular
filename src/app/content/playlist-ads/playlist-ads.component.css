@@ -1,0 +1,56 @@
+.mainscreen{
+  padding: 20px;
+}
+
+.heading{
+  text-align: center;
+  margin-bottom: 15px;
+  color: rgb(0, 50, 67);
+}
+
+.body{
+  padding: 10px;
+}
+
+.actionbox{
+  margin-top: 10px;
+  width: 100%;
+  display: inline-flex;
+  justify-content: space-between;
+  align-content: center;
+}
+
+.actionitem{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.addbtn{
+  color: green;
+  border: 1px solid green;
+}
+
+.addbtn:hover{
+  color: white;
+  background-color: green;
+}
+
+table{
+  width: 100%;
+}
+
+.deletebtn{
+  color: gray;
+}
+
+.deletebtn:hover{
+  background-color: rgba(145, 145, 145, 0.227);
+}
+
+.emptytext{
+  text-align: center;
+  color: grey;
+}

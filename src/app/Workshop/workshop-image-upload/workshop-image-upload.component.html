@@ -1,0 +1,220 @@
+<mat-tab-group #tabGroup mat-align-tabs="center">
+  <mat-tab label="View Uploaded Images">
+    <div>
+      <mat-form-field  appearance="fill" class="ml-2">
+        <mat-label>Filter</mat-label>
+        <input matInput  placeholder="Filter by name" #input  (keyup)="ApplyFilter($event)">
+      </mat-form-field> 
+      <div>
+        <table mat-table matSort [dataSource]="dataSource" class="mat-elevation-z8">
+    
+          <!-- <ng-container matColumnDef="Title">
+            <th mat-header-cell *matHeaderCellDef>Title</th>
+            <td mat-cell *matCellDef="let row">{{row.title}}</td>
+          </ng-container> -->
+
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let row">{{row.name}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="ratio">
+            <th mat-header-cell *matHeaderCellDef>ratio</th>
+            <td mat-cell *matCellDef="let row">{{row.ratio}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let row">{{row.type}}</td>
+          </ng-container>
+    
+          <ng-container matColumnDef="description">
+             <th mat-header-cell *matHeaderCellDef>Description</th>
+             <td mat-cell *matCellDef="let row">{{row.description}}</td>
+          </ng-container>
+
+          <!-- <ng-container matColumnDef="tags">
+            <th mat-header-cell *matHeaderCellDef>Tags</th>
+            <td mat-cell *matCellDef="let row">
+              <li *ngFor="let tag of row.tags">{{mapTaxonomy[tag]}}</li>
+            </td>
+         </ng-container> -->
+
+          <!-- <ng-container matColumnDef="convertedtohls">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Converted to HLS </th>
+            <td mat-cell *matCellDef="let row">{{row.convertedtohls == true ? 'Yes' : 'No'}}</td>
+          </ng-container> -->
+    
+          <!-- <ng-container matColumnDef="Series">
+             <th mat-header-cell *matHeaderCellDef>imagesize</th>
+             <td mat-cell *matCellDef="let row">{{row.imagesize/1000}}kb</td>
+          </ng-container> -->
+    
+          <ng-container matColumnDef="imageurl">
+            <th mat-header-cell *matHeaderCellDef>Image</th>
+            <td mat-cell *matCellDef="let row"><img *ngIf="row.imageUrl" [src]="row.imageUrl" controls style="width: 256px;height: 144px;"></td>
+          </ng-container>
+    
+          <!-- <ng-container matColumnDef="Episode">
+            <th mat-header-cell *matHeaderCellDef>Episode</th>
+            <td mat-cell *matCellDef="let row"><video *ngIf="row.videoUrl" [src]="row.videoUrl" controls style="width: 240px;height: 135px;"></video></td>
+          </ng-container> -->
+
+          <ng-container matColumnDef="copyimageurl">
+            <th mat-header-cell *matHeaderCellDef>Copy Image Url</th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-icon-button [cdkCopyToClipboard]="row.imageUrl"><mat-icon>content_copy</mat-icon></button>
+            </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="Edit">
+            <th mat-header-cell *matHeaderCellDef> Edit </th>
+            <td mat-cell *matCellDef="let row"><button type="button" mat-mini-fab color="primary" (click)="openEditDialog(row,'Upload New Image')"><mat-icon>edit</mat-icon></button></td>
+          </ng-container>
+        
+          <!-- <ng-container matColumnDef="Delete">
+            <th mat-header-cell *matHeaderCellDef> Delete </th>
+            <td mat-cell *matCellDef="let row"><button type="button" mat-mini-fab color="accent" (click)="openDeleteDialog(row.id,row.videoUrl,row.imageUrl,row.srt)"><mat-icon>delete</mat-icon></button> </td>
+          </ng-container> -->
+        
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+        <mat-paginator [pageSizeOptions]="[10, 25, 100]"></mat-paginator>
+      </div>
+    </div>
+  </mat-tab>
+  <mat-tab label="Upload New Image">
+    <!-- <div class="d-flex flex-row justify-content-end m-2">
+      <button mat-raised-button color="primary" (click)="openDialog()">Add Episodes</button>
+    </div> -->
+    <!-- <div class="m-1">
+      <h6>Update Tag :-</h6>
+      <mat-chip-list >
+        <mat-chip *ngFor="let tag of uploadEpisodeDoc.tags;let i = index" color="primary" [selected]="true">
+            {{mapTaxonomy[tag]}}<mat-icon (click)="onTagRemove(i)">cancel</mat-icon>
+        </mat-chip>
+      </mat-chip-list>
+      <mat-form-field appearance="standard" class="w-100">
+        <mat-label>Search Tag</mat-label>
+        <input type="text" matInput (keyup)="onTagSearch($event)">
+      </mat-form-field>
+      <mat-chip-list >
+        <mat-chip *ngFor="let tag of filteredTaxonomyList;" [value]="tag.id" color="primary"(click)="onTagSelect(tag.id)">
+            {{tag['name']}}
+        </mat-chip>
+      </mat-chip-list>
+    </div> -->
+
+    <div class="d-flex flex-row m-2">
+      <!-- <div class="m-1">
+        <mat-form-field appearance="outline">
+          <input matInput type="text" placeholder="title" [(ngModel)]="uploadEpisodeDoc.title" required >
+        </mat-form-field>
+      </div> -->
+
+       <div class="m-1">
+        <mat-form-field appearance="outline">
+          <mat-label>Ratio</mat-label>
+          <mat-select [(ngModel)]="uploadEpisodeDoc.ratio">
+            <mat-option *ngFor="let option of ['w16h9','w9h16','w4h5','w5h4','w1h1','w4h3']" [value]="option">{{option}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+       <div class="m-1">
+        <mat-form-field appearance="outline">
+          <mat-label>Type</mat-label>
+          <mat-select [(ngModel)]="uploadEpisodeDoc.type">
+            <mat-option *ngFor="let option of ['image','icon','thumbnail']" [value]="option">{{option}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="m-1">
+        <mat-form-field appearance="outline">
+          <mat-label>Description</mat-label>
+          <input matInput type="text" placeholder="description" [(ngModel)]="uploadEpisodeDoc.description" required >
+        </mat-form-field>
+      </div>
+      <div class="d-flex flex-column m-1">
+        <label>Choose a thumbnail/image/icon : </label>
+        <input *ngIf="![null,undefined].includes(uploadEpisodeDoc.ratio)" type="file" #thumbnailref accept="image/*" (change)="previewImage($event)">
+        <img *ngIf="uploadEpisodeDoc.previewImageUrl != undefined || uploadEpisodeDoc.imageUrl != undefined" [src]="uploadEpisodeDoc.previewImageUrl != undefined ? uploadEpisodeDoc.previewImageUrl : uploadEpisodeDoc.imageUrl" controls style="width:200px;height:300px;margin-top:10px">
+      </div>
+      <!-- <div class="d-flex flex-column m-1">
+        <label>Choose a screenshot : </label>
+        <input type="file" #screenshotref accept="image/*" (change)="previewScreenshot($event.target.files)">
+        <img *ngIf="uploadEpisodeDoc.previewScreenshotUrl != undefined || uploadEpisodeDoc.screenshot != undefined" [src]="uploadEpisodeDoc.previewScreenshotUrl != undefined ? uploadEpisodeDoc.previewScreenshotUrl : uploadEpisodeDoc.screenshot" controls style="width:200px;height:300px;margin-top:10px">
+      </div> -->
+      <!-- <div class="d-flex flex-column m-1">
+        <label>Choose a subtitle file</label>
+        <input type="file" #srtref accept=".srt" (change)="addToDoc($event.target.files)">
+      </div> -->
+      <!-- <div class="d-flex flex-column m-1">
+        <label>Choose a video</label>
+        <input type="file" #videoref accept="video/*" (change)="previewVideo($event.target.files)">
+        <mat-error *ngIf="showFileSizeError" class="text-danger">Maximum file size limit is 15 GB.</mat-error>
+        <video  *ngIf="uploadEpisodeDoc.previewVideoUrl != undefined || uploadEpisodeDoc.videoUrl != undefined"  [src]="uploadEpisodeDoc.previewVideoUrl != null ? sanitize(uploadEpisodeDoc.previewVideoUrl) : uploadEpisodeDoc.videoUrl" controls style="width:300px;height:300px;margin-top:10px;"></video>
+      </div> -->
+      <div style="margin-top:10%;margin-left:5%">
+        <button mat-stroked-button type="button" [disabled] = 'showFileSizeError == true' (click)="onSubmit()">Upload</button>&nbsp;&nbsp;
+      </div>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Name</th>
+          <th scope="col">Ratio</th>
+          <th scope="col">Type</th>
+          <!-- <th scope="col">Title</th> -->
+          <th scope="col">Description</th>
+          <!-- <th scope="col">tags</th> -->
+          <!-- <th scope="col">Video</th> -->
+          <th scope="col">Image</th>
+          <!-- <th scope="col">Srt</th> -->
+          <!-- <th scope="col">Submit</th> -->
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let task of uploadingTask;let i = index">
+          <th scope="row">{{i+1}}</th>
+          <td>{{task.name}}</td>
+          <td>{{task.ratio}}</td>
+          <td>{{task.type}}</td>
+          <!-- <td>{{task.title}}</td> -->
+          <td>{{task.description}}</td>
+          <!-- <td>
+            <li *ngFor="let tag of task.tags">{{mapTaxonomy[tag]}}</li>
+          </td> -->
+          <!-- <td>{{task.videoFileName}}-{{(task.uploadingVideoPercentage | async) | number: '1.0-0'}}%</td> -->
+          <td>{{task.imageFileName}}-{{(task.uploadingImagePercentage | async) | number: '1.0-0'}}%</td>
+          <!-- <td>{{task.srtFileName}}-{{(task.uploadingSrtPercentage | async) | number: '1.0-0'}}%</td> -->
+          <td>
+            <span *ngIf="(task.uploadImageFile ? (task.uploadingImagePercentage | async) == 100 : true)">
+            {{getTaskStatus(task,i)}}
+                <!-- {{(!task.submitted && 
+                  (task.uploadVideoFile ? (task.uploadingVideoPercentage | async) == 100 : true) && 
+                  (task.uploadImageFile ? (task.uploadingImagePercentage | async) == 100 : true) && 
+                  (task.uploadSrtFile ? (task.uploadingSrtPercentage | async) == 100 : true)) ? saveDataToFirestore(i) : (task.submitted ? "Submitted" : "Not Yet Uploaded")}} -->
+            </span>
+
+            <!-- <button *ngIf="!task.submitted" mat-stroked-button type="button" (click)="saveDataToFirestore(i)" 
+            [disabled]="((task.uploadingVideoPercentage | async) ? (task.uploadingVideoPercentage | async) != 100 : false)|| ((task.uploadingImagePercentage | async) ? (task.uploadingImagePercentage | async) != 100 :false)">Submit</button>&nbsp;&nbsp; -->
+            <!-- <mat-icon *ngIf="task.submitted">check</mat-icon>&nbsp;&nbsp; -->
+            <button mat-mini-fab color="primary" (click)="openEditDialog(task,'Upload New Image');task.submitted = false;removeDoc(i);">
+              <mat-icon>edit</mat-icon>
+            </button>&nbsp;&nbsp;
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </mat-tab>
+</mat-tab-group>
+
+<!-- 
+*ngIf="task.submitted === false && 
+                (task.uploadVideoFile ? (task.uploadingVideoPercentage | async) == 100 : true) && 
+                (task.uploadImageFile ? (task.uploadingImagePercentage | async) == 100 : true) && 
+                (task.uploadSrtFile ? (task.uploadingSrtPercentage | async) == 100 : true)" -->

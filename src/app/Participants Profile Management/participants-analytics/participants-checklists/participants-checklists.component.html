@@ -1,0 +1,34 @@
+<div class="dialog-container">
+    <div mat-dialog-title class="dialog-header">
+      <h2>{{ formattedType }} Checklist</h2>
+      <span class="record-count">{{ totalRecords }} Records</span>
+    </div>
+    
+    <mat-dialog-content class="dialog-content">
+      <div class="table-wrapper">
+        <table class="dialog-table">
+          <thead>
+            <tr>
+              <th *ngFor="let column of columns" class="table-header">
+                {{ column.header }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of processedTableData; let i = index" 
+                [class.even-row]="i % 2 === 0">
+              <td *ngFor="let column of columns" class="table-cell">
+                <span *ngIf="column.key === 'name'">{{row[column.key]}}</span>
+                <span *ngIf="['activejourney','lastcompletedjourney', 'higherorderpurchase'].includes(column.key)">{{mapjourney[row[column.key]]}}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </mat-dialog-content>
+    
+    <mat-dialog-actions class="dialog-actions" style="float: right;">
+      <!-- <button mat-button (click)="export()">Export</button> -->
+      <button mat-button (click)="close()">Close</button>
+    </mat-dialog-actions>
+</div>

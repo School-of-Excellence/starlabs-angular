@@ -1,0 +1,230 @@
+<main class="m-4">
+
+  <div class="d-flex justify-content-center">
+    <h3>Create/Update Eiflix Enrollment</h3>
+  </div>
+
+  <div class="m-2 w-50">
+    <mat-form-field>
+      <mat-label>Name</mat-label>
+      <input type="text" matInput [(ngModel)]="enrollment.label" name="name">
+    </mat-form-field>
+  </div>
+
+  <div class="d-flex flex-row justify-content-center">
+    <div class="w-50 m-2 card border-dark">
+
+      <div class="d-flex flex-row justify-content-center m-2">
+        <button mat-stroked-button (click)="addlayout()" type="button">Add layout</button>&nbsp;&nbsp;
+        <button mat-stroked-button (click)="removelayout()" type="button">Remove layout</button>
+      </div>
+
+      <div style="height:80vh;overflow-y: auto;" *ngIf="loading">
+        <div 
+          [ngClass]="selectedLayoutIndex === layoutindex ? 'border-primary' : null" 
+          class="card m-2" 
+          *ngFor="let list of enrollment.layout;let layoutindex = index;" 
+        >
+          <div class="card-body">
+            <button class="float-right" mat-stroked-button type="button" (click)="selectedLayoutIndex = layoutindex;onLayoutChange()">Select Layout</button>
+            <br>
+              <ul>
+                <li *ngFor="let layoutdetail of list | keyvalue;">
+
+                  {{layoutdetail.key}}&nbsp;:&nbsp;&nbsp;
+
+                  <span *ngIf="['text','number','boolean','color'].includes(mapList[layoutdetail.key].type)">
+                    <span *ngIf="!['image','videourl'].includes(mapList[layoutdetail.key].keyvalue)" style="font-weight:600;">
+                      {{layoutdetail.value}} 
+                    </span>
+                    <span *ngIf="['image'].includes(mapList[layoutdetail.key].keyvalue)" style="font-weight:600;">
+                      <img [src]="layoutdetail.value" width="200" height="150">
+                    </span>
+                    <span *ngIf="['videourl'].includes(mapList[layoutdetail.key].keyvalue)">
+                      <video width="300" height="150" controls>
+                        <source [src]="layoutdetail.value" type="video/mp4">
+                        Your browser does not support the video tag.
+                      </video>
+                    </span>
+                    &nbsp;&nbsp;
+                    <button mat-icon-button  type="button" (click)="onLayoutTextValueRemove(layoutindex,layoutdetail.key)"><mat-icon>cancel</mat-icon></button>
+                  </span>
+
+
+                  <span *ngIf="['array'].includes(mapList[layoutdetail.key].type)" class="m-2">
+
+                    <span *ngIf="mapList[layoutdetail.key].multiple === true">
+                      &nbsp;&nbsp;<button mat-icon-button type="button" (click)="onLayoutTextValueRemove(layoutindex,layoutdetail.key)"><mat-icon>cancel</mat-icon></button>
+                      <br>
+
+                      <span *ngIf="mapList[layoutdetail.key].keyvalue === 'text'">
+                        <div cdkDropList class="example-list" (cdkDropListDropped)="drop(layoutindex,layoutdetail.key,$event)">
+                          <div class="example-box" *ngFor="let option of layoutdetail.value;let j = index;" cdkDrag>
+                            {{option}}
+                            <button mat-icon-button type="button" (click)="onLayoutArrayValueRemove(layoutindex,layoutdetail.key,j)"><mat-icon>remove</mat-icon></button>
+                          </div>
+                        </div>
+                      </span>
+
+                      <span *ngIf="mapList[layoutdetail.key].keyvalue === 'image'">
+                        <div class="ms-4 d-flex flex-row" style="overflow-x: auto;">
+                          <div  cdkDropList cdkDropListOrientation="horizontal" class="example-list-horz" (cdkDropListDropped)="drop(layoutindex,layoutdetail.key,$event)">
+                            <div  class="example-box-horz d-flex flex-column" *ngFor="let option of layoutdetail.value;let j = index;" cdkDrag>
+                              <!-- <span style="align-items: center;"> -->
+                                <img [src]="option" width="200" height="100">
+                                <span class="d-flex justify-content-center">
+                                  <button  mat-stroked-button color="accent"  type="button" (click)="onLayoutArrayValueRemove(layoutindex,layoutdetail.key,j)">
+                                    <!-- <mat-icon>cancel</mat-icon> -->Remove
+                                  </button>
+                                </span>
+                              <!-- </span> -->
+                            </div>
+                          </div>
+                        </div>
+                      </span>
+
+                      <span *ngIf="mapList[layoutdetail.key].keyvalue === 'videourl'">
+                        <div class="ms-4 d-flex flex-row" style="overflow-x: auto;">
+                          <div  cdkDropList cdkDropListOrientation="horizontal" class="example-list-horz" (cdkDropListDropped)="drop(layoutindex,layoutdetail.key,$event)">
+                            <div  class="example-box-horz d-flex flex-column" *ngFor="let option of layoutdetail.value;let j = index" cdkDrag>
+                              <!-- <span style="align-items: center;"> -->
+                                <video width="300" height="150" controls>
+                                  <source [src]="option" type="video/mp4">
+                                  Your browser does not support the video tag.
+                                </video>
+                                <span class="d-flex justify-content-center">
+                                  <button  mat-icon-button color="accent" type="button" (click)="onLayoutArrayValueRemove(layoutindex,layoutdetail.key,j)">
+                                    <!-- <mat-icon>cancel</mat-icon> -->Remove
+                                  </button>
+                                </span>
+                              <!-- </span> -->
+                            </div>
+                          </div>
+                        </div>
+                      </span>
+
+                    </span>
+
+                    <span *ngIf="mapList[layoutdetail.key].multiple === false">
+                      <span *ngIf="mapList[layoutdetail.key].keyvalue === 'text'">{{layoutdetail.value}}</span>
+                      <span *ngIf="mapList[layoutdetail.key].keyvalue === 'image'" class="align-middle">
+                        <img [src]="layoutdetail.value" alt="" width="200" height="300">
+                      </span>
+                      <span *ngIf="mapList[layoutdetail.key].keyvalue === 'videourl'" class="align-middle">
+                        <video [src]="layoutdetail.value" width="200" height="300"></video>
+                      </span>
+                      &nbsp;&nbsp;<button mat-icon-button type="button" (click)="onLayoutTextValueRemove(layoutindex,layoutdetail.key)"><mat-icon>cancel</mat-icon></button>
+                    </span>
+
+                  </span>
+
+                  <span *ngIf="['imagemap'].includes(mapList[layoutdetail.key].type)">
+                      &nbsp;&nbsp;<button mat-icon-button type="button" (click)="onLayoutTextValueRemove(layoutindex,layoutdetail.key)"><mat-icon>cancel</mat-icon></button>
+                      <br>
+                      <div class="ms-4 d-flex flex-row" style="overflow-x: auto;">
+                        <span *ngFor="let option of layoutdetail.value | keyvalue" class="d-flex flex-column me-2">
+                          <span class="mb-1">{{option.key}}&nbsp; : &nbsp;&nbsp;
+                            <button type="button" class="btn btn-outline-info btn-sm" (click)="onRemoveImageMap(layoutindex,layoutdetail.key,$any(option.key))">Remove</button>
+                          </span>
+                          <span><img [src]="option.value" width="200" height="150"></span>
+                        </span>
+                      </div>
+                  </span>
+
+                </li>
+              </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="w-50 card m-2" style="overflow-y: auto;height:90vh;" *ngIf="list.length != 0">
+
+      <div *ngFor="let obj of list;let i = index;" class="m-2">
+
+        <!-- [(ngModel)]="obj.value"  -->
+        <!-- (ngModelChange)="addValueToEnrollementlayout(obj.name,obj.value)" -->
+        <div *ngIf="['text'].includes(obj.type)">
+          <mat-form-field appearance="fill" class="w-75">
+            <mat-label>{{obj.name | uppercase}}</mat-label>
+            <textarea matInput (change)="onAddText(i,$event)"></textarea>
+          </mat-form-field>
+        </div>
+
+        <div *ngIf="['number'].includes(obj.type)">
+          <mat-form-field appearance="fill" class="w-75">
+            <mat-label>{{obj.name | uppercase}}</mat-label>
+            <input [type]="obj.type" matInput [(ngModel)]="obj.value" [name]="obj.name+i" (ngModelChange)="addValueToEnrollementlayout(obj.name,obj.value)">
+          </mat-form-field>
+        </div>
+
+        <div *ngIf="['boolean'].includes(obj.type)">
+          <span class="example-list-section">
+            <mat-checkbox [(ngModel)]="obj.value" [name]="obj.name+i" (ngModelChange)="addValueToEnrollementlayout(obj.name,obj.value)">{{obj.name}}</mat-checkbox>
+          </span>
+        </div>
+
+        <div *ngIf="['color'].includes(obj.type)">
+          <mat-form-field appearance="fill" class="w-75">
+            <mat-label>{{obj.name | uppercase}}</mat-label>
+            <input [type]="obj.type" matInput (change)="getColorValue(i,$event)">
+          </mat-form-field>
+        </div>
+
+
+        <div *ngIf="['array'].includes(obj.type) && obj.multiple === true">
+          <mat-form-field appearance="fill" style="width:90%">
+            <mat-label>Add {{obj.name}}</mat-label>
+                <input 
+                  *ngIf="obj.options.length === 0"
+                  type="text"
+                  matInput
+                  placeholder="type to search value..."
+                  (keydown.enter)="onTextEnter(i,$event)"
+                >
+                <input 
+                  *ngIf="obj.options.length != 0"
+                  type="text"
+                  placeholder="type to search value..."
+                  matInput
+                  (keyup)="onTextSearch(i,$event)"
+                  [matAutocomplete]="autoA"
+                >
+            <mat-autocomplete *ngIf="obj.options.length != 0" #autoA="matAutocomplete"  (optionSelected)="onSelectedArrayMultiple(i,$event)">
+              <mat-option *ngFor="let filtervalue of obj.filteredoptions" [value]="filtervalue">{{filtervalue}}</mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+        </div>
+
+        <div *ngIf="['array'].includes(obj.type) && obj.multiple === false">
+          <mat-form-field appearance="fill" class="w-75">
+            <mat-label>{{obj.name}}</mat-label>
+            <input type="text"
+              placeholder="Pick one"
+              matInput
+              (keyup)="onTextSearch(i,$event)"
+              [matAutocomplete]="auto"
+            >
+            <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onSelectedArray(i,$event)">
+              <mat-option *ngFor="let option of obj.filteredoptions" [value]="option">{{option}}</mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+        </div>
+
+        <div *ngIf="['imagemap'].includes(obj.type)">
+          <mat-form-field appearance="fill" style="width:90%" >
+            <mat-label>Add {{obj.name}}</mat-label>
+            <textarea matInput placeholder="add type reference..." (keydown.enter)="onAddImageMap(i,$event)"></textarea>
+          </mat-form-field>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+  <div class="d-flex flex-row justify-content-center">
+    <button mat-stroked-button color="accent" type="button" (click)="onCancel()">Cancel</button>&nbsp;&nbsp;
+    <button mat-stroked-button color="primary" type="button" (click)="onSubmit()">Submit</button>&nbsp;&nbsp;
+  </div>
+</main>
+

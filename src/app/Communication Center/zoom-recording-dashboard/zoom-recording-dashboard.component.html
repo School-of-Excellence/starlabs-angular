@@ -1,0 +1,213 @@
+<div class="zoom-records-cnt">
+  <h1>Zoom Backup Recordings</h1>
+
+  <!-- filtering options -->
+  <div class="filters-container">
+    <p>Filter By</p>
+    <form [formGroup]="form" class="filters">
+      <!-- text search filter -->
+      <div>
+        <mat-form-field appearance="outline" style="min-width: 300px">
+          <mat-label>Meeting ID or Topic or Email</mat-label>
+          <input
+            type="text"
+            placeholder="Ex..."
+            matInput
+            (keyup)="applyFilter()"
+            formControlName="search"
+          />
+        </mat-form-field>
+      </div>
+      <!-- filter by start time-->
+      <div>
+        <mat-form-field appearance="outline">
+          <mat-label>Enter a date range</mat-label>
+          <mat-date-range-input [rangePicker]="picker">
+            <input
+              matStartDate
+              placeholder="Start date"
+              formControlName="startDate"
+              (dateChange)="applyFilter()"
+            />
+            <input
+              matEndDate
+              placeholder="End date"
+              formControlName="endDate"
+              (dateChange)="applyFilter()"
+            />
+          </mat-date-range-input>
+          <mat-datepicker-toggle
+            matIconSuffix
+            [for]="picker"
+          ></mat-datepicker-toggle>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+
+      <!-- filter by status -->
+      <div>
+        <mat-form-field appearance="outline">
+          <mat-label>Status</mat-label>
+          <mat-select
+            (selectionChange)="applyFilter()"
+            formControlName="status"
+          >
+            <mat-option>--</mat-option>
+            <mat-option [value]="'completed'">Completed</mat-option>
+            <mat-option [value]="'failed'">Failed</mat-option>
+            <mat-option [value]="'partial_success'">Partial Success</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </form>
+    <div>
+      <!-- table to display zoom records -->
+      <table mat-table [dataSource]="recordsBackup" class="mat-elevation-z8">
+        <ng-container matColumnDef="meetingId">
+          <th mat-header-cell *matHeaderCellDef>MeetingId</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "meetingId") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="meetingTopic">
+          <th mat-header-cell *matHeaderCellDef>Meeting Topic</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "meetingTopic") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="hostEmail">
+          <th mat-header-cell *matHeaderCellDef>Host Email</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "hostEmail") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef>Duration</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "duration") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "status") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="successCount">
+          <th mat-header-cell *matHeaderCellDef>Success Count</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "successCount") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="failedCount">
+          <th mat-header-cell *matHeaderCellDef>Failed Count</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "failedCount") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="startTime">
+          <th mat-header-cell *matHeaderCellDef>Start Time</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "startTime") | date : "medium" }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalSize">
+          <th mat-header-cell *matHeaderCellDef>TotalSize</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "totalSize") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalFiles">
+          <th mat-header-cell *matHeaderCellDef>TotalFiles</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "totalFiles") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="file">
+          <th mat-header-cell *matHeaderCellDef>View File</th>
+          <td mat-cell *matCellDef="let element">
+            <button
+              mat-icon-button
+              class="file-popup-btn"
+              (click)="openFileModel(element.id)"
+            >
+              <i class="fa-regular fa-file"></i>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="tableHeaders"></tr>
+        <tr mat-row *matRowDef="let row; columns: tableHeaders"></tr>
+      </table>
+
+      <!-- paginator -->
+      <mat-paginator
+        [pageSizeOptions]="[10, 20, 25, 50, 100, 200]"
+        showFirstLastButtons
+      >
+      </mat-paginator>
+    </div>
+  </div>
+</div>
+
+<!-- file popup box -->
+
+@if (files !== null) {
+<div class="model-overlay">
+  <div class="file-container">
+    <h1>File</h1>
+    <div>
+      <!-- table to display files -->
+      @if (files.length > 0) {
+      <table mat-table [dataSource]="files">
+        <ng-container matColumnDef="fileName">
+          <th mat-header-cell *matHeaderCellDef>File Name</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "fileName") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="fileSize">
+          <th mat-header-cell *matHeaderCellDef>File Size</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "fileSize") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="fileType">
+          <th mat-header-cell *matHeaderCellDef>File Type</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "fileType") }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let element">
+            {{ formatDisplayData(element, "status") }}
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="filetableHeaders"></tr>
+        <tr mat-row *matRowDef="let row; columns: filetableHeaders"></tr>
+      </table>
+      } @else{
+      <p>No files For this Record</p>
+      }
+    </div>
+
+    <!-- close button -->
+    <button mat-button (click)="closeFileModel()">Cancel</button>
+  </div>
+</div>
+}

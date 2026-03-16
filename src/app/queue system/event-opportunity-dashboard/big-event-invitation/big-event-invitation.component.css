@@ -1,0 +1,13 @@
+.formfield{
+    width: 400px;
+  }
+  
+  .closebtn{
+    color: red;
+    border: 1px solid red;
+  }
+  
+  .submitbtn{
+    color: white;
+    background-color: green;
+  }

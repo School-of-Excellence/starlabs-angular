@@ -1,0 +1,37 @@
+<div style="padding: 20px;">
+  <h2 style="display: flex; justify-content: center;">Tags</h2>
+  <div class="d-flex mb-10 p-10 mt-4 justify-content-between">
+    <h5 class="mt-4">Add New Tag</h5>
+    <form [formGroup]="tagForm">
+        <mat-form-field>
+          <mat-label>Add Tag</mat-label>
+          <input matInput formControlName="newTag" placeholder="Enter tag"/>
+        </mat-form-field>    
+        <button class="ms-2" mat-raised-button color="primary" [disabled]="!tagForm?.valid" (click)="addtags()">Add</button>
+    </form>
+  </div>
+
+  <!-- <p class="tagtext mt-1" >once tag created its cant be deleted</p>  -->
+  
+    <h5 class="mt-5">Total Participants Selected: {{ data.totalCount }}</h5>
+    <mat-form-field appearance="outline" class="w-100 mt-4">
+      <mat-label>Search Tag</mat-label>
+      <input type="text" matInput (keyup)="onTagSearch($event)">
+    </mat-form-field>
+    
+    <mat-chip-set>
+    <mat-chip-option *ngFor="let tag of filteredTagsData | keyvalue; trackBy: trackById"
+                    [selected]="isTagSelected(tag.value)"
+                    (selectionChange)="toggleTagSelection(tag.value)"
+                    [value]="tag.value">
+        {{ tag.value.tagName }}
+    </mat-chip-option>
+    </mat-chip-set>
+
+
+    
+    <br>
+    <div class="d-flex justify-content-center mt-4">
+      <button mat-raised-button color="primary" (click)="addparticipantTags()" [disabled]="!selectedTags.length">Add</button>
+    </div>
+</div>

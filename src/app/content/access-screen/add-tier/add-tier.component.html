@@ -1,0 +1,71 @@
+<div style="padding: 20px;">
+<div *ngIf="add">
+    <div mat-dialog-title>
+      <h2>Add Tier</h2>
+    </div>
+    <div mat-dialog-content>
+        <form #myForm="ngForm">
+            <mat-form-field>
+                <input type="text" placeholder="Add Tier" matInput [(ngModel)]="tier"
+                       ngModel
+                       name="name"
+                       #name="ngModel"
+                       required (keyup)="onSelect()">
+                       <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Tier name required</mat-error>
+                       <mat-hint *ngIf="crossmatch">
+                        <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
+                       </mat-hint>
+            </mat-form-field>
+            <mat-form-field style="width:100%;">
+            <textarea matInput rows="4"
+                        placeholder="Tier Eligibility Message"
+                        [(ngModel)]="tiereligibilitymessage"
+                        name="tiereligibilitymessage"
+                        rows="3">
+            </textarea>
+            </mat-form-field>
+        </form>
+            <button  mat-raised-button color="primary" (click)="onSubmit()" [disabled]="myForm.invalid ? true :crossmatch ? true: false">Add</button>&nbsp;&nbsp;
+            <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+    </div>
+</div>
+
+<div *ngIf="edit">
+    <div mat-dialog-title>
+      <h2>Edit Tier</h2>
+    </div>
+    <div mat-dialog-content>
+        <form #myForm="ngForm">
+            <mat-form-field>
+                <input type="text" placeholder="Edit Tier" matInput [(ngModel)]="tier"
+                       ngModel
+                       name="name"
+                       required
+                       #name="ngModel" (keyup)="onSelect()">
+                       <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Tier name required</mat-error>
+                       <mat-hint *ngIf="crossmatch">
+                        <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
+                       </mat-hint>
+            </mat-form-field>
+            <mat-form-field style="width:100%;">
+            <textarea matInput  rows="4"
+                        placeholder="Tier Eligibility Message"
+                        [(ngModel)]="tiereligibilitymessage"
+                        name="tiereligibilitymessage"
+                        rows="3">
+            </textarea>
+            </mat-form-field>
+        </form>
+            <button  mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>&nbsp;&nbsp;
+            <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+    </div>
+</div>
+
+<div *ngIf="delete">
+    <div mat-dialog-title style="width: 350px;">
+        <h3>Are you sure you want to delete?</h3>
+    </div>
+        <button  mat-raised-button color="primary" (click)="onDelete(data.id)">Delete</button>&nbsp;&nbsp;
+        <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+</div>
+</div>

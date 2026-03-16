@@ -1,0 +1,58 @@
+
+<div style="margin:50px">
+  <mat-form-field class="dorpdownfield" appearance="outline">
+    <mat-label>Product</mat-label>
+    <mat-select [(ngModel)]="producttodelivery['product']" [disabled]="data != null" required>
+      <mat-option class="matoption" *ngFor="let product of nonexistingproductlist" [value]="product.path">{{product.name}}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <br>
+  <div *ngFor="let options of producttodelivery['deliveryoptions'];let i = index">
+    <mat-card style="margin: 10px;border:0.1px solid;border-color:darkgrey;padding: 10px;">
+      <span style="float: right;">
+        <button mat-icon-button (click)="adddelvieryoption()">
+          <mat-icon>add_circle_outline</mat-icon>
+        </button>&nbsp;&nbsp;
+
+        <button *ngIf="producttodelivery['deliveryoptions'].length != 1" mat-icon-button (click)="removedeliveryoption(i)">
+          <mat-icon>remove_circle_outline</mat-icon>
+        </button>
+      </span>
+      <mat-form-field class="dorpdownfield" appearance="outline">
+        <mat-label>Delivery Type</mat-label>
+        <input type="text" matInput [(ngModel)]="producttodelivery['deliveryoptions'][i]['deliverytype']" placeholder="delivery type online or offline" required>
+      </mat-form-field>
+      <div cdkDropList class="example-list" (cdkDropListDropped)="pdrop($event,i)">
+        <div cdkDrag class="example-box" *ngFor="let item of producttodelivery['deliveryoptions'][i]['deliverysequence'];let j = index">
+          <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+          <mat-form-field class="dorpdownfield" appearance="outline">
+            <mat-label>Delivery Activities</mat-label>
+            <mat-select [(ngModel)]="producttodelivery['deliveryoptions'][i]['deliverysequence'][j]['activity']"  required>
+              <mat-option class="matoption" *ngFor="let delivery of deliveryList" [value]="delivery.path">{{delivery.deliveryname}} ({{delivery.type}})</mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          
+          <mat-form-field class="textfield" appearance="outline">
+            <mat-label>Label</mat-label>
+            <input type="text" matInput [(ngModel)]="producttodelivery['deliveryoptions'][i]['deliverysequence'][j]['label']" required>
+          </mat-form-field>&nbsp;&nbsp;
+
+          <mat-form-field class="textfield" appearance="outline">
+            <mat-label>Description</mat-label>
+            <input type="text" matInput [(ngModel)]="producttodelivery['deliveryoptions'][i]['deliverysequence'][j]['description']" required>
+          </mat-form-field>&nbsp;&nbsp;
+
+          <button mat-icon-button (click)="adddelvierysequence(i)">
+            <mat-icon>add_circle_outline</mat-icon>
+          </button>&nbsp;&nbsp;
+
+          <button *ngIf="producttodelivery['deliveryoptions'][i]['deliverysequence'].length != 1" mat-icon-button (click)="removedeliverysequence(i,j)">
+            <mat-icon>remove_circle_outline</mat-icon>
+          </button>
+          
+        </div>
+      </div>
+    </mat-card>
+  </div>
+  <button  mat-raised-button color="primary" type="submit" (click)="onproducttodeliverysubmit()">Submit</button>
+</div>

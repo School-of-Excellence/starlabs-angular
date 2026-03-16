@@ -1,0 +1,138 @@
+<div class="mainscreen">
+    <h4 class="title">Arena Live Studio</h4>
+    <div>
+        <mat-form-field class="w-100" appearance="outline">
+            <mat-label>Select Queue</mat-label>
+            <mat-select (selectionChange)="onQueueSelect($event.value)">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let list of filterQueue()" [value]="list.docid">
+                    {{list.queuename}}
+                </mat-option>
+            </mat-select>
+          </mat-form-field>
+    </div>
+    <!-- <div>
+        <mat-list *ngFor="let item of arenaparticipant;let i = index;">
+            <mat-list-item>
+                {{i + 1}})&nbsp;EIS : &nbsp;<span *ngFor="let eis of item['pairing']"><b>{{mapProfile[eis]}}</b>&nbsp;,</span>&nbsp;&nbsp;&nbsp;
+                Client : &nbsp;<b>{{mapProfile[item['participantid']]}}</b>&nbsp;&nbsp;&nbsp;
+                Stage : &nbsp;<b>{{item['stagename']}}</b>&nbsp;&nbsp;&nbsp;
+                Zoom : &nbsp;<b>{{item['zoomdata'] != null && item['zoomdata'] != undefined ? item['zoomdata']["host_email"] : "Unknown"}}</b>
+                <button *ngIf="developer" mat-stroked-button class="ml-2" (click)="closeStudio(item)">Close Studio</button>
+            </mat-list-item>
+        </mat-list>
+    </div> -->
+    <div class="zoom-section">
+        <span class="count-badge">{{ zoomNotInUseEmails.length }} Available</span>
+        
+        <mat-chip-set class="email-chips">
+            <mat-chip *ngFor="let email of zoomNotInUseEmails">
+            <mat-icon matChipAvatar>videocam</mat-icon>
+            {{ email?.email || email }}
+            </mat-chip>
+        </mat-chip-set>
+    </div>
+</div>
+
+<div class="arena-participants-container">
+  <mat-card *ngFor="let item of arenaparticipant; let i = index" 
+            class="participant-card"
+            [ngClass]="{
+              'stage-mismatch': mapParticipantToToken[item['participantid']]?.['currentstage'] !== item['stagename'],
+              'zoom-in-use': item['zoomdata'] && mapZoomAccount[item['zoomdata']['host_email']]?.['inuse'],
+              'duplicate-pairing': duplicateSpecialistPairing.includes(item['pairing'].join(','))
+            }">
+    
+    <mat-card-content>
+      <div class="participant-row">
+        <!-- Index -->
+        <span class="participant-index">{{ i + 1 }}</span>
+        
+        <!-- EIS Section with Duplicate Warning -->
+        <div class="info-block">
+          <span class="label">
+            EIS
+            <mat-icon *ngIf="duplicateSpecialistPairing.includes(item['pairing'].join(','))" 
+                      class="duplicate-icon"
+                      matTooltip="Duplicate pairing detected!">
+              content_copy
+            </mat-icon>
+          </span>
+          <div class="value eis-list" 
+               [ngClass]="{'duplicate-eis': duplicateSpecialistPairing.includes(item['pairing'].join(','))}">
+            <span *ngFor="let eis of item['pairing']; let last = last" class="eis-chip">
+              {{ mapProfile[eis] }}{{ !last ? ',' : '' }}
+            </span>
+          </div>
+        </div>
+        
+        <!-- Client Section -->
+        <div class="info-block">
+          <span class="label">Client</span>
+          <span class="value">{{ mapProfile[item['participantid']] }}</span>
+        </div>
+        
+        <!-- Stage Section with Warning -->
+        <div class="info-block">
+          <span class="label">Stage</span>
+          <span class="value" 
+                [ngClass]="{'warning-text': mapParticipantToToken[item['participantid']]?.['currentstage'] !== item['stagename']}">
+            {{ item['stagename'] }}
+            <mat-icon *ngIf="mapParticipantToToken[item['participantid']]?.['currentstage'] !== item['stagename']" 
+                      class="warning-icon"
+                      matTooltip="Current stage mismatch: {{ mapParticipantToToken[item['participantid']]?.['currentstage'] }}">
+              warning
+            </mat-icon>
+          </span>
+        </div>
+        
+        <!-- Zoom Section with In-Use Indicator -->
+        <div class="info-block">
+          <span class="label">Zoom</span>
+          <span class="value zoom-value">
+            {{ item['zoomdata']?.['host_email'] || 'Unknown' }}
+            <mat-chip *ngIf="item['zoomdata'] && mapZoomAccount[item['zoomdata']['host_email']]?.['inuse']"
+                      class="in-use-chip"
+                      color="accent"
+                      selected>
+              In Use
+            </mat-chip>
+            <mat-chip *ngIf="item['zoomdata'] && !mapZoomAccount[item['zoomdata']['host_email']]?.['inuse']"
+                      class="available-chip">
+              Available
+            </mat-chip>
+          </span>
+        </div>
+        
+        <!-- Actions -->
+        <div class="actions" *ngIf="developer">
+          <button mat-raised-button color="warn" (click)="closeStudio(item)">
+            <mat-icon>close</mat-icon>
+            Close Studio
+          </button>
+        </div>
+      </div>
+      
+      <!-- Warning Banners -->
+      <div class="warning-banner" 
+           *ngIf="mapParticipantToToken[item['participantid']]?.['currentstage'] !== item['stagename']">
+        <mat-icon>error_outline</mat-icon>
+        <span>Stage mismatch! Expected: <strong>{{ mapParticipantToToken[item['participantid']]?.['currentstage'] }}</strong></span>
+      </div>
+      
+      <div class="duplicate-banner" 
+           *ngIf="duplicateSpecialistPairing.includes(item['pairing'].join(','))">
+        <mat-icon>content_copy</mat-icon>
+        <span>Duplicate EIS pairing detected!</span>
+      </div>
+    </mat-card-content>
+  </mat-card>
+  
+  <!-- Empty State -->
+  <div *ngIf="!arenaparticipant?.length" class="empty-state">
+    <mat-icon>people_outline</mat-icon>
+    <p>No participants in arena</p>
+  </div>
+</div>

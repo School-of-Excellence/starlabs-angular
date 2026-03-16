@@ -1,0 +1,287 @@
+<div class="mainscreen">
+  <div class="header">
+    <h2 class="heading">Participant Form Tracker</h2>
+  </div>
+
+  <!-- Filters - only for Ask A&H and Love Letter -->
+  <div class="filters-row" *ngIf="activeTab < 2">
+    <mat-form-field appearance="outline">
+      <mat-label>Select Date Range</mat-label>
+      <mat-date-range-input [rangePicker]="rangePicker">
+        <input matStartDate [formControl]="startDate" placeholder="Start date">
+        <input matEndDate [formControl]="endDate" placeholder="End date">
+      </mat-date-range-input>
+      <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+      <mat-date-range-picker #rangePicker></mat-date-range-picker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Participant</mat-label>
+      <mat-select [(value)]="selectedParticipant">
+        <mat-option>
+          <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search participant..."
+            noEntriesFoundLabel="No participant found">
+          </ngx-mat-select-search>
+        </mat-option>
+        <mat-option>-- None --</mat-option>
+        <mat-option *ngFor="let p of filteredParticipants" [value]="p">{{ p.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button mat-raised-button color="primary" (click)="applyFilters()">Apply</button>
+    <button mat-stroked-button (click)="clearFilters()">Clear</button>
+  </div>
+
+  <!-- Action buttons - only for Ask A&H and Love Letter -->
+  <div class="table-actions" *ngIf="activeTab < 2 && selectedRecords.length > 0">
+    <button mat-raised-button color="accent" (click)="viewMerged()">
+      View Merged ({{ selectedRecords.length }})
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <mat-tab-group (selectedTabChange)="onTabChange($event)">
+    <mat-tab label="Ask A&H">
+      <ng-container *ngTemplateOutlet="formTableTemplate"></ng-container>
+    </mat-tab>
+    <mat-tab label="Love Letter">
+      <ng-container *ngTemplateOutlet="formTableTemplate"></ng-container>
+    </mat-tab>
+    <mat-tab label="Interim Report Log">
+      <div class="body mat-elevation-z2">
+        <div class="actionbox">
+          <div class="actionitem">
+            <mat-form-field appearance="outline">
+              <mat-label>Filter Table</mat-label>
+              <input matInput (keyup)="filterLogData(logInput.value)" #logInput autocomplete="off">
+            </mat-form-field>
+          </div>
+        </div>
+        <div class="table-container">
+          <table mat-table [dataSource]="logDataSource" matSort>
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Profile Name</th>
+              <td mat-cell *matCellDef="let row">{{ row["name"] }}</td>
+            </ng-container>
+            <ng-container matColumnDef="reportlist">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Reports Done</th>
+              <td mat-cell *matCellDef="let row">
+                <label style="white-space: pre-wrap;">{{ row["reportlist"] }}</label>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="lastupdate">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Last Update</th>
+              <td mat-cell *matCellDef="let row">{{ row["lastupdate"] | date: 'MMMM d, y, h:mm a' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+              <td mat-cell *matCellDef="let row">{{ row["status"] }}</td>
+            </ng-container>
+            <ng-container matColumnDef="duedate">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Due Date</th>
+              <td mat-cell *matCellDef="let row">{{ row["duedate"] | date }}</td>
+            </ng-container>
+            <ng-container matColumnDef="lockdate">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Lock Date</th>
+              <td mat-cell *matCellDef="let row">{{ row["lockdate"] | date }}</td>
+            </ng-container>
+            <ng-container matColumnDef="remainderdate">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Remainder Date</th>
+              <td mat-cell *matCellDef="let row">{{ row["remainderdate"] | date }}</td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="logDisplayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: logDisplayedColumns;"></tr>
+          </table>
+        </div>
+        <mat-paginator #logPaginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+
+  <!-- Shared Form Table Template -->
+  <ng-template #formTableTemplate>
+    <div class="table-container">
+      <div *ngIf="loading" class="loading-spinner">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <table mat-table [dataSource]="records" *ngIf="!loading && records.length > 0">
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox [checked]="isAllSelected()"
+              [indeterminate]="selectedRecords.length > 0 && !isAllSelected()" (change)="toggleAll($event.checked)">
+            </mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+            <mat-checkbox [checked]="isSelected(row)" (change)="toggleRow(row, $event.checked)">
+            </mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="sno">
+          <th mat-header-cell *matHeaderCellDef>S.No</th>
+          <td mat-cell *matCellDef="let row; let i = index">{{ (currentPage * pageSize) + i + 1 }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let row">{{ mapProfiles[row.profileid]?.['name'] }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let row">
+            {{ row.created?.toDate ? (row.created.toDate() | date: 'medium') : (row.created | date: 'medium') }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="like">
+          <th mat-header-cell *matHeaderCellDef>Like</th>
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+            <div class="action-cell">
+              <button mat-icon-button (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''">
+                <mat-icon>{{ row.liked ? 'favorite' : 'favorite_border' }}</mat-icon>
+              </button>
+              <div class="action-meta" *ngIf="row.liked && row.likedetails">
+                <span class="action-user">{{ mapProfiles[row.likedetails.user]?.['name'] || '-' }}</span>
+                <span class="action-time">{{ row.likedetails.time?.toDate ? (row.likedetails.time.toDate() | date: 'short') :
+                  (row.likedetails.time | date: 'short') }}</span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+        
+        <ng-container matColumnDef="flag">
+          <th mat-header-cell *matHeaderCellDef>Flag</th>
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+            <div class="action-cell">
+              <button mat-icon-button (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''">
+                <mat-icon>{{ row.tagged ? 'flag' : 'outlined_flag' }}</mat-icon>
+              </button>
+              <div class="action-meta" *ngIf="row.tagged && row.tagdetails">
+                <span class="action-user">{{ mapProfiles[row.tagdetails.user]?.['name'] || '-' }}</span>
+                <span class="action-time">{{ row.tagdetails.time?.toDate ? (row.tagdetails.time.toDate() | date: 'short') :
+                  (row.tagdetails.time | date: 'short') }}</span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="notes">
+          <th mat-header-cell *matHeaderCellDef>Notes</th>
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+            <div class="notes-cell">
+              <button mat-icon-button (click)="openNotes(row)"
+                [color]="row.notes && row.notes.length > 0 ? 'primary' : ''">
+                <mat-icon>{{ row.notes && row.notes.length > 0 ? 'sticky_note_2' : 'note_add' }}</mat-icon>
+              </button>
+              <span class="notes-preview" *ngIf="row.notes && row.notes.length > 0">
+                {{ row.notes[row.notes.length - 1].notes }}
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="['select', 'sno', 'name', 'date', 'notes', 'like', 'flag']; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date', 'notes', 'like', 'flag']"
+          [class.selected-row]="isSelected(row)" (click)="viewRow(row)"></tr>
+      </table>
+
+      <div *ngIf="!loading && records.length === 0" class="no-data">
+        No records found.
+      </div>
+    </div>
+
+    <mat-paginator [length]="totalRecords || 1000" [pageSize]="pageSize" [pageSizeOptions]="[100, 200, 500]"
+      [pageIndex]="currentPage" (page)="onPageChange($event)">
+    </mat-paginator>
+  </ng-template>
+
+  <!-- View Overlay -->
+  <div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+    <div class="overlay-panel" (click)="$event.stopPropagation()">
+      <div class="overlay-header">
+        <h2>{{ overlayTitle }}</h2>
+        <button mat-icon-button (click)="closeOverlay()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="overlay-content">
+        <div *ngIf="overlayLoading" class="loading-spinner">
+          <mat-spinner diameter="40"></mat-spinner>
+        </div>
+
+        <!-- Individual View -->
+        <div *ngIf="overlayMode === 'individual' && !overlayLoading && overlayRecords.length > 0">
+          <div class="record-card">
+            <div class="record-header">
+              <span class="record-name">{{ overlayRecords[0].name }}</span>
+              <span class="record-date">{{ overlayRecords[0].date }}</span>
+            </div>
+            <div class="content-label">{{ overlayRecords[0].contentLabel }}</div>
+            <div class="record-content" [innerHTML]="overlayRecords[0].content"></div>
+            <div *ngIf="overlayRecords[0].content2">
+              <div class="content-label">{{ overlayRecords[0].content2Label }}</div>
+              <div class="record-content secondary" [innerHTML]="overlayRecords[0].content2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Merged View -->
+        <div *ngIf="overlayMode === 'merged' && !overlayLoading">
+          <div *ngFor="let record of overlayRecords; let i = index" class="record-card">
+            <div class="record-header">
+              <span class="record-number">{{ i + 1 }}.</span>
+              <span class="record-name">{{ record.name }}</span>
+              <span class="record-date">{{ record.date }}</span>
+            </div>
+            <div class="content-label">{{ record.contentLabel }}</div>
+            <div class="record-content" [innerHTML]="record.content"></div>
+            <div *ngIf="record.content2">
+              <div class="content-label">{{ record.content2Label }}</div>
+              <div class="record-content secondary" [innerHTML]="record.content2"></div>
+            </div>
+            <hr *ngIf="i < overlayRecords.length - 1" class="record-divider">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes Overlay -->
+  <div class="overlay-backdrop" *ngIf="showNotesOverlay" (click)="closeNotes()">
+    <div class="notes-panel" (click)="$event.stopPropagation()">
+      <div class="overlay-header">
+        <h2>Notes - {{ notesRecord?.profileName }}</h2>
+        <button mat-icon-button (click)="closeNotes()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="notes-content">
+        <!-- Add new note -->
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Add a note</mat-label>
+          <textarea matInput [(ngModel)]="notesText" rows="3" placeholder="Write your notes here..."></textarea>
+        </mat-form-field>
+
+        <!-- Previous notes -->
+        <div class="notes-history" *ngIf="notesRecord?.notes && notesRecord.notes.length > 0">
+          <h4>Previous Notes</h4>
+          <div *ngFor="let note of getReversedNotes()" class="note-item">
+            <div class="note-meta">
+              <span class="note-user">{{ mapProfiles[note.user]?.['name'] || note.user }}</span>
+              <span class="note-time">{{ note.time?.toDate ? (note.time.toDate() | date: 'medium') : (note.time | date: 'medium') }}</span>
+            </div>
+            <div class="note-text">{{ note.notes }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-actions">
+        <button mat-stroked-button (click)="closeNotes()">Cancel</button>
+        <button mat-raised-button color="primary" (click)="saveNotes()" [disabled]="!notesText.trim()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>

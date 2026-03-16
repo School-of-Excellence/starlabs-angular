@@ -1,0 +1,103 @@
+.mainscreen{
+  text-align: center;
+  width: 100%;
+  padding: 20px 20px;
+}
+
+.title{
+  font-size: 18px;
+  font-weight: bold;
+  color: rgb(0, 50, 67);
+  margin-bottom: 20px;
+}
+
+.inputfield{
+  margin-left: 20px;
+}
+
+.subtitle{
+  margin-bottom: 15px;
+  font-size: 16px;
+  color: rgb(0, 50, 67);
+  text-decoration: underline;
+}
+
+.journeystatusbox{
+  text-align: left;
+  margin-top: 20px;
+}
+
+::ng-deep .mdc-label {
+  font-size: 16px;
+}
+
+
+.btnbox{
+  margin-top: 15px;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red;
+}
+
+.cancelbtn:hover{
+  background-color: whitesmoke;
+}
+
+.submitbtn{
+  margin-left: 15px;
+  color: white;
+  background-color: green;
+}
+
+.submitbtn:hover{
+  background-color: rgb(0, 104, 0);
+}
+
+
+.mat-dialog-container {
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+.mat-dialog-actions button,
+.mat-dialog-content button {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10001 !important;
+}
+
+/* Make sure your specific buttons work */
+button {
+  pointer-events: auto !important;
+}
+
+.meeting-info {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  margin: 24px 0;
+  border-left: 4px solid #007bff;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.label {
+  font-weight: 500;
+  color: #666;
+}
+
+.value {
+  color: #333;
+  font-weight: 400;
+}

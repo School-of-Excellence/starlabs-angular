@@ -1,0 +1,319 @@
+.meeting-end-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+  }
+
+  .dialog-wrapper {
+    position: relative;
+    z-index: 10001;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .dialog-content {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 48px 32px;
+  }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 24px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  h2 {
+    color: #1a1a1a;
+    margin-bottom: 16px;
+    text-align: center;
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  h3 {
+    color: #333;
+    margin: 24px 0 16px;
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  h4 {
+    color: #555;
+    margin: 20px 0 12px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .meeting-info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 24px 0;
+    border-left: 4px solid #007bff;
+  }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .info-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .label {
+    font-weight: 500;
+    color: #666;
+  }
+
+  .value {
+    color: #333;
+    font-weight: 400;
+  }
+
+  .attendance-section {
+    margin: 24px 0;
+  }
+
+  .toggle-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    padding: 16px 20px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .toggle-btn:hover:not(:disabled) {
+    border-color: #007bff;
+    background: #f8f9ff;
+  }
+
+  .toggle-btn.active {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+  }
+
+  .toggle-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .cancellation-section {
+    margin: 20px 0;
+    padding: 16px;
+    background: #fff5f5;
+    border-radius: 8px;
+    border-left: 4px solid #dc3545;
+  }
+
+  .reason-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .reason-btn {
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.3s ease;
+  }
+
+  .reason-btn:hover:not(:disabled) {
+    border-color: #dc3545;
+    background: #fff5f5;
+  }
+
+  .reason-btn.selected {
+    border-color: #dc3545;
+    background: #dc3545;
+    color: white;
+  }
+
+  .time-section {
+    margin: 20px 0;
+  }
+
+  .time-inputs {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+  }
+
+  .time-input {
+    flex: 1;
+  }
+
+  .time-input label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #555;
+  }
+
+  .time-input input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+  }
+
+  .action-buttons {
+    text-align: center;
+    margin-top: 32px;
+  }
+
+  .btn-primary {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    min-width: 200px;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #0056b3;
+  }
+
+  .btn-primary:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+
+  .progress-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #28a745);
+    transition: width 0.5s ease;
+  }
+
+  .progress-text {
+    text-align: center;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .warning-text {
+    text-align: center;
+    margin-top: 16px;
+    color: #856404;
+    font-style: italic;
+  }
+
+  @media (max-width: 768px) {
+    .dialog-content {
+      padding: 24px;
+    }
+    
+    .toggle-buttons {
+      flex-direction: column;
+    }
+    
+    .time-inputs {
+      flex-direction: column;
+    }
+  }
+
+  .title{
+    font-size: 18px;
+    font-weight: bold;
+    color: rgb(0, 50, 67);
+    margin-bottom: 20px;
+  }
+  
+  .inputfield{
+    margin-left: 20px;
+  }
+  
+  .subtitle{
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: rgb(0, 50, 67);
+    text-decoration: underline;
+  }
+  
+  .journeystatusbox{
+    text-align: left;
+    margin-top: 20px;
+  }
+  
+  ::ng-deep .mdc-label {
+    font-size: 16px;
+  }
+  
+  
+  .btnbox{
+    margin-top: 15px;
+  }

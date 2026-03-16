@@ -1,0 +1,160 @@
+<div *ngIf="loading">
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  </div>
+  <div class="mainscreen">
+    <h4 class="title">Active Journeys</h4>
+    <div class="profilebox">
+      <mat-form-field appearance="outline">
+        <mat-label>Select Profile</mat-label>
+        <mat-select [(ngModel)]="selectedProfileid" (selectionChange)="changeProfile()" [disabled]="!developer">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="profileFilterCtrl" name="name" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let profile of returnProfile()" [value]="profile.id">{{profile.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="dataworkbox">
+        <label class="dataworklabel">Data Work Status & Flags</label><br>
+        <mat-radio-group [(ngModel)]="profileDataStatus" (ngModelChange)="onDataStatusChange()" labelPosition="after">
+          <mat-radio-button class="radionbtn" *ngFor="let status of dataWorkStatus" [value]="status">
+            {{status}}
+          </mat-radio-button>
+        </mat-radio-group>
+        <br>
+        <mat-checkbox [(ngModel)]="sequencechanged" (change)="onDataStatusChange()">Delivery Sequence Changes</mat-checkbox>
+        <br>
+        <mat-checkbox [(ngModel)]="migrationrequired" (change)="onDataStatusChange()">Migration Required</mat-checkbox>
+      </div>
+    </div>
+    <div *ngIf="participantProducts.length != 0">
+      <div class="submitbox mt-4">
+        <button class="resetbtn" mat-stroked-button (click)="resetJourney()">Reset Changes</button>
+        <button class="submitbtn" mat-stroked-button (click)="submitJourney()">Update Delivery Plan</button>
+      </div>
+      <div class="row">
+        <div class="col colbox">
+          <h6 class="coltitle">Product Delivery Sequence</h6>
+          <div cdkDropList class="example-list" (cdkDropListDropped)="productSequenceDrop($event)">
+            <div class="example-box" *ngFor="let product of participantProducts; let i = index" cdkDrag [cdkDragDisabled]="loading">
+              <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+              <div>{{mapProduct[product.productref.path]}} - <span [ngClass]="(product.status == 'ongoing' || product.status == 'initiated') ? 'statusorange' : extinctStatus.includes(product.status) ? 'statusgreen' : 'statusred'">{{product.status != null ? product.status : 'No Status'}}</span></div>
+              <div>
+                <!-- <button mat-icon-button (click)="removeProduct(i)">
+                  <mat-icon>remove_circle_outline</mat-icon>
+                </button> -->
+                <button [ngClass]="{'selectedContainer': selectedProductIndex == i}" mat-icon-button (click)="onProductSelect(i)">
+                  <mat-icon>arrow_forward_ios</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col colbox">
+          <div *ngIf="selectedProductIndex != null">
+            <h6 class="coltitle">{{mapProduct[participantProducts[selectedProductIndex].productref.path]}}</h6>
+            <div class="fieldbox">
+              <mat-form-field class="w-50" appearance="outline">
+                <mat-label>Subscription Start</mat-label>
+                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].subscriptionstart" [matDatepicker]="startpicker" (click)="startpicker.open()" placeholder="MM-DD-YYYY">
+                <mat-datepicker-toggle matSuffix [for]="startpicker"></mat-datepicker-toggle>
+                <mat-datepicker #startpicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field class="w-50" appearance="outline">
+                <mat-label>Subscription End</mat-label>
+                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].subscriptionend" [matDatepicker]="endpicker" (click)="endpicker.open()" placeholder="MM-DD-YYYY">
+                <mat-datepicker-toggle matSuffix [for]="endpicker"></mat-datepicker-toggle>
+                <mat-datepicker #endpicker></mat-datepicker>
+              </mat-form-field>
+              <br>
+              <mat-form-field class="singlefield" appearance="outline">
+                <mat-label>Tentative Start Date</mat-label>
+                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].tentativestart" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
+                <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+              </mat-form-field>
+              <br>
+              <mat-form-field class="singlefield" appearance="outline">
+                <mat-label>Product Status</mat-label>
+                <mat-select [(ngModel)]="participantProducts[selectedProductIndex].status">
+                  <mat-option [value]="null">Clear Status</mat-option>
+                  <mat-option *ngFor="let status of statusList" [value]="status.toLowerCase()">{{status}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field class="singlefield" *ngIf="participantProducts[selectedProductIndex].status != null" appearance="outline">
+                <mat-label>{{participantProducts[selectedProductIndex].status}} On</mat-label>
+                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].statusdate[participantProducts[selectedProductIndex].status]" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
+                <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+              </mat-form-field> 
+              <div cdkDropList class="example-list" (cdkDropListDropped)="DeliverySequenceDrop($event)">
+                <div class="example-box" *ngFor="let delivery of participantProducts[selectedProductIndex].delivery; let i = index" cdkDrag [cdkDragDisabled]="loading">
+                  <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+                  <div>
+                  {{mapdeliveries[mapDeliveryDoc[delivery.sequenceref.path]['deliveryref']['path']]}} ({{delivery.type}}) - <span [ngClass]="delivery.status == 'ongoing' ? 'statusorange' : (delivery.status == 'ready' || delivery.status == 'completed') ? 'statusgreen' : 'statusred'">{{delivery.status != null ? delivery.status : 'No Status'}}</span>
+                    <mat-expansion-panel class="mat-elevation-z0" hideToggle>
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>
+                          <div class="labeldescription">
+                            <span *ngIf="(delivery.label == null && delivery.description == null) || (delivery.label?.length == 0 && delivery.description?.length == 0)">Update delivery label and description</span>
+                            <span>{{delivery.label}}</span><br>
+                            <span *ngIf="delivery.description != null && delivery.description.length != 0"> ~ {{delivery.description}}</span>
+                          </div>
+                        </mat-panel-title>
+                      </mat-expansion-panel-header>
+                      <mat-form-field class="textfield" appearance="outline">
+                        <mat-label>Label</mat-label>
+                        <input matInput [(ngModel)]="delivery.label" [ngModelOptions]="{standalone: true}">
+                      </mat-form-field>
+                      <br>
+                      <mat-form-field class="textfield" appearance="outline">
+                        <mat-label>Description</mat-label>
+                        <textarea rows="4" matInput [(ngModel)]="delivery.description" [ngModelOptions]="{standalone: true}"></textarea>
+                      </mat-form-field>
+                    </mat-expansion-panel>                  
+                  </div>
+                  <div>
+                    <button mat-icon-button (click)="deleteDeliverable(i, mapdeliveries[mapDeliveryDoc[delivery.sequenceref.path]['deliveryref']['path']], delivery.sequenceref.path)">
+                      <mat-icon>remove_circle_outline</mat-icon>
+                    </button>
+                    <button mat-icon-button [ngClass]="{'selectedContainer': selectDeliveryIndex == i}" (click)="onDeliverySelect(i)">
+                      <mat-icon>arrow_forward_ios</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="newdeliverybox">
+                <mat-form-field class="newdeliveryfield" appearance="outline">
+                  <mat-label>New Delivery</mat-label>
+                  <mat-select [(ngModel)]="newDelivery">
+                    <mat-option class="matoption" *ngFor="let item of deliveryList" [value]="item">{{mapdeliveries[item.path]}} ({{item.type}})</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button class="newdeliverybtn" mat-stroked-button (click)="newDeliverable()">
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col colbox">
+          <div *ngIf="selectDeliveryIndex != null">
+            <h6 class="coltitle">{{mapdeliveries[mapDeliveryDoc[participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].sequenceref.path]['deliveryref']['path']]}}</h6>
+            <mat-form-field class="singlefield" appearance="outline">
+              <mat-label>Delivery Status</mat-label>
+              <mat-select [(ngModel)]="participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].status">
+                <mat-option [value]="null">Clear Status</mat-option>
+                <mat-option *ngFor="let status of deliveryStatus" [value]="status.toLowerCase()">{{status}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <br>
+            <mat-form-field *ngIf="participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].type == 'appointment'" class="singlefield" appearance="outline">
+              <mat-label>Map Existing Appointments</mat-label>
+              <mat-select [(ngModel)]="selectedAppointments" multiple (selectionChange)="onAppointmentSelection()">
+                <mat-option class="matoption" *ngFor="let appt of returnExistingAppt(mapDeliveryDoc[participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].sequenceref.path]['deliveryref']['path'])" [value]="appt.id">{{mapAppointment[appt.data()["appointment"].id]}} - ({{appt.data()["starttime"].toDate() | date:'medium'}})</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>

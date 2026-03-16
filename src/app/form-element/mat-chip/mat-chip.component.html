@@ -1,0 +1,22 @@
+<div [formGroup]="form">
+    <mat-form-field class="example-chip-list" appearance="fill">
+      <mat-label>{{label}}</mat-label>
+      <mat-chip-grid #chipList>
+        <mat-chip-row 
+          *ngFor="let option of form.get(controlName)?.value || []; let i = index"
+          (removed)="remove(i)">
+          {{option}}
+          <button matChipRemove>
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+        
+        <input 
+          placeholder="type your input..."
+          [matChipInputFor]="chipList"
+          [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+          (matChipInputTokenEnd)="add($event)">
+      </mat-chip-grid>
+      <mat-hint>type & press enter to add multiple {{label}}</mat-hint>
+    </mat-form-field>
+</div>  

@@ -1,0 +1,670 @@
+<div *ngIf="loading" class="loading">
+  <mat-progress-spinner class="inner" [diameter]="50" strokeWidth="3" mode="indeterminate"></mat-progress-spinner>
+  <br>
+  <span class="font">Fetching Data Please Wait...</span>
+</div>
+<div *ngIf="!loading">
+  <div class="dashboard-container">
+    <h5 class="heading">Live Event Dashboard -
+      <span style="font-weight: bold;">{{eventParticipants.length}} </span>
+      <span>Event Participants
+      </span>
+
+    </h5>
+    <form [formGroup]="form">
+      <mat-form-field style="padding: 20px;" appearance="outline" class="w-25">
+        <mat-label>Select Live Event</mat-label>
+        <mat-select formControlName="event">
+          <mat-option *ngFor="let option of liveeventList" [value]="option">{{option.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>&nbsp;&nbsp;
+      <mat-form-field appearance="outline">
+        <mat-label>Enter a date Range to get ATC </mat-label>
+        <mat-date-range-input formGroupName="range" [rangePicker]="picker">
+          <input matStartDate formControlName="start" placeholder="Start date">
+          <input matEndDate formControlName="end" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker #picker></mat-date-range-picker>
+      </mat-form-field>&nbsp;&nbsp;
+      <mat-form-field appearance="outline">
+        <mat-label>Select AtcModel</mat-label>
+        <mat-select multiple formControlName="atcmodel">
+          <mat-option *ngFor="let option of listOfAtcmodels" [value]="option">{{option}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button type="button" (click)="fetchData()">Filter</button>
+    </form>
+    <div class="cards-container">
+     <div class="card-row">
+    <!-- ATC -->
+    <div class="metric-card">
+      <div class="card-header">ATC</div>
+      <div class="card-content">
+        <div class="metric-item clickable" (click)="onCardClick('validatedATC')">
+          <span class="metric-label">Validated ATC:</span>
+          <span class="metric-value">{{validatedATC}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('unvalidatedATC')">
+          <span class="metric-label">UnValidated ATC:</span>
+          <span class="metric-value">{{unvalidatedATC}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('totalATC')">
+          <span class="metric-label">Total ATC:</span>
+          <span class="metric-value">{{validatedATC + unvalidatedATC}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('noATC')">
+          <span class="metric-label">No ATC</span>
+          <span class="metric-value">{{storedAggregateData.length - (validatedATC + unvalidatedATC)}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="card-header">Adjustment</div>
+      <div class="card-content">
+        <div class="metric-item clickable" (click)="onCardClick('adjustmentCompleted')">
+          <span class="metric-label">Done:</span>
+          <span class="metric-value">{{totalAdjustmentCompletedCount}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('adjustmentPending')">
+          <span class="metric-label">Pending:</span>
+          <span class="metric-value">{{totalAdjustmentPendingCount}}</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Total:</span>
+          <span class="metric-value">{{totalAdjustmentCount}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="card-header">Procedure</div>
+      <div class="card-content">
+        <div class="metric-item clickable" (click)="onCardClick('procedureCompleted')">
+              <span class="metric-label">Done:</span>
+              <span class="metric-value">{{totalprocedurecompleted}}</span>
+          </div>
+          <div class="metric-item clickable" (click)="onCardClick('procedurePending')">
+              <span class="metric-label">Not Done:</span>
+              <span class="metric-value">{{totalprocedurepending}}</span>
+          </div>
+          <div class="metric-item">
+              <span class="metric-label">Total:</span>
+              <span class="metric-value">{{totalprocedure}}</span>
+          </div>
+      </div>
+    </div>
+    
+    <!-- New Old -->
+    <div class="metric-card">
+      <div class="card-header">uP! Participants</div>
+      <div class="card-content">
+          <div class="metric-item clickable" (click)="onCardClick('newParticipants')">
+              <span class="metric-label">New:</span>
+              <span class="metric-value">{{eventNewCount}}</span>
+          </div>
+          <div class="metric-item clickable" (click)="onCardClick('oldParticipants')">
+              <span class="metric-label">Old:</span>
+              <span class="metric-value">{{eventOldCount}}</span>
+          </div>
+          <div class="metric-item">
+              <span class="metric-label">Total:</span>
+              <span class="metric-value">{{eventNewCount + eventOldCount}}</span>
+          </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Second Row -->
+  <div class="card-row">
+    <!-- Today's Live -->
+    <div class="metric-card">
+      <div class="card-header">Today's Live</div>
+      <div class="card-content">
+        <div class="metric-item clickable" (click)="onCardClick('todayAttendance')">
+          <span class="metric-label">Attendance:</span>
+          <span class="metric-value">{{todayAttendence}}</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Total:</span>
+          <span class="metric-value">{{eventParticipants.length}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('allDayAbsent')">
+          <span class="metric-label">Absent All Days</span>
+          <span class="metric-value">{{allDayAbsent}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Breakthroughs -->
+    <div class="metric-card">
+      <div class="card-header">Breakthroughs</div>
+      <div class="card-content">
+        <div class="metric-item clickable" (click)="onCardClick('todayBreakthroughs')">
+          <span class="metric-label">Today:</span>
+          <span class="metric-value">{{todayBreakthrough}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('eventBreakthroughs')">
+          <span class="metric-label">Event: </span>
+          <span class="metric-value">{{currentEventBreakthroughs}}</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Total:</span>
+          <span class="metric-value">{{totalBreakthroughs}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AEL -->
+    <div class="metric-card">
+      <div class="card-header">AEL</div>
+      <div class="card-content">
+        <div class="metric-item clickable" (click)="onCardClick('validatedAEL')">
+          <span class="metric-label">Validated:</span>
+          <span class="metric-value">{{validatedAEL}}</span>
+        </div>
+        <div class="metric-item clickable" (click)="onCardClick('unvalidatedAEL')">
+          <span class="metric-label">UnValidated:</span>
+          <span class="metric-value">{{totalAELcount - validatedAEL}}</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Total:</span>
+          <span class="metric-value">{{totalAELcount}}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="card-row">
+        <div class="metric-card procedures-card">
+          <div class="card-header">Top Procedures</div>
+          <div class="card-content">
+            <div class="procedures-list">
+              <div *ngFor="let proc of showAllProcedures ? proceduresArray : topProcedures" class="procedure-item">
+                <div class="procedure-name">{{proc.name}}</div>
+                <div class="procedure-stats">
+                  <div class="stat-bar">
+                    <div class="stat-progress" [style.width.%]="(proc.completed / proc.total) * 100"></div>
+                  </div>
+                  <div class="stat-numbers">
+                    <span class="completed">{{proc.completed}}</span> /
+                    <span class="total">{{proc.total}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="view-all-container">
+              <button mat-button class="view-all-btn" (click)="toggleProceduresView()">
+                <span>{{ showAllProcedures ? 'Show Less' : 'View All' }}</span>
+                <mat-icon>{{ showAllProcedures ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="table-container">
+      <div class="filter-section">
+        <div class="filter-header">
+          <h3 class="filter-title">Data Filters</h3>
+          <button mat-stroked-button type="button" (click)="resetFilters()"
+            *ngIf="originalDataSource && dataSource.data.length !== originalDataSource.length" class="reset-filter-btn">
+            <mat-icon>refresh</mat-icon>
+            <span>Reset</span>
+            <span class="filter-info" *ngIf="currentFilterState.type">Current: {{currentFilterState.type | titlecase}} -
+              {{currentFilterState.status | titlecase}}</span>
+          </button>
+        </div>
+
+        <div class="filter-body">
+          <div class="filters">
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Participant</mat-label>
+                <mat-select multiple [(ngModel)]="filter.name" (selectionChange)="onFilter()">
+                  <!-- <mat-form-field style="width: 100%;" appearance="fill">
+                    <mat-label>Search Participants</mat-label>
+                    <input matInput type="text" (keyup)="onSearchParticipants()" [(ngModel)]="searchtext">
+                  </mat-form-field> -->
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="searchtext" (keyup)="onSearchParticipants()"
+                      [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'">
+                    </ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let profile of filteredEventParticipants" [value]="profile['profileid']">
+                    {{mapprofile[profile['profileid']]}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Products</mat-label>
+                <mat-select multiple [(ngModel)]="filter.product" (selectionChange)="onFilter()">
+                  <mat-option *ngFor="let option of productsList" [value]="option['productref'].id">
+                    {{mapProductsNameById[option['productref'].id]}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Participant Type</mat-label>
+                <mat-select [(ngModel)]="filter.eventnew" (selectionChange)="onFilter()">
+                  <mat-option [value]="null">All Participants</mat-option>
+                  <mat-option [value]="true">New</mat-option>
+                  <mat-option [value]="false">Experienced</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-container">
+                <mat-form-field appearance="outline">
+                  <mat-label>Time Operator</mat-label>
+                  <mat-select [(ngModel)]="filter.lastActivityOperator" (selectionChange)="onFilter()">
+                    <mat-option [value]="">All</mat-option>
+                    <mat-option *ngFor="let op of timeOperators" [value]="op.value">{{op.label}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="filter.lastActivityOperator">
+                  <mat-label>Hours</mat-label>
+                  <input matInput type="number" [(ngModel)]="filter.lastActivityHours" (ngModelChange)="onFilter()">
+                </mat-form-field>
+              </div>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Absent On</mat-label>
+                <mat-select multiple [(ngModel)]="filter.abscent" (selectionChange)="onFilter()">
+                  <mat-option *ngFor="let option of getEventDatesUntilToday" [value]="option">
+                    {{option | date : 'mediumDate'}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Present On</mat-label>
+                <mat-select multiple [(ngModel)]="filter.present" (selectionChange)="onFilter()">
+                  <mat-option *ngFor="let option of getEventDatesUntilToday" [value]="option">
+                    {{option | date : 'mediumDate'}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Breakthroughs</mat-label>
+                <mat-select [(ngModel)]="filter.breakthroughs" (selectionChange)="onFilter()">
+                  <mat-option [value]="">Total</mat-option>
+                  <mat-option *ngFor="let option of breakthroughsFilter" [value]="option">
+                    {{option}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <div class="filter-container">
+                <mat-form-field appearance="outline">
+                  <mat-label>Proc DFO Operator</mat-label>
+                  <mat-select [(ngModel)]="filter.procDFO_Operator" (selectionChange)="onFilter()">
+                    <mat-option *ngFor="let op of ['>','<','>=','<=','===']" [value]="op">{{op}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="filter.procDFO_Operator">
+                  <mat-label>Proc DFO Count</mat-label>
+                  <input matInput type="number" [(ngModel)]="filter.procCount" (ngModelChange)="onFilter()">
+                </mat-form-field>
+              </div>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>AEL</mat-label>
+                <mat-select [(ngModel)]="filter.ael" (selectionChange)="onFilter()">
+                  <mat-option [value]="">Total</mat-option>
+                  <mat-option *ngFor="let option of aelFilter" [value]="option">
+                    {{option}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Adjustment</mat-label>
+                <mat-select [(ngModel)]="filter.adj" (selectionChange)="onFilter()">
+                  <mat-option [value]="">Total</mat-option>
+                  <mat-option *ngFor="let option of adjFilter" [value]="option">
+                    {{option}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Procedure</mat-label>
+                <mat-select [(ngModel)]="filter.proc" (selectionChange)="onFilter()">
+                  <mat-option [value]="">Total</mat-option>
+                  <mat-option *ngFor="let option of procFilter" [value]="option">
+                    {{option}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>ATC</mat-label>
+                <mat-select [(ngModel)]="filter.atc" (selectionChange)="onFilter()">
+                  <mat-option [value]="">All</mat-option>
+                  <mat-option *ngFor="let option of atcFilter" [value]="option">
+                    {{option}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <div class="filter-container">
+                <mat-form-field appearance="outline">
+                  <mat-label>Proc.C Operator</mat-label>
+                  <mat-select [(ngModel)]="filter.proc_c_Operator" (selectionChange)="onFilter()">
+                    <mat-option *ngFor="let op of ['>','<','>=','<=','===']" [value]="op">{{op}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="filter.proc_c_Operator">
+                  <mat-label>Proc.C Count</mat-label>
+                  <input matInput type="number" [(ngModel)]="filter.procedurecompletioncount"
+                    (ngModelChange)="onFilter()">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="filter.proc_c_Operator">
+                  <mat-label>Proc.C %</mat-label>
+                  <input matInput type="number" [(ngModel)]="filter.procedurecompletionpercentage"
+                    (ngModelChange)="onFilter()">
+                </mat-form-field>
+              </div>
+            </div>
+            <!-- ['uP!', 'LYL', 'B!G','LFL'] -->
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>ATC Model</mat-label>
+                <mat-select multiple [(ngModel)]="filter.atcmodel" (selectionChange)="onFilter()">
+                  <mat-option *ngFor="let item of eventProductAtcModelList" [value]="item">
+                    {{item}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="filter-group">
+              <mat-form-field appearance="outline">
+                <mat-label>Author</mat-label>
+                <mat-select multiple [(ngModel)]="filter.author" (selectionChange)="onFilter()">
+                  <!-- <mat-form-field style="width: 100%;" appearance="fill">
+                    <mat-label>Search Participants</mat-label>
+                    <input matInput type="text" (keyup)="onSearchProfile()" [(ngModel)]="searchProfileText">
+                  </mat-form-field> -->
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="searchProfileText" (keyup)="onSearchProfile()"
+                      [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'">
+                    </ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let profileid of filteredProfileList" [value]="profileid">
+                    {{mapprofile[profileid]}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+          <div class="filter-actions">
+            <div class="filter-results">
+              <div class="results-count">
+                <mat-icon>people</mat-icon>
+                <span>{{getUniqueListOfParticipants()}} unique participants</span>
+              </div>
+            </div>
+            <div class="filter-buttons">
+              <mat-form-field appearance="outline">
+                <mat-label>Select Table Columns</mat-label>
+                <mat-select [(value)]="displayedColumns" multiple>
+                  <mat-option *ngFor="let option of tableColumns" [value]="option.value">
+                    {{ option.name }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button type="button" mat-raised-button (click)="exportCSV()" class="clear-all-btn">
+                <mat-icon>cloud_download</mat-icon>
+                Export CSV
+              </button>
+              <button type="button" mat-raised-button (click)="onclear()" class="clear-all-btn">
+                <mat-icon>clear_all</mat-icon>
+                Clear All Filters
+              </button>
+              <!-- <button *ngIf="loggedProfileID === '3LVxKXuyxldYoRDEpx5' || loggedProfileID === 'esTeyFLy9yGIfwaY5n6K'" type="button" mat-raised-button (click)="upLogDialog()" class="clear-all-btn">
+              Screen Log
+            </button> -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z1 scrolltotable">
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Name"> Name </th>
+        <td mat-cell *matCellDef="let element">
+          <div class="procedure-status vertical">
+            <a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank" rel="noopener">
+              {{element['name'] || 'Unknown'}}
+            </a>
+            <span class="status-chip completed">{{mapJourney[mapactivejourney[element['profileid']]] || 'None'}}
+              Journey</span>
+            <span class="status-chip" [ngClass]="element.eventnew ? 'completed' : 'pending'">
+              {{element.eventnew ? 'New' : 'Old'}} Participant
+            </span>
+          </div>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="arenaproducts">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Products"> Products </th>
+        <td mat-cell *matCellDef="let element">
+          <li *ngFor="let item of element['arenaproducts']">
+            {{mapProductsNameById[item] || 'None'}}
+          </li>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="atcmodel">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="atc prescribed product">ATC Model</th>
+        <td mat-cell *matCellDef="let element"> {{element.atcmodel}} </td>
+      </ng-container>
+      <ng-container matColumnDef="prescription_date">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Prescription Date"> Prescription Date </th>
+        <td mat-cell *matCellDef="let element"> {{element.prescription_date ? (element.prescription_date| date:'medium')
+          : null}} </td>
+      </ng-container>
+      <ng-container matColumnDef="author">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Author">Author</th>
+        <td mat-cell *matCellDef="let element">
+          <span *ngFor="let option of element['author']">{{mapprofile[option]}}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="participanttotalprocedurecompleted">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Procedure Completed"> Pro.C. </th>
+        <td mat-cell *matCellDef="let element"> {{element.participanttotalprocedurecompleted || 0}} </td>
+      </ng-container>
+      <ng-container matColumnDef="participanttotalprocedurepending">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Procedure Pending"> Pro.P. </th>
+        <td mat-cell *matCellDef="let element"> {{element.participanttotalprocedurepending || 0}} </td>
+      </ng-container>
+      <ng-container matColumnDef="procedurecompletionpercentage">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Procedure Completion %"> Pro.C.%. </th>
+        <td mat-cell *matCellDef="let element"> {{element.procedurecompletionpercentage || 0}} % </td>
+      </ng-container>
+      <ng-container matColumnDef="arenaAttendence">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Attendance Present / Total"> Attd </th>
+        <td mat-cell *matCellDef="let element">
+          <span>{{element.arenaAttendence ? element.arenaAttendence.length : 0}} /{{totaleventdays}}</span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="validatedAel">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Last AEL validated or Not"> AEL </th>
+        <td mat-cell *matCellDef="let element">
+          <span class="status-chip"
+            [ngClass]="element.validatedAel && element.validatedAel.length > 0 ? 'completed' : 'pending'">
+            <a [ngClass]="element.validatedAel && element.validatedAel.length > 0 ? 'routercolorcompleted' : 'routercolorpending'"
+              [routerLink]="['/participantAEL', element['profileid']]" target="_blank" rel="noopener">
+              {{element.validatedAel && element.validatedAel.length > 0 ? 'Validated' : 'Un Validated'}}
+            </a>
+          </span>
+          <!-- <span class="count-badge">{{element.validatedAel ? element.validatedAel.length : 0}} / {{element.ael ? element.ael.length : 0}}</span> -->
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="atccount">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="ATC Count"> ATC </th>
+        <td mat-cell *matCellDef="let element">
+          <div class="progress-container">
+            <div class="progress-text">
+              {{element.atccount}}
+            </div>
+          </div>
+        </td>
+      </ng-container>
+       <ng-container matColumnDef="unvalidatedatccount">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Unval ATC Count"> UnVal ATC </th>
+        <td mat-cell *matCellDef="let element">
+          <div class="progress-container">
+            <div class="progress-text">
+              {{element.unvalidatedatccount}}
+            </div>
+          </div>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="totaladjustmentcompleted">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Adjustment Completed"> Adj.C. </th>
+        <td mat-cell *matCellDef="let element"> {{element.totaladjustmentcompleted || 0}} </td>
+      </ng-container>
+      <ng-container matColumnDef="totaladjustmentpending">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Adjustment Pending"> Adj.P. </th>
+        <td mat-cell *matCellDef="let element"> {{element.totaladjustmentpending || 0}} </td>
+      </ng-container>
+      <ng-container matColumnDef="proceduredoneforothers">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="procedure done for others"> Proc-DFO </th>
+        <td mat-cell *matCellDef="let element">
+          <button style="font-size: 14px;" mat-icon-button
+            [matMenuTriggerFor]="procmenu">{{element.proceduredoneforothers || 0}}</button>
+          <mat-menu #procmenu="matMenu">
+            <button mat-menu-item *ngFor="let list of (procedureDoneForOthers[element['profileid']] || {}) | keyvalue">
+              {{mapProcedure[$any(list.key)]['name']}}&nbsp;&nbsp;&nbsp;&nbsp;{{list.value}}
+            </button>
+          </mat-menu>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="eventbreakthroughs">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="Breakthroughs"> Brk.Thr </th>
+        <td mat-cell *matCellDef="let element">
+          <span class="count-badge">{{element.eventbreakthroughs ? element.eventbreakthroughs.length : 0}}</span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="isdelete">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header matTooltip="isdelete"> Delete </th>
+        <td mat-cell *matCellDef="let element">
+          <span *ngIf="temporaryFunctionAccess.includes(loggedProfileID)" (click)="onDeleteATC(element)">Delete</span>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    <mat-paginator [pageSizeOptions]="[10, 25, 50, 100,dataSource.data.length]" [pageSize]="10"
+      showFirstLastButtons></mat-paginator>
+  </div>
+
+ <div class="modal-overlay" *ngIf="showParticipantModal" (click)="closeParticipantModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{getMetricTitle(selectedMetric)}}</h3>
+      <button mat-icon-button (click)="closeParticipantModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="participants-count">
+        <span class="count-label">Total Records: </span>
+        <span class="count-value">{{selectedParticipants.length}}</span>
+        <span class="count-detail" *ngIf="selectedMetric.includes('adjustment') || selectedMetric.includes('procedure')">
+          (Showing ATC records that contribute to the sum)
+        </span>
+      </div>
+      
+      <div class="participants-list">
+        <div class="participant-item" *ngFor="let participant of selectedParticipants; trackBy: trackByATCId">
+          <div class="participant-info">
+            <div class="participant-header">
+              <div class="participant-name">
+                <a [routerLink]="'/userprofile/' + participant.profileid" target="_blank" rel="noopener">
+                  {{participant.name || 'Unknown'}}
+                </a>
+              </div>
+              <div class="atc-id" *ngIf="participant.atcid">
+                ATC ID: {{participant.atcid}}
+              </div>
+            </div>
+            <div class="participant-details">
+              <span class="detail-chip" [ngClass]="participant.eventnew ? 'new' : 'experienced'">
+                {{participant.eventnew ? 'New' : 'Experienced'}}
+              </span>
+              <span class="detail-chip journey">
+                {{mapJourney[mapactivejourney[participant.profileid]] || 'None'}} Journey
+              </span>
+              <span class="detail-chip atc-model" *ngIf="participant.atcmodel">
+                {{participant.atcmodel}}
+              </span>
+              <span class="detail-chip prescription-date" *ngIf="participant.prescription_date">
+                {{participant.prescription_date | date:'shortDate'}}
+              </span>
+            </div>
+            <div class="participant-metrics" *ngIf="selectedMetric.includes('adjustment') || selectedMetric.includes('procedure')">
+              <div class="metric-row" *ngIf="selectedMetric.includes('adjustment')">
+                <span class="metric-label">Adjustments:</span>
+                <span class="metric-values">
+                  <span class="completed">{{participant.totaladjustmentcompleted || 0}}</span> completed / 
+                  <span class="pending">{{participant.totaladjustmentpending || 0}}</span> pending / 
+                  <span class="total">{{participant.totaladjustment || 0}}</span> total
+                </span>
+              </div>
+              <div class="metric-row" *ngIf="selectedMetric.includes('procedure')">
+                <span class="metric-label">Procedures:</span>
+                <span class="metric-values">
+                  <span class="completed">{{participant.participanttotalprocedurecompleted || 0}}</span> completed / 
+                  <span class="pending">{{participant.participanttotalprocedurepending || 0}}</span> pending / 
+                  <span class="total">{{participant.participanttotalprocedure || 0}}</span> total
+                </span>
+              </div>
+            </div>
+            <div class="participant-stats" *ngIf="!selectedMetric.includes('adjustment') && !selectedMetric.includes('procedure')">
+              <span class="stat" *ngIf="selectedMetric.includes('ATC')">
+                ATC: {{participant.atccount || 0}}
+              </span>
+              <span class="stat" *ngIf="selectedMetric.includes('breakthrough')">
+                Breakthroughs: {{(participant.breakthroughs || []).length}}
+              </span>
+              <span class="stat" *ngIf="selectedMetric.includes('attendance') || selectedMetric.includes('Absent')">
+                Attendance: {{(participant.arenaAttendence || []).length}}/{{totaleventdays}}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button mat-stroked-button (click)="closeParticipantModal()">Close</button>
+    </div>
+  </div>
+</div>
+</div>

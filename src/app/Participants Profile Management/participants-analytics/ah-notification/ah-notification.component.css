@@ -1,0 +1,382 @@
+.mainscreen{
+  padding: 20px;
+  justify-content: center;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.header {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.title {
+  color: white;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.color-teal {
+  background-color: rgb(0, 101, 135);
+}
+
+.eventbox{
+  vertical-align: middle;
+}
+
+.events{
+  font-weight: bold;
+}
+  
+.checkbox{
+  margin-right: 15px;
+}
+
+.profilebox{
+  margin-top: 20px;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.selectednames{
+  margin-left: 15px;
+  vertical-align: middle;
+}
+
+.messagebox{
+  margin-top: 10px;
+  margin-bottom: 15px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.textbox{
+  resize: both;
+  font-size: 18px;
+  padding: 5px;
+}
+
+.notificationcontainer {
+  background-color: #333;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-left: 30px;
+  padding-top: 5px;
+  border-radius: 15px;
+}
+.saveButton{
+  margin: 15px;
+  background-color: rgb(10, 210, 245);
+  color: white;
+  font-size:18px;
+  padding: 16px;
+  font-family: 'Nunito Sans', sans-serif;
+  border-radius: 15px;
+  font-weight: bold;
+}
+
+.saveButton:disabled{
+  background-color: grey;
+}
+.sendButton{
+  margin: 15px;
+  background-color: green;
+  color: white;
+  font-size:18px;
+  padding: 16px;
+  font-family: 'Nunito Sans', sans-serif;
+  border-radius: 15px;
+  font-weight: bold;
+}
+
+.sendButton:disabled{
+  background-color: grey;
+}
+
+.cancelButton {
+  margin: 15px;
+  background-color: #dc3545;
+  color: white;
+  font-size: 18px;
+  padding: 16px;
+  font-family: 'Nunito Sans', sans-serif;
+  border-radius: 15px;
+  font-weight: bold;
+}
+
+.cancelButton:hover {
+  background-color: #c82333;
+}
+
+.createTemplateBtn{
+  text-align: center;
+  color: blue;
+}
+
+.notemplate{
+  text-align: center;
+  align-items: center;
+  margin: 20px;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+mat-hint {
+  font-size: 12px;
+}
+
+/* Edit Mode Banner */
+.edit-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+
+.edit-mode-banner mat-icon {
+  color: #856404;
+}
+
+.edit-mode-banner span {
+  flex: 1;
+  font-weight: 600;
+  color: #856404;
+  font-size: 16px;
+}
+
+/* Table Filter Container */
+.table-filter-container {
+  margin-top: 30px;
+  margin-bottom: 16px;
+}
+
+.filter-field {
+  width: 100%;
+  max-width: 400px;
+}
+
+.filter-field mat-icon {
+  color: #94a3b8;
+}
+
+/* Table Container Styles */
+.table-container {
+  margin-top: 10px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: scroll;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Table Header Styles */
+table.mat-mdc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th.mat-mdc-header-cell {
+  font-weight: 600;
+  color: #475569;
+  background-color: #f8fafc;
+  padding: 16px 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Table Body Styles */
+td.mat-mdc-cell {
+  font-size: 14px;
+  color: #1e293b;
+  padding: 14px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* Row Hover Effect */
+tr.mat-mdc-row:hover {
+  background-color: #f8fafc;
+  transition: background-color 0.2s ease;
+}
+
+/* Editing Row Highlight */
+tr.editing-row {
+  background-color: #fef3c7 !important;
+  border-left: 4px solid #f59e0b;
+}
+
+tr.editing-row:hover {
+  background-color: #fef3c7 !important;
+}
+
+/* Message Cell */
+.message-cell {
+  max-width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* Landing Page Cell */
+.landingpage-cell {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sticky Icon */
+.sticky-icon {
+  font-size: 20px;
+}
+
+.false-text {
+  color: #94a3b8;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 15px;
+  background-color: #fafafa;
+}
+
+/* Paginator Styles */
+.mat-mdc-paginator {
+  background-color: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  padding: 8px 0;
+}
+
+/* Sort Header Styles */
+.mat-sort-header-arrow {
+  color: #64748b;
+}
+
+.mat-sort-header-container:hover .mat-sort-header-arrow {
+  opacity: 1;
+}
+
+/* Action Button */
+td .mat-mdc-icon-button {
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+}
+
+td .mat-mdc-icon-button mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+td .mat-mdc-icon-button:hover {
+  background-color: rgba(0, 101, 135, 0.1);
+  border-radius: 50%;
+}
+
+/* Send Button Accent Color */
+td .mat-mdc-icon-button[color="accent"] mat-icon {
+  color: #4caf50;
+}
+
+td .mat-mdc-icon-button[color="accent"]:hover {
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .table-container {
+    overflow-x: auto;
+  }
+
+  th.mat-mdc-header-cell,
+  td.mat-mdc-cell {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .message-cell {
+    max-width: 150px;
+  }
+
+  .landingpage-cell {
+    max-width: 120px;
+  }
+
+  .filter-field {
+    max-width: 100%;
+  }
+
+  .edit-mode-banner {
+    flex-wrap: wrap;
+  }
+}
+
+/* Alternating Row Colors (optional - uncomment if desired) */
+/*
+tr.mat-mdc-row:nth-child(even) {
+  background-color: #fafafa;
+}
+*/
+
+/* Tooltip Styles */
+.mat-mdc-tooltip {
+  font-size: 13px;
+  max-width: 300px;
+  word-wrap: break-word;
+}
+/* Schedule Expand Row */
+.schedule-detail-row {
+  height: 0;
+}
+
+.schedule-detail-row-expanded {
+  height: auto;
+}
+
+.schedule-expand-container {
+  overflow: hidden;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-left: 4px solid #0284c7;
+}
+
+.schedule-expand-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.expanded-row {
+  background-color: #f0f9ff !important;
+}
+
+/* Schedule toggle in table */
+.mat-mdc-slide-toggle {
+  transform: scale(0.85);
+}

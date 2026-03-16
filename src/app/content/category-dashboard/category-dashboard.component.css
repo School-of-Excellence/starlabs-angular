@@ -1,0 +1,38 @@
+.example-container {
+    position: absolute;
+    top: 60px;
+    bottom:10px;
+    
+    left: 0;
+    right: 0;
+  }
+  .headerClass2{
+   margin-left: 500px;
+   font-size: large;
+}
+  
+
+
+table{
+    width: 70%;
+    margin-left: 100px;
+}
+th, td {
+    text-align: left;
+    padding: 8px;
+  }
+.btn{
+    display: block;
+    float: right;
+    margin-right: 25%;
+    margin-top: 50px;
+}
+h1{
+    text-align: center;
+    margin-top: 30px;
+}
+.filter{
+    margin-top: 50px;
+    margin-left: 100px;
+    width: 250px;
+ }

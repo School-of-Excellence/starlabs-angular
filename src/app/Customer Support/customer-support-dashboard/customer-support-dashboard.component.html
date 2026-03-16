@@ -1,0 +1,687 @@
+<!-- if loading is enabled display spinner  -->
+<div *ngIf="loading == true" class="center">
+  <mat-progress-spinner diameter=50 mode="indeterminate" color="primary"></mat-progress-spinner>
+</div>
+
+<div class="content">
+  <mat-tab-group mat-stretch-tabs="false" mat-align-tabs="start" animationDuration="0ms"
+    [(selectedIndex)]="selectedTabIndex" (selectedTabChange)="onTabChange($event)">
+    <mat-tab *ngFor="let tab of ticketArray; let i = index">
+      <ng-template mat-tab-label><b
+          [ngClass]="i == selectedTabIndex ? 'selectedtab' : 'nonselectedtab'">{{tab.label}}</b> <button *ngIf="i != 0"
+          mat-icon-button type="button" (click)="closeTab(i)"> <mat-icon
+            style="font-size: 15px;">close</mat-icon></button></ng-template>
+      <div *ngIf="loading == false && tab.label == 'Dashboard'">
+
+        <div class="uppercardContent">
+          <div class="ticketcount">
+            <div class="section-header">
+              <span class="section-title">Total</span>
+            </div>
+            <div class="button-row">
+              <div class="ticket-button" [ngClass]="clickedFilter == '' ? 'clicked' : 'notclicked'"
+                (click)="filterValues('tickets','', true)">
+                <span class="button-label">Total</span>
+                <span class="countFontSize"><b>{{totaltickets}}</b></span>
+              </div>
+              <div class="ticket-button" [ngClass]="clickedFilter == 'Open' ? 'clicked' : 'notclicked'"
+                (click)="filterValues('tickets','Open', true)">
+                <span class="button-label">Open</span>
+                <span class="countFontSize"><b>{{opentickets}}</b></span>
+              </div>
+              <div class="ticket-button" [ngClass]="clickedFilter == 'Closed' ? 'clicked' : 'notclicked'"
+                (click)="filterValues('tickets','Closed', true)">
+                <span class="button-label">Closed</span>
+                <span class="countFontSize"><b>{{closetickets}}</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="prioritycount">
+            <div class="section-header">
+              <span class="section-title">Open Tickets</span>
+            </div>
+            <div class="button-row">
+              <div class="ticket-button new-ticket" [ngClass]="clickedFilter == 'New' ? 'clicked' : 'notclicked'"
+                (click)="filterValues('tickets','New', true)">
+                <span class="button-label">New</span>
+                <span class="countFontSize"><b>{{newtickets}}</b></span>
+              </div>
+              <div class="ticket-button" [ngClass]="clickedFilter == 'Decision Making' ? 'clicked' : 'notclicked'"
+                (click)="filterValues('tickets','Decision Making', true)">
+                <span class="button-label">Need to Reply</span>
+                <span class="countFontSize"><b>{{pendingtickets}}</b></span>
+              </div>
+              <div class="ticket-button" [ngClass]="clickedFilter == 'Responded' ? 'clicked' : 'notclicked'"
+                (click)="filterValues('tickets','Responded', true)">
+                <span class="button-label">Responded</span>
+                <span class="countFontSize"><b>{{respondedtickets}}</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="prioritycount">
+            <div class="toggle-container"
+              [ngClass]="filterMap['tickets'] != 'Closed' ? 'toggleEnable' : 'toggleDisable'">
+              <div class="section-header">
+                <span class="section-title">Negligence Review</span>
+              </div>
+              <div class="button-row">
+                <div class="ticket-button" [ngClass]="clickedFilter == 'flag' ? 'clicked' : 'notclicked'"
+                  (click)="filterValues('flag','flag', true)">
+                  <span class="button-label">Flagged</span>
+                  <span class="countFontSize"><b>{{flagtickets}}</b></span>
+                </div>
+                <div class="ticket-button" [ngClass]="clickedFilter == 'reviewpending' ? 'clicked' : 'notclicked'"
+                  (click)="filterValues('priority','reviewpending', true)">
+                  <span class="button-label">Pending</span>
+                  <span class="countFontSize"><b>{{reviewpending}}</b></span>
+                </div>
+                <div class="ticket-button" [ngClass]="clickedFilter == 'reviewmarked' ? 'clicked' : 'notclicked'"
+                  (click)="filterValues('priority','reviewmarked', true)">
+                  <span class="button-label">Reviewed</span>
+                  <span class="countFontSize"><b>{{reviewmarked}}</b></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metricscount">
+            <div class="toggle-container"
+              [ngClass]="filterMap['tickets'] != 'Closed' ? 'toggleEnable' : 'toggleDisable'">
+              <div class="section-header metrics-header">
+                <span class="section-title metrics-title">Negligence Metrics - Week {{weekNumber}} - {{weekYear}}</span>
+                <mat-form-field class="hidden-datepicker">
+                  <input matInput [matDatepicker]="weekpicker" [(ngModel)]="weekDate"
+                    (dateChange)="onDateChange(weekDate)">
+                  <mat-datepicker #weekpicker></mat-datepicker>
+                </mat-form-field>
+                <button mat-icon-button class="calendar-button" (click)="weekpicker.open()">
+                  <mat-icon>calendar_month</mat-icon>
+                </button>
+              </div>
+              <div class="button-row metrics-row">
+                <div class="metrics-button"
+                  [ngClass]="clickedFilter == 'gross' ? 'metricsclicked' : 'metricsnotclicked'"
+                  (click)="filterValues('metrics','gross',true)">
+                  <span class="button-label">Gross</span>
+                  <span class="countFontSize"><b>{{grosstickets}}</b></span>
+                </div>
+                <div class="metrics-button" [ngClass]="clickedFilter == 'high' ? 'metricsclicked' : 'metricsnotclicked'"
+                  (click)="filterValues('metrics','high',true)">
+                  <span class="button-label">High</span>
+                  <span class="countFontSize"><b>{{hightickets}}</b></span>
+                </div>
+                <div class="metrics-button"
+                  [ngClass]="clickedFilter == 'moderate' ? 'metricsclicked' : 'metricsnotclicked'"
+                  (click)="filterValues('metrics','moderate',true)">
+                  <span class="button-label">Moderate</span>
+                  <span class="countFontSize"><b>{{moderatetickets}}</b></span>
+                </div>
+                <div class="metrics-button disabled-button"
+                  [ngClass]="clickedFilter == 'low' ? 'metricsclicked' : 'metricsnotclicked'">
+                  <span class="button-label">Low</span>
+                  <span class="countFontSize"><b>{{lowtickets}}</b></span>
+                </div>
+                <div class="metrics-button disabled-button"
+                  [ngClass]="clickedFilter == 'no' ? 'metricsclicked' : 'metricsnotclicked'">
+                  <span class="button-label">No</span>
+                  <span class="countFontSize"><b>{{notickets}}</b></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- details, filter and table container -->
+        <div class="bottom-container">
+
+          <div class="details-container">
+            <!-- ticket manipulation -->
+            <div class="ticket-container">
+              <div class="ticket-item" (click)="allCases()">
+                <p
+                  [ngStyle]="viewOfCases == 'alltickets' ? {'color':'orange', 'font-weight': 'bold', 'font-size':'17px'} : {}">
+                  All Tickets
+                </p>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="ticket-item" (click)="myCases()">
+                <p
+                  [ngStyle]="viewOfCases == 'mytickets' ? {'color':'orange', 'font-weight': 'bold', 'font-size':'17px'} : {}">
+                  Assigned to me
+                </p>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="ticket-item" (click)="raiseIssue(null)">
+                <div style="display: flex; align-items: center;">
+                  <p>Raise a Ticket</p> &nbsp;&nbsp; <mat-icon>add</mat-icon>
+                </div>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="ticket-item" (click)="openCategorySelector()">
+                <p>Daily Report</p>
+              </div>
+
+              <!-- Category Selection Dialog -->
+              <div class="dialog-overlay" *ngIf="showCategoryDialog" (click)="showCategoryDialog = false">
+                <div class="dialog-box" (click)="$event.stopPropagation()">
+                  <h3>Select Categories for Report</h3>
+              
+                  <div class="dialog-actions-top">
+                    <button (click)="selectAll()">Select All</button>
+                    <button (click)="deselectAll()">Deselect All</button>
+                  </div>
+              
+                  <div class="category-list">
+                    <label *ngFor="let category of allCategories" class="category-item">
+                      <input type="checkbox" [checked]="isSelected(category)" (change)="toggleCategory(category)" />
+                      <span>{{ category }}</span>
+                    </label>
+                  </div>
+              
+                  <div class="dialog-actions-bottom">
+                    <button class="cancel-btn" (click)="showCategoryDialog = false">Cancel</button>
+                    <button class="download-btn" (click)="downloadReport()">
+                      Download ({{ selectedCategories.length }} selected)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="ticket-item" (click)="chatConfig()">
+                <p>Add/Edit Category</p>
+              </div>
+            </div>
+
+            <!-- category open and close count -->
+            <div class="category-container">
+              <table class="category-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Open</th>
+                    <th>Closed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let cat of categoryCountMap | keyvalue; trackBy: trackByCategoryKey">
+                    <td class="category-name" (mouseenter)="showAssigned(cat.key, $event)"
+                      (mouseleave)="hideAssigned()">
+                      {{cat.key}}
+                    </td>
+                    <td class="category-count open-count">
+                      {{$any(cat.value).open}}
+                    </td>
+                    <td class="category-count closed-count">
+                      {{$any(cat.value).close}}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Keep the existing assign popup -->
+              <div *ngIf="assignData" class="assign"
+                [ngStyle]="{ top: assignData.position.top + 'px', left: assignData.position.left + 'px' }">
+                <p *ngIf="assignData.length != 0"><b>Category : </b>{{assignData['category']}}</p>
+                <p *ngIf="assignData.length != 0"><b>Assigned To:</b></p>
+                <div style="line-height: 0.7;">
+                  <div *ngFor="let assign of assignData['assignto']; let idx = index">
+                    <p>{{idx + 1}}{{'.'}} &nbsp;{{mapProfileData[assign]?.name}}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- table and filter container -->
+          <div class="right-column">
+            <!-- filter container -->
+            <div class="filter-container">
+              <form [formGroup]="filterform">
+                <div class="filter-row">
+                  <mat-form-field appearance="outline" class="custom-form-field"
+                    [ngClass]="filterform.controls['search'].value && filterform.controls['search'].value.trim() !== ''  ? 'highlight':''">
+                    <mat-label>Search</mat-label>
+                    <input matInput formControlName="search" (keyup)="formfilter(filterform.value, true)"
+                      placeholder="Search" #input>
+                    <mat-icon matSuffix>search</mat-icon>
+                  </mat-form-field>
+
+                  <mat-form-field class="custom-form-field" appearance="outline"
+                    [ngClass]="filterform.controls['category'].value && filterform.controls['category'].value.length != 0 ? 'highlight': ''">
+                    <mat-label>Category</mat-label>
+                    <mat-select formControlName="category" multiple
+                      (selectionChange)="formfilter(filterform.value, true)">
+                      <mat-option *ngFor="let category of categories;"
+                        [value]="category.category">{{category.category}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field class="custom-form-field" appearance="outline"
+                    [ngClass]="filterform.controls['journey'].value && filterform.controls['journey'].value.length != 0? 'highlight': ''">
+                    <mat-label>Journey</mat-label>
+                    <mat-select formControlName="journey" multiple
+                      (selectionChange)="formfilter(filterform.value, true)">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filteredJourney" [ngModelOptions]="{standalone: true}"
+                          [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let journey of returnFilterJourney()"
+                        [value]="journey.id">{{journey.journey}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field class="custom-form-field" appearance="outline"
+                    [ngClass]="filterform.controls['assign'].value && filterform.controls['assign'].value.length != 0? 'highlight': ''">
+                    <mat-label>Assigned To</mat-label>
+                    <mat-select formControlName="assign" multiple
+                      (selectionChange)="formfilter(filterform.value, true)">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}"
+                          [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let user of returnFilterMember()"
+                        [value]="user">{{mapProfileData[user]['name']}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field class="custom-form-field" appearance="outline" *ngIf="clickedFilter == 'reviewmarked'"
+                    [ngClass]="filterform.controls['reviewedby'].value && filterform.controls['reviewedby'].value.length != 0? 'highlight': ''">
+                    <mat-label>Reviewed By</mat-label>
+                    <mat-select formControlName="reviewedby" multiple
+                      (selectionChange)="formfilter(filterform.value, true)">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filteredReviewed" [ngModelOptions]="{standalone: true}"
+                          [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let user of returnReviewedUser()"
+                        [value]="user">{{mapProfileData[user]['name']}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <!-- <mat-form-field class="custom-form-field" appearance="outline"
+                    [ngClass]="filterform.controls['peopleinvolved'].value && filterform.controls['peopleinvolved'].value.length != 0? 'highlight': ''">
+                    <mat-label>People Involved</mat-label>
+                    <mat-select formControlName="peopleinvolved" multiple
+                      (selectionChange)="formfilter(filterform.value, true)">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}"
+                          [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let user of returnFilterMember()"
+                        [value]="user">{{mapProfileData[user]['name']}}</mat-option>
+                    </mat-select>
+                  </mat-form-field> -->
+
+                  <mat-form-field appearance="outline" class="custom-form-field"
+                    [ngClass]="filterform.controls['ticketstart'].value !== ''? 'highlight': '' ">
+                    <mat-label>Reported Date</mat-label>
+                    <mat-date-range-input [rangePicker]="picker">
+                      <input matStartDate formControlName="ticketstart" placeholder="Start date"
+                        (dateInput)="formfilter(filterform.value, true)">
+                      <input matEndDate formControlName="ticketend" placeholder="End date"
+                        (dateInput)="formfilter(filterform.value, true)">
+                    </mat-date-range-input>
+                    <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                    <mat-date-range-picker #picker></mat-date-range-picker>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="custom-form-field" *ngIf="['Closed'].includes(clickedFilter)"
+                    [ngClass]="filterform.controls['closedstart'].value !== ''? 'highlight': '' ">
+                    <mat-label>Closed Date</mat-label>
+                    <mat-date-range-input [rangePicker]="picker">
+                      <input matStartDate formControlName="closedstart" placeholder="Start date"
+                        (dateInput)="formfilter(filterform.value, true)">
+                      <input matEndDate formControlName="closedend" placeholder="End date"
+                        (dateInput)="formfilter(filterform.value, true)">
+                    </mat-date-range-input>
+                    <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                    <mat-date-range-picker #picker></mat-date-range-picker>
+                  </mat-form-field>
+
+                  <button type="button" style="margin-left: 10px;" mat-mini-fab color="primary"
+                    (click)="refresh()"><mat-icon>refresh</mat-icon></button>
+                  <button type="button" mat-raised-button class="submitbtn" (click)="exportToExcel()">Export</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- table container -->
+            <div #tableContainer class="table-container" (scroll)="onTableScroll($event)">
+              <!-- OPEN TICKETS TABLE -->
+              <!-- OPEN TICKETS TABLE - Add Flag column header -->
+              <table class="native-table" *ngIf="tableView == 'open' || tableView == ''">
+                <thead class="table-head">
+                  <tr>
+                    <th style="width: 5vw;" (click)="sortcolumn('issueno')"
+                      [ngClass]="sortColumn == 'issueno' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Ticket No
+                    </th>
+                    <th style="width: 8vw;" (click)="sortcolumn('reporteddate')"
+                      [ngClass]="sortColumn == 'reporteddate' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
+                      Reported Date</th>
+                    <th style="width: 5vw;" (click)="sortcolumn('reportedBy')"
+                      [ngClass]="sortColumn == 'reportedBy' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Reported
+                      By</th>
+                    <th style="width: 8vw;" (click)="sortcolumn('category')"
+                      [ngClass]="sortColumn == 'category' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Category
+                    </th>
+                    <th style="width: 8vw;" (click)="sortcolumn('name')"
+                      [ngClass]="sortColumn == 'name' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Client Name
+                    </th>
+                    <th style="width: 10vw;" (click)="sortcolumn('journey')"
+                      [ngClass]="sortColumn == 'journey' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Journey
+                    </th>
+                    <th style="width: 5vw;" (click)="sortcolumn('active')"
+                      [ngClass]="sortColumn == 'active' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Active</th>
+                    <th style="width: 20vw;">Ticket</th>
+                    <th style="width: 15vw;">Notes</th>
+                    <th style="width: 8vw;" (click)="sortcolumn('chatstatus')"
+                      [ngClass]="sortColumn == 'chatstatus' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Chat
+                      Status</th>
+                    <th style="width: 5vw;">Review</th>
+                    <th style="width: 5vw;">Flag</th>
+
+                  </tr>
+                </thead>
+                <tbody *ngIf="clientIssues.length == 0">
+                  <tr style="text-align: center;">
+                    <td colspan="12">No Data to display</td>
+                  </tr>
+                </tbody>
+                <tbody class="table-body">
+                  <tr *ngFor="let element of paginatedData; let idx = index" [ngClass]="{
+      'flagrow': element['flag'], 
+      'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom']),
+      'status-open': element.status?.status.toLowerCase() == 'open',
+      'status-closed': element.status?.status.toLowerCase() == 'closed'
+    }">
+                    <td style="width: 5vw;" (click)="messageIssue($event,element, false)">{{element.issueno}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{
+                      element.reporteddate.toDate() | date: 'MMM d,y HH:mm'}}</td>
+                    <td style="width: 5vw;" (click)="messageIssue($event,element, false)">
+                      {{[null,undefined,""].includes(mapProfileData[element.reportedBy]) ? '' :
+                      mapProfileData[element.reportedBy]['name']}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{element.category}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)"
+                      (mouseenter)="showPopup(element, $event)" (mouseleave)="hidePopup()" class="clickable">
+                      <span>{{element.name}}</span>
+                    </td>
+                    <td style="width: 10vw;" (click)="messageIssue($event,element, false)">{{[null, undefined,
+                      ""].includes(element.journey) ? "No Journey" : mapJourney[element.journey.id]}}</td>
+                    <td style="width: 5vw;" (click)="messageIssue($event,element, false)">{{element['active']}}</td>
+                    <td style="width: 20vw;" (click)="messageIssue($event,element, false)">
+                      {{element['issue'].substring(0, 35)}}</td>
+                    <td style="width: 15vw;" (click)="messageIssue($event,element, false)">
+                      <div class="list">
+                        <span *ngFor="let notes of element.notes; let i = index">
+                          <ng-container *ngIf="i === element.notes.length - 1">
+                            {{ notes.remarks.substring(0,35) }}
+                          </ng-container>
+                        </span>
+                      </div>
+                    </td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)"> {{ ![null,
+                      undefined,""].includes(element['chatstatus']) ?
+                      element['chatstatus'].toUpperCase() : 'NO CHAT STATUS'}}</td>
+
+
+
+                    <!-- Review Column -->
+                    <td style="width: 5vw;">
+                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                        style="background-color: red; color: white;" *ngIf="!isIdPresent(element)">{{'Review'}}</button>
+                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                        style="background-color: green; color: white;"
+                        *ngIf="isIdPresent(element)">{{mapProfileData[getMostRecentTimestampKey(element['review'])]?.name}}</button>
+                    </td>
+
+                    <!-- Flag Column -->
+                    <td style="width: 5vw;">
+                      <ng-container *ngIf="![null, undefined, '', false].includes(element['flag']); else noFlag">
+                        <button mat-stroked-button color="warn" (click)="updateFlag(element)">
+                          Unflag
+                        </button>
+                      </ng-container>
+                      <ng-template #noFlag>
+                        <button mat-stroked-button [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger"
+                          (click)="updateFlag(element)">
+                          Flag
+                        </button>
+                      </ng-template>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot style="position: sticky; z-index: 1000; background-color: white; bottom: 0;">
+                  <tr>
+                    <td colspan="12">
+                      <div class="pagination">
+                        <button (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+                        <div class="scroll-container" #scrollContainer>
+                          <div class="scroll-content">
+                            <button *ngFor="let page of [].constructor(totalPages); let i = index"
+                              (click)="setPage(i + 1)" [class.active]="currentPage === (i + 1)">
+                              {{ i + 1 }}
+                            </button>
+                          </div>
+                        </div>
+                        <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+                        <span style="margin-left: 15px;">Items per page:</span>
+                        <select [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                          <option value="200">200</option>
+                        </select>
+                        <span style="margin-left: 15px;">
+                          <b>Pages: {{totalPages}}</b>
+                        </span>
+                        <span style="margin-left: 10px;">
+                          <b>Total: {{clientIssues.length}}</b>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <!-- CLOSED TICKETS TABLE - Add Flag column header -->
+              <table class="native-table" *ngIf="tableView == 'close'">
+                <thead class="table-head">
+                  <tr>
+                    <th style="width: 5vw;" (click)="sortcolumn('issueno')"
+                      [ngClass]="sortColumn == 'issueno' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Ticket No
+                    </th>
+                    <th style="width: 8vw;" (click)="sortcolumn('reporteddate')"
+                      [ngClass]="sortColumn == 'reporteddate' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
+                      Reported Date</th>
+                    <th style="width: 5vw;" (click)="sortcolumn('reportedBy')"
+                      [ngClass]="sortColumn == 'reportedBy' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Reported
+                      By</th>
+                    <th style="width: 8vw;" (click)="sortcolumn('closeddate')"
+                      [ngClass]="sortColumn == 'closeddate' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Closed
+                      Date</th>
+                    <th style="width: 8vw;" (click)="sortcolumn('name')"
+                      [ngClass]="sortColumn == 'name' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Client Name
+                    </th>
+                    <th style="width: 5vw;" (click)="sortcolumn('closed')"
+                      [ngClass]="sortColumn == 'closed' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Closed
+                      Duration</th>
+                    <th style="width: 8vw;" (click)="sortcolumn('category')"
+                      [ngClass]="sortColumn == 'category' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Category
+                    </th>
+                    <th style="width: 10vw;" (click)="sortcolumn('journey')"
+                      [ngClass]="sortColumn == 'journey' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Journey
+                    </th>
+                    <th style="width: 20vw;">Ticket</th>
+                    <th style="width: 15vw;">Notes</th>
+                    <th style="width: 8vw;" (click)="sortcolumn('happinessindex')"
+                      [ngClass]="sortColumn == 'happinessindex' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
+                      Happiness Index</th>
+                    <th style="width: 5vw;">Review</th>
+                    <th style="width: 5vw;">Flag</th>
+
+                  </tr>
+                </thead>
+                <tbody *ngIf="clientIssues.length == 0">
+                  <tr style="text-align: center;">
+                    <td colspan="13">No Data to display</td>
+                  </tr>
+                </tbody>
+                <tbody class="table-body">
+                  <tr *ngFor="let element of paginatedData; let idx = index"
+                    [ngClass]="{'flagrow': element['flag'], 'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom'])}">
+                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{element.issueno}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{
+                      element.reporteddate.toDate() | date: 'MMM d, y HH:mm'}}</td>
+                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{
+                      [null,undefined,""].includes(mapProfileData[element.reportedBy]) ? '' :
+                      mapProfileData[element.reportedBy]['name']}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{element.status.date.toDate()
+                      | date: 'MMM d, y HH:mm'}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)"
+                      (mouseenter)="showPopup(element, $event)" (mouseleave)="hidePopup()" class="clickable">
+                      <span>{{element.name}}</span>
+                    </td>
+                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{element.closed}}</td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{element.category}}</td>
+                    <td style="width: 10vw;" (click)="messageIssue($event,element,false)">{{[null, undefined,
+                      ""].includes(element.journey) ? "No Journey" : mapJourney[element.journey.id]}}</td>
+                    <td style="width: 20vw;" (click)="messageIssue($event,element,false)">
+                      {{element['issue'].substring(0, 35)}}</td>
+                    <td style="width: 15vw;" (click)="messageIssue($event,element,false)">
+                      <div class="list">
+                        <span *ngFor="let notes of element.notes; let i = index">
+                          <ng-container *ngIf="i === element.notes.length - 1">
+                            {{ notes.remarks.substring(0,35)}}
+                          </ng-container>
+                        </span>
+                      </div>
+                    </td>
+                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{[null,
+                      undefined,""].includes(element.happinessindex)? 'Unrated' : element.happinessindex}}</td>
+
+
+                    <!-- Review Column -->
+                    <td style="width: 5vw;">
+                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                        style="background-color: red; color: white;" *ngIf="!isIdPresent(element)">{{'Review'}}</button>
+                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                        style="background-color: green; color: white;"
+                        *ngIf="isIdPresent(element)">{{mapProfileData[getMostRecentTimestampKey(element['review'])]?.name}}</button>
+                    </td>
+
+                    <!-- Flag Column -->
+                    <td style="width: 5vw;">
+                      <ng-container *ngIf="![null, undefined, '', false].includes(element['flag']); else noFlagClosed">
+                        <button mat-stroked-button color="warn" (click)="updateFlag(element)">
+                          Unflag
+                        </button>
+                      </ng-container>
+                      <ng-template #noFlagClosed>
+                        <button mat-stroked-button [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger"
+                          (click)="updateFlag(element)">
+                          Flag
+                        </button>
+                      </ng-template>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot style="position: sticky; z-index: 1000; background-color: white; bottom: 0;">
+                  <tr>
+                    <td colspan="13">
+                      <div class="pagination">
+                        <button (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+                        <div class="scroll-container" #scrollContainer>
+                          <div class="scroll-content">
+                            <button *ngFor="let page of [].constructor(totalPages); let i = index"
+                              (click)="setPage(i + 1)" [class.active]="currentPage === (i + 1)">
+                              {{ i + 1 }}
+                            </button>
+                          </div>
+                        </div>
+                        <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+                        <span style="margin-left: 15px;">Items per page:</span>
+                        <select [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                          <option value="200">200</option>
+                        </select>
+                        <span style="margin-left: 15px;">
+                          <b>Pages: {{totalPages}}</b>
+                        </span>
+                        <span style="margin-left: 10px;">
+                          <b>Total: {{clientIssues.length}}</b>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <!-- Mat Menu for flagging (shared between both tables) -->
+              <mat-menu #flagmenu="matMenu">
+                <div class="flagnegligence">
+                  <mat-form-field appearance="outline" class="custom-form-field">
+                    <mat-label>Severity</mat-label>
+                    <mat-select [(ngModel)]="flagseverity" (click)="$event.stopPropagation()">
+                      <mat-option *ngFor="let severity of severityList" [value]="severity">{{severity}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <br>
+                  <button mat-stroked-button color="primary" (click)="updateData(selectedElementForFlag, $event)"
+                    mat-menu-close>Flag Negligence</button>
+                </div>
+              </mat-menu>
+            </div>
+
+            <!-- Popup (outside table container) -->
+            <div *ngIf="popupData" class="popup"
+              [ngStyle]="{ top: popupData.position.top + 'px', left: popupData.position.left + 'px' }">
+              <p><b>Ticket ID:</b> {{ popupData.issueno }}</p>
+              <p><b>Ticket:</b> {{ popupData.issue }}</p>
+              <p *ngIf="popupData['notes'].length != 0"><b>Notes:</b></p>
+              <div style="line-height: 1.0;">
+                <div *ngFor="let notes of popupData['notes']; let idx = index">
+                  <p><b>{{idx+1}}</b> &nbsp;&nbsp; {{[null, undefined,''].includes(mapProfileData[notes['writtenBy']]) ?
+                    '...' : mapProfileData[notes['writtenBy']]['name']}} : {{notes['date'].toDate() | date: 'short' }}
+                  </p>
+                  <p>&nbsp;{{notes.remarks}}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="!tab.label.includes('Review') && !tab.label.includes('Dashboard')">
+        <app-customer-chat-screen [ticketid]="tab.ticketid" [profileid]="tab.profileid" [admin]="tab.admin"
+          [roles]="loginRoles" [mapprofiledata]="mapProfileData" [mapuserId]="mapUserId" [categories]="categories"
+          [status]="statuslist" [validators]="validators" [negligence]="negligencelist" [journeymap]="mapJourney"
+          [chatconfigdatainput]="chatConfigData" [type]="'support'" [screentab]="i" [selectedtab]="selectedTabIndex">
+        </app-customer-chat-screen>
+      </div>
+      <div *ngIf="tab.label.includes('Review')">
+        <app-flag-review-screen [clientid]="tab.clientid" [profileid]="tab.profileid" [status]="statuslist"
+          [validators]="validators" [negligence]="negligencelist" [mapuserId]="mapUserId" [categories]="categories"
+          [mapprofiledata]="mapProfileData" [mapuserId]="mapUserId" [tabIndex]="selectedTabIndex"
+          [weeknumber]="weekNumber" [weekYear]="weekYear">
+        </app-flag-review-screen>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

@@ -1,0 +1,48 @@
+<div class="mainscreen">
+    <h5 class="title">{{data != null ? 'Edit ' : ''}}Journey & Product Mapping</h5>
+    <form [formGroup]="journeyProductForm">
+      <mat-form-field appearance="outline">
+        <mat-label>Journey</mat-label>
+        <mat-select formControlName="journey" [disabled]="data != null" (selectionChange)="onJourneySelect($event.value)">
+          <mat-option class="matoption" *ngFor="let journey of journeyList" [value]="journey.path">{{journey.name}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="journeyProductForm.get('journey').hasError('required')">
+          Product <strong>Required</strong>
+        </mat-error>
+        <mat-error *ngIf="journeyProductForm.get('journey').hasError('exists')">
+          Already <strong>exists</strong>
+        </mat-error>
+      </mat-form-field>
+      <mat-checkbox class="checkbox" formControlName="journeyrequiredjourneycoach">Journey Coach Required</mat-checkbox>
+      <br>
+      <mat-form-field appearance="outline">
+        <mat-label>Products</mat-label>
+        <mat-select formControlName="product" (selectionChange)="onProductSelect()" multiple>
+          <mat-option class="matoption" *ngFor="let product of productList" [value]="product.path">{{product.name}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="journeyProductForm.get('product').hasError('required')">
+          At least one <strong>Required</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <div cdkDropList class="example-list" (cdkDropListDropped)="drop($event)">
+        <div class="example-box" *ngFor="let order of productOrder; let i = index" cdkDrag>
+          <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+          {{mapProduct[order]}}
+          <div>
+            <button mat-icon-button (click)="addAgain(order)">
+              <mat-icon>add_circle_outline</mat-icon>
+            </button>
+            <button mat-icon-button (click)="remove(i)">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+  
+      <div class="btnarea">
+        <button type="button" class="closebtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
+        <button type="submit" class="bookbtn" mat-stroked-button (click)="updateJourneyProduct()" [disabled]="loading">{{loading ? 'Loading' : 'Submit'}}</button>
+      </div>
+    </form>
+</div>

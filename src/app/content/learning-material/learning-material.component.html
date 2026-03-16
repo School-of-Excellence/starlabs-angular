@@ -1,0 +1,84 @@
+<div class="audio-dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Resources</h1>
+      <p class="dash-sub">Upload and manage documents, images, and files</p>
+    </div>
+    <button class="btn-primary" (click)="openUploadDialog()">
+      <mat-icon>cloud_upload</mat-icon>
+      <span>Upload</span>
+    </button>
+  </div>
+
+  <div class="filters-row">
+    <div class="input-box search-box">
+      <mat-icon class="ib-icon">search</mat-icon>
+      <input type="text" class="ib-input" placeholder="Search materials..."
+        #input (keyup)="applyFilter($event)" autocomplete="off" />
+    </div>
+  </div>
+
+  <div class="table-outer">
+    <div class="table-card">
+      <table mat-table [dataSource]="dataSource" matSort>
+        <ng-container matColumnDef="sno">
+          <th mat-header-cell *matHeaderCellDef class="sno-cell">#</th>
+          <td mat-cell *matCellDef="let row; let i = index" class="sno-cell">{{ i + 1 }}</td>
+        </ng-container>
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="c-name">{{ row.name }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef class="col-desc">Description</th>
+          <td mat-cell *matCellDef="let row" class="col-desc">
+            <span class="c-desc">{{ row.description }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="files">
+          <th mat-header-cell *matHeaderCellDef>Files</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="chip chip-sm">{{ row.files?.length || 0 }} file{{ row.files?.length === 1 ? '' : 's' }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="c-size">{{ row.date?.toDate ? (row.date.toDate() | date:'mediumDate') : (row.date | date:'mediumDate') }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="edit">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-edit" (click)="onEdit(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-del" (click)="onDelete(row)">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="empty">
+              <mat-icon>folder_open</mat-icon>
+              <p>No materials found</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons class="paginator"></mat-paginator>
+  </div>
+</div>

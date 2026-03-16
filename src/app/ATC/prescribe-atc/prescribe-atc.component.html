@@ -1,0 +1,533 @@
+<div *ngIf="loading">
+    <mat-progress-spinner mode="indeterminate" class="loading-bar"></mat-progress-spinner>
+  </div>
+  
+  <div class="atc-edit-container">
+    <!-- Offline/Online status bar -->
+    <nav class="navbar sticky-top navbar-light justify-content-end status-bar" *ngIf="!isonline">
+      <span class="status-message">No internet connection. Autosave is off. Keep this tab open until it's restored.</span>
+    </nav>
+    
+    <nav class="navbar sticky-top navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
+      <div>
+        <span class="icon-text-container" (click)="autoSave()">
+          <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
+          <span>{{draftStatus.message}}</span>
+          <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
+        </span>
+      </div>
+      <!-- <div *ngIf="autosaveonprogress">
+        <span class="icon-text-container">
+          <mat-icon>sync</mat-icon>
+          <span>saving to draft...</span>
+        </span>
+      </div>
+      <div *ngIf="!autosaveonprogress">
+        <span class="icon-text-container">
+          <mat-icon>sync</mat-icon>
+          <span>ATC Saved to draft.</span>
+        </span>
+      </div> -->
+    </nav>
+    
+    <header class="atc-header">
+      <h1 class="header-title">Prescribe ATC</h1>
+      
+      <div class="share-container" *ngIf="autoSaveID != null">
+        <button mat-button class="share-button" (click)="copyToClipboard()">
+          Copy Link For Collaborators
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </div>
+    </header>
+  
+    <main class="atc-main">
+      <!-- ATC Data Section -->
+      <section class="content-section">
+        <h2 class="section-heading">ATC Data</h2>
+        <div class="info-grid">
+          <div class="info-box">
+            <mat-form-field appearance="outline" class="flat-field">
+              <mat-label>Participant's Name</mat-label>
+              <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity()" [required]="true">
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            
+            <div *ngIf="participantProfileid !== null && (selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="profile-image-container">
+              <img class="profile-image" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']">
+            </div>
+          </div>
+  
+          <div class="info-box">
+            <mat-form-field appearance="outline" class="flat-field">
+              <mat-label>What is the ATC given for?</mat-label>
+              <mat-select [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [required]="true">
+                <mat-option *ngFor="let productName of productLists" [value]="productName.atcmodel">{{productName.atcmodel}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+  
+          <div class="info-box">
+            <mat-form-field appearance="outline" class="flat-field">
+              <mat-label>Prescribed Date</mat-label>
+              <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY" (dateChange)="autoSave()" [disabled]="!transcriber || this.assignmentInitiated" [required]="true">
+              <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-datepicker #picker></mat-datepicker>
+            </mat-form-field>
+          </div>
+        </div>
+      </section>
+      
+      <!-- ATC Directive Section -->
+      <section class="content-section" *ngIf="product != null">
+        <h2 class="section-heading">ATC DIRECTIVE</h2>
+        <div class="directive-container">
+          <div class="directive-text">
+            <label>{{atcdirective != null ? atcdirective : 'Provide ATC Directive'}}</label>
+          </div>
+          <button class="edit-button primary-button" mat-button (click)="editDirective()" [disabled]="assignmentInitiated">Update Directive</button>
+        </div>
+      </section>
+      
+      <!-- Authors Section -->
+      <section class="content-section" *ngIf="!this.bigActivity()">
+        <h2 class="section-heading">AUTHORS</h2>
+        <div class="personnel-container">
+          <div class="field-grid field-header">
+            <div class="field-activity">Activity</div>
+            <div class="field-person">Specialist</div>
+          </div>
+          
+          <div *ngFor="let activity of bigActivityAuthor" class="field-grid">
+            <div class="field-activity">
+              <mat-form-field appearance="outline" class="flat-field">
+                <input matInput [value]="activity['activity']" readonly>
+              </mat-form-field>
+            </div>
+            <div class="field-person">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select placeholder="Select Specialist" [(ngModel)]="authorMap[activity['docid']]" (selectionChange)="autoSave()" multiple [disabled]="this.assignmentInitiated">
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableSpecialistList()" [value]="name.authorpath">
+                    <span class="person-chip">{{name.authorname}}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Observers Section -->
+      <section class="content-section" *ngIf="!this.bigActivity()">
+        <h2 class="section-heading">OBSERVERS</h2>
+        <div class="personnel-container">
+          <div class="field-grid field-header">
+            <div class="field-activity">Activity</div>
+            <div class="field-person">Shadow</div>
+          </div>
+          
+          <div *ngFor="let activity of bigActivityObserver" class="field-grid">
+            <div class="field-activity">
+              <mat-form-field appearance="outline" class="flat-field">
+                <input matInput [value]="activity['activity']" readonly>
+              </mat-form-field>
+            </div>
+            <div class="field-person">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select placeholder="Select Specialist" [(ngModel)]="observerMap[activity['docid']]" (selectionChange)="onObserverSelect(); autoSave()" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableSpecialistList()" [value]="name.authorpath">
+                    <span class="person-chip">{{name.authorname}}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+      </section>
+  
+      <!-- Mentors Section -->
+      <section class="content-section">
+        <h2 class="section-heading">MENTORS</h2>
+        <div class="personnel-container">
+          <div class="field-grid field-header">
+            <div class="field-activity">Activity</div>
+            <div class="field-person">Mentor</div>
+          </div>
+          
+          <div *ngFor="let activity of bigActivityMentor" class="field-grid">
+            <div class="field-activity">
+              <mat-form-field appearance="outline" class="flat-field">
+                <input matInput [value]="activity['activity']" readonly>
+              </mat-form-field>
+            </div>
+            <div class="field-person">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select placeholder="Select Specialist" [(ngModel)]="mentorMap[activity['docid']]" (selectionChange)="autoSave()" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableMentorList()" [value]="name.authorpath">
+                    <span class="person-chip">{{name.authorname}}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Additional Activities Section -->
+      <section class="content-section">
+        <h2 class="section-heading">ADDITIONAL ACTIVITIES</h2>
+        <div class="personnel-container">
+          <div *ngFor="let activity of additionalActivityMap; let i = index" class="field-grid">
+            <div class="field-activity">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select placeholder="Select Activity" [(ngModel)]="activity.activity" (selectionChange)="autoSave()">
+                  <mat-option *ngFor="let name of bigActivityAdditional" [value]="name.docid">{{name.activity}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="field-person">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select placeholder="Select Specialist" [(ngModel)]="activity.specialist" (selectionChange)="autoSave()" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableSpecialistList()" [value]="name.authorpath">
+                    <span class="person-chip">{{name.authorname}}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="field-actions">
+              <button class="action-button remove-button" mat-icon-button (click)="removeAdditionalActivity(i)">
+                <mat-icon>remove</mat-icon>
+              </button>
+            </div>
+          </div>
+          <div class="empty-activities">
+            <button class="primary-button" mat-button (click)="addAdditionalActivity()">Add New Activity</button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Mentors Section (if mentor exists) -->
+      <section class="content-section" *ngIf="mentor && mentorOption.length != 0">
+        <h2 class="section-heading">MENTORS</h2>
+        <div class="personnel-container">
+          <label class="mentor-label">Mentored in Person Offline/Online</label>
+          <div *ngFor="let value of mentorOption" class="mentor-checkbox">
+            <mat-checkbox (change)="onMenteeSelect($event.checked, value)">{{mapProfile[value]["name"]}}</mat-checkbox>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Captures Section (if data exists) -->
+      <section class="content-section" *ngIf="data && data.length > 0">
+        <h2 class="section-heading">CAPTURES</h2>
+        <div class="captures-container">
+          <div class="captures-grid">
+            <div *ngFor="let clip of data" class="capture-item">
+              <div *ngIf="clip['clipurl']">
+                <video [src]="clip['clipurl']" controls class="capture-video"></video>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Adjustments and Procedures Section -->
+      <section class="content-section">
+        <h2 class="section-heading">ADJUSTMENTS & PROCEDURES</h2>
+        <div class="adjustment-container" cdkDropList (cdkDropListDropped)="drop($event)">
+          <div *ngFor="let adjustment of transcript; let i=index" class="adjustment-item" cdkDrag>
+            <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+            
+            <div class="adjustment-content">
+              <div class="adjustment-text">
+                <span class="adjustment-number">{{i+1}}.</span>
+                <textarea class="adjustment-textarea" rows="6" [(ngModel)]="adjustment.adjustment" (focusout)="autoSave()" placeholder="Type Your Adjustment..." [required]="true"></textarea>
+                
+                <div class="adjustment-actions">
+                  <button class="reorder-button" mat-stroked-button cdkDragHandle>
+                    <mat-icon>reorder</mat-icon>
+                    Move Sequence
+                  </button>
+                  <button *ngIf="transcript.length > 1" mat-icon-button class="remove-button mt-2" (click)="removeAdjustment(i)">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
+                </div>
+              </div>
+              
+              <div class="awareness-field">
+                <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
+                <mat-form-field appearance="outline" class="flat-field">
+                  <mat-select [compareWith]="compareFnc" [(ngModel)]="adjustment.awareness" (selectionChange)="autoSave()" [required]="true">
+                    <mat-option *ngFor="let item of adjustmentAwarenessDetail.awarenesslist" [value]="item">{{item.value}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                
+                <div class="potential-years">
+                  <mat-label>{{adjustmentAwarenessDetail.potentialyearlabel}}</mat-label>
+                  <mat-form-field appearance="outline" class="year-field">
+                    <input type="number" matInput [(ngModel)]="adjustment.potentialyears" (focusout)="autoSave()" [required]="true">
+                  </mat-form-field>
+                </div>
+              </div>
+              
+              <!-- Procedures -->
+              <div class="procedure-list">
+                <div *ngFor="let procedure of adjustment.procedure; let j = index" class="procedure-item">
+                  <div class="procedure-form">
+                    <span class="procedure-marker">*</span>
+                    
+                    <mat-form-field appearance="outline" class="procedure-field">
+                      <mat-label>Procedure</mat-label>
+                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true">
+                        <mat-option *ngFor="let pro of procedurelist" [value]="pro.procedurepath">{{pro.procedurename}}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    
+                    <mat-form-field appearance="outline" class="procedure-field">
+                      <mat-label>Recommended To</mat-label>
+                      <mat-select [(ngModel)]="procedure.recommended_to" (selectionChange)="autoSave()">
+                        <mat-option [value]="null">Not Recommended</mat-option>
+                        <mat-option *ngFor="let value of recommendlist" [value]="value.path">{{value.name}}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    
+                    <mat-form-field *ngFor="let assigned of bigActivityAssignedto" appearance="outline" class="procedure-field">
+                      <mat-label>{{assigned.activity}}</mat-label>
+                      <mat-select [(ngModel)]="procedure.assignedMap[assigned.docid]" multiple (selectionChange)="autoSave()">
+                        <mat-option>
+                          <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                        </mat-option>
+                        <mat-option *ngFor="let name of availableSpecialistList()" [value]="name.authorpath">{{name.authorname}}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    
+                    <mat-checkbox class="procedure-checkbox" [(ngModel)]="procedure.mandatory" (change)="autoSave()">Mandatory</mat-checkbox>
+                    
+                    <mat-checkbox class="procedure-checkbox" [(ngModel)]="procedure.completed" (change)="autoSave()">Mark as Completed</mat-checkbox>
+                    
+                    <div class="procedure-actions">
+                      <button class="action-button add-button" mat-icon-button *ngIf="(adjustment.procedure.length - 1) == j" (click)="addnewProcedure(i)">
+                        <mat-icon>add</mat-icon>
+                      </button>
+                      <button class="action-button remove-button" mat-icon-button *ngIf="adjustment.procedure.length > 1" (click)="removeProcedure(i,j)">
+                        <mat-icon>remove</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="add-adjustment">
+          <button mat-button class="primary-button" (click)="addNewAdjustment()">
+            Add New Adjustment
+          </button>
+        </div>
+      </section>
+      
+      <!-- Directives for Micro ATC Section (if mentor) -->
+      <section class="content-section" *ngIf="mentor">
+        <h2 class="section-heading">DIRECTIVES FOR MICRO ATC</h2>
+        <div class="directives-container">
+          <div *ngFor="let directive of atcAssignment; let i = index" class="directive-item">
+            <textarea class="directive-textarea" rows="6" placeholder="Give your Directive Here..." [(ngModel)]="directive['directive']" (focusout)="autoSave()"></textarea>
+            
+            <div class="directive-options">
+              <mat-form-field appearance="outline" class="directive-field">
+                <mat-label>Activity</mat-label>
+                <mat-select [(ngModel)]="directive['activity']" (selectionChange)="autoSave()">
+                  <mat-option *ngFor="let name of bigActivityAuthor" [value]="name.docid">{{name.activity}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              
+              <mat-form-field appearance="outline" class="directive-field">
+                <mat-label>Assign To</mat-label>
+                <mat-select [(ngModel)]="directive['assignedto']" (selectionChange)="autoSave()" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableSpecialistList()" [value]="name.authorpath">{{name.authorname}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="mt-1 text-right">
+              <button *ngIf="atcAssignment.length > 1" mat-button class="remove-button" (click)="removeDirective(i)">
+                Remove this Directive
+              </button>
+            </div>
+          </div>
+          <div>
+            <button mat-button class="primary-button" (click)="addDirective()">
+              Add New Directive
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Notes Section -->
+      <section class="content-section">
+        <h2 class="section-heading">NOTES</h2>
+        <div class="notes-container">
+          <div class="note-field">
+            <h3 class="field-label">Consultation Summary</h3>
+            <mat-form-field appearance="outline" class="note-textarea">
+              <textarea matInput rows="6" [(ngModel)]="consultationSummary" (focusout)="autoSave()" placeholder="Summary"></textarea>
+            </mat-form-field>
+          </div>
+          
+          <div class="note-field">
+            <h3 class="field-label">Consultation Points*</h3>
+            <mat-form-field appearance="outline" class="note-textarea">
+              <textarea matInput rows="6" [(ngModel)]="consultationpoint" (focusout)="autoSave()" placeholder="Notes" [required]="true"></textarea>
+            </mat-form-field>
+          </div>
+          
+          <div class="note-field">
+            <h3 class="field-label">Case Notes*</h3>
+            <mat-form-field appearance="outline" class="note-textarea">
+              <textarea matInput rows="6" [(ngModel)]="casenotes" (focusout)="autoSave()" placeholder="Notes" [required]="true"></textarea>
+            </mat-form-field>
+          </div>
+          
+          <div class="note-field" *ngIf="mentor">
+            <h3 class="field-label">Mentor Notes</h3>
+            <mat-form-field appearance="outline" class="note-textarea">
+              <textarea matInput rows="6" [(ngModel)]="mentornotes" (focusout)="autoSave()" placeholder="Notes"></textarea>
+            </mat-form-field>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Audio Section -->
+      <section class="content-section">
+        <h2 class="section-heading">CHANGEWORK BRIEF</h2>
+        <div class="audio-container">
+          <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">
+            <audio controls class="audio-player">
+              <source [src]="sanitize(audio)" type="audio/wav">
+            </audio>
+            <button class="remove-button" mat-icon-button (click)="removeAudio(i)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="progress-item" *ngIf="uploadProgress.isUploading && audioBlob.length > 0">
+            <span>Audio Upload: {{uploadProgress.audio}}%</span>
+            <mat-progress-bar mode="determinate" [value]="uploadProgress.audio"></mat-progress-bar>
+          </div>
+          
+          <div class="audio-controls">
+            <button *ngIf="!recording" mat-stroked-button class="record-button" (click)="initiateRecording()">
+              Add Recording <mat-icon>fiber_manual_record</mat-icon>
+            </button>
+            <input #file type="file" accept="audio/*" #input (change)="audioUpload(input.value)" hidden multiple>
+            <button *ngIf="!recording" mat-stroked-button class="upload-button" (click)="file.click()">
+              Upload Audio <mat-icon>record_voice_over</mat-icon>
+            </button>
+            <button *ngIf="recording" mat-stroked-button class="stop-button" (click)="stopRecording()">
+              Stop Recording <mat-icon>stop</mat-icon>
+            </button>
+            <label class="timer" *ngIf="recording">{{countDown}}</label>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Images Section -->
+      <section class="content-section">
+        <h2 class="section-heading">IMAGES</h2>
+        
+        <!-- Notes Images -->
+        <div class="image-section">
+          <h3 class="subsection-heading">Upload Images Notes</h3>
+          <!-- <input class="file-input"  type="file" accept="image/*" #input multiple (change)="importNoteImages(input.value)"> -->
+          <input class="file-input"  type="file" accept="image/*" #input multiple (change)="importNoteImages($event)">
+          <div class="image-previews">
+            <div class="preview-item" *ngFor="let preview of previewNoteImages; let imgIndex = index">
+              <img [src]="preview" class="preview-img">
+              <span class="remove-image" (click)="removeNoteImage(imgIndex)">Remove</span>
+            </div>
+          </div>
+          <div class="progress-item" *ngIf="uploadProgress.isUploading && selectedNoteImages.length > 0">
+            <span>Note Images Upload: {{uploadProgress.noteImages}}%</span>
+            <mat-progress-bar mode="determinate" [value]="uploadProgress.noteImages"></mat-progress-bar>
+          </div>
+        </div>
+        
+        <!-- ATC Images -->
+        <div class="image-section">
+          <h3 class="subsection-heading">Upload Prescribed ATC Images</h3>
+          <!-- <input class="file-input"  type="file" accept="image/*" #input multiple (change)="importATCImages(input.value)"> -->
+          <input class="file-input"  type="file" accept="image/*" #input multiple (change)="importATCImages($event)">
+          <div class="image-previews">
+            <div class="preview-item" *ngFor="let preview of previewATCImages; let imgIndex = index">
+              <img [src]="preview" class="preview-img">
+              <span class="remove-image" (click)="removeATCImage(imgIndex)">Remove</span>
+            </div>
+          </div>
+          <div class="progress-item" *ngIf="uploadProgress.isUploading && selectedATCImages.length > 0">
+            <span>ATC Images Upload: {{uploadProgress.atcImages}}%</span>
+            <mat-progress-bar mode="determinate" [value]="uploadProgress.atcImages"></mat-progress-bar>
+          </div>
+        </div>
+      </section>
+      <!-- AI SUmmary Section -->
+      <section class="content-section">
+        <h2 class="section-heading">Areas to explore</h2>
+        <div class="validation-container">
+          <h4>{{areasstring}}</h4>
+        </div>
+        <h2 class="section-heading">A&H AI Summary (Beta)</h2>
+        <div class="validation-container">
+          <markdown [data]="summarystring" class="markdown-content"></markdown>
+        </div>
+      </section>      
+      <!-- Validation Section -->
+      <section class="content-section" *ngIf="!arenamode && !assignmentInitiated && !this.bigActivity()">
+        <h2 class="section-heading">VALIDATION</h2>
+        <div class="validation-container">
+          <mat-checkbox [(ngModel)]="validationnotrequired" class="validation-checkbox">
+            Make ATC visible to participant without any additional validation
+          </mat-checkbox>
+          
+          <mat-form-field *ngIf="!validationnotrequired" appearance="outline" class="flat-field validator-field">
+            <mat-label>Validator Person(s)</mat-label>
+            <mat-select [(ngModel)]="validator" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let name of availableMentorList()" [value]="name.authorpath">{{name.authorname}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </section>
+      
+      <!-- Submit Section -->
+      <section class="submit-section">
+        <div *ngIf="loading" class="loading">
+          <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+          <label>Uploading...</label>
+        </div>
+        
+        <button *ngIf="!loading" mat-raised-button class="submit-button" [disabled]="loading || uploadProgress.isUploading" (click)="submit()">
+          Submit ATC
+        </button>
+      </section>
+    </main>
+  </div>

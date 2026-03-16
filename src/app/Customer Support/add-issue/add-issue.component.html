@@ -1,0 +1,234 @@
+<div *ngIf="loading">
+  <mat-progress-bar diameter=50 mode="indeterminate" color="primary"></mat-progress-bar>
+</div>
+
+<div class="mainscreen" *ngIf="!loading" >
+  <h4 class="title" *ngIf="dailogData.type == 'new'">ADD TICKET</h4>
+  <h4 class="title" *ngIf="dailogData.type == 'edit'">EDIT TICKET</h4>
+  <div *ngIf="dailogData.metadata && dailogData.metadata['status'] && dailogData.metadata['status']['status']" style="margin-top: 10px; margin-left: 15px;">
+    <div *ngIf="dailogData.metadata['status']['status'] != 'closed'">
+      <span style="font-size: 20px;">This ticket is Open {{activeDays}} days </span>
+    </div>
+  </div>
+
+  <div style="line-height: 0.7;">
+    <p>Recent Ticket Number : <b>{{dailogData['recentticket']}}</b></p>
+    <p>Expected Ticket Number : <b>{{expectedNumber}}</b></p>
+  </div>
+
+  <form [formGroup]="addissue">
+    <div class="main">
+      <div style="margin: 20px;">
+        <mat-card>
+        <div style="padding: 20px;">
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Reported Date</mat-label>
+            <input matInput type="date" formControlName="reporteddate" placeholder="please Enter client name">
+            <mat-error *ngIf="!addissue.controls['reporteddate'].valid">Reported date is required </mat-error>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label autofocus="on">Client Name</mat-label>
+            <mat-select formControlName="clientid" (selectionChange)="fetchProfileData($event.value)" [disabled]="dailogData['type'] == 'edit'">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">{{client.name}}</mat-option>
+            </mat-select>
+            <span *ngIf="checkIssue === true">
+               <mat-icon matSuffix><i class="fa fa-exclamation-circle" style="color: red;" aria-hidden="true"></i></mat-icon>
+            </span>
+            <mat-error *ngIf="!addissue.controls['clientid'].valid">Client name is required </mat-error>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label autofocus="on">Email</mat-label>
+            <mat-select formControlName="email" [disabled]="dailogData['type'] == 'edit'">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredEmail" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let client of  returnFilterEmail()" [value]="client.email">{{client.email}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label autofocus="on">Phone</mat-label>
+            <mat-select formControlName="mobile" [disabled]="dailogData['type'] == 'edit'">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredPhone" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let client of returnFilterPhone()" [value]="client.number">{{client.number}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Journey</mat-label>
+            <mat-select formControlName="journey">
+                <mat-option *ngFor="let item of dailogData['journey']" [value]="item.id">{{item.journey}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="!addissue.controls['journey'].valid">Journey is required </mat-error>
+          </mat-form-field>
+        </div>
+        </mat-card>
+      </div>
+
+      <div style="margin: 20px;">
+        <mat-card>
+        <div style="padding: 20px;">
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Issue Reported By</mat-label>
+            <mat-select formControlName="issueReportedBy">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">{{client.name}}</mat-option>
+            </mat-select>
+            <span *ngIf="checkIssue === true">
+               <mat-icon matSuffix><i class="fa fa-exclamation-circle" style="color: red;" aria-hidden="true"></i></mat-icon>
+            </span>
+            <mat-error *ngIf="!addissue.controls['issueReportedBy'].valid">Issue Reported by is required </mat-error>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Reported By</mat-label>
+            <mat-select formControlName="reportedBy">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let user of returnFilterMember()" [value]="user.profileid" >{{user.name}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="!addissue.controls['reportedBy'].valid">Reported by is required </mat-error>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Category</mat-label> 
+            <mat-select formControlName="category" (selectionChange)="getSubCategory($event.value)">
+              <mat-option *ngFor="let category of categories;" [value]="category.category">{{category.category}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="!addissue.controls['category'].valid">Category  is required </mat-error>
+          </mat-form-field>
+
+          <br>
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Assigned To</mat-label>
+            <mat-select formControlName="assign" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let user of returnFilterMember()" [value]="user.profileid" >{{user.name}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="!addissue.controls['assign'].valid">Assign To is required </mat-error>
+          </mat-form-field>
+
+          <br>
+
+          <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="status">
+              <mat-option *ngFor="let status of configData['status']" [value]="status">{{status.toUpperCase()}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="!addissue.controls['status'].valid">Status is required </mat-error>
+          </mat-form-field>
+
+          <br>
+          </div>
+        </mat-card>
+      </div>
+
+      <div style="margin-left: 30px;margin-top: 20px;">
+        <mat-card style="height: 500px; overflow: auto;width: 750px; padding: 20px;">
+          <mat-form-field class="formfield1" appearance="outline" style="width: 700px;">
+            <mat-label>Issue</mat-label>
+            <textarea matInput id="myTextarea" formControlName="issue" (input)="adjustTextareaHeight()" [readonly]="dailogData['type'] == 'edit'"
+              [ngClass]="{ 'status-action': addissue.controls['status'].value === 'open',
+              'status-resolved': addissue.controls['status'].value === 'closed',
+              'status-pending': addissue.controls['status'].value === 'Action yet to be taken'
+              }" 
+            ></textarea>
+            <div *ngIf="dailogData.metadata['issue'] != null && dailogData.metadata['issue'].length != 0">
+              <span>
+                {{ mapProfile[dailogData.metadata["issueReportedBy"]] }}  <span style="float: right">({{ reportedDate }})</span>
+              </span>              
+            </div>
+            <mat-error *ngIf="!addissue.controls['issue'].valid">Issue name is required </mat-error>
+          </mat-form-field>
+          <br>
+          <div *ngIf="dailogData.metadata && dailogData.metadata['status'] && dailogData.metadata['status']['status']">
+            <div  *ngIf="dailogData.metadata['status']['status'] === 'closed'">
+              <div style="font-size: 20px;">
+                status closed
+                <div style="margin-top: 10px;">
+                  {{ editedPerson }}  <span style="float: right"> ({{ dailogData.metadata['status']['date'].toDate() | date: 'MMM d, y, h:mm:ss a' }})</span>
+                </div>
+              </div> 
+            </div>
+          </div>
+          <div *ngIf="dailogData.metadata['notes'] != null && dailogData.metadata['notes'].length != 0" style="margin-top: 20px; margin-bottom: 20px;">
+            <div>
+              <span *ngFor="let note of dailogData.metadata['notes']; let i = index">
+                <ng-container>
+                    <div style="border: 1px solid rgb(140, 136, 136);margin-bottom: 20px;padding: 10px 10px 0px 10px;border-radius: 5px; background-color: rgb(249, 239, 228); font-family: Montserrat;">
+                      {{ note.remarks }}
+                      <div style="margin-top: 10px;">
+                         {{mapProfile[note.writtenBy]}} <span style="float: right"> ({{ note.date.toDate() | date: 'MMM d, y, h:mm:ss a' }})</span>
+                      </div>
+                    </div> 
+                </ng-container>
+              </span>     
+            </div>
+          </div>
+          <div style="float: right;margin-top: 15px;">
+            <mat-icon (click)="openNotes()" style="cursor: pointer;">add_circle_outline</mat-icon>
+            <mat-hint style="margin-left: 5px;">Add Notes</mat-hint>
+          </div>
+          <br>
+          <div>
+            <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
+            <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('video')" class="attach"><mat-icon>videocam</mat-icon></button>
+              <br>
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('audio')" class="attach"><mat-icon>music_note</mat-icon></button>
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('files')" class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
+            </mat-menu>
+            <input style="display: none;" #fileInput type="file" [accept]="filetype" (click)="onClick($event)"
+            (change)="selectFiles($event)" multiple>
+              <div>
+                <span *ngIf="addissue.controls['files'].value != 0">
+                    <div *ngFor="let file of addissue.controls['files'].value; let i = index">
+                    <div style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px; margin: 5px; text-align: center;background-color: rgb(189, 189, 189);border-radius: 10px; color: black;">
+                        <span class="lastmessage">
+                            <p>{{file.name}}</p>
+                        </span>
+                        <button mat-icon-button (click)="removeFile(i)"><mat-icon>close</mat-icon></button>
+                    </div>
+                  </div>
+                </span>
+              </div>
+          </div>
+        </mat-card>
+      </div>
+    </div>
+
+    <div class="btnarea">
+      <button mat-raised-button color="primary" type="button" class="closebtn" (click)="onNoClick()">Back</button>
+      <button mat-raised-button color="primary" type="submit" class="submitbtn" [disabled]="!addissue.valid"  (click)="onsubmit(addissue.value)">Submit</button>
+    </div>
+  </form>
+</div>

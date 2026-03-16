@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./coi-serviceworker.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./coi-serviceworker.js').then(function(registration) {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      }).catch(function(error) {
+        console.log('ServiceWorker registration failed: ', error);
+      });
+    }
+  </script>
+  <title>Zoom ClientView Component</title>
+</head>
+<body>
+  <div class="d-flex flex-row justify-content-center">
+    <h1>Zoom ClientView Component</h1>
+  </div>
+  
+  <div id="zmmtg-root"></div>
+  <div *ngIf="profileHost">
+    <div class="slider-container">
+      <div *ngFor="let screenshot of screenshots" class="slider-item">
+        <img [src]="screenshot" alt="Screenshot" crossorigin="anonymous">
+      </div>
+    </div>
+  </div>
+  <button *ngIf="profileHost" class="float" (click)="onClick()">capture</button>
+  <div id="aria-notify-area"></div>
+</body>
+</html>
+

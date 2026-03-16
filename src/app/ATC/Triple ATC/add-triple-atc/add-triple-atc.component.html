@@ -1,0 +1,162 @@
+<div *ngIf="settingup">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <div class="title">Prescribe Triple ATC</div>
+  
+  <div class="atcdetail">
+    <div class="form-grid">
+      <div class="form-item">
+        <label class="form-label">Prescribed Date</label>
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>MM-DD-YYYY</mat-label>
+          <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" (dateChange)="autoSave()" [disabled]="true">
+          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div class="form-item">
+        <label class="form-label">Participant Name</label>
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Select participant</mat-label>
+          <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="!roles['transcriber'] && !roles['developer'] && this.bigActivity()">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-item">
+        <label class="form-label">Authors</label>
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Select authors</mat-label>
+          <mat-select [(ngModel)]="author" (selectionChange)="autoSave()" multiple [disabled]="!roles['transcriber'] && !roles['developer'] && this.bigActivity()">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let name of availableSpecialistList()" [value]="name.authorpath">{{name.authorname}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-item">
+        <label class="form-label">Select Event</label>
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Choose event</mat-label>
+          <mat-select [(ngModel)]="selectedQueueid" (selectionChange)="autoSave()">
+            <mat-option *ngFor="let queue of queueList" [value]="queue['docid']">{{queue['queuename']}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-item">
+        <label class="form-label">What is the ATC given for?</label>
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>Select product</mat-label>
+          <mat-select [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()">
+            <mat-option *ngFor="let productName of productLists" [value]="productName.atcmodel">{{productName.atcmodel}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="form-item directive-container" *ngIf="product != null">
+        <label class="form-label">Directive for this ATC</label>
+        <div class="directive-content">
+          <p class="directive-text">{{atcdirective != null ? atcdirective : 'Directive not provided'}}</p>
+          <button mat-stroked-button class="edit-button" (click)="editDirective()">
+            <mat-icon>edit</mat-icon> Edit
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="mt-4">
+      <div class="flexbox">
+        <div class="heading mr-2">
+          Preceptual Positions & Adjustments
+        </div>
+        <div class="heading">
+          Procedures
+        </div>
+      </div>
+    </div>
+  
+    <div *ngFor="let triple of tripleATC; let a = index">
+      <div class="mt-3">
+        <div style="vertical-align: middle;">
+          <div class="subheading"><u>Perceptual Position {{a+1}}:&nbsp;</u></div>
+          <textarea class="adjustmenttextarea" [(ngModel)]="triple['position']" (focusout)="autoSave()" placeholder="Perceptual Position of"></textarea>
+          <button *ngIf="a > 2" class="text-seconday border-secondary ml-3" mat-stroked-button (click)="removeATC(a); autoSave()">Remove this Position</button>
+        </div>
+  
+        <div cdkDropList class="example-list" (cdkDropListDropped)="drop(a, $event)">
+          <div *ngFor="let transcript of triple['atc']; let i=index" cdkDrag>
+            <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+            <div class="flexbox">
+              <div class="adjustmentbox">
+                <textarea class="adjustmenttextarea" [(ngModel)]="transcript.adjustment" (focusout)="autoSave()" placeholder="Adjustment"></textarea>
+                <button *ngIf="i != 0" mat-icon-button class="deleteicon" (click)="removeAdjustment(a, i); autoSave()">
+                  <mat-icon>remove_circle</mat-icon>
+                </button>
+                <button class="reorderbtn ml-2" mat-stroked-button cdkDragHandle>
+                  <mat-icon class="mb-1">reorder</mat-icon>
+                  Move Sequence
+                </button>
+              </div>
+  
+              <div class="procedurebox">
+                <div *ngFor="let procedure of transcript.procedure; let j = index" class="mb-2">
+                  <div class="proceduredata">
+                    <label style="display: inline;" class="procedureitem">*</label>
+            
+                    <mat-form-field class="procedureitem">
+                      <mat-label>Procedure</mat-label>
+                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()">
+                        <mat-option *ngFor="let pro of procedurelist" [value]="pro.procedurepath">{{pro.procedurename}}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+            
+                    <mat-checkbox class="procedureitem" [(ngModel)]="procedure.mandatory" (change)="autoSave()">Mandatory</mat-checkbox>
+            
+                    <!-- <button class="addremovebtn" mat-icon-button (click)="addnewProcedure(a, i)">
+                      <mat-icon class="icon">add_circle</mat-icon>
+                    </button> -->
+                    <button class="addremovebtn" mat-icon-button *ngIf="transcript.procedure.length > 1" (click)="removeProcedure(a, i, j)">
+                      <mat-icon class="icon">remove_circle</mat-icon>
+                    </button>
+                  </div>
+                </div>
+                <button mat-button class="addnewprocedure" (click)="addnewProcedure(a, i); autoSave()">
+                  Add Procedure
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="m-3">
+          <button class="text-success border-success" mat-stroked-button (click)="addNewAdjustment(a); autoSave()">Add another Adjustment</button>
+        </div>
+      </div>
+      <mat-divider class="my-4" *ngIf="a+1 != tripleATC.length"></mat-divider>
+    </div>
+  </div>
+  
+  <div class="mt-4 mb-4">
+    <button mat-stroked-button class="border-success text-success" (click)="addATC(); autoSave()">Add Additional Position</button>
+  </div>
+
+  <div *ngIf="loading" class="loading">
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    <label>Uploading...</label>
+  </div>
+
+  <div class="submitarea">
+    <button *ngIf="!loading" mat-stroked-button class="submitbtn" (click)="submit()" [disabled]="loading">Submit ATC</button>
+  </div>
+</div>

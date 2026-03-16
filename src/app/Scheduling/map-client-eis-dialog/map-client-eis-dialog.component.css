@@ -1,0 +1,57 @@
+.mainscreen{
+  padding: 20px;
+  width: 100%;
+}
+
+.heading{
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 20px;
+  color: rgb(0, 50, 67);
+}
+
+.inputfield{
+  margin-right: 10px;
+  width: 400px;
+}
+  
+.form{
+  margin-top: 10px;
+}
+
+.addbtnbox{
+  width: 100%;
+  text-align: right;
+}
+
+.addremovebtn{
+  margin-right: 15px;
+  color:  rgb(0, 146, 194);
+  background-color: whitesmoke;
+}
+
+.addremovebtn .icon{
+  margin: 0 auto;
+  vertical-align: middle;
+  margin-bottom: 3px;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red;
+  margin-right: 20px;
+}
+
+.submitbtn{
+  color: green;
+  border: 1px solid green;
+}
+
+.matOption{
+  margin: 1rem 0;
+  overflow: visible;
+  line-height: initial;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}

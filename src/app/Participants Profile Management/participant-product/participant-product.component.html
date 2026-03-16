@@ -1,0 +1,280 @@
+<div class="p-3 w-100">
+    <div class="h5 m-2 mb-3 text-center">Participants Products</div>
+    
+    <!-- Unlimited Products Summary Section -->
+    <div *ngIf="mapMissingProduct != null" class="mt-3 mb-4">
+        <div class="d-flex flex-wrap gap-3">
+            <div *ngFor="let productData of mapMissingProduct | keyvalue" 
+                 class="card" 
+                 style="cursor: pointer; min-width: 200px;"
+                 (click)="showSpecialProduct(productData.key)"
+                 [class.border-primary]="selectedMissingProduct === productData.value['productName']">
+                <div class="card-body">
+                    <h6 class="card-title">{{ productData.value['productName'] }}</h6>
+                    <p class="card-text mb-0">
+                        <span class="badge" [class.bg-warning]="productData.value['missingParticipants'].length" [class.bg-success]="productData.value['missingParticipants'].length === 0">
+                            {{ productData.value['missingParticipants'].length }} Missing
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div *ngIf="showSpecialProductFilter" class="alert alert-info mt-3">
+            <strong>Showing:</strong> Participants missing <strong>{{ selectedMissingProduct }}</strong>
+            <br>
+            <button class="btn btn-secondary btn-sm mt-3" (click)="hideSpecialProduct(); clearProductFilter()">Reset Filter</button>
+        </div>
+    </div>
+
+   
+   <!-- Filter and Export Section -->
+    <div>
+        <!-- <button class="ms-2" mat-stroked-button (click)="exportCSV()">Export CSV</button> -->
+        <!-- <mat-form-field *ngIf="testingRole" class="ml-3" appearance="outline">
+            <mat-label>Testing Date</mat-label>
+            <input matInput [(ngModel)]="testDate" [matDatepicker]="startpicker" (click)="startpicker.open()" (dateChange)="onTestDateChange($event.target.value)" placeholder="MM-DD-YYYY">
+            <mat-datepicker-toggle matSuffix [for]="startpicker"></mat-datepicker-toggle>
+            <mat-datepicker #startpicker></mat-datepicker>
+        </mat-form-field>
+        <button *ngIf="testingRole" class="ml-3" (click)="testDate = null; onTestDateChange(null)" mat-flat-button>Clear Test Date</button> -->
+
+        <!-- <mat-form-field appearance="outline">
+            <mat-label>Filter by Participant</mat-label>
+            <mat-select [(ngModel)]="selectedProfile" (selectionChange)="onProfileSelect()">
+                <mat-option *ngFor="let option of mapProfile | keyvalue" [value]="option.key">
+                    {{option.value["name"]}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>Filter by Product</mat-label>
+            <mat-select [(ngModel)]="selectedProduct" (selectionChange)="onProductSelect()">
+                <mat-option *ngFor="let option of mapProduct | keyvalue" [value]="option.key">
+                    {{option.value}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <button *ngIf="selectedProduct || selectedProfile" (click)="hideSpecialProduct(); clearProductFilter()">Clear Filter</button> -->
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <mat-form-field appearance="outline" class="mb-0 w-25">
+            <mat-label>Filter by Participant</mat-label>
+            <mat-select [(ngModel)]="selectedProfile" (selectionChange)="onProfileSelect()">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="dropdownFilterText" [placeholderLabel]="'Search Profile'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let option of filterProfileList()" [value]="option['id']">
+                    {{option["name"]}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="mb-0 w-25">
+            <mat-label>Filter by Product</mat-label>
+            <mat-select [(ngModel)]="selectedProduct" (selectionChange)="onProductSelect()">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="dropdownFilterText" [placeholderLabel]="'Search Product'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let option of filterProductList()" [value]="option['id']">
+                    {{option['product']}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <button  *ngIf="selectedProduct || selectedProfile"  mat-stroked-button  color="primary" class="mb-2"(click)="selectedProduct = null; selectedProfile = null; hideSpecialProduct(); clearProductFilter()">
+            Clear Filters
+        </button>
+    </div>
+
+    <!-- Table Section -->
+    <div class="w-100 mat-elevation-z5 bg-light">
+        <div class="pt-3 ps-3 bg-light">
+            <mat-form-field class="w-25" appearance="outline">
+                <mat-label>Filter Table</mat-label>
+                <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Mia" #input>
+            </mat-form-field>
+        </div>
+        
+        <table mat-table [dataSource]="dataSource" matSort>
+            <!-- Name Column -->
+            <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+                <td mat-cell *matCellDef="let row"> 
+                    {{row.name}}  
+                    <span class="text-secondary">
+                        ({{(mapJourney[(this.mapProfile[row["profileid"]] || {})["activejourney"]]) || 'No Active Journey'}} - {{row.participantmode || 'No Mode'}})
+                    </span>
+                </td>
+            </ng-container>
+
+            <!-- Product Column -->
+            <ng-container matColumnDef="product">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Product </th>
+                <td mat-cell *matCellDef="let row"> {{row.product}} </td>
+            </ng-container>
+
+            <!-- Status Column -->
+            <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
+                <td mat-cell *matCellDef="let row"> 
+                    <span [class.text-danger]="row.status === 'Missing'">{{row.status}}</span>
+                </td>
+            </ng-container>
+
+            <!-- 1. INITIATED -->
+            <ng-container matColumnDef="initiated">
+                <th mat-header-cell *matHeaderCellDef> Initiated </th>
+                <td mat-cell *matCellDef="let row">            
+                    <div *ngIf="!(editingCell?.row === row && editingCell?.column === 'initiated')"  (click)="enableEdit(row, 'initiated'); $event.stopPropagation()" style="cursor:pointer;">
+                        {{ (row.statusdate?.initiated?.toDate() | date:'dd MMM yyyy') || '-' }}
+                        <mat-icon class="ms-1">edit</mat-icon>
+                    </div>            
+                    <div *ngIf="editingCell?.row === row && editingCell?.column === 'initiated'">
+                        <mat-form-field appearance="outline" class="w-100">
+                            <input matInput [matDatepicker]="pickerInitiated" [(ngModel)]="tempDateValue">
+                            <mat-datepicker-toggle matSuffix [for]="pickerInitiated"></mat-datepicker-toggle>
+                            <mat-datepicker #pickerInitiated></mat-datepicker>
+                        </mat-form-field>
+                        <button mat-button color="primary" (click)="onDateChange('initiated', tempDateValue)">
+                            Save
+                        </button>
+                        <button mat-button color="warn" (click)="cancelEdit()">
+                            Cancel
+                        </button>
+                    </div>
+                </td>
+            </ng-container>
+            <!-- 2. ONGOING  -->
+            <ng-container matColumnDef="ongoing">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Ongoing </th>
+                <td mat-cell *matCellDef="let row">
+                    <div *ngIf="!(editingCell?.row === row && editingCell?.column === 'ongoing')" (click)="enableEdit(row, 'ongoing') ; $event.stopPropagation()" style="cursor:pointer;">
+                        {{ (row.statusdate?.ongoing?.toDate() | date:'dd MMM yyyy') || '-' }}
+                        <mat-icon class="ms-1">edit</mat-icon>
+                    </div>            
+                    <div *ngIf="editingCell?.row === row && editingCell?.column === 'ongoing'">
+                        <mat-form-field appearance="outline" class="w-100">
+                            <input matInput [matDatepicker]="pickerOngoing" [(ngModel)]="tempDateValue">
+                            <mat-datepicker-toggle matSuffix [for]="pickerOngoing"></mat-datepicker-toggle>
+                            <mat-datepicker #pickerOngoing></mat-datepicker>
+                        </mat-form-field>
+                        <button mat-icon-button color="primary" (click)="onDateChange('ongoing', tempDateValue)">
+                            <mat-icon>save</mat-icon>
+                        </button>
+                        <button mat-icon-button color="warn" (click)="cancelEdit()">
+                            <mat-icon>close</mat-icon>
+                        </button>
+                    </div>
+                </td>
+            </ng-container>
+            <!-- 3. COMPLETED  -->
+            <ng-container matColumnDef="completed">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Completed </th>
+                <td mat-cell *matCellDef="let row">
+                    <div *ngIf="!(editingCell?.row === row && editingCell?.column === 'completed')"(click)="enableEdit(row, 'completed') ; $event.stopPropagation()" style="cursor:pointer;">
+                        {{ (row.statusdate?.completed?.toDate() | date:'dd MMM yyyy') || '-' }}
+                        <mat-icon class="ms-1">edit</mat-icon>
+                    </div>
+                    <div *ngIf="editingCell?.row === row && editingCell?.column === 'completed'">
+                        <mat-form-field appearance="outline" class="w-100">
+                            <input matInput [matDatepicker]="pickerCompleted" [(ngModel)]="tempDateValue">
+                            <mat-datepicker-toggle matSuffix [for]="pickerCompleted"></mat-datepicker-toggle>
+                            <mat-datepicker #pickerCompleted></mat-datepicker>
+                        </mat-form-field>
+                        <button mat-icon-button color="primary" (click)="onDateChange('completed', tempDateValue)">
+                            <mat-icon>save</mat-icon>
+                        </button>
+                        <button mat-icon-button color="warn" (click)="cancelEdit()">
+                            <mat-icon>close</mat-icon>
+                        </button>
+                    </div>
+                </td>
+            </ng-container>
+            <!-- 4. CANCELLED  -->
+            <ng-container matColumnDef="cancelled">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Cancelled </th>
+                <td mat-cell *matCellDef="let row">
+                    <div *ngIf="!(editingCell?.row === row && editingCell?.column === 'cancelled')"(click)="enableEdit(row, 'cancelled') ; $event.stopPropagation()" style="cursor:pointer;">
+                        {{ (row.statusdate?.cancelled?.toDate() | date:'dd MMM yyyy') || '-' }}
+                        <!-- <mat-icon class="ms-1">edit</mat-icon> -->
+                    </div>
+                    <!-- <div *ngIf="editingCell?.row === row && editingCell?.column === 'cancelled'">
+                            <mat-form-field appearance="outline" class="w-100">
+                                <input matInput[matDatepicker]="pickerCancelled"[(ngModel)]="tempDateValue">
+                                <mat-datepicker-toggle matSuffix [for]="pickerCancelled"></mat-datepicker-toggle>
+                                <mat-datepicker #pickerCancelled></mat-datepicker>
+                            </mat-form-field>
+                            <button mat-icon-button color="primary"
+                                    (click)="onDateChange('cancelled', tempDateValue)">
+                                <mat-icon>save</mat-icon>
+                            </button>
+                            <button mat-icon-button color="warn"
+                                    (click)="cancelEdit()">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </div> -->
+                </td>
+            </ng-container>
+            <!-- 5. SHIFTED  -->
+            <ng-container matColumnDef="shifted">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Shifted </th>
+                <td mat-cell *matCellDef="let row">
+                    <div *ngIf="!(editingCell?.row === row && editingCell?.column === 'shifted')" (click)="enableEdit(row, 'shifted') ; $event.stopPropagation()" style="cursor:pointer;">
+                        {{ (row.statusdate?.shifted?.toDate() | date:'dd MMM yyyy') || '-' }}
+                        <!-- <mat-icon  class="ms-1">edit</mat-icon> -->
+                    </div>
+                    <!-- <div *ngIf="editingCell?.row === row && editingCell?.column === 'shifted'">
+                            <mat-form-field appearance="outline" class="w-100">
+                                <input matInput [matDatepicker]="pickerShifted"[(ngModel)]="tempDateValue">
+                                <mat-datepicker-toggle matSuffix [for]="pickerShifted"></mat-datepicker-toggle>
+                                <mat-datepicker #pickerShifted></mat-datepicker>
+                            </mat-form-field>
+                            <button mat-icon-button color="primary"
+                                    (click)="onDateChange('shifted', tempDateValue)">
+                                <mat-icon>save</mat-icon>
+                            </button>
+                            <button mat-icon-button color="warn"
+                                    (click)="cancelEdit()">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </div> -->
+                </td>
+            </ng-container>
+            <ng-container matColumnDef="mode">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Mode </th>
+                <td mat-cell *matCellDef="let row"> {{row.mode}} </td>
+            </ng-container>
+            <ng-container matColumnDef="nextmode">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Next Mode </th>
+                <td mat-cell *matCellDef="let row"> {{row.nextmode}} {{row.nextmodedate != null ? (" - " + (row.nextmodedate.toDate() | date)) : ''}}</td>
+            </ng-container>
+            <ng-container matColumnDef="days">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Days Left </th>
+                <td mat-cell *matCellDef="let row"> {{row.nextmodedate != null ? (calculateDiff(row.nextmodedate.toDate()) + " days left") : ''}}</td>
+            </ng-container>
+            <ng-container matColumnDef="deliverymode">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Delivery Mode </th>
+                <td mat-cell *matCellDef="let row"> {{row.deliverymode}} </td>
+            </ng-container>
+            <ng-container matColumnDef="deliveryplanning">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header> Delivery Planning </th>
+                <td mat-cell *matCellDef="let row"> {{row.deliveryplanning}} </td>
+            </ng-container>
+    
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;" ></tr>
+    
+            <tr class="mat-row" *matNoDataRow>
+                <td class="mat-cell text-secondary text-center p-2" [attr.colspan]="displayedColumns.length">
+                    <span *ngIf="input.value.length != 0">No data matching the filter "{{input.value}}"</span>
+                    <span *ngIf="input.value.length == 0">No data in the table</span>
+                </td>
+            </tr>
+        </table>
+        <mat-paginator [pageSizeOptions]="[50, 100, 150, 200, 300]" aria-label="Select page of users"></mat-paginator>
+    </div>
+</div>

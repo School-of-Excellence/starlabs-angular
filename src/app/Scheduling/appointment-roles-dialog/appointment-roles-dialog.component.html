@@ -1,0 +1,38 @@
+<div class="mainscreen">
+  <div class="heading" mat-dialog-title>{{data != null ? "Edit" : "Add"}} Delivery Roles</div>
+  <div [formGroup]="apptRoleForm" mat-dialog-content >
+    <div>
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Appointment Role</mat-label>
+        <input type="text" matInput placeholder="Role" formControlName="role" (ngModelChange)="onvaluechange($event)" autocomplete="off">
+        <mat-error *ngIf="apptRoleForm.get('role').hasError('required')">
+          Name <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="apptRoleForm.get('role').hasError('exists')">
+          Already <strong>Exists</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="radiogrp">
+      <mat-label>Experience Stage:</mat-label><br>
+      <mat-radio-group aria-label="Select an option" formControlName="experienceStage">
+        <mat-radio-button class="radiobtn" *ngFor="let item of experienceStage" [value]="item">{{item}}</mat-radio-button>
+      </mat-radio-group>
+    </div>
+
+    <div class="radiogrp" *ngIf="apptRoleForm.get('experienceStage').value != null">
+      <mat-label>Experience Level:</mat-label><br>
+      <mat-radio-group aria-label="Select an option" formControlName="experienceLevel">
+        <mat-radio-button class="radiobtn" *ngFor="let item of experienceLevel[apptRoleForm.get('experienceStage').value]" [value]="item">{{item}}</mat-radio-button>
+      </mat-radio-group>
+    </div>
+
+    <div class="btnarea">
+      <button class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
+      <button class="submitbtn" mat-stroked-button (click)="onformsubmit(apptRoleForm.value)" [disabled]="loading">
+        {{data != null ? "Update" : "Create"}}
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,1550 @@
+<mat-sidenav-container class="example-sidenav-container">
+ <mat-sidenav #snav style="width:25%" mode="side" position="end">
+  <!-- chat header -->
+  <div class="panel-header">
+    <h3>
+      <mat-icon>people_outline</mat-icon>
+      <b>{{selectedChatStage}} {{selectedChatStageType}}</b>
+    </h3>
+    <button mat-icon-button (click)="snav.close(); selectedStages = []; selectedTokens.clear()" class="close-panel-btn">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  <main *ngIf="selectedChatStage != null" class="communication-container">
+    
+    <!-- Stage Multi-Select Dropdown -->
+    <section class="stage-select-section">
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Select Stages</mat-label>
+        <mat-select [(ngModel)]="selectedStages" multiple (selectionChange)="onStageSelectionChange()">
+          <mat-option *ngFor="let stage of getAvailableStagesForComm()" [value]="stage.stageKey">
+            {{ getStageDisplayName(stage) }} ({{ stage.tokenlist?.length || 0 }})
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <!-- <div class="selected-stages-chips" *ngIf="selectedStages.length > 0">
+      <mat-chip-set>
+        <mat-chip *ngFor="let stageKey of selectedStages" (removed)="removeStage(stageKey)">
+          {{ getStageNameByKey(stageKey) }}
+          <span *ngIf="getStageTypeByKey(stageKey)">
+            ({{ getStageTypeByKey(stageKey) }})
+          </span>
+          <mat-icon matChipRemove>cancel</mat-icon>
+        </mat-chip>
+      </mat-chip-set>
+      </div> -->
+    </section>
+
+    <!-- Communication Buttons -->
+    <section class="communication-buttons">
+      <button class="comm-btn whatsapp-btn" [class.active]="selectedCommType === 'whatsapp'"
+        (click)="selectCommType('whatsapp')" [disabled]="getSelectedTokens().length === 0">
+        <i class="bi bi-whatsapp"></i>
+        Whatsapp({{getSelectedTokens().length}})
+      </button>
+      <button class="comm-btn email-btn" [class.active]="selectedCommType === 'email'"
+        (click)="selectCommType('email')" [disabled]="getSelectedTokens().length === 0">
+        <i class="bi bi-envelope"></i>
+        Email({{getSelectedTokens().length}})
+      </button>
+      <button class="comm-btn notification-btn" [class.active]="selectedCommType === 'notification'"
+        (click)="selectCommType('notification')" [disabled]="getSelectedTokens().length === 0">
+        <i class="bi bi-bell-fill"></i>
+        Notification({{getSelectedTokens().length}})
+      </button>
+      <button class="comm-btn notification-btn" (click)="onBulkInvite()" [disabled]="getSelectedTokens().length === 0">
+        <i class="bi bi-bell-fill"></i>
+        BulkInvite({{getSelectedTokens().length}})
+      </button>
+      <button class="comm-btn notification-btn" (click)="bulkAvTest()" [disabled]="getSelectedTokens().length === 0">
+          <i class="bi bi-bell-fill"></i>
+          Bulk AV Test({{getSelectedTokens().length}})
+        </button>
+       <button *ngIf="roles['developer'] || roles['admin'] || roles['tester'] || roles['floor']"
+        class="comm-btn notification-btn"
+        [class.active]="selectedCommType === 'appactionpending'"
+        (click)="selectCommType('appactionpending')"
+        [disabled]="getSelectedTokens().length === 0">
+        <i class="bi bi-bell-fill"></i>
+        Force Action ({{getSelectedTokens().length}})
+      </button>
+      <div class="round-robin-card">
+        <!-- Form View -->
+        <form
+          *ngIf="!isRoundRobinRunning"
+          (ngSubmit)="roundRobin()"
+          #form="ngForm"
+          class="rr-form"
+        >
+          <mat-form-field appearance="outline" class="rr-field">
+            <mat-label>Inv. Count</mat-label>
+            <input
+              matInput
+              type="number"
+              name="participants"
+              [(ngModel)]="roundRobbinformData.howManyParticipantsNeeded"
+              min="1"
+              [max]="getSelectedTokens().length"
+              required
+            />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="rr-field">
+            <mat-label>Duration (mins)</mat-label>
+            <input
+              matInput
+              type="number"
+              name="duration"
+              [(ngModel)]="roundRobbinformData.duration"
+              required
+            />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="rr-field">
+            <mat-label>Max Attempts</mat-label>
+            <input
+              matInput
+              type="number"
+              name="maxcycle"
+              [(ngModel)]="roundRobbinformData.maxcycle"
+              min="2"
+              required
+            />
+          </mat-form-field>
+
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            [disabled]="form.invalid"
+          >
+            Start Round Robin
+          </button>
+        </form>
+
+        <!-- Status View -->
+        <div *ngIf="isRoundRobinRunning" class="rr-status">
+          <div class="status-items">
+            <div class="status-item">
+              <span class="label">Needed</span>
+              <span class="value">{{ roundRobinStatus.needed }}</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Approved</span>
+              <span class="value success">{{ roundRobinStatus.approved.length }}</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Next Round</span>
+              <span class="value">{{ roundRobinStatus.sleeptimer }}s</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Batch</span>
+              <span class="value">{{ roundRobinStatus.attempts}} / {{ roundRobinStatus.maxattempts}}</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Cycle</span>
+              <span class="value">{{ roundRobinStatus.currentcycle}} / {{ roundRobinStatus.maxcycle}}</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Status</span>
+              <span class="value" [class.success]="roundRobinStatus.status === 'Success'">
+                {{ roundRobinStatus.status }}
+              </span>
+            </div>
+          </div>
+
+          <button
+            mat-stroked-button
+            color="warn"
+            (click)="cancelRoundRobin()"
+          >
+            <span *ngIf="['Success','Completed']"></span>
+            {{roundRobinStatus.status === 'Running' ? 'Cancel Round Robin' : 'Close Round Robin'}}
+            Cancel Round Robin
+          </button>
+        </div>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
+          <mat-icon>upload_file</mat-icon> Import
+        </button>
+        <input type="file" #fileInput style="display: none" (change)="onImportData($event)" accept=".csv,.xlsx,.xls" />
+        
+        <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()" [disabled]="getSelectedTokens().length === 0">
+          <mat-icon>local_offer</mat-icon> Add Tag
+        </button>
+      </div>
+    </section>
+
+      <!-- Send Button -->
+      <section class="send-button-section" *ngIf="selectedCommType">
+        <button class="send-btn" (click)="sendCommunication()" [disabled]="getSelectedTokens().length === 0">
+          <i class="bi bi-send-fill"></i>
+          Send {{selectedCommType | titlecase}} to {{getSelectedTokens().length}} participant(s)
+        </button>
+      </section>
+
+      <!-- Participants Section -->
+      <section class="participants-section">
+        <!-- Header -->
+        <div class="participants-header">
+          <h5 class="participants-title">
+            Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length : (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
+          </h5>
+          <div class="select-all-wrapper" (click)="toggleSelectAll()">
+            <div class="custom-checkbox" [class.checked]="areAllSelected()">
+              <i class="bi bi-check" *ngIf="areAllSelected()"></i>
+            </div>
+            <span class="select-all-text">Select All</span>
+          </div>
+        </div>
+
+        <!-- Participants List - Merged from selected stages -->
+        <div class="participants-list" *ngIf="selectedStages.length > 0">
+          <div *ngFor="let token of getMergedParticipants(); let i = index"
+            class="participant-item" (click)="toggleTokenSelection(token)">
+
+            <!-- Checkbox -->
+            <!-- <div class="custom-checkbox" [class.checked]="isTokenSelected(token)">
+              <i class="bi bi-check" *ngIf="isTokenSelected(token)"></i>
+            </div> -->
+
+            <input type="checkbox" [checked]="isTokenSelected(token)" >
+
+            <!-- Avatar with Number -->
+            <div class="participant-avatar">
+              #{{i + 1}}
+            </div>
+
+            <!-- Participant Info -->
+            <div class="participant-info">
+              <div class="participant-name">
+                <i class="bi bi-person-fill"></i>
+                {{mapProfileData[token.profile_id]?.['name']}}
+              </div>
+              <div class="participant-email">
+                <i class="bi bi-envelope"></i>
+                {{mapProfileData[token.profile_id]?.['email']}}
+              </div>
+              
+              <!-- Stage Info -->
+              <div class="participant-stage">
+                <i class="bi bi-layers"></i>
+                <span class="stage-badge">{{token.fromStage}}</span>
+                <span class="stage-type-badge" *ngIf="token.fromStageType">({{token.fromStageType}})</span>
+              </div>
+              
+              <!-- Segments Display -->
+              <div class="participant-segments" *ngIf="selectedSegments.length > 0 && getParticipantSegments(token.profile_id).length > 0">
+                <i class="bi bi-diagram-3"></i>
+                <span class="segment-badge" *ngFor="let segName of getParticipantSegments(token.profile_id)">
+                  {{segName}}
+                </span>
+              </div>
+              
+              <!-- Tags Display -->
+              <div class="participant-tags" *ngIf="selectedTags.length > 0 && getParticipantTags(token.profile_id).length > 0">
+                <i class="bi bi-tags"></i>
+                <span class="tag-badge" *ngFor="let tagName of getParticipantTags(token.profile_id)">
+                  {{tagName}}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div *ngIf="getMergedParticipants().length === 0" class="empty-state">
+            <i class="bi bi-person-x"></i>
+            <p>No participants found in selected stages</p>
+          </div>
+        </div>
+
+        <!-- Participants List - Single stage (when no stages selected in dropdown) -->
+        <div class="participants-list" *ngIf="selectedStages.length === 0">
+          <div *ngFor="let token of getStageParticipants(selectedChatStage)?.['tokenlist']; let i = index"
+            class="participant-item" (click)="toggleTokenSelection(token)">
+
+            <!-- Checkbox -->
+            <div class="custom-checkbox" [class.checked]="isTokenSelected(token)">
+              <i class="bi bi-check" *ngIf="isTokenSelected(token)"></i>
+            </div>
+
+            <!-- Avatar with Number -->
+            <div class="participant-avatar">
+              #{{i + 1}}
+            </div>
+
+            <!-- Participant Info -->
+            <div class="participant-info">
+              <div class="participant-name">
+                <i class="bi bi-person-fill"></i>
+                {{mapProfileData[token.profile_id]?.['name']}}
+              </div>
+              <div class="participant-email">
+                <i class="bi bi-envelope"></i>
+                {{mapProfileData[token.profile_id]?.['email']}}
+              </div>
+              
+              <!-- Segments Display -->
+              <div class="participant-segments" *ngIf="selectedSegments.length > 0 && getParticipantSegments(token.profile_id).length > 0">
+                <i class="bi bi-diagram-3"></i>
+                <span class="segment-badge" *ngFor="let segName of getParticipantSegments(token.profile_id)">
+                  {{segName}}
+                </span>
+              </div>
+              
+              <!-- Tags Display -->
+              <div class="participant-tags" *ngIf="selectedTags.length > 0 && getParticipantTags(token.profile_id).length > 0">
+                <i class="bi bi-tags"></i>
+                <span class="tag-badge" *ngFor="let tagName of getParticipantTags(token.profile_id)">
+                  {{tagName}}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div *ngIf="!getStageParticipants(selectedChatStage)?.['tokenlist']?.length" class="empty-state">
+            <i class="bi bi-person-x"></i>
+            <p>No participants found for this stage</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+    <!-- list of pinned chat message by login person -->
+    <div style="max-height:200px;min-height:0px;" class="overflow-auto">
+      <span class="d-flex justify-content-center" *ngFor="let pinnedChat of pinnedChatList">
+        <div class="talk-bubblep round">
+          <div class="talktext d-flex justify-content-start flex-column">
+            <span class="d-flex justify-content-between">
+              <p>{{pinnedChat['message']}}</p>
+              <button mat-icon-button type="button">
+                <mat-icon (click)="onChatPinned(pinnedChat['pinned'] ? false : true,pinnedChat)"
+                  style="vertical-align:top;" [ngClass]="pinnedChat['pinned'] ? 'golden' : 'white'">star
+                </mat-icon>
+              </button>
+            </span>
+            <span style="font-size: 14px;">
+              <p>{{pinnedChat['date']?.toDate() | date:'short'}}</p>
+            </span>
+          </div>
+        </div>
+      </span>
+    </div>
+    <!-- listing chat mesage -->
+    <div *ngIf="selectedChatStage != null" style="height:700px" class="w-100 overflow-auto">
+      <span *ngIf="![null,undefined].includes(chatList[selectedChatStage])">
+        <span *ngFor="let list of chatList[selectedChatStage]">
+          <span *ngIf="list['senderprofileid'] === profileid">
+            <div class="talk-bubble round" style="float:right;">
+              <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
+                <span class="d-flex justify-content-between">
+                  <button mat-icon-button type="button"><mat-icon
+                      (click)="onChatPinned(list['pinned'] ? false : true,list)" style="vertical-align:top;"
+                      [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
+                  <p>{{list['message']}}</p>
+                </span>
+                <span style="font-size: 14px;color: deepskyblue;">
+                  <p>{{list['date']?.toDate() | date:'short'}}</p>
+                </span>
+              </div>
+            </div>
+          </span>
+          <span *ngIf="list['senderprofileid'] != profileid">
+            <div class="talk-bubble1 round">
+              <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
+                <span class="d-flex justify-content-between">
+                  <p>{{mapProfileData[list['senderprofileid']]['name']}}</p>
+                  <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
+                      [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
+                </span>
+                <span>
+                  <p>{{list['message']}}</p>
+                </span>
+                <span style="font-size: 14px;color: rgb(1, 121, 161);">
+                  <p>{{list['date']?.toDate() | date:'short'}}</p>
+                </span>
+              </div>
+            </div>
+          </span>
+        </span>
+      </span>
+    </div>
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <div class="mainscreen" [class.panel-open]="showStageCountPanel">
+      <!-- Header -->
+      <div class="row">
+        <div class="col-sm">
+          <mat-form-field class="w-100" appearance="outline">
+            <mat-label>Select Queue</mat-label>
+            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="searchQueue" [ngModelOptions]="{standalone: true}"
+                  placeholderLabel="Columns" [placeholderLabel]="'Search'"
+                  [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let item of returnQueue().sort()" [value]="item">{{item.queuename}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <span *ngIf="selectedQueue != null">
+            <h5 style="font-size: 16px;"><b style="font-weight: bold;color:rgb(0, 101, 135);">Total Participants</b> :
+              {{currentQueueParticipants.length}}
+            </h5>
+          </span>
+        </div>
+
+        <div class="w-100 col-sm">
+          <h4 class="title">Queue Manager {{selectedQueue != null ? ('- ' + selectedQueue.queuename) : ''}}</h4>
+        </div>
+
+        <div class="col-sm">
+          <div *ngIf="selectedQueue != null" class="text-end d-flex align-items-center justify-content-end gap-2">
+            <!-- Scroll toggle buttons -->
+            <button mat-icon-button type="button" (click)="togglescroll = 'vertical'">
+              <mat-icon aria-hidden="false" [ngClass]="togglescroll === 'vertical'?'forestgreen':null">swap_vertical_circle</mat-icon>
+            </button>
+            <button mat-icon-button type="button" (click)="togglescroll = 'horizontal'">
+              <mat-icon aria-hidden="false" [ngClass]="togglescroll === 'horizontal'?'forestgreen':null">swap_horizontal_circle</mat-icon>
+            </button>
+            <!-- <button mat-button [matMenuTriggerFor]="menu">Menu</button>
+            <mat-menu #menu="matMenu">
+              <button mat-menu-item (click)="onBulkInvite()">Bulk Invitation</button>
+              <button mat-menu-item (click)="exportCSV()">Export CSV</button>
+            </mat-menu> -->
+            <!-- <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button" (click)="onBulkInvite()">Bulk Invitation</button> -->
+            <!-- Quick Link Buttons -->
+            <!-- Quick Links Eye Button + Menu -->
+
+            <!-- Existing buttons -->
+            <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button" (click)="exportCSV()">Export CSV</button>
+            <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button" (click)="selectedChatStage = 'queueadmin';snav.open()">Admin Stage</button>
+
+            <button mat-icon-button [matMenuTriggerFor]="quickLinksMenu" matTooltip="Quick Access" color="primary">
+              <mat-icon>visibility</mat-icon>
+            </button>
+
+            <mat-menu #quickLinksMenu="matMenu" panelClass="quick-links-menu" xPosition="before">
+                <!-- Existing Links -->
+              <div class="quick-links-list" (click)="$event.stopPropagation()">
+                <!-- Header with Add Link button -->
+                <div class="quick-links-header">
+                  <span class="quick-links-title">Quick Links</span>
+                  <button class="add-link-toggle-btn" (click)="showAddLinkForm = !showAddLinkForm; $event.stopPropagation()">
+                    <mat-icon>{{ showAddLinkForm ? 'close' : 'add' }}</mat-icon>
+                    {{ showAddLinkForm ? 'Cancel' : 'Add Link' }}
+                  </button>
+                </div>
+                <!-- Add Link Form - toggles on click -->
+                <div class="add-link-form-expanded" *ngIf="showAddLinkForm">
+                  <!-- Toggle -->
+                  <div class="add-form-row">
+                    <div class="link-type-toggle" (click)="newLinkData.isInternal = !newLinkData.isInternal; $event.stopPropagation()">
+                      <span class="toggle-label" [class.active]="!newLinkData.isInternal">External</span>
+                      <div class="toggle-switch" [class.internal]="newLinkData.isInternal">
+                        <div class="toggle-knob"></div>
+                      </div>
+                      <span class="toggle-label" [class.active]="newLinkData.isInternal">Internal</span>
+                    </div>
+                  </div>
+
+                  <!-- Screen Name -->
+                  <div class="add-form-row">
+                    <label class="add-form-label">Screen Name</label>
+                    <input type="text" [(ngModel)]="newLinkData.screenName" placeholder="Enter screen name" class="add-form-input" (click)="$event.stopPropagation()" (keydown.enter)="saveQuickLink(); showAddLinkForm = false">
+                  </div>
+
+                  <!-- URL -->
+                  <div class="add-form-row">
+                    <label class="add-form-label">{{ newLinkData.isInternal ? 'Path (*add the path which is next to the starlab base url)' : 'URL' }}</label>
+                    <input type="text" [(ngModel)]="newLinkData.url" [placeholder]="newLinkData.isInternal ? 'e.g. profilelist' : 'https://...'" class="add-form-input" (click)="$event.stopPropagation()" (keydown.enter)="saveQuickLink(); showAddLinkForm = false">
+                  </div>
+
+                  <!-- Save Button -->
+                  <div class="add-form-row add-form-save-row">
+                    <button  class="add-form-save-btn" (click)="saveQuickLink(); showAddLinkForm = false; $event.stopPropagation()" [disabled]="!newLinkData.screenName || !newLinkData.url">
+                      <mat-icon>check_circle</mat-icon>
+                      Save
+                    </button>
+                  </div>
+                </div>
+                <div class="quick-links-divider" *ngIf="quickLinks.length > 0"></div>
+                <!-- Existing Links -->
+                <div *ngIf="quickLinks.length === 0 && !showAddLinkForm" class="no-links-msg">
+                  No links added yet
+                </div>
+                <div class="quick-link-row" *ngFor="let link of quickLinks; let i = index">
+                  <!-- Normal view -->
+                  <ng-container *ngIf="editingLinkIndex !== i">
+                    <button class="link-open-btn" (click)="openLink(link.url, link.isInternal)" [matTooltip]="link.screenName">
+                      <mat-icon>{{ link.isInternal ? 'home' : 'open_in_new' }}</mat-icon>
+                      <span>{{ link.screenName }}</span>
+                    </button>
+                    <button class="link-edit-btn" (click)="startEditLink(i); $event.stopPropagation()" matTooltip="Edit">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button class="link-remove-btn" (click)="removeLink(i); $event.stopPropagation()" matTooltip="Remove">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </ng-container>
+                  <!-- Edit view -->
+                  <ng-container *ngIf="editingLinkIndex === i">
+                    <div class="link-edit-expanded" (click)="$event.stopPropagation()">
+                      <!-- Toggle -->
+                      <div class="add-form-row">
+                        <div class="link-type-toggle" (click)="editingLinkData.isInternal = !editingLinkData.isInternal; $event.stopPropagation()">
+                          <span class="toggle-label" [class.active]="!editingLinkData.isInternal">External</span>
+                          <div class="toggle-switch" [class.internal]="editingLinkData.isInternal">
+                            <div class="toggle-knob"></div>
+                          </div>
+                          <span class="toggle-label" [class.active]="editingLinkData.isInternal">Internal</span>
+                        </div>
+                      </div>
+                      <!-- Screen Name -->
+                      <div class="add-form-row">
+                        <label class="add-form-label">Screen Name</label>
+                        <input  type="text" [(ngModel)]="editingLinkData.screenName" placeholder="Enter screen name" class="add-form-input" (click)="$event.stopPropagation()">
+                      </div>
+                      <!-- URL -->
+                      <div class="add-form-row">
+                        <label class="add-form-label">{{ editingLinkData.isInternal ? 'Path' : 'URL' }}</label>
+                        <input type="text" [(ngModel)]="editingLinkData.url" [placeholder]="editingLinkData.isInternal ? 'e.g. profilelist' : 'https://...'" class="add-form-input" (click)="$event.stopPropagation()">
+                      </div>
+                      <!-- Save + Cancel -->
+                      <div class="add-form-row add-form-save-row">
+                        <button class="link-cancel-btn-text" (click)="cancelEditLink(); $event.stopPropagation()">
+                          Cancel
+                        </button>
+                        <button class="add-form-save-btn" (click)="saveEditLink(); $event.stopPropagation()" [disabled]="!editingLinkData.screenName || !editingLinkData.url">
+                          <mat-icon>check_circle</mat-icon>
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </ng-container>
+                </div>
+              </div>
+            </mat-menu>
+          </div>
+        </div>
+      </div>
+
+      <div class="row w-100">
+        <div class="col-sm">
+          <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1">
+            <div class="fw-bold mb-2 h5">Live Queue</div>
+            <span *ngFor="let live of liveQueueList">
+              <button mat-stroked-button class="me-2 mb-2"
+                [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
+                (click)="selectedQueue = live; onQueueSelect()">
+                {{live["queuename"]}}
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============= ENHANCED: Browser-like Search Section ============= -->
+      <div class="filter-section" [class.panel-open]="showStageCountPanel" *ngIf="selectedQueue != null">
+        <div class="filter-row">
+          <!-- Enhanced Search Field -->
+          <div class="browser-search-container">
+            <mat-form-field appearance="outline" class="search-field-main">
+              <mat-label>Search (Ctrl+F)</mat-label>
+              <input #searchBox matInput [(ngModel)]="searchFilter" 
+                     (ngModelChange)="onSearchChange()"
+                     (keydown.enter)="$event.preventDefault(); goToNextMatch()"
+                     (keydown.shift.enter)="$event.preventDefault(); goToPreviousMatch()"
+                     (focus)="isSearchActive = true"
+                     placeholder="Search name, email, phone, token, stage...">
+              <mat-icon matPrefix>search</mat-icon>
+              
+              <!-- Match Counter -->
+              <span matSuffix class="match-counter" *ngIf="isSearchActive && searchFilter"
+                    [class.no-match]="searchMatches.length === 0">
+                {{ getMatchPositionText() }}
+              </span>
+              <mat-hint>(Ctrl + G) for Browser Search</mat-hint>
+            </mat-form-field>
+
+            <!-- Case Sensitive Toggle -->
+            <button mat-icon-button (click)="toggleCaseSensitive()" [class.active-toggle]="caseSensitiveSearch"
+              matTooltip="Match case" *ngIf="searchFilter">
+              <mat-icon>text_fields</mat-icon>
+            </button>
+
+            <!-- Clear Search Button -->
+            <button mat-icon-button (click)="clearSearch()" matTooltip="Clear search (Esc)" *ngIf="searchFilter">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div class="filter-dropdown-wrapper" *ngIf="availableSegments.length > 0">
+            <div class="filter-dropdown-trigger" (click)="!selectedStageSlot && (segmentDropdownOpen = !segmentDropdownOpen); !selectedStageSlot && onSegmentDropdownOpen()"[class.disabled-filter]="selectedStageSlot|| dfuFilterActive">
+              <div class="filter-dropdown-label">
+                <mat-icon>diagram_3</mat-icon>
+                <span *ngIf="selectedSegments.length === 0">Filter by Segment</span>
+                <span *ngIf="selectedSegments.length > 0">{{selectedSegments.length}} Segment(s) Selected</span>
+              </div>
+              <mat-icon class="dropdown-arrow" [class.rotated]="segmentDropdownOpen">expand_more</mat-icon>
+            </div>
+            
+            <div class="filter-dropdown-menu" *ngIf="segmentDropdownOpen">
+              <div class="filter-search-box">
+                <mat-icon>search</mat-icon>
+                <input type="text" 
+                      [(ngModel)]="segmentSearchTerm" 
+                      (input)="filterSegments()"
+                      (click)="$event.stopPropagation()"
+                      placeholder="Search segments...">
+                <button *ngIf="segmentSearchTerm" (click)="clearSegmentSearch(); $event.stopPropagation()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              
+              <div class="filter-options-list">
+                <div class="filter-option" 
+                    *ngFor="let segment of filteredSegments" 
+                    (click)="toggleSegmentSelection(segment.id); $event.stopPropagation()">
+                  <div class="custom-checkbox small" [class.checked]="isSegmentSelected(segment.id)">
+                    <mat-icon *ngIf="isSegmentSelected(segment.id)">check</mat-icon>
+                  </div>
+                  <span class="option-label">{{segment.segmentname || segment.name || segment.id}}</span>
+                </div>
+                
+                <div class="no-results" *ngIf="filteredSegments.length === 0">
+                  No segments found
+                </div>
+              </div>
+              
+              <div class="filter-dropdown-footer" *ngIf="selectedSegments.length > 0">
+                <button class="clear-selection-btn" (click)="selectedSegments = []; onSegmentFilterChange(); $event.stopPropagation()">
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tags Filter with Search -->
+          <div class="filter-dropdown-wrapper" *ngIf="availableTags.length > 0">
+            <div class="filter-dropdown-trigger" (click)="!selectedStageSlot && (tagDropdownOpen = !tagDropdownOpen); !selectedStageSlot && onTagDropdownOpen()"[class.disabled-filter]="selectedStageSlot|| dfuFilterActive">
+              <div class="filter-dropdown-label">
+                <mat-icon>local_offer</mat-icon>
+                <span *ngIf="selectedTags.length === 0">Filter by Tags</span>
+                <span *ngIf="selectedTags.length > 0">{{selectedTags.length}} Tag(s) Selected</span>
+              </div>
+              <mat-icon class="dropdown-arrow" [class.rotated]="tagDropdownOpen">expand_more</mat-icon>
+            </div>
+            
+            <div class="filter-dropdown-menu" *ngIf="tagDropdownOpen">
+              <div class="filter-search-box">
+                <mat-icon>search</mat-icon>
+                <input type="text" 
+                      [(ngModel)]="tagSearchTerm" 
+                      (input)="filterTags()"
+                      (click)="$event.stopPropagation()"
+                      placeholder="Search tags...">
+                <button *ngIf="tagSearchTerm" (click)="clearTagSearch(); $event.stopPropagation()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              
+              <div class="filter-options-list">
+                <div class="filter-option" 
+                    *ngFor="let tag of filteredTags" 
+                    (click)="toggleTagSelection(tag.docid); $event.stopPropagation()">
+                  <div class="custom-checkbox small" [class.checked]="isTagSelected(tag.docid)">
+                    <mat-icon *ngIf="isTagSelected(tag.docid)">check</mat-icon>
+                  </div>
+                  <span class="option-label">{{tag.name}}</span>
+                </div>
+                
+                <div class="no-results" *ngIf="filteredTags.length === 0">
+                  No tags found
+                </div>
+              </div>
+              
+              <div class="filter-dropdown-footer" *ngIf="selectedTags.length > 0">
+                <button class="clear-selection-btn" (click)="selectedTags = []; onTagFilterChange(); $event.stopPropagation()">
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </div>
+    
+          <!-- DFU Filter -->
+          <button mat-stroked-button  class="dfu-filter-btn" [class.active]="dfuFilterActive" (click)="toggleDFUFilter()">
+            DFU Participants ({{ getTotalDFUCount() }})
+          </button>
+          <!-- Preassigned Filter -->
+          <div class="filter-dropdown-wrapper">
+            <mat-form-field appearance="outline" class="preassigned-filter-field">
+              <mat-label>Preassigned Status</mat-label>
+              <mat-select [(ngModel)]="preassignedFilter" (selectionChange)="onPreassignedFilterChange()"[disabled]="selectedStageSlot !== null || dfuFilterActive">
+                <mat-option value="all">All Participants</mat-option>
+                <mat-option value="preassigned">Pre-assigned Only</mat-option>
+                <mat-option value="not-preassigned">Not Pre-assigned</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <div class="filter-dropdown-wrapper stage-slot-combined">
+            <!-- Stage Slot Select -->
+            <mat-form-field appearance="outline" class="stage-slot-filter-field">
+              <mat-label>Filter by Stage Slot</mat-label>
+              <mat-select [(ngModel)]="selectedStageSlot"  (selectionChange)="onStageSlotChange()" panelClass="stage-slot-dropdown" [disabled]="dfuFilterActive">
+                <mat-option [value]="null">All Stages</mat-option>
+                <mat-option *ngFor="let stage of availableStagesFromSlot" [value]="stage">
+                  {{stage}}
+                </mat-option>
+              </mat-select>
+
+              <!-- Inline date range picker icon as suffix when stage selected -->
+              <span matSuffix *ngIf="selectedStageSlot" class="inline-date-suffix">
+                <mat-date-range-picker #inlineRangePicker></mat-date-range-picker>
+                <mat-datepicker-toggle [for]="inlineRangePicker"
+                  [matTooltip]="dateRangeStart && dateRangeEnd ? 
+                    (dateRangeStart | date:'MMM d, y') + ' – ' + (dateRangeEnd | date:'MMM d, y') : 
+                    'Filter by date range'">
+                </mat-datepicker-toggle>
+                <mat-date-range-input style="width:0;height:0;overflow:hidden;position:absolute;" [rangePicker]="inlineRangePicker">
+                  <input matStartDate  [ngModel]="dateRangeStart" (ngModelChange)="dateRangeStart = $event"(dateChange)="onDateRangeChange()">
+                  <input matEndDate [ngModel]="dateRangeEnd" (ngModelChange)="dateRangeEnd = $event" (dateChange)="onDateRangeChange()">
+                </mat-date-range-input>
+                 <!-- Clock icon with dropdown -->
+                <div class="time-slot-dropdown-wrapper" *ngIf="showTimeSlotPicker" (click)="$event.stopPropagation()">
+                <button class="clock-btn"  [class.active]="selectedTimeSlots.length > 0" (click)="openTimeDropdown($event)" [matTooltip]="selectedTimeSlots.length > 0 ? selectedTimeSlots.join(', ') : 'Filter by time'">
+                  <mat-icon>schedule</mat-icon>
+                  <span *ngIf="selectedTimeSlots.length > 0" class="clock-active-dot"></span>
+                </button>
+
+                <!-- Dropdown Panel -->
+                <div class="time-dropdown-panel" *ngIf="showTimeDropdown"[style.top]="timeDropdownPosition.top"[style.right]="timeDropdownPosition.right"[style.left]="timeDropdownPosition.left">
+                  <div class="time-dropdown-header">
+                  <mat-icon>schedule</mat-icon>
+                  <span>Select Time</span>
+                  <span class="time-dropdown-date" *ngIf="dateRangeStart && dateRangeEnd">
+                    {{dateRangeStart | date:'MMM d'}} – {{dateRangeEnd | date:'MMM d'}}
+                  </span>
+                </div>
+
+                  <div class="time-dropdown-list">
+                    <!-- All option -->
+                      <div class="time-dropdown-item"[class.active]="selectedTimeSlots.length === 0" (click)="selectTimeSlot(null)">
+                        <span class="item-time">All Times</span>
+                        <span class="item-count">{{getTotalSlotCount()}}</span>
+                      </div>
+                      <!-- Time range options -->
+                      <div class="time-dropdown-item"
+                          *ngFor="let slot of availableTimeSlots"
+                          [class.active]="selectedTimeSlots.includes(slot.timeRange)"
+                          (click)="selectTimeSlot(slot.timeRange)">
+                        <div class="item-left">
+                          <div class="multi-check" [class.checked]="selectedTimeSlots.includes(slot.timeRange)">
+                            <mat-icon *ngIf="selectedTimeSlots.includes(slot.timeRange)">check</mat-icon>
+                          </div>
+                          <span class="item-time">{{slot.timeRange}}</span>
+                        </div>
+                        <span class="item-count">{{slot.count}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </span>
+            </mat-form-field>
+          </div>
+          <!-- Clear Filters Button -->
+          <button mat-stroked-button color="warn" class="clear-filters-btn" *ngIf="searchFilter || selectedSegments.length > 0 || selectedTags.length > 0 ||  preassignedFilter !== 'all' || selectedStageSlot || dateRangeStart || dateRangeEnd || dfuFilterActive || reminderTodayFilterActive" (click)="clearAllFilters()">
+            <mat-icon>clear_all</mat-icon>
+            Clear Filters
+          </button>
+        </div>
+        
+        <!-- Active Filters Display -->
+        <div class="active-filters" *ngIf="searchFilter || selectedSegments.length > 0 ||  selectedTags.length > 0 || preassignedFilter !== 'all' ||   selectedStageSlot || dateRangeStart || dateRangeEnd || selectedTimeSlots.length > 0">
+          <span class="filter-label">Active Filters:</span>
+          <h5 style="font-size: 16px; margin-top: 10px;">
+            <b style="font-weight: bold; color: rgb(0, 101, 135);">Filtered Participants</b> :
+            {{totalParticipants}}
+          </h5>
+          <mat-chip-set class="styled-chip-set">
+            <mat-chip class="filter-chip search-chip" *ngIf="searchFilter" (removed)="clearSearch()">
+              <mat-icon matChipAvatar>search</mat-icon>
+              "{{searchFilter}}" 
+              <span class="chip-count">{{searchMatches.length}}</span>
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+
+            <mat-chip class="filter-chip segment-chip" *ngFor="let segId of selectedSegments"  (removed)="removeSegment(segId); onSegmentFilterChange()">
+              <mat-icon matChipAvatar>group</mat-icon>
+              {{(availableSegments | segmentName:segId) || segId}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+
+            <mat-chip class="filter-chip tag-chip"   *ngFor="let tagId of selectedTags"  (removed)="removeTag(tagId)">
+              <mat-icon matChipAvatar>local_offer</mat-icon>
+              {{getTagName(tagId)}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+
+            <mat-chip class="filter-chip preassign-chip"  *ngIf="preassignedFilter !== 'all'"  (removed)="preassignedFilter = 'all'; onPreassignedFilterChange()">
+              <mat-icon matChipAvatar>assignment_ind</mat-icon>
+              {{preassignedFilter === 'preassigned' ? 'Pre-assigned Only' : 'Not Pre-assigned'}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+            <mat-chip class="filter-chip reminder-today-chip" *ngIf="reminderTodayFilterActive" (removed)="toggleReminderTodayFilter()">
+              <mat-icon matChipAvatar>alarm</mat-icon>
+              Today's Reminders ({{todayReminders.length}})
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+            <mat-chip class="filter-chip dfu-chip" *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
+              DFU Participants ({{ getTotalDFUCount() }})
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+            <mat-chip class="filter-chip stage-chip"   *ngIf="selectedStageSlot"  (removed)="clearStageSlotFilter()">
+              <mat-icon matChipAvatar>layers</mat-icon>
+              Stage: {{selectedStageSlot}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+
+            <mat-chip class="filter-chip date-chip"  *ngIf="dateRangeStart && dateRangeEnd" 
+                      (removed)="dateRangeStart = null; dateRangeEnd = null; selectedTimeSlots = null; availableTimeSlots = []; showTimeSlotPicker = false; onDateRangeChange()">
+              <mat-icon matChipAvatar>date_range</mat-icon>
+               {{dateRangeStart | date:'MMM d'}} – {{dateRangeEnd | date:'MMM d, y'}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+
+            <!-- <mat-chip class="filter-chip time-chip" 
+              *ngIf="selectedTimeSlots.length > 0" 
+              (removed)="selectTimeSlot(null)">
+              <mat-icon matChipAvatar>schedule</mat-icon>
+              {{selectedTimeSlots.length === 1 ? selectedTimeSlots[0] : selectedTimeSlots.length + ' times selected'}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip> -->
+
+          </mat-chip-set>
+        </div>
+      </div>
+      <!-- ============= END: Enhanced Search Section ============= -->
+      <!-- Reminder Banner -->
+      <div class="reminder-chip" *ngIf="reminders.length > 0 && showReminderBanner">
+        <span class="reminder-chip-content" (click)="openReminderListModal('today')">
+          <mat-icon>notifications_active</mat-icon>
+          <span>Reminders</span>
+          <span class="reminder-chip-count" 
+                (click)="toggleReminderTodayFilter(); $event.stopPropagation()"
+                [style.background]="reminderTodayFilterActive ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)'"
+                [style.color]="reminderTodayFilterActive ? '#667eea' : 'white'"
+                matTooltip="Click to filter today's reminders on stage">
+            Today - {{todayReminders.length}}
+          </span>
+        </span>
+      </div>
+
+      <div class="stagebox" [class.panel-open]="showStageCountPanel" *ngIf="selectedQueue != null">
+          <!-- Stage Count Chips Row -->
+          <div class="stage-count-chips-row" *ngIf="stageCountCards.length > 0">
+            <span class="stage-count-chips-label">Stage Counts:</span>
+            <div class="stage-count-chip" 
+                *ngFor="let card of stageCountCards"
+                (click)="openStageCountPanel(card)"
+                [class.active]="selectedStageCountCard?.docid === card.docid">
+              <span class="chip-name">{{ card.stagename }}</span>
+              <span class="chip-badge">{{ getStageCountTotal(card) }}</span>
+            </div>
+            <button class="clear-stage-filter-btn"  *ngIf="activeStageCountFilter.length > 0"(click)="clearStageCountFilter()" matTooltip="Clear stage count filter">
+              <mat-icon>clear</mat-icon>
+              Clear Filter
+            </button>
+          </div>
+
+          <!-- Stage Count Side Panel -->
+          <div class="stage-count-panel" [class.open]="showStageCountPanel">
+            <div class="stage-count-panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 2px solid #ccc; background: white;">
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: bold;">
+                <mat-icon>dashboard</mat-icon>
+                <span>{{ selectedStageCountCard?.stagename }}</span>
+              </div>
+              <button (click)="closeStageCountPanel()" 
+                      style="background: red; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <div class="stage-count-panel-body" *ngIf="selectedStageCountCard">
+              <!-- Total -->
+              <div class="panel-total-row">
+                <span class="panel-total-label">Total</span>
+                <span class="panel-total-value">{{ getStageCountTotal(selectedStageCountCard) }}</span>
+              </div>
+              <!-- Individual Stage Rows -->
+              <div class="panel-stage-list">
+                <div class="panel-stage-row" *ngFor="let stageConfig of selectedStageCountCard.stage">
+                  <div class="panel-stage-info">
+                    <span class="panel-stage-name">{{ stageConfig.stagename }}</span>
+                    <span class="panel-stage-status">{{ getStatusLabel(stageConfig.status) }}</span>
+                  </div>
+                  <span class="panel-stage-count">{{ getIndividualStageCount(stageConfig) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        <div [ngClass]="togglescroll === 'horizontal'?'flex-horiz':null">
+         <ng-container *ngFor="let column of filteredStageQueue; let i = index">
+            <div class="example-container">
+              <!-- STAGE NAME WITH HIGHLIGHTING -->
+              <div class="stagename" [attr.data-stage-key]="column.stageKey"[class.stage-current-match]="isCurrentStageMatch(column.stageKey)">
+                <span>
+                  <!-- Stage name with text highlighting -->
+                  <span [innerHTML]="highlightText(column.stagename)"></span>
+                  <span *ngIf="column.type != null">&nbsp;(<span [innerHTML]="highlightText(column.type)"></span>)</span>
+                  - <span>{{column.allTokens?.length || column.tokenlist.length}}</span>
+                  <button class="m-2 text-secondary" mat-icon-button
+                    (click)="selectedChatStage = column.stagename;selectedChatStageType = column.type != null ? ' - ' + column.type : '';snav.open();selectedStageType = column.type;">
+                    <mat-icon>message</mat-icon>
+                  </button>
+                  <button *ngIf="roles['developer']" class="text-secondary" mat-icon-button
+                    (click)="completeQueue(column.allTokens || column.tokenlist, column.stagename)"><mat-icon>cloud_done</mat-icon></button>
+                </span><br>
+              </div>
+
+              <div class="example-list" (scroll)="onStageScroll($event, column)">
+                <!-- Token Card - NO card highlighting, only text highlighting -->
+                <div #tokenElement
+                  [attr.data-token-id]="token.profile_id || token.docid"
+                  [ngClass]="{
+                    'example-box-locked': ['locked'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true,
+                    'example-box-defaulted': ['defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true,
+                    'example-box': !['locked', 'defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) || (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] != true,
+                    'current-match-scroll-target': isCurrentMatch(token),
+                    'priority-orange': getTokenHighlight(token.profile_id) === 'orange'
+                  }"
+                  *ngFor="let token of getDisplayedTokens(column); let tokenIndex = index">
+                  <div class="token-content">
+                    <!-- Move Menu Wrapper -->
+                    <div class="move-menu-wrapper">
+                      <button 
+                        class="move-btn"
+                        [disabled]="(['locked','defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true) || getTokenHighlight(token.profile_id) === 'orange'"
+                        [class.disabled]="getTokenHighlight(token.profile_id) === 'orange'"
+                        [matTooltip]="getTokenHighlight(token.profile_id) === 'orange' ? 'Move disabled for DFU participants' : ''"
+                        (click)="toggleMoveMenu($event, token, column.stagename, column.type)">
+                        ⇄
+                      </button>
+
+                      <div class="move-dropdown" *ngIf="isMenuOpen(token)">
+                        <div class="search-box" (click)="$event.stopPropagation()">
+                          <input type="text" [(ngModel)]="stageSearchTerm" (input)="filterStages()"
+                            (click)="$event.stopPropagation()" placeholder="Search stages...">
+                          <button *ngIf="stageSearchTerm" (click)="clearStageSearch(); $event.stopPropagation()">✕</button>
+                        </div>
+
+                        <div class="stage-list">
+                          <button *ngFor="let targetColumn of filteredAvailableStages" class="stage-item"
+                            [disabled]="targetColumn.stagename === column.stagename"
+                            (click)="moveTokenToStage(token, column.stagename, column.type, targetColumn.stagename, targetColumn.markascompleted); closeMoveMenu()">
+                            {{ targetColumn.stagename }}
+                          </button>
+
+                          <div *ngIf="filteredAvailableStages.length === 0" class="no-results">
+                            No stages found
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Token Menu Wrapper -->
+                    <div class="token-menu-wrapper">
+                      <button class="menu-btn" (click)="toggleTokenMenu($event, token)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                          fill="currentColor">
+                          <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                        </svg>
+                      </button>
+
+                      <div class="token-dropdown" *ngIf="isTokenMenuOpen(token)" (click)="$event.stopPropagation()">
+                        <button class="menu-item" (click)="openPreAssignDialog(token); closeTokenMenu()">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path
+                              d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                          </svg>
+                          <span>Pre-Assign Token</span>
+                        </button>
+
+                        <button class="menu-item" *ngIf="!hasNotesOrTags(token)"
+                          (click)="openNotesTagsDialog(token); closeTokenMenu()" title="Add notes and tags to this token">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path
+                              d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z" />
+                          </svg>
+                          <span>Add Notes & Tags</span>
+                        </button>
+
+                        <button class="menu-item" (click)="openReminderDialog(token); closeTokenMenu()">
+                          <mat-icon style="width: 18px; height: 18px; font-size: 18px;">alarm_add</mat-icon>
+                          <span>Add Reminder</span>
+                        </button>
+
+                        <button class="menu-item" *ngIf="hasNotesOrTags(token)"
+                          (click)="openNotesTagsDialog(token); closeTokenMenu()" title="View or edit notes and tags">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path
+                              d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                          </svg>
+                          <span>View Notes & Tags</span>
+                        </button>
+
+                        <div class="menu-divider"></div>
+
+                        <label class="menu-item checkbox-item" (click)="$event.stopPropagation()">
+                          <input type="checkbox" [checked]="token.tokenstatus == 'inActive'"
+                            (change)="onCheckboxChange($event, token)">
+                          <span class="checkmark"></span>
+                          <span>Mark as unattended</span>
+                        </label>
+
+                        <div class="menu-divider"></div>
+
+                        <button class="menu-item" (click)="toggleVariationSubmenu($event)">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" />
+                          </svg>
+                          <span>Update Variation</span>
+                          <svg class="arrow-icon" [class.rotated]="showVariationSubmenu"
+                            xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                          </svg>
+                        </button>
+
+                        <div class="submenu-expanded" *ngIf="showVariationSubmenu">
+                          <button class="submenu-item" *ngFor="let variation of variationList"
+                            (click)="updateVariation(token, variation.id); closeTokenMenu()">
+                            {{ variation.variationname }}
+                          </button>
+
+                          <div class="no-variations" *ngIf="variationList.length === 0">
+                            No variations available
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Token Number with TEXT highlighting only -->
+                    <span class="label">Token Number:</span> 
+                    <span [innerHTML]="highlightText(token.tokennumber?.toString() || '')"></span>
+                    <!-- <span *ngIf="i==0 && deleteOption" style="margin-left: 10px;"(click)="deleteParticipant(token)"><mat-icon>delete</mat-icon></span> -->
+                    <br>
+                    
+                    <!-- Name with TEXT highlighting only -->
+                    <span class="label">Name:</span> 
+                    <span [innerHTML]="highlightText(mapProfileData[token.profile_id]?.['name'] || '')"></span>
+                    <span *ngIf="column.type != null && column.type != 'Activity'">&nbsp;({{token['status'] == null ?
+                      'Queued' : token['status']}})</span>
+                    
+                    <!-- Email with TEXT highlighting (if you want to show email) -->
+                    <div *ngIf="mapProfileData[token.profile_id]?.['email'] && textContainsSearch(mapProfileData[token.profile_id]?.['email'])">
+                      <span class="label">Email:</span>
+                      <span [innerHTML]="highlightText(mapProfileData[token.profile_id]?.['email'] || '')"></span>
+                    </div>
+
+                    <!-- Phone with TEXT highlighting (if you want to show phone when searched) -->
+                    <div *ngIf="mapProfileData[token.profile_id]?.['number'] && textContainsSearch(mapProfileData[token.profile_id]?.['number']?.toString())">
+                      <span class="label">Phone:</span>
+                      <span [innerHTML]="highlightText(mapProfileData[token.profile_id]?.['number']?.toString() || '')"></span>
+                    </div>
+
+                    <!-- People Involved with TEXT highlighting -->
+                    <div
+                      *ngIf="token['people_involved'] != null && token['people_involved'] != undefined && token['people_involved'].length != 0">
+                      <span class="label">People Involved:&nbsp;</span>
+                      <span *ngFor="let specialist of token['people_involved']; let isLast = last">
+                        <span [innerHTML]="highlightText(mapProfileData[specialist]?.['name'] || '')"></span><span *ngIf="!isLast">,&nbsp;</span>
+                      </span>
+                    </div>
+                    
+                    <div *ngIf="token['variationid'] != null">
+                      <span class="label">Queue Variation:&nbsp;</span>
+                      <span>{{mapVariation[token['variationid']]?.variationname}}</span>
+                    </div>
+                    <div *ngIf="column.type != null && column.type != 'Activity' && token['queueposition'] != null">
+                      <span class="label">Position:&nbsp;</span>
+                      <span>{{token['queueposition']}}</span>
+                    </div>
+                    <div *ngIf="token['preassigned']">
+                      <span class="label">Preassigned To: </span>
+                      <ng-container *ngFor="let stage of getPreassignedEntries(token); let last = last">
+                        <span class="stage-entry">
+                          <b>{{ stage.key }}:</b>
+                          <span *ngFor="let studioId of stage.value; let isLastStudio = last">
+                            <span
+                              *ngFor="let participant of mapStudio[studioId]['participants']; let isLastParticipant = last">
+                              {{ mapProfileData[participant]['name'] }}<span *ngIf="!isLastParticipant">, </span>
+                            </span>
+                            <span *ngIf="!isLastStudio"> | </span>
+                          </span>
+                        </span>
+                        <span *ngIf="!last" class="separator"> / </span>
+                      </ng-container>
+                    </div>
+                    <div>
+                      <span class="label">Audio Video Test:&nbsp;</span>
+                      <span class="textbtn" (click)="avTest(token)">{{token["avtest"] != null && token["avtest"] !=
+                        undefined ? token["avtest"] : 'Test Now'}}</span>
+                    </div>
+
+                    <div *ngIf="selectedStageSlot && getBookedSlot(token)">
+                      <span class="label">Slot Booked:&nbsp;</span>
+                      <span>
+                        {{ getBookedSlot(token)!.start | date:'MMM d, y' }}
+                        [{{ getBookedSlot(token)!.start | date:'h:mm a' }} – {{ getBookedSlot(token)!.end | date:'h:mm a' }}]
+                      </span>
+                    </div>
+
+                    <div *ngIf="(participantMetaDataMap?.[token.profile_id]?.['profiletags'] || []).length > 0">
+                      <div class="profile-tags-container" *ngIf="participantMetaDataMap[token.profile_id]?.['profiletags']?.length > 0">
+                        <span class="profile-tag" *ngFor="let tag of participantMetaDataMap[token.profile_id]['profiletags']">
+                          <span *ngIf="![null,undefined].includes(mapTagsMetaData[tag])">{{mapTagsMetaData[tag]['name']}}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="icon-row">
+                      <!-- Left: P in Square (Unconsumed/Package) -->
+                      <span class="icon-left" [matTooltip]="getMatchTooltip(token['profile_id'])" matTooltipClass="multiline-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon"
+                          [class.matched]="isParticipantMatched(token['profile_id'])"
+                          [class.not-matched]="!isParticipantMatched(token['profile_id'])">
+                          <!-- Square border -->
+                          <rect x="2" y="2" width="20" height="20" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="2" />
+                          <!-- Letter P -->
+                          <text x="12" y="17" text-anchor="middle" font-size="14" font-weight="bold" font-family="Arial, sans-serif"
+                            fill="currentColor">P</text>
+                        </svg>
+                      </span>
+                    
+                      <!-- Center: WhatsApp, Email, Bell -->
+                      <div class="icon-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon"
+                          *ngIf="isWhatsAppActive">
+                          <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                        </svg>
+                    
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon" *ngIf="isEmailActive">
+                          <path
+                            d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+                        </svg>
+                    
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon"
+                          *ngIf="appNotificationProfiles[token['profile_id']]">
+                          <path
+                            d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                        </svg>
+                      </div>
+                    
+                      <!-- Right: Dollar (Finance Status) -->
+                      <div class="icon-right">
+                        <span [matTooltip]="getFinanceTooltip(token['profile_id'])" matTooltipClass="multiline-tooltip">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon"
+                            [class.status-yellow]="getFinanceStatus(token['profile_id']) === 'yellow'"
+                            [class.status-orange]="getFinanceStatus(token['profile_id']) === 'orange'"
+                            [class.status-red]="getFinanceStatus(token['profile_id']) === 'red'"
+                            [class.status-none]="getFinanceStatus(token['profile_id']) === 'none'">
+                            <path
+                              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09v.58c0 .73-.59 1.33-1.33 1.33h-.16c-.73 0-1.33-.6-1.33-1.33v-.6c-1.33-.28-2.51-1.01-3.13-2.24-.41-.81.11-1.83 1.03-1.83h.08c.47 0 .87.32 1.08.74.34.67 1.04 1.17 2.02 1.17 1.35 0 1.98-.81 1.98-1.53 0-.66-.36-1.29-1.85-1.72-2.01-.57-3.69-1.46-3.69-3.47 0-1.56 1.22-2.68 2.81-3.04v-.57c0-.73.6-1.33 1.33-1.33h.16c.73 0 1.33.6 1.33 1.33v.61c1.04.27 1.92.88 2.4 1.84.41.81-.1 1.83-1.02 1.83h-.09c-.47 0-.87-.32-1.08-.74-.28-.56-.88-1.02-1.79-1.02-1.2 0-1.82.66-1.82 1.37 0 .6.39 1.17 1.88 1.6 2.15.6 3.63 1.58 3.63 3.56.01 1.69-1.2 2.76-2.75 3.04z" />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="notes-tags-indicators" *ngIf="hasNotesOrTags(token)">
+                      <div *ngIf="token.notes || (token.notesList && token.notesList.length > 0)" class="notes-indicator"
+                        (click)="openNotesTagsDialog(token)">
+                        <mat-icon>event_note</mat-icon>
+                        <div class="notes-preview">
+                          <div class="notes-label">
+                            <span *ngIf="token.notesList && token.notesList.length > 1">
+                              {{token.notesList.length}} Notes
+                            </span>
+                            <span *ngIf="!token.notesList || token.notesList.length <= 1">
+                              Note
+                            </span>
+                          </div>
+                          <div class="notes-text" *ngIf="token.notes || (token.notesList && token.notesList.length > 0)">
+                            {{ getNotesPreview(token) }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div *ngIf="token.tags && token.tags.length > 0" class="tags-indicator"
+                        (click)="openNotesTagsDialog(token)">
+                        <mat-icon>local_offer</mat-icon>
+                        <div class="tags-preview">
+                          <div class="tags-label">Tags</div>
+                          <div class="tag-chips">
+                            <span *ngFor="let tag of token.tags.slice(0, 2)" class="tag-chip">
+                              {{tag}}
+                            </span>
+                            <span *ngIf="token.tags.length > 2" class="more-tags">
+                              +{{token.tags.length - 2}} more
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="reminder-indicator" *ngIf="hasReminders(token.profile_id)" (click)="openReminderDialog(token)">
+                      <mat-icon class="reminder-icon-badge">alarm</mat-icon>
+                      <span class="reminder-count">{{getTokenReminders(token.profile_id).length}}</span>
+                    </div>
+                    <!-- Stage Log -->
+                    <div class="stage-log-container">
+                      <div class="stage-log-toggle" (click)="fetchLogs(token)">
+                        <mat-icon>history</mat-icon>
+                        <span>View Stage Log</span>
+                      </div>
+                    
+                      <div *ngIf="showStageLog[token.profile_id]" class="stage-log-content">
+                        <div *ngIf="this.queuehistory?.[token.profile_id]">
+                          <div class="log-header">
+                            <b>{{this.queuehistory[token.profile_id][0]?.['profile_name']}}</b>
+                          </div>
+                    
+                          <div class="log-entries">
+                            <!-- Token Created -->
+                            <div class="log-entry created">
+                              <span class="log-time">{{this.queuehistory[token.profile_id][0]?.['createdon'].toDate() | date:'MMM d, h:mm a'}}</span>
+                              <span class="log-text">Token Created</span>
+                            </div>
+                    
+                            <!-- Stage Entries -->
+                            <ng-container *ngFor="let list of this.queuehistory[token.profile_id]; let k = index">
+                              <div *ngIf="list['logdate']" class="log-entry">
+                                <span class="log-time">{{list['logdate'].toDate() | date:'MMM d, h:mm a'}}</span>
+                                <span class="log-stage">{{list['currentstage']}}</span>
+                                <span *ngIf="['queued', 'invited'].includes(list['status'])" class="badge queued">Q</span>
+                                <span *ngIf="list['status'] == 'ready'" class="badge waiting">W</span>
+                                <span *ngIf="list['liveassignmentid']" class="badge activity">A</span>
+                                <span *ngIf="list['movedby']" class="log-meta">
+                                  <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]['name']}}
+                                </span>
+                                <span *ngIf="list['movedthrough']" class="log-via" [ngClass]="list['movedthrough']?.toLowerCase()">
+                                  {{list['movedthrough']}}
+                                </span>
+                                <span *ngIf="(list['peopleinvolvedname'] || []).length" class="log-people">
+                                  ({{list['peopleinvolvedname']}})
+                                </span>
+                              </div>
+                            </ng-container>
+                          </div>
+                        </div>
+                    
+                        <div *ngIf="!this.queuehistory?.[token.profile_id]" class="no-history">
+                          {{token['createdon'].toDate() | date:'MMM d, h:mm a'}} - Token Created
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Load More -->
+                <div class="load-more-container" *ngIf="hasMoreTokens(column)">
+                  <div *ngIf="stageLoadingMore[column.stageKey]" class="loading-indicator">
+                    <mat-icon class="spin">sync</mat-icon>
+                    <span>Loading more...</span>
+                  </div>
+                  <button *ngIf="!stageLoadingMore[column.stageKey]" mat-stroked-button class="load-more-btn"
+                    (click)="loadMoreTokens(column)">
+                    <mat-icon>expand_more</mat-icon>
+                    Load More ({{getRemainingCount(column)}} remaining)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ng-container> 
+        </div>
+      </div>
+    </div>
+    <!-- Reminder List Modal -->
+    <div class="reminder-modal-backdrop" *ngIf="showReminderListModal" (click)="closeReminderListModal()">
+      <div class="reminder-modal-dialog" (click)="$event.stopPropagation()">
+        
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <h2>
+            <span *ngIf="selectedReminderFilter === 'overdue'">Overdue Reminders</span>
+            <span *ngIf="selectedReminderFilter === 'today'">Today's Reminders</span>
+            <span *ngIf="selectedReminderFilter === 'upcoming'">Upcoming Reminders</span>
+          </h2>
+          <button mat-icon-button (click)="closeReminderListModal()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="modal-tabs">
+          <button class="tab-btn"  [class.active]="selectedReminderFilter === 'today'" (click)="selectedReminderFilter = 'today'" *ngIf="todayReminders.length > 0">
+            Today ({{todayReminders.length}})
+          </button>
+          <button class="tab-btn"   [class.active]="selectedReminderFilter === 'upcoming'" (click)="selectedReminderFilter = 'upcoming'" *ngIf="upcomingReminders.length > 0">
+            Upcoming ({{upcomingReminders.length}})
+          </button>
+          <button class="tab-btn"  [class.active]="selectedReminderFilter === 'overdue'" (click)="selectedReminderFilter = 'overdue'" *ngIf="overdueReminders.length > 0">
+            Overdue ({{overdueReminders.length}})
+          </button>
+        </div>
+
+        <!-- Modal Body - Table with Better Spacing -->
+        <div class="modal-body">
+          <table class="reminder-table">
+            <thead>
+              <tr>
+                <th>S.NO</th>
+                <th>TOKEN</th>
+                <th>NAME</th>
+                <th style="width: 250px; max-width: 250px;">REMINDER</th>
+                <th>DATE</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let reminder of getFilteredReminders(); let i = index">
+                <td>{{i + 1}}</td>
+                <td>
+                  <span class="token-badge">#{{reminder.queuetokenno}}</span>
+                </td>
+                <td>
+                  <span class="participant-name">{{getReminderParticipantName(reminder.profileid)}}</span>
+                </td>
+                <td style="max-width: 250px;">
+                  <div class="reminder-context" [matTooltip]="reminder.context" matTooltipClass="multiline-tooltip">
+                    {{reminder.context}}
+                  </div>
+                </td>
+                <td>
+                  <div class="datetime-cell">
+                    <div class="date-line">{{reminder.date?.toDate() | date: 'MMM dd, yyyy - h:mm a'}}</div>
+                  </div>
+                </td>
+                <td>
+                  <!-- Normal view -->
+                  <div class="action-btns" *ngIf="editingReminderId !== reminder.docid">
+                    <button mat-icon-button
+                            color="primary"
+                            (click)="goToToken(reminder)"
+                            matTooltip="Go to token">
+                      <mat-icon>my_location</mat-icon>
+                    </button>
+                    <button mat-icon-button
+                            color="primary"
+                            (click)="startEditReminder(reminder)"
+                            matTooltip="Edit reminder">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button
+                            color="accent"
+                            (click)="markReminderCompleted(reminder.docid)"
+                            matTooltip="Mark complete">
+                      <mat-icon>check_circle</mat-icon>
+                    </button>
+                    <button mat-icon-button
+                            color="warn"
+                            (click)="deleteReminder(reminder.docid)"
+                            matTooltip="Delete">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+
+                  <!-- Edit view -->
+                  <div class="edit-reminder-inline" *ngIf="editingReminderId === reminder.docid">
+                    <mat-form-field appearance="outline" class="edit-reminder-field">
+                      <mat-label>Context</mat-label>
+                      <input matInput [(ngModel)]="editingReminderContext">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="edit-reminder-field">
+                      <mat-label>Date</mat-label>
+                      <input matInput [matDatepicker]="editPicker" [(ngModel)]="editingReminderDate">
+                      <mat-datepicker-toggle matSuffix [for]="editPicker"></mat-datepicker-toggle>
+                      <mat-datepicker #editPicker></mat-datepicker>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="edit-reminder-field">
+                      <mat-label>Time</mat-label>
+                      <input matInput type="time" [(ngModel)]="editingReminderTime">
+                    </mat-form-field>
+                    <div class="edit-reminder-actions">
+                      <button mat-icon-button color="primary" (click)="saveEditReminder()" matTooltip="Save">
+                        <mat-icon>check</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="cancelEditReminder()" matTooltip="Cancel">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Empty State -->
+          <div class="empty-state" *ngIf="getFilteredReminders().length === 0">
+            <mat-icon>alarm_off</mat-icon>
+            <p>No reminders in this category</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>
+<!-- Reminder Dialog Modal -->
+<div class="reminder-modal-overlay" *ngIf="showReminderDialog" (click)="closeReminderDialog()">
+  <div class="reminder-modal" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="reminder-header">
+      <div class="reminder-title">
+        <mat-icon>alarm</mat-icon>
+        <h3>Participant Reminder - Token #{{selectedReminderToken?.tokennumber}}</h3>
+      </div>
+      <button mat-icon-button (click)="closeReminderDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Participant Info -->
+    <div class="reminder-participant-info">
+      <div class="participant-detail">
+        <strong>Name:</strong> {{mapProfileData[selectedReminderToken?.profile_id]?.['name']}}
+      </div>
+      <div class="participant-detail">
+        <strong>Token:</strong> #{{selectedReminderToken?.tokennumber}}
+      </div>
+    </div>
+
+    <!-- Add New Reminder Form -->
+    <div class="reminder-form">
+      <h4>Add New Reminder</h4>
+      
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Reminder Context</mat-label>
+        <textarea matInput  [(ngModel)]="newReminderContext"  placeholder="Enter reminder details..." rows="3"  maxlength="500"></textarea>
+        <mat-hint align="end">{{newReminderContext.length}}/500</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Reminder Date</mat-label>
+        <input matInput  [matDatepicker]="reminderPicker"  [(ngModel)]="newReminderDate" [min]="minReminderDate" placeholder="Select date">
+        <mat-datepicker-toggle matSuffix [for]="reminderPicker"></mat-datepicker-toggle>
+        <mat-datepicker #reminderPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Reminder Time</mat-label>
+        <input matInput  type="time" [(ngModel)]="newReminderTime" placeholder="Select time">
+      </mat-form-field>
+      <button mat-raised-button  color="primary"  (click)="addReminder()" [disabled]="!newReminderContext.trim() || !newReminderDate || !newReminderTime">
+        <mat-icon>add_alarm</mat-icon>
+        Add Reminder
+      </button>
+    </div>
+
+    <!-- Existing Reminders List -->
+    <div class="reminders-list" *ngIf="getTokenReminders(selectedReminderToken?.profile_id).length > 0">
+      <h4>Existing Reminders</h4>
+      
+      <div class="reminder-item" *ngFor="let reminder of getTokenReminders(selectedReminderToken?.profile_id)">
+        <div class="reminder-content">
+          <div class="reminder-context">
+            <mat-icon class="reminder-icon">alarm</mat-icon>
+            <p>{{reminder.context}}</p>
+          </div>
+          <div class="reminder-date">
+            <mat-icon>event</mat-icon>
+            <span>{{reminder.date?.toDate() | date:'MMM d, y, h:mm a'}}</span>
+          </div>
+          <div class="reminder-created-by">
+            <mat-icon>person</mat-icon>
+            <span>Created by: {{mapProfileData[reminder.userentry?.user]?.['name']}}</span>
+            <span class="reminder-created-date">on {{reminder.userentry?.date?.toDate() | date:'MMM d, y'}}</span>
+          </div>
+        </div>
+        
+        <div class="reminder-actions">
+          <button mat-icon-button 
+                  color="primary" 
+                  (click)="markReminderCompleted(reminder.docid)"
+                  matTooltip="Mark as completed">
+            <mat-icon>check_circle</mat-icon>
+          </button>
+          <button mat-icon-button 
+                  color="warn" 
+                  (click)="deleteReminder(reminder.docid)"
+                  matTooltip="Delete reminder">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="no-reminders" *ngIf="getTokenReminders(selectedReminderToken?.profile_id).length === 0">
+      <mat-icon>alarm_off</mat-icon>
+      <p>No reminders yet. Add your first reminder above.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Reminder Notification Popup  -->
+<div class="reminder-notification-overlay" *ngIf="showReminderNotification && dueRemindersToShow.length > 0">
+  <div class="reminder-notification-popup-multi">
+    <div class="reminder-notification-header">
+      <mat-icon class="reminder-bell-icon">notifications_active</mat-icon>
+      <h3>
+        Reminder Alert
+        <span class="reminder-count-badge">{{ dueRemindersToShow.length }}</span>
+      </h3>
+      <button mat-icon-button class="close-all-btn" (click)="closeReminderNotification()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    
+    <div class="reminder-notification-content-multi">
+      <div class="reminder-card" *ngFor="let reminder of dueRemindersToShow; let i = index">
+        <div class="reminder-card-header">
+          <span class="reminder-number">#{{ reminder.queuetokenno }}</span>
+          <span class="reminder-time">
+            <mat-icon>schedule</mat-icon>
+            {{ reminder.date?.toDate() | date: 'h:mm a' }}
+          </span>
+        </div>
+        
+        <div class="reminder-card-body">
+          <div class="reminder-info-row">
+            <mat-icon class="info-icon">person</mat-icon>
+            <div class="info-content">
+              <span class="info-label">Participant:</span>
+              <span class="info-value">{{ getReminderParticipantName(reminder.profileid) }}</span>
+            </div>
+          </div>
+          <div class="reminder-info-row">
+            <mat-icon class="info-icon">note</mat-icon>
+            <div class="info-content">
+              <span class="info-label">Context:</span>
+              <span class="info-value context-text">{{ reminder.context }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="reminder-card-actions">
+          <button mat-button (click)="markReminderCompleted(reminder.docid)">
+            <mat-icon>check_circle</mat-icon>
+            Mark Complete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

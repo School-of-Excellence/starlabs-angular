@@ -1,0 +1,373 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.mainscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  flex-shrink: 0;
+  padding: 10px 24px;
+  background: #37474f;
+  color: white;
+  text-align: center;
+}
+
+.heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.filters-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  background: white;
+}
+
+.filters-row mat-form-field {
+  width: 350px;
+}
+
+.table-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+::ng-deep .mat-mdc-tab-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+::ng-deep .mat-mdc-tab-header {
+  flex-shrink: 0;
+  background: white;
+}
+
+::ng-deep .mat-mdc-tab-body-wrapper {
+  flex: 1;
+  overflow: hidden;
+}
+
+::ng-deep .mat-mdc-tab-body-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.table-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.actionbox {
+  flex-shrink: 0;
+  padding: 8px 16px;
+}
+
+::ng-deep .mat-mdc-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: white;
+}
+
+mat-paginator {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  z-index: 1;
+}
+
+table {
+  width: 100%;
+}
+
+.selected-row {
+  background: #e3f2fd;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+}
+
+/* Table Columns */
+.mat-column-select {
+  width: 50px;
+  max-width: 50px;
+}
+
+.mat-column-sno {
+  width: 60px;
+  max-width: 60px;
+}
+
+.mat-column-name {
+  width: 200px;
+}
+
+.mat-column-date {
+  width: 200px;
+}
+
+.mat-column-like {
+  width: 160px;
+  max-width: 160px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mat-column-flag {
+  width: 160px;
+  max-width: 160px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mat-column-notes {
+  flex: 1;
+  min-width: 200px;
+  max-width: none;
+}
+
+/* Notes Cell */
+.notes-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notes-preview {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 600px;
+}
+
+/* Like & Flag Cell */
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.action-user {
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.action-time {
+  font-size: 10px;
+  color: #999;
+}
+
+/* Overlay */
+.overlay-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay-panel {
+  background: white;
+  border-radius: 12px;
+  width: 700px;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.overlay-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.overlay-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.record-card {
+  padding: 16px 0;
+}
+
+.record-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.record-number {
+  font-weight: bold;
+  color: #666;
+}
+
+.record-name {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.record-date {
+  color: #888;
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.content-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.record-content {
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.record-content.secondary {
+  margin-top: 12px;
+  background: #e8f5e9;
+}
+
+.record-divider {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 8px 0;
+}
+
+/* Notes Panel */
+.notes-panel {
+  background: white;
+  border-radius: 12px;
+  width: 550px;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.notes-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.notes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 24px;
+  border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.notes-history {
+  margin-top: 16px;
+}
+
+.notes-history h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #555;
+}
+
+.note-item {
+  padding: 10px 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.note-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.note-user {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.note-time {
+  font-size: 11px;
+  color: #999;
+}
+
+.note-text {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}

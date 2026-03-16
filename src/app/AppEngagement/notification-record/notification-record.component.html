@@ -1,0 +1,501 @@
+<mat-tab-group>
+  <mat-tab label="Notifications"> 
+    <div class="notification-log-container">
+      <!-- Header -->
+      <!-- <div class="header">
+        <label class="text-center title">Notification Log</label>
+        <button mat-stroked-button class="export-btn" (click)="exportData()">
+          <mat-icon>file_download</mat-icon>
+          Export
+        </button>
+      </div> -->
+
+      <!-- Search and Date Filter Row -->
+      <div class="filter-row-1 mt-1">
+        <div class="date-range-container">
+          <mat-form-field appearance="outline" class="date-field">
+            <!-- <mat-icon matPrefix>calendar_today</mat-icon> -->
+            <mat-label>Start Date</mat-label>
+            <input matInput placeholder="DD/MM/YYYY" [matDatepicker]="startPicker" [(ngModel)]="startDate">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker (dateChange)="onDateChange()"></mat-datepicker>
+          </mat-form-field>
+          
+          <!-- <span class="date-separator">→</span> -->
+          
+          <mat-form-field appearance="outline" class="date-field">
+            <mat-label>End Date</mat-label>
+            <input matInput placeholder="DD/MM/YYYY" [matDatepicker]="endPicker" [(ngModel)]="endDate">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker (dateChange)="onDateChange()"></mat-datepicker>
+          </mat-form-field>
+        </div>
+        <button mat-raised-button style="margin-bottom: 20px;" (click)="onDateChange()" [disabled]="!startDate && !endDate">
+          <mat-icon>date_range</mat-icon>
+          Fetch Notification Record
+        </button>
+      </div>
+
+      <!-- Dropdown Filters Row -->
+      <div class="filter-row-2">
+        <!-- <mat-form-field appearance="outline" class="filter-dropdown">
+          <mat-select placeholder="Category Type" [(value)]="selectedCategoryType" (selectionChange)="onCategoryFilterChange()">
+            <mat-option value="">All Categories</mat-option>
+            <mat-option *ngFor="let category of categoryTypes" [value]="category">{{category}}</mat-option>
+          </mat-select>
+          <mat-icon matSuffix>expand_more</mat-icon>
+        </mat-form-field> -->
+
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput placeholder="Search..." [(ngModel)]="searchText" (input)="onSearchChange()">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-dropdown">
+          <mat-select placeholder="Notification Type" [(value)]="selectedNotificationType" (selectionChange)="onNotificationTypeFilterChange()">
+            <mat-option value="">All Types</mat-option>
+            <mat-option *ngFor="let type of notificationTypes" [value]="type">{{type}}</mat-option>
+          </mat-select>
+          <mat-icon matSuffix>expand_more</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-dropdown">
+          <mat-select placeholder="Notification Status" [(value)]="selectedNotificationStatus" (selectionChange)="onNotificationStatusFilterChange()">
+            <mat-option value="">All Statuses</mat-option>
+            <mat-option *ngFor="let status of notificationStatuses" [value]="status">{{status}}</mat-option>
+          </mat-select>
+          <mat-icon matSuffix>expand_more</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-dropdown search-person">
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput 
+              placeholder="Search by Person name" 
+              [(ngModel)]="searchPersonName"
+              (input)="onPersonNameFilterChange()">
+        </mat-form-field>
+
+        <button mat-raised-button color="accent" style="margin-bottom: 20px;" (click)="clearFilters()">
+          Clear Filters
+        </button>
+      </div>
+
+      <!-- Statistics Cards -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <h3 class="stat-title">Total Notifications</h3>
+          <div class="stat-value">{{totalNotifications}}</div>
+          <div class="stat-subtitle green">{{newlyNotifications.length}} Newly Sent Today</div>
+        </div>
+
+        <div class="stat-card">
+          <h3 class="stat-title">Notification sent Rate%</h3>
+          <div class="stat-value">{{notificationSentRate}}%</div>
+          <div class="stat-subtitle green">
+            <mat-icon class="trend-icon">trending_up</mat-icon>
+            +{{newlysentnotificationRate}}% New Notification sent
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <h3 class="stat-title">Notification sent Failure</h3>
+          <div class="stat-value failure">
+            <mat-icon class="warning-icon">warning</mat-icon>
+            {{failedNotifications}}
+          </div>
+          <div class="stat-subtitle red">
+            <mat-icon class="trend-icon">trending_down</mat-icon>
+            {{currentfailedRate}} New Notification sent Failed
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Table -->
+      <div class="table-container">
+        <table mat-table [dataSource]="notificationDataSource" matSort class="notification-table">
+          
+          <!-- Log Date & Time Column -->
+          <ng-container matColumnDef="logDateTime">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Log Date & Time</th>
+            <td mat-cell *matCellDef="let element">
+              <div class="date-time-cell">
+                <mat-icon class="calendar-icon">calendar_today</mat-icon>
+                <span class="date">{{element.date.toDate() | date : "dd/MM/yyyy"}}</span>
+                <br>
+                <mat-icon class="time-icon">schedule</mat-icon>
+                <span class="time">{{element.date.toDate() | date : "h:mm a"}}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Notification Title Column -->
+          <ng-container matColumnDef="notificationTitle">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Notification Title</th>
+            <td mat-cell *matCellDef="let element">
+              <div class="notification-title">
+                {{element.title}}
+                <!-- <div class="ticket-number" *ngIf="element.ticketNo">
+                  Ticket No :{{element.ticketNo}}
+                </div> -->
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Message Column -->
+          <ng-container matColumnDef="message">
+            <th mat-header-cell *matHeaderCellDef>Message</th>
+            <td mat-cell *matCellDef="let element">
+              <div class="message-cell">{{element.message}}</div>
+            </td>
+          </ng-container>
+
+          <!-- Category Column -->
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+            <td mat-cell *matCellDef="let element">
+              <span class="category-badge">{{element.notificationtype}}</span>
+            </td>
+          </ng-container>
+
+          <!-- Notification Type Column -->
+          <!-- <ng-container matColumnDef="notificationType">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Notification Type</th>
+            <td mat-cell *matCellDef="let element">
+              <span class="notification-type">{{element.notificationType}}</span>
+            </td>
+          </ng-container> -->
+
+          <!-- Sent to Column -->
+          <ng-container matColumnDef="sentTo">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Sent to</th>
+            <td mat-cell *matCellDef="let element">
+              <button mat-flat-button  (click)="openRecipientsDialog(element)">
+                <mat-icon style="padding: 5px;">group</mat-icon>
+                <span style="color: green;">✓ {{element.profilesuccess?.length || 0}} </span>
+                <span style="color: red;">✗ {{element.profilefailed?.length || 0}} </span>
+                <span style="color: #666; font-size: 12px;">Total: {{element.profileid?.length || 0}}</span>
+              </button>
+            </td>
+          </ng-container>
+
+          <!-- Received Rate Column -->
+          <ng-container matColumnDef="receivedRate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Received Rate</th>
+            <td mat-cell *matCellDef="let element">
+              <div class="progress-container">
+                <div class="progress-bar" [style.width.%]="element.receivedRate" 
+                    [style.background-color]="getReceivedRateColor(element.receivedRate)">
+                </div>
+                <span class="progress-text">{{element.receivedRate}}%</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
+      </div>
+
+      <!-- Recipients Dialog -->
+      <div *ngIf="showRecipientsDialog" class="recipients-overlay" (click)="closeRecipientsDialog()">
+        <div class="recipients-dialog" (click)="$event.stopPropagation()">
+          <div class="dialog-header">
+            <h3>Recipient Details</h3>
+            <div class="header-actions">
+              <!-- Load All Logs Button (shown when not all logs loaded) -->
+              <button mat-stroked-button 
+                      *ngIf="!allLogsLoaded"
+                      color="accent"
+                      (click)="loadAllLogsForExport()" 
+                      [disabled]="isLoadingAllLogs">
+                <mat-icon>{{isLoadingAllLogs ? 'sync' : 'cloud_download'}}</mat-icon>
+                {{isLoadingAllLogs ? 'Loading... ' + logsLoadingProgress + '%' : 'Load All Logs'}}
+              </button>
+
+              <!-- Export Button -->
+              <button mat-raised-button 
+                      color="primary" 
+                      (click)="exportRecipientsToExcel()" 
+                      [disabled]="!allLogsLoaded || isExporting"
+                      [matTooltip]="!allLogsLoaded ? 'Load all logs first to enable export' : ''">
+                <mat-icon>{{isExporting ? 'hourglass_empty' : 'file_download'}}</mat-icon>
+                {{isExporting ? 'Exporting...' : 'Export'}}
+              </button>
+
+              <button mat-icon-button (click)="closeRecipientsDialog()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="dialog-content">
+            <!-- Progress indicator -->
+            <div *ngIf="!allLogsLoaded" class="logs-progress-container">
+              <div class="logs-progress-info">
+                <span>Logs loaded: {{logsCheckedCount}} / {{totalRecipientsWithUserRef}}</span>
+                <span>{{logsLoadingProgress}}%</span>
+              </div>
+              <div class="logs-progress-bar">
+                <div class="logs-progress-fill" [style.width.%]="logsLoadingProgress"></div>
+              </div>
+              <small class="logs-progress-hint">Click "Load All Logs" to enable export</small>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="tab-buttons">
+              <button mat-flat-button 
+                      [class.active-tab]="selectedTab === 'success'"
+                      [color]="selectedTab === 'success' ? 'primary' : ''"
+                      (click)="switchTab('success')"
+                      class="tab-btn">
+                <mat-icon>check_circle</mat-icon>
+                Success ({{filteredSuccessRecipients.length}})
+              </button>
+              <button mat-flat-button 
+                      [class.active-tab]="selectedTab === 'failed'"
+                      [color]="selectedTab === 'failed' ? 'warn' : ''"
+                      (click)="switchTab('failed')"
+                      class="tab-btn">
+                <mat-icon>error</mat-icon>
+                Failed ({{filteredFailedRecipients.length}})
+              </button>
+            </div>
+
+            <!-- Search input -->
+            <mat-form-field appearance="outline" class="search-recipients">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search by name..." [(ngModel)]="recipientSearchText" (input)="filterRecipients()">
+            </mat-form-field>
+
+            <!-- Loading indicator -->
+            <div *ngIf="logsLoadingCount > 0" class="loading-indicator">
+              <mat-icon class="spin">sync</mat-icon>
+              Loading logs for {{logsLoadingCount}} recipient(s)...
+            </div>
+
+            <!-- SUCCESS TAB -->
+            <div *ngIf="selectedTab === 'success'" class="recipients-table-container">
+              <table mat-table [dataSource]="getPaginatedSuccessRecipients()" class="recipients-table">
+                <!-- Name Column -->
+                <ng-container matColumnDef="name">
+                  <th mat-header-cell *matHeaderCellDef>Name</th>
+                  <td mat-cell *matCellDef="let recipient">{{recipient.name}}</td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>Status</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    <span class="status-badge success">{{recipient.status}}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Channel Column -->
+                <ng-container matColumnDef="channel">
+                  <th mat-header-cell *matHeaderCellDef>Channel</th>
+                  <td mat-cell *matCellDef="let recipient">
+                    <span *ngIf="recipient.appstatus" class="channel-badge app">{{recipient.appstatus}}</span>
+                    <span *ngIf="recipient.webstatus" class="channel-badge web">{{recipient.webstatus}}</span>
+                    <span *ngIf="!recipient.appstatus && !recipient.webstatus">-</span>
+                  </td>
+                </ng-container>
+
+            <!-- NEW: Read Column for SUCCESS tab -->
+            <ng-container matColumnDef="read">
+              <th mat-header-cell *matHeaderCellDef>Read</th>
+              <td mat-cell *matCellDef="let recipient">
+                <span *ngIf="recipient.logsLoading" class="log-status loading">
+                  <mat-icon class="spin">sync</mat-icon>
+                </span>
+                <span *ngIf="!recipient.logsLoading && recipient.logsChecked" 
+                      [class.read-yes]="recipient.read === true" 
+                      [class.read-no]="recipient.read === false">
+                  {{recipient.read ? 'true' : 'false'}}
+                </span>
+                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+              </td>
+            </ng-container>
+
+            <!-- NEW: Clicked Column for SUCCESS tab -->
+            <ng-container matColumnDef="clicked">
+              <th mat-header-cell *matHeaderCellDef>Clicked</th>
+              <td mat-cell *matCellDef="let recipient">
+                <span *ngIf="recipient.logsLoading" class="log-status loading">
+                  <mat-icon class="spin">sync</mat-icon>
+                </span>
+                <span *ngIf="!recipient.logsLoading && recipient.logsChecked" 
+                      [class.clicked-yes]="recipient.clicked === 'Yes'" 
+                      [class.clicked-unknown]="recipient.clicked === 'unknown'">
+                  {{recipient.clicked}}
+                </span>
+                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+              </td>
+            </ng-container>
+
+          <!-- Log Status Column -->
+          <ng-container matColumnDef="logStatus">
+            <th mat-header-cell *matHeaderCellDef>Log Created</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span *ngIf="recipient.logsLoading" class="log-status loading">
+                <mat-icon class="spin">sync</mat-icon> Loading...
+              </span>
+              <span *ngIf="!recipient.logsLoading && !recipient.logsChecked && recipient.hasUserRef" class="log-status pending">
+                <mat-icon>schedule</mat-icon> Pending
+              </span>
+              <span *ngIf="!recipient.logsLoading && recipient.logsChecked && recipient.hasLogs" class="log-status success">
+                <mat-icon>check_circle</mat-icon> Yes ({{recipient.logCount}})
+              </span>
+              <span *ngIf="!recipient.logsLoading && recipient.logsChecked && !recipient.hasLogs && recipient.hasUserRef" class="log-status warning">
+                <mat-icon>warning</mat-icon> No
+              </span>
+              <span *ngIf="!recipient.hasUserRef" class="log-status error">
+                <mat-icon>person_off</mat-icon> No user ref
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Update the header and row definitions to include new columns -->
+          <tr mat-header-row *matHeaderRowDef="['name', 'status', 'channel', 'read', 'clicked', 'logStatus']"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'channel', 'read', 'clicked', 'logStatus'];"></tr>
+        </table>
+
+        <mat-paginator 
+          [length]="filteredSuccessRecipients.length"
+          [pageSize]="pageSize"
+          [pageIndex]="successPageIndex"
+          [pageSizeOptions]="pageSizeOptions"
+          (page)="onSuccessPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+
+        <div *ngIf="filteredSuccessRecipients.length === 0" class="no-recipients">
+          <mat-icon>check_circle_outline</mat-icon>
+          <span>No successful recipients</span>
+        </div>
+      </div>
+
+      <!-- FAILED TAB -->
+      <div *ngIf="selectedTab === 'failed'" class="recipients-table-container">
+        <table mat-table [dataSource]="getPaginatedFailedRecipients()" class="recipients-table">
+          <!-- Name Column -->
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let recipient">{{recipient.name}}</td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span class="status-badge failed">{{recipient.status}}</span>
+            </td>
+          </ng-container>
+
+          <!-- Failed Reason Column -->
+          <ng-container matColumnDef="reason">
+            <th mat-header-cell *matHeaderCellDef>Reason</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span class="failed-reason" [title]="recipient.reason">{{recipient.reason}}</span>
+            </td>
+          </ng-container>
+
+          <!-- Channel Column -->
+          <ng-container matColumnDef="channel">
+            <th mat-header-cell *matHeaderCellDef>Channel</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span *ngIf="recipient.appstatus" class="channel-badge app-failed">{{recipient.appstatus}}</span>
+              <span *ngIf="recipient.webstatus" class="channel-badge web-failed">{{recipient.webstatus}}</span>
+              <span *ngIf="!recipient.appstatus && !recipient.webstatus">-</span>
+            </td>
+          </ng-container>
+
+          <!-- NEW: Read Column for FAILED tab -->
+          <ng-container matColumnDef="read">
+            <th mat-header-cell *matHeaderCellDef>Read</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span *ngIf="recipient.logsLoading" class="log-status loading">
+                <mat-icon class="spin">sync</mat-icon>
+              </span>
+              <span *ngIf="!recipient.logsLoading && recipient.logsChecked" 
+                    [class.read-yes]="recipient.read === true" 
+                    [class.read-no]="recipient.read === false">
+                {{recipient.read ? 'true' : 'false'}}
+              </span>
+              <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+            </td>
+          </ng-container>
+
+          <!-- NEW: Clicked Column for FAILED tab -->
+          <ng-container matColumnDef="clicked">
+            <th mat-header-cell *matHeaderCellDef>Clicked</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span *ngIf="recipient.logsLoading" class="log-status loading">
+                <mat-icon class="spin">sync</mat-icon>
+              </span>
+              <span *ngIf="!recipient.logsLoading && recipient.logsChecked" 
+                    [class.clicked-yes]="recipient.clicked === 'Yes'" 
+                    [class.clicked-unknown]="recipient.clicked === 'unknown'">
+                {{recipient.clicked}}
+              </span>
+              <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+            </td>
+          </ng-container>
+
+              <!-- Log Status Column -->
+              <ng-container matColumnDef="logStatus">
+                <th mat-header-cell *matHeaderCellDef>Log Created</th>
+                <td mat-cell *matCellDef="let recipient">
+                  <span *ngIf="recipient.logsLoading" class="log-status loading">
+                    <mat-icon class="spin">sync</mat-icon> Loading...
+                  </span>
+                  <span *ngIf="!recipient.logsLoading && !recipient.logsChecked && recipient.hasUserRef" class="log-status pending">
+                    <mat-icon>schedule</mat-icon> Pending
+                  </span>
+                  <span *ngIf="!recipient.logsLoading && recipient.logsChecked && recipient.hasLogs" class="log-status success">
+                    <mat-icon>check_circle</mat-icon> Yes ({{recipient.logCount}})
+                  </span>
+                  <span *ngIf="!recipient.logsLoading && recipient.logsChecked && !recipient.hasLogs && recipient.hasUserRef" class="log-status warning">
+                    <mat-icon>warning</mat-icon> No
+                  </span>
+                  <span *ngIf="!recipient.hasUserRef" class="log-status error">
+                    <mat-icon>person_off</mat-icon> No user ref
+                  </span>
+                </td>
+              </ng-container>
+
+              <!-- Update the header and row definitions to include new columns -->
+              <tr mat-header-row *matHeaderRowDef="['name', 'status', 'reason', 'channel', 'read', 'clicked', 'logStatus']"></tr>
+              <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'reason', 'channel', 'read', 'clicked', 'logStatus'];"></tr>
+            </table>
+
+            <mat-paginator 
+              [length]="filteredFailedRecipients.length"
+              [pageSize]="pageSize"
+              [pageIndex]="failedPageIndex"
+              [pageSizeOptions]="pageSizeOptions"
+              (page)="onFailedPageChange($event)"
+              showFirstLastButtons>
+            </mat-paginator>
+
+            <div *ngIf="filteredFailedRecipients.length === 0" class="no-recipients">
+              <mat-icon>error_outline</mat-icon>
+              <span>No failed recipients</span>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-tab>
+  <mat-tab label="Whatsapp">
+    <app-wati-record></app-wati-record>
+  </mat-tab>
+  <mat-tab label="Emails"> 
+    <app-email-record></app-email-record>
+  </mat-tab>
+  <mat-tab label="Calls">
+    <app-calls-record></app-calls-record>
+  </mat-tab>
+</mat-tab-group>

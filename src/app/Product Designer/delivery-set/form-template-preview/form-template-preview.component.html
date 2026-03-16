@@ -1,0 +1,56 @@
+<!-- Form Preview Dialog -->
+<div class="preview-dialog-container m-4">
+  <div class="preview-header">
+    <h2>Review Your Submission</h2>
+    <p>Please review your answers before final submission.</p>
+  </div>
+  
+  <div class="preview-content">
+    <div *ngFor="let field of previewData" class="preview-field">
+      <ng-container *ngIf="field.value !== null && field.value !== undefined && field.value !== ''">
+        <div class="preview-field-name">{{field.fieldname}}</div>
+        
+        <!-- Display simple text/number/email values -->
+        <div *ngIf="isSimpleValue(field.value)" class="preview-field-value">
+          {{field.value}}
+        </div>
+        
+        <!-- Display date values properly formatted -->
+        <div *ngIf="isDateValue(field.value)" class="preview-field-value">
+          {{formatDate(field.value)}}
+        </div>
+        
+        <!-- Display array of strings (for multi-select) -->
+        <div *ngIf="isArrayOfStrings(field.value)" class="preview-field-value">
+          <ul class="preview-list">
+            <li *ngFor="let item of field.value">{{item}}</li>
+          </ul>
+        </div>
+        
+        <!-- Display complex arrays (form arrays) -->
+        <div *ngIf="isFormArray(field.value)" class="preview-field-value">
+          <div *ngFor="let arrayItem of field.value; let i = index" class="preview-array-item">
+            <div class="preview-array-header">Item {{i + 1}}</div>
+            <div *ngFor="let key of getObjectKeys(arrayItem)" class="preview-array-field">
+              <ng-container *ngIf="arrayItem[key] !== null && arrayItem[key] !== undefined && arrayItem[key] !== false && arrayItem[key] !== ''">
+                <!-- <div class="preview-array-field-name">{{key}}</div> -->
+                <div class="preview-array-field-value">
+                  {{isDateValue(arrayItem[key]) ? formatDate(arrayItem[key]) : arrayItem[key]}}
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+  
+  <div class="preview-actions">
+    <button mat-button (click)="onCancel()" class="cancel-button">
+      <mat-icon>arrow_back</mat-icon> Edit Form
+    </button>
+    <button mat-raised-button color="primary" (click)="onConfirm()" class="confirm-button">
+      <mat-icon>check_circle</mat-icon> Confirm Submission
+    </button>
+  </div>
+</div>

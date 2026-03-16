@@ -1,0 +1,93 @@
+<div class="home">
+  <div>
+    <div class="title">Event Lists</div>
+    <div class="createeventbtn">
+      <button mat-raised-button class="menuitem fadein" (click)="openEventEditor()">
+        Create New Event
+      </button>
+    </div>
+    <table class="tablebox mat-elevation-z2" mat-table matSort [dataSource]="eventDataSource">
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>Event ID</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["id"]}}</label>
+          <button *ngIf="event['enddate'].getTime() > currentDate.getTime()" class="text-secondary me-2" mat-icon-button (click)="copyToClipboard(event['docid'])">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>Event Name</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["name"]}}</label>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="venue">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>Venue</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["venue"]}}</label>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="startdate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>Start Date</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["startdate"] | date : "medium"}}</label>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="enddate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>End Date</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["enddate"] | date : "medium"}}</label>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="notifyparticipants">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>Notify Participants</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["notifyparticipants"] ? 'Yes' : 'No' }}</label>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="addtocalendar">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>
+          <label>Add to Calendar</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <label>{{event["addtocalendar"] ? 'Yes' : 'No'}}</label>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef>
+          <label>More</label>
+        </th>
+        <td mat-cell *matCellDef="let event">
+          <button mat-icon-button [matMenuTriggerFor]="menu"><mat-icon>more_vert</mat-icon></button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item (click)="openEventEditor(event['docid'])">Update Event</button>
+            <button mat-menu-item (click)="onViewEventParticipants(event['docid'])">Manage Participants</button>
+          </mat-menu>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="eventHeader; sticky: true"></tr>
+      <tr mat-row *matRowDef="let row; columns: eventHeader"></tr>
+    </table>
+  </div>
+</div>

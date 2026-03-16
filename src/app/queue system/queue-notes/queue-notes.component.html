@@ -1,0 +1,132 @@
+<div class="notes-tags-dialog">
+    <div class="dialog-header">
+      <div class="title">
+        <h2>Participant Notes & Tags - Token #{{data.tokennumber}}</h2>
+      </div>
+      <div class="participant-info">
+        <span class="participant-name">{{data.profile_name || 'Participant'}}</span>
+      </div>
+    </div>
+  
+    <mat-divider></mat-divider>
+  
+    <div class="dialog-content">
+      <!-- Notes Section -->
+      <div class="notes-section">
+        <div class="section-header">
+          <mat-icon>event_note</mat-icon>
+          <h3>Notes</h3>
+        </div>
+        
+        <!-- Multiple Notes Management -->
+        <div class="notes-list-container" *ngIf="notesList.length > 0">
+          <div *ngFor="let note of notesList; let i = index" class="note-item">
+            <div class="note-content">
+              <div class="note-text">{{note.text}}</div>
+              <div class="note-meta">
+                <span class="note-timestamp" *ngIf="note.updatedon">{{note.updatedon | date:'MMM d, h:mm a'}}</span>
+                <span class="note-author" *ngIf="note.author">by {{this.mapProfile[note.author]}}</span><br>
+                <span class="note-author" *ngIf="note.stage">Note added stage {{note.stage}}</span>
+              </div>
+            </div>
+            <button mat-icon-button color="warn" (click)="removeNote(i)" class="note-remove-btn">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Add New Note -->
+        <mat-form-field appearance="outline" class="notes-field">
+          <mat-label>Add a new note</mat-label>
+          <textarea 
+            matInput 
+            [formControl]="newNoteCtrl" 
+            rows="3"
+            (keydown)="onKeydown($event)"></textarea>
+          <button 
+            mat-icon-button 
+            matSuffix 
+            color="primary" 
+            [disabled]="!newNoteCtrl.value || newNoteCtrl.value.trim() === ''"
+            (click)="addNote()">
+            <mat-icon>add_circle</mat-icon>
+          </button>
+          <mat-hint>Click the + button or press Ctrl+Enter to add this note</mat-hint>
+        </mat-form-field>
+      </div>
+  
+      <!-- Tags Section -->
+      <div class="tags-section">
+        <div class="section-header">
+          <mat-icon>local_offer</mat-icon>
+          <h3>Tags</h3>
+        </div>
+        
+        <!-- Selected Tags -->
+        <div class="selected-tags-container">
+          <div class="selected-tags-wrapper">
+            <mat-chip-grid #chipList>
+              <mat-chip 
+                *ngFor="let tag of selectedTags" 
+                [removable]="true"
+                (removed)="remove(tag)"
+                class="tag-chip">
+                {{tag}}
+                <mat-icon matChipRemove>cancel</mat-icon>
+              </mat-chip>
+            </mat-chip-grid>
+          </div>
+          
+          <!-- Tag Input -->
+          <div class="tag-input-container">
+            <mat-form-field appearance="outline" class="tag-input">
+              <mat-label>Add tags</mat-label>
+              <input 
+                matInput
+                #tagInput
+                [formControl]="tagCtrl"
+                [matAutocomplete]="auto"
+                [matChipInputFor]="chipList"
+                [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                (matChipInputTokenEnd)="add($event)"
+                placeholder="Type tag and press Enter">
+              <mat-hint align="start">Press Enter to add a new tag</mat-hint>
+              <mat-autocomplete #auto="matAutocomplete" (optionSelected)="selected($event)">
+                <mat-option *ngFor="let tag of filteredTags | async" [value]="tag">
+                  {{tag}}
+                </mat-option>
+              </mat-autocomplete>
+            </mat-form-field>
+          </div>
+        </div>
+        
+        <!-- Available Tags -->
+        <div class="available-tags-container" *ngIf="!loading && allTags.length > 0">
+          <div class="available-tags-header">
+            <span class="available-tags-title">Available Tags</span>
+          </div>
+          <div class="available-tags">
+            <button 
+              *ngFor="let tag of allTags.slice(0, 15)" 
+              mat-stroked-button 
+              class="tag-button"
+              [class.tag-selected]="selectedTags.includes(tag)"
+              [disabled]="selectedTags.includes(tag)"
+              (click)="addQuickTag(tag)">
+              <mat-icon class="tag-icon" *ngIf="selectedTags.includes(tag)">check</mat-icon>
+              {{tag}}
+            </button>
+            <mat-progress-spinner *ngIf="loading" diameter="24"></mat-progress-spinner>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <mat-divider></mat-divider>
+  
+    <!-- Actions -->
+    <div class="dialog-actions">
+      <button mat-button class="cancel-button" (click)="cancel()">Cancel</button>
+      <button mat-raised-button color="primary" class="save-button" (click)="save()">Save</button>
+    </div>
+  </div>

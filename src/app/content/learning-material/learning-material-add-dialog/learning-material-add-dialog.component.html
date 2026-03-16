@@ -1,0 +1,181 @@
+<div class="dialog-wrap">
+  <div class="dialog-header">
+    <h2 class="dialog-title">
+      <mat-icon class="dialog-title-icon">cloud_upload</mat-icon>
+      {{ isEditMode ? 'Edit Material' : 'Upload Material' }}
+    </h2>
+    <button class="a-btn" mat-dialog-close>
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-body">
+    <div class="field-group">
+      <label class="label">Name <span class="required">*</span></label>
+      <div class="input-box">
+        <mat-icon class="ib-icon">title</mat-icon>
+        <input type="text" class="ib-input" placeholder="Enter material name"
+          [(ngModel)]="name" required />
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="label">Description</label>
+      <div class="input-box lm-textarea-box">
+        <textarea class="ib-input lm-textarea" placeholder="Enter description"
+          [(ngModel)]="description" rows="3"></textarea>
+      </div>
+    </div>
+    <br>
+    <div class="field-group">
+      <label class="label">Access Type <span class="required">*</span></label>
+      <mat-select
+        [(ngModel)]="type"
+        name="type"
+        required
+        (selectionChange)="ontypeChange()"
+        #accessCtrl="ngModel"
+        class="cat-select">
+        
+        <mat-option value="free">Free</mat-option>
+        <mat-option value="tier">Tier</mat-option>
+      </mat-select>
+
+      <span class="field-error" *ngIf="!accessCtrl.valid && accessCtrl.touched">
+        Access type is required
+      </span>
+    </div>
+    <br>
+    <div class="field-group" *ngIf="type === 'tier'">
+      <label class="label">Tier <span class="required">*</span></label>
+
+      <mat-select
+        [(ngModel)]="selectedTier"
+        name="tier"
+        multiple
+        [required]="type === 'tier'"
+        class="cat-select"
+        #tierCtrl="ngModel">
+
+        <mat-option *ngFor="let t of tierList" [value]="t.id">
+          {{ t.tier }}
+        </mat-option>
+      </mat-select>
+
+      <span class="field-error"
+        *ngIf="type === 'tier' && !tierCtrl.valid && tierCtrl.touched">
+        Select at least one tier
+      </span>
+    </div>
+    <br>
+    <div class="field-group">
+      <label class="label">Available<span class="required">*</span></label>
+      <mat-select
+        [(ngModel)]="available"
+        name="available"
+        required
+        #availableCtrl="ngModel"
+        class="cat-select">
+        
+        <mat-option value="yes">Yes</mat-option>
+        <mat-option value="no">No</mat-option>
+      </mat-select>
+
+      <span class="field-error" *ngIf="!availableCtrl.valid && availableCtrl.touched">
+        Available (yes/no) is required
+      </span>
+    </div>
+    <br>
+    <div class="field-group">
+      <label class="label">Thumbnail <span class="required">*</span></label>
+
+      <div class="upload-zone" (click)="thumbInput.click()">
+        <input
+          #thumbInput
+          type="file"
+          accept="image/*"
+          hidden
+          (change)="onThumbnailSelected($event)"
+        />
+
+        <div class="upload-zone-content">
+          <mat-icon class="upload-icon">image</mat-icon>
+          <span class="upload-text">
+            {{ thumbnailUrl ? 'Change Thumbnail' : 'Click to upload thumbnail' }}
+          </span>
+          <span class="upload-hint">Only images allowed</span>
+        </div>
+      </div>
+
+      <div *ngIf="thumbnailUploading" class="lm-progress-bar" style="margin-top:8px;">
+        <div class="lm-progress-fill" style="width:100%"></div>
+      </div>
+
+      <div *ngIf="thumbnailUrl" style="margin-top:12px;">
+        <img
+          [src]="thumbnailUrl"
+          style="width:120px; height:120px; object-fit:cover; border-radius:8px;"
+        />
+      </div>
+    </div>
+    <br>
+    <div class="field-group">
+      <label class="label">Files</label>
+      <div class="upload-zone" (click)="fileInput.click()"
+        (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onFileDrop($event)"
+        [class.drag-active]="isDragOver">
+        <input #fileInput type="file" multiple
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg"
+          (change)="onFilesSelected($event)" hidden />
+        <div class="upload-zone-content">
+          <mat-icon class="upload-icon">upload_file</mat-icon>
+          <span class="upload-text">Click or drag files here</span>
+          <span class="upload-hint">PDF, DOC, XLS, PPT, Images supported</span>
+        </div>
+      </div>
+    </div>
+    <div class="field-group" *ngIf="uploadingFiles.length > 0">
+      <label class="label">Uploading...</label>
+      <div class="lm-file-list">
+        <div class="lm-file-item" *ngFor="let uf of uploadingFiles">
+          <mat-icon class="lm-file-icon">{{ getFileIcon(uf.name) }}</mat-icon>
+          <div class="lm-file-info">
+            <span class="lm-file-name">{{ uf.name }}</span>
+            <div class="lm-progress-bar">
+              <div class="lm-progress-fill" [style.width.%]="uf.progress"></div>
+            </div>
+          </div>
+          <span class="lm-file-percent">{{ uf.progress }}%</span>
+        </div>
+      </div>
+    </div>
+    <div class="field-group" *ngIf="files.length > 0">
+      <label class="label">Uploaded Files ({{ files.length }}) — Drag to reorder</label>
+      <div class="drag-list" cdkDropList (cdkDropListDropped)="dropFile($event)">
+        <div class="drag-item" *ngFor="let f of files; let i = index" cdkDrag>
+          <div class="drag-handle" cdkDragHandle>
+            <mat-icon>drag_indicator</mat-icon>
+          </div>
+          <span class="drag-index">{{ i + 1 }}</span>
+          <mat-icon class="lm-file-icon-sm">{{ getFileIcon(f.name) }}</mat-icon>
+          <div class="lm-file-info">
+            <span class="c-name lm-file-name-link" (click)="openFile(f.url)">{{ f.name }}</span>
+            <span class="c-size">{{ f.size }}</span>
+          </div>
+          <button class="a-btn a-del" (click)="removeFile(i)" style="margin-left: auto;">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-footer">
+    <button class="btn-cancel" mat-dialog-close>Cancel</button>
+    <button class="btn-primary" (click)="onSave()"
+      [disabled]="saving || !name.trim() || uploadingFiles.length > 0">
+      <mat-icon *ngIf="!saving">save</mat-icon>
+      <mat-icon *ngIf="saving" class="spin-icon">sync</mat-icon>
+      {{ saving ? 'Saving...' : 'Save' }}
+    </button>
+  </div>
+</div>

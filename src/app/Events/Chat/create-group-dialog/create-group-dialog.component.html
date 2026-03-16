@@ -1,0 +1,208 @@
+<!-- Enhanced HTML Template -->
+<div class="create-group-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <button type="button" mat-icon-button class="back-button" (click)="close()">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <h1 class="page-title">{{ groupData ? 'Edit Group' : 'Create Group' }}</h1>
+    <div class="header-spacer"></div>
+    <button 
+      *ngIf="groupData"
+      type="button"
+      mat-raised-button 
+      class="delete-button text-light"
+      (click)="hideGroup()">
+      <mat-icon>delete</mat-icon>
+      Delete Group
+    </button>
+    <button 
+      type="submit" 
+      mat-raised-button 
+      class="create-button text-light"
+      [disabled]="!form.valid"
+      (click)="submit(form.value)">
+      <mat-icon>{{ groupData ? 'save' : 'group_add' }}</mat-icon>
+      {{ groupData ? 'Save Changes' : 'Create Group' }}
+    </button>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content-wrapper">
+    <form [formGroup]="form" class="group-form">
+      
+      <!-- Group Image Section -->
+      <div class="form-section">
+        <div class="section-header">
+          <mat-icon class="section-icon">photo_camera</mat-icon>
+          <h3>Group Image</h3>
+        </div>
+        
+        <div class="image-upload-area">
+          <div class="upload-zone" *ngIf="!getGroupImage() || getGroupImage() === defaultGroupIcon" (click)="fileInput.click()">
+            <div class="default-avatar">
+              <img [src]="defaultGroupIcon" alt="Default group icon" class="default-icon-preview"/>
+            </div>
+            <p class="upload-text">Click to upload group image</p>
+            <small class="upload-hint">Supports JPG, PNG, GIF</small>
+          </div>
+          
+          <div class="image-preview" *ngIf="getGroupImage() && getGroupImage() !== defaultGroupIcon">
+            <img 
+              [src]="getGroupImage()" 
+              alt="Group preview" 
+              class="preview-image"
+              (error)="removeImage()"/>
+            <div class="image-overlay">
+              <button mat-mini-fab color="primary" type="button" (click)="fileInput.click()" class="change-btn" matTooltip="Change image">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-mini-fab color="warn" type="button" (click)="removeImage()" class="remove-btn" matTooltip="Remove image">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+          
+          <input 
+            #fileInput
+            type="file" 
+            accept="image/*" 
+            (change)="importImages($event.target)" 
+            [multiple]="false" 
+            style="display: none"/>
+        </div>
+      </div>
+
+      <!-- Group Name Section -->
+      <div class="form-section">
+        <div class="section-header">
+          <mat-icon class="section-icon">drive_file_rename_outline</mat-icon>
+          <h3>Group Details</h3>
+        </div>
+        
+        <mat-form-field appearance="outline" class="full-width-field">
+          <mat-label>Group Name</mat-label>
+          <input type="text" matInput formControlName="groupname" placeholder="Enter group name">
+          <mat-icon matSuffix>group</mat-icon>
+          <mat-error *ngIf="form.get('groupname')?.hasError('required')">
+            Group name is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <!-- Members Section with Import Button -->
+      <div class="form-section">
+        <div class="section-header">
+          <mat-icon class="section-icon">people</mat-icon>
+          <h3>Add Members</h3>
+          <span class="member-count" *ngIf="form.controls['members'].value.length > 0">
+            ({{ form.controls['members'].value.length }} selected)
+          </span>
+          
+          <!-- Import Button in Header -->
+          <div class="import-button-group">
+            <button 
+              type="button" 
+              mat-raised-button 
+              color="primary"
+              (click)="excelInput.click()"
+              [disabled]="isImporting"
+              class="import-excel-btn">
+              <mat-icon *ngIf="!isImporting">upload_file</mat-icon>
+              <mat-spinner *ngIf="isImporting" diameter="18"></mat-spinner>
+              {{ isImporting ? 'Importing...' : 'Import Excel' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Hidden Excel Input -->
+        <input 
+          #excelInput
+          type="file" 
+          accept=".xlsx,.xls,.csv" 
+          (change)="importFromExcel($event)" 
+          style="display: none"/>
+
+        <!-- Import Results Alert -->
+        <div class="import-results" *ngIf="importResults">
+          <div class="result-summary" [class.has-errors]="importResults.notFound.length > 0">
+            <mat-icon *ngIf="importResults.notFound.length === 0">check_circle</mat-icon>
+            <mat-icon *ngIf="importResults.notFound.length > 0">warning</mat-icon>
+            <span>{{ importResults.matched }} member(s) imported</span>
+            <span *ngIf="importResults.notFound.length > 0" class="not-found-count">
+              ({{ importResults.notFound.length }} not found)
+            </span>
+            <button mat-icon-button (click)="clearImportResults()" matTooltip="Dismiss" class="dismiss-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          
+          <div class="not-found-list" *ngIf="importResults.notFound.length > 0">
+            <div class="not-found-emails">
+              <span class="not-found-email" *ngFor="let email of importResults.notFound">
+                {{ email }}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <mat-form-field appearance="outline" class="full-width-field">
+          <mat-label>Select Members</mat-label>
+          <mat-select multiple formControlName="members" placeholder="Choose group members" [compareWith]="compareMembers" required>
+            <mat-option>
+              <ngx-mat-select-search 
+                [(ngModel)]="filterprofile" 
+                [ngModelOptions]="{standalone: true}" 
+                [placeholderLabel]="'Search by name or email...'" 
+                [noEntriesFoundLabel]="'No matching profiles found'">
+              </ngx-mat-select-search>
+            </mat-option>
+            
+            <mat-option *ngFor="let profile of returnfilterProfile()" [value]="profile">
+              <div class="profile-option">
+                <span class="profile-name">{{ mapUser[profile]?.name || profile }}</span>
+                <!-- <span class="profile-email" *ngIf="mapUser[profile]?.email">{{ mapUser[profile]?.email }}</span> -->
+              </div>
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>people_outline</mat-icon>
+          <mat-error *ngIf="form.get('members')?.hasError('required')">
+            Please select at least one member
+          </mat-error>
+        </mat-form-field>
+      </div>
+    </form>
+
+    <!-- Selected Members Display -->
+    <div class="members-section" *ngIf="form.controls['members'].value.length > 0">
+      <div class="section-header">
+        <mat-icon class="section-icon">group</mat-icon>
+        <h3>Selected Members</h3>
+        <mat-chip class="member-chip">{{ form.controls['members'].value.length }}</mat-chip>
+      </div>
+      
+      <div class="members-grid">
+        <mat-card 
+          class="member-tile" 
+          *ngFor="let member of form.controls['members'].value; let i = index">
+          <div class="member-content">
+            <div class="member-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="member-info">
+              <h4 class="member-name">{{ mapUser[member]?.name || member }}</h4>
+              <p class="member-email">{{ mapUser[member]?.email || 'No email' }}</p>
+            </div>
+            <button 
+              mat-icon-button 
+              class="remove-member-btn" 
+              (click)="removeMember(member)"
+              matTooltip="Remove member">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </mat-card>
+      </div>
+    </div>
+  </div>
+</div>

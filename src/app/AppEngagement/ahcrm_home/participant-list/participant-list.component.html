@@ -1,0 +1,707 @@
+<div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ "Loading Dashboard.." }}</div>
+    <div class="loading-progress">
+      <div class="progress-bar-container">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW: Show Form View when form is selected -->
+<app-fill-form
+  *ngIf="showFormView && selectedFormDocId"
+  [formDocId]="selectedFormDocId"
+  [profileId]="selectedProfileId || ''"
+  (closeForm)="closeFormView()"
+  (formSaved)="onFormSaved()"
+></app-fill-form>
+
+<!-- Show Detail View when participant is selected (but not form view) -->
+<app-participant-detail
+  *ngIf="showDetailView && selectedProfileId && !showFormView"
+  [profileId]="selectedProfileId"
+  [loggedUser]="loggedUser"
+  (closeDetail)="closeDetailView()"
+  (openForm)="openFormView($event)"
+  (uploadImageRequest)="openImageUploadFromDetail($event)"
+></app-participant-detail>
+
+<!-- Show List View when no participant is selected -->
+<div
+  class="participant-list-container"
+  *ngIf="!showDetailView && !showFormView"
+>
+  <!-- Header -->
+  <div class="header" [class.scrolled]="isScrolled">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>A&H CRM</h1>
+        <span class="participant-count"
+          >{{ filterActive ? `${filteredProfileIds.length} of ` : ""
+          }}{{ totalProfileCount }} Participants</span
+        >
+      </div>
+
+      <button
+        class="icon-btn"
+        [class.active]="filterActive"
+        (click)="openFilterModal()"
+      >
+        <i class="material-icons">tune</i>
+        <span class="filter-badge" *ngIf="filterActive"></span>
+      </button>
+    </div>
+
+    <div class="search-container">
+      <div class="search-box">
+        <i class="material-icons search-icon">search</i>
+        <input
+          type="text"
+          placeholder="Search participants..."
+          [ngModel]="searchText"
+          (input)="onSearchChange($event)"
+        />
+        <button class="clear-btn" *ngIf="searchText" (click)="clearSearch()">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="events-filter">
+    <p class="on-going-event">On Going Events</p>
+    <!-- <mat-chip-listbox
+      multiple
+      class="custom-chip-list"
+      [(ngModel)]="selectedEvents"
+      (change)="filterByEvents($event)"
+    >
+      <mat-chip-option
+        *ngFor="let event of eventList"
+        [value]="event['docid']"
+        [selected]="selectedEvents.includes(event?.docid)"
+        >{{ event["name"] ?? "-" }}</mat-chip-option
+      > -->
+    <!-- <mat-chip-option selected class="custom-chip">HTML</mat-chip-option>
+    <mat-chip-option class="custom-chip">CSS</mat-chip-option>
+    <mat-chip-option class="custom-chip">Angular</mat-chip-option> -->
+    <!-- </mat-chip-listbox> -->
+    <!-- <p *ngIf="eventList.length === 0">No Ongoing events</p> -->
+    <div class="filter-chips">
+      <div
+        class="chip"
+        [class.active]="selectedEvents.includes(event?.docid)"
+        *ngFor="let event of eventList"
+        (click)="toggleSelectEvent(event?.docid)"
+      >
+        <span class="chip-dot"></span>
+        <span class="chip-label">{{ event["name"] ?? "-" }}</span>
+        <button class="chip-close">×</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Filter Chips -->
+  <div class="filters-container" *ngIf="getActiveFilterChips().length > 0">
+    <div class="filters-header">
+      <p>Active Events</p>
+      <button (click)="clearAllFilters()">clear all</button>
+    </div>
+    <div class="filter-chips">
+      <!-- <div class="chip" *ngFor="let chip of getActiveFilterChips()">
+        <span class="chip-dot"></span>
+        <span class="chip-label">{{ chip.label }}</span>
+      </div> -->
+      <div
+        class="chip"
+        [class.active]="true"
+        *ngFor="let chip of getActiveFilterChips()"
+      >
+        <span class="chip-dot"></span>
+        <span class="chip-label">{{ chip.label }}</span>
+        <button class="chip-close" (click)="removeFilter(chip)">×</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content" #scrollContainer (scroll)="onScroll($event)">
+    <!-- Loading State -->
+    <!-- <div class="loading-container" *ngIf="loading">
+      <div class="shimmer-card" *ngFor="let i of [1, 2, 3, 4, 5, 6, 7, 8]">
+        <div class="shimmer-avatar"></div>
+        <div class="shimmer-content">
+          <div class="shimmer-line w-60"></div>
+          <div class="shimmer-line w-40"></div>
+          <div class="shimmer-line w-80"></div>
+        </div>
+      </div>
+    </div> -->
+
+    <!-- Empty State -->
+    <div
+      class="empty-state"
+      *ngIf="!isLoading && filteredProfileIds.length === 0"
+    >
+      <i class="material-icons">search_off</i>
+      <h3>No participants found</h3>
+      <p>Try adjusting your search or filters</p>
+    </div>
+
+    <!-- Participant List -->
+    <div
+      class="participant-cards"
+      *ngIf="
+        !isLoading &&
+        !loadingStatus.participant &&
+        filteredProfileIds.length > 0
+      "
+    >
+      <div
+        class="participant-card"
+        *ngFor="let profileId of filteredProfileIds; trackBy: trackByProfileId"
+        (click)="openDetailView(profileId)"
+      >
+        <ng-container *ngIf="getParticipant(profileId) as profile">
+          <!-- Profile Image - Clickable -->
+          <div
+            class="profile-image"
+            (click)="openImagePreviewPopup(profile, $event)"
+          >
+            <img
+              *ngIf="getProfileImage(profile)"
+              [src]="getProfileImage(profile)"
+              [alt]="profile.name"
+              loading="lazy"
+            />
+            <div class="avatar-placeholder" *ngIf="!getProfileImage(profile)">
+              <i class="material-icons">person</i>
+            </div>
+            <div class="image-overlay">
+              <i class="material-icons">visibility</i>
+            </div>
+          </div>
+
+          <!-- Content -->
+          <div class="card-content">
+            <h3 class="participant-name">{{ profile.name }}</h3>
+
+            <ng-container
+              *ngIf="getMetadata(profileId)?.activejourney as journeyId"
+            >
+              <ng-container *ngIf="getJourney(journeyId)">
+                <div class="journey-tag">
+                  <i class="material-icons">flag</i>
+                  <span>{{ getJourney(journeyId) }}</span>
+                </div>
+              </ng-container>
+            </ng-container>
+
+            <div class="note-preview">
+              <i class="material-icons">notes</i>
+              <span>{{ getLatestNote(profile) }}</span>
+            </div>
+          </div>
+
+          <!-- Add Note Button -->
+          <button
+            class="add-note-btn"
+            (click)="openAddNoteModal(profile, $event)"
+          >
+            <i class="material-icons">add</i>
+          </button>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Loading More -->
+    <div class="loading-more" *ngIf="isLoadingMore">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="bottom-spacer"></div>
+  </div>
+
+  <!-- Scroll to Top FAB -->
+  <button
+    class="fab-scroll-top"
+    [class.visible]="isScrolled"
+    (click)="scrollToTop()"
+  >
+    <i class="material-icons">keyboard_arrow_up</i>
+  </button>
+
+  <!-- Filter Modal -->
+  <div
+    class="modal-overlay"
+    *ngIf="showFilterModal"
+    (click)="closeFilterModal()"
+  >
+    <div class="filter-modal" (click)="$event.stopPropagation()">
+      <div class="modal-handle"></div>
+
+      <div class="modal-header">
+        <div class="header-indicator"></div>
+        <h2>Filter Participants</h2>
+      </div>
+
+      <div class="modal-divider"></div>
+
+      <div class="modal-content">
+        <div class="filter-categories">
+          <!-- <button
+            class="category-btn"
+            [class.active]="filterbox === 1"
+            (click)="selectFilterTab(1)"
+          >
+            Events
+          </button> -->
+          <button
+            class="category-btn"
+            [class.active]="filterbox === 1"
+            (click)="selectFilterTab(1)"
+          >
+            Queues
+          </button>
+          <button
+            class="category-btn"
+            [class.active]="filterbox === 2"
+            (click)="selectFilterTab(2)"
+          >
+            Ecosystem
+          </button>
+          <button
+            class="category-btn"
+            [class.active]="filterbox === 3"
+            (click)="selectFilterTab(3)"
+          >
+            DFU
+          </button>
+        </div>
+
+        <div class="filter-options">
+          <!-- Events List -->
+          <!-- <div class="options-list" *ngIf="filterbox === 1">
+            <div class="empty-options" *ngIf="eventList.length === 0">
+              <i class="material-icons">inbox</i>
+              <span>No events available</span>
+            </div>
+            <div
+              class="option-item"
+              *ngFor="let event of eventList"
+              [class.selected]="selectedEvents.includes(event.id)"
+              (click)="EventSelection(event.id)"
+            >
+              <span class="option-label">{{ event.name }}</span>
+              <div
+                class="checkbox"
+                [class.checked]="selectedEvents.includes(event.id)"
+              >
+                <i
+                  class="material-icons"
+                  *ngIf="selectedEvents.includes(event.id)"
+                  >check</i
+                >
+              </div>
+            </div>
+          </div> -->
+
+          <!-- Queues List -->
+          <div class="options-list" *ngIf="filterbox === 1">
+            <div class="empty-options" *ngIf="queueList.length === 0">
+              <i class="material-icons">inbox</i>
+              <span>No queues available</span>
+            </div>
+            <div
+              class="option-item"
+              *ngFor="let queue of queueList"
+              [class.selected]="selectedQueues.includes(queue.id)"
+              (click)="toggleQueueSelection(queue.id)"
+            >
+              <span class="option-label">{{ queue.queuename }}</span>
+              <div
+                class="checkbox"
+                [class.checked]="selectedQueues.includes(queue.id)"
+              >
+                <i
+                  class="material-icons"
+                  *ngIf="selectedQueues.includes(queue.id)"
+                  >check</i
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Ecosystem List -->
+          <div class="options-list" *ngIf="filterbox === 2">
+            <div
+              class="empty-options"
+              *ngIf="ecosystemJourneysList.length === 0"
+            >
+              <i class="material-icons">inbox</i>
+              <span>No ecosystem items available</span>
+            </div>
+            <div
+              class="option-item"
+              *ngFor="let ecosystem of ecosystemJourneysList"
+              [class.selected]="selectedEcosystem.includes(ecosystem)"
+              (click)="toggleEcosystemSelection(ecosystem)"
+            >
+              <span class="option-label">{{ getJourney(ecosystem) }}</span>
+              <div
+                class="checkbox"
+                [class.checked]="selectedEcosystem.includes(ecosystem)"
+              >
+                <i
+                  class="material-icons"
+                  *ngIf="selectedEcosystem.includes(ecosystem)"
+                  >check</i
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- DFU List -->
+          <div class="options-list" *ngIf="filterbox === 3">
+            <div class="empty-options" *ngIf="dfuJourneysList.length === 0">
+              <i class="material-icons">inbox</i>
+              <span>No DFU items available</span>
+            </div>
+            <div
+              class="option-item"
+              *ngFor="let dfu of dfuJourneysList"
+              [class.selected]="selectedDFU.includes(dfu)"
+              (click)="toggleDFUSelection(dfu)"
+            >
+              <span class="option-label">{{ getJourney(dfu) }}</span>
+              <div class="checkbox" [class.checked]="selectedDFU.includes(dfu)">
+                <i class="material-icons" *ngIf="selectedDFU.includes(dfu)"
+                  >check</i
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-clear" (click)="clearAllFilters()">Clear All</button>
+        <button class="btn-apply" (click)="applyFilterSelection()">
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Add Note Modal -->
+  <div
+    class="modal-overlay"
+    *ngIf="showQuickNoteModal"
+    (click)="closeQuickNoteModal()"
+  >
+    <div class="quick-note-modal" (click)="$event.stopPropagation()">
+      <div class="modal-handle"></div>
+
+      <div class="quick-note-header">
+        <div class="profile-info-row">
+          <div class="profile-avatar-small">
+            <img
+              *ngIf="getProfileImage(quickNoteProfile!)"
+              [src]="getProfileImage(quickNoteProfile!)"
+              alt="Profile"
+            />
+            <i
+              class="material-icons"
+              *ngIf="!getProfileImage(quickNoteProfile!)"
+              >person</i
+            >
+          </div>
+          <div class="profile-details">
+            <h3>{{ quickNoteProfile?.name }}</h3>
+            <ng-container
+              *ngIf="
+                getMetadata(quickNoteProfile?.profileid)
+                  ?.activejourney as journeyId
+              "
+            >
+              <div class="journey-tag" *ngIf="getJourney(journeyId)">
+                <i class="material-icons">flag</i>
+                <span>{{ getJourney(journeyId) ?? "-" }}</span>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeQuickNoteModal()">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+
+      <div class="quick-note-content">
+        <div class="quick-note-input-container">
+          <textarea
+            [(ngModel)]="quickNoteText"
+            placeholder="Write your note here..."
+            rows="4"
+          ></textarea>
+          <button
+            mat-icon-button
+            matSuffix
+            class="mic-btn"
+            type="button"
+            aria-label="Voice input"
+          >
+            <mat-icon>mic</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="quick-note-actions">
+        <button class="btn-cancel" (click)="closeQuickNoteModal()">
+          Cancel
+        </button>
+        <button
+          class="btn-save"
+          [disabled]="!quickNoteText.trim() || quickNoteSaving"
+          (click)="saveQuickNote()"
+        >
+          <span *ngIf="!quickNoteSaving">Save Note</span>
+          <div class="spinner-small" *ngIf="quickNoteSaving"></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Preview Popup -->
+  <div
+    class="image-preview-overlay"
+    *ngIf="showImagePreviewPopup"
+    (click)="closeImagePreviewPopup()"
+  >
+    <div class="image-preview-popup" (click)="$event.stopPropagation()">
+      <button class="close-preview-btn" (click)="closeImagePreviewPopup()">
+        <i class="material-icons">close</i>
+      </button>
+
+      <div class="preview-image-container">
+        <img
+          *ngIf="getProfileImage(imagePreviewProfile)"
+          [src]="getProfileImage(imagePreviewProfile)"
+          [alt]="imagePreviewProfile?.name"
+        />
+        <div
+          class="preview-placeholder"
+          *ngIf="!getProfileImage(imagePreviewProfile)"
+        >
+          <i class="material-icons">person</i>
+        </div>
+      </div>
+
+      <div class="preview-info">
+        <h3>{{ imagePreviewProfile?.name }}</h3>
+      </div>
+
+      <div class="preview-actions">
+        <button class="btn-upload-image" (click)="switchToUploadFromPreview()">
+          <i class="material-icons">cloud_upload</i>
+          <span>{{
+            getProfileImage(imagePreviewProfile)
+              ? "Change Image"
+              : "Upload Image"
+          }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Upload Modal - OUTSIDE main container so it works from detail view -->
+<div
+  class="modal-overlay"
+  *ngIf="showImageUploadModal"
+  (click)="closeImageUploadModal()"
+>
+  <div class="image-upload-modal" (click)="$event.stopPropagation()">
+    <div class="modal-handle"></div>
+
+    <div class="image-upload-header">
+      <h3>Upload Profile Image</h3>
+      <button class="close-btn" (click)="closeImageUploadModal()">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+
+    <div class="image-upload-content">
+      <div class="current-image">
+        <img
+          *ngIf="imagePreviewUrl"
+          [src]="imagePreviewUrl"
+          alt="Preview"
+          class="preview-image"
+        />
+        <img
+          *ngIf="!imagePreviewUrl && getProfileImage(imageUploadProfile)"
+          [src]="getProfileImage(imageUploadProfile)"
+          alt="Current"
+          class="preview-image"
+        />
+        <div
+          class="placeholder-image"
+          *ngIf="!imagePreviewUrl && !getProfileImage(imageUploadProfile)"
+        >
+          <i class="material-icons">person</i>
+        </div>
+      </div>
+
+      <div class="upload-area">
+        <input
+          type="file"
+          id="imageInput"
+          accept="image/*"
+          (change)="onImageSelected($event)"
+          hidden
+        />
+        <label for="imageInput" class="upload-btn">
+          <i class="material-icons">cloud_upload</i>
+          <span>{{ selectedImageFile ? "Change Image" : "Select Image" }}</span>
+        </label>
+        <p class="upload-hint">JPG, PNG or GIF. Max 5MB</p>
+      </div>
+
+      <div class="selected-file" *ngIf="selectedImageFile">
+        <i class="material-icons">image</i>
+        <span>{{ selectedImageFile.name }}</span>
+      </div>
+    </div>
+
+    <div class="image-upload-actions">
+      <button class="btn-cancel" (click)="closeImageUploadModal()">
+        Cancel
+      </button>
+      <button
+        class="btn-upload"
+        [disabled]="!selectedImageFile || imageUploading"
+        (click)="uploadProfileImage()"
+      >
+        <span *ngIf="!imageUploading">Upload</span>
+        <div class="spinner-small" *ngIf="imageUploading"></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div
+  class="bottom-filters"
+  *ngIf="selectedEvents.length > 0 && !showFilterModal"
+>
+  <div class="filter-pill" (click)="openEventDilaog('cohort')">
+    <mat-icon>groups_2</mat-icon>
+    <span>Cohorts</span>
+  </div>
+
+  <div
+    class="filter-pill"
+    [class.active]="false"
+    (click)="openEventDilaog('journey')"
+  >
+    <mat-icon>route</mat-icon>
+    <span>Journey</span>
+  </div>
+
+  <div class="filter-pill" (click)="openEventDilaog('product')">
+    <mat-icon>inventory_2</mat-icon>
+    <span>Products</span>
+  </div>
+</div>
+
+<ng-template #eventModal>
+  <div class="journey-dialog" *ngIf="eventDilaogConfig">
+    <div class="dialog-header">
+      <div class="header-content">
+        <div class="journey-icon">
+          <mat-icon>{{ eventDilaogConfig?.icon }}</mat-icon>
+        </div>
+        <div class="header-text">
+          <h2 class="dialog-title">{{ eventDilaogConfig?.title }}</h2>
+          <p class="available-count">
+            {{ eventDilaogConfig.options?.length  ?? '0'}} available
+          </p>
+        </div>
+      </div>
+      <button mat-icon-button mat-dialog-close>
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="selection-bar">
+      <span class="selection-count"
+        >{{ eventDilaogConfig.selectedOptionsList.length }} selected</span
+      >
+      <div>
+        <button mat-button class="select-all-btn" (click)="selectAll()">
+          Select All
+        </button>
+        <button mat-button class="deselect-all-btn" (click)="clearAll()">
+          Clear All
+        </button>
+      </div>
+    </div>
+    <mat-dialog-content>
+      <ng-template #loader>
+        <div class="event-model-loader">
+          <div class="loading-spinner"></div>
+        </div>
+      </ng-template>
+      <div
+        *ngIf="
+          eventDilaogConfig.options && eventDilaogConfig.optionsMap;
+          else loader
+        "
+      >
+        <div
+          class="dialog-content"
+          *ngIf="eventDilaogConfig.options.length > 0; else noItems"
+        >
+          <mat-selection-list
+            multiple
+            [(ngModel)]="eventDilaogConfig.selectedOptionsList"
+          >
+            <mat-list-option
+              [value]="option?.id"
+              *ngFor="let option of eventDilaogConfig.options"
+            >
+              <div class="product-info">
+                <span class="product-name">{{ option?.name }}</span>
+                <span class="product-description" 
+                  >{{
+                    option?.participantList?.length ?? "-"
+                  }}
+                  Participants</span
+                >
+              </div>
+            </mat-list-option>
+          </mat-selection-list>
+        </div>
+
+        <ng-template #noItems>
+          <div class="no-items">
+            <mat-icon class="no-items-icon">inventory_2</mat-icon>
+            <p class="no-items-text">No items found</p>
+          </div>
+        </ng-template>
+        </div>
+    </mat-dialog-content>
+    <div class="dialog-actions">
+      <button
+        mat-flat-button
+        color="primary"
+        class="select-btn"
+        mat-dialog-close
+      >
+        Select items
+      </button>
+    </div>
+  </div>
+</ng-template>

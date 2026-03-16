@@ -1,0 +1,362 @@
+<mat-tab-group #tabGroup mat-align-tabs="center" class="episodes-tabs">
+  <mat-tab label="View Uploaded Episodes">
+    <div class="audio-dashboard">
+      <div class="dash-header">
+        <div>
+          <h1 class="dash-title">Episodes</h1>
+          <p class="dash-sub">Manage uploaded episodes</p>
+        </div>
+      </div>
+
+      <!-- Filter -->
+      <div class="filters-row">
+        <div class="input-box search-box">
+          <mat-icon class="ib-icon">search</mat-icon>
+          <input type="text" class="ib-input" placeholder="Filter by name..."
+            #input (keyup)="ApplyFilter($event)" autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-outer">
+        <div class="table-card">
+          <table mat-table matSort [dataSource]="dataSource">
+
+            <!-- Title -->
+            <ng-container matColumnDef="Title">
+              <th mat-header-cell *matHeaderCellDef>Title</th>
+              <td mat-cell *matCellDef="let row" class="col-title"><span class="c-name">{{ row.title }}</span></td>
+            </ng-container>
+
+            <!-- Description -->
+            <ng-container matColumnDef="Description">
+              <th mat-header-cell *matHeaderCellDef class="col-desc">Description</th>
+              <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.description }}</span></td>
+            </ng-container>
+            <!-- Duration -->
+            <ng-container matColumnDef="Duration">
+              <th mat-header-cell *matHeaderCellDef class="col-desc">Duration</th>
+              <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.duration }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="added">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-date">Added</th>
+              <td mat-cell *matCellDef="let row" class="col-date">
+                <span class="c-date">{{ row.date.toDate() | date }}</span>
+              </td>
+            </ng-container>
+            <!-- Tags -->
+            <ng-container matColumnDef="tags">
+              <th mat-header-cell *matHeaderCellDef class="col-tags">Tags</th>
+              <td mat-cell *matCellDef="let row" class="col-tags">
+                <div class="tags-wrap">
+                  <span class="chip chip-sm" *ngFor="let tag of row.tags">{{ mapTaxonomy[tag] }}</span>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Converted to HLS -->
+            <ng-container matColumnDef="convertedtohls">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>HLS</th>
+              <td mat-cell *matCellDef="let row">
+                <span class="status-badge" [class.active]="row.convertedtohls" [class.deleted]="!row.convertedtohls">
+                  {{ row.convertedtohls ? 'Yes' : 'No' }}
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Image Size -->
+            <ng-container matColumnDef="videosize">
+              <th mat-header-cell *matHeaderCellDef class="col-size">Video Size</th>
+              <td mat-cell *matCellDef="let row" class="col-size">
+                <span class="c-size">{{ row.videoSize}}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="Series">
+              <th mat-header-cell *matHeaderCellDef class="col-size">Img Size</th>
+              <td mat-cell *matCellDef="let row" class="col-size">
+                <span class="c-size">{{ row.imagesize / 1000 | number:'1.0-0' }} KB</span>
+              </td>
+            </ng-container>
+
+            <!-- Thumbnail -->
+            <!-- <ng-container matColumnDef="Thumbnail">
+              <th mat-header-cell *matHeaderCellDef>Thumbnail</th>
+              <td mat-cell *matCellDef="let row">
+                <img *ngIf="row.imageUrl" [src]="row.imageUrl" class="ep-thumb" />
+                <span class="c-size" *ngIf="!row.imageUrl">—</span>
+              </td>
+            </ng-container> -->
+
+            <!-- Episode Video -->
+            <!-- <ng-container matColumnDef="Episode">
+              <th mat-header-cell *matHeaderCellDef>Episode</th>
+              <td mat-cell *matCellDef="let row">
+                <video *ngIf="row.videoUrl" [src]="row.videoUrl" controls class="ep-video"></video>
+                <span class="c-size" *ngIf="!row.videoUrl">—</span>
+              </td>
+            </ng-container> -->
+
+            <!-- Edit -->
+            <ng-container matColumnDef="Edit">
+              <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+              <td mat-cell *matCellDef="let row" class="col-act">
+                <button class="a-btn a-edit" (click)="openEditDialog(row, 'Upload New Episode')">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <!-- Delete -->
+            <ng-container matColumnDef="Delete">
+              <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+              <td mat-cell *matCellDef="let row" class="col-act">
+                <button class="a-btn a-del" (click)="openDeleteDialog(row.id, row.srt, row.imageUrl, row.videoUrl, row.screenshot)">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+                <div class="empty">
+                  <mat-icon>videocam_off</mat-icon>
+                  <p>No episodes matching "{{ input.value }}"</p>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <mat-paginator [pageSizeOptions]="[10, 25, 100]" showFirstLastButtons class="paginator"></mat-paginator>
+      </div>
+    </div>
+  </mat-tab>
+
+  <mat-tab label="Upload New Episode">
+    <div class="audio-dashboard">
+      <div class="dash-header">
+        <div>
+          <h1 class="dash-title">Upload Episode</h1>
+          <p class="dash-sub">Add new episode with media and tags</p>
+        </div>
+        <button class="btn-primary" [disabled]="showFileSizeError" (click)="onSubmit()">
+          <mat-icon>cloud_upload</mat-icon>
+          <span>Upload</span>
+        </button>
+      </div>
+
+      <div class="content-layout">
+        <div class="content-col">
+          <div class="form-fields">
+            <div class="field-group">
+              <label class="label">Title <span class="required">*</span></label>
+              <div class="input-box">
+                <mat-icon class="ib-icon">title</mat-icon>
+                <input type="text" class="ib-input" placeholder="Enter episode title"
+                  [(ngModel)]="uploadEpisodeDoc.title" required />
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div class="field-group">
+              <label class="label">Description <span class="required">*</span></label>
+              <div class="input-box">
+                <mat-icon class="ib-icon">description</mat-icon>
+                <input type="text" class="ib-input" placeholder="Enter description"
+                  [(ngModel)]="uploadEpisodeDoc.description" required />
+              </div>
+            </div>
+
+            <!-- Duration -->
+            <div class="field-group">
+              <label class="label">Duration (in Minutes only, Example 56:45)</label>
+              <div class="input-box">
+                <mat-icon class="ib-icon">schedule</mat-icon>
+                <input type="text"
+                  class="ib-input"
+                  placeholder="Auto detected or enter manually"
+                  [(ngModel)]="uploadEpisodeDoc.duration" />
+              </div>
+            </div>
+
+            <!-- Thumbnail Upload -->
+            <div class="field-group">
+              <label class="label">Thumbnail</label>
+              <div class="upload-zone" (click)="thumbnailref.click()">
+                <input #thumbnailref type="file" accept="image/*" (change)="previewImage($event)" hidden />
+                <div class="upload-zone-content"
+                  *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewImageUrl) && [null,undefined].includes(uploadEpisodeDoc.imageUrl)">
+                  <mat-icon class="upload-icon">image</mat-icon>
+                  <span class="upload-text">Click to upload thumbnail</span>
+                  <span class="upload-hint">PNG, JPG supported</span>
+                </div>
+              </div>
+              <div class="media-card"
+                *ngIf="![null,undefined].includes(uploadEpisodeDoc.previewImageUrl) || ![null,undefined].includes(uploadEpisodeDoc.imageUrl)">
+                <img [src]="![null,undefined].includes(uploadEpisodeDoc.previewImageUrl) ? uploadEpisodeDoc.previewImageUrl : uploadEpisodeDoc.imageUrl"
+                  class="media-preview media-preview-img" />
+              </div>
+            </div>
+
+            <!-- Screenshot Upload -->
+            <div class="field-group">
+              <label class="label">Screenshot</label>
+              <div class="upload-zone" (click)="screenshotref.click()">
+                <input #screenshotref type="file" accept="image/*" (change)="previewScreenshot($event)" hidden />
+                <div class="upload-zone-content"
+                  *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) && [null,undefined].includes(uploadEpisodeDoc.screenshot)">
+                  <mat-icon class="upload-icon">screenshot_monitor</mat-icon>
+                  <span class="upload-text">Click to upload screenshot</span>
+                </div>
+              </div>
+              <div class="media-card"
+                *ngIf="![null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) || ![null,undefined].includes(uploadEpisodeDoc.screenshot)">
+                <img [src]="![null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) ? uploadEpisodeDoc.previewScreenshotUrl : uploadEpisodeDoc.screenshot"
+                  class="media-preview media-preview-img" />
+              </div>
+            </div>
+
+            <!-- SRT Upload -->
+            <div class="field-group">
+              <label class="label">Subtitle File (.srt)</label>
+              <div class="upload-zone" (click)="srtref.click()">
+                <input #srtref type="file" accept=".srt" (change)="addToDoc($event)" hidden />
+                <div class="upload-zone-content" *ngIf="!uploadEpisodeDoc.srtFileName">
+                  <mat-icon class="upload-icon">subtitles</mat-icon>
+                  <span class="upload-text">Click to upload SRT</span>
+                </div>
+                <div class="upload-preview-audio" *ngIf="uploadEpisodeDoc.srtFileName">
+                  <mat-icon class="preview-icon">subtitles</mat-icon>
+                  <span class="preview-name">{{ uploadEpisodeDoc.srtFileName }}</span>
+                  <mat-icon class="preview-change">swap_horiz</mat-icon>
+                </div>
+              </div>
+            </div>
+
+            <!-- Video Upload -->
+            <div class="field-group">
+              <label class="label">Video</label>
+              <div class="upload-zone" (click)="videoref.click()">
+                <input #videoref type="file" accept="video/*" (change)="previewVideo($event)" hidden />
+                <div class="upload-zone-content"
+                  *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) && [null,undefined].includes(uploadEpisodeDoc.videoUrl)">
+                  <mat-icon class="upload-icon">videocam</mat-icon>
+                  <span class="upload-text">Click to upload video</span>
+                  <span class="upload-hint">MP4, MOV, MKV, AVI (max 15 GB)</span>
+                </div>
+              </div>
+              <span class="field-error" *ngIf="showFileSizeError">Maximum file size limit is 15 GB.</span>
+              <div class="media-card"
+                *ngIf="![null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) || ![null,undefined].includes(uploadEpisodeDoc.videoUrl)">
+                <video controls class="media-preview"
+                  [src]="![null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) ? sanitize(uploadEpisodeDoc.previewVideoUrl) : uploadEpisodeDoc.videoUrl">
+                </video>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ═══ RIGHT: Tags ═══ -->
+        <div class="content-col">
+          <div class="field-group">
+            <label class="label">Tags</label>
+            <div class="selected-tags" *ngIf="uploadEpisodeDoc.tags?.length">
+              <span class="chip" *ngFor="let tag of uploadEpisodeDoc.tags; let i = index">
+                {{ mapTaxonomy[tag] }}
+                <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+              </span>
+            </div>
+            <div class="input-box">
+              <mat-icon class="ib-icon">search</mat-icon>
+              <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+            </div>
+            <div class="available-tags">
+              <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+                <mat-icon>add_circle_outline</mat-icon>
+                {{ tag['name'] }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ UPLOAD QUEUE TABLE ═══ -->
+      <div class="table-outer" *ngIf="uploadingTask.length > 0" style="margin-top: 28px;">
+        <div class="dash-header" style="margin-bottom: 14px;">
+          <div>
+            <h1 class="dash-title" style="font-size: 18px;">Upload Queue</h1>
+            <p class="dash-sub">{{ uploadingTask.length }} item(s) in queue</p>
+          </div>
+        </div>
+
+        <div class="upload-queue">
+          <div class="queue-card" *ngFor="let task of uploadingTask; let i = index">
+            <div class="queue-card-header">
+              <div class="queue-info">
+                <span class="c-name">{{ task.title }}</span>
+                <span class="c-desc">{{ task.description }}</span>
+              </div>
+              <div class="queue-actions">
+                <span class="status-badge active" *ngIf="task.status$ | async">
+                  {{ getTaskStatus(task, i) }}
+                </span>
+                <button class="a-btn a-edit" (click)="openEditDialog(task, 'Upload New Episode'); task.submitted = false; removeDoc(i);">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="tags-wrap" *ngIf="task.tags?.length" style="margin-top: 8px;">
+              <span class="chip chip-sm" *ngFor="let tag of task.tags">{{ mapTaxonomy[tag] }}</span>
+            </div>
+
+            <!-- Progress bars -->
+            <div class="queue-progress-list">
+              <!-- Image -->
+              <div class="queue-progress-row" *ngIf="task.uploadImageFile">
+                <mat-icon class="queue-file-icon">image</mat-icon>
+                <span class="queue-file-name">{{ task.imageFileName }}</span>
+                <div class="progress-bar-wrap">
+                  <div class="progress-bar-fill" [style.width.%]="(task.uploadingImagePercentage | async) || 0"></div>
+                </div>
+                <span class="queue-pct">{{ (task.uploadingImagePercentage | async) | number:'1.0-0' }}%</span>
+              </div>
+              <!-- Screenshot -->
+              <div class="queue-progress-row" *ngIf="task.uploadScreenshotFile">
+                <mat-icon class="queue-file-icon">screenshot_monitor</mat-icon>
+                <span class="queue-file-name">{{ task.screenshotFileName }}</span>
+                <div class="progress-bar-wrap">
+                  <div class="progress-bar-fill" [style.width.%]="(task.uploadingScreenshotPercentage | async) || 0"></div>
+                </div>
+                <span class="queue-pct">{{ (task.uploadingScreenshotPercentage | async) | number:'1.0-0' }}%</span>
+              </div>
+              <!-- SRT -->
+              <div class="queue-progress-row" *ngIf="task.uploadSrtFile">
+                <mat-icon class="queue-file-icon">subtitles</mat-icon>
+                <span class="queue-file-name">{{ task.srtFileName }}</span>
+                <div class="progress-bar-wrap">
+                  <div class="progress-bar-fill" [style.width.%]="(task.uploadingSrtPercentage | async) || 0"></div>
+                </div>
+                <span class="queue-pct">{{ (task.uploadingSrtPercentage | async) | number:'1.0-0' }}%</span>
+              </div>
+              <!-- Video -->
+              <div class="queue-progress-row" *ngIf="task.uploadVideoFile">
+                <mat-icon class="queue-file-icon">videocam</mat-icon>
+                <span class="queue-file-name">{{ task.videoFileName }}</span>
+                <div class="progress-bar-wrap">
+                  <div class="progress-bar-fill" [style.width.%]="(task.uploadingVideoPercentage | async) || 0"></div>
+                </div>
+                <span class="queue-pct">{{ (task.uploadingVideoPercentage | async) | number:'1.0-0' }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </mat-tab>
+</mat-tab-group>

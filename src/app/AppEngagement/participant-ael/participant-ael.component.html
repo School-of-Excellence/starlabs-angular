@@ -1,0 +1,154 @@
+<div class="mainscreen">
+  <h3 class="main-title">Participant AEL</h3>
+
+  <div class="compact-filter-container">
+  <!-- Filter Header -->
+  <div class="filter-header">
+    <h3 class="filter-title">Participant Filters</h3>
+  </div>
+
+  <!-- Primary Filter Row -->
+  <div class="filter-row primary-row">
+    <mat-radio-group [value]="selectedFilterType" class="horizontal-radio-group">
+      <!-- All Participants Option -->
+      <mat-radio-button *ngIf="superRole" value="all" (click)="onAllAELselect(); selectedFilterType = 'all'" class="filter-radio">
+        All Participants
+      </mat-radio-button>
+
+      <!-- Live Event Selection -->
+      <div class="radio-with-input">
+        <mat-radio-button value="event" class="filter-radio">
+          From Live Event:
+        </mat-radio-button>
+        <mat-form-field appearance="outline" class="inline-field">
+          <mat-select [(ngModel)]="selectedLiveEvent" (selectionChange)="onLiveEventSelect()" placeholder="Select Live Event">
+            <mat-option *ngFor="let event of liveEventList" [value]="event">
+              {{event.eventname}} ({{event.type}})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </mat-radio-group>
+  </div>
+
+  <!-- Secondary Filter Row -->
+  <div class="filter-row secondary-row" *ngIf="selectedLiveEvent != null && superRole">
+    <mat-radio-group [value]="selectedBigParticipanttype" class="horizontal-radio-group secondary-group">
+      <!-- Show All in Event -->
+      <mat-radio-button value="all" (click)="onBigParticipantSelect('all')" class="filter-radio">
+        All in Event
+      </mat-radio-button>
+
+      <!-- ATC Prescribed Filter -->
+      <div class="radio-with-input">
+        <mat-radio-button [value]="selectedBigParticipant" class="filter-radio">
+          ATC Prescribed By:
+        </mat-radio-button>
+        <mat-form-field appearance="outline" class="inline-field wide-field">
+          <mat-select [(ngModel)]="selectedBigParticipant" (selectionChange)="onBigParticipantSelect($event.value)"placeholder="Search prescriber...">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onFilterProfiles()" [placeholderLabel]="'Search prescriber...'" [noEntriesFoundLabel]="'No matching records found'"></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let profileid of filteredProfiles" [value]="profileid">
+              {{mapProfile[profileid]}}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="date-info">
+          <mat-icon class="info-icon">info</mat-icon>
+          <span class="date-range">ATC Prescribed From {{startDate | date: 'MMM d, y'}} - {{endDate | date: 'MMM d, y'}}</span>
+        </div>
+      </div>
+    </mat-radio-group>
+  </div>
+</div>
+  
+  <div>
+    <div class="mat-elevation-z2">
+      <div class="action-row">
+        <div>
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Filter Participants</mat-label>
+            <input matInput (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
+            <!-- <input matInput [(ngModel)]="mapProfile[inputValue]" (keyup)="applyFilter(value)" placeholder="Search participants" #input> -->
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+        </div>
+
+        <div *ngIf="loggedinProfileData['admin'] || loggedinProfileData['ah'] || loggedinProfileData['developer']">
+          <!-- <mat-radio-group [value]="selectedFilterType" class="example-radio-group">
+            <mat-radio-button value="all" (click)="selectedFilterType = 'all'; groupAELbyProfile(null)" class="example-radio-button" >
+              All AEL
+            </mat-radio-button>
+            <br>
+            <mat-radio-button value="prescribed" (click)="selectedFilterType = 'prescribed'; groupAELbyProfile(null)" class="example-radio-button" >
+              Filter Participant, Whose ATC Prescribed By Me ({{startDate | date: 'mediumDate'}} - {{endDate | date: 'mediumDate'}})
+            </mat-radio-button>  
+            <br>
+            <mat-form-field appearance="outline" style="width:100%">
+              <mat-label>Select Big Participant</mat-label>
+              <mat-select (selectionChange)="groupAELbyProfile($event.value)">
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onFilterProfiles()" 
+                  [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'">
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let profileid of filteredProfiles" [value]="profileid">{{mapProfile[profileid]}}</mat-option>
+              </mat-select>
+            </mat-form-field>          
+          </mat-radio-group> -->
+        </div>
+      </div>
+
+      <table  mat-table [dataSource]="tableDataSource" matSort>
+        <ng-container matColumnDef="sno">
+          <th mat-header-cell *matHeaderCellDef>S No</th>
+          <td mat-cell *matCellDef="let element; let i = index">{{(i+1) + (paginator ? (paginator.pageIndex * paginator.pageSize) : 0)}}</td>
+        </ng-container>
+        <ng-container matColumnDef="participant">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>PARTICIPANT</th>
+          <td mat-cell *matCellDef="let element">{{element["participant"]}}</td>
+        </ng-container>
+
+        <ng-container *ngFor="let header of tableHeader.slice(2)" [matColumnDef]="header">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            {{header == 'recentdate' ? "RECENT DATE" : header == 'recentstatus' ? "RECENT STATUS" : header == 'recentparticipantresponse' ? "Participant Response" : header == 'recentvalidatedby' ? "Validated By" : (header | uppercase)}}
+          </th>
+          <td mat-cell *matCellDef="let element">
+            <ng-container *ngIf="header == 'recentdate'; else default">
+              {{element[header] | date: 'MMM d, y'}}
+            </ng-container>
+            <ng-template #default>
+              <label [class.text-danger]="header == 'recentstatus' && ['unvalidated', 'discuss later'].includes(element[header])">
+                {{element[header]}}
+                <mat-icon class="ms-1" *ngIf="header == 'recentstatus' && element['recentupdated']">update</mat-icon>
+              </label>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>ACTION</th>
+          <td mat-cell *matCellDef="let element">
+            <button mat-stroked-button *ngIf="element['recentstatus'] == 'unvalidated' || element['recentstatus'] == 'discuss later'" 
+              (click)="markAsValidate(element)">
+              Mark as Validated
+            </button>
+            <!-- <button mat-stroked-button *ngIf="element['recentstatus'] == 'unvalidated'" (click)="discussLater(element)">Discuss Later</button> -->
+            <button mat-stroked-button *ngIf="element['recentstatus'] == 'unvalidated' || element['recentstatus'] == 'discuss later'"  (click)="reviewAEL(element)">Review and Update AEL</button>
+            <button mat-stroked-button *ngIf="element['recentstatus'] == 'validated'" (click)="reviewAEL(element)">Edit AEL</button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="tableHeaderWithAction; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: tableHeaderWithAction;"></tr>
+        
+        <!-- Row shown when there is no matching data -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="tableHeader.length">No data matching the filter "{{input.value}}"</td>
+        </tr>
+      </table>
+      <mat-paginator [pageSizeOptions]="[25, 50, 100]" [pageSize]="25"></mat-paginator>
+    </div>
+  </div>
+</div>

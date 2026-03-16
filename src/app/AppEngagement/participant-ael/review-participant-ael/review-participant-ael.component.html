@@ -1,0 +1,32 @@
+<!-- review-ael.component.html -->
+<div class="mainscreen">
+  <h5>Review AEL</h5>
+  <div class="ael-section" *ngFor="let participantAEL of reviewAEL; let a = index">
+    <h6>AEL Submission - {{participantAEL["created"] | date: 'MMM d, y'}}</h6>
+    <div class="info">
+      <strong>AEL at the Time of the Last Diagnostics/Consultation with you</strong>
+      <br><br>
+      <label>
+        Below is the AEL selected by Participant before Diagnostics/Consultation<br>
+        As we did not get to validate their selected AEL values then, we request you to validate now<br>
+        Kindly Note: The evaluation by you is not for the version of the participant as they may be today, because they have come to uP!, executed ATC and would have evolved. Please evaluate below and make changes (if any) the AEL values for the version of the person that came for Diagnostics/Consultation on Date with you, the AEL as of then.
+      </label>
+    </div>
+    <div class="crossover-item" *ngFor="let crossover of participantAEL.crossoverList">
+      <label class="crossover-label">{{crossover.key}}</label>
+      <mat-form-field class="levelfield" appearance="outline">
+        <mat-label>Current Level</mat-label>
+        <mat-select [(ngModel)]="crossover.value.displayValue">
+          <mat-option *ngFor="let option of levelList" [value]="option['startpoint'] + '---' + option['endpoint']">
+            {{option["startpoint"]}} to {{option["endpoint"]}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+  
+  <div class="button-group">
+    <button mat-stroked-button class="cancelbtn" (click)="close()">Close</button>
+    <button mat-stroked-button class="submitbtn" (click)="submit()">Mark as Validated</button>
+  </div>
+</div>

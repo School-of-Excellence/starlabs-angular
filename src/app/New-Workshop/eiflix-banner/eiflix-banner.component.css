@@ -1,0 +1,227 @@
+/* Dialog Host Styles */
+:host {
+  display: block;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.card {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+  box-shadow: none !important;
+}
+
+h2 {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.full {
+  width: 100%;
+}
+
+.tab-content {
+  padding: 20px 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Upload Section */
+.upload-row {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.upload-btn {
+  background: #2e2e2e;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+
+.upload-btn:hover {
+  background: #444;
+}
+
+.preview-container {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview-img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.preview-video {
+  width: 100%;
+  border-radius: 6px;
+}
+
+.submit {
+  width: 100%;
+  margin-top: 15px;
+}
+
+button.submit:disabled {
+  background-color: #1976d2 !important;
+  color: white !important;
+  opacity: 0.9;
+}
+
+/* Search Field */
+.search-field {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.search-field mat-icon {
+  color: #666;
+}
+
+/* Table Styles */
+.table-container {
+  overflow-x: auto;
+  max-height: 45vh;
+  overflow-y: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.banner-table {
+  width: 100%;
+}
+
+.banner-table th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+  color: #333;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.banner-table td {
+  vertical-align: middle;
+}
+
+.table-img {
+  width: 80px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.table-img:hover {
+  transform: scale(1.1);
+}
+
+.description-cell {
+  display: block;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* No Data Row */
+.no-data {
+  text-align: center;
+  padding: 40px !important;
+}
+
+.no-data-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #999;
+}
+
+.no-data-content i {
+  opacity: 0.5;
+}
+
+/* Paginator */
+mat-paginator {
+  background: transparent;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Tab Styles */
+::ng-deep .mat-mdc-tab-labels {
+  background: #fafafa;
+  border-radius: 8px 8px 0 0;
+}
+
+::ng-deep .mat-mdc-tab {
+  min-width: 150px !important;
+}
+
+::ng-deep .mat-mdc-tab-body-content {
+  padding-top: 10px;
+  overflow: auto !important;
+}
+
+/* Action Buttons */
+.mat-icon-button {
+  margin: 0 2px;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .card {
+    padding: 10px;
+    margin: 10px;
+  }
+
+  .upload-row {
+    flex-direction: column;
+  }
+
+  .upload-btn {
+    justify-content: center;
+  }
+
+  .table-container {
+    margin: 0 -10px;
+  }
+
+  .description-cell {
+    max-width: 100px;
+  }
+
+  ::ng-deep .mat-mdc-tab {
+    min-width: 100px !important;
+  }
+}
+
+/* Row hover effect */
+.banner-table tr.mat-mdc-row:hover {
+  background-color: #f5f5f5;
+}
+
+/* Sort header styling */
+::ng-deep .mat-sort-header-arrow {
+  color: #1976d2;
+}
+
+tr[cdkDrag] {
+  cursor: move;
+}

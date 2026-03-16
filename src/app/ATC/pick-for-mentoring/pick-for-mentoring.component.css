@@ -1,0 +1,70 @@
+.title{
+  color: rgb(0, 50, 67) !important;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.resetbtn{
+  color: red !important;
+  border: 1px solid red !important;
+}
+
+.expansionheader{
+  display: block;
+  line-height: 1.8;
+  font-size: medium;
+  justify-items: start;
+  align-items: start;
+  align-content: start;
+  align-self: flex-start;
+}
+
+.tobebtn{
+  color: green !important;
+  border: 1px solid green !important;
+}
+
+.donebtn{
+  color: white !important;
+  background-color: green !important;
+}
+
+.maticon{
+  vertical-align: middle;
+  color: green !important;
+  margin-left: 10px;
+}
+
+.head{
+  color: rgb(21, 21, 26) !important;
+  font-style: italic;
+  font-weight: bold;
+}
+
+.body{
+  /* display: inline-block; */
+  color: rgb(48, 48, 48) !important;
+}
+
+.mentorbox{
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  margin-top: 10px;
+  padding: 3px;
+}
+
+.mentornotefield{
+  height: 80px;
+  width: 250px;
+  border: 1px solid gray !important;
+  border-radius: 6px;
+  margin-right: 20px;
+  resize: both;
+}
+
+.adjbox{
+  line-height: 1.8;
+  font-size: medium;
+}

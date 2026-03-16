@@ -1,0 +1,31 @@
+.container-fluid {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.row {
+  height: 100%;
+}
+
+.col-md-4, .col-md-8 {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.list-group-item.active {
+  background-color: #5c93e4;
+  border-color: #5c93e4;
+}
+
+.table-responsive {
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.liveColor{
+  color: green;
+}
+
+.endedColor{
+  color: rgb(210, 65, 65);
+}

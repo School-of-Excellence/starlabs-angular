@@ -1,0 +1,19 @@
+<div class="dialog-overlay">
+  <div class="dialog-container">
+    <div class="dialog-header">
+      <div class="title">{{dailogData["heading"]}}</div>
+      <button class="close-button" (click)="onClose()">×</button>
+    </div>
+    <div class="dialog-content">
+      <textarea 
+        [(ngModel)]="commentBox" 
+        placeholder="Enter your Comment here..."
+        rows="5">
+      </textarea>
+    </div>
+    <div class="dialog-footer">
+      <button class="cancel-button" (click)="onClose()">Close</button>
+      <button class="confirm-button" (click)="onConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>

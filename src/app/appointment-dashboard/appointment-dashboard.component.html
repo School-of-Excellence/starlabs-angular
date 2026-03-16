@@ -1,0 +1,148 @@
+<div class="dashboard-wrapper">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <h1 class="page-title">Appointment Dashboard</h1>
+      <span class="page-subtitle">View available slots across all products</span>
+    </div>
+    <div class="top-bar-right">
+      <mat-form-field appearance="outline" class="date-range-field">
+        <mat-label>Date Range</mat-label>
+        <mat-date-range-input [rangePicker]="rangePicker">
+          <input
+            matStartDate
+            placeholder="Start"
+            [value]="startDate"
+            (dateChange)="onDateRangeChange('start', $event)"
+          />
+          <input
+            matEndDate
+            placeholder="End"
+            [value]="endDate"
+            (dateChange)="onDateRangeChange('end', $event)"
+          />
+        </mat-date-range-input>
+        <mat-datepicker-toggle matIconSuffix [for]="rangePicker"></mat-datepicker-toggle>
+        <mat-date-range-picker #rangePicker></mat-date-range-picker>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="loading">
+    <mat-icon class="spin-icon">sync</mat-icon>
+    <span>Loading products and appointment types...</span>
+  </div>
+  <div class="empty-state" *ngIf="!loading && groupedProducts.length === 0">
+    <mat-icon>event_busy</mat-icon>
+    <p>No products or appointment types found.</p>
+  </div>
+  <div class="main-content" *ngIf="!loading && groupedProducts.length > 0">
+    <div class="product-card" *ngFor="let product of groupedProducts">
+      <!-- Product Header (always expanded, no toggle) -->
+      <div class="product-header">
+        <div class="product-header-left">
+          <mat-icon class="product-icon">inventory_2</mat-icon>
+          <span class="product-name">{{ product.productName }}</span>
+        </div>
+        <div class="product-header-right">
+          <span class="badge appt-count-badge">
+            {{ product.appointmentTypes.length }} Appointment Type{{ product.appointmentTypes.length > 1 ? 's' : '' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Appointment Types Row (horizontal) -->
+      <div class="product-body">
+        <div class="appt-types-row">
+          <div
+            class="appt-type-chip"
+            *ngFor="let ap of product.appointmentTypes"
+            [class.active]="expandedAppointmentTypeId === ap.appointmentTypeId"
+            (click)="toggleAppointmentType(ap.appointmentTypeId)"
+          >
+            <mat-icon class="appt-chip-icon">event_available</mat-icon>
+            <span class="appt-chip-name">{{ ap.appointmentType || ap.appointmentTypeId }}</span>
+            <span
+              class="badge slot-count-badge"
+              [class.has-slots]="getSlotCount(ap.appointmentTypeId) > 0"
+              [class.no-slots]="getSlotCount(ap.appointmentTypeId) === 0"
+            >
+              {{ getSlotCount(ap.appointmentTypeId) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Expanded Slots Area (below the row) -->
+        <div
+          class="slots-container"
+          *ngIf="expandedAppointmentTypeId && isAppointmentTypeInProduct(product, expandedAppointmentTypeId)"
+        >
+          <div class="slots-loading" *ngIf="loadingSlots">
+            <mat-icon class="spin-icon small">sync</mat-icon>
+            <span>Fetching slots...</span>
+          </div>
+
+          <div
+            class="no-slots-msg"
+            *ngIf="!loadingSlots && getSlotCount(expandedAppointmentTypeId) === 0"
+          >
+            <mat-icon>event_busy</mat-icon>
+            <span>No available slots for the selected date range.</span>
+          </div>
+
+          <ng-container *ngIf="!loadingSlots && getSlotCount(expandedAppointmentTypeId) > 0">
+            <div
+              class="date-group"
+              *ngFor="let dayGroup of groupSlotsByDate(getSlotsForType(expandedAppointmentTypeId))"
+            >
+              <div class="date-header">
+                <mat-icon class="date-icon">today</mat-icon>
+                <span class="date-label">{{ dayGroup.dateLabel }}</span>
+                <span class="date-count">{{ dayGroup.slots.length }}</span>
+              </div>
+
+              <div class="slots-grid">
+                <div
+                  class="slot-card"
+                  *ngFor="let s of dayGroup.slots"
+                  [class.selected]="isSlotSelected(s)"
+                  [class.single-role]="s.roleCount === 1"
+                  [class.multi-role]="s.roleCount >= 2"
+                  (click)="selectSlot(s)"
+                >
+                  <div class="slot-role-indicator">
+                    <span
+                      class="role-badge"
+                      [class.role-single]="s.roleCount === 1"
+                      [class.role-full]="s.roleCount >= 2"
+                    >
+                      <mat-icon class="role-badge-icon">
+                        {{ s.roleCount >= 2 ? 'group' : 'person' }}
+                      </mat-icon>
+                      {{ s.roleCount >= 2 ? s.roleCount + ' Specialists' : '1 Specialist' }}
+                    </span>
+                  </div>
+
+                  <div class="slot-time-row">
+                    <mat-icon class="slot-clock-icon">schedule</mat-icon>
+                    <span class="slot-time">{{ s.start | date:'h:mm a' }}</span>
+                    <span class="slot-dash">–</span>
+                    <span class="slot-time">{{ s.end | date:'h:mm a' }}</span>
+                  </div>
+
+                  <div class="slot-specialist-row">
+                    <mat-icon class="slot-person-icon">badge</mat-icon>
+                    <span class="slot-specialist-name">{{ s.specialist || 'Specialist' }}</span>
+                  </div>
+
+                  <div class="slot-eis-row" *ngIf="s.eisNames && s.eisNames.length > 0">
+                    <div class="eis-chip" *ngFor="let eis of s.eisNames">{{ eis }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

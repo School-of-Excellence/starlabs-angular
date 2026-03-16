@@ -1,0 +1,63 @@
+<div class="mainscreen">
+  <div class="title">Schedule Availability</div>
+
+  <mat-form-field class="fieldbox" *ngIf="superadmin" appearance="outline">
+    <mat-label>Select Profile</mat-label>
+    <mat-select [(ngModel)]="selectedSpecialist" (selectionChange)="onSpecialistSelect()">
+      <mat-option>
+        <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+      </mat-option>
+      <mat-option *ngFor="let user of returnSpecialist()" [value]="user.profileid">{{user.name}}</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <div>
+    <form [formGroup]="weekForm" (ngSubmit)="updateSchedule()">
+      <div *ngFor="let day of weekdays" [formGroupName]="day.id">
+        <ul *ngIf="!loading && allowTimesheet && selectedSpecialist != null">
+          <label class="dayname">
+            <b>{{day.displayname}}</b>
+            <mat-checkbox class="ml-2" (change)="updateWeekOff(day.id, $event.checked)" [checked]="specialistWeekOffDays.includes(day.id)">Mark myself Unavailable</mat-checkbox>
+          </label>
+          <li *ngFor="let slot of slots(day.id).controls; let i = index" [formGroupName]="i">
+            <mat-form-field class="fieldbox" appearance="outline">
+              <mat-label>Start Time</mat-label>
+              <input matInput type="time" formControlName="starttime" (change)="onStartDateChange(day.id, i)" required>
+              <mat-error *ngIf="weekForm.get(day.id)['controls'][i].get('starttime').hasError('required')">
+                Starttime <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+            <mat-form-field class="fieldbox" appearance="outline">
+              <mat-label>End Time</mat-label>
+              <input matInput type="time" formControlName="endtime" (change)="onEndDateChange(day.id, i)" required>
+              <mat-error *ngIf="weekForm.get(day.id)['controls'][i].get('endtime').hasError('required')">
+                Endtime <strong>Required</strong>
+              </mat-error>
+              <mat-error *ngIf="weekForm.get(day.id)['controls'][i].get('endtime').hasError('invalid')">
+                30Mins Time Difference Required
+              </mat-error>
+            </mat-form-field>
+            <button class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeSlot(day.id, i)">
+              <mat-icon class="icon">remove</mat-icon>
+            </button>
+            <button class="addremovebtn" *ngIf="i+1 == slots(day.id).controls.length" mat-icon-button type="button" (click)="addSlot(day.id)">
+              <mat-icon class="icon">add</mat-icon>
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div *ngIf="!loading && !allowTimesheet && selectedSpecialist != null">
+        <div class="requestnote">
+          You have already submitted your delivery hours. Please request Admin to update if any changes.
+        </div>
+      </div>
+      <div class="timezonenote">
+        <b>Note:</b> Your current timezone is {{timezone.name}} ({{timezone.hour < 0 ? "" : "+"}}{{timezone.hour}}:{{timezone.minute}})
+      </div>
+      <div class="actionbox">
+        <button class="closebtn" type="button" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
+        <button class="submitbtn" type="submit" mat-stroked-button [disabled]="!weekForm.valid || loading">{{loading ? "Loading...." : "Add Availability"}}</button>
+      </div>
+    </form>
+  </div>
+</div>

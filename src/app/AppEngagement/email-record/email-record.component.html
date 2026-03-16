@@ -1,0 +1,598 @@
+<div class="email-record-container">
+  <!-- Header -->
+  <div class="header-section">
+    <h1 class="page-title">Email Archive Log</h1>
+    <button mat-stroked-button color="primary" (click)="exportData()" [disabled]="isExporting" class="export-btn">
+      <mat-icon *ngIf="!isExporting">download</mat-icon>
+      <mat-spinner diameter="16" *ngIf="isExporting"></mat-spinner>
+      Export
+    </button>
+  </div>
+
+  <!-- Search and Date Filters -->
+  <mat-card class="filters-card">
+    <mat-card-content>
+      <form [formGroup]="filterForm" class="filters-form">
+        <div class="filters-row">
+          <!-- Main Search -->
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search...</mat-label>
+            <input matInput formControlName="search" placeholder="Search by subject, content...">
+            <mat-icon matPrefix>search</mat-icon>
+            <button matSuffix mat-icon-button *ngIf="filterForm.get('search')?.value"
+              (click)="filterForm.patchValue({search: ''})">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <!-- Date Range -->
+          <mat-form-field appearance="outline" class="date-field">
+            <mat-label>From Date</mat-label>
+            <input matInput [matDatepicker]="fromPicker" formControlName="fromDate">
+            <mat-datepicker-toggle matSuffix [for]="fromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #fromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="date-field">
+            <mat-label>To Date</mat-label>
+            <input matInput [matDatepicker]="toPicker" formControlName="toDate">
+            <mat-datepicker-toggle matSuffix [for]="toPicker"></mat-datepicker-toggle>
+            <mat-datepicker #toPicker></mat-datepicker>
+          </mat-form-field>
+
+          <!-- Apply Date Filter Button -->
+          <button mat-raised-button color="primary" (click)="applyDateFilter()" 
+            [disabled]="isLoading" class="apply-filter-btn">
+            <mat-icon *ngIf="!isLoading">filter_list</mat-icon>
+            <mat-spinner diameter="16" *ngIf="isLoading"></mat-spinner>
+            Apply Date Filter
+          </button>
+        </div>
+
+        <div class="filters-row">
+          <!-- Status Filter -->
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="status">
+              <mat-option *ngFor="let status of statusOptions" [value]="status">
+                {{status}}
+              </mat-option>
+            </mat-select>
+            <mat-icon matSuffix>assignment</mat-icon>
+          </mat-form-field>
+
+          <!-- Profile Autocomplete Filter -->
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Filter by Profile</mat-label>
+            <input type="text" 
+                   matInput 
+                   formControlName="profileFilter"
+                   [matAutocomplete]="profileAuto"
+                   placeholder="Search and select profile...">
+            <mat-autocomplete #profileAuto="matAutocomplete" 
+                             [displayWith]="displayProfile.bind(this)">
+              <mat-option *ngFor="let profile of filteredProfileOptions | async" [value]="profile">
+                <div class="profile-option">
+                  <div class="profile-name">{{profile.name}}</div>
+                  <div class="profile-email">{{profile.email}}</div>
+                </div>
+              </mat-option>
+            </mat-autocomplete>
+            <mat-icon matSuffix>person</mat-icon>
+            <button matSuffix mat-icon-button *ngIf="filterForm.get('profileFilter')?.value" 
+              (click)="filterForm.patchValue({profileFilter: ''}); $event.stopPropagation();">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <!-- Email Search -->
+          <mat-form-field appearance="outline">
+            <mat-label>Search by Email</mat-label>
+            <input matInput formControlName="emailSearch" placeholder="Search by recipient email...">
+            <mat-icon matPrefix>email</mat-icon>
+            <button matSuffix mat-icon-button *ngIf="filterForm.get('emailSearch')?.value" 
+              (click)="filterForm.patchValue({emailSearch: ''})">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <!-- Profile Search -->
+          <mat-form-field appearance="outline">
+            <mat-label>Search by Profile</mat-label>
+            <input matInput formControlName="profileSearch" placeholder="Search by profile name or ID...">
+            <mat-icon matPrefix>person_search</mat-icon>
+            <button matSuffix mat-icon-button *ngIf="filterForm.get('profileSearch')?.value" 
+              (click)="filterForm.patchValue({profileSearch: ''})">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <!-- Clear Filters Button -->
+          <button mat-stroked-button color="warn" (click)="clearFilters()" class="clear-filters-btn">
+            Clear Filters
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Statistics Cards -->
+  <div class="stats-section">
+    <mat-card class="stat-card total-card">
+      <mat-card-content>
+        <div class="stat-number">{{totalArchives}}</div>
+        <div class="stat-label">Total Email Archives</div>
+        <div class="stat-sublabel">Last 7 days by default</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card delivery-card">
+      <mat-card-content>
+        <div class="stat-number">{{sentRate}}%</div>
+        <div class="stat-label">Sent Rate</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card delivery-card">
+      <mat-card-content>
+        <div class="stat-number">{{deliveryRate}}%</div>
+        <div class="stat-label">Delivery Rate</div>
+        <div class="stat-sublabel success">From sent emails</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card engagement-card">
+      <mat-card-content>
+        <div class="stat-number">{{openRate}}%</div>
+        <div class="stat-label">Open Rate</div>
+        <div class="stat-sublabel">{{clickRate}}% Click Rate</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card bounce-card">
+      <mat-card-content>
+        <div class="stat-number">{{bounceRate}}%</div>
+        <div class="stat-label">Bounce Rate</div>
+        <div class="stat-sublabel">Hard bounces</div>
+      </mat-card-content>
+    </mat-card>
+    
+    <mat-card class="stat-card failed-card">
+      <mat-card-content>
+        <div class="stat-number">{{failedRate}}%</div>
+        <div class="stat-label">Failed Rate</div>
+        <div class="stat-sublabel error">Not sent</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Data Table -->
+  <mat-card class="table-card">
+    <mat-card-content class="table-content">
+
+      <div class="table-wrapper" *ngIf="!isLoading; else loadingTemplate">
+        <table mat-table [dataSource]="dataSource" matSort class="email-table">
+
+          <!-- Time Column -->
+          <ng-container matColumnDef="time">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>schedule</mat-icon>
+                Date & Time
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="time-cell">
+              <div class="time-info">
+                <div class="date-icon">
+                  <mat-icon>calendar_today</mat-icon>
+                  <span class="date-text">{{formatDate(record.date)}}</span>
+                </div>
+                <div class="time-icon">
+                  <mat-icon>schedule</mat-icon>
+                  <span class="time-text">{{formatTime(record.date)}}</span>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Template Column -->
+          <ng-container matColumnDef="templatename">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>alternate_email</mat-icon>
+                Template
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="templatename-cell">
+              <div class="templatename-content" [title]="record.templateid">
+                {{record.templateid || 'No Template'}}
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Subject Column -->
+          <ng-container matColumnDef="subject">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>subject</mat-icon>
+                Subject / Campaign
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="subject-cell">
+              <div class="subject-content" [title]="record.subject || record.broadcastname">
+                {{record.subject || record.broadcastname || 'No Subject'}}
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Recipients Column -->
+          <ng-container matColumnDef="recipients">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>group</mat-icon>
+                Recipients
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="email-cell">
+              <div class="email-content">
+                <button mat-button class="recipient-chip clickable-chip" 
+                  (click)="openParticipantsPopup(record, 'all')"
+                  matTooltip="Click to view all participants">
+                  <mat-icon>group</mat-icon>
+                  {{record.statusCounts?.total || 0}} Recipients
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>info</mat-icon>
+                Status
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="status-cell">
+              <mat-chip [color]="getStatusColor(record.status)" selected class="status-chip">
+                {{record.status || 'pending'}}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <!-- Stats Summary Column -->
+          <ng-container matColumnDef="stats">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>analytics</mat-icon>
+                Email Events
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="stats-cell">
+              <div class="stats-summary">
+                <div class="stat-items">
+                  <button mat-button class="stat-button sent" 
+                    *ngIf="record.statusCounts?.sent > 0"
+                    (click)="openParticipantsPopup(record, 'sent')"
+                    matTooltip="View sent emails">
+                    <mat-icon>send</mat-icon>
+                    <span>{{record.statusCounts?.sent}}</span>
+                  </button>
+                  
+                  <button mat-button class="stat-button delivered"
+                    *ngIf="record.statusCounts?.delivery > 0"
+                    (click)="openParticipantsPopup(record, 'delivery')"
+                    matTooltip="View delivered emails">
+                    <mat-icon>check_circle</mat-icon>
+                    <span>{{record.statusCounts?.delivery}}</span>
+                  </button>
+                  
+                  <button mat-button class="stat-button opened"
+                    *ngIf="record.statusCounts?.open > 0"
+                    (click)="openParticipantsPopup(record, 'open')"
+                    matTooltip="View opened emails">
+                    <mat-icon>visibility</mat-icon>
+                    <span>{{record.statusCounts?.open}}</span>
+                  </button>
+                  
+                  <button mat-button class="stat-button clicked"
+                    *ngIf="record.statusCounts?.click > 0"
+                    (click)="openParticipantsPopup(record, 'click')"
+                    matTooltip="View clicked emails">
+                    <mat-icon>mouse</mat-icon>
+                    <span>{{record.statusCounts?.click}}</span>
+                  </button>
+
+                  <button mat-button class="stat-button bounce"
+                    *ngIf="record.statusCounts?.bounce > 0"
+                    (click)="openParticipantsPopup(record, 'bounce')"
+                    matTooltip="View bounced emails">
+                    <mat-icon>error_outline</mat-icon>
+                    <span>{{record.statusCounts?.bounce}}</span>
+                  </button>
+                  
+                  <button mat-button class="stat-button subscription"
+                    *ngIf="record.statusCounts?.subscriptionchange > 0"
+                    (click)="openParticipantsPopup(record, 'subscriptionchange')"
+                    matTooltip="View subscription changes">
+                    <mat-icon>unsubscribe</mat-icon>
+                    <span>{{record.statusCounts?.subscriptionchange}}</span>
+                  </button>
+
+                  <button mat-button class="stat-button failed"
+                    *ngIf="record.statusCounts?.failed > 0"
+                    (click)="openParticipantsPopup(record, 'failed')"
+                    matTooltip="View failed emails">
+                    <mat-icon>cancel</mat-icon>
+                    <span>{{record.statusCounts?.failed}}</span>
+                  </button>
+
+                  <button mat-button class="stat-button notSent"
+                    *ngIf="record.statusCounts?.notSent > 0"
+                    (click)="openParticipantsPopup(record, 'notSent')"
+                    matTooltip="View not sent emails">
+                    <mat-icon>block</mat-icon>
+                    <span>{{record.statusCounts?.notSent}}</span>
+                  </button>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Delivery Rate Column -->
+          <ng-container matColumnDef="deliveryRate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="status-header">
+              <div class="header-content">
+                <mat-icon>trending_up</mat-icon>
+                Performance
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let record" class="rate-cell">
+              <div class="performance-metrics">
+                <div class="metric-item">
+                  <span class="metric-label">Delivery</span>
+                  <div class="rate-bar" [ngClass]="getDeliveryRateColor(record.deliveryRate)">
+                    <div class="rate-fill" [style.width.%]="record.deliveryRate"></div>
+                    <span class="rate-text">{{record.deliveryRate}}%</span>
+                  </div>
+                </div>
+                <div class="metric-item" *ngIf="record.openRate > 0">
+                  <span class="metric-label">Open</span>
+                  <span class="metric-value">{{record.openRate}}%</span>
+                </div>
+                <div class="metric-item" *ngIf="record.clickRate > 0">
+                  <span class="metric-label">Click</span>
+                  <span class="metric-value">{{record.clickRate}}%</span>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns" class="table-header-row"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"
+            [class.has-events]="row.statusCounts?.sent > 0 || row.statusCounts?.delivery > 0"></tr>
+        </table>
+
+        <!-- Pagination -->
+        <mat-paginator 
+          #paginator
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          [pageSize]="10"
+          [showFirstLastButtons]="true"
+          [length]="dataSource.filteredData.length"
+          class="email-paginator">
+        </mat-paginator>
+
+        <!-- Empty State -->
+        <div class="empty-state" *ngIf="dataSource.data.length === 0 && !isLoading">
+          <mat-icon class="empty-icon">inbox</mat-icon>
+          <h3>No email archives found</h3>
+          <p>No data available. Check your Firestore collection 'email archive' or adjust your date range.</p>
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>clear_all</mat-icon>
+            Clear Filters
+          </button>
+          <button mat-button (click)="debugTableState()" style="margin-left: 8px;">
+            <mat-icon>bug_report</mat-icon>
+            Debug Info
+          </button>
+        </div>
+
+        <!-- No Results State -->
+        <div class="empty-state" *ngIf="dataSource.data.length > 0 && dataSource.filteredData?.length === 0 && !isLoading">
+          <mat-icon class="empty-icon">search_off</mat-icon>
+          <h3>No results found</h3>
+          <p>Try adjusting your search criteria or filters. {{dataSource.data.length}} total records available.</p>
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>clear_all</mat-icon>
+            Clear Filters
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading Template -->
+      <ng-template #loadingTemplate>
+        <div class="loading-container">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading email archives...</p>
+          <p *ngIf="isLoadingLogs" class="loading-sublabel">Fetching email logs...</p>
+        </div>
+      </ng-template>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ==================== UNIFIED PARTICIPANTS POPUP ==================== -->
+  <div class="participants-overlay" *ngIf="showParticipantsModal && selectedArchiveForPopup" (click)="closeParticipantsModal()">
+    <mat-card class="participants-modal" (click)="$event.stopPropagation()">
+      
+      <!-- Modal Header -->
+      <mat-card-header class="participants-modal-header">
+        <div class="header-left">
+          <mat-icon class="header-icon">people</mat-icon>
+          <div class="header-text">
+            <h2 class="modal-title">Email Participants</h2>
+            <p class="modal-subtitle">
+              {{selectedArchiveForPopup?.subject || selectedArchiveForPopup?.broadcastname || 'Campaign'}}
+            </p>
+          </div>
+        </div>
+        <button mat-icon-button (click)="closeParticipantsModal()" class="close-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-card-header>
+
+      <mat-card-content class="participants-modal-content">
+        
+        <!-- Status Summary as Filters (Moved to Top) -->
+        <div class="status-summary-filters">
+          <div class="summary-grid">
+            <div class="summary-item all" 
+                 [class.active]="isStatusFilterActive('all')"
+                 (click)="toggleStatusFilter('all')"
+                 matTooltip="Show all participants">
+              <mat-icon>people</mat-icon>
+              <span class="count">{{participantStatusCounts.total}}</span>
+              <span class="label">All</span>
+            </div>
+            <div class="summary-item sent" 
+                 [class.active]="isStatusFilterActive('sent')"
+                 (click)="toggleStatusFilter('sent')"
+                 matTooltip="Filter by sent">
+              <mat-icon>send</mat-icon>
+              <span class="count">{{participantStatusCounts.sent}}</span>
+              <span class="label">Sent</span>
+            </div>
+            <div class="summary-item delivery" 
+                 [class.active]="isStatusFilterActive('delivery')"
+                 (click)="toggleStatusFilter('delivery')"
+                 matTooltip="Filter by delivered">
+              <mat-icon>check_circle</mat-icon>
+              <span class="count">{{participantStatusCounts.delivery}}</span>
+              <span class="label">Delivered</span>
+            </div>
+            <div class="summary-item open" 
+                 [class.active]="isStatusFilterActive('open')"
+                 (click)="toggleStatusFilter('open')"
+                 matTooltip="Filter by opened">
+              <mat-icon>visibility</mat-icon>
+              <span class="count">{{participantStatusCounts.open}}</span>
+              <span class="label">Opened</span>
+            </div>
+            <div class="summary-item click" 
+                 [class.active]="isStatusFilterActive('click')"
+                 (click)="toggleStatusFilter('click')"
+                 matTooltip="Filter by clicked">
+              <mat-icon>mouse</mat-icon>
+              <span class="count">{{participantStatusCounts.click}}</span>
+              <span class="label">Clicked</span>
+            </div>
+            <div class="summary-item bounce" 
+                 [class.active]="isStatusFilterActive('bounce')"
+                 (click)="toggleStatusFilter('bounce')"
+                 matTooltip="Filter by bounced">
+              <mat-icon>error_outline</mat-icon>
+              <span class="count">{{participantStatusCounts.bounce}}</span>
+              <span class="label">Bounced</span>
+            </div>
+            <div class="summary-item subscriptionchange" 
+                 [class.active]="isStatusFilterActive('subscriptionchange')"
+                 (click)="toggleStatusFilter('subscriptionchange')"
+                 matTooltip="Filter by unsubscribed">
+              <mat-icon>unsubscribe</mat-icon>
+              <span class="count">{{participantStatusCounts.subscriptionchange}}</span>
+              <span class="label">Unsubscribed</span>
+            </div>
+            <div class="summary-item failed" 
+                 [class.active]="isStatusFilterActive('failed')"
+                 (click)="toggleStatusFilter('failed')"
+                 matTooltip="Filter by failed">
+              <mat-icon>cancel</mat-icon>
+              <span class="count">{{participantStatusCounts.failed}}</span>
+              <span class="label">Failed</span>
+            </div>
+            <div class="summary-item notSent" 
+                 [class.active]="isStatusFilterActive('notSent')"
+                 (click)="toggleStatusFilter('notSent')"
+                 matTooltip="Filter by not sent">
+              <mat-icon>block</mat-icon>
+              <span class="count">{{participantStatusCounts.notSent}}</span>
+              <span class="label">Not Sent</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search participants</mat-label>
+            <input matInput 
+              [(ngModel)]="participantSearchFilter" 
+              (input)="onParticipantSearchChange()"
+              placeholder="Search by email, name, or profile ID...">
+            <mat-icon matPrefix>search</mat-icon>
+            <button matSuffix mat-icon-button *ngIf="participantSearchFilter" 
+              (click)="participantSearchFilter=''; onParticipantSearchChange()">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+          <div class="result-count">
+            Showing {{filteredParticipants.length}} of {{allParticipants.length}} participants
+          </div>
+        </div>
+
+        <!-- Participants List -->
+        <div class="participants-list-container">
+          <div class="participants-list" *ngIf="filteredParticipants.length > 0">
+            <div class="participant-item" *ngFor="let participant of filteredParticipants; let i = index">
+              
+              <!-- Participant Avatar -->
+              <div class="participant-avatar">
+                <mat-icon>person</mat-icon>
+              </div>
+              
+              <!-- Participant Info -->
+              <div class="participant-info">
+                <div class="participant-email">{{participant.email}}</div>
+                <div class="participant-name" *ngIf="participant.name && participant.name !== 'Unknown'">
+                  {{participant.name}}
+                  <span class="profile-id" *ngIf="participant.profileid">({{participant.profileid}})</span>
+                </div>
+              </div>
+              
+              <!-- Status Badges -->
+              <div class="participant-statuses">
+                <ng-container *ngFor="let status of getParticipantStatusBadges(participant)">
+                  <span class="status-badge" [class]="status" [matTooltip]="getStatusLabel(status)">
+                    <mat-icon>{{getStatusIcon(status)}}</mat-icon>
+                  </span>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Participants Found -->
+          <div class="no-participants" *ngIf="filteredParticipants.length === 0">
+            <mat-icon>search_off</mat-icon>
+            <h4>No participants found</h4>
+            <p>Try adjusting your search or status filters</p>
+          </div>
+        </div>
+
+      </mat-card-content>
+
+      <!-- Modal Actions -->
+      <mat-card-actions class="participants-modal-actions" align="end">
+        <button mat-button (click)="closeParticipantsModal()">
+          <mat-icon>close</mat-icon>
+          Close
+        </button>
+        <button mat-raised-button color="primary" (click)="exportParticipants()">
+          <mat-icon>download</mat-icon>
+          Export Participants
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+  <!-- ==================== END UNIFIED PARTICIPANTS POPUP ==================== -->
+
+</div>

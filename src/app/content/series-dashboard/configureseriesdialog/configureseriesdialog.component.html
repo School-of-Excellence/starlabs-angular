@@ -1,0 +1,198 @@
+<div class="dialog-wrap dialog-wide">
+  <div class="dialog-header">
+    <h2 class="dialog-title">
+      <mat-icon class="dialog-title-icon">video_library</mat-icon>
+      {{ isEditMode ? 'Edit Series' : 'Create Series' }}
+    </h2>
+    <button class="a-btn" mat-dialog-close>
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-body">
+    <form #myForm="ngForm">
+      <div class="content-layout">
+        <div class="content-col">
+          <div class="field-group">
+            <label class="label">Series Name <span class="required">*</span></label>
+            <div class="input-box" [class.error]="(!nameCtrl.valid && nameCtrl.touched) || crossmatch">
+              <mat-icon class="ib-icon">title</mat-icon>
+              <input type="text" class="ib-input" placeholder="Enter series name"
+                [(ngModel)]="seriesName" name="seriesName" required minlength="4"
+                #nameCtrl="ngModel" (keyup)="onNameCheck()" />
+            </div>
+            <span class="field-error" *ngIf="!nameCtrl.valid && nameCtrl.touched">Series name required (min 4 chars)</span>
+            <span class="field-error" *ngIf="crossmatch">{{ crossmatcherrormessage }}</span>
+          </div>
+          <!-- <div class="field-group">
+            <label class="label">Free Series</label>
+            <mat-slide-toggle [(ngModel)]="freetier" name="freetier" color="primary">
+              {{ freetier ? 'Enabled' : 'Disabled' }}
+            </mat-slide-toggle>
+          </div> -->
+          <div class="field-group">
+            <label class="label">Access Type <span class="required">*</span></label>
+            <mat-select
+              [(ngModel)]="type"
+              name="type"
+              required
+              (selectionChange)="ontypeChange()"
+              #accessCtrl="ngModel"
+              class="cat-select">
+              
+              <mat-option value="free">Free</mat-option>
+              <mat-option value="exclusive">Exclusive</mat-option>
+              <mat-option value="tier">Tier</mat-option>
+            </mat-select>
+
+            <span class="field-error" *ngIf="!accessCtrl.valid && accessCtrl.touched">
+              Access type is required
+            </span>
+          </div>
+          <div class="field-group">
+            <label class="label">Description <span class="required">*</span></label>
+            <div class="input-box" [class.error]="!descCtrl.valid && descCtrl.touched">
+              <mat-icon class="ib-icon">description</mat-icon>
+              <input type="text" class="ib-input" placeholder="Enter description"
+                [(ngModel)]="description" name="description" required minlength="6"
+                #descCtrl="ngModel" />
+            </div>
+            <span class="field-error" *ngIf="!descCtrl.valid && descCtrl.touched">Description required (min 6 chars)</span>
+          </div>
+          <!-- <div class="field-group">
+            <label class="label">Tier <span class="required">*</span></label>
+            <mat-select [(ngModel)]="selectedTier" name="tier" multiple required
+              class="cat-select" #tierCtrl="ngModel">
+              <mat-option *ngFor="let t of tierList" [value]="t.id">{{ t.tier }}</mat-option>
+            </mat-select>
+            <span class="field-error" *ngIf="!tierCtrl.valid && tierCtrl.touched">Select at least one tier</span>
+          </div> -->
+          <div class="field-group" *ngIf="type === 'tier'">
+            <label class="label">Tier <span class="required">*</span></label>
+
+            <mat-select
+              [(ngModel)]="selectedTier"
+              name="tier"
+              multiple
+              [required]="type === 'tier'"
+              class="cat-select"
+              #tierCtrl="ngModel">
+
+              <mat-option *ngFor="let t of tierList" [value]="t.id">
+                {{ t.tier }}
+              </mat-option>
+            </mat-select>
+
+            <span class="field-error"
+              *ngIf="type === 'tier' && !tierCtrl.valid && tierCtrl.touched">
+              Select at least one tier
+            </span>
+          </div>
+        </div>
+        <div class="content-col">
+          <div class="field-group">
+            <label class="label">Hero Image</label>
+            <div class="upload-zone" *ngIf="!heroImagePreview && !existingHeroImageUrl" (click)="heroImageInput.click()">
+              <input #heroImageInput type="file" accept="image/*" (change)="onHeroImageSelected($event)" hidden />
+              <div class="upload-zone-content">
+                <mat-icon class="upload-icon">panorama</mat-icon>
+                <span class="upload-text">Click to upload hero image</span>
+              </div>
+            </div>
+            <div class="media-card" *ngIf="heroImagePreview || existingHeroImageUrl">
+              <img [src]="heroImagePreview || existingHeroImageUrl" class="media-preview media-preview-img" />
+              <div class="media-card-bar">
+                <mat-icon class="media-bar-icon">panorama</mat-icon>
+                <span class="media-bar-name">{{ heroImageFile?.name || 'Hero image' }}</span>
+                <button class="a-btn" type="button" (click)="changeHeroInput.click()">
+                  <mat-icon>swap_horiz</mat-icon>
+                </button>
+                <input #changeHeroInput type="file" accept="image/*" (change)="onHeroImageSelected($event)" hidden />
+                <button class="a-btn a-del" type="button" (click)="removeHeroImage()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="label">Thumbnail Image <span class="required" *ngIf="!isEditMode">*</span></label>
+            <div class="upload-zone" *ngIf="!thumbImagePreview && !existingThumbImageUrl" (click)="thumbImageInput.click()">
+              <input #thumbImageInput type="file" accept="image/*" (change)="onThumbImageSelected($event)" hidden />
+              <div class="upload-zone-content">
+                <mat-icon class="upload-icon">image</mat-icon>
+                <span class="upload-text">Click to upload thumbnail</span>
+              </div>
+            </div>
+            <div class="media-card" *ngIf="thumbImagePreview || existingThumbImageUrl">
+              <img [src]="thumbImagePreview || existingThumbImageUrl" class="media-preview media-preview-img" />
+              <div class="media-card-bar">
+                <mat-icon class="media-bar-icon">image</mat-icon>
+                <span class="media-bar-name">{{ thumbImageFile?.name || 'Thumbnail' }}</span>
+                <button class="a-btn" type="button" (click)="changeThumbInput.click()">
+                  <mat-icon>swap_horiz</mat-icon>
+                </button>
+                <input #changeThumbInput type="file" accept="image/*" (change)="onThumbImageSelected($event)" hidden />
+                <button class="a-btn a-del" type="button" (click)="removeThumbImage()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </form>
+    <div style="margin-top: 24px;">
+      <div class="field-group">
+        <label class="label">Select Episodes ({{ selectedEpisodeIds.length }} selected)</label>
+        <mat-select
+          [(ngModel)]="selectedEpisodeIds"
+          (selectionChange)="onEpisodeSelectionChange()"
+          multiple
+          class="cat-select"
+          panelClass="cat-select-panel">
+          <mat-option disabled class="cat-search-option">
+            <div class="cat-search-box" (click)="$event.stopPropagation()">
+              <mat-icon class="ib-icon">search</mat-icon>
+              <input type="text" class="ib-input" placeholder="Search episodes..."
+                (keyup)="onEpisodeSearch($event)" (keydown)="$event.stopPropagation()" />
+            </div>
+          </mat-option>
+          <mat-option *ngFor="let ep of filteredEpisodeList" [value]="ep.id">
+            {{ ep.title }}
+          </mat-option>
+          <mat-option disabled *ngIf="filteredEpisodeList.length === 0">
+            <span class="cat-no-result">No episodes found</span>
+          </mat-option>
+        </mat-select>
+      </div>
+    </div>
+    <div *ngIf="rearrangedSequence.length > 0" style="margin-top: 24px;">
+      <label class="label" style="margin-bottom: 10px; display: block;">
+        Episode Order — Drag to reorder
+      </label>
+      <div class="drag-list" cdkDropList (cdkDropListDropped)="drop($event)">
+        <div class="drag-item" *ngFor="let row of rearrangedSequence; let i = index" cdkDrag>
+          <div class="drag-handle" cdkDragHandle>
+            <mat-icon>drag_indicator</mat-icon>
+          </div>
+          <span class="drag-index">{{ i + 1 }}</span>
+          <img *ngIf="row.imageUrl" [src]="row.imageUrl" class="drag-thumb" />
+          <span class="c-name">{{ row.title }}</span>
+          <button class="a-btn a-del" (click)="removeFromSequence(row.id)" style="margin-left: auto;">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <button class="btn-cancel" mat-dialog-close>Cancel</button>
+    <button class="btn-primary" (click)="onSubmit()"
+      [disabled]="saving || myForm?.invalid || crossmatch || (!isEditMode && !thumbImageFile)">
+      <mat-icon *ngIf="!saving">{{ isEditMode ? 'save' : 'cloud_upload' }}</mat-icon>
+      <mat-icon *ngIf="saving" class="spin-icon">sync</mat-icon>
+      {{ saving ? 'Saving...' : (isEditMode ? 'Update' : 'Submit') }}
+    </button>
+  </div>
+</div>

@@ -1,0 +1,71 @@
+<div class="meeting-end-container">
+    <div class="overlay"></div>
+    <div class="dialog-wrapper">
+      <div class="dialog-content" *ngIf="!loading">
+        <h2>Meeting Ended</h2>
+        <p>The meeting has been ended by the host. Please update the appointment status.</p>
+        
+        <div class="meeting-info" *ngIf="meetingData">
+          <div class="info-row">
+            <span class="label">Meeting ID:</span>
+            <span class="value">{{meetingData.meetingId}}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Host:</span>
+            <span class="value">{{meetingData.host}}</span>
+          </div>
+          <div class="info-row" *ngIf="productType">
+            <span class="label">Product Type:</span>
+            <span class="value">{{productType}}</span>
+          </div>
+        </div>
+
+        <!-- Attendance Status -->
+        <div class="title">Appointment Status</div>
+          <mat-form-field appearance="outline">
+            <mat-label>Start Time</mat-label>
+            <input matInput type="time" [(ngModel)]="start">
+          </mat-form-field>
+          <mat-form-field class="inputfield" appearance="outline">
+            <mat-label>End Time</mat-label>
+            <input matInput type="time" [(ngModel)]="end">
+          </mat-form-field>
+        <div>
+
+        <!-- Cancellation Reason (if not attended) -->
+        <div>
+          <mat-checkbox [(ngModel)]="attended">Appointment Happened Successfully!</mat-checkbox>
+        </div>
+        <div class="journeystatusbox" *ngIf="!attended">
+          <div class="subtitle">Why not Happened?</div>
+          <mat-form-field appearance="outline">
+            <mat-label>Select Reason</mat-label>
+            <mat-select [(ngModel)]="cancelledReason">
+              <mat-option *ngFor="let reason of cancelledReasonList" [value]="reason">{{reason}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="action-buttons">
+          <button 
+            class="btn-primary"
+            (click)="submit()">
+            {{loading ? 'Please wait...' : 'Update Status'}}
+          </button>
+        </div>
+
+
+        <div class="warning-text">
+          <small>⚠️ You must update the appointment status to continue</small>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="dialog-content loading-state" *ngIf="loading">
+        <div class="spinner"></div>
+        <h3>Loading appointment details...</h3>
+        <p>Please wait while we fetch the appointment information.</p>
+      </div>
+    </div>
+</div>

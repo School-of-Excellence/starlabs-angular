@@ -1,0 +1,37 @@
+.mainscreen{
+    padding: 15px;
+}
+
+.title {
+  text-align: center;
+}
+.cancelbtn{
+    color: red;
+    border: 1px solid red;
+    margin-right: 10px;
+}
+  
+.submitbtn{
+    color: white;
+    background: green;
+}
+
+.inputfields{
+    margin-top: 20px;
+    margin-right: 20px;
+    min-width: 400px;
+    max-width: 500px;
+    background-color: transparent;
+}
+
+.actionitem{
+    margin-bottom: 20px;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+table{
+    width : 100%
+}
+th,td{
+    padding: 5px;
+}

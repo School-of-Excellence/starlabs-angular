@@ -1,0 +1,192 @@
+.onboard-remark-card {
+    /* width: 300px; */
+    /* border: 1px solid #e0e0e0; */
+    /* border-radius: 8px; */
+    font-family: 'Nunito Sans', sans-serif;
+    color: #333;
+    /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); */
+    padding: 0px;
+    background-color: #fff;
+
+}
+  
+.header {
+    background-color: rgb(0, 101, 135);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.user-info {
+    margin-top: 12px;
+    padding: 10px;
+    background-color: #f1f1f1;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.username {
+    font-weight: bold;
+    color: #4a90e2;
+}
+
+.date {
+    color: #666;
+}
+
+ .owner {
+    background-color: #d81b60;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 12px;
+    float: right;
+}
+
+.sales-note,
+.onboarding-report {
+    margin: 20px;
+}
+
+.onboarding-report p{
+    font-size: 16px;
+    margin-left: 10px;
+}
+
+.sales-note h4,
+.onboarding-report h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+    font-weight: bold;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+ }
+
+.sales-note p,
+.onboarding-report p {
+    margin: 8px 0;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.options {
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-evenly;
+    align-items: start;
+    font-size: 16px;
+}
+
+.options label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.submit-button {
+    width: 35%;
+    padding: 6px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: white;
+    align-items: center;
+    margin-bottom: 20px;
+    margin-top: 20px;
+    background-color: #208cff;
+    font-family: 'Nunito Sans', sans-serif;
+    display:flex;
+    justify-content: center;
+    text-align: center;
+}
+
+.submit-button:hover {
+    background-color: #0056b3;
+}
+
+.notes-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 700px;
+    margin: auto;
+}
+  
+.textareafield {
+    width: 100%;
+}
+  
+.textareafield textarea {
+    width: 100%;
+}
+
+.displaynotes{
+    overflow-y: auto;
+}
+
+.displaynotes span{
+    margin-bottom: 10px;
+}
+
+.date-time-picker {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  
+  @media (max-width: 600px) {
+    .date-time-picker {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  .no-padding-time-input {
+    width: auto !important; /* Reduce width to content */
+    height: auto !important; /* Reduce height */
+  }
+
+  .no-padding-time-input .mat-mdc-form-field-infix {
+    padding: 0px !important;
+    min-height: 30px !important; /* Reduce default height */
+    width: auto !important; /* Make width auto to fit content */
+  }
+
+  .no-padding-time-input .mat-mdc-text-field-wrapper {
+    padding: 0px !important;
+  }
+
+  .no-padding-time-input .mat-mdc-form-field-flex {
+    margin: 0 !important;
+  }
+
+  /* For the input itself */
+  .no-padding-time-input input[type="time"] {
+    margin: 0px !important;
+    padding: 0px !important;
+    font-size: 14px !important; /* Smaller font size */
+  }
+  
+  /* Reduce space for the outline border */
+  .no-padding-time-input .mdc-notched-outline {
+    padding: 0px !important;
+  }
+  
+  /* Reduce label size */
+  .no-padding-time-input .mat-mdc-form-field-label {
+    font-size: 12px !important;
+    top: -3px !important;
+  }
+
+  .no-padding-time-input.mat-form-field-appearance-outline .mat-form-field-wrapper {
+    margin-bottom: -1.25em;
+    padding-bottom: 0px !important;
+  }

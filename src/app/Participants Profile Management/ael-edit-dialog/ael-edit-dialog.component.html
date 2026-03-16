@@ -1,0 +1,210 @@
+<h2 mat-dialog-title>Edit AEL</h2>
+<mat-dialog-content>
+  <form>
+    <div class="category">
+        <h5>Business</h5>
+        <mat-form-field appearance="outline">
+          <mat-label>Start Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Business.startpoint" name="startPointBusiness">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.startpoint">
+              {{ level.startpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+          <mat-label>End Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Business.endpoint" name="endPointBusiness">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+              {{ level.endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+            <mat-label>Metric</mat-label>
+            <mat-select 
+            (selectionChange)="
+            selectedPoints.Business.metric = selectedPoints.Business.metric === 0 ? null : selectedPoints.Business.metric;
+            selectedPoints.Business.metric < 8 ? selectedPoints.Business.jumpedfrom = null : null"        
+            [(ngModel)]="selectedPoints.Business.metric" name="metricBusiness">
+              <mat-option *ngFor="let num of numberRange" [value]="num">
+                {{ num }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;
+          <mat-form-field appearance="outline" *ngIf="selectedPoints.Business.metric >= 8">
+            <mat-label>Jumped From</mat-label>
+            <mat-select [(ngModel)]="selectedPoints.Business.jumpedfrom" name="jumpedFromBusiness">
+              <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+                {{ level.endpoint }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        <br><br>
+    </div>
+    <div class="category">
+        <h5>Career</h5>
+        <mat-form-field appearance="outline">
+          <mat-label>Start Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Career.startpoint" name="startPointCareer">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.startpoint">
+              {{ level.startpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+          <mat-label>End Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Career.endpoint" name="endPointCareer">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+              {{ level.endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+            <mat-label>Metric</mat-label>
+            <mat-select 
+            (selectionChange)="
+            selectedPoints.Career.metric = selectedPoints.Career.metric === 0 ? null : selectedPoints.Career.metric;
+            selectedPoints.Career.metric < 8 ? selectedPoints.Career.jumpedfrom = null : null"   
+            [(ngModel)]="selectedPoints.Career.metric" name="metricCareer">
+              <mat-option *ngFor="let num of numberRange" [value]="num">
+                {{ num }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;
+          <mat-form-field appearance="outline" *ngIf="selectedPoints.Career.metric >= 8">
+            <mat-label>Jumped From</mat-label>
+            <mat-select [(ngModel)]="selectedPoints.Career.jumpedfrom" name="jumpedFromCareer">
+              <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+                {{ level.endpoint }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        <br><br>
+    </div>
+    <div class="category">
+        <h5>Health</h5>
+        <mat-form-field appearance="outline">
+          <mat-label>Start Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Health.startpoint" name="startPointHealth">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.startpoint">
+              {{ level.startpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+          <mat-label>End Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Health.endpoint" name="endPointHealth">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+              {{ level.endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+            <mat-label>Metric</mat-label>
+            <mat-select 
+            (selectionChange)="
+            selectedPoints.Health.metric = selectedPoints.Health.metric === 0 ? null : selectedPoints.Health.metric;
+            selectedPoints.Health.metric < 8 ? selectedPoints.Health.jumpedfrom = null : null"        
+            [(ngModel)]="selectedPoints.Health.metric" name="metricHealth">
+              <mat-option *ngFor="let num of numberRange" [value]="num">
+                {{ num }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;
+          <mat-form-field appearance="outline" *ngIf="selectedPoints.Health.metric >= 8">
+            <mat-label>Jumped From</mat-label>
+            <mat-select [(ngModel)]="selectedPoints.Health.jumpedfrom" name="jumpedFromHealth">
+              <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+                {{ level.endpoint }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        <br><br>
+    </div>
+    <div class="category">
+        <h5>Personal Genius</h5>
+        <mat-form-field appearance="outline">
+          <mat-label>Start Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints['Personal Genius'].startpoint" name="startPointPersonalGenius">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.startpoint">
+              {{ level.startpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+          <mat-label>End Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints['Personal Genius'].endpoint" name="endPointPersonalGenius">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+              {{ level.endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+            <mat-label>Metric</mat-label>
+            <mat-select 
+            (selectionChange)="
+            selectedPoints['Personal Genius'].metric = selectedPoints['Personal Genius'].metric === 0 ? null : selectedPoints['Personal Genius'].metric;
+            selectedPoints['Personal Genius'].metric < 8 ? selectedPoints['Personal Genius'].jumpedfrom = null : null"          
+            [(ngModel)]="selectedPoints['Personal Genius'].metric" name="metricPersonalGenius">
+              <mat-option *ngFor="let num of numberRange" [value]="num">
+                {{ num }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;
+          <mat-form-field appearance="outline" *ngIf="selectedPoints['Personal Genius'].metric >= 8">
+            <mat-label>Jumped From</mat-label>
+            <mat-select [(ngModel)]="selectedPoints['Personal Genius'].jumpedfrom" name="jumpedFromPersonalGenius">
+              <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+                {{ level.endpoint }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        <br><br>
+    </div>
+    <div class="category">
+        <h5>Family</h5>
+        <mat-form-field appearance="outline">
+          <mat-label>Start Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Family.startpoint" name="startPointFamily">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.startpoint">
+              {{ level.startpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+          <mat-label>End Point</mat-label>
+          <mat-select [(ngModel)]="selectedPoints.Family.endpoint" name="endPointFamily">
+            <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+              {{ level.endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+            <mat-label>Metric</mat-label>
+            <mat-select     
+            (selectionChange)="
+            selectedPoints.Family.metric = selectedPoints.Family.metric === 0 ? null : selectedPoints.Family.metric;
+            selectedPoints.Family.metric < 8 ? selectedPoints.Family.jumpedfrom = null : null"
+            [(ngModel)]="selectedPoints.Family.metric" name="metricFamily">
+              <mat-option *ngFor="let num of numberRange" [value]="num">
+                {{ num }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;
+          <mat-form-field appearance="outline" *ngIf="selectedPoints.Family.metric >= 8">
+            <mat-label>Jumped From</mat-label>
+            <mat-select [(ngModel)]="selectedPoints.Family.jumpedfrom" name="jumpedFromFamily">
+              <mat-option *ngFor="let level of acceleratedLevel" [value]="level.endpoint">
+                {{ level.endpoint }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        <br><br>
+    </div>
+
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions>
+  <button mat-button (click)="dialogRef.close()">Cancel</button>
+  <button mat-button [disabled]="updating" (click)="save()">Update</button>
+</mat-dialog-actions>

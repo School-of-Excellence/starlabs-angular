@@ -1,0 +1,25 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "4S8G77HWG6.com.app.launchyourlegacy",
+        "paths": [
+          "/recommended/*",
+          "/content/*",
+          "/eiflix/*",
+          "/generalcontent/*",
+          "/home",
+          "/login",
+          "/register",
+          "/forgotpassword",
+          "/calendar/*",
+          "/calendar/*/*",
+          "/tv-auth",
+          "/tv-auth/*",
+          "/tv-auth/*/*"
+        ]
+      }
+    ]
+  }
+}

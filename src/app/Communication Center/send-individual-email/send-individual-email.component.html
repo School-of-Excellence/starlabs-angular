@@ -1,0 +1,231 @@
+<!-- HTML Template -->
+<div class="appointment-dialog">
+    <header class="header color-teal">
+        <h1 class="title">Schedule Appointment</h1>
+        <button mat-icon-button mat-dialog-close class="close-button">
+            <mat-icon style="color:white">close</mat-icon>
+        </button>
+    </header>
+
+    <div class="dialog-content">
+        <form [formGroup]="emailform" class="email-form">
+            <div class="main-content-container">
+                <!-- Left side - Editor Section -->
+                <div class="editor-container">
+                    <mat-form-field appearance="outline" class="subject-field">
+                        <mat-label>Subject</mat-label>
+                        <input matInput placeholder="Enter Subject" required formControlName="subject">
+                    </mat-form-field>
+
+                    <!-- <angular-editor #editor class="email-editor" (ngModelChange)="onContentChange()"
+                        (click)="onEditorClick($event)" [config]="editorConfig" formControlName="htmlbody">
+                    </angular-editor> -->
+
+                    <!-- Button Panel -->
+                    <div *ngIf="!hideAddButton" class="button-panel">
+                        <h5>Add a Custom Button</h5>
+                        <div class="button-grid">
+                            <div class="form-group">
+                                <label for="buttonName" class="form-control-label">Button Name</label>
+                                <input id="buttonName" class="form-control" type="text" [(ngModel)]="buttonName"
+                                    placeholder="Enter button text" required />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="buttonSize" class="form-control-label">Button Size</label>
+                                <select id="buttonSize" class="form-control" [(ngModel)]="buttonSize" required>
+                                    <option value="small">Small</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="large">Large</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="buttonAlign" class="form-control-label">Alignment</label>
+                                <select id="buttonAlign" class="form-control" [(ngModel)]="buttonAlign" required>
+                                    <option value="left">Left</option>
+                                    <option value="center" selected>Center</option>
+                                    <option value="right">Right</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="buttonLink" class="form-control-label">Button Link</label>
+                                <input id="buttonLink" class="form-control" type="text" [(ngModel)]="buttonLink"
+                                    placeholder="https://example.com" required />
+                            </div>
+
+                            <div class="form-group">
+                                <button [disabled]="validateButton()"
+                                    (click)="insertButton(buttonName,buttonSize,buttonLink,buttonAlign)"
+                                    class="insert-button">
+                                    Insert Button
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Resize Panel -->
+                    <div *ngIf="selectedImage" class="image-resize-panel">
+                        <h4>Resize Image</h4>
+                        <div class="image-resize-controls">
+                            <div class="form-group">
+                                <label for="imageWidth" class="form-control-label">Width</label>
+                                <!-- <input id="imageWidth" class="form-control dimension-control" type="number"
+                                    [(ngModel)]="selectedImageWidth" (input)="resizeImage('center')" /> -->
+                            </div>
+
+                            <div class="form-group">
+                                <label for="imageHeight" class="form-control-label">Height</label>
+                                <!-- <input id="imageHeight" class="form-control dimension-control" type="number"
+                                    [(ngModel)]="selectedImageHeight" (input)="resizeImage('center')" /> -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Section -->
+                    <div class="notes-section">
+                        <mat-form-field appearance="outline" class="notes-field">
+                            <mat-label><strong>Notes for creating these emails to Participants</strong></mat-label>
+                            <textarea matInput name="notes" rows="3" placeholder="" formControlName="notes"></textarea>
+                        </mat-form-field>
+                    </div>
+                </div>
+
+                <!-- Right side - From Email and Preview Section -->
+                <div class="preview-container">
+                    <!-- From Address Field moved to right side -->
+                    <div class="d-flex justify-content-around">
+                        <mat-form-field appearance="outline" class="from-address">
+                            <mat-label>From Address</mat-label>
+                            <input matInput [matAutocomplete]="auto" formControlName="from"
+                                placeholder="Enter email address">
+                            <mat-autocomplete #auto="matAutocomplete">
+                                <mat-option *ngFor="let mailid of senderEmailID"
+                                    [value]="mailid">{{mailid}}</mat-option>
+                            </mat-autocomplete>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="from-address">
+                            <mat-label>Template</mat-label>
+                            <mat-select (selectionChange)="onTemplateSelect($event.value)" formControlName="template">
+                                <mat-option *ngFor="let template of templateArray" [value]="template">
+                                    {{template.templatename}}
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div class="preview-section">
+                        <div class="preview-header">
+                            <h4>Preview</h4>
+                            <div class="preview-actions">
+                                <!-- <button mat-stroked-button class="create-button" [disabled]="!emailform.valid" (click)="sendTest(emailform.value)">
+                                    Send Test
+                                </button> -->
+
+                                <button mat-stroked-button class="create-button" [disabled]="!emailform.valid"
+                                    (click)="sendEMail(emailform.value)">
+                                    Send Email
+                                </button>
+
+                                <button mat-icon-button class="device-button"
+                                    [ngClass]="{'active': previewMode === 'mobile'}" (click)="setSize('mobile')"
+                                    matTooltip="Mobile Preview">
+                                    <mat-icon>smartphone</mat-icon>
+                                </button>
+
+                                <button mat-icon-button class="device-button"
+                                    [ngClass]="{'active': previewMode === 'web'}" (click)="setSize('web')"
+                                    matTooltip="Desktop Preview">
+                                    <mat-icon>computer</mat-icon>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="preview-scroll-container">
+                            <div class="preview-content web" *ngIf="previewMode !== 'mobile'">
+                                <div class="gmail-web-header">
+                                    <div class="gmail-logo">
+                                        <img src="https://ssl.gstatic.com/ui/v1/icons/mail/rfr/logo_gmail_lockup_default_1x_r4.png"
+                                            alt="Gmail">
+                                    </div>
+                                </div>
+
+                                <div class="gmail-email-container">
+                                    <div class="gmail-email-header">
+                                        <!-- <div class="gmail-email-subject">{{ emailform.controls.subject.value || 'Email Subject' }}</div> -->
+                                        <div class="gmail-email-details">
+                                            <div class="gmail-avatar-container">
+                                                <div class="gmail-avatar">A&H</div>
+                                            </div>
+                                            <div class="gmail-sender-info">
+                                                <div class="gmail-sender-name">
+                                                    <!-- Antano&Harini <span style="color: #5f6368; font-weight: normal;">&lt;{{emailform.controls.from.value}}&gt;</span> -->
+                                                </div>
+                                                <div class="gmail-sender-address">
+                                                    to me
+                                                </div>
+                                            </div>
+                                            <div class="gmail-email-date">
+                                                {{getCurrentTime()}}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Email Content with Wrapper Div for Extra Protection -->
+                                    <div id="contentContainer" class="gmail-email-body">
+                                        <div style="text-align: left !important; max-width: 100%;"
+                                            [innerHTML]="sanitizedHtmlContent"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Gmail Mobile App Preview -->
+                            <div class="preview-content mobile" *ngIf="previewMode === 'mobile'">
+                                <div class="mobile-status-bar">
+                                    <div class="mobile-status-time">10:41 AM</div>
+                                    <div class="mobile-status-icons">
+                                        <span>●</span>
+                                        <span>●</span>
+                                        <span>●</span>
+                                    </div>
+                                </div>
+
+                                <div class="gmail-mobile-header">
+                                    <div class="gmail-mobile-menu">☰</div>
+                                    <div class="gmail-mobile-search">🔍 Search in mail</div>
+                                    <div class="gmail-mobile-avatar">A&H</div>
+                                </div>
+
+                                <div class="gmail-mobile-email">
+                                    <div class="gmail-mobile-email-header">
+                                        <!-- <div class="gmail-mobile-subject">{{ emailform.controls.subject.value || 'Email Subject' }}</div> -->
+                                        <div class="gmail-mobile-sender">
+                                            <div class="gmail-mobile-sender-avatar">A&H</div>
+                                            <div class="gmail-mobile-sender-info">
+                                                <div class="gmail-mobile-sender-name">
+                                                    <!-- Antano&Harini <span style="color: #5f6368; font-weight: normal;">&lt;{{emailform.controls.from.value}}&gt;</span> -->
+                                                </div>
+                                                <div class="gmail-mobile-sender-details">
+                                                    <span class="gmail-mobile-to-me">to me</span>
+                                                    <span class="gmail-mobile-time">{{getCurrentTime()}}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mobile Email Content with Wrapper Div -->
+                                    <div id="mobileContentContainer" class="gmail-mobile-email-body">
+                                        <div style="text-align: left !important; max-width: 100%;"
+                                            [innerHTML]="sanitizedHtmlContent"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

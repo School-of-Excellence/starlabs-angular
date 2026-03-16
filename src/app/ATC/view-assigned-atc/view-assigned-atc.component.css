@@ -1,0 +1,361 @@
+.mainscreen {
+  padding: 20px;
+}
+
+.heading {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #3f51b5 !important;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.filterbox {
+  margin-bottom: 20px;
+}
+
+.filterrow{
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  gap: 10px;
+}
+
+.filteritem {
+  background-color: white !important;
+  width: 100%;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+}
+
+.filteritem ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  height: 0;
+}
+
+.clearbtn {
+  margin-top: 15px;
+  background-color: white !important;
+  color: rgb(252, 13, 13) !important;
+  border: 1px solid rgb(252, 13, 13) !important;
+  font-size: 16px;
+  min-width: 100px;
+}
+
+.hoverprofile:hover{
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+/* List styles */
+mat-list {
+  padding: 0 !important;
+  background-color: white !important;
+}
+
+mat-list-item {
+  height: auto !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+  padding: 0.75rem 0.75rem !important;
+}
+
+/* Date styles */
+.atcdate {
+  display: inline-block;
+  font-weight: 600;
+  color: rgb(61, 61, 61) !important;
+  margin-bottom: 0.50rem;
+  margin-right: 10px;
+}
+
+/* ATC Header Container - Profile and Meta */
+.atc-header-container {
+  display: flex;
+  align-content: space-between;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.atc-meta {
+  width: 100%;
+}
+
+/* Profile Image */
+.profile-image-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: end;
+  text-align: end;
+}
+
+.profile-image {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e0e0e0 !important;
+}
+
+/* Content container */
+.atcdetail {
+  margin-top: 10px;
+  margin-left: 15px;
+  /* Fix for line-through issue */
+  text-decoration: none;
+}
+
+/* Label styles */
+.info-label {
+  font-weight: 600;
+  font-style: italic;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.info-value {
+  color: black !important;
+}
+
+/* Full ATC View */
+.full-atc-view {
+  margin-top: 5px;
+  padding-top: 10px;
+  border-top: 1px solid #e0e0e0 !important;
+}
+
+.loading-atc {
+  padding: 10px;
+  text-align: left;
+  font-style: italic;
+  color: #666 !important;
+}
+
+.deleteStyle{
+  color: grey !important;
+  font-weight: 400;
+}
+
+.transcription-item {
+  margin-bottom: 15px;
+}
+
+/* Adjustment styles */
+.adjustment-container {
+  background-color: #fdfdfd !important;
+  border-radius: 4px;
+  padding: 0 15px;
+}
+
+.adjustment-header {
+  margin-bottom: 8px;
+}
+
+.adjustment {
+  font-size: 16.6px;
+  display: block;
+  margin-bottom: 5px;
+  font-weight: normal;
+}
+
+/* Procedures section */
+.procedures-section {
+  margin-top: 10px;
+}
+
+.procedure-item {
+  margin-bottom: 10px;
+}
+
+/* Procedure view and row */
+.procedure-view {
+  padding: 3px 0;
+  padding-top: 8px;
+}
+
+.procedure-row {
+  background-color: #f5f5f5 !important;
+  padding: 8px 10px;
+  border-radius: 4px;
+}
+
+.procedure-row .filterbox{
+  background-color: white !important;
+}
+
+.procedure-name {
+  display: inline-block;
+  margin-right: 10px;
+  font-weight: 600;
+}
+
+.mandatory-icon {
+  color: #da635a !important;
+  margin-right: 10px;
+}
+
+
+.agentfield {
+  background-color: white !important;
+  padding-bottom: 0 !important;
+}
+
+.agentfield ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  height: 0;
+}
+
+.todobtn{
+  color: white !important;
+  background-color: rgb(0, 146, 194) !important;
+  margin-right: 15px;
+  padding: 3px 15px;
+  font-size: 16px;
+}
+
+.successbtn{
+  color: white !important;
+  background-color: green !important;
+  margin-right: 15px;
+  padding: 3px 15px;
+  font-size: 16px;
+}
+
+.submitbtn{
+  color: green !important;
+  border: 1px solid green !important;
+  background-color: white !important;
+  padding: 3px 12px !important;
+  font-size: 16px;
+  min-width: 120px;
+  margin-right: 15px;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red !important;
+  background-color: white !important;
+  padding: 3px 15px !important;
+  font-size: 16px;
+  min-width: 120px;
+  margin-right: 15px;
+}
+
+.assigned-authors {
+  font-style: italic;
+  margin-right: 10px;
+  font-weight: 500;
+}
+
+.edit-button {
+  min-width: 64px;
+}
+
+/* Procedure edit form */
+.procedure-edit {
+  background-color: #f5f5f5 !important;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 5px 0;
+}
+
+.procedure-edit-title {
+  display: block;
+  font-weight: 600;
+  margin-top: 5px;
+}
+
+.procedure-edit-options {
+  padding: 15px 10px;
+  /* display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+  margin-bottom: 10px; */
+}
+
+.procedure-checkbox {
+  margin-right: 15px;
+}
+
+.procedure-edit-authors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.procedure-edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.adjustment-action-button {
+  margin-top: 10px;
+}
+
+.comment-container {
+  background-color: #fdfdfd !important;
+  border-left: 4px solid #3f51b5 !important;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+
+/* Audio container */
+.audio-container {
+  margin-top: 5px;
+}
+
+/* Image Notes */
+.image-notes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.image-preview img {
+  border-radius: 4px;
+  border: 1px solid #ddd !important;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+.image-preview img:hover {
+  transform: scale(1.1);
+}
+
+/* Make checkboxes align properly */
+:host ::ng-deep .mat-checkbox-layout {
+  white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .filterrow {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .procedure-row {
+    flex-wrap: wrap;
+  }
+  
+  .procedure-name {
+    flex: 0 0 100%;
+    margin-bottom: 5px;
+  }
+  
+  .assigned-authors {
+    flex: 1 0 100%;
+    margin: 5px 0;
+  }
+  
+  .profile-image {
+    width: 50px;
+    height: 50px;
+  }
+}

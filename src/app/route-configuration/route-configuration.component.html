@@ -1,0 +1,132 @@
+<mat-card class="route-config-card">  
+  <mat-card-content>
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Filter</mat-label>
+      <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Dashboard" #input>
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>&nbsp;&nbsp;&nbsp;
+    <button mat-stroked-button type="button" (click)="createRoute()">Create Route</button>&nbsp;
+    <button mat-stroked-button type="button" (click)="toggleExpandAll()">
+      {{ isAllExpanded ? 'Collapse All' : 'Expand All' }}
+    </button>
+    <div class="table-container">
+      <table mat-table [dataSource]="dataSource" 
+             cdkDropList 
+             [cdkDropListData]="getTableData()"
+             (cdkDropListDropped)="onChildRouteDrop($event)"
+             matSort class="mat-elevation-z2">
+        <ng-container matColumnDef="expand">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let element">
+            <button mat-icon-button 
+                    *ngIf="hasChildren(element) && !element.isChild" 
+                    (click)="toggleExpand(element)">
+              <mat-icon>{{element.isExpanded ? 'expand_less' : 'expand_more'}}</mat-icon>
+            </button>
+            <!-- <mat-icon *ngIf="element.isChild"  -->
+            <mat-icon *ngIf="element.showDrag" 
+                      class="drag-handle" 
+                      cdkDragHandle>
+              drag_indicator
+            </mat-icon>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="order">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="order-header">Order</th>
+          <td mat-cell *matCellDef="let element" class="order-cell" [class.child-row]="element.isChild">
+            <span class="order-value">{{element.order || '-'}}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="label">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="label-header">Label</th>
+          <td mat-cell *matCellDef="let element" class="label-cell" [class.child-row]="element.isChild">
+            <span class="label-text" [class.child-label]="element.isChild">{{element.label}}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="sidenav">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="route-header">Sidenav</th>
+          <td mat-cell *matCellDef="let element" class="route-cell" [class.child-row]="element.isChild">
+            <span class="label-text" style="font-weight: bold;" [ngStyle]="{ 'color': element.showInSidenav ? 'green' : 'red' }">{{element.showInSidenav ? 'yes' : 'No'}}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="route">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="route-header">Route</th>
+          <td mat-cell *matCellDef="let element" class="route-cell" [class.child-row]="element.isChild">
+            <span class="route-code">{{element.route ?? 'Sub Route'}}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="icon">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="icon-header">Icon</th>
+          <td mat-cell *matCellDef="let element" class="icon-cell" [class.child-row]="element.isChild">
+            <div class="icon-container">
+              <mat-icon class="route-icon">{{element.icon}}</mat-icon>
+              <span class="icon-name">{{element.icon}}</span>
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="sub">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Sub Route </th>
+        <td mat-cell *matCellDef="let element">
+          <span class="label-text" *ngIf="element.children">{{ element.children.length }}</span>
+        </td>
+        </ng-container>
+        <ng-container matColumnDef="roles">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Roles </th>
+          <td mat-cell *matCellDef="let element">
+            <div class="user-role" *ngFor="let role of element.roles">{{ role | uppercase }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="Edit">
+        <th mat-header-cell *matHeaderCellDef> Edit </th>
+        <td mat-cell *matCellDef="let element">
+          <button mat-mini-fab
+          [disabled]="element.route === '/routeconfiguration'"
+            *ngIf="!element.isChild" 
+            color="primary" 
+            (click)="editRoute(element)"
+          >
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+        </ng-container>
+        <ng-container matColumnDef="Delete">
+        <th mat-header-cell *matHeaderCellDef> Delete </th>
+        <td mat-cell *matCellDef="let element">
+          <button mat-mini-fab
+          [disabled]="element.route === '/routeconfiguration'"
+            *ngIf="!element.isChild" 
+            color="warn" 
+            (click)="deleteRoute(element)"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row 
+            *matRowDef="let row; columns: displayedColumns;" 
+            [cdkDragDisabled]="!canDrag(row)"
+            cdkDrag
+            [class.child-row]="row.isChild"
+            [class.parent-row]="!row.isChild">
+        </tr>
+        <tr class="no-data-row" *matNoDataRow>
+          <td class="no-data-cell" [attr.colspan]="displayedColumns.length">
+            <div class="no-data-container">
+              <mat-icon class="no-data-icon">search_off</mat-icon>
+              <span>No data matching the filter "{{input.value}}"</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <mat-paginator 
+        [pageSizeOptions]="[60, 100, 150, 200]" 
+        showFirstLastButtons
+        class="table-paginator">
+      </mat-paginator>
+    </div>
+  </mat-card-content>
+</mat-card>

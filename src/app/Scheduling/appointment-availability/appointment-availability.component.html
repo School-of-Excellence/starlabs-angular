@@ -1,0 +1,110 @@
+<div *ngIf="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <label class="heading">My Availability Slot</label>
+  <div class="mat-elevation-z2">
+    <div class="actionbox">
+      <div class="actionitem">
+        <mat-form-field appearance="outline">
+          <mat-label>Search Slot</mat-label>
+          <input matInput #search (input)="applyFilter($event)" #input autocomplete="off">
+        </mat-form-field>
+      </div>
+      <div class="actionitem">
+        <button class="slotbtn" mat-stroked-button (click)="openDailyAvailability()">Add Availability By Date</button>
+      </div>
+    </div>
+    
+    <div #TABLE>
+      <table id="event" mat-table [dataSource]="dataSource" multiTemplateDataRows matSort>
+
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let row">{{row.name}}</td>
+        </ng-container>
+    
+        <!-- Appointment Column -->
+        <ng-container matColumnDef="appointment">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>List Of Appointments</th>
+          <td mat-cell *matCellDef="let row">{{row.appointment.join(', ')}}</td>
+        </ng-container>
+    
+        <!-- Date Column -->
+        <ng-container matColumnDef="date" >
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+          <td mat-cell *matCellDef="let row">{{row.date | date}}</td>
+        </ng-container>
+    
+        <!-- Start Time Column -->
+        <ng-container matColumnDef="starttime">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Start Time</th>
+          <td mat-cell *matCellDef="let row">{{row.starttime | date:'shortTime'}}</td>
+        </ng-container>
+    
+        <!-- End Time Column -->
+        <ng-container matColumnDef="endtime">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>End Time</th>
+          <td mat-cell *matCellDef="let row">{{row.endtime | date:'shortTime'}}</td>
+        </ng-container> 
+    
+        <!-- Action Column -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef>Action</th>
+          <td mat-cell *matCellDef="let row; let i = dataIndex">
+            <button class="menubtn" mat-icon-button [matMenuTriggerFor]="appointmentMenu" xPosition="before">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #appointmentMenu="matMenu">
+              <button mat-menu-item (click)="onrowdelete(row)">
+                Delete Availability
+              </button>
+              <button mat-menu-item (click)="toggle(row)">
+                View Computed Slot
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+  
+        <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+        <ng-container matColumnDef="expandedDetail">
+          <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
+            <div class="expandedbox" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+              <div class="row mt-1" *ngIf="element.slotgroup">
+                <div class="col" *ngFor="let appt of element.appointment">
+                  <div *ngIf="element.slotgroup[appt] && element.slotgroup[appt].length > 0">
+                    <label style="text-decoration: underline; font-weight: bold; width: 100%;">{{appt}}</label>
+                    <ul>
+                      <li *ngFor="let slot of element.slotgroup[appt]">
+                        <label style="white-space: nowrap;" [ngClass]="{'text-success fw-bold': slot.booked}">{{slot.starttime}} - {{slot.endtime}}</label>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+    
+        <!-- Table Header -->
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <!-- Table Row -->
+        <tr mat-row *matRowDef="let element; columns: displayedColumns;" 
+          class="tablerow" [class.example-expanded-row]="isExpanded(element)">
+        </tr>
+        <!-- Table Expanded Row -->
+        <tr class="expandrow" mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr>
+  
+        <!-- Row shown when there is no matching data -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell emptytext" [attr.colspan]="displayedColumns.length">
+            {{input.value.length != 0 ? 'No Data matching - ' + input.value : 'Your Slots Will Be Listed Here!'}}
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+  </div>
+</div>

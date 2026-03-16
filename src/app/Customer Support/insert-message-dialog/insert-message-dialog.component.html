@@ -1,0 +1,77 @@
+<div class="main-content">
+    <p class="font2">INSERT MESSAGE</p>
+    <div class="forms">
+        <mat-form-field class="formfield" appearance="outline">
+            <mat-label autofocus="on">Sender Name</mat-label>
+            <mat-select [(ngModel)]="selectedClient">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}"
+                        [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                        ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let client of returnFilterClient()"
+                    [value]="client.profileid">{{client.name}}</mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        &nbsp;&nbsp;&nbsp;
+
+        <mat-form-field class="formfield" appearance="outline">
+            <mat-label>Choose a Date</mat-label>
+            <input matInput [matDatepicker]="picker" [(ngModel)]="date">
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+
+        &nbsp;&nbsp;&nbsp;
+
+        <mat-form-field class="timefield" appearance="outline">
+            <mat-label>Choose a Time</mat-label>
+            <input matInput type="time" [(ngModel)]="time">
+        </mat-form-field>
+    </div>
+    <div class="forms">
+        <mat-form-field class="textarea" appearance="outline">
+            <mat-label>Enter Message</mat-label>
+            <textarea matInput placeholder="Enter Message" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6" [(ngModel)]="message"></textarea>
+        </mat-form-field>
+
+        &nbsp;&nbsp;&nbsp;
+
+        <div class="buttons">
+            <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
+            <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('video')"
+                class="attach"><mat-icon>videocam</mat-icon></button>
+              <br>
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('audio')"
+                class="attach"><mat-icon>music_note</mat-icon></button>
+              &nbsp;&nbsp;
+              <button mat-icon-button (click)="chooseType('files')"
+                class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
+            </mat-menu>
+            <input style="display: none;" #fileInput type="file" [accept]="this['filetype']" (click)="onClick($event)"
+              (change)="selectFiles($event)" multiple>
+          </div>
+    </div>
+    <span *ngIf="this.files.length != 0">
+        <div *ngFor="let file of this.files; let index = index">
+            <div
+                style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px; margin: 5px; text-align: center;background-color: rgb(189, 189, 189);border-radius: 10px; color: black;">
+                <span class="lastmessage">
+                    <p>{{file.filename}}</p>
+                </span>
+                <button mat-icon-button (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
+            </div>
+        </div>
+    </span>
+    <div style="display: flex; flex-direction: row; justify-content: space-evenly; width: 80%">
+        <button type="button" mat-stroked-button color="warn" (click)="dialogRef.close()">Close</button>
+        <button type="button" mat-stroked-button color="primary" (click)="insertMessage()" *ngIf="selectedClient != '' && message != ''">Insert Message</button>
+    </div>
+</div>
+

@@ -1,0 +1,42 @@
+.mainscreen{
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.title{
+  text-align: center;
+  margin: 15px;
+  font-size: large;
+}
+
+.editicon{
+  margin-left: 10px;
+  color: grey;
+  font-size: large;
+}
+
+.modebox{
+  padding: 7px 15px;
+}
+
+.modetitle{
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.modetitle:hover{
+  text-decoration: underline;
+}
+
+.mat-list-base.inline-list {
+  display: flex;
+  overflow-x: auto;
+  white-space: nowrap;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.mat-list-base.inline-list::-webkit-scrollbar {
+  display: none;  
+}

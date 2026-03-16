@@ -1,0 +1,189 @@
+<div class="transcribe-wrapper">
+  <!-- Type Select -->
+  <mat-form-field class="full-width" appearance="outline">
+    <mat-label>Type</mat-label>
+    <mat-select [(ngModel)]="type" (selectionChange)="onTypeChange()">
+      <mat-option value="videoask">VideoAsk</mat-option>
+      <mat-option value="image">Image</mat-option>
+      <mat-option value="announcement">Announcement</mat-option>
+      <mat-option value="timer">Timer</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <!-- VIDEOASK -->
+  <div *ngIf="type === 'videoask'">
+    <mat-form-field class="full-width" appearance="outline">
+      <mat-label>Select Profile</mat-label>
+      <mat-select [(ngModel)]="selectedProfileId">
+        <ngx-mat-select-search
+          [(ngModel)]="profileSearch"
+          placeholderLabel="Search profile"
+          (ngModelChange)="filterProfiles()">
+        </ngx-mat-select-search>
+        <mat-option *ngFor="let p of filteredProfiles" [value]="p.profileid">
+          {{ p.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field class="full-width" appearance="outline">
+      <mat-label>Transcription</mat-label>
+      <textarea matInput rows="4" [(ngModel)]="transcribeText"></textarea>
+    </mat-form-field>
+  </div>
+
+  <!-- IMAGE -->
+  <div *ngIf="type === 'image'">
+    <mat-form-field class="full-width" appearance="outline">
+      <mat-label>Heading</mat-label>
+      <input matInput [(ngModel)]="heading">
+    </mat-form-field>
+
+    <input
+      type="file"
+      accept="image/*"
+      (change)="onFileSelected($event)"
+    />
+  </div>
+
+  <!-- TIMER -->
+  <div *ngIf="type === 'timer'">
+    <mat-form-field class="full-width" appearance="outline">
+      <mat-label>Heading</mat-label>
+      <input matInput [(ngModel)]="heading">
+    </mat-form-field>
+
+    <div class="datetime-picker-row">
+      <mat-form-field appearance="outline" class="date-field">
+        <mat-label>Date</mat-label>
+        <input matInput [matDatepicker]="picker" [(ngModel)]="timerDate">
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="time-field">
+        <mat-label>Time</mat-label>
+        <input matInput type="time" [(ngModel)]="timerTime">
+      </mat-form-field>
+    </div>
+  </div>
+
+  <!-- ANNOUNCEMENT -->
+  <div *ngIf="type === 'announcement'">
+    <mat-form-field class="full-width" appearance="outline">
+      <mat-label>Heading</mat-label>
+      <input matInput [(ngModel)]="heading">
+    </mat-form-field>
+
+    <mat-form-field class="full-width" appearance="outline">
+      <mat-label>Announcement</mat-label>
+      <textarea matInput rows="4" [(ngModel)]="announcementText"></textarea>
+    </mat-form-field>
+  </div>
+
+  <!-- Available Toggle -->
+  <mat-slide-toggle [(ngModel)]="available" class="toggle-margin">
+    Available
+  </mat-slide-toggle>
+
+  <!-- Submit -->
+  <div class="actions">
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="submit()"
+      [disabled]="isSubmitDisabled()">
+      {{ editDocId ? 'Update' : 'Submit' }}
+    </button>
+
+    <button
+      *ngIf="editDocId"
+      mat-button
+      (click)="resetForm()">
+      Cancel
+    </button>
+  </div>
+
+  <!-- Responsive Table -->
+  <div class="table-container">
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z4">
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Type</th>
+        <td mat-cell *matCellDef="let row">
+          {{ row.from || '—' }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="heading">
+        <th mat-header-cell *matHeaderCellDef>Heading</th>
+        <td mat-cell *matCellDef="let row">
+          {{ row.heading || '—' }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="content">
+        <th mat-header-cell *matHeaderCellDef>Content</th>
+        <td mat-cell *matCellDef="let row">
+          <!-- VIDEOASK -->
+          <span *ngIf="row.from === 'videoask'">
+            {{ row.transcribe || '—' }}
+          </span>
+
+          <!-- ANNOUNCEMENT -->
+          <span *ngIf="row.from === 'announcement'">
+            {{ row.announcementtext || '—' }}
+          </span>
+
+          <!-- TIMER -->
+          <span *ngIf="row.from === 'timer'">
+            {{ formatTimestamp(row.time) }}
+          </span>
+
+          <!-- IMAGE -->
+          <img
+            *ngIf="row.from === 'image' && row.imageUrl"
+            [src]="row.imageUrl"
+            style="max-height:40px;border-radius:4px"
+          />
+          <span *ngIf="row.from === 'image' && !row.imageUrl">—</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="profile">
+        <th mat-header-cell *matHeaderCellDef>Profile</th>
+        <td mat-cell *matCellDef="let row">
+          {{ row.profileid ? mapProfile[row.profileid]?.name : '—' }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="available">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Available</th>
+        <td mat-cell *matCellDef="let row">{{ row.available ? 'Yes' : 'No' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef>Action</th>
+        <td mat-cell *matCellDef="let row">
+          <button mat-icon-button color="primary" (click)="edit(row)">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef>Delete</th>
+        <td mat-cell *matCellDef="let row">
+          <button
+            mat-icon-button
+            color="warn"
+            (click)="deleteRow(row)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+    <mat-paginator [pageSize]="10" showFirstLastButtons></mat-paginator>
+  </div>
+</div>

@@ -1,0 +1,45 @@
+<span class="d-flex flex-row justify-content-center mt-2 mb-2">
+  <h3>Accelerated Time Compression</h3>
+</span>
+<section *ngIf="profileRoles && profileRoles['mentor'] ? profileRoles['mentor'] || profileRoles['developer'] : false" class="mb-4 ml-4 mr-4">
+  <div class="atcdetail" *ngIf="atcdata['atcref']">
+    <label style="float:right;color:black;font-size: 1.25rem;">{{atcdata.status | titlecase}}</label>
+    <br>
+    <label class="highlight">Prescribed Author(s):</label>
+    <label><span *ngFor="let item of atcdata['author']"><strong>{{mapProfile[item.id]}},</strong></span></label>
+    <br>
+    <label class="highlight">Prescribed Date:</label>
+    <label>{{atcdata['prescription_date'].toDate() | date : 'medium'}}</label>
+    <br>
+    <label class="highlight">Validator(s):</label>
+    <label><span *ngFor="let item of atcdata['validator'] || []"><strong>{{mapProfile[item.id]}},</strong></span></label>
+  </div>
+  <table *ngIf="![null,undefined].includes(atcdata) && ![null,undefined].includes(atcdata['prescription'])" style="width:100%">
+    <tr>
+        <th class="heading">
+            Adjustments
+        </th>
+        <th class="heading">
+            Procedures
+        </th>
+    </tr>
+    <tr *ngFor="let prescription of atcdata['prescription'];" style="padding-bottom: 10px;">
+      <td class="adjustmentbox">
+          <label [ngClass]="prescription.isdelete ? 'strikeDelete' : null">
+            {{prescription.name}}
+            <span *ngIf="![null,undefined].includes(prescription.newlyadded)" style="color:#228B22">(New)</span>
+            <span *ngIf="![null,undefined].includes(prescription.editedby)">
+              (Enhanced by <b>{{mapProfile[prescription.editedby.id]}}</b> : <span>{{prescription.editedon ? (prescription.editedon.toDate() | date : 'mediumDate') : ""}}</span>)
+            </span>
+          </label>
+          <br>
+      </td>
+      <td class="procedurebox">
+          <div *ngFor="let procedure of prescription.procedures; let j = index">
+              <label [ngClass]="procedure.isdelete ? 'strikeDelete' : null">- {{mapProcedures[procedure.name['id']]}}</label>
+              <br>
+          </div>
+      </td>
+    </tr>
+  </table>
+</section>

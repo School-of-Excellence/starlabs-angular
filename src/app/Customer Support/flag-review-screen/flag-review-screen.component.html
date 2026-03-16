@@ -1,0 +1,367 @@
+<div class="main-content">
+    <div class="details-container">
+        <div class="current-ticket">
+            <div style="display: flex; flex-direction: row;">
+                <div>
+                    <p>Ticket No</p>
+                    <p>Category</p>
+                    <p>Issue Reported By</p>
+                    <p>Reported By</p>
+                    <p>Assigned To</p>
+                    <p>People Involved</p>
+                </div>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <div>
+                    <p style="font-weight: bold;">: {{currentIssueData['issueno']}}</p>                
+                    <p>: {{currentIssueData['category']}}</p>
+                    <p>: {{mapProfileData[currentIssueData['issueReportedBy']]?.name}}</p>
+                    <p>: {{mapProfileData[currentIssueData['reportedBy']]?.name}}</p>
+                    <div style="display: flex; flex-direction: row; padding: 8px; justify-content: space-between;">
+                        <div style="line-height: 0.2;  font-size: 15px;">
+                            <div *ngFor="let assign of currentIssueData['assign']">
+                                <p *ngIf="![null, undefined,''].includes(assign)">* {{mapProfileData[assign]?.name}}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: row; padding: 8px; justify-content: space-between;">
+                        <div style="line-height: 0.2;  font-size: 15px;">
+                            <div *ngFor="let assign of currentIssueData['peopleinvolved']">
+                                <p *ngIf="![null, undefined,''].includes(assign)">* {{mapProfileData[assign]?.name}}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button mat-raised-button class="flagbtn" color="primary" [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger" (click)="updateFlag()">{{[null, undefined, false].includes(currentIssueData['flag']) ? 'Flag' : 'Unflag'}}</button>
+            <div class="flagnegligence" *ngIf="enableFlag"> 
+                <mat-form-field appearance="outline">
+                    <mat-label>Severity</mat-label>
+                    <mat-select [(ngModel)]="flagseverity" (click)="$event.stopPropagation()">
+                        <mat-option *ngFor="let severity of severityList" [value]="severity">{{severity}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+                <button mat-stroked-button color="primary" (click)="updateData()" mat-menu-close>Flag Negligence</button>
+            </div>
+        </div>
+
+        <div class="interaction-history">
+            <p><b>Interaction History</b></p>
+            <div style="max-height: 50vh; overflow: auto;">
+                <div *ngFor="let log of clientTicketsLog">
+                    <div (click)="changeTicket(log)"
+                        [ngClass]="log['id'] == currentIssueData['id'] ? 'selected-container' : 'history-container'">
+                        <div style="display: flex; flex-direction: row; justify-content: space-between;">
+                            <p>{{log['issueno']}} - {{log['reporteddate']?.toDate() | date : 'mediumDate'}}</p>
+                            <p (mouseenter)="showPopup(log, $event)" (mouseleave)="hidePopup()"
+                                style="font-weight: bold;"><u>View Details</u></p>
+                        </div>
+                        <p>{{log['issue'].substring(0, 35)}}{{'....'}}</p>
+                        <div style="display: flex; flex-direction: row;">
+                            <p class="chat-tile"
+                                [ngStyle]="log['status']['status']?.toLowerCase() == 'open' ? {'color':'#22AE4B'} : {'color': 'red'}">
+                                {{log['status']['status']?.toUpperCase() }}</p>
+                            <!-- <p class="chat-tile">{{ ![null, undefined,""].includes(log['priority']) ?
+                                log['priority'].toUpperCase() : 'NO PRIORITY'}}</p> -->
+                            <p class="chat-tile">{{log['category'].toUpperCase()}}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div *ngIf="popupData" class="popup">
+                <p><b>Ticket ID:</b> {{ popupData.issueno }}</p>
+                <p><b>Ticket:</b> {{ popupData.issue }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <!-- <div #tableContainer class="table-container" (scroll)="onTableScroll($event)"> -->
+            <span style="display: flex; flex-direction: column; text-align: center; justify-content: center; align-items: center; gap: 10px; top: 50%;" *ngIf="loading == true">
+                <p style="padding: 0; margin: 0;">{{'Getting Chats Ready For Review :)'}}</p>
+                <div class="progress-bar-container">
+                    <p style="padding: 0; margin: 0;"><mat-progress-bar mode="determinate" [value]="progressvalue"></mat-progress-bar></p>
+                </div>
+            </span>
+
+            <div *ngIf="loading == false">
+                <div style="background-color: rgb(241, 235, 235); position: sticky; top: 0; width: 100%; z-index: 20; padding: 8px;">
+                    <div class="row" style="justify-content: space-evenly;">
+                        <button color="primary" (click)="scrollToNextTicket(true)" mat-raised-button>Scroll to Next Ticket</button>
+                        <button color="warn"(click)="scrollToNextTicket(false)" mat-raised-button>Scroll to previous Ticket</button>
+                    </div>
+                </div>
+                <div #itemElement *ngFor="let chat of clientMessages; let idx = index" [ngClass]="mapTicketData[chat['ticketno']]['assign'].includes(loggedinprofile_id) ? 'assignedTicket' : ''" [attr.data-ticketno]="chat.ticketno">
+                    <div *ngIf="isTimeGap(chat.sender_uid,idx)?.isGap">
+                        <mat-divider class="divider"></mat-divider>
+                        <div style="display: flex; flex-direction: row; width: 100%; justify-content: space-between;">
+                            <p></p>
+                            <div style="background-color: yellow; font-size: 17px; font-weight: bold; padding: 10px; border: 1px solid black; border-radius: 15px; align-items: center; justify-content: center; text-align: center;"> <p>Time Gap: {{ isTimeGap(chat.sender_uid, idx)?.formattedGap }}</p></div>
+
+                            <div style="display: flex; flex-direction: column">
+                                <div *ngIf="![null, undefined].includes(negligenceData[clientMessages[idx]['timegapid']]) && negligenceData[clientMessages[idx]['timegapid']].length != 0">
+                                    <div *ngFor="let flag of negligenceData[clientMessages[idx]['timegapid']]" style="line-height: 0.2;">
+                                        <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold;">
+                                            <p>{{mapProfileData[flag.markedby]['name']}} : </p>
+                                            <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.category)">&nbsp;{{flag.category}} /</p>
+                                            <p style="color: blue;">&nbsp;{{flag.severity}}</p>
+                                            <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.rating)">/&nbsp;{{flag.rating}}</p>
+                                            <p *ngIf="flag.type == 'edited'">&nbsp;(edited)</p>
+                                        </div>
+                                        <div>{{flag.lastupdate.toDate() | date: 'medium'}}</div>
+                                    </div>
+                                </div>
+                                <form [formGroup]="timegapform">
+                                    <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 16px; ">
+                                        <!-- Heading -->
+                                        <h4 style="font-size: 18px; color: #DC3545; margin: 0; display: flex; align-items: center; height: 56px;"> Negligence: </h4>
+    
+                                        <!-- Negligence Field -->
+                                        <mat-form-field appearance="outline" class="custom-form-field">
+                                            <mat-label>Category</mat-label>
+                                            <mat-select formControlName="category">
+                                                <mat-option *ngFor="let negligence of negligencelist"
+                                                    [value]="negligence">{{negligence}}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+    
+                                        <!-- Status Field -->
+                                        <mat-form-field appearance="outline" class="custom-form-field">
+                                            <mat-label>Severity</mat-label>
+                                            <mat-select formControlName="severity">
+                                                <mat-option *ngFor="let severity of severityList"
+                                                    [value]="severity">{{severity}}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+    
+                                        <!-- Rating Field -->
+                                        <mat-form-field appearance="outline" class="custom-form-field">
+                                            <mat-label>Rating</mat-label>
+                                            <input matInput type="number" placeholder="Rate 0 - 10" formControlName="rating" min="0" max="10"(keypress)="validateKeyPress($event)"(input)="validateInput($event)">                                
+                                        </mat-form-field>
+    
+                                        <!-- Submit Button -->
+                                        <button mat-raised-button type="button" class="submitbtn"
+                                            (click)="submitReview(chat, idx, 'timegap', timegapform.value)">
+                                            Submit
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        <mat-divider class="divider"></mat-divider>
+                    </div>
+                    
+                    <div>
+
+                        <div *ngIf="idx == 0 || (idx > 0 && clientMessages[idx - 1]['ticketid'] != clientMessages[idx]['ticketid'])" [ngClass]="chat['status']?.toLowerCase() == 'open' ? 'ticketopen' : 'ticketclose'" class="ticket-title">
+                            <p>Ticket No - {{chat.ticketno}}</p>
+                        </div>
+
+                        <div *ngIf="idx == 0 || (idx > 0 && (clientMessages[idx - 1]['time']?.toDate() | date) != (clientMessages[idx]['time']?.toDate() | date))" class="date">
+                            {{chat['time']?.toDate() | date:'fullDate'}}
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: row;">
+                        <div style="width: 50%;">
+                            <div [ngClass]="chat.sender_profileid != clientid ? 'mychat' : 'otherchat'">
+
+                                <div style="display: flex; flex-direction: column;">
+                                    <div
+                                        style="display: flex; flex-direction: row; justify-content: space-between; width: 95%">
+                                        <div style="padding-top: 5px;">
+                                            <p *ngIf="![null,undefined,''].includes(chat.sender_uid)"
+                                                style="font-size: 15px;">
+                                                <b *ngIf="clientid != chat['sender_profileid']"> {{[null,undefined].includes(mapUserId[chat.sender_uid]) ? '...' : chat.type == 'automated' ? 'Automated' : mapUserId[chat.sender_uid]['name']}}</b>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <button type="button" mat-icon-button [matMenuTriggerFor]="menu3"
+                                                style="float: inline-end;"><mat-icon>more_vert</mat-icon></button>
+                                            <mat-menu #menu3="matMenu">
+                                                <!-- <button mat-menu-item (click)="insertMessage(chat)">Insert Chat</button> -->
+                                            </mat-menu>
+                                        </div>
+                                    </div>
+
+                                    <div style="display: flex; flex-direction: row; width: 80%; margin-top: -15px;">
+                                        <div>
+                                            <span *ngIf="chat['message'] == '' && chat['files'].length == 0" style="color: grey;">Loading
+                                                File...</span>
+                                            <span *ngIf="chat['files'] != null && chat['files'].length != 0"
+                                                style="display:inline-flex;flex-direction: column;justify-content: center;min-width: 30%;max-width: 65%;">
+                                                <span *ngFor="let image of chat['files']">
+                                                    <span style="margin-left: 5px;margin-top: 5px;">
+                                                        <span *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
+                                                            <br>
+                                                            <img style="margin-bottom: 5px; width: 22vw;" [src]="image['fileurl']" alt="">
+                                                        </span>
+                                                        <span #myvideo *ngIf="image['mediatype']?.includes('video')" (click)="downloadFiles(image['fileurl'])">
+                                                            <video style="margin-bottom: 5px; width: 22vw;" height="350" controls id="myvideo">
+                                                                <source [src]="image['fileurl']">
+                                                            </video>
+                                                        </span>
+                                                        <span *ngIf="image['mediatype']?.includes('audio')">
+                                                            <audio style="width: 22vw; height: 50px" controls>
+                                                                <source [src]="image['fileurl']">
+                                                            </audio>
+                                                        </span>
+                                                        <span
+                                                            style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px;text-align: center; border-radius: 10px; width: 12vw;">
+                                                            <span>
+                                                                <img *ngIf="image['filetype']?.includes('.sheet')" src="assets/Images/xls.png" width="25"
+                                                                    height="25">
+                                                                <img *ngIf="image['filetype']?.includes('pdf')" src="assets/Images/pdf-file.png" width="25"
+                                                                    height="25">
+                                                                <img *ngIf="image['filetype']?.includes('.document')" src="assets/Images/doc.png" width="25"
+                                                                    height="25">
+                                                            </span>
+                                                            <span class="lastmessage" style="width: 12vw; font-size: 14px;">
+                                                                {{image['filename']}}
+                                                                <button mat-icon-button
+                                                                    (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
+                                                            </span>
+                                                        </span>
+                                                    </span>
+                                                </span>
+                                            </span>
+                                            <p id="messages" [innerHTML]="chat['message'] | linebreaks | link"></p>
+                                        </div>
+                                    </div>
+                                    <div
+                                        style="display: flex; flex-direction: row; justify-content: space-between; width: 95%; font-size: 12px; margin-top: -15px; padding: 0;">
+                                        <div>
+                                            <p></p>
+                                        </div>
+                                        <div style="display: flex; flex-direction: row;">
+                                            <p style="margin-right: 5px; color:#ff7a55; font-weight: bold;" *ngIf="![null,undefined, ''].includes(chat.time)">{{chat.time.toDate() | date : 'shortTime'}}</p>
+                                            <span *ngIf="clientid != chat['sender_profileid']">
+                                                <img src="./../../../assets/Images/tick.png" style="width: 15px; height: 15px;" *ngIf="chat['pending'].includes('user') && chat['read_by'].includes('admin')">
+                                                <img src="./../../../assets/Images/double_tick.png" style="width: 15px; height: 15px;" *ngIf="chat['read_by'].includes('user') && chat['read_by'].includes('admin')">
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div *ngIf="isNotMatch(chat.sender_uid,idx)" style="width: 50%;">
+                            <div *ngIf="![null, undefined].includes(negligenceData[clientMessages[idx]['flagid']]) && negligenceData[clientMessages[idx]['flagid']].length != 0">
+                                <div *ngFor="let flag of negligenceData[clientMessages[idx]['flagid']]" style="line-height: 0.2;">
+                                    <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold;">
+                                        <p>{{mapProfileData[flag.markedby]['name']}} : </p>
+                                        <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.category)">&nbsp;{{flag.category}} /</p>
+                                        <p style="color: blue;">&nbsp;{{flag.severity}} </p>
+                                        <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.rating)">/&nbsp;{{flag.rating}}</p>
+                                        <p *ngIf="flag.type == 'edited'">&nbsp;(edited)</p>
+                                        <p *ngIf="![null, undefined, ''].includes(flag.lastupdate)">&nbsp; - &nbsp;{{flag.lastupdate.toDate() | date: 'short'}}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <form [formGroup]="flagform">
+                                <div
+                                    style="display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 16px; width: 100%;">
+                                    <!-- Heading -->
+                                    <h4
+                                        style="font-size: 18px; color: #DC3545; margin: 0; display: flex; align-items: center; height: 56px;">
+                                        Negligence:
+                                    </h4>
+
+                                    <!-- Negligence Field -->
+                                    <!-- <mat-form-field appearance="outline" class="custom-form-field" *ngIf="idx > 0 && clientMessages[idx-1]['ticketno'] == clientMessages[idx]['ticketno']"> -->
+                                    <mat-form-field appearance="outline" class="custom-form-field">
+                                        <mat-label>Category</mat-label>
+                                        <mat-select formControlName="category" (selectionChange)="negligenceCheck[idx] = true">
+                                            <mat-option *ngFor="let negligence of negligencelist" [value]="negligence">{{negligence}}</mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+
+                                    <!-- Status Field -->
+                                    <!-- <mat-form-field appearance="outline" class="custom-form-field" *ngIf="negligenceCheck[idx] || (clientMessages[idx-1]?.ticketno != clientMessages[idx]?.ticketno)"> -->
+                                    <mat-form-field appearance="outline" class="custom-form-field">
+                                        <mat-label>Severity</mat-label>
+                                        <mat-select formControlName="severity">
+                                            <mat-option *ngFor="let severity of severityList" [value]="severity">{{severity}}</mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+
+                                    <!-- Rating Field -->
+                                    <mat-form-field appearance="outline" class="custom-form-field">
+                                        <mat-label>Rating</mat-label>
+                                        <input matInput type="number" placeholder="Rate 0 - 10" formControlName="rating" min="0" max="10" (keypress)="validateKeyPress($event)" (input)="validateInput($event)">                                
+                                    </mat-form-field>
+
+                                    <!-- Submit Button -->
+                                    <button mat-raised-button type="button" class="submitbtn"
+                                        (click)="submitReview(chat, idx, 'flag', flagform.value)">
+                                        Submit
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div *ngIf="isTimeGap(chat.sender_uid,idx)?.isGap && idx == clientMessages.length-1">
+                        <mat-divider class="divider"></mat-divider>
+                        <div style="display: flex; flex-direction: row; width: 100%; justify-content: space-between;">
+                            <p></p>
+                            <div style="background-color: yellow; font-size: 17px; font-weight: bold; padding: 10px; border: 1px solid black; border-radius: 15px; align-items: center; justify-content: center; text-align: center;"> <p>Time Gap: {{ isTimeGap(chat.sender_uid, idx)?.formattedGap }}</p></div>
+                            <p></p>
+
+                            <!-- <div style="display: flex; flex-direction: column">
+                                <div *ngIf="![null, undefined].includes(negligenceData[clientMessages[idx]['timegapid']]) && negligenceData[clientMessages[idx]['timegapid']].length != 0">
+                                    <div *ngFor="let flag of negligenceData[clientMessages[idx]['timegapid']]" style="line-height: 0.2;">
+                                        <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold;">
+                                            <p>{{mapProfileData[flag.markedby]['name']}} : </p>
+                                            <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.category)">&nbsp;{{flag.category}} /</p>
+                                            <p style="color: blue;">&nbsp;{{flag.severity}}</p>
+                                            <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.rating)">/&nbsp;{{flag.rating}}</p>
+                                            <p *ngIf="flag.type == 'edited'">&nbsp;(edited)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <form [formGroup]="timegapform">
+                                    <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 16px; ">
+                                        <h4 style="font-size: 18px; color: #DC3545; margin: 0; display: flex; align-items: center; height: 56px;"> Negligence: </h4>
+    
+                                        <mat-form-field appearance="outline" class="custom-form-field">
+                                            <mat-label>Category</mat-label>
+                                            <mat-select formControlName="category">
+                                                <mat-option *ngFor="let negligence of negligencelist"
+                                                    [value]="negligence">{{negligence}}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+    
+                                        <mat-form-field appearance="outline" class="custom-form-field">
+                                            <mat-label>Severity</mat-label>
+                                            <mat-select formControlName="severity">
+                                                <mat-option *ngFor="let severity of severityList"
+                                                    [value]="severity">{{severity}}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+    
+                                        <mat-form-field appearance="outline" class="custom-form-field">
+                                            <mat-label>Rating</mat-label>
+                                            <input matInput type="number" placeholder="Rate 0 - 10" formControlName="rating" min="0" max="10"(keypress)="validateKeyPress($event)"(input)="validateInput($event)">                                
+                                        </mat-form-field>
+    
+                                        <button mat-raised-button type="button" class="submitbtn"
+                                            (click)="submitReview(chat, idx, 'timegap', timegapform.value)">
+                                            Submit
+                                        </button>
+                                    </div>
+                                </form>
+                            </div> -->
+                        </div>
+                        <mat-divider class="divider"></mat-divider>
+                    </div>
+                    <div style="display: flex; flex-direction: row; justify-content: space-between;" *ngIf="idx > 0 && (idx+1 == clientMessages.length || clientMessages[idx]['ticketid'] != clientMessages[idx+1]['ticketid'])">
+                        <p></p>
+                        <button mat-raised-button *ngIf="!reviewedTickets.includes(clientMessages[idx]['ticketid'])" class="reviewbtn" (click)="updateMarked(clientMessages[idx]['ticketid'])">Mark Reviewed</button>
+                        <p class="reviewedbtn" *ngIf="reviewedTickets.includes(clientMessages[idx]['ticketid'])"><b>REVIEWED</b></p>
+                        <p></p>
+                    </div>
+                </div>
+            </div>
+        <!-- </div> -->
+    </div>
+</div>

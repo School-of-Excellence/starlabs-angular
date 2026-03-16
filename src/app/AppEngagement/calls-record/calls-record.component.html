@@ -1,0 +1,389 @@
+<div class="call-logs-wrapper">
+  <!-- Header Section -->
+  <div class="header-section">
+    <mat-toolbar class="custom-toolbar">
+      <mat-icon class="header-icon">call</mat-icon>
+      <span class="header-title">Call Logs Management</span>
+      <span class="spacer"></span>
+      <mat-chip-set>
+        <mat-chip [highlighted]="true">
+          <mat-icon matChipAvatar>phone</mat-icon>
+          {{filteredData.length}} Total Calls
+        </mat-chip>
+        <mat-chip class="realtime-chip" [highlighted]="isRealTimeActive">
+          <mat-icon matChipAvatar>wifi</mat-icon>
+          {{isRealTimeActive ? 'Live' : 'Offline'}}
+        </mat-chip>
+      </mat-chip-set>
+    </mat-toolbar>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="isLoading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p class="loading-text">Loading call logs...</p>
+  </div>
+
+  <div *ngIf="!isLoading" class="content-container">
+    <!-- Enhanced Filters Section -->
+    <mat-card class="filters-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>filter_list</mat-icon>
+          Filters & Search
+        </mat-card-title>
+        <mat-card-subtitle>Filter calls by date, profile, and status</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <form [formGroup]="filterForm" class="enhanced-filter-form">
+          <div class="filter-grid">
+            <!-- Date Range Filters -->
+            <div class="date-range-section">
+              <div class="date-inputs">
+                <mat-form-field appearance="outline" class="date-field">
+                  <mat-label>Start Date</mat-label>
+                  <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+                  <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #startPicker></mat-datepicker>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="date-field">
+                  <mat-label>End Date</mat-label>
+                  <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+                  <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #endPicker></mat-datepicker>
+                </mat-form-field>
+              </div>
+
+              <!-- Quick Date Buttons -->
+              <div class="quick-date-buttons">
+                <button mat-stroked-button (click)="setQuickDate(1)" [class.active]="isQuickDateActive(1)">
+                  Today
+                </button>
+                <button mat-stroked-button (click)="setQuickDate(7)" [class.active]="isQuickDateActive(7)">
+                  Last 7 Days
+                </button>
+                <button mat-stroked-button (click)="setQuickDate(30)" [class.active]="isQuickDateActive(30)">
+                  Last 30 Days
+                </button>
+              </div>
+            </div>
+
+            <!-- Profile and Status Filters -->
+            <div class="profile-status-inputs">
+              <div>
+                <mat-form-field appearance="outline" class="profile-field">
+                  <mat-label>Search Profile</mat-label>
+                  <mat-select formControlName="profile" [multiple]="false">
+                    <mat-option>
+                      <ngx-mat-select-search [formControl]="profileSearchCtrl" placeholderLabel="Search profiles..."
+                        noEntriesFoundLabel="No profiles found">
+                      </ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option value="">All Profiles</mat-option>
+                    <mat-option *ngFor="let profile of filteredProfiles" [value]="profile.myoperatorid">
+                      <div class="profile-option">
+                        <mat-icon class="profile-avatar">account_circle</mat-icon>
+                        <div class="profile-info">
+                          <span class="profile-name">{{profile.name}}</span>
+                          <span class="profile-details">{{profile.number}} • {{profile.myoperatorid || ''}}</span>
+                        </div>
+                      </div>
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              
+              <div>
+                <mat-form-field appearance="outline" class="status-field">
+                  <mat-label>Call Status</mat-label>
+                  <mat-select formControlName="callStatus">
+                    <mat-option value="">All Status</mat-option>
+                    <mat-option value="received">
+                      <mat-icon class="status-icon received">call_received</mat-icon>
+                      Received
+                    </mat-option>
+                    <mat-option value="missed">
+                      <mat-icon class="status-icon missed">call_missed</mat-icon>
+                      Missed
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              <!-- Search -->
+              <div class="search-section">
+                <mat-form-field appearance="outline" class="search-field">
+                  <mat-label>Search Number / Name</mat-label>
+                  <input matInput formControlName="searchText" placeholder="Enter phone number or name">
+                  <mat-icon matSuffix>search</mat-icon>
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="filter-actions">
+            <button mat-raised-button color="primary" (click)="applyFilters()" [disabled]="isLoading">
+              <mat-icon>filter_alt</mat-icon>
+              Apply Filters
+            </button>
+            <button mat-stroked-button (click)="clearFilters()">
+              <mat-icon>clear</mat-icon>
+              Clear All
+            </button>
+            <button mat-stroked-button (click)="refreshData()">
+              <mat-icon>refresh</mat-icon>
+              Refresh
+            </button>
+            <button mat-stroked-button (click)="toggleRealTime()" [color]="isRealTimeActive ? 'warn' : 'primary'">
+              <mat-icon>{{isRealTimeActive ? 'wifi_off' : 'wifi'}}</mat-icon>
+              {{isRealTimeActive ? 'Stop Live' : 'Start Live'}}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Enhanced Table Section -->
+    <mat-card class="table-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>list</mat-icon>
+          Call Records
+        </mat-card-title>
+        <mat-card-subtitle>
+          Showing {{paginatedData.length}} of {{filteredData.length}} calls
+          <span *ngIf="isRealTimeActive" class="live-indicator">• Live Updates</span>
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content class="table-content">
+        <div class="table-container">
+          <table mat-table [dataSource]="paginatedData" matSort (matSortChange)="sortData($event)"
+            class="enhanced-calls-table">
+
+            <ng-container matColumnDef="index">
+              <th mat-header-cell *matHeaderCellDef class="index-column">#</th>
+              <td mat-cell *matCellDef="let element; let i = index" class="index-cell">
+                {{(pageIndex * pageSize) + i + 1}}
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="calledby">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Called By</th>
+              <td mat-cell *matCellDef="let element">
+                <div class="caller-info">
+                  <mat-icon class="caller-icon">account_circle</mat-icon>
+                  <div class="caller-details">
+                    <div class="caller-name">{{getProfileName(element.calledby) || 'Not-Found'}}</div>
+                    <div class="caller-number">{{element.calledby}}</div>
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="calledto">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Called To</th>
+              <td mat-cell *matCellDef="let element">
+                <div class="caller-info">
+                  <mat-icon class="caller-icon">phone_forwarded</mat-icon>
+                  <div class="caller-details">
+                    <div class="caller-name">{{profileNumberMap[element.calledto]?.['name'] || 'Not-Found'}}</div>
+                    <div class="caller-number">{{element.calledto}}</div>
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="callstatus">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Call Status</th>
+              <td mat-cell *matCellDef="let element">
+                <div class="status-container">
+                  <span class="enhanced-status-badge" [ngClass]="element.callstatus?.toLowerCase()">
+                    <mat-icon class="status-icon">
+                      {{getStatusIcon(element.callstatus)}}
+                    </mat-icon>
+                    {{element.callstatus?.toUpperCase()}}
+                  </span>
+                </div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="duration">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Duration</th>
+              <td mat-cell *matCellDef="let element">
+                <div class="duration-display">
+                  <mat-icon class="duration-icon">schedule</mat-icon>
+                  <span class="duration-text">{{element.duration || '00:00'}}</span>
+                </div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="recording">
+              <th mat-header-cell *matHeaderCellDef>Recording</th>
+              <td mat-cell *matCellDef="let element; let i = index">
+                <div class="enhanced-audio-container">
+                  <button mat-mini-fab color="primary" class="play-button" *ngIf="element.recordingurl"
+                    (click)="toggleAudio(element, i)" [matTooltip]="audioStates[i]?.isPlaying ? 'Pause' : 'Play'">
+                    <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
+                  </button>
+
+                  <!-- Enhanced Audio Player with Better Progress Controls -->
+                  <div class="enhanced-audio-player" [ngClass]="{'active': audioStates[i]?.isActive}"
+                    [id]="'audio-player-' + i">
+                    <div class="audio-controls" *ngIf="audioStates[i]?.isActive">
+                      <audio #audioElement [src]="element.recordingurl" (timeupdate)="updateProgress($event, i)"
+                        (ended)="audioEnded(i)" (pause)="audioPaused(i)" (play)="audioPlayed(i)"
+                        (loadedmetadata)="onAudioLoaded($event, i)">
+                      </audio>
+
+                      <div class="audio-header">
+                        <div class="audio-info">
+                          <span class="audio-title">Call Recording</span>
+                          <span class="audio-subtitle">{{getProfileName(element.calledby)}} →
+                            {{profileNumberMap[element.calledto]?.['name'] || element.calledto}}</span>
+                        </div>
+                        <button mat-icon-button class="close-button" (click)="closeAudio(i)">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      </div>
+
+                      <!-- Main Play Controls -->
+                      <div class="main-controls">
+                        <button mat-icon-button (click)="skipBackward(audioElement, i)" matTooltip="Skip 10s backward">
+                          <mat-icon>replay_10</mat-icon>
+                        </button>
+
+                        <button mat-fab color="primary" (click)="togglePlayPause(audioElement, i)"
+                          class="main-play-button">
+                          <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
+                        </button>
+
+                        <button mat-icon-button (click)="skipForward(audioElement, i)" matTooltip="Skip 10s forward">
+                          <mat-icon>forward_10</mat-icon>
+                        </button>
+                      </div>
+
+                      <!-- Enhanced Progress Section -->
+                      <div class="progress-section">
+                        <div class="time-display">
+                          <span class="current-time">{{ formatTime(audioStates[i]?.currentTime) }}</span>
+                        </div>
+
+                        <div class="progress-container">
+                          <mat-progress-bar mode="determinate" [value]="audioStates[i]?.progress || 0"
+                            class="audio-progress-bar" (click)="seekToPosition($event, audioElement, i)">
+                          </mat-progress-bar>
+
+                          <!-- Custom Slider for Better Seeking -->
+                          <mat-slider class="seek-slider" [min]="0" [max]="audioStates[i]?.duration || 0" [step]="1"
+                            discrete>
+                            <input matSliderThumb [value]="audioStates[i]?.currentTime || 0"
+                              (input)="onSeekChange($event, audioElement, i)">
+                          </mat-slider>
+                        </div>
+
+                        <div class="time-display">
+                          <span class="duration">{{ formatTime(audioStates[i]?.duration) }}</span>
+                        </div>
+                      </div>
+
+                      <!-- Secondary Controls -->
+                      <div class="secondary-controls">
+                        <!-- Volume Control -->
+                        <div class="volume-control">
+                          <button mat-icon-button (click)="toggleMute(audioElement, i)" matTooltip="Toggle mute">
+                            <mat-icon>{{ audioStates[i]?.isMuted ? 'volume_off' : 'volume_up' }}</mat-icon>
+                          </button>
+                          <mat-slider class="volume-slider" [min]="0" [max]="1" [step]="0.1">
+                            <input matSliderThumb [value]="audioStates[i]?.volume || 1"
+                              (input)="onVolumeChange($event, audioElement, i)">
+                          </mat-slider>
+
+                        </div>
+
+                        <!-- Playback Speed -->
+                        <div class="speed-control">
+                          <mat-form-field appearance="outline" class="speed-selector">
+                            <mat-label>Speed</mat-label>
+                            <mat-select value="1.0"
+                              (selectionChange)="changePlaybackSpeed($event.value, audioElement, i)">
+                              <mat-option value="0.5">0.5x</mat-option>
+                              <mat-option value="0.75">0.75x</mat-option>
+                              <mat-option value="1.0">1.0x</mat-option>
+                              <mat-option value="1.25">1.25x</mat-option>
+                              <mat-option value="1.5">1.5x</mat-option>
+                              <mat-option value="2.0">2.0x</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </div>
+
+                        <!-- Download Button -->
+                        <button mat-icon-button (click)="downloadAudio(element.recordingurl, element)"
+                          matTooltip="Download recording">
+                          <mat-icon>download</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div *ngIf="!element.recordingurl" class="no-recording">
+                    <mat-icon class="no-recording-icon">mic_off</mat-icon>
+                    <span>No Recording</span>
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+              <td mat-cell *matCellDef="let element">
+                <span class="enhanced-status-badge" [ngClass]="element.status?.toLowerCase()">
+                  <mat-icon class="status-icon">
+                    {{getCallStatusIcon(element.status)}}
+                  </mat-icon>
+                  {{element.status}}
+                </span>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="time">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Time</th>
+              <td mat-cell *matCellDef="let element">
+                <div class="enhanced-time-display">
+                  <div class="time-value">
+                    <mat-icon class="time-icon">access_time</mat-icon>
+                    {{ formatDateTime(element.time, 'time') }}
+                  </div>
+                  <div class="date-value">
+                    <mat-icon class="date-icon">calendar_today</mat-icon>
+                    {{ formatDateTime(element.time, 'date') }}
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"
+              [class.highlighted]="row.callstatus === 'missed'" [class.new-record]="isNewRecord(row)"></tr>
+          </table>
+
+          <!-- Empty State -->
+          <div *ngIf="filteredData.length === 0" class="empty-state">
+            <mat-icon class="empty-icon">call_end</mat-icon>
+            <h3>No call records found</h3>
+            <p>Try adjusting your filters or date range to see more results.</p>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Enhanced Pagination -->
+    <mat-card class="pagination-card">
+      <mat-paginator [length]="filteredData.length" [pageSize]="pageSize" [pageSizeOptions]="[5, 10, 25, 50, 100]"
+        [pageIndex]="pageIndex" (page)="onPageChange($event)" [showFirstLastButtons]="true" class="enhanced-paginator">
+      </mat-paginator>
+    </mat-card>
+  </div>
+</div>

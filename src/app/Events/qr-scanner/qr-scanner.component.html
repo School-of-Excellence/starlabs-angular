@@ -1,0 +1,110 @@
+<!-- HTML Template with Fullscreen Approved Result -->
+<div class="qr-scanner-container">
+  <div class="header-section">
+    <!-- <h2 class="main-title">Arena Participant Attendance</h2> -->
+    
+    <form [formGroup]="Form" class="event-selector">
+      <div class="event-selection">
+        <h4 class="selection-label">Select Event:</h4>
+        <div class="chip-container">
+          <mat-chip-set>
+            <mat-chip-option 
+              class="event-chip" 
+              color="primary" 
+              *ngFor="let option of events;" 
+              [value]="option.path"
+              (selectionChange)="onProductSelected($event)"
+            >
+              {{option['name']}}
+            </mat-chip-option>
+          </mat-chip-set>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div *ngIf="showscanner" class="scanner-section">
+    <div class="scanner-frame">
+      <zxing-scanner (scanSuccess)="onCodeResult($event)" [enable]="true"></zxing-scanner>
+      <div class="laser"></div>
+      <div class="scanner-corners">
+        <div class="corner top-left"></div>
+        <div class="corner top-right"></div>
+        <div class="corner bottom-left"></div>
+        <div class="corner bottom-right"></div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="scannedParticipantEligibleProducts.length != 0" class="product-selection">
+    <h4 class="selection-label">Select Eligible Product:</h4>
+    <div class="chip-container">
+      <mat-chip-set>
+        <mat-chip-option 
+          class="product-chip" 
+          *ngFor="let productid of scannedParticipantEligibleProducts" 
+          [value]="productid" 
+          (selectionChange)="productSelected=$event.source.value;afterProductSelect()"
+        >
+          {{mapProduct[productid]}}
+        </mat-chip-option>
+      </mat-chip-set>
+    </div>
+  </div>
+
+  <div class="result-section">
+    <!-- Other result cards stay the same -->
+    <!-- Denied Result -->
+    <div *ngIf="ticketdenied" class="result-card denied" (click)="clearResult()">
+      <div class="result-content">
+        <mat-icon class="result-icon">highlight_off</mat-icon>
+        <h3 class="result-text">Denied</h3>
+        <p class="support-text">Contact Admin for assistance</p>
+      </div>
+    </div>
+
+    <!-- Event Closed Result -->
+    <div *ngIf="eventnotactive" class="result-card warning" (click)="clearResult()">
+      <div class="result-content">
+        <mat-icon class="result-icon">event_busy</mat-icon>
+        <h3 class="result-text">Event Closed</h3>
+        <button class="rescan-button" (click)="clearResult()">Rescan</button>
+      </div>
+    </div>
+
+    <!-- Event Not Started Result -->
+    <div *ngIf="eventyettostart" class="result-card warning" (click)="clearResult()">
+      <div class="result-content">
+        <mat-icon class="result-icon">schedule</mat-icon>
+        <h3 class="result-text">Event Yet to Start</h3>
+        <button class="rescan-button" (click)="clearResult()">Rescan</button>
+      </div>
+    </div>
+
+    <!-- Used Ticket Result -->
+    <div *ngIf="usedticket" class="result-card warning" (click)="clearResult()">
+      <div class="result-content">
+        <mat-icon class="result-icon">error</mat-icon>
+        <h3 class="result-text">QR Already Used</h3>
+        <button class="rescan-button" (click)="clearResult()">Rescan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Fullscreen Approved Result -->
+  <div *ngIf="ticketApproved" class="fullscreen-approved" (click)="clearResult()">
+    <div class="approved-content">
+      <div class="profile-fullscreen-container">
+        <img class="profile-fullscreen-image" [src]="profile['profile_img'] ? profile['profile_img'] : profile['profile']">
+      </div>
+      <div class="approval-info">
+        <mat-icon class="approval-icon">task_alt</mat-icon>
+        <h2 class="approval-text">Approved</h2>
+        <p class="approval-name" *ngIf="profile['name']">{{profile['name']}}</p>
+        <button class="close-button">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

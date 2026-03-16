@@ -1,0 +1,53 @@
+<div class="mainscreen">
+  <div class="title">Appointment Status</div>
+  <div class="meeting-info" *ngIf="data">
+    <div class="info-row">
+      <span class="label">Client Name:</span>
+      <span class="value"><strong>{{data.clientname}}</strong></span>
+    </div>
+    <div class="info-row">
+      <span class="label">Appointment Type:</span>
+      <span class="value"><strong>{{data.appointmenttype}}</strong></span>
+    </div>
+    <div class="info-row">
+      <span class="label">Date:</span>
+      <span class="value">
+        <strong>{{data["starttime"].toDate() | date:'MMM d, y'}}</strong>
+      </span>
+    </div>
+    <div class="info-row">
+      <!-- <span class="label">Specialists:</span>
+      <span class="value"> -->
+        <strong><label class="text-start">{{data.hosts}}</label></strong>
+      <!-- </span> -->
+    </div>
+    <div class="info-row" *ngIf="productType">
+      <span class="label">Product Type:</span>
+      <span class="value">{{productType}}</span>
+    </div>
+  </div>
+  <mat-form-field appearance="outline">
+    <mat-label>Start Time</mat-label>
+    <input matInput type="time" [(ngModel)]="start">
+  </mat-form-field>
+  <mat-form-field class="inputfield" appearance="outline">
+    <mat-label>End Time</mat-label>
+    <input matInput type="time" [(ngModel)]="end">
+  </mat-form-field>
+  <div>
+    <mat-checkbox [(ngModel)]="attended">Appointment Happened Successfully!</mat-checkbox>
+  </div>
+  <div class="journeystatusbox" *ngIf="!attended">
+    <div class="subtitle">Why not Happened?</div>
+    <mat-form-field appearance="outline">
+      <mat-label>Select Reason</mat-label>
+      <mat-select [(ngModel)]="cancelledReason">
+        <mat-option *ngFor="let reason of cancelledReasonList" [value]="reason">{{reason}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+  <div class="btnbox">
+    <button class="cancelbtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
+    <button class="submitbtn" mat-stroked-button (click)="submit()" [disabled]="loading">{{loading ? 'Please wait...' : 'Update Status'}}</button>
+  </div>
+</div>

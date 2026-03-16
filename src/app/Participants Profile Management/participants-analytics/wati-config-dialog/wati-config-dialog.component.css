@@ -1,0 +1,213 @@
+/* Dialog Header */
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: white;
+  font-size: 20px;
+}
+
+h2[mat-dialog-title] mat-icon {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+}
+
+/* Dialog Content */
+mat-dialog-content {
+  padding: 20px !important;
+  min-width: 700px;
+  max-height: 70vh;
+}
+
+.dialog-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Add Form Card */
+.add-form-card {
+  background: #f0fdf4;
+  border: 1px solid #25D366;
+}
+
+.add-form-card mat-card-header {
+  background: #dcfce7;
+  padding: 12px 16px;
+  margin: -16px -16px 16px -16px;
+  border-radius: 4px 4px 0 0;
+}
+
+.add-form-card mat-icon[mat-card-avatar] {
+  background: #25D366;
+  color: white;
+  padding: 8px;
+  border-radius: 50%;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-grid mat-form-field {
+  width: 100%;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Table Styles */
+.table-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.configs-table {
+  width: 100%;
+}
+
+.configs-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+  color: #333;
+  padding: 12px 16px;
+}
+
+.configs-table td {
+  vertical-align: middle;
+  padding: 8px 16px;
+}
+
+.configs-table tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.configs-table tr:hover {
+  background: #f0f7ff;
+}
+
+.editing-row {
+  background: #fff3e0 !important;
+}
+
+.table-input {
+  width: 100%;
+  margin: -8px 0;
+}
+
+.table-input ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+.cell-text {
+  font-size: 14px;
+  color: #333;
+}
+
+/* Token Cell */
+.token-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.token-text {
+  font-family: monospace;
+  font-size: 13px;
+  color: #555;
+}
+
+.visibility-btn {
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+}
+
+.visibility-btn mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #666;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #999;
+  text-align: center;
+}
+
+.empty-state mat-icon {
+  font-size: 64px;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  color: #666;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #999;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #666;
+}
+
+/* Dialog Actions */
+mat-dialog-actions {
+  padding: 12px 24px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  mat-dialog-content {
+    min-width: auto;
+    padding: 16px !important;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .configs-table th,
+  .configs-table td {
+    padding: 8px;
+    font-size: 12px;
+  }
+}

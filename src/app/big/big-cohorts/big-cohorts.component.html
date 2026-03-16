@@ -1,0 +1,198 @@
+<!-- 
+<div *ngIf="!loading" class="h-100 d-flex flex-column" style="background-color:#F2F2F7;">
+  <div class="d-flex flex-column position-absolute" style="left:100px;width: 500px;gap: 10px;top:90px">
+    <mat-label style="color:white">Filter By:  Marathon & Accelerator Event</mat-label>
+    <mat-form-field  appearance="outline" class="w-100">
+      <mat-label>Select Marathon</mat-label>
+      <mat-select [(ngModel)]="selectedMarathon" (selectionChange)="onFilterAcceleratorEvent();onFilter()">
+        <mat-option *ngFor="let option of marathonList" [value]="option.docid">{{option.title}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field multiple appearance="outline" class="w-100">
+      <mat-label>Select Event</mat-label>
+      <mat-select [(ngModel)]="selectedAcceleratorEvent" multiple (selectionChange)="onFilter()">
+        <mat-option *ngFor="let option of filteredAcceleratorEventList" [value]="option.ref.id">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+  <div class="header d-flex justify-content-end">
+    <div class="header-text position-absolute">
+      <span class="header-percentage">{{totalParticpantsEngagement}}%</span><br>
+      <span class="header-description">B!G Participants Occupied with activities</span>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap justify-content-start content-ch">
+    <div class="card" *ngFor="let cohorts of filteredCohortsList">
+      <div class="card-header d-flex flex-row align-items-start">
+        <div class="card-icon">{{cohorts['name'][0] | uppercase}}</div>
+        <span class=" d-flex flex-column">
+          <span class="card-title">{{cohorts['name'] | uppercase}}</span>
+          <span class="card-participants" style="cursor: pointer;" 
+            (click)="cohorts['contentview'] == 'participants' ? cohorts['contentview'] = null : cohorts['contentview'] = 'participants'" >
+            {{cohorts['participantidlist'].length}} Participants<mat-icon style="font-size:20px;vertical-align: bottom;">arrow_downward</mat-icon>
+          </span>
+          <span class="card-participants" >{{ mapMarathon[cohorts['marathonref'].id] ? mapMarathon[cohorts['marathonref'].id]['title'] : ""}}</span>
+          <span class="card-participants" >{{cohorts['eventref'] ? mapAcceleratorEvent[cohorts['eventref'].id] : null}}</span>
+        </span>
+        <span class="card-arrow ml-auto"> > </span>
+      </div>
+
+      <div class="activity-content d-flex flex-column scroll-container">
+
+        <div *ngIf="cohorts['contentview'] === 'participants'">
+          <ul class="list-group">
+            <li class="list-group-item" *ngFor="let participant of cohorts['participantidlist']">{{mapProfile[participant]}}</li>
+          </ul>
+        </div>
+
+        <span *ngIf="selectedMarathon && mapParticiantsAssignments[cohorts['docid']] && cohorts['contentview'] != 'participants'">
+          <div class="activity-section" *ngFor="let assignment of mapParticiantsAssignments[cohorts['docid']] | keyvalue">
+            <div class="d-flex flex-row">
+              <div class="activity-icon" *ngIf="![null,undefined].includes(mapBigAssignment[$any(assignment.key)]?.['title'])">{{(mapBigAssignment[$any(assignment.key)]?.['title']?.[0] | uppercase) || '...'}}</div>&nbsp;&nbsp;&nbsp;&nbsp;
+              <div class="activity-text d-flex flex-column">
+                <span class="activity-title" *ngIf="![null,undefined].includes(mapBigAssignment[$any(assignment.key)]['title'])">
+                  {{mapBigAssignment[$any(assignment.key)]?.['title'] || '...'}} &nbsp;&nbsp;&nbsp;&nbsp;
+                </span>
+                <span class="activity-date">{{mapBigAssignment[$any(assignment.key)]['createddate'].toDate() | date:"short"}}</span>
+                <span class="activity-subtitle">{{mapBigAssignment[$any(assignment.key)]['selectionMode'] | uppercase}}</span>
+                <span class="activity-date d-flex flex-row">
+                  ongoing : 
+                  <strong>{{
+                        (mapOngoingAssignments[$any(assignment.key)] ? mapOngoingAssignments[$any(assignment.key)].length : 0)
+                      }} / {{($any(assignment.value).length || 0)
+                      }}
+                  </strong> 
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  completed : 
+                  <strong>{{
+                        (mapCompletedAssignments[$any(assignment.key)] ? mapCompletedAssignments[$any(assignment.key)].length : 0)
+                      }} / {{($any(assignment.value).length || 0)
+                      }}
+                  </strong>
+                </span>
+              </div>
+              <span style="flex: 1 1 auto"></span>
+              <button mat-icon-button type="button">
+                <span *ngIf="mapBigAssignment[$any(assignment.key)]['cohortsref'].id === cohorts['docid']">
+                  <mat-icon (click)="onEditAssignment(cohorts,mapBigAssignment[$any(assignment.key)])">edit</mat-icon>
+                </span>
+              </button>
+            </div>
+            <div class="d-flex flex-row justify-content-end m-1">
+              <button 
+                *ngIf="mapBigAssignment[$any(assignment.key)]['zoomdata'] != undefined && mapBigAssignment[$any(assignment.key)]['zoomdata']['start_url']" 
+                mat-stroked-button type="button" 
+                (click)="onStartMetting($any(assignment.key))"
+              > 
+              <i class="fa-solid fa-video"></i> Start Meeting 
+              </button>&nbsp;&nbsp;
+              <button mat-stroked-button type="button" (click)="onValidateParticipantAssignment($any(assignment.key))"> 
+                <i class="fa-solid fa-user-check"></i> Validate
+              </button>
+            </div>
+          </div>
+        </span>
+
+      </div>
+
+      <div class="add-activity d-flex align-items-center justify-content-center">
+        <span class="add-activity-text" style="cursor: pointer;" (click)="onCreateAssignment(cohorts)">+ Add Activity</span>
+      </div>
+
+    </div>
+  </div>
+</div> -->
+
+<div *ngIf="!loading" class="h-100 d-flex flex-column dashboard-container">
+  <div class="filter-container">
+    <mat-label class="filter-label">Filter By: Marathon & Accelerator Event</mat-label>
+    <mat-form-field appearance="outline" class="w-100 custom-select">
+      <mat-label>Select Marathon</mat-label>
+      <mat-select [(ngModel)]="selectedMarathon" (selectionChange)="onFilterAcceleratorEvent();onFilter()">
+        <mat-option *ngFor="let option of marathonList" [value]="option.docid">{{option.title}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="w-100 custom-select">
+      <mat-label>Select Event</mat-label>
+      <mat-select [(ngModel)]="selectedAcceleratorEvent" multiple (selectionChange)="onFilter()">
+        <mat-option *ngFor="let option of filteredAcceleratorEventList" [value]="option.ref.id">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="header">
+    <div class="header-text">
+      <span class="header-percentage">{{totalParticpantsEngagement}}%</span>
+      <span class="header-description">B!G Participants Occupied with activities</span>
+    </div>
+  </div>
+
+  <div class="content-ch">
+    <div class="card" *ngFor="let cohorts of filteredCohortsList; let i = index" [style.animation-delay]="(i * 0.1) + 's'">
+      <div class="card-header">
+        <div class="card-icon">{{cohorts['name'][0] | uppercase}}</div>
+        <div class="card-info">
+          <span class="card-title">{{cohorts['name'] | uppercase}}</span>
+          <span class="card-participants" (click)="cohorts['contentview'] == 'participants' ? cohorts['contentview'] = null : cohorts['contentview'] = 'participants'">
+            {{cohorts['participantidlist'].length}} Participants
+            <mat-icon class="dropdown-icon">arrow_drop_down</mat-icon>
+          </span>
+          <span class="card-participants">{{ mapMarathon[cohorts['marathonref'].id] ? mapMarathon[cohorts['marathonref'].id]?.['title'] : ""}}</span>
+          <span class="card-participants">{{cohorts['eventref'] ? mapAcceleratorEvent[cohorts['eventref'].id] : null}}</span>
+        </div>
+        <span class="card-arrow">›</span>
+      </div>
+
+      <div class="scroll-container">
+        <div *ngIf="cohorts['contentview'] === 'participants'" class="participants-list">
+          <ul class="list-group">
+            <li class="list-group-item" *ngFor="let participant of cohorts['participantidlist']">{{mapProfile[participant]}}</li>
+          </ul>
+        </div>
+
+        <div *ngIf="selectedMarathon && mapParticiantsAssignments[cohorts['docid']] && cohorts['contentview'] != 'participants'">
+          <div class="activity-section" *ngFor="let assignment of mapParticiantsAssignments[cohorts['docid']] | keyvalue">
+            <div *ngIf="!mapBigAssignment[$any(assignment.key)]">
+              This Assignment is Deleted. Assignment ID: {{assignment.key}}
+              <br>
+            </div>
+            <div class="activity-header" *ngIf="mapBigAssignment[$any(assignment.key)]">
+              <div class="activity-icon" *ngIf="![null,undefined].includes(mapBigAssignment[$any(assignment.key)]?.['title'])">
+                {{(mapBigAssignment[$any(assignment.key)]?.['title']?.[0] | uppercase) || '...'}}
+              </div>
+              <div class="activity-details">
+                <div class="activity-title" *ngIf="![null,undefined].includes(mapBigAssignment[$any(assignment.key)]?.['title'])">
+                  {{mapBigAssignment[$any(assignment.key)]?.['title'] || '...'}}
+                </div>
+                <span class="activity-date">{{mapBigAssignment[$any(assignment.key)]?.['createddate'].toDate() | date:"short"}}</span>
+                <span class="activity-subtitle">{{mapBigAssignment[$any(assignment.key)]?.['selectionMode'] | uppercase}}</span>
+                <div class="activity-stats">
+                  <span>ongoing: <strong>{{(mapOngoingAssignments[$any(assignment.key)] ? mapOngoingAssignments[$any(assignment.key)].length : 0)}} / {{($any(assignment.value).length || 0)}}</strong></span>
+                  <span>completed: <strong>{{(mapCompletedAssignments[$any(assignment.key)] ? mapCompletedAssignments[$any(assignment.key)].length : 0)}} / {{($any(assignment.value).length || 0)}}</strong></span>
+                </div>
+              </div>
+              <button mat-icon-button class="edit-btn" *ngIf="mapBigAssignment[$any(assignment.key)]['cohortsref'].id === cohorts['docid']">
+                <mat-icon (click)="onEditAssignment(cohorts,mapBigAssignment[$any(assignment.key)])">edit</mat-icon>
+              </button>
+            </div>
+            <div class="activity-buttons" *ngIf="mapBigAssignment[$any(assignment.key)]">
+              <button *ngIf="mapBigAssignment[$any(assignment.key)]['zoomdata'] != undefined && mapBigAssignment[$any(assignment.key)]['zoomdata']['start_url']" 
+                mat-stroked-button 
+                class="action-btn"
+                (click)="onStartMetting($any(assignment.key))">
+                <i class="fa-solid fa-video"></i> Start Meeting
+              </button>
+              <button mat-stroked-button class="action-btn" (click)="onValidateParticipantAssignment($any(assignment.key))">
+                <i class="fa-solid fa-user-check"></i> Validate
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-activity" (click)="onCreateAssignment(cohorts)">
+        <span class="add-activity-text">+ Add Activity</span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,160 @@
+<div *ngIf="router.url.includes('/login') || router.url.includes('joinroom')">
+  <router-outlet></router-outlet>
+</div>
+
+<div *ngIf="!router.url.includes('/login') && !router.url.includes('joinroom')">
+  <mat-toolbar class="toolbar mat-elevation-z8" *ngIf="!router.url.includes('/openmeeting') &&  !router.url.includes('arenadesigninsights')">   
+    <button class="text-light" mat-icon-button (click)="toggleLeftDrawer()" matTooltip="Toggle Navigation Menu">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <div class="header">
+      <script type="text/javascript" src="js/jquery/jquery.js"></script>
+      <script type="text/javascript" src="js/jquery/jquery-migrate.min.js"></script>
+      <script type="text/javascript" src="plugins/revslider/public/assets/js/jquery.themepunch.tools.min.js"></script>
+      <script type="text/javascript"
+        src="plugins/revslider/public/assets/js/jquery.themepunch.revolution.min.js"></script>
+      <script type="text/javascript" src="plugins/snazzy-maps/snazzymaps.js"></script>
+      <script type="text/javascript" src="plugins/goodlayers-core/plugins/combine/script.js"></script>
+
+      <div>
+        <a routerLink="/EISDashboard" class="title">STARLABS</a>
+      </div>
+
+      <div>
+        <button class="menuicon me-4" mat-icon-button [matMenuTriggerFor]="notificationMenu"
+          (click)="loadNotifications()">
+          <mat-icon [matBadge]="unreadCount" [matBadgeHidden]="unreadCount === 0" matBadgeColor="warn"
+            matBadgeSize="small">
+            notifications
+          </mat-icon>
+        </button>
+        <button class="menuicon" mat-icon-button [matMenuTriggerFor]="userMenu"
+          [matTooltip]="profileData['name']+'`s Menu'">
+          <mat-icon>settings</mat-icon>
+        </button>
+        <mat-menu #notificationMenu="matMenu" class="notification-menu">
+          <div class="notification-header" (click)="$event.stopPropagation()">
+            <h3>Notifications</h3>
+            <button mat-button color="primary" *ngIf="unreadCount > 0" (click)="markAllAsRead()">
+              Mark all read
+            </button>
+          </div>
+
+          <div class="notification-list" (click)="$event.stopPropagation()">
+            <div *ngIf="loading" class="loading-container">
+              <mat-spinner diameter="30"></mat-spinner>
+            </div>
+
+            <div *ngIf="!loading && notifications.length === 0" class="no-notifications">
+              <mat-icon>notifications_none</mat-icon>
+              <p>No notifications yet</p>
+            </div>
+
+            <div *ngFor="let notification of notifications; trackBy: trackByNotification" class="notification-item"
+              [class.unread]="!notification.read" (click)="onNotificationClick(notification)">
+
+              <div class="notification-content">
+                <div class="notification-image" *ngIf="notification.notificationimage">
+                  <img [src]="notification.notificationimage" alt="Notification image">
+                </div>
+
+                <div class="notification-text">
+                  <h4>{{ notification.title }}</h4>
+                  <p *ngIf="notification.subtitle" class="subtitle">{{ notification.subtitle }}</p>
+                  <p class="message">{{ notification.message }}</p>
+                  <span class="timestamp">{{ formatTimestamp(notification.date) }}</span>
+                </div>
+
+                <div class="notification-actions">
+                  <button mat-icon-button *ngIf="!notification.read" (click)="markAsRead(notification, $event)"
+                    matTooltip="Mark as read">
+                    <mat-icon>done</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- <div class="notification-footer" *ngIf="notifications.length > 0">
+              <button mat-button color="primary" (click)="viewAllNotifications()">
+                View All Notifications
+              </button>
+            </div> -->
+          </div>
+        </mat-menu>
+        <mat-menu #userMenu="matMenu">
+          <a mat-menu-item [routerLink]="'userprofile/' + profileData['profileid']">
+            <mat-icon>person</mat-icon>
+            <span>{{profileData['name']}}'s Profile</span>
+          </a>
+          <a *ngIf="guard.loggedinRoles['developer']" mat-menu-item [routerLink]="'/routeconfiguration'">
+            <mat-icon>developer_mode</mat-icon>
+            Developers Settings
+          </a>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>exit_to_app</mat-icon>
+            <span>Logout</span>
+          </button>
+        </mat-menu>
+      </div>
+    </div>
+  </mat-toolbar>
+
+  <div class="mainscreen">
+    <mat-drawer-container class="drawer-container">
+      <mat-drawer #leftDrawer mode="over" (closed)="leftDrawerOpened = false" position="start">
+        <div class="ps-3 pe-3 pt-4">
+          <mat-form-field style="width: 100%;" appearance="outline">
+            <mat-label>Search</mat-label>
+            <input matInput [(ngModel)]="searchQuery" (keyup)="filterNavItems()" placeholder="Search" #input>
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+        </div>
+        <div class="routerbox" *ngFor="let item of filteredDashboard; let i = index">
+          <div *ngIf="item['route'] || (item['children'] || []).length > 0">
+            <div *ngIf="item['route']; else default">
+              <a class="categorybox" [class.fw-bold]="router.url === item['route']" [routerLink]="item['route']"
+                (click)="closeLeftDrawer()">
+                <mat-icon matListItemIcon>{{item.icon}}</mat-icon>
+                <span>{{item.label | uppercase}}</span>
+              </a>
+            </div>
+            <ng-template #default>
+              <div class="categorybox" (click)="onNavItemClick(item)">
+                <mat-icon matListItemIcon>{{item.icon}}</mat-icon>
+                <span>{{item.label | uppercase}}</span>
+              </div>
+            </ng-template>
+            <div class="mb-3">
+              <div *ngIf="item.children && item.children.length > 0 && this.expandedDashboard[item['id']]">
+                <div *ngFor="let child of item.children">
+                  <a class="routerscreen" [class.activeroute]="router.url === child['route']"
+                    [routerLink]="child['route']" (click)="closeLeftDrawer()">
+                    <mat-icon matListItemIcon>{{child.icon}}</mat-icon>
+                    <span>{{child.label | uppercase}}</span>
+                    <button class="pinbutton"
+                      [class.pinnedicon]="(child['favourites'] || []).includes(profileData['profileid'])"
+                      mat-icon-button
+                      (click)="$event.stopPropagation(); $event.preventDefault(); pinItem(item.id, child);">
+                      <mat-icon>push_pin</mat-icon>
+                    </button>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-drawer>
+
+      <mat-drawer-content class="main-content">
+        <div class="content-wrapper">
+          <router-outlet></router-outlet>
+          <div class="w-100 text-center" *ngIf="router.url == '/EISDashboard' && guard.favouriteDashboard.length == 0">
+            <button mat-stroked-button class="openscreenbutton" (click)="toggleLeftDrawer()">Open Screen</button>
+          </div>
+        </div>
+      </mat-drawer-content>
+
+    </mat-drawer-container>
+  </div>
+</div>

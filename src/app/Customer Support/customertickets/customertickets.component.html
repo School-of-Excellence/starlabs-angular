@@ -1,0 +1,505 @@
+<!-- <div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ "Loading Dashboard.." }}</div>
+    <div class="loading-progress">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div>
+      <div class="progress-text">{{ getLoadedCount() }} / 6 modules loaded</div>
+    </div>
+  </div>
+</div> -->
+
+<div class="dashboard">
+  <!-- Header -->
+  <div class="header">
+    <h1>Customer Support</h1>
+    <div class="date-selector">
+      <span>📅</span>
+      <div class="compact-date-picker">
+        <!-- Month Picker -->
+        <div *ngIf="pickerMode === 'month'" class="month-picker">
+          <button
+            class="nav-btn"
+            aria-label="Previous month"
+            (click)="backwardMonth()"
+          >
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <input
+            class="month-input"
+            type="month"
+            [(ngModel)]="monthyear"
+            (change)="updateDate()"
+          />
+
+          <button
+            class="nav-btn"
+            aria-label="Next month"
+            (click)="forwardMonth()"
+          >
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+
+        <!-- Date Range Picker -->
+        <div *ngIf="pickerMode === 'range'" class="range-picker">
+          <mat-form-field appearance="outline" class="compact-field">
+            <mat-date-range-input [rangePicker]="picker">
+              <input matStartDate [(ngModel)]="startDate" placeholder="Start" />
+              <input matEndDate [(ngModel)]="endDate" placeholder="End" />
+            </mat-date-range-input>
+            <mat-datepicker-toggle
+              matIconSuffix
+              [for]="picker"
+            ></mat-datepicker-toggle>
+            <mat-date-range-picker
+              #picker
+              (closed)="applyFilter()"
+            ></mat-date-range-picker>
+          </mat-form-field>
+        </div>
+        <!-- Simple Toggle Button -->
+        <button class="toggle-btn" (click)="toggleDate()">
+          <mat-icon>{{
+            pickerMode === "month" ? "date_range" : "calendar_view_month"
+          }}</mat-icon>
+          <!-- <span>{{
+          pickerMode === "month" ? "Switch to Range" : "Switch to Month"
+        }}</span> -->
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Stats -->
+  <div class="stats-grid">
+    <div class="stat-card red">
+      <div class="stat-header">
+        <span class="stat-label">Total Open</span>
+        <div class="stat-icon">📬</div>
+      </div>
+      <div class="stat-value">{{ totalOpen }}</div>
+      <div class="stat-breakdown">
+        <span *ngFor="let status of ['new', 'responded', 'reply']">
+          <small
+            style="font-size: 0.75rem; opacity: 0.7; text-transform: capitalize"
+            >{{ getStatusLabel(status) }}</small
+          >
+          <strong [attr.class]="`status-${status}`">{{
+            getCategoryTotal(["unresolved"], getCategoriesKeys(), [status])
+          }}</strong>
+        </span>
+      </div>
+    </div>
+
+    <div class="stat-card green">
+      <div class="stat-header">
+        <span class="stat-label">Total Closed</span>
+        <div class="stat-icon">✓</div>
+      </div>
+      <div class="stat-value">{{ totalClosed }}</div>
+    </div>
+
+    <div class="stat-card violet">
+      <div class="stat-header">
+        <span class="stat-label">Avg Days to Close</span>
+        <div class="stat-icon">⏱</div>
+      </div>
+      <div class="stat-value">{{ getOverAllAvg?.toFixed(1) }}</div>
+    </div>
+  </div>
+
+  <!-- Tables Grid -->
+  <div class="tables-grid">
+    <!-- Unresolved -->
+    <div
+      class="table-card"
+      *ngFor="let card of ['unresolved', 'under2', '2to7', 'over7']"
+    >
+      <div class="table-header">
+        <h3 class="table-title" style="text-transform: capitalize">
+          {{ cardMap[card] }}
+        </h3>
+        <div class="table-badge" [ngClass]="`card-${card}`">
+          {{
+            getCategoryTotal([card], getCategoriesKeys(), [
+              "new",
+              "responded",
+              "reply"
+            ])
+          }}
+          Total
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th style="text-align: center">Total</th>
+            <th style="text-align: center">New</th>
+            <th style="text-align: center">Responded</th>
+            <th style="text-align: center">Need Reply</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let cat of getCategorySortByStatus(card)">
+            <td class="category-name">
+              {{ cat }}
+            </td>
+            <td class="number total" style="text-align: center">
+              {{
+                getCategoryTotal(
+                  [card],
+                  [categoryMap[cat]],
+                  ["new", "responded", "reply"]
+                )
+              }}
+            </td>
+            <td
+              class="number new"
+              style="text-align: center"
+              (click)="onTabChange('events & process', 'new', card)"
+            >
+              {{ getCategoryTotal([card], [categoryMap[cat]], ["new"]) }}
+            </td>
+            <td
+              class="number responded"
+              style="text-align: center"
+              (click)="onTabChange('events & process', 'responded', card)"
+            >
+              {{ getCategoryTotal([card], [categoryMap[cat]], ["responded"]) }}
+            </td>
+            <td
+              class="number reply"
+              style="text-align: center"
+              (click)="onTabChange('events & process', 'decision making', card)"
+            >
+              {{ getCategoryTotal([card], [categoryMap[cat]], ["reply"]) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Negligence Metrics -->
+  <div class="performance-section">
+    <div
+      class="filter-cont"
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      "
+    >
+      <h2 class="section-title" style="margin-bottom: 0">
+        Negligence Review Metrics
+      </h2>
+      <div class="filter-group">
+        <mat-form-field appearance="outline">
+          <mat-label>Filter By</mat-label>
+          <mat-select
+            [(ngModel)]="negFilterType"
+            (selectionChange)="onFilterTypeChange()"
+          >
+            <mat-option [value]="'week'">Week</mat-option>
+            <mat-option [value]="'month'">Month</mat-option>
+            <mat-option [value]="'daterange'">Date</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="date-range"
+          *ngIf="negFilterType === 'daterange'"
+        >
+          <mat-date-range-input
+            [rangePicker]="picker"
+            [dateFilter]="onlyTuesdayFilter"
+          >
+            <input
+              matStartDate
+              [(ngModel)]="negFilter.startDate"
+              placeholder="Start Date"
+            />
+            <input
+              matEndDate
+              [(ngModel)]="negFilter.endDate"
+              placeholder="End Date"
+            />
+          </mat-date-range-input>
+          <mat-datepicker-toggle
+            matIconSuffix
+            #date
+            [for]="picker"
+          ></mat-datepicker-toggle>
+          <mat-date-range-picker
+            #picker
+            (closed)="initNegMetrics()"
+          ></mat-date-range-picker>
+        </mat-form-field>
+
+        <div class="month-picker" *ngIf="negFilterType === 'month'">
+          <button
+            class="nav-btn"
+            aria-label="Previous month"
+            (click)="backwardNegMonth()"
+          >
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+
+          <input
+            class="month-input"
+            type="month"
+            [(ngModel)]="negFilter.monthyear"
+            (change)="updateNegMonth()"
+          />
+
+          <button
+            class="nav-btn"
+            aria-label="Next month"
+            (click)="forwardNegMonth()"
+          >
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+
+        <div class="week-selector" *ngIf="negFilterType === 'week'">
+          <button
+            mat-icon-button
+            class="week-nav-btn"
+            (click)="goToPreviousWeek()"
+          >
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <span class="week-text"
+            >Week {{ negFilter.weekNumber }} - {{ negFilter.weekYear }}</span
+          >
+          <button mat-icon-button class="week-nav-btn" (click)="goToNextWeek()">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="negligence-container">
+      <div class="negligence-summary">
+        <div class="negligence-stat-card">
+          <div class="negligence-icon flagged">🚩</div>
+          <div class="negligence-info">
+            <div class="negligence-value">
+              {{ negligence.flagged }}
+            </div>
+            <div class="negligence-label">Flagged</div>
+          </div>
+        </div>
+        <div class="negligence-stat-card">
+          <div class="negligence-icon pending">⏳</div>
+          <div class="negligence-info">
+            <div class="negligence-value">
+              {{ negligence.pendingReview }}
+            </div>
+            <div class="negligence-label">Pending Review</div>
+          </div>
+        </div>
+        <div class="negligence-stat-card">
+          <div class="negligence-icon reviewed">✓</div>
+          <div class="negligence-info">
+            <div class="negligence-value">
+              {{ negligence.reviewed }}
+            </div>
+            <div class="negligence-label">Reviewed</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="negligence-levels">
+        <div class="level-card gross">
+          <div class="level-header">
+            <div class="level-icon">⚡</div>
+            <div class="level-name">Gross</div>
+          </div>
+          <div class="level-value">{{ negligenceMetrics.gross }}</div>
+        </div>
+
+        <div class="level-card high">
+          <div class="level-header">
+            <div class="level-icon">🔥</div>
+            <div class="level-name">High</div>
+          </div>
+          <div class="level-value">{{ negligenceMetrics.high }}</div>
+        </div>
+
+        <div class="level-card moderate">
+          <div class="level-header">
+            <div class="level-icon">⚠️</div>
+            <div class="level-name">Moderate</div>
+          </div>
+          <div class="level-value">{{ negligenceMetrics.moderate }}</div>
+        </div>
+
+        <div class="level-card low">
+          <div class="level-header">
+            <div class="level-icon">ℹ️</div>
+            <div class="level-name">Low</div>
+          </div>
+          <div class="level-value">{{ negligenceMetrics.low }}</div>
+        </div>
+
+        <div class="level-card no-negligence">
+          <div class="level-header">
+            <div class="level-icon">✨</div>
+            <div class="level-name">No</div>
+          </div>
+          <div class="level-value">{{ negligenceMetrics.no }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Metrics -->
+  <div class="performance-section">
+    <h2 class="section-title">Average Days to Close by Category</h2>
+    <div class="metrics-grid">
+      <div class="metric-item" *ngFor="let cat of getCategories()">
+        <div class="metric-label">{{ categoriesLabel[categoryMap[cat]] }}</div>
+        <div class="metric-value">
+          {{ getAvgForCategory(categoryMap[cat])?.toFixed(1) }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="charts-section">
+    <!-- Overview Bar Chart -->
+    <div class="chart-card overview-chart">
+      <div class="chart-header">
+        <h3 class="chart-title">Tickets Overview by Category</h3>
+      </div>
+      <!-- <canvas id="overviewChart"></canvas> -->
+      <apx-chart
+        [series]="chartOptions.series!"
+        [chart]="chartOptions.chart!"
+        [xaxis]="chartOptions.xaxis!"
+        [yaxis]="chartOptions.yaxis!"
+        [dataLabels]="chartOptions.dataLabels!"
+        [plotOptions]="chartOptions.plotOptions!"
+        [grid]="chartOptions.grid!"
+        [stroke]="chartOptions.stroke!"
+        [tooltip]="chartOptions.tooltip!"
+        [legend]="chartOptions.legend!"
+        [colors]="chartOptions.colors!"
+      >
+      </apx-chart>
+    </div>
+
+    <!-- Response Time Distribution -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3 class="chart-title">Response Time Distribution</h3>
+        <!-- <span class="trend-indicator up">↑ 12% faster</span> -->
+      </div>
+      <apx-chart
+        [series]="doughnutChart.series"
+        [chart]="doughnutChart.chart"
+        [labels]="doughnutChart.chartLabels"
+        [colors]="doughnutChart.colors"
+        [stroke]="doughnutChart.stroke"
+        [plotOptions]="doughnutChart.plotOptions"
+        [dataLabels]="doughnutChart.dataLabels"
+        [tooltip]="doughnutChart.tooltip"
+        [legend]="doughnutChart.legend"
+      ></apx-chart>
+    </div>
+
+    <!-- Ticket Status Breakdown -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3 class="chart-title">Current Ticket Status</h3>
+      </div>
+      <div class="ticket-chart-wrapper">
+        <apx-chart
+          [series]="pieChart.series"
+          [chart]="pieChart.chart"
+          [labels]="pieChart.chartLabels"
+          [colors]="pieChart.colors"
+          [stroke]="pieChart.stroke"
+          [tooltip]="pieChart.tooltip"
+          [dataLabels]="pieChart.dataLabels"
+          [legend]="pieChart.legend"
+        ></apx-chart>
+      </div>
+    </div>
+
+    <!-- Resolution Rate -->
+    <!-- <div class="chart-card">
+      <div class="chart-header">
+        <h3 class="chart-title">Weekly Resolution Trend</h3>
+        <span class="trend-indicator down">↓ 5% vs last week</span>
+      </div>
+      <apx-chart
+        [series]="areaChart.series"
+        [chart]="areaChart.chart"
+        [xaxis]="areaChart.xaxis"
+        [yaxis]="areaChart.yaxis"
+        [stroke]="areaChart.stroke"
+        [colors]="areaChart.colors"
+        [fill]="areaChart.fill"
+        [grid]="areaChart.grid"
+        [markers]="areaChart.markers"
+        [dataLabels]="areaChart.dataLabels"
+        [legend]="areaChart.legend"
+        [tooltip]="areaChart.tooltip"
+        
+      ></apx-chart>
+    </div> -->
+
+    <!-- Performance Rings -->
+    <!-- <div class="chart-card">
+      <div class="chart-header">
+        <h3 class="chart-title">Team Performance</h3>
+      </div>
+      <div class="progress-ring-container">
+        <div class="chart-block">
+          <apx-chart
+            [series]="firstResponseChart.series"
+            [chart]="firstResponseChart.chart"
+            [plotOptions]="firstResponseChart.plotOptions"
+            [stroke]="firstResponseChart.stroke"
+            [fill]="firstResponseChart.fill"
+            [labels]="firstResponseChart.labels"
+            [colors]="firstResponseChart.colors"
+          ></apx-chart>
+          <p class="label">First Response Rate</p>
+        </div>
+        <div class="chart-block">
+          <apx-chart
+            [series]="resolutionRateChart.series"
+            [chart]="resolutionRateChart.chart"
+            [plotOptions]="resolutionRateChart.plotOptions"
+            [stroke]="resolutionRateChart.stroke"
+            [fill]="resolutionRateChart.fill"
+            [labels]="resolutionRateChart.labels"
+            [colors]="resolutionRateChart.colors"
+          ></apx-chart>
+          <p class="label">Resolution Rate</p>
+        </div>
+        <div class="chart-block">
+          <apx-chart
+            [series]="customerSatisfactionChart.series"
+            [chart]="customerSatisfactionChart.chart"
+            [plotOptions]="customerSatisfactionChart.plotOptions"
+            [stroke]="customerSatisfactionChart.stroke"
+            [fill]="customerSatisfactionChart.fill"
+            [labels]="customerSatisfactionChart.labels"
+            [colors]="customerSatisfactionChart.colors"
+          ></apx-chart>
+          <p class="label">Customer Satisfaction</p>
+        </div>
+      </div>
+    </div> -->
+  </div>
+</div>

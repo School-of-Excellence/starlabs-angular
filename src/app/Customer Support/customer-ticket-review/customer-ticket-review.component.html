@@ -1,0 +1,27 @@
+<div style="align-items: center; width: 100%; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+    <div class="container" style="align-items: center;">
+        <div class="row">
+            <div class="col-xs-12">
+                <div class="chart-scale">
+                    <p class="page-header">How happy do you think the participant is, with the support of this ticket?</p>
+                    <div class="chart-scale">
+                        <button class="btn btn-scale btn-scale-desc-1"  (click)="selectedValue = 1" >1</button>
+                        <button class="btn btn-scale btn-scale-desc-2"  (click)="selectedValue = 2">2</button>
+                        <button class="btn btn-scale btn-scale-desc-3"  (click)="selectedValue = 3">3</button>
+                        <button class="btn btn-scale btn-scale-desc-4"  (click)="selectedValue = 4">4</button>
+                        <button class="btn btn-scale btn-scale-desc-5"  (click)="selectedValue = 5">5</button>
+                        <button class="btn btn-scale btn-scale-desc-6"  (click)="selectedValue = 6">6</button>
+                        <button class="btn btn-scale btn-scale-desc-7"  (click)="selectedValue = 7">7</button>
+                        <button class="btn btn-scale btn-scale-desc-8"  (click)="selectedValue = 8">8</button>
+                        <button class="btn btn-scale btn-scale-desc-9"  (click)="selectedValue = 9">9</button>
+                        <button class="btn btn-scale btn-scale-desc-10"  (click)="selectedValue = 10">10</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; flex-direction: row; justify-content: space-evenly; margin-top: 15px;">
+        <button mat-stroked-button (click)="dialogRef.close()">Close</button>
+        <button mat-stroked-button (click)="addRating()">Submit</button>
+    </div>
+</div>

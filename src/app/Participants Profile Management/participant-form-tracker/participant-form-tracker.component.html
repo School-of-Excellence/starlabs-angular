@@ -1,0 +1,243 @@
+<!-- Filters -->
+<div class="filters-row">
+    <mat-form-field appearance="outline">
+        <mat-label>Select Date Range</mat-label>
+        <mat-date-range-input [rangePicker]="rangePicker">
+            <input matStartDate [formControl]="startDate" placeholder="Start date">
+            <input matEndDate [formControl]="endDate" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+        <mat-date-range-picker #rangePicker></mat-date-range-picker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+        <mat-label>Participant</mat-label>
+        <mat-select [(value)]="selectedParticipant">
+            <mat-option>
+                <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search participant..."
+                    noEntriesFoundLabel="No participant found">
+                </ngx-mat-select-search>
+            </mat-option>
+            <mat-option>-- None --</mat-option>
+            <mat-option *ngFor="let p of filteredParticipants" [value]="p">{{ p.name }}</mat-option>
+        </mat-select>
+    </mat-form-field>
+
+    <button mat-raised-button color="primary" (click)="applyFilters()">Apply</button>
+    <button mat-stroked-button (click)="clearFilters()">Clear</button>
+</div>
+
+<!-- Action buttons -->
+<div class="table-actions" *ngIf="selectedRecords.length > 0">
+    <button mat-raised-button color="accent" (click)="viewMerged()">
+        View Merged ({{ selectedRecords.length }})
+    </button>
+</div>
+
+<!-- Tabs -->
+<mat-tab-group (selectedTabChange)="onTabChange($event)">
+    <mat-tab label="Ask A&H">
+        <ng-container *ngTemplateOutlet="tableTemplate"></ng-container>
+    </mat-tab>
+    <mat-tab label="Love Letter">
+        <ng-container *ngTemplateOutlet="tableTemplate"></ng-container>
+    </mat-tab>
+    <mat-tab label="uP! Life Report">
+        <ng-container *ngTemplateOutlet="tableTemplate"></ng-container>
+    </mat-tab>
+</mat-tab-group>
+
+<!-- Shared Table Template -->
+<ng-template #tableTemplate>
+    <div class="table-container">
+        <div *ngIf="loading" class="loading-spinner">
+            <mat-spinner diameter="40"></mat-spinner>
+        </div>
+
+        <table mat-table [dataSource]="records" *ngIf="!loading && records.length > 0">
+            <ng-container matColumnDef="select">
+                <th mat-header-cell *matHeaderCellDef>
+                    <mat-checkbox [checked]="isAllSelected()"
+                        [indeterminate]="selectedRecords.length > 0 && !isAllSelected()"
+                        (change)="toggleAll($event.checked)">
+                    </mat-checkbox>
+                </th>
+                <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+                    <mat-checkbox [checked]="isSelected(row)" (change)="toggleRow(row, $event.checked)">
+                    </mat-checkbox>
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="sno">
+                <th mat-header-cell *matHeaderCellDef>S.No</th>
+                <td mat-cell *matCellDef="let row; let i = index">{{ (currentPage * pageSize) + i + 1 }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Name</th>
+                <td mat-cell *matCellDef="let row">{{ mapProfiles[row.profileid]?.['name'] }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="date">
+                <th mat-header-cell *matHeaderCellDef>Date</th>
+                <td mat-cell *matCellDef="let row">
+                    {{ activeTab === 2
+                    ? (row.date?.toDate ? (row.date.toDate() | date: 'medium') : (row.date | date: 'medium'))
+                    : (row.created?.toDate ? (row.created.toDate() | date: 'medium') : (row.created | date: 'medium'))
+                    }}
+                </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="['select', 'sno', 'name', 'date']; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date']"
+                [class.selected-row]="isSelected(row)" (click)="viewRow(row)"></tr>
+        </table>
+
+        <div *ngIf="!loading && records.length === 0" class="no-data">
+            No records found.
+        </div>
+    </div>
+
+    <mat-paginator [length]="totalRecords || 1000" [pageSize]="pageSize" [pageSizeOptions]="[100, 200, 500]"
+        [pageIndex]="currentPage" (page)="onPageChange($event)">
+    </mat-paginator>
+</ng-template>
+
+<!-- Overlay -->
+<!-- Overlay -->
+<div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+  <div class="overlay-panel" [class.wide]="activeTab === 2" (click)="$event.stopPropagation()">
+    <div class="overlay-header">
+      <h2>{{ overlayTitle }}</h2>
+      <button mat-icon-button (click)="closeOverlay()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="overlay-content">
+      <div *ngIf="overlayLoading" class="loading-spinner">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <!-- Individual View -->
+      <div *ngIf="overlayMode === 'individual' && !overlayLoading && overlayRecords.length > 0">
+
+        <!-- Ask A&H / Love Letter -->
+        <div *ngIf="activeTab !== 2" class="record-card">
+          <div class="record-header">
+            <span class="record-name">{{ overlayRecords[0].name }}</span>
+            <span class="record-date">{{ overlayRecords[0].date }}</span>
+          </div>
+          <div class="content-label">{{ overlayRecords[0].contentLabel }}</div>
+          <div class="record-content" [innerHTML]="overlayRecords[0].content"></div>
+          <div *ngIf="overlayRecords[0].content2">
+            <div class="content-label">{{ overlayRecords[0].content2Label }}</div>
+            <div class="record-content secondary" [innerHTML]="overlayRecords[0].content2"></div>
+          </div>
+        </div>
+
+        <!-- uP! Life Report -->
+        <div *ngIf="activeTab === 2" class="form-view">
+          <div class="form-banner"></div>
+          <div class="form-participant">{{ overlayRecords[0].name }}</div>
+          <div class="form-title">{{ overlayRecords[0].formTitle }}</div>
+          <div class="form-description" *ngIf="overlayRecords[0].formDescription">
+            {{ overlayRecords[0].formDescription }}
+          </div>
+          <div class="form-meta">Submitted: {{ overlayRecords[0].date }}</div>
+          <hr class="form-divider">
+
+          <div *ngFor="let field of overlayFormFields" class="form-field-item">
+            <!-- Label type -->
+            <div *ngIf="field.type === 'label'" class="form-section-label">
+              <div class="section-title">{{ field.fieldname }}</div>
+              <div class="section-description" *ngIf="field.fielddescription">
+                {{ field.fielddescription }}
+              </div>
+            </div>
+
+            <!-- Field type -->
+            <div *ngIf="field.type === 'field'" class="form-question">
+              <div class="question-title">
+                {{ field.number }}. {{ field.fieldname }}
+                <span class="required-star" *ngIf="field.required">*</span>
+              </div>
+              <div class="question-description" *ngIf="field.fielddescription">
+                {{ field.fielddescription }}
+              </div>
+              <div class="question-value" [class.empty-value]="field.isEmpty">
+                {{ field.value }}
+              </div>
+              <div class="question-notes" *ngIf="field.fieldnotes">
+                Note: {{ field.fieldnotes }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Merged View -->
+      <div *ngIf="overlayMode === 'merged' && !overlayLoading">
+        <!-- Ask A&H / Love Letter merged -->
+        <div *ngIf="activeTab !== 2">
+            <div *ngFor="let record of overlayRecords; let i = index" class="record-card">
+                <div class="record-header">
+                    <span class="record-number">{{ i + 1 }}.</span>
+                    <span class="record-name">{{ record.name }}</span>
+                    <span class="record-date">{{ record.date }}</span>
+                </div>
+                <div class="content-label">{{ record.contentLabel }}</div>
+                <div class="record-content" [innerHTML]="record.content"></div>
+                <div *ngIf="record.content2">
+                    <div class="content-label">{{ record.content2Label }}</div>
+                    <div class="record-content secondary" [innerHTML]="record.content2"></div>
+                </div>
+                <hr *ngIf="i < overlayRecords.length - 1" class="record-divider">
+            </div>
+        </div>
+
+        <!-- uP! Life Report merged -->
+        <div *ngIf="activeTab === 2">
+            <div *ngFor="let form of overlayMergedForms; let i = index" class="form-view">
+                <div class="form-banner"></div>
+                <div class="form-count">Form {{ i + 1 }} of {{ overlayMergedForms.length }}</div>
+                <div class="form-participant">{{ form.name }}</div>
+                <div class="form-title">{{ form.formTitle }}</div>
+                <div class="form-description" *ngIf="form.formDescription">
+                    {{ form.formDescription }}
+                </div>
+                <div class="form-meta">Submitted: {{ form.date }}</div>
+                <hr class="form-divider">
+        
+                <div *ngFor="let field of form.fields" class="form-field-item">
+                    <div *ngIf="field.type === 'label'" class="form-section-label">
+                        <div class="section-title">{{ field.fieldname }}</div>
+                        <div class="section-description" *ngIf="field.fielddescription">
+                            {{ field.fielddescription }}
+                        </div>
+                    </div>
+        
+                    <div *ngIf="field.type === 'field'" class="form-question">
+                        <div class="question-title">
+                            {{ field.number }}. {{ field.fieldname }}
+                            <span class="required-star" *ngIf="field.required">*</span>
+                        </div>
+                        <div class="question-description" *ngIf="field.fielddescription">
+                            {{ field.fielddescription }}
+                        </div>
+                        <div class="question-value" [class.empty-value]="field.isEmpty">
+                            {{ field.value }}
+                        </div>
+                        <div class="question-notes" *ngIf="field.fieldnotes">
+                            Note: {{ field.fieldnotes }}
+                        </div>
+                    </div>
+                </div>
+        
+                <hr *ngIf="i < overlayMergedForms.length - 1" class="form-separator">
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

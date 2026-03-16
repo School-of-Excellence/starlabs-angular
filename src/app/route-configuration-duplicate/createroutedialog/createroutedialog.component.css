@@ -1,0 +1,152 @@
+.full-width {
+  min-width: 380px;
+}
+
+.child-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.child-input {
+  width: 30%;
+  min-width: 200px;
+}
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+}
+
+/* Title Tabs */
+/* .title-tabs {
+  display: flex;
+  gap: 8px;
+  background: var(--bg-card);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+
+.title-tab {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.title-tab.active {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #8b5cf6 100%);
+  color: rgb(8, 8, 8);
+  box-shadow: 0 4px 15px var(--accent-glow);
+} */
+
+/* .title-tab:hover:not(.active) {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+} */
+
+/* header */
+
+.header-split{
+  display: flex;
+  gap: 15px;
+}
+
+.title-tabs{
+  position: relative;
+  display: inline-flex;
+  gap: 8px;
+  height: 45px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #f6f7fb;
+  border: 1px solid #e6eaf2;
+  /* box-shadow: 0 12px 28px rgba(15,23,42,.10); */
+}
+
+.title-tab{
+  height: 30px; 
+  min-width: 70px;          /* adjust */
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: #4b5563;
+
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.title-tab:hover{
+  background: rgba(15,23,42,.06);
+  color: #1f2937;
+}
+
+.title-tab.active{
+  background: linear-gradient(180deg, #6d5ef7, #5b4be6);
+  color: #ffffff;
+  /* box-shadow: 0 10px 18px rgba(91,75,230,.22), 0 4px 10px rgba(15,23,42,.10); */
+}
+
+/* keyboard focus (don’t remove without replacement) */
+.title-tab:focus-visible{
+  outline: 2px solid rgba(91,75,230,.55);
+  outline-offset: 2px;
+}
+
+/* profile input */
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.option-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.option-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.option-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.option-email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+
+

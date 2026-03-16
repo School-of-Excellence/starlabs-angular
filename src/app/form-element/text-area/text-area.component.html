@@ -1,0 +1,14 @@
+<div [formGroup]="form">
+    <mat-form-field appearance="outline" class="w-100">
+      <mat-label>{{label}}</mat-label>
+      <textarea 
+        matInput 
+        [formControlName]="controlName"
+        [required]="form.get(controlName).hasError('required')"
+        >
+      </textarea>
+      <mat-error *ngIf="form.get(controlName).hasError('required')">
+        {{label}} is required
+      </mat-error>
+    </mat-form-field>
+</div>

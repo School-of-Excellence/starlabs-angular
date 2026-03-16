@@ -1,0 +1,19 @@
+.example-container {
+  height: 400px;
+  overflow: auto;
+}
+
+.example-container2 {
+  height: 700px;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+}
+.image {
+  max-width: 170px;
+  max-height: 300px;
+  width: auto;
+  height: auto;
+}

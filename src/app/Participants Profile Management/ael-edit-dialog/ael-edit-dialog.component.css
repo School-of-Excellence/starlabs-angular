@@ -1,0 +1,54 @@
+mat-dialog-content {
+    padding: 20px;
+    background-color: #f9f9f9; /* Light background for the dialog */
+    border-radius: 8px; /* Rounded corners for the dialog */
+  }
+  
+  .category {
+    border: 1px solid #00AEEF; /* Border color for each category */
+    border-radius: 6px; /* Rounded corners for each category */
+    padding: 15px; /* Padding inside each category */
+    margin-bottom: 20px; /* Space between categories */
+    background-color: #ffffff; /* White background for categories */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  }
+  
+  h5 {
+    color: #00AEEF; /* Color for category headings */
+    margin-bottom: 10px; /* Space below headings */
+  }
+  
+  mat-form-field {
+    width: calc(33% - 20px); /* Adjust width to fit three fields in a row */
+    margin-right: 10px; /* Space between form fields */
+  }
+  
+  mat-form-field:last-child {
+    margin-right: 0; /* Remove margin for the last field */
+  }
+  
+  button {
+    background-color: #00AEEF;
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+  }
+  
+  button:hover {
+    background-color: #007B9E;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+  }
+  
+  button:active {
+    background-color: #005C7C;
+  }
+  
+  button[mat-button]:not(:first-of-type) {
+    margin-left: 15px;
+  }

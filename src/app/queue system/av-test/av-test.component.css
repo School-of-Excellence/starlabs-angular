@@ -1,0 +1,33 @@
+.title{
+    text-align: center;
+    color: rgb(0, 50, 67);
+  }
+  
+  .divider{
+    margin-top: 20px;
+    margin-bottom: 40px;
+  }
+  
+  .textfield{
+    width: 400px;
+  }
+  
+  .markbtn{
+    color: green;
+    border: 1px solid green;
+  }
+  
+  .cancelbtn{
+    color: red;
+    border: 1px solid red;
+  }
+  
+  .successbtn{
+    color: white;
+    background-color: green;
+  }
+  
+  .successbtn:disabled{
+    color: white;
+    background-color: rgb(190, 190, 190);
+  }

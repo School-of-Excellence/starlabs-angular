@@ -1,0 +1,467 @@
+<div *ngIf="!isloading" class="maincontent">
+  <header class="header">
+    <h1 class="title">{{selectedProfile['name'] || '...'}} - {{saleData['journeytype'] | uppercase}} Purchase</h1>
+    <button mat-icon-button (click)="onCancel()">
+      <mat-icon style="color: white;">close</mat-icon>
+    </button>
+  </header>
+
+  <div class="d-flex flex-column justify-content-center content">
+    <div class="d-flex align-items-center gap-2">
+      <!-- Display Mode -->
+      <span *ngIf="purchasedate != null && !isEditingPurchaseDate" class="d-flex align-items-center gap-2">
+        <mat-label><strong>Purchase Date : {{purchasedate | date : 'medium'}}</strong></mat-label>
+        <mat-icon (click)="editPurchaseDate()" style="cursor: pointer;" class="text-primary">edit</mat-icon>
+      </span>
+    
+      <!-- Edit Mode -->
+      <div *ngIf="isEditingPurchaseDate" class="d-flex align-items-center gap-2">
+        <mat-form-field appearance="outline">
+          <mat-label>Purchase Date</mat-label>
+          <input matInput [matDatepicker]="purchasePicker" [(ngModel)]="tempPurchaseDate">
+          <mat-datepicker-toggle matIconSuffix [for]="purchasePicker"></mat-datepicker-toggle>
+          <mat-datepicker #purchasePicker></mat-datepicker>
+        </mat-form-field>
+    
+        <mat-icon (click)="savePurchaseDate()" style="cursor: pointer;" class="text-success">check_circle</mat-icon>
+        <mat-icon (click)="cancelPurchaseDateEdit()" style="cursor: pointer;" class="text-danger">cancel</mat-icon>
+      </div>
+    </div>
+
+    <div class="d-flex flex-row">
+      <section class="lead-details-container">
+        <!-- Cancelled Journey Display -->
+        <div class="card cancelled-journey" *ngIf="saleData['journeytype'] == 'cancelled'">
+          <div class="card-header">
+            <h2>Cancelled Journey Details</h2>
+          </div>
+          <div class="card-body">
+            <div class="info-grid">
+              <div class="info-item" *ngIf="saleData['installmentstartdate'] != null">
+                <span class="label">Installment Start Date:</span>
+                <span class="value">{{saleData['installmentstartdate'].toDate() | date}}</span>
+              </div>
+              <div class="info-item" *ngIf="saleData['installmentamount'] != null">
+                <span class="label">Installment Amount:</span>
+                <span class="value">{{saleData['installmentamount']}}</span>
+              </div>
+              <div class="info-item" *ngIf="saleData['salespersonname'] != null">
+                <span class="label">Sales By:</span>
+                <span class="value">{{saleData['salespersonname']}}</span>
+              </div>
+              <div class="info-item alert" *ngIf="saleData['totalpurchasevalue'] != null">
+                <span class="label">Owe Us:</span>
+                <span class="value">{{saleData['totalpurchasevalue']}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Journey Display -->
+        <div class="d-flex flex-row">
+          <div class="active-journey" *ngIf="saleData['journeytype'] != 'cancelled'">
+            <div class="card journey-info">
+              <div class="card-header">
+                <h2>Journey Information</h2>
+              </div>
+              <div class="card-body">
+                <div class="info-grid">
+
+                  <div class="info-item" *ngIf="journeyPurchaseLabel != null">
+                    <span class="label">Watson Purchase Label:</span>
+                    <span class="value highlight">{{journeyPurchaseLabel}}</span>
+                  </div>
+
+                  <div class="d-flex flex-row justify-content-between gap-3">
+                    <div class="info-item" *ngIf="saleData['initialpayment'] != null">
+                      <span class="label">Initial Payment:</span>
+                      <span class="value">{{saleData['initialpayment']}}</span>
+                    </div>
+                    <div class="info-item" *ngIf="saleData['installmentamount'] != null">
+                      <span class="label">Installment Amount:</span>
+                      <span class="value">{{saleData['installmentamount']}}</span>
+                    </div>
+                  </div>
+
+                  <div class="d-flex flex-row justify-content-between gap-3">
+                    <div class="info-item" *ngIf="saleData['journeytenure'] != null">
+                      <span class="label">Journey Tenure:</span>
+                      <span class="value">{{saleData['journeytenure']}}</span>
+                    </div>
+                    <div class="info-item" *ngIf="saleData['dueday'] != null">
+                      <span class="label">Due Day:</span>
+                      <span class="value">{{saleData['dueday']}}</span>
+                    </div>
+                  </div>
+
+                  <div class="info-item" *ngIf="saleData['salespersonname'] != null">
+                    <span class="label">Sales By:</span>
+                    <span class="value">{{saleData['salespersonname']}}</span>
+                  </div>
+
+                  <div class="info-item" *ngIf="saleData['paymentid'] != null">
+                    <span class="label">Payment ID:</span>
+                    <span class="value">{{saleData['paymentid']}}</span>
+                  </div>
+
+                  <div class="info-item" *ngIf="saleData['installmentstartdate'] != null">
+                    <span class="label">Installment Start Date:</span>
+                    <span class="value">{{saleData['installmentstartdate'].toDate() | date}}</span>
+                  </div>
+                </div>
+
+                <div class="notes-section" *ngIf="saleData['notes'] != null">
+                  <h3>Sale Notes</h3>
+                  <p class="notes">{{saleData['notes']}}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Snapshots Section -->
+            <div class="card payment-snapshots"
+              *ngIf="saleData['paymentsnapshot'] && saleData['paymentsnapshot'].length > 0">
+              <div class="card-header">
+                <h2>Payment Snapshots</h2>
+              </div>
+              <div class="card-body">
+                <div class="snapshot-gallery">
+                  <div class="snapshot-item" *ngFor="let item of saleData['paymentsnapshot']; trackBy: trackByFn">
+                    <div class="image-container" (click)="openFullscreen(item)">
+                      <img [src]="item" alt="Payment Snapshot" (error)="handleImageError($event)">
+                      <div class="zoom-overlay">
+                        <span class="material-icons">zoom_in</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fullscreen Modal -->
+            <div class="fullscreen-modal" [class.active]="fullscreenActive" (click)="closeFullscreen()">
+              <div class="fullscreen-container">
+                <img [src]="fullscreenImage" alt="Fullscreen Payment Snapshot" *ngIf="fullscreenImage">
+                <div class="close-button" (click)="closeFullscreen()">
+                  <span class="material-icons">close</span>
+                </div>
+                <div class="download-button" (click)="downloadImage($event)">
+                  <span class="material-icons">download</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex flex-column justify-content-start">
+            <!-- Edit Form Section -->
+            <div class="card edit-form">
+              <div class="card-header">
+                <h2>Update Journey Details</h2>
+              </div>
+              <div class="card-body">
+
+                <div class="form-group mb-3">
+                  <mat-form-field appearance="outline" class="w-100">
+                    <mat-label>Total Purchase Value</mat-label>
+                    <input matInput type="number" [(ngModel)]="totalPurchaseValue">
+                  </mat-form-field>
+                </div>
+
+                <div class="updatejourneydetails row g-3">
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Initial Payment Balance</mat-label>
+                        <input matInput type="number" [(ngModel)]="initialpaymentbalance">
+                      </mat-form-field>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Previous Journey Balance</mat-label>
+                        <input matInput type="number" [(ngModel)]="pendingbalanceamount">
+                      </mat-form-field>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="subscription-info mt-3">
+                  <div class="subscription-note">
+                    <div class="badge bg-primary text-white" *ngIf="this.saleData['subscriptionfrompurchasedate']">
+                      <span>
+                        Subscription starts from Purchase Date
+                      </span>
+                    </div>
+                    <div class="badge bg-info text-white"
+                      *ngIf="!this.saleData['subscriptionfrompurchasedate'] && saleData['journeytype'] == 'upgrade'">
+                      <div class="d-flex flex-column">
+                        <span>Subscription starts from</span>
+                        <span>Previous Journey Subscription End Date</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="date-field-group mt-3">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Subscription Start</mat-label>
+                          <input matInput [matDatepicker]="picker" [(ngModel)]="subscriptionStart">
+                          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                          <mat-datepicker #picker></mat-datepicker>
+                        </mat-form-field>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Subscription End</mat-label>
+                          <input matInput [matDatepicker]="picker1" [(ngModel)]="subscriptionEnd">
+                          <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+                          <mat-datepicker #picker1></mat-datepicker>
+                        </mat-form-field>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="edit-form mt-3"
+              *ngIf="saleData['journeytype'] === 'upgrade' || saleData['journeytype'] === 'cancelled' || saleData['journeytype'] === 'downgrade' || saleData['journeytype'] == 'addons'">
+              <!-- Participant Selection -->
+              <div class="card participant-selection">
+                <div class="card-header">
+                  <h2>Participant Selection</h2>
+                </div>
+                <div class="card-body">
+                  <mat-form-field *ngIf="filterParticipant().length != 0" appearance="outline" class="w-100">
+                    <mat-label>Watson Participant</mat-label>
+                    <mat-select [(ngModel)]="selectedWatsonParticipant" [compareWith]="compareFn">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filterParticipantName" [placeholderLabel]="'Search'"
+                          [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let participant of filterParticipant()"
+                        [value]="participant">{{participant.name}}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <div class="selection-note mt-3" *ngIf="!profileExist">
+                    <div class="alert alert-info d-flex align-items-center">
+                      <span class="material-icons me-2">info</span>
+                      <span>Select Participant</span>
+                    </div>
+                  </div>
+
+                  <div class="selection-note mt-3" *ngIf="profileExist">
+                    <div class="alert alert-success d-flex align-items-center">
+                      <span class="material-icons me-2">check_circle</span>
+                      <span>Check Patched Participant Details are Correct</span>
+                    </div>
+                  </div>
+
+                  <div class="selected-participant mt-3" *ngIf="selectedWatsonParticipant != null">
+                    <div class="participant-card">
+                      <div class="d-flex align-items-center">
+                        <div class="participant-avatar me-3">
+                          <span class="avatar-text">{{selectedWatsonParticipant.name.substr(0,1)}}</span>
+                        </div>
+                        <div class="participant-details">
+                          <h3 class="mb-2">{{selectedWatsonParticipant.name}}</h3>
+                          <div class="contact-details">
+                            <div class="d-flex align-items-center mb-1">
+                              <span class="material-icons me-2 text-muted">email</span>
+                              <span>{{selectedWatsonParticipant.email}}</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                              <span class="material-icons me-2 text-muted">phone</span>
+                              <span>{{selectedWatsonParticipant.phone}}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <section class="participant-section">
+        <div class="container-fluid"
+          *ngIf="saleData['journeytype'] === 'upgrade' || saleData['journeytype'] === 'cancelled' || saleData['journeytype'] === 'downgrade' || saleData['journeytype'] == 'addons'">
+
+          <!-- Purchase History -->
+          <div class="card purchase-history mb-4" *ngIf="purchaseHistoryList.length != 0">
+            <div class="card-header">
+              <h2>Purchase History</h2>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped custom-table">
+                  <thead class="table-dark">
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Date</th>
+                      <th scope="col">Product</th>
+                      <th scope="col">Total Purchase Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let list of purchaseHistoryList; let i = index">
+                      <td data-label="#">{{i+1}}</td>
+                      <td data-label="Date">{{list['purchasedate']}}</td>
+                      <td data-label="Product">{{list['product']}}</td>
+                      <td data-label="Total Purchase Value" class="fw-bold text-success">{{list['fee']}}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Current KYJ -->
+          <div class="card journey-card mb-4" *ngIf="previousKYJ.length != 0">
+            <div class="card-header current-journey bg-warning text-dark">
+              <h2 class="mb-0">Current KYJ</h2>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped custom-table">
+                  <thead class="table-dark">
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Product</th>
+                      <th scope="col">Package</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let list of previousKYJ; let i = index">
+                      <td data-label="#">{{i+1}}</td>
+                      <td data-label="Product">{{list['product'] || 'Not Found'}}</td>
+                      <td data-label="Package">{{list['package'] || 'Not Found'}}</td>
+                      <td data-label="Status">
+                        <span class="badge status-badge" [ngClass]="{
+                            'bg-success': list['status'] === 'Active',
+                            'bg-danger': list['status'] === 'Cancelled',
+                            'bg-warning text-dark': list['status'] === 'Pending',
+                            'bg-primary': list['status'] === 'Completed'
+                          }">{{list['status'] || 'Yet to Start'}}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- New KYJ -->
+          <div class="card journey-card mb-4" *ngIf="newKYJ.length != 0">
+            <div class="card-header new-journey bg-success text-white">
+              <h2 class="mb-0">New KYJ</h2>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped custom-table">
+                  <thead class="table-dark">
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Product</th>
+                      <th scope="col">Package</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let list of newKYJ; let i = index">
+                      <td data-label="#">{{i+1}}</td>
+                      <td data-label="Product">{{list['product'] || 'Not Found'}}</td>
+                      <td data-label="Package">{{list['package'] || 'Not Found'}}</td>
+                      <td data-label="Status">
+                        <span class="badge status-badge" [ngClass]="{
+                            'bg-success': list['status'] === 'Active',
+                            'bg-danger': list['status'] === 'Cancelled',
+                            'bg-warning text-dark': list['status'] === 'Pending',
+                            'bg-primary': list['status'] === 'Completed'
+                          }">{{list['status'] || 'Yet to Start'}}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </div>
+
+    <div class="mt-4">
+      <div>
+        <h1><span class="material-icons me-2">info</span>Checkpoint Status</h1>
+        <ul class="checkpoint-list">
+          <li *ngFor="let checkpoint of commoncheckpoint" class="checkpoint-item" [ngClass]="{
+                'pending': checkpoint['status'].toLowerCase() === 'pending',
+                'completed': checkpoint['status'].toLowerCase() === 'completed',
+                'failed': checkpoint['status'].toLowerCase() === 'failed',
+                'in-progress': checkpoint['status'].toLowerCase() === 'in-progress'
+              }">
+            <div>
+              <div class="checkpoint-label">{{ checkpoint['label'] }}</div>
+              <div class="checkpoint-value" *ngIf="checkpoint['description']">{{ checkpoint['description'] }}</div>
+            </div>
+            <span>
+              <span class="checkpoint-type" [ngClass]="{
+                'common': checkpoint['type'].toLowerCase() === 'common',
+                'new': checkpoint['type'].toLowerCase() === 'new',
+                'upgrade': checkpoint['type'].toLowerCase() === 'upgrade',
+                'downgrade': checkpoint['type'].toLowerCase() === 'downgrade',
+                'cancelled': checkpoint['type'].toLowerCase() === 'cancelled',
+                'addons': checkpoint['type'].toLowerCase() === 'addons',}">
+                {{ `${checkpoint['type']}` }}
+              </span>
+              &nbsp;
+              <span class="checkpoint-status" [ngClass]="{
+                  'status-pending': checkpoint['status'].toLowerCase() === 'pending',
+                  'status-completed': checkpoint['status'].toLowerCase() === 'completed',
+                  'status-failed': checkpoint['status'].toLowerCase() === 'failed',
+                  'status-in-progress': checkpoint['status'].toLowerCase() === 'in-progress'}">
+                {{ checkpoint['status'] }}
+              </span>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="d-flex flex-row justify-content-center gap-3 mt-4 mb-4">
+      <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+
+      <button *ngIf="!saleData['initialpaymentapproved']" mat-stroked-button type="button" (click)="initialPayment()">
+        Initial Payment Approval
+      </button>
+
+      <button *ngIf="saleData['initialpaymentapproved']" mat-stroked-button type="button"
+        class="text-success border-success">
+        Initial Payment Approved
+      </button>
+
+      <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="submitValidation()" class="btn-primary">
+        <span *ngIf="saleData['journeytype'] == 'new'">Approve New Purchase</span>
+        <span *ngIf="saleData['journeytype'] == 'upgrade'">Approve Upgrade Purchase</span>
+        <span *ngIf="saleData['journeytype'] == 'addons'">Approve Addon Purchase</span>
+        <span *ngIf="saleData['journeytype'] == 'downgrade'">Approve Downgrade Purchase</span>
+        <span *ngIf="saleData['journeytype'] == 'cancelled'">Approve Cancelled Purchase</span>
+      </button>
+
+    </div>
+  </div>
+</div>

@@ -1,0 +1,80 @@
+<div class="mainscreen">
+  <h1 mat-dialog-title class="formdialog">Update EIS Zoom Credentials</h1>
+  <div  mat-dialog-content class="formleftdialog">
+    <div [formGroup]="eisForm" class="formdialog">
+      <div class="formleftdialog"> 
+
+        <div *ngIf="dialogData['accountdata'] == null; else profileField">
+          <mat-form-field appearance="outline" class="textField">
+            <mat-label>Name</mat-label>
+            <mat-select [(ngModel)]="selectedProfile" [ngModelOptions]="{standalone: true}" placeholder="Select Profile" (selectionChange)="onProfileSelected($event.value)" required>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredProfile" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let profile of returnProfile()" [value]="profile">{{profile.name}}</mat-option>
+            </mat-select>
+            <mat-error>
+              <mat-error *ngIf="eisForm.get('profileid').hasError('required')">
+                Name is <strong>required</strong>
+              </mat-error>
+            </mat-error>
+          </mat-form-field>
+        </div>
+        <ng-template #profileField>
+          <mat-form-field appearance="outline">
+            <input matInput [(ngModel)]="dialogData['accountdata']['name']" [ngModelOptions]="{standalone: true}" disabled>
+          </mat-form-field>
+        </ng-template>
+        
+        <mat-form-field appearance="outline" class="textField" >
+          <mat-label>Email</mat-label>
+          <input type="email" matInput formControlName="email" placeholder="Enter email" required>
+          <mat-error *ngIf="eisForm.get('email').hasError('required')">
+            Email is <strong>required</strong>
+          </mat-error>
+          <mat-error *ngIf="eisForm.get('email').hasError('email')">
+            <strong>Incorrect</strong> Format
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="textField">
+          <mat-label>Phone Number</mat-label>
+          <input type="tel" formControlName="phonenumber" matInput minlength="10" maxlength="10" placeholder="Enter Phone Number" required>
+          <mat-error *ngIf="eisForm.get('phonenumber').hasError('required')">
+            Phone Number is <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="formleftdialog">
+        <mat-form-field appearance="outline" class="textField">
+          <mat-label>Zoom URL</mat-label>
+          <input type="text" matInput formControlName="zoomurl" placeholder="Enter Zoom URL Link" required>
+          <mat-error *ngIf="eisForm.get('zoomurl').hasError('required')">
+            Zoom URL is <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="textField">
+          <mat-label>Zoom ID</mat-label>
+          <input type="text" matInput formControlName="zoomid" placeholder="Enter Zoom Id" required>
+          <mat-error *ngIf="eisForm.get('zoomid').hasError('required')">
+            Zoom ID is <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="textField">
+          <mat-label>Zoom Password</mat-label>
+          <input type="text" matInput formControlName="zoompassword" placeholder="Enter Zoom Password" required>
+          <mat-error *ngIf="eisForm.get('zoompassword').hasError('required')">
+            Zoom Password is <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+      </div>
+    </div>
+    <div class="formdialog">
+      <button class="closebtn" mat-stroked-button type="submit" (click)="close()">Close</button>
+      <button [disabled]="eisForm.invalid" class="submitbtn" mat-stroked-button type="submit" (click)="submit()">Submit</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,234 @@
+<div class="eco-dialog">
+  <!-- Header -->
+  <div class="dialog-header">
+    <div class="header-left">
+      <div class="header-icon" [ngClass]="getHeaderIconClass()">
+        <ng-container [ngSwitch]="heading">
+          <svg *ngSwitchCase="'Total ATC'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+          </svg>
+          <svg *ngSwitchCase="'Completed ATC'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+          </svg>
+          <svg *ngSwitchCase="'Limitation Years'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+          <svg *ngSwitchCase="'Saved Years'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <svg *ngSwitchCase="'Total Adjustment'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>
+          </svg>
+          <svg *ngSwitchDefault width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+        </ng-container>
+      </div>
+      <div class="header-title">
+        <h2>{{ heading }}</h2>
+        <span class="header-subtitle" *ngIf="subHeading">{{ subHeading }}</span>
+      </div>
+    </div>
+    <button class="close-btn" (click)="closeDialog()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+    <span>Loading data...</span>
+  </div>
+
+  <!-- Content -->
+  <div *ngIf="!loading" class="dialog-content">
+    <!-- Search & Filters -->
+    <div class="toolbar">
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="text" placeholder="Search..." [(ngModel)]="searchTerm" (input)="filterItems()"/>
+      </div>
+      <div class="result-count">
+        <span class="count-badge">{{ filteredData?.length || limitationYearsData?.length || 0 }}</span>
+        <span>Results</span>
+      </div>
+    </div>
+
+    <!-- Scrollable Content -->
+    <div class="scrollable-content">
+      <!-- Table View -->
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="th-sno">#</th>
+              <th class="th-name">Name</th>
+              <th class="th-date">Prescription Date</th>
+              <th class="th-product">Product</th>
+              <th class="th-product" *ngIf="['Total Adjustment', 'Completed ATC'].includes(heading)">Total Prescribed</th>
+              <th class="th-product" *ngIf="['Total Adjustment', 'Completed ATC'].includes(heading)">Completed</th>
+              <th class="th-product" *ngIf="['Un Aware', 'Aware'].includes(heading)">Aware Years</th>
+              <th class="th-product" *ngIf="['Un Aware', 'Aware'].includes(heading)">Unaware Years</th>
+              <th class="th-product" *ngIf="['Limitation Years'].includes(heading)">Limitation Years</th>
+              <th class="th-product" *ngIf="['Saved Years'].includes(heading)">Saved Years</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let validatedATC of filteredData; let i = index" (click)="profileNavigation(validatedATC['profileid'])" class="table-row">
+              <td class="td-sno">{{ i + 1 }}</td>
+              <td class="td-name">
+                <div class="name-cell">
+                  <div class="avatar">{{ getInitials(mapProfile[validatedATC['profileid']]) }}</div>
+                  <span>{{ mapProfile[validatedATC['profileid']] }}</span>
+                </div>
+              </td>
+              <td class="td-date">
+                <span class="date-badge">{{ validatedATC?.prescription_date?.toDate() | date : 'medium'}}</span>
+              </td>
+              <td class="td-product">
+                <span class="product-tag">{{ validatedATC?.product || '-' }}</span>
+              </td>
+              <td class="td-product" *ngIf="['Total Adjustment', 'Completed ATC'].includes(heading)">
+                <span class="product-tag">{{ validatedATC?.totaladjustment || 0 }}</span>
+              </td>
+              <td class="td-product" *ngIf="['Total Adjustment', 'Completed ATC'].includes(heading)">
+                <span class="product-tag">{{ validatedATC?.totaladjustmentcompleted || 0 }}</span>
+              </td>
+              <td class="td-product" *ngIf="['Un Aware', 'Aware'].includes(heading)">
+                <span class="product-tag">{{ validatedATC?.totaladjustmentaware || 0 }}</span>
+              </td>
+              <td class="td-product" *ngIf="['Un Aware', 'Aware'].includes(heading)">
+                <span class="product-tag">{{ validatedATC?.totaladjustmentunaware || 0 }}</span>
+              </td>
+              <td class="td-product" *ngIf="['Limitation Years'].includes(heading)">
+                <span class="product-tag">{{ validatedATC?.evolutionyearwasted || 0 }}</span>
+              </td>
+              <td class="td-product" *ngIf="['Saved Years'].includes(heading)">
+                <span class="product-tag">{{ validatedATC?.evolutionyearsaved || 0 }}</span>
+              </td>
+            </tr>
+            <tr *ngIf="filteredData?.length === 0" class="empty-row">
+              <td colspan="4">
+                <div class="empty-state">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"/><path d="M8 15h8M9 9h.01M15 9h.01"/>
+                  </svg>
+                  <span>No data found</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- <div class="dialog-header">
+  <button mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<div *ngIf="loading" class="loading-container">
+  <mat-spinner></mat-spinner>
+</div>
+
+<div *ngIf="!loading" class="content-container">
+  <div class="fixed-top-section">
+    <h4 class="heading">{{ heading + (subHeading ? ' ' + subHeading : '') }}</h4><br>
+    <div *ngIf="sectionMetric === 'MetricSection'"  style="display: flex; align-items: center; gap: 15px;">
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(152, 235, 152); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">Sequence Increased</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(237, 159, 159); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">Sequence Decreased</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(249,249,249); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Change in Sequence</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(155, 154, 154); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Previous AEL</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(123, 207, 245); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Change in Sequence, but Metric Value Increased</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(224, 130, 247); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Change in Sequence, but Metric Value Decreased</span>
+      </div>
+    </div> <br>
+    <input
+      type="text" 
+      placeholder="Search..." 
+      [(ngModel)]="searchTerm" 
+      (input)="filterItems()" 
+      class="search-input" 
+    />
+  </div>
+  <div class="scrollable-content">
+    <div *ngIf="heading !== 'Limitation Years' && heading !== 'Saved Years' && heading !== 'Total Adjustment' && heading !== 'Un Aware' && heading !== 'Aware'" class="item-container">
+      <div class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
+        <div class="profile-name">{{ mapProfile[profile] }}</div>
+        <div *ngIf="sectionMetric === 'MetricSection'" class="metrics-container">
+          <div class="previous-metrics">
+            <h5>Previous 
+              <span *ngIf="previousMetric && previousMetric[profile]">({{ previousMetric[profile].month }} {{ previousMetric[profile].year }})</span>
+            </h5>
+            <ng-container *ngIf="previousMetric && previousMetric[profile]">
+              <div class="metrics-list">
+                <ng-container *ngFor="let category of ['Business', 'Career', 'Family', 'Health', 'Personal Genius']">
+                  <div *ngIf="previousMetric[profile].data[category]" class="metric-item">
+                    <strong>{{ category }}</strong>: 
+                    {{ previousMetric[profile].data[category].startpoint }} to {{ previousMetric[profile].data[category].endpoint }} 
+                    <span *ngIf="previousMetric[profile].data[category].metric" class="metric-value"> , Metric: {{ previousMetric[profile].data[category].metric }}</span>
+                    <span *ngIf="previousMetric[profile].data[category].jumpedfrom" class="jumped-from"> , Jumped from: {{ previousMetric[profile].data[category].jumpedfrom }}</span>
+                  </div>
+                </ng-container>
+              </div>
+            </ng-container>
+          </div>
+          <div class="current-metrics">
+            <h5>Current</h5>
+            <ng-container *ngIf="metricData">
+              <div class="metrics-list">
+                <ng-container *ngFor="let category of ['Business', 'Career', 'Family', 'Health', 'Personal Genius']">
+                  <div *ngIf="metricData[profile][category]" class="metric-item" [ngClass]="{
+                    'sequence-increase': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence > previousMetric[profile].data[category].sequence,
+                    'sequence-decrease': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence < previousMetric[profile].data[category].sequence,
+                    'sequence-same': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence === previousMetric[profile].data[category].sequence,
+                    'metric-increase': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence === previousMetric[profile].data[category].sequence && metricData[profile][category].metric > previousMetric[profile].data[category].metric,
+                    'metric-decrease': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence === previousMetric[profile].data[category].sequence && metricData[profile][category].metric < previousMetric[profile].data[category].metric,
+                    'sequence-no-previous': !previousMetric[profile] || !previousMetric[profile].data || !previousMetric[profile].data[category]
+                  }">
+                    <strong>{{ category }}</strong>: 
+                    {{ metricData[profile][category].startpoint }} to {{ metricData[profile][category].endpoint }} 
+                    <span *ngIf="metricData[profile][category].metric" class="metric-value"> , Metric: {{ metricData[profile][category].metric }}</span>
+                    <span *ngIf="metricData[profile][category].jumpedfrom" class="jumped-from"> , Jumped from: {{ metricData[profile][category].jumpedfrom }}</span>
+                  </div>
+                </ng-container>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="heading === 'Limitation Years' || heading === 'Saved Years' || heading === 'Total Adjustment' || heading === 'Un Aware' || heading === 'Aware'" class="item-container">
+      <div class="item" *ngFor="let profile of limitationYearsData" (click)="profileNavigation(profile.key)">
+        {{ mapProfile[profile.key] }} - {{ profile.value }}
+      </div>
+    </div>  
+  </div>
+</div>
+ -->

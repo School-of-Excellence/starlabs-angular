@@ -1,0 +1,186 @@
+<!-- Refactored HTML with a reusable template for all tabs -->
+<div class="mainscreen">
+  <div class="title text-center mb-3">Review/Flag ATC</div>
+  <div class="m-3">
+    <mat-form-field appearance="outline" class="me-4">
+      <mat-label>Filter Client</mat-label>
+      <mat-select [(ngModel)]="selectedProfile" (selectionChange)="selectedSpecialist = null; filterATC()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterProfile()" [value]="option.profileid">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="me-4">
+      <mat-label>Filter Specialist</mat-label>
+      <mat-select [(ngModel)]="selectedSpecialist" (selectionChange)="selectedProfile = null; filterATC()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterSpecialist()" [value]="option.profileid">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <button *ngIf="selectedProfile != null || selectedSpecialist != null" class="resetbtn" mat-stroked-button (click)="selectedProfile = null; selectedSpecialist = null; filterATC()">Reset</button>
+  </div>
+  <mat-tab-group mat-stretch-tabs mat-align-tabs="center">
+
+    <!-- Validation ATC -->
+    <mat-tab label="Yet to Validate ({{filtervalidateATC.length}})">
+      <ng-container *ngTemplateOutlet="atcListTemplate; context: {
+        atcList: filtervalidateATC,
+        startIndex: validateStart, 
+        endIndex: validateEnd, 
+        tabType: 'validate'
+      }"></ng-container>
+    </mat-tab>
+
+    <!-- Alpha ATC -->
+    <mat-tab label="Validated By Arena Mentor ({{filteralphaATC.length}})">
+      <ng-container *ngTemplateOutlet="atcListTemplate; context: {
+        atcList: filteralphaATC,
+        startIndex: alphaStart, 
+        endIndex: alphaEnd, 
+        tabType: 'alpha'
+      }"></ng-container>
+    </mat-tab>
+
+    <!-- Flag Mandatory -->
+    <mat-tab label="Marked for Mandatory Consultation ({{filterflagMandatoryATC.length}})">
+      <ng-container *ngTemplateOutlet="atcListTemplate; context: {
+        atcList: filterflagMandatoryATC,
+        startIndex: flagMandatoryStart, 
+        endIndex: flagMandatoryEnd, 
+        tabType: 'flagmandatory'
+      }"></ng-container>
+    </mat-tab>
+
+    <!-- Flag Enhance -->
+    <mat-tab label="Marked for Enhanced Scope Consultation ({{filterflagEnhanceATC.length}})">
+      <ng-container *ngTemplateOutlet="atcListTemplate; context: {
+        atcList: filterflagEnhanceATC,
+        startIndex: flagEnhanceStart, 
+        endIndex: flagEnhanceEnd, 
+        tabType: 'flagenhance'
+      }"></ng-container>
+    </mat-tab>
+
+    <!-- Final Review -->
+    <mat-tab label="Approved ATC as Final ({{filterfinalReviewATC.length}})">
+      <ng-container *ngTemplateOutlet="atcListTemplate; context: {
+        atcList: filterfinalReviewATC,
+        startIndex: finalReviewStart, 
+        endIndex: finalReviewEnd, 
+        tabType: 'finalreview'
+      }"></ng-container>
+    </mat-tab>
+  </mat-tab-group>
+</div>
+
+<!-- Reusable template for ATC list -->
+<ng-template #atcListTemplate let-atcList="atcList" let-startIndex="startIndex" let-endIndex="endIndex" let-tabType="tabType">
+  <mat-accordion multi>
+    <mat-expansion-panel *ngFor="let atc of atcList.slice(startIndex, endIndex); let i = index" (opened)="openATC(atc)">
+      <mat-expansion-panel-header #header collapsedHeight="110%" expandedHeight="115%">
+        <mat-panel-title>
+          <div class="expansionheader p-2">
+            <span class="head">Client: </span><span class="body">{{mapProfile[atc.profileid]}}</span>
+            <br>
+            <span class="head">Authors: </span><span class="body" *ngFor="let author of atc.author">{{mapProfile[author.id]}},&nbsp;</span>
+            <br>
+            <span class="head">Product: </span><span class="body">{{atc.product}}</span>
+            <br>
+            <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
+            <br>
+
+            <!-- Flag Comment -->
+            <div class="comment-container" *ngIf="tabType != 'validate' && tabType != 'alpha' && (atc['flagcomment'] || []).length != 0">
+              <label><b class="font-italic">Last Comment:</b> {{atc['flagcomment'][atc['flagcomment'].length - 1]['comment']}} <span class="text-secondary"> - By {{mapProfile[atc['flagcomment'][atc['flagcomment'].length - 1]['addedby']]}}</span></label>
+            </div>
+
+            <div [ngClass]="{'mt-2 mb-2': tabType !== 'validate' && tabType !== 'alpha'}">
+              <!-- Different buttons based on tab type -->
+              <ng-container *ngIf="tabType === 'validate'">
+                <button class="me-3" mat-stroked-button (click)="$event.stopPropagation(); editATC(atc.atcid, 'validation')">Edit ATC</button>
+                <button class="me-3" mat-stroked-button (click)="$event.stopPropagation(); markATCvalidate(atc.atcid)">Mark ATC as Validated</button>
+              </ng-container>
+              
+              <ng-container *ngIf="tabType !== 'validate'">
+                <button mat-stroked-button (click)="$event.stopPropagation(); editATC(atc.atcid, 'alpha')">Edit ATC</button>
+                <button [ngClass]="atc['flagtype'] == 'flagmandatory' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'flagmandatory')">Mark for Mandatory Consultation</button>
+                <button [ngClass]="atc['flagtype'] == 'flagenhance' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'flagenhance')">Mark for Enhanced Scope Consultation</button>
+                <button [ngClass]="atc['flagtype'] == 'finalreview' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'finalreview')">Approve This ATC as Final</button>
+              </ng-container>
+            </div>
+            
+            <span *ngIf="tabType !== 'validate' && tabType !== 'alpha' && atc['status'] != null" class="maticon">{{atc['status'] == "validated" ? "Validated by Arena Mentor" : atc['status'] == "atc given" ? "Yet to Validate" : atc['status']}}</span>
+          </div>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      
+      <!-- Content area is the same for all tabs -->
+      <div *ngIf="(mapATCtranscription[atc.atcid] || []).length == 0">
+        <span class="text-secondary text-center">Fetching Adjustment & Procedures.....</span>
+      </div>
+      <div *ngIf="(mapATCtranscription[atc.atcid] || []).length != 0">
+        <div class="title text-left mb-0">Adjustment & Procedures</div>
+        <div class="adjbox mt-2" *ngFor="let adj of mapATCtranscription[atc.atcid]; let i = index">
+          <label><em *ngIf="tabType !== 'validate'">{{i+1}}) {{adj.adjustment.name}}</em><span *ngIf="tabType === 'validate'">{{i+1}}) {{adj.adjustment.name}}</span></label>
+          <!-- Subtext -->
+          <div class="text-secondary font-italic mb-2" *ngIf="adj.adjustment['editedby']"> <!--  && !atc['authorid'].includes(adjustmentData['editedby']?.id) -->
+            * This adjustment has been {{mentorProfileid.includes(adj.adjustment['editedby']?.id) ? 'enhanced' : ' last edited'}} by {{mapProfile[adj.adjustment['editedby']?.id]}}
+          </div>
+          <div class="ms-3" *ngFor="let pro of adj.procedure">
+            - {{mapProcedure[pro.name.id]}} 
+            <span *ngIf="pro.assigned_to != null">
+              (<span *ngFor="let name of pro.assigned_to">{{mapProfile[name.id]}},&nbsp;</span>)
+            </span>
+          </div>
+        </div>
+
+        <!-- ATC Notes -->
+        <div class="comment-container" *ngIf="![null, undefined].includes(atc['mentoringid']) || ![null, undefined].includes(atc['notesid'])">
+          <div *ngIf="mapATCnotes[atc['mentoringid']] as mentoringData">
+            <label><b class="font-italic">Mentoring Notes:</b> {{mentoringData["mentoringnote"]}}</label>
+          </div>
+          <div *ngIf="mapATCnotes[atc['notesid']] as notesData">
+            <div *ngIf="(notesData['consultationpoint'] || '').length != 0">
+              <label><b class="font-italic">Consultation Points:</b> {{notesData["consultationpoint"]}}</label>
+            </div>
+            <div *ngIf="(notesData['consultationsummary'] || '').length != 0">
+              <label><b class="font-italic">Consultation Summary:</b> {{notesData["consultationsummary"]}}</label>
+            </div>
+            <div *ngIf="(notesData['notes'] || '').length != 0">
+              <label><b class="font-italic">Case Notes:</b> {{notesData["notes"]}}</label>
+            </div>
+            <div *ngIf="(notesData['changeworkbrief'] || []).length != 0">
+              <label class="info-label">Changework Brief:</label>
+              <div>
+                <div *ngFor="let audio of notesData['changeworkbrief']; let i = index">
+                  <audio class="audio-container" controls>
+                    <source [src]="audio" type="audio/wav">
+                  </audio>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="(notesData['imagenotes'] || []).length != 0">
+              <label class="info-label">Image Notes:</label>
+              <div class="image-notes-container">
+                <div class="image-preview" *ngFor="let image of notesData['imagenotes']">
+                  <img [src]="image" height="80" width="80" (click)="viewImage(image)">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </mat-expansion-panel>
+  </mat-accordion>
+  
+  <!-- Pagination buttons -->
+  <div class="w-100 text-left">
+    <div class="mt-3 btn-group w-25">
+      <button *ngIf="startIndex >= 10" class="btn btn-primary" (click)="previous(tabType)">Previous</button>
+      <button *ngIf="endIndex < atcList.length" class="btn btn-primary" (click)="next(tabType)">Next</button>
+    </div>
+  </div>
+</ng-template>

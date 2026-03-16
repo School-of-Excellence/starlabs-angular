@@ -1,0 +1,43 @@
+<div style="padding: 20px; max-width: 400px;">
+  <h2 mat-dialog-title>{{ isEditMode ? 'Edit Category' : 'Create Category' }}</h2>
+  
+  <mat-form-field appearance="outline" style="width: 100%;">
+    <mat-label>Workshop Category Name</mat-label>
+    <input matInput [formControl]="nameControl" placeholder="Enter category name">
+    <mat-error *ngIf="nameControl.hasError('required')">
+      Category name is required
+    </mat-error>
+    <mat-error *ngIf="nameControl.hasError('minlength')">
+      Category name must be at least 2 characters
+    </mat-error>
+  </mat-form-field>
+  <br>
+  <mat-form-field appearance="outline" style="width: 100%;">
+    <mat-label>Workshop Category Description</mat-label>
+    <input matInput [formControl]="descriptionControl" placeholder="Enter category description">
+    <mat-error *ngIf="descriptionControl.hasError('required')">
+      Category description is required
+    </mat-error>
+    <mat-error *ngIf="descriptionControl.hasError('minlength')">
+      Category description must be at least 2 characters
+    </mat-error>
+  </mat-form-field>
+
+  <div style="display: flex; gap: 10px; margin-top: 10px;">
+    <button 
+      mat-raised-button 
+      color="primary" 
+      (click)="saveCategory()" 
+      [disabled]="nameControl.invalid"
+      style="flex: 1;">
+      {{ isEditMode ? 'Update' : 'Create' }}
+    </button>
+    
+    <button 
+      mat-button 
+      (click)="cancel()"
+      style="flex: 1;">
+      Cancel
+    </button>
+  </div>
+</div>

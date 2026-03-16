@@ -1,0 +1,555 @@
+<div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ 'Loading Dashboard...' }}</div>
+    </div>
+</div>
+
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="header">
+        <h1 class="title">Mode Dashboard</h1>
+        <div class="members-badge" (click)="openModeDialog(debugModeList, 'debug', null)">
+            <span class="members-text">Members Not Moved to Next Mode</span>
+            <span class="badge">{{debugModeList.length}}</span>
+        </div>
+    </div>
+
+<!-- Categorized participants based on their mode  -->
+<div class="mode-section">
+    <div class="section-header">
+        <span class="filter-title">Participant Modes</span>
+    </div>
+
+    <div class="mode-selection">
+        <div class="filters-grid">
+            <div *ngFor="let mode of modesList">
+                <div class="filter-badge" 
+                     (click)="openModeDialog(modeProfile[mode] || [], 'participants', mode)">
+                    <span class="filter-name">{{mode}}</span>
+                    <span class="filter-count">{{(modeProfile[mode] && modeProfile[mode].length) || 0}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mode Transition Section -->
+<div class="mode-section">
+    <div class="section-header">
+        <div class="moving-next">
+            <span class="edit-hint">📝</span>
+            <span class="moving-text">Moving Next Mode in</span>
+            <div class="input-wrapper">
+                <input type="number" class="days-input" [(ngModel)]="startDay" min="0" (input)="nextModeChange()"
+                    title="Click to edit start day">
+            </div>
+            <span class="days-text">to</span>
+            <div class="input-wrapper">
+                <input type="number" class="days-input" [(ngModel)]="endDay" min="1" (input)="nextModeChange()"
+                    title="Click to edit end day">
+            </div>
+            <span class="days-text">Days</span>
+        </div>
+        <div class="date-range">
+            <i class="calendar-icon">📅</i>
+            <span>Moving In : <b>{{returnDate(startDay, true) | date: "mediumDate"}}</b> -
+                <b>{{returnDate(endDay,false) | date: "mediumDate"}}</b></span>
+        </div>
+        <button class="view-config-btn" (click)="openConfig()">
+            View Configuration
+        </button>
+    </div>
+
+    <div class="mode-selection">
+        <div class="transitions-grid">
+            <div *ngFor="let mode of nextModeList">
+                <div class="transition-card" (click)="openModeDialog(mode, 'transition', null)">
+                    <span class="from-mode">{{mode['currentmode']}}</span>
+                    <span class="arrow">→</span>
+                    <span class="to-mode">{{mode['nextmode']}}</span>
+                    <span class="count-badge">{{mode['participantprofile'].length}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event/Queue Filter Section -->
+<div class="event-section">
+    <div class="event-header">
+        <span class="filter-title">Event/Queue Filter</span>
+        
+        <div class="current-event">
+            <i class="calendar-icon">📅</i>
+            <span *ngIf="selectedEvent">Event: {{mapEvents[selectedEvent]?.name || 'N/A'}}</span>
+            <span *ngIf="selectedQueue">Queue: {{mapQueues[selectedQueue]?.queuename || 'N/A'}}</span>
+            <span *ngIf="!selectedEvent && !selectedQueue">Select an Event or Queue</span>
+        </div>
+
+        <mat-form-field appearance="outline" class="large-dropdown">
+            <mat-label>Events List</mat-label>
+            <mat-select [(ngModel)]="selectedEvent" 
+                        (selectionChange)="selectedQueue = ''; updateEventData()"
+                        [disabled]="!!selectedQueue">
+                <mat-option [value]="''">-- None --</mat-option>
+                <mat-option *ngFor="let event of eventsList" [value]="event['docid']">
+                    {{event['name']}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="large-dropdown">
+            <mat-label>Queue List</mat-label>
+            <mat-select [(ngModel)]="selectedQueue" 
+                        (selectionChange)="selectedEvent = ''; updateQueueData()"
+                        [disabled]="!!selectedEvent">
+                <mat-option [value]="''">-- None --</mat-option>
+                <mat-option *ngFor="let queue of queueList" [value]="queue['docid']">
+                    {{queue['queuename']}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="medium-dropdown">
+            <mat-label>Filter by Product</mat-label>
+            <mat-select (selectionChange)="filterEventQueueByProduct($event.value)"
+                        [disabled]="!selectedEvent && !selectedQueue">
+                <mat-option [value]="''">-- All Products --</mat-option>
+                <mat-option *ngFor="let product of productList" [value]="product['id']">
+                    {{product['product']}}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+    </div>
+
+    <div class="filters-grid">
+        <div *ngFor="let event of mapEventData | keyvalue">
+            <div class="filter-badge" (click)="openModeDialog(event.value, 'event', event.key)">
+                <span class="filter-name">{{event.key}}</span>
+                <span class="filter-count">{{event.value.length || 0}}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="outer-container">
+    <div class="configuration-wrapper" #configuredSection>
+        <div class="configuration-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="title-section">
+                    <span class="title">Review Configured</span>
+                    <span class="count-badge">{{configuredModes.length}}</span>
+                </div>
+                <form [formGroup]="configuredform">
+                    <div class="search-section">
+                        <mat-form-field appearance="outline" class="large-dropdown">
+                            <mat-label>Filter by Product</mat-label>
+                            <mat-select multiple formControlName="product"
+                                (selectionChange)="configuredFilter(configuredform.value)">
+                                <mat-option *ngFor="let product of productList"
+                                    [value]="product['id']">{{product['product']}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="medium-dropdown">
+                            <mat-label>Filter by Mode</mat-label>
+                            <mat-select multiple formControlName="mode"
+                                (selectionChange)="configuredFilter(configuredform.value)">
+                                <mat-option *ngFor="let mode of modesList"
+                                [value]="mode">{{mode}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Products Grid -->
+            <!-- <div class="products-grid">
+                <div *ngFor="let configured of getDisplayedConfigured()">
+                    <div class="product-card">
+                        Last Configured On: {{[null, undefined].includes(configured['lastupdate']) ? 'NA' :
+                        (configured['lastupdate'].toDate() | date: 'mediumDate')}}
+                        <div class="product-header">
+                            <span class="product-text">Product :
+                                {{mapProducts[configured['productid']]['product']}}</span>
+                            <span class="product-count"></span>
+                        </div>
+                        <div class="mode-footer">
+                            <span class="mode-text">Mode : {{configured['mode']}}</span>
+                            <button class="configure-btn"
+                                (click)="updateConfig(configured['mode'], configured['productid'])">Configure
+                                Mode</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="show-more-container" *ngIf="configuredModes.length > itemsToShow">
+                <button class="show-more-btn" *ngIf="hasMoreConfigured()" (click)="showMoreConfigured()">
+                    Show More (10)
+                    <span class="arrow-icon">▼</span>
+                </button>
+                <button class="show-less-btn" *ngIf="isShowingMoreConfigured()" 
+                        (click)="showLessConfigured(configuredSection)">
+                    Show Less
+                    <span class="arrow-icon">▲</span>
+                </button>
+            </div> -->
+
+            <div class="products-grid">
+                <ng-container *ngFor="let configured of getConfiguredModesProductGroups();let i = index;let last = last;" >
+                    <div (click)="highlightConfiguredMode(configured?.productId , configured?.configurations , i)" 
+                        [class.expanded]="configuredModeHighlight !== null">
+                        <div class="product-card" 
+                        [class.active]="isConfiguredCardActive(configured?.productId)" 
+                            [class.nonactive]="!isConfiguredCardActive(configured?.productId)">
+                            <div class="product-header">
+                                <span class="product-text">Product :
+                                    {{mapProducts[configured?.productId]['product']}}</span>
+                                <span class="product-count">{{configured?.configurations?.length ?? ''}}</span>
+                            </div>
+                            <!-- <div class="mode-footer">
+                                <span class="mode-text">Mode : {{getConfiguredProductModes(configured)}}</span>
+                            </div> -->
+                        </div>
+                    </div>
+                    <div *ngIf="configuredModeHighlight !== null && isExpandedConfiguredRow(i , last)" class="exp-section">
+                        <div class="products-grid">
+                            <div *ngFor="let configured of getConfiguredModesOfProduct()">
+                                <div class="product-card">
+                                    Last Configured On: {{[null, undefined].includes(configured['lastupdate']) ? 'NA' :
+                                    (configured['lastupdate'].toDate() | date: 'mediumDate')}}
+                                    <div class="product-header">
+                                    <span class="product-text">Product :
+                                        {{mapProducts[configured['productid']]['product']}}</span>
+                                    <span class="product-count"></span>
+                                </div>
+                                <div class="mode-footer">
+                                    <span class="mode-text">Mode : {{configured['mode']}}</span>
+                                    <button class="configure-btn"
+                                    (click)="updateConfig(configured['mode'], configured['productid'])">Configure Mode</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </ng-container>
+            </div>
+
+            <div class="show-more-container" *ngIf="configuredModesProductsLength > itemsToShow">
+                <button class="show-more-btn" *ngIf="hasMoreConfigured()" (click)="showMoreConfigured()">
+                    Show More (10)
+                    <span class="arrow-icon">▼</span>
+                </button>
+                <button class="show-less-btn" *ngIf="isShowingMoreConfigured()" 
+                        (click)="showLessConfigured(configuredSection)">
+                    Show Less
+                    <span class="arrow-icon">▲</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="outer-container">
+    <div class="configuration-wrapper" #notConfiguredSection>
+        <div class="configuration-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="title-section">
+                    <span class="title">Configuration Missing</span>
+                    <span class="count-badge">{{notConfiguredModes.length}}</span>
+                </div>
+                <form [formGroup]="notconfiguredform">
+                    <div class="search-section">
+                        <mat-form-field appearance="outline" class="large-dropdown">
+                            <mat-label>Filter by Product</mat-label>
+                            <mat-select multiple formControlName="product"
+                                (selectionChange)="notConfiguredFilter(notconfiguredform.value)">
+                                <mat-option *ngFor="let product of productList"
+                                    [value]="product['id']">{{product['product']}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="medium-dropdown">
+                        <mat-label>Filter by Mode</mat-label>
+                        <mat-select multiple formControlName="mode"
+                            (selectionChange)="notConfiguredFilter(notconfiguredform.value)">
+                            <mat-option *ngFor="let mode of modesList"
+                            [value]="mode">{{mode}}</mat-option>
+                        </mat-select>
+                        </mat-form-field>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Products Grid -->
+            <!-- <div class="products-grid">
+                <div *ngFor="let notconfigured of getDisplayedNotConfigured()">
+                    <div class="product-card">
+                        <div class="product-header">
+                            <span class="product-text">Product :
+                                {{mapProducts[notconfigured['productid']]['product']}}</span>
+                            <span class="product-count"></span>
+                        </div>
+                        <div class="mode-footer">
+                            <span class="mode-text">Mode : {{notconfigured['mode']}}</span>
+                            <button class="configure-btn"
+                                (click)="updateConfig(notconfigured['mode'], notconfigured['productid'])">Configure
+                                Mode</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="show-more-container" *ngIf="notConfiguredModes.length > itemsToShow">
+                <button class="show-more-btn" *ngIf="hasMoreNotConfigured()" (click)="showMoreNotConfigured()">
+                    Show More (10)
+                    <span class="arrow-icon">▼</span>
+                </button>
+                <button class="show-less-btn" *ngIf="isShowingMoreNotConfigured()" 
+                        (click)="showLessNotConfigured(notConfiguredSection)">
+                    Show Less
+                    <span class="arrow-icon">▲</span>
+                </button>
+            </div> -->
+
+            <div class="products-grid">
+                <ng-container *ngFor="let notconfigured of getNotConfiguredModesProductGroups();let i = index;let last = last;"  >
+                    <div (click)="highlightNotConfiguredMode(notconfigured?.productId , notconfigured?.configurations , i)" 
+                        [class.expanded]="notConfiguredModeHighlight !== null">
+                        <div class="product-card" 
+                            [class.active]="isNotConfiguredCardActive(notconfigured?.productId)" 
+                            [class.nonactive]="!isNotConfiguredCardActive(notconfigured?.productId)">
+                            <div class="product-header">
+                                <span class="product-text">Product :
+                                    {{mapProducts[notconfigured?.productId]['product']}}</span>
+                                <span class="product-count">{{notconfigured?.configurations?.length ?? ''}}</span>
+                            </div>
+                            <!-- <div class="mode-footer">
+                                <span class="mode-text">Mode : {{getConfiguredProductModes(configured)}}</span>
+                            </div> -->
+                        </div>
+                    </div>
+                    <div *ngIf="notConfiguredModeHighlight !== null && isExpandedNotConfiguredRow(i , last)" class="exp-section">
+                        <div class="products-grid">
+                            <div *ngFor="let notconfigured of getNotConfiguredModesOfProduct()">
+                                <div class="product-card">
+                                    <div class="product-header">
+                                        <span class="product-text">Product :
+                                        {{mapProducts[notconfigured['productid']]['product']}}</span>
+                                        <span class="product-count"></span>
+                                    </div>
+                                    <div class="mode-footer">
+                                        <span class="mode-text">Mode : {{notconfigured['mode']}}</span>
+                                        <button class="configure-btn"
+                                        (click)="updateConfig(notconfigured['mode'], notconfigured['productid'])">Configure
+                                        Mode</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </ng-container>
+            </div>
+            <div class="show-more-container" *ngIf="notConfiguredModesProductsLength > itemsToShow">
+                <button class="show-more-btn" *ngIf="hasMoreNotConfigured()" (click)="showMoreNotConfigured()">
+                    Show More (10)
+                    <span class="arrow-icon">▼</span>
+                </button>
+                <button class="show-less-btn" *ngIf="isShowingMoreNotConfigured()" 
+                        (click)="showLessNotConfigured(notConfiguredSection)">
+                    Show Less
+                    <span class="arrow-icon">▲</span>
+                </button>
+            </div> 
+        </div>
+    </div>
+</div>
+
+<!-- Modal/Dialog -->
+    <div class="modal-overlay" *ngIf="showDialog" (click)="closeDialog()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <div class="header-content">
+                    <h2 *ngIf="['transition'].includes(tableView)">Mode Transition Details</h2>
+                    <h2 *ngIf="['debug'].includes(tableView)">Participants Not Moved to Next Mode</h2>
+                    <h2 *ngIf="['participants', 'event'].includes(tableView)">{{activeMode}}</h2>
+                    <div class="mode-badges" *ngIf="selectedMode && ['transition'].includes(tableView)">
+                        <span class="mode-badge from-badge">{{selectedMode.currentmode}}</span>
+                        <span class="arrow-icon">→</span>
+                        <span class="mode-badge to-badge">{{selectedMode.nextmode}}</span>
+                    </div>
+                </div>
+                <button class="close-btn" (click)="closeDialog()">
+                    <span>×</span>
+                </button>
+            </div>
+
+            <div class="modal-body" *ngIf="selectedMode">
+                <!-- Summary Cards -->
+                <div class="summary-cards" *ngIf="['transition'].includes(tableView)">
+                    <div class="summary-card">
+                        <div class="card-icon participants">👥</div>
+                        <div class="card-content">
+                            <span class="card-value">{{selectedMode.participantprofile?.length || 0}}</span>
+                            <span class="card-label">Participants</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="card-icon products">📦</div>
+                        <div class="card-content">
+                            <span class="card-value">{{selectedMode.productids?.length || 0}}</span>
+                            <span class="card-label">Products</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="card-icon hierarchy">🏢</div>
+                        <div class="card-content">
+                            <span class="card-value">{{selectedMode.hierarchyprofile?.length || 0}}</span>
+                            <span class="card-label">Hierarchy Profiles</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Tables -->
+                <div class="table-section">
+                    <div class="table-tabs" *ngIf="['transition'].includes(tableView)">
+                        <button class="tab-btn" [class.active]="activeTab === 'participants'"
+                            (click)="setActiveTab('participants')">
+                            Participants
+                        </button>
+                        <button class="tab-btn" [class.active]="activeTab === 'products'"
+                            (click)="setActiveTab('products')">
+                            Products
+                        </button>
+                        <button class="tab-btn" [class.active]="activeTab === 'hierarchy'"
+                            (click)="setActiveTab('hierarchy')">
+                            Hierarchy
+                        </button>
+                    </div>
+
+                    <!-- Participants Table -->
+                    <div class="table-content" *ngIf="activeTab === 'participants'">
+                        <div class="table-header">
+                            <div style="display: flex;">
+                                <h4>Participant Details</h4>
+                                &nbsp;&nbsp;
+                                <span class="count-badge">{{selectedMode.participantproduct?.length || selectedMode.length}}</span>
+                            </div>
+                            <button class="export-btn" (click)="exportToExcel()">
+                                <span>📥</span> Export
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th *ngIf="['transition','debug'].includes(tableView)">Product</th>
+                                            <th *ngIf="['debug'].includes(tableView)">Events</th>
+                                            <!-- <th *ngIf="['participNameants'].includes(tableView)">Hierarchy Product</th> -->
+                                            <th *ngIf="['transition','debug'].includes(tableView)">Current Mode</th>
+                                            <th *ngIf="['transition','debug'].includes(tableView)">Next Mode</th>
+                                            <th *ngIf="['transition','debug'].includes(tableView)">Next Mode Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            *ngFor="let participant of (tableView == 'transition' ? selectedMode.participantproduct : selectedMode); let i = index">
+                                            <td>{{i + 1}}</td>
+                                            <td *ngIf="['transition','debug', 'event'].includes(tableView)">{{mapProfile[participant.profileid] || 'N/A'}}</td>
+                                            <td *ngIf="['participants'].includes(tableView)">{{mapProfile[participant] || 'N/A'}}</td>
+                                            <td *ngIf="['transition','debug', 'event'].includes(tableView)">{{mapMetaData[participant.profileid]?.email || 'N/A'}}</td> <!-- ADD THIS -->
+                                            <td *ngIf="['participants'].includes(tableView)">{{mapMetaData[participant]?.email || 'N/A'}}</td> <!-- ADD THIS -->
+                                            <td *ngIf="['transition','debug'].includes(tableView)">{{mapProducts[participant['productref'].id]['product'] || 'N/A'}}</td>
+                                            <td *ngIf="['debug'].includes(tableView)">{{getEventOrQueueName(participant)}}</td>
+                                                <!-- <td *ngIf="['participants'].includes(tableView)">{{mapProducts[participant['currentproduct']]['product'] || 'N/A'}}</td> -->
+                                            <td *ngIf="['transition','debug'].includes(tableView)">
+                                                <span class="status-badge">{{participant.mode || 'N/A'}}</span>
+                                            </td>
+                                            <td *ngIf="['transition','debug'].includes(tableView)">
+                                                <span class="status-badge">{{participant.nextmode || 'N/A'}}</span>
+                                            </td>
+                                            <td *ngIf="['transition','debug'].includes(tableView)">{{(participant.nextmodedate.toDate() | date: 'mediumDate') || 'N/A'}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Table -->
+                    <div class="table-content" *ngIf="activeTab === 'products' && ['transition'].includes(tableView)">
+                        <div class="table-header">
+                            <h4>Product Details</h4>
+                            <span class="count-badge">{{selectedMode.productids?.length || 0}}</span>
+                        </div>
+                        <div class="table-container">
+                            <div class="table-wrapper"> 
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Product Name</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr *ngFor="let productId of selectedMode.productids; let i = index">
+                                            <td>{{i + 1}}</td>
+                                            <td>{{getProductName(productId)}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div> 
+                            <div class="empty-state"
+                                *ngIf="!selectedMode.productids || selectedMode.productids.length === 0">
+                                <div class="empty-icon">📦</div>
+                                <p>No product data available</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hierarchy Table -->
+                    <div class="table-content" *ngIf="activeTab === 'hierarchy' && ['transition'].includes(tableView)">
+                        <div class="table-header">
+                            <h4>Hierarchy Details</h4>
+                            <span class="count-badge">{{selectedMode.hierarchyproduct?.length || 0}}</span>
+                        </div>
+                        <div class="table-container">
+                            <div class="table-wrapper"> 
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Name</th>
+                                            <th>Product</th>
+                                            <th>Next Mode Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr *ngFor="let hierarchy of selectedMode.hierarchyproduct; let i = index">
+                                            <td>{{i + 1}}</td>
+                                            <td>{{mapProfile[hierarchy.profileid] || 'N/A'}}</td>
+                                            <td>{{mapProducts[hierarchy['productref'].id]['product'] || 'N/A'}}</td>
+                                            <td>{{(hierarchy.nextmodedate.toDate() | date: 'mediumDate') || 'N/A'}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div> <!-- CLOSE WRAPPER HERE -->
+                            <div class="empty-state"
+                                *ngIf="!selectedMode.hierarchyproduct || selectedMode.hierarchyproduct.length === 0">
+                                <div class="empty-icon">🏢</div>
+                                <p>No hierarchy data available</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,28 @@
+.formrow{
+    display : flex;
+    flex-direction: row;
+    justify-content: center;
+    margin : 10px;
+  }
+  .textField {
+    width: 300px;
+    height: 70px;
+    margin: 5px;
+  }
+  .btn {
+    
+    padding: 10px 15px;
+    border-radius: 12px;
+    width: 200px;
+    font-size: 24px;
+    letter-spacing: 4px;
+    margin-bottom: 20px;
+  }
+  
+  button {
+    margin: 5px;
+  }
+  
+  .example-chip-list{
+    width: 100%;
+  }

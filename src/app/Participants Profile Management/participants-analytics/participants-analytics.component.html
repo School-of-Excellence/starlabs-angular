@@ -1,0 +1,576 @@
+<main class="m-2">
+
+  <div class="d-flex flex-row-reverse mb-3 g-2">
+    <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="Checklists">Checklists</button>
+    <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="actions">Actions</button>
+    <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="exports"> Export </button>
+    <button mat-stroked-button class="ms-2" (click)="inputFile.click()"> Import </button>
+    <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
+    <button mat-stroked-button class="ms-2" (click)="showSectionType='showTableColumn'"> Add Column to Table </button>
+    <button mat-stroked-button class="ms-2" (click)="showSectionType='savedFilters'"> Saved Filters </button>
+    <button mat-stroked-button class="ms-2" (click)="showSectionType='filters'"> Filters </button>
+    <button mat-stroked-button matButton="elevated" [matBadge]="pendingEmailsList.length" matBadgePosition="after" class="ms-2" (click)="sendEmailToSelectedParicipant()"> Queued Emails </button>
+    <mat-menu #Checklists="matMenu">
+      <button mat-menu-item (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
+    </mat-menu>
+    <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
+    <mat-menu #actions="matMenu">
+      <button mat-menu-item [mat-menu-trigger-for]="playlist">Playlist</button>
+      <button mat-menu-item *ngIf="workshopadmin.includes(loggedInProfileId)" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages (Workshop Only)</button>
+      <!-- <button mat-menu-item [mat-menu-trigger-for]="email">Email</button> -->
+      <button mat-menu-item (click)="exportWithFilters()">Export With Filters</button>
+      <!-- <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Send Wati Messages</button> -->
+      <button mat-menu-item (click)="openWatiConfig()">Wati Configuration</button>
+      <button mat-menu-item (click)="addremarks(selection.selected)" [disabled]="selection.selected.length === 0">Add Remarks</button>
+      <button mat-menu-item (click)="bulkAddProducts()" [disabled]="selection.selected.length === 0">Add Products</button>
+      <button mat-menu-item (click)="tagParticipants()">Tags</button>
+      <!-- <button mat-menu-item (click)="addSegments()">Create Segments</button> -->
+      <button mat-menu-item mat-menu-item [mat-menu-trigger-for]="communication">Send Communication</button>
+      <button mat-menu-item (click)="addSubscription(selection.selected)" [disabled]="selection.selected.length === 0">Extent Subscription</button>
+      <!-- <button mat-menu-item (click)="sendNotificationinBreakthrough()" [disabled]="selection.selected.length === 0">Send Notifications in Breakthroughs</button> -->
+      <button mat-menu-item (click)="addBulkActionPending()" [disabled]="selection.selected.length === 0">App Action Pending</button>
+      <button mat-menu-item (click)="sendChatBroadcast()">Send Broadcast in Breakthroughs</button>
+      <button mat-menu-item (click)="onParticipantEvolution(selection.selected)" [disabled]="selection.selected.length === 0">Participant Evolution Summary</button>
+      <button mat-menu-item (click)="sendInterimReport(selection.selected)" [disabled]="selection.selected.length === 0">Manage Interim Report</button>
+      <button mat-menu-item (click)="sendEvolutionWishList(selection.selected)" [disabled]="selection.selected.length === 0">Evolution Wishlist</button>
+      <!-- <button mat-menu-item (click)="updatelist(selection.selected)" [disabled]="selection.selected.length === 0">Update List</button> -->
+      <button mat-menu-item (click)="managelist(selection.selected)">Manage List & Segments</button>
+
+    </mat-menu>
+    <mat-menu #exports="matMenu">
+      <button mat-menu-item (click)="exportExcel()">Excel</button>
+      <button mat-menu-item (click)="exportContentConsumption()">Content Consumption</button>
+    </mat-menu>
+    <mat-menu #playlist="matMenu">
+      <button mat-menu-item (click)="createRecommendedPlaylistToSelectedParticipant()" [disabled]="selection.selected.length === 0">Recommend</button>
+      <!-- <button mat-menu-item (click)="createRecommendedPlaylistToSelectedParticipant(false)" [disabled]="selection.selected.length === 0"> Recommend</button>
+      <button mat-menu-item (click)="createRecommendedPlaylistToSelectedParticipant(true)" [disabled]="selection.selected.length === 0"> Curate</button> -->
+      <button mat-menu-item (click)="onViewRecommendedPlaylist()"> View Recommened</button>
+    </mat-menu>
+    <!-- <mat-menu #email="matMenu">
+      <button mat-menu-item (click)="sendEmailToSelectedParicipant()" [disabled]="selection.selected.length === 0"> Send</button>
+      <button mat-menu-item (click)="patchEmailValidator()"> Patch Validator</button>
+      <button mat-menu-item (click)="updateEmailValidator()" [disabled]="selection.selected.length === 0"> Update Validator</button>
+    </mat-menu> -->
+
+    <mat-menu #communication="matMenu">
+      <button mat-menu-item (click)="sendNotificationinBreakthrough()" [disabled]="selection.selected.length === 0">Notification</button>
+      <button mat-menu-item (click)="sendEmailToSelectedParicipant()" [disabled]="selection.selected.length === 0">Email</button>
+      <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Wati</button>
+    </mat-menu>
+  </div>
+
+  <section *ngIf="filterText != null && filterText.length > 5">
+    <mat-divider class="mt-2 mb-2"></mat-divider>
+      <div class="mb-2">
+        <label>{{filterText}}</label>
+      </div>
+  </section>
+
+  <section>
+    <div *ngIf="showSectionType==='savedFilters'">
+      <mat-divider class="mb-2"></mat-divider>
+      <div>
+        <div class="d-flex flex-row justify-content-center">
+          <mat-form-field style="width:50%;" appearance="outline">
+            <mat-label>Search Saved Filters</mat-label>
+            <input type="text" matInput [(ngModel)]="searchsavedfilters" placeholder="Search" (keyup)="savedfiltersearch()">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+        </div>
+        <mat-chip-set>
+            <mat-chip-option
+              *ngFor="let option of savedfiltersearch();let i = index;"
+              [selected]="selectedSavedFilterQueryLabel === option['label']"
+              (click)="loadtabledata(savedfilterquery[i]);returnFilterText();"
+            >
+              <div class="chip-content">
+                <span class="label">{{option.label}}</span>
+                <div class="icon-group">
+                  <mat-icon 
+                    (click)="updateDefaultSearch(savedfilterquery[i])" 
+                    [class.selected]="option.docid === defaultSearchDocId"
+                    [matTooltip]="option.docid === defaultSearchDocId ? 'Default search' : 'Set as default'"
+                    class="action-icon bookmark-icon">
+                    {{ option.docid === defaultSearchDocId ? 'bookmark' : 'bookmark_border' }}
+                  </mat-icon>
+                  <mat-icon 
+                    (click)="ondeletefilterdata(savedfilterquery[i])" 
+                    class="action-icon delete-icon"
+                    matTooltip="Delete filter">
+                    delete
+                  </mat-icon>
+                </div>
+              </div>
+            </mat-chip-option>
+        </mat-chip-set>
+      </div>
+      <mat-divider class="mt-2 mb-4"></mat-divider>
+    </div>
+
+    <div *ngIf="showSectionType === 'filters'">
+      <mat-divider></mat-divider>
+      <div class="mt-2 mb-2">
+        <form class="d-flex flex-row flex-wrap" #participantform="ngForm">
+          <!-- {{participantform.form.value | json}} -->
+          <mat-form-field appearance="outline">
+            <mat-label>Participant Mode</mat-label>
+            <mat-select [(ngModel)]="filterdata['participantmode']" name="participantmode" (selectionChange)="returnFilterText()" multiple>
+              <mat-option [value]="'none'">None</mat-option>
+              <mat-option *ngFor="let option of modesList" [value]="option.mode">
+                {{option.mode}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Customer Status</mat-label>
+            <mat-select [(ngModel)]="filterdata['customerstatus']" name="customerstatus" (selectionChange)="returnFilterText()" multiple>
+              <mat-option [value]="'none'">None</mat-option>
+              <mat-option *ngFor="let option of ['non active','active','discontinued']" [value]="option.toLowerCase()">
+                {{option}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Financial Status</mat-label>
+            <mat-select [(ngModel)]="filterdata['financialstatus']" name="financialstatus" (selectionChange)="returnFilterText()" multiple>
+              <mat-option [value]="'none'">None</mat-option>
+              <mat-option *ngFor="let option of ['null','regular','locked','defaulted', 'discontinued', 'banned']" [value]="option.toLowerCase()">
+                {{option}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Active Journey</mat-label>
+            <mat-select [(ngModel)]="filterdata['activejourney']" name="activejourney" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterjourneylist" name="filterjourneylist0" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option [value]="'none'">No Active Journey</mat-option>
+              <mat-option *ngFor="let option of onfilterjourneylist()" [value]="option.id">
+                {{option.journey}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline" style="min-width:300px">
+            <mat-label>Last Completed Journey</mat-label>
+            <mat-select [(ngModel)]="filterdata['lastcompletedjourney']" name="lastcompletedjourney" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterjourneylist" name="filterjourneylist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option [value]="'none'">No Active Journey</mat-option>
+              <mat-option *ngFor="let option of onfilterjourneylist()" [value]="option.id">
+                {{option.journey}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Active Products</mat-label>
+            <mat-select [(ngModel)]="filterdata['activeproduct']" name="activeproduct" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist0" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option [value]="'none'">No Active Product</mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Profile Tags</mat-label>
+            <mat-select [(ngModel)]="filterdata['profiletags']" name="profiletags" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterTagList" name="filterTagList" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option [value]="'none'">No Profile Tag</mat-option>
+              <mat-option *ngFor="let option of onfiltertags()" [value]="option">
+                {{mapfiltervalues[option]}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <div [ngModelGroup]="'subscriptionend'" name="subscriptionend" #nameCtrl="ngModelGroup">
+            <mat-form-field appearance="outline" style="min-width: 300px;">
+              <mat-label>Subscription End Date Range</mat-label>
+              <mat-date-range-input [rangePicker]="picker">
+                <input matStartDate [(ngModel)]="filterdata['subscriptionend']['start']" name="start" placeholder="Start date">
+                <input matEndDate [(ngModel)]="filterdata['subscriptionend']['end']"  name="end" (dateChange)="returnFilterText()" placeholder="End date">
+              </mat-date-range-input>
+              <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
+              <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-date-range-picker #picker></mat-date-range-picker>
+            </mat-form-field>
+          </div>&nbsp;&nbsp;
+          <mat-form-field appearance="outline" style="min-width:300px;">
+            <mat-label>Consumed Products</mat-label>
+            <mat-select [(ngModel)]="filterdata['consumedproducts']" name="consumedproducts" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist1" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline" style="min-width: 300px;">
+            <mat-label>UnConsumed Products</mat-label>
+            <mat-select [(ngModel)]="filterdata['unconsumedproducts']" name="unconsumedproducts" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist2" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Select Operator</mat-label>
+            <mat-select [(ngModel)]="filterdata['operator']" name="operator" (ngModelChange)="returnFilterText()">
+              <mat-option *ngFor="let option of mapOperator | keyvalue" [value]="option.value">
+                {{option.key}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Product Count</mat-label>
+            <input matInput type="number" [(ngModel)]="filterdata['productcount']" name="productcount" (ngModelChange)="returnFilterText()" placeholder="enter product count">
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline" style="min-width: 350px;">
+            <mat-label>Select Product</mat-label>
+            <mat-select [(ngModel)]="filterdata['products']" name="products" (selectionChange)="returnFilterText()">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist3" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">{{option.product}}</mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2 mr-2" appearance="outline">
+            <mat-label>Select Event</mat-label>
+            <mat-select [(ngModel)]="filterdata['productevent']" name="productevent" (ngModelChange)="returnFilterText()" aria-label="select event">
+              <mat-option *ngFor="let option of productEventList" [value]="option.id">
+                {{option.name}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <!-- <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>ATC Model</mat-label>
+            <mat-select [(ngModel)]="filterdata['atcmodel']" name="atcmodel" (ngModelChange)="returnFilterText()">
+              <mat-option *ngFor="let option of atcModelList" [value]="option">
+                {{option}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field> -->
+          <mat-form-field class="ml-2 mr-2" appearance="outline">
+            <mat-label>Select QueueEvent</mat-label>
+            <mat-select [(ngModel)]="filterdata['queueevent']" name="queueevent" (ngModelChange)="returnFilterText()" aria-label="select QueueEvent">
+              <mat-option *ngFor="let option of queueventList" [value]="option.id">
+                {{option.queuename}}
+              </mat-option>
+            </mat-select>	
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>ATC Count</mat-label>
+            <input matInput type="number" [(ngModel)]="filterdata['atccount']" name="atccount" (ngModelChange)="returnFilterText()" placeholder="enter atc count">
+          </mat-form-field>&nbsp;&nbsp;
+          <!-- <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Purchase</mat-label>
+            <mat-select [(ngModel)]="filterdata['purchase']" name="purchase" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterpurchase" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterpurchase()" [value]="option.product">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field> -->
+          <!-- <div [ngModelGroup]="'purchasedate'" name="purchasedate" #purchasedateCtrl="ngModelGroup">
+            <mat-form-field class="ml-2" appearance="outline">
+              <mat-label>Purchase Date Range</mat-label>
+              <mat-date-range-input [rangePicker]="picker1">
+                <input matStartDate [(ngModel)]="filterdata['purchasedate']['start']" name="start" (dateChange)="returnFilterText()" placeholder="Start date">
+                <input matEndDate [(ngModel)]="filterdata['purchasedate']['end']"  name="end" (dateChange)="returnFilterText()" placeholder="End date">
+              </mat-date-range-input>
+              <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
+              <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+              <mat-date-range-picker #picker1></mat-date-range-picker>
+            </mat-form-field>
+          </div> -->
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Addons</mat-label>
+            <mat-select [(ngModel)]="filterdata['addons']" name="addons" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist4" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Gifts</mat-label>
+            <mat-select [(ngModel)]="filterdata['gifts']" name="gifts" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist5" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Bonus</mat-label>
+            <mat-select [(ngModel)]="filterdata['bonus']" name="bonus" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist6" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                {{option.product}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Customer Support</mat-label>
+            <mat-select [(ngModel)]="filterdata['customersupport']" name="customersupport" (selectionChange)="returnFilterText()">
+              <mat-option *ngFor="let option of ['Open','Closed']" [value]="option.toLowerCase()">
+                {{option}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Tier</mat-label>
+            <mat-select [(ngModel)]="filterdata['tier']" name="tier" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filtertier" name="filtertier" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onfiltertier()" [value]="option.id">
+                {{option.tier}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Search Label</mat-label>
+            <input type="text" matInput [(ngModel)]="filterdata['label']" name="label">
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Registered User</mat-label>
+            <mat-select [(ngModel)]="filterdata['registereduser']" name="registereduser" multiple (selectionChange)="returnFilterText()">
+              <mat-option *ngFor="let option of ['Registered','Non-Registered']" [value]="option.toLowerCase()">
+                {{option}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+        </form>
+        <div class="d-flex justify-content-center" style="margin-bottom:10px;">
+          <button mat-stroked-button type="button" (click)="onDataSearch();" [disabled]="searchValidation()">Search</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" (click)="saveSearchedFilter(filterdata);">Save Search</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" (click)="onformreset();">Reset</button>&nbsp;&nbsp;
+        </div>
+      </div>
+      <mat-divider></mat-divider>
+    </div>
+    <div *ngIf="showSectionType === 'showTableColumn'">
+      <mat-divider class="mt-2 mb-2"></mat-divider>
+      <div class="d-flex flex-row justify-content-center">
+        <mat-form-field class="w-50" appearance="outline">
+          <mat-label>Add Column to Table</mat-label>
+          <mat-select [(ngModel)]="selectedColumns" name="selectedColumns" (selectionChange)="onColumnNameSelect(selectedColumns)" multiple>
+            <mat-select-trigger>
+              {{this.displayedColumns ? this.displayedColumns[0] : ''}}
+              <span *ngIf="this.displayedColumns?.length > 1" class="example-additional-selection">
+                (+{{this.displayedColumns.length - 1}} {{this.displayedColumns?.length === 2 ? 'other' : 'others'}})
+              </span>
+            </mat-select-trigger>
+            <mat-option>
+              <ngx-mat-select-search 
+                [(ngModel)]="searchColumn" 
+                [ngModelOptions]="{standalone: true}" 
+                placeholderLabel="Columns" 
+                [placeholderLabel]="'Search'" 
+                [noEntriesFoundLabel]="'No matching records found'" 
+                ngDefaultControl>
+              </ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let item of returnTableColumns().sort()" [value]="item">
+              {{item}}
+            </mat-option>
+          </mat-select>
+          <mat-hint class="clickable-hint" (click)="onDataSearch()">
+            Click here to get updated data on table ({{nooftimesloaded}}).
+          </mat-hint>
+        </mat-form-field>
+      </div>
+
+      <mat-divider class="mt-2 mb-2"></mat-divider>
+    </div>
+  </section>
+
+  <section>
+    <div class="d-flex flex-row">
+      <span  style="margin-top: 30px;">
+        <h3>Total: {{ dataSource.data.length }}</h3>
+      </span>&nbsp;&nbsp;&nbsp;&nbsp;
+      <span>
+        <mat-form-field appearance="fill" style="min-width: 300px;">
+        <mat-label>Filter</mat-label>
+        <input matInput (keyup)="applyFilter($event)" #input>
+      </mat-form-field>
+      </span>&nbsp;&nbsp;&nbsp;&nbsp;
+      <span style="margin-top: 40px;">
+        Selected Participants - {{this.selection.selected.length}}
+      </span>
+    </div>
+    <div>
+      <table #Table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>
+
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox (change)="$event ? toggleAllRows() : null"
+                          [checked]="selection.hasValue() && isAllSelected()"
+                          [indeterminate]="selection.hasValue() && !isAllSelected()"
+                          [aria-label]="checkboxLabel()">
+            </mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <mat-checkbox (click)="$event.stopPropagation()"
+                          (change)="$event ? selection.toggle(row) : null"
+                          [checked]="selection.isSelected(row)"
+                          [aria-label]="checkboxLabel(row)">
+            </mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="{{column}}" *ngFor="let column of displayedColumns | excludeFilterString : 'select'">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> 
+            <span *ngIf="column != 'select'">{{column | titlecase}}</span>&nbsp;&nbsp;
+            <span *ngIf="column === 'productcount'">Filter Count / Total Count</span> 
+          </th>
+          <td [ngClass]="{'remarks-column': column === 'remarks'}" mat-cell *matCellDef="let element">
+            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','dateofbirth','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags'].includes(column)">{{element[column]}}</span>
+            <span *ngIf="['consumedproducts', 'unconsumedproducts', 'activeproduct', 'profiletags', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'purchase'].includes(column)">
+              <ng-container *ngIf="element[column]">
+                <!-- Check if it is an array -->
+                <!-- <ng-container *ngIf="element[column] instanceof Array; else handleNonArray"> -->
+                <span *ngFor="let value of element[column]; let i = index">
+                  {{ mapfiltervalues[value] || value }}
+                  <span *ngIf="i < element[column].length - 1">, </span>
+                </span>
+              </ng-container>
+            </span>
+            
+            <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate'):null)}}</span>
+            <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+            <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+            <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+            <!-- <span *ngIf="column == 'activejourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->
+            <span *ngIf="['activejourney','lastcompletedjourney', 'lastsubscribedjourney','higherorderpurchase'].includes(column)">{{mapfiltervalues[element[column]]}}</span>
+            <!-- <span *ngIf="column == 'lastcompletedjourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->
+            <span *ngIf="column == 'atcmodel'">{{![null,undefined].includes(filterdata['atcmodel']) ? filterAtcModel(element[column]) : element[column]}}</span>
+            <span *ngIf="column == 'productcount'">
+              <span *ngIf="filterdata['productcount'] != null && (filterdata['unconsumedproducts'] != null)">
+                {{filterproducts(element['unconsumedproducts'],filterdata['unconsumedproducts'][0])}}, 
+                {{![null,undefined].includes(element['productcount']) ? element['productcount'][filterdata['unconsumedproducts'][0]] : 0}}
+              </span>
+              <span *ngIf="filterdata['productcount'] != null && (filterdata['consumedproducts'] != null)">
+                {{filterproducts(element['consumedproducts'],filterdata['consumedproducts'][0])}}, 
+                {{![null,undefined].includes(element['productcount']) ? element['productcount'][filterdata['consumedproducts'][0]] : 0}}
+              </span>
+              <span *ngIf="filterdata['productcount'] != null && (filterdata['activeproduct'] != null)">
+                {{filterproducts(element['activeproduct'],filterdata['activeproduct'][0])}}, 
+                {{![null,undefined].includes(element['productcount']) ? element['productcount'][filterdata['activeproduct'][0]] : 0}}
+              </span>
+            </span>
+            <!-- /* productevent as pe */ -->
+            <span *ngIf="column == 'productevent'">
+              <span *ngIf="filterdata['productevent'] != null && (filterdata['products'] != null)">
+                {{filterdata['products']}} : {{ ![null,undefined].includes(element[column][filterdata['products']]) ? element[column][filterdata['products']].join(",  ") : null}}
+              </span>
+              <!-- peOpt - product event option -->
+              <span *ngIf="filterdata['products'] ===  null || filterdata['products']===undefined">
+                <li *ngFor="let peOpt of element[column] | keyvalue">{{mapfiltervalues[$any(peOpt.key)]}} : {{mapfiltervalues[$any(peOpt.value)]}}</li>
+              </span>
+            </span>
+            <span *ngIf="column == 'queueevent'">
+              <span *ngIf="filterdata['queueevent'] != null && (filterdata['products'] != null)">
+                {{filterdata['products']}} : {{ ![null,undefined].includes(element[column][filterdata['products']]) ? element[column][filterdata['products']].join(",  ") : null}}
+              </span>
+              <!-- peOpt - product event option -->
+              <span *ngIf="filterdata['products'] ===  null || filterdata['products']===undefined">
+                <li *ngFor="let peOpt of element[column] | keyvalue">{{mapfiltervalues[$any(peOpt.key)]}} : {{mapfiltervalues[$any(peOpt.value)]}}</li>
+              </span>
+            </span>
+            <!-- show eiflix recommended playlist -->
+            <span *ngIf="['eiflix','solarvoice','generalcontent'].includes(column)">
+              <li *ngFor=" let obj of element[column] || {} | keyvalue">{{mapPlaylist[$any(obj.key)]}} - 
+                <ng-container *ngFor="let item of $any(obj.value); let last = last">
+                  {{ mapPlaylist[item] }}<span *ngIf="!last">, </span>
+                </ng-container>
+              </li>
+            </span>
+            <!-- show remarks -->
+            <span *ngIf="['remarks'].includes(column)">
+              <li *ngFor="let item of element[column]">{{item.note}} - {{mapParticipantName[item.givenby]}}</li>
+              <button *ngIf="element[column] != undefined" class="deletebtn" mat-icon-button type="button" [disabled]="selection.selected.length === 0" (click)="editremarks(selection.selected)">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"(click)="selection.toggle(row)"></tr>
+      </table>
+      <mat-paginator
+        [pageSizeOptions]="[15, 50, 100, 200, dataSource.data.length]"
+        [length]="dataSource.data.length"
+        [pageSize]="25"
+        aria-label="Select page of users"
+        showFirstLastButtons>
+      </mat-paginator>
+      
+      <!-- <ng-template #loadingBlock>
+        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+        <p>Loading data...</p>
+      </ng-template> -->
+      
+    </div>
+  </section>
+  <!-- Tag History Side Panel -->
+  <div class="tag-history-overlay" *ngIf="showTagHistory" (click)="closeTagHistory()"></div>
+  <div class="tag-history-panel" *ngIf="showTagHistory">
+    <div class="tag-history-header">
+      <div>
+        <strong>Tag History</strong>
+        <p class="tag-history-subname">{{ selectedTagHistoryName }}</p>
+      </div>
+      <button mat-icon-button (click)="closeTagHistory()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="tag-history-body">
+      <div *ngIf="selectedTagHistory.length === 0" class="tag-history-empty">
+        <mat-icon>label_off</mat-icon>
+        <p>No tag history found</p>
+      </div>
+      <div *ngFor="let version of selectedTagHistory; let i = index" class="tag-version-item">
+        <div class="tag-version-meta">
+          <span class="tag-version-badge" *ngIf="i === 0">Latest</span>
+          <span class="tag-version-date">{{ version.updated?.toDate() | date:'d MMM y, h:mm a' }}</span>
+          <span class="tag-version-user">by {{ mapProfile[version.updatedby] }}</span>
+        </div>
+        <div class="tag-chips">
+          <span *ngFor="let tag of version.tags" class="tag-chip">
+            {{ mapfiltervalues[tag] || tag }}
+          </span>
+          <span *ngIf="!version.tags?.length" class="tag-chip-empty">No tags</span>
+        </div>
+        <div class="tag-diff">
+          <span [ngClass]="version.type == 'added' ? 'diff-added' : 'diff-removed'">{{version.type}}</span>
+        </div>
+        <!-- <div class="tag-diff" *ngIf="i < selectedTagHistory.length - 1">
+          <span *ngFor="let tag of getTagsAdded(version, selectedTagHistory[i+1])" class="diff-added">+ {{ mapfiltervalues[tag] || tag }}</span>
+          <span *ngFor="let tag of getTagsRemoved(version, selectedTagHistory[i+1])" class="diff-removed">− {{ mapfiltervalues[tag] || tag }}</span>
+        </div> -->
+        <mat-divider *ngIf="i < selectedTagHistory.length - 1"></mat-divider>
+      </div>
+    </div>
+  </div>
+</main>

@@ -1,0 +1,612 @@
+
+
+
+<div class="dialog-container">
+  <div class="dialog-header">
+    <div class="header-left">
+      <i class="fa-regular fa-paper-plane header-icon"></i>
+      <h2 class="title">Send Message</h2>
+    </div>
+    <button mat-icon-button class="close-btn" (click)="close()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  
+  <mat-tab-group [(selectedIndex)]="selectedTabIndex" class="message-tabs">
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <i class="fa-regular fa-envelope tab-icon"></i>
+        Email
+      </ng-template>
+      <div class="tab-content">
+        <form [formGroup]="mailForm" class="form">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Subject</mat-label>
+              <textarea matInput formControlName="subject" rows="2" cdkTextareaAutosize placeholder="Enter email subject..."></textarea>
+              <mat-hint align="end">{{ mailForm.get('subject')?.value?.length || 0 }}/200</mat-hint>
+              <mat-error *ngIf="mailForm.get('subject')?.hasError('required')">Subject is required</mat-error>
+            </mat-form-field>
+          </div>
+          
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Message</mat-label>
+              <textarea matInput formControlName="message" rows="6" cdkTextareaAutosize placeholder="Type your message here..."></textarea>
+              <mat-hint align="end">{{ mailForm.get('message')?.value?.length || 0 }}/2000</mat-hint>
+              <mat-error *ngIf="mailForm.get('message')?.hasError('required')">Message is required</mat-error>
+            </mat-form-field>
+          </div>
+          <div class="email-preview">
+            <div class="preview-header">
+              <i class="fa-regular fa-eye"></i>
+              <span>Email Preview</span>
+            </div>
+            <div class="preview-body">
+              <div class="preview-card">
+                <div class="preview-logo">
+                  <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/logo%2FAH_Black_Logo_Only.png?alt=media&token=d6bde4f1-0508-44d1-86cd-a65bc15887a2" alt="Logo">
+                </div>
+                <div class="preview-greeting">Dear <strong>Recipient</strong>,</div>
+                <div class="preview-message">{{ mailForm.get('message')?.value || 'Your message will appear here...' }}</div>
+                <div class="preview-signature">
+                  Warm regards,<br><strong>A&H Workshop Team</strong>
+                </div>
+                <div class="preview-link">
+                  <a href="https://eiflix.com"><i class="fa-solid fa-link"></i> eiflix.com</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button mat-stroked-button class="btn-cancel" (click)="close()">
+              <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
+            <button mat-flat-button class="btn-primary" (click)="sendMail()">
+              <i class="fa-regular fa-paper-plane"></i> Send Email
+            </button>
+          </div>
+        </form>
+      </div>
+    </mat-tab>
+    
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <i class="fa-brands fa-whatsapp tab-icon"></i>
+        WhatsApp
+      </ng-template>
+      <div class="tab-content">
+        <form [formGroup]="whatsappForm" class="form">
+          <div class="selected-profiles-section" *ngIf="data?.selectedprofiles?.length > 0">
+            <div class="profiles-header" (click)="profilesExpanded = !profilesExpanded">
+              <div class="profiles-header-left">
+                <i class="fa-solid fa-users"></i>
+                <span class="profiles-title">Selected Recipients</span>
+                <span class="profiles-count">{{ data.selectedprofiles.length }}</span>
+              </div>
+              <i class="fa-solid" [ngClass]="profilesExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </div>
+            <div class="profiles-content" *ngIf="profilesExpanded">
+              <mat-chip-set class="profiles-chips">
+                <mat-chip *ngFor="let profile of data.selectedprofiles" class="profile-chip" disabled>
+                  <i class="fa-regular fa-user"></i>
+                  {{ profile.name }}
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Select Template</mat-label>
+              <mat-select formControlName="templateName" (selectionChange)="onTemplateSelected($event)">          
+                <mat-select-trigger>{{ whatsappForm.get('templateName')?.value }}</mat-select-trigger>
+                
+                <mat-option>
+                  <ngx-mat-select-search 
+                    [formControl]="templateSearchCtrl"
+                    placeholderLabel="Search templates..."
+                    noEntriesFoundLabel="No templates found">
+                  </ngx-mat-select-search>
+                </mat-option>
+                
+                <mat-option *ngIf="isLoadingTemplates" disabled>
+                  <div class="loading-state">
+                    <mat-spinner diameter="18"></mat-spinner>
+                    <span>Loading templates...</span>
+                  </div>
+                </mat-option>
+                
+                <mat-option *ngIf="templatesLoadError && !isLoadingTemplates" disabled>
+                  <span class="error-state"><i class="fa-solid fa-circle-exclamation"></i> {{ templatesLoadError }}</span>
+                </mat-option>
+                
+                <ng-container *ngIf="!isLoadingTemplates && !templatesLoadError">
+                  <mat-option *ngFor="let template of filteredTemplates | async" [value]="template.elementName">
+                    <div class="template-option">
+                      <span class="template-name">
+                        {{ template.elementName }}
+                        <span class="template-badge">utility</span>
+                      </span>
+                      <button mat-icon-button class="pin-btn" [class.pinned]="isPinned(template.elementName)"
+                        (click)="togglePin(template, $event); $event.stopPropagation(); false"
+                        (mousedown)="$event.stopPropagation()" type="button">
+                        <i class="fa-solid fa-thumbtack"></i>
+                      </button>
+                    </div>
+                  </mat-option>
+                </ng-container>
+                
+                <mat-option *ngIf="!isLoadingTemplates && !templatesLoadError && watiTemplates.length === 0" disabled>
+                  <span class="empty-state"><i class="fa-regular fa-folder-open"></i> No templates available</span>
+                </mat-option>
+              </mat-select>
+              <mat-error *ngIf="whatsappForm.get('templateName')?.hasError('required')">Template is required</mat-error>
+              <button mat-icon-button matSuffix (click)="refreshTemplates(); $event.stopPropagation()" 
+                      [disabled]="isLoadingTemplates" title="Refresh templates" class="refresh-btn">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+            </mat-form-field>
+          </div>
+          <div *ngIf="pinnedTemplates.length > 0" class="pinned-section">
+            <div class="pinned-label">
+              <i class="fa-solid fa-thumbtack"></i> Quick Access
+            </div>
+            <div class="pinned-chips">
+              <mat-chip-set>
+                <mat-chip *ngFor="let template of pinnedTemplates"
+                  (click)="selectPinnedTemplate(template)"
+                  [highlighted]="whatsappForm.get('templateName')?.value === template.elementName">
+                  {{ template.elementName }}
+                  <button matChipRemove (click)="removePinnedTemplate(template, $event)">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+          <div *ngIf="selectedTemplate" class="template-config">
+            <div class="config-left">
+              <div class="guide-row">
+                <div class="info-box" ngNonBindable>
+                  <i class="fa-solid fa-lightbulb"></i>
+                  Use <code>*{{name}}*</code> for participant name
+                </div>
+                <div class="info-box2" ngNonBindable>
+                  <i class="fa-solid fa-lightbulb"></i>
+                  Use <code>Win + .</code> for choose emoji 😁♥️
+                </div>
+                <div class="format-box">
+                  <span class="format-label"><i class="fa-solid fa-wand-magic-sparkles"></i> Format:</span>
+                  <code>*bold*</code>
+                  <code>_italic_</code>
+                  <code>~strike~</code>
+                  <code>`mono`</code>
+                </div>
+              </div>
+              <div *ngIf="dynamicParams.length > 0" class="params-section">
+                <div class="params-header">
+                  <div class="params-title-wrapper">
+                    <i class="fa-regular fa-bookmark"
+                       [matMenuTriggerFor]="cacheMenu"
+                       [class.has-cache]="getCachedMessagesForTemplate().length > 0"
+                       matTooltip="Load from recent messages">
+                      </i>
+                    <span class="params-title-text">Parameters</span>
+                    <span *ngIf="getCachedMessagesForTemplate().length > 0" class="cache-badge">
+                      {{ getCachedMessagesForTemplate().length }}
+                    </span>
+                  </div>
+                  <div class="byte-counter" [class.exceeded]="totalMessageLength > 950">
+                      <i class="fa-solid fa-gauge-high"></i>
+                      {{ totalMessageLength }} / 950 bytes
+                      <span *ngIf="totalMessageLength > 950" class="exceeded-badge">Limit Exceeded</span>
+                  </div>
+                  <!-- <div class="byte-counter" [class.exceeded]="getTotalMessageLength() > 950">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    {{ getTotalMessageLength() }} / 950 bytes
+                    <span *ngIf="getTotalMessageLength() > 950" class="exceeded-badge">Limit Exceeded</span>
+                  </div> -->
+                </div>
+
+                <!-- Cache Menu -->
+                <mat-menu #cacheMenu="matMenu" class="cache-menu">
+                  <div class="cache-menu-header" (click)="$event.stopPropagation()">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Recent Messages</span>
+                  </div>
+                  
+                  <div *ngIf="getCachedMessagesForTemplate().length === 0" class="cache-empty" (click)="$event.stopPropagation()">
+                    <i class="fa-regular fa-folder-open"></i>
+                    <span>No saved messages yet</span>
+                    <small>Messages will appear here after sending</small>
+                  </div>
+                  
+                  <ng-container *ngIf="getCachedMessagesForTemplate().length > 0">
+                    <button mat-menu-item *ngFor="let cached of getCachedMessagesForTemplate()" 
+                            class="cache-item" (click)="loadCachedMessage(cached)">
+                      <div class="cache-item-content">
+                        <div class="cache-item-preview">{{ cached.previewText }}</div>
+                        <div class="cache-item-meta">
+                          <span class="cache-time">
+                            <i class="fa-regular fa-clock"></i>
+                            {{ formatCacheTimestamp(cached.timestamp) }}
+                          </span>
+                          <button mat-icon-button class="cache-delete-btn" 
+                                  (click)="deleteCachedMessage(cached, $event)"
+                                  matTooltip="Delete">
+                            <i class="fa-solid fa-trash-can"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </button>
+                    
+                    <mat-divider></mat-divider>
+                    <button mat-menu-item class="cache-clear-all" (click)="clearAllCacheForTemplate()">
+                      <i class="fa-solid fa-broom"></i>
+                      <span>Clear all for this template</span>
+                    </button>
+                  </ng-container>
+                </mat-menu>
+
+                <div class="params-grid">
+                  <div *ngFor="let param of dynamicParams" class="param-field-wrapper">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ param.paramName }}</mat-label>
+                      <textarea matInput [formControlName]="param.paramName" rows="3" cdkTextareaAutosize
+                        (keydown.enter)="$event.preventDefault()"
+                        (paste)="onPasteRemoveNewlines($event, param.paramName)"
+                        placeholder="Enter {{ param.paramName }}...">
+                      </textarea>
+                      <mat-error *ngIf="whatsappForm.get(param.paramName)?.hasError('required')">
+                        {{ param.paramName }} is required
+                      </mat-error>
+                    </mat-form-field>
+                    <!-- <div class="quick-insert">
+                      <span class="quick-insert-label">Quick insert:</span>
+                      <button type="button" class="suggestion-chip" (click)="insertAtCursor(param.paramName, '{{name}}')" ngNonBindable>
+                        <i class="fa-regular fa-user"></i> {{name}}
+                      </button>
+                    </div> -->
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="config-right">
+              <div class="preview-title">
+                <i class="fa-solid fa-mobile-screen-button"></i> Live Preview
+              </div>
+              
+              <div class="phone-mockup">
+                <div class="phone-status">
+                  <span>11:14</span>
+                  <div class="status-icons">
+                    <i class="fa-solid fa-signal"></i>
+                    <i class="fa-solid fa-wifi"></i>
+                    <i class="fa-solid fa-battery-full"></i>
+                  </div>
+                </div>
+                <div class="wa-header">
+                  <i class="fa-solid fa-chevron-left"></i>
+                  <div class="wa-avatar">A</div>
+                  <div class="wa-name">A&H <i class="fa-solid fa-circle-check"></i></div>
+                  <div class="wa-actions">
+                    <i class="fa-solid fa-video"></i>
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                  </div>
+                </div>
+                <div class="wa-notice">
+                  <i class="fa-solid fa-lock"></i> Messages are end-to-end encrypted
+                </div>
+                <div class="wa-chat">
+                  <div class="wa-bubble">
+                    <div class="bubble-content" [innerHTML]="formatWhatsAppText(previewText)"></div>
+                    <div class="bubble-footer" *ngIf="footertext" [innerHTML]="formatWhatsAppText(footertext)"></div>
+                    <div class="bubble-meta">
+                      13:49 <i class="fa-solid fa-check-double"></i>
+                    </div>
+                  </div>
+                </div>
+                <div class="wa-input">
+                  <i class="fa-solid fa-plus"></i>
+                  <div class="wa-input-field"></div>
+                  <i class="fa-regular fa-face-smile"></i>
+                  <i class="fa-solid fa-camera"></i>
+                  <i class="fa-solid fa-microphone"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button mat-stroked-button class="btn-cancel" (click)="close()">
+              <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
+            <button mat-flat-button class="btn-storelocal" (click)="saveToCache()">
+              <i class="fa-regular fa-bookmark"></i> Store Local
+            </button>
+            <button mat-flat-button class="btn-whatsapp" (click)="sendWhatsApp()">
+              <i class="fa-brands fa-whatsapp"></i> Send WhatsApp
+            </button>
+          </div>
+        </form>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>
+
+<!-- <div class="dialog-container">
+  <div class="dialog-header">
+    <div class="header-left">
+      <i class="fa-regular fa-paper-plane header-icon"></i>
+      <h2 class="title">Send Message</h2>
+    </div>
+    <button mat-icon-button class="close-btn" (click)="close()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  
+  <mat-tab-group [(selectedIndex)]="selectedTabIndex" class="message-tabs">
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <i class="fa-regular fa-envelope tab-icon"></i>
+        Email
+      </ng-template>
+      <div class="tab-content">
+        <form [formGroup]="mailForm" class="form">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Subject</mat-label>
+              <textarea matInput formControlName="subject" rows="2" cdkTextareaAutosize placeholder="Enter email subject..."></textarea>
+              <mat-hint align="end">{{ mailForm.get('subject')?.value?.length || 0 }}/200</mat-hint>
+              <mat-error *ngIf="mailForm.get('subject')?.hasError('required')">Subject is required</mat-error>
+            </mat-form-field>
+          </div>
+          
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Message</mat-label>
+              <textarea matInput formControlName="message" rows="6" cdkTextareaAutosize placeholder="Type your message here..."></textarea>
+              <mat-hint align="end">{{ mailForm.get('message')?.value?.length || 0 }}/2000</mat-hint>
+              <mat-error *ngIf="mailForm.get('message')?.hasError('required')">Message is required</mat-error>
+            </mat-form-field>
+          </div>
+          <div class="email-preview">
+            <div class="preview-header">
+              <i class="fa-regular fa-eye"></i>
+              <span>Email Preview</span>
+            </div>
+            <div class="preview-body">
+              <div class="preview-card">
+                <div class="preview-logo">
+                  <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/logo%2FAH_Black_Logo_Only.png?alt=media&token=d6bde4f1-0508-44d1-86cd-a65bc15887a2" alt="Logo">
+                </div>
+                <div class="preview-greeting">Dear <strong>Recipient</strong>,</div>
+                <div class="preview-message">{{ mailForm.get('message')?.value || 'Your message will appear here...' }}</div>
+                <div class="preview-signature">
+                  Warm regards,<br><strong>A&H Workshop Team</strong>
+                </div>
+                <div class="preview-link">
+                  <a href="https://eiflix.com"><i class="fa-solid fa-link"></i> eiflix.com</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button mat-stroked-button class="btn-cancel" (click)="close()">
+              <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
+            <button mat-flat-button class="btn-primary" (click)="sendMail()">
+              <i class="fa-regular fa-paper-plane"></i> Send Email
+            </button>
+          </div>
+        </form>
+      </div>
+    </mat-tab>
+    
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <i class="fa-brands fa-whatsapp tab-icon"></i>
+        WhatsApp
+      </ng-template>
+      <div class="tab-content">
+        <form [formGroup]="whatsappForm" class="form">
+          <div class="selected-profiles-section" *ngIf="data?.selectedprofiles?.length > 0">
+            <div class="profiles-header" (click)="profilesExpanded = !profilesExpanded">
+              <div class="profiles-header-left">
+                <i class="fa-solid fa-users"></i>
+                <span class="profiles-title">Selected Recipients</span>
+                <span class="profiles-count">{{ data.selectedprofiles.length }}</span>
+              </div>
+              <i class="fa-solid" [ngClass]="profilesExpanded ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </div>
+            <div class="profiles-content" *ngIf="profilesExpanded">
+              <mat-chip-set class="profiles-chips">
+                <mat-chip *ngFor="let profile of data.selectedprofiles" class="profile-chip" disabled>
+                  <i class="fa-regular fa-user"></i>
+                  {{ profile.name }}
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Select Template</mat-label>
+              <mat-select formControlName="templateName" (selectionChange)="onTemplateSelected($event)">          
+                <mat-select-trigger>{{ whatsappForm.get('templateName')?.value }}</mat-select-trigger>
+                
+                <mat-option>
+                  <ngx-mat-select-search 
+                    [formControl]="templateSearchCtrl"
+                    placeholderLabel="Search templates..."
+                    noEntriesFoundLabel="No templates found">
+                  </ngx-mat-select-search>
+                </mat-option>
+                
+                <mat-option *ngIf="isLoadingTemplates" disabled>
+                  <div class="loading-state">
+                    <mat-spinner diameter="18"></mat-spinner>
+                    <span>Loading templates...</span>
+                  </div>
+                </mat-option>
+                
+                <mat-option *ngIf="templatesLoadError && !isLoadingTemplates" disabled>
+                  <span class="error-state"><i class="fa-solid fa-circle-exclamation"></i> {{ templatesLoadError }}</span>
+                </mat-option>
+                
+                <ng-container *ngIf="!isLoadingTemplates && !templatesLoadError">
+                  <mat-option *ngFor="let template of filteredTemplates | async" [value]="template.elementName">
+                    <div class="template-option">
+                      <span class="template-name">
+                        {{ template.elementName }}
+                        <span class="template-badge">utility</span>
+                      </span>
+                      <button mat-icon-button class="pin-btn" [class.pinned]="isPinned(template.elementName)"
+                        (click)="togglePin(template, $event); $event.stopPropagation(); false"
+                        (mousedown)="$event.stopPropagation()" type="button">
+                        <i class="fa-solid fa-thumbtack"></i>
+                      </button>
+                    </div>
+                  </mat-option>
+                </ng-container>
+                
+                <mat-option *ngIf="!isLoadingTemplates && !templatesLoadError && watiTemplates.length === 0" disabled>
+                  <span class="empty-state"><i class="fa-regular fa-folder-open"></i> No templates available</span>
+                </mat-option>
+              </mat-select>
+              <mat-error *ngIf="whatsappForm.get('templateName')?.hasError('required')">Template is required</mat-error>
+              <button mat-icon-button matSuffix (click)="refreshTemplates(); $event.stopPropagation()" 
+                      [disabled]="isLoadingTemplates" title="Refresh templates" class="refresh-btn">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+            </mat-form-field>
+          </div>
+          <div *ngIf="pinnedTemplates.length > 0" class="pinned-section">
+            <div class="pinned-label">
+              <i class="fa-solid fa-thumbtack"></i> Quick Access
+            </div>
+            <div class="pinned-chips">
+              <mat-chip-set>
+                <mat-chip *ngFor="let template of pinnedTemplates"
+                  (click)="selectPinnedTemplate(template)"
+                  [highlighted]="whatsappForm.get('templateName')?.value === template.elementName">
+                  {{ template.elementName }}
+                  <button matChipRemove (click)="removePinnedTemplate(template, $event)">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+          <div *ngIf="selectedTemplate" class="template-config">
+            <div class="config-left">
+              <div class="guide-row">
+                <div class="info-box" ngNonBindable>
+                  <i class="fa-solid fa-lightbulb"></i>
+                  Use <code>*{{name}}*</code> for participant name
+                </div>
+                <div class="info-box2" ngNonBindable>
+                  <i class="fa-solid fa-lightbulb"></i>
+                  Use <code>Win + .</code> for choose emoji 😁♥️
+                </div>
+                <div class="format-box">
+                  <span class="format-label"><i class="fa-solid fa-wand-magic-sparkles"></i> Format:</span>
+                  <code>*bold*</code>
+                  <code>_italic_</code>
+                  <code>~strike~</code>
+                  <code>`mono`</code>
+                </div>
+              </div>
+              <div *ngIf="dynamicParams.length > 0" class="params-section">
+                <div class="params-header">
+                  <div class="params-title">
+                    <i class="fa-solid fa-sliders"></i> Parameters
+                  </div>
+                  <div class="byte-counter" [class.exceeded]="getTotalMessageLength() > 950">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    {{ getTotalMessageLength() }} / 950 bytes
+                    <span *ngIf="getTotalMessageLength() > 950" class="exceeded-badge">Limit Exceeded</span>
+                  </div>
+                </div>
+
+                <div class="params-grid">
+                  <div *ngFor="let param of dynamicParams" class="param-field-wrapper">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ param.paramName }}</mat-label>
+                      <textarea matInput [formControlName]="param.paramName" rows="3" cdkTextareaAutosize
+                        (keydown.enter)="$event.preventDefault()"
+                        (paste)="onPasteRemoveNewlines($event, param.paramName)"
+                        placeholder="Enter {{ param.paramName }}...">
+                      </textarea>
+                      <mat-error *ngIf="whatsappForm.get(param.paramName)?.hasError('required')">
+                        {{ param.paramName }} is required
+                      </mat-error>
+                    </mat-form-field>
+                    <div class="quick-insert">
+                      <span class="quick-insert-label">Quick insert:</span>
+                      <button type="button" class="suggestion-chip" (click)="insertAtCursor(param.paramName, '{{name}}')" ngNonBindable>
+                        <i class="fa-regular fa-user"></i> {{name}}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="config-right">
+              <div class="preview-title">
+                <i class="fa-solid fa-mobile-screen-button"></i> Live Preview
+              </div>
+              
+              <div class="phone-mockup">
+                <div class="phone-status">
+                  <span>11:14</span>
+                  <div class="status-icons">
+                    <i class="fa-solid fa-signal"></i>
+                    <i class="fa-solid fa-wifi"></i>
+                    <i class="fa-solid fa-battery-full"></i>
+                  </div>
+                </div>
+                <div class="wa-header">
+                  <i class="fa-solid fa-chevron-left"></i>
+                  <div class="wa-avatar">A</div>
+                  <div class="wa-name">A&H <i class="fa-solid fa-circle-check"></i></div>
+                  <div class="wa-actions">
+                    <i class="fa-solid fa-video"></i>
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                  </div>
+                </div>
+                <div class="wa-notice">
+                  <i class="fa-solid fa-lock"></i> Messages are end-to-end encrypted
+                </div>
+                <div class="wa-chat">
+                  <div class="wa-bubble">
+                    <div class="bubble-content" [innerHTML]="formatWhatsAppText(previewText)"></div>
+                    <div class="bubble-footer" *ngIf="footertext" [innerHTML]="formatWhatsAppText(footertext)"></div>
+                    <div class="bubble-meta">
+                      13:49 <i class="fa-solid fa-check-double"></i>
+                    </div>
+                  </div>
+                </div>
+                <div class="wa-input">
+                  <i class="fa-solid fa-plus"></i>
+                  <div class="wa-input-field"></div>
+                  <i class="fa-regular fa-face-smile"></i>
+                  <i class="fa-solid fa-camera"></i>
+                  <i class="fa-solid fa-microphone"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button mat-stroked-button class="btn-cancel" (click)="close()">
+              <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
+            <button mat-flat-button class="btn-whatsapp" (click)="sendWhatsApp()">
+              <i class="fa-brands fa-whatsapp"></i> Send WhatsApp
+            </button>
+          </div>
+        </form>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div> -->

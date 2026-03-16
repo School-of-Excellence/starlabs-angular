@@ -1,0 +1,120 @@
+<div class="body">
+
+    <header class="header color-teal">
+        <h1 class="title">Edit Arena Space</h1>
+        <button mat-icon-button mat-dialog-close class="close-button">
+          <mat-icon style="color:white">close</mat-icon>
+        </button>
+    </header>
+    
+    <div class="content">
+    
+        <div class="arena-form-container">
+            <!-- First row: Event and Date -->
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Event</mat-label>
+                <mat-select [(ngModel)]="arenaSpaceData['eventref']" (selectionChange)="selectedEvent($event.value)">
+                  <mat-option *ngFor="let event of eventsArray" [value]="event">
+                    {{event}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+          
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Choose a date</mat-label>
+                <input matInput [matDatepicker]="picker" [(ngModel)]="arenaSpaceData['date']">
+                <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+              </mat-form-field>
+            </div>
+          
+            <!-- Second row: Participant and Doer -->
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Participant</mat-label>
+                <mat-select [(ngModel)]="arenaSpaceData['participantslist']" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search 
+                      [(ngModel)]="filteredProfile" 
+                      [ngModelOptions]="{standalone: true}"
+                      [placeholderLabel]="'Search'" 
+                      [noEntriesFoundLabel]="'No matching records found'"
+                      ngDefaultControl>
+                    </ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let participant of returnFilterProflie()" [value]="participant">
+                    {{mapProfile[participant]['name']}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+          
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Doer</mat-label>
+                <mat-select [(ngModel)]="arenaSpaceData['mentor']" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search 
+                      [(ngModel)]="filteredMentor" 
+                      [ngModelOptions]="{standalone: true}"
+                      [placeholderLabel]="'Search'" 
+                      [noEntriesFoundLabel]="'No matching records found'"
+                      ngDefaultControl>
+                    </ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let participant of returnMentor()" [value]="participant">
+                    {{mapProfile[participant]['name']}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          
+            <!-- Third row: A&H Space and Engagement -->
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>A&H Space</mat-label>
+                <mat-select [(ngModel)]="arenaSpaceData['spaceid']">
+                  <mat-option *ngFor="let space of spaceArray" [value]="space.docid">
+                    {{space.spacename}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+          
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Engagement</mat-label>
+                <mat-select [(ngModel)]="arenaSpaceData['pivottype']">
+                  <mat-option *ngFor="let type of typeArray" [value]="type.docid">
+                    {{type.typename}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field">
+                <mat-label>Cohorts</mat-label>
+                <mat-select [(ngModel)]="arenaSpaceData['cohortsid']">
+                  <mat-option *ngFor="let cohort of cohortsArray" [value]="cohort.docid">
+                    {{cohort.name}}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          
+            <!-- Fourth row: Consultation Summary (full width) -->
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field full-width">
+                <mat-label>Consultation Summary</mat-label>
+                <textarea matInput [(ngModel)]="arenaSpaceData['summary']" rows="4"></textarea>
+              </mat-form-field>
+            </div>
+          
+            <!-- Button row -->
+            <div class="button-row">
+              <button mat-raised-button class="submit-button" (click)="submit()">
+                <mat-icon>check_circle</mat-icon>
+                <span>Submit</span>
+              </button>
+            </div>
+          </div>
+    </div>
+</div>

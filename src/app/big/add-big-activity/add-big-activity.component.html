@@ -1,0 +1,55 @@
+<div class="mainscreen">
+    <h4 class="title">Update Activity</h4>
+    <form [formGroup]="activityForm" (ngSubmit)="submit()">
+      <div>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Activity</mat-label>
+          <input matInput type="text" formControlName="activity">
+          <mat-error *ngIf="activityForm.get('activity').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>ATC Property</mat-label>
+          <mat-select formControlName="atcproperty">
+            <mat-option [value]="null">Clear</mat-option>
+            <mat-option *ngFor="let option of atcPropertyList" [value]="option">{{option}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+  
+      <div class="mb-3">
+        <mat-checkbox formControlName="shadow">Mark as Shadow Activity</mat-checkbox>
+      </div>
+  
+      <!-- <div>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Procedure Property</mat-label>
+          <mat-select formControlName="procedureproperty">
+            <mat-option *ngFor="let option of atcPropertyList" [value]="option">{{option}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Assignment Property</mat-label>
+          <mat-select formControlName="assignmentproperty">
+            <mat-option *ngFor="let option of atcPropertyList" [value]="option">{{option}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div> -->
+      <div>
+        <mat-radio-group aria-label="Select an option" formControlName="activitytype">
+          <mat-radio-button style="margin-right:10px" value="special">Special Activity</mat-radio-button>
+          <mat-radio-button style="margin-right:10px" value="booster">Booster</mat-radio-button>
+          <mat-radio-button [value]="null">None</mat-radio-button>
+        </mat-radio-group>
+      </div>
+      <div>
+        <button mat-stroked-button class="cancelbtn" type="button" (click)="close()">Close</button>
+        <button mat-stroked-button class="submitbtn" type="submit">Update Activity</button>
+      </div>
+    </form>
+  </div>

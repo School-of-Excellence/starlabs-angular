@@ -1,0 +1,124 @@
+<!-- Group Name Dialog -->
+<div *ngIf="showGroupNameDialog" class="group-name-container">
+  <h2 mat-dialog-title>Create New Group</h2>
+  
+  <mat-dialog-content>
+    <form [formGroup]="groupNameForm" (ngSubmit)="onGroupNameSubmit()">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Group Name</mat-label>
+        <input 
+          matInput 
+          formControlName="groupName"
+          maxlength="25"
+          autocomplete="off">
+        <mat-error *ngIf="groupNameErrors">{{ groupNameErrors }}</mat-error>
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
+  
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="onCancel()" [disabled]="isValidating">
+      Cancel
+    </button>
+    <button 
+      mat-raised-button 
+      color="primary"
+      (click)="onGroupNameSubmit()"
+      [disabled]="!groupNameForm.valid || isValidating">
+      <mat-spinner diameter="16" *ngIf="isValidating"></mat-spinner>
+      <span *ngIf="!isValidating">Next</span>
+    </button>
+  </mat-dialog-actions>
+</div>
+
+<!-- Add People Dialog -->
+<div *ngIf="showAddPeopleDialog" class="add-people-container">
+  <!-- Toolbar with search -->
+  <mat-toolbar color="primary" *ngIf="!searchMode">
+    <button mat-icon-button (click)="onCancel()">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <span class="toolbar-title">Add People</span>
+    <span class="spacer"></span>
+    <button mat-icon-button (click)="toggleSearch()">
+      <mat-icon>search</mat-icon>
+    </button>
+  </mat-toolbar>
+
+  <mat-toolbar color="primary" *ngIf="searchMode">
+    <mat-form-field class="search-field">
+      <input 
+        matInput 
+        [(ngModel)]="searchText" 
+        placeholder="Search"
+        class="search-input">
+    </mat-form-field>
+    <button mat-icon-button (click)="toggleSearch()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-toolbar>
+
+  <mat-dialog-content class="dialog-content">
+    <!-- Selected Members Section -->
+    <div class="section-header">
+      <span class="section-title">Selected Members</span>
+      <mat-divider></mat-divider>
+    </div>
+
+    <div class="selected-members-container">
+      <div *ngIf="selectedProfiles.length === 0" class="no-selection">
+        No members selected
+      </div>
+      <div *ngIf="selectedProfiles.length > 0" class="selected-members-list">
+        <div *ngFor="let profile of selectedProfiles" class="selected-member">
+          <img 
+            [src]="getProfileImage(profile)" 
+            [alt]="profile.name"
+            class="member-avatar-small"
+            (error)="handleImageError($event)">
+          <span class="member-name-small">{{ profile.name }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Available Members Section -->
+    <div class="section-header">
+      <span class="section-title">Available Members</span>
+      <mat-divider></mat-divider>
+    </div>
+
+    <div *ngIf="isLoading" class="loading-container">
+      <mat-spinner></mat-spinner>
+    </div>
+
+    <div *ngIf="!isLoading" class="members-list">
+      <div 
+        *ngFor="let profile of filteredProfiles" 
+        class="member-item"
+        (click)="toggleMember(profile)">
+        <img 
+          [src]="getProfileImage(profile)" 
+          [alt]="profile.name"
+          class="member-avatar"
+          (error)="handleImageError($event)">
+        
+        <span class="member-name">{{ profile.name }}</span>
+        
+        <mat-icon class="selection-icon" [class.selected]="isProfileSelected(profile)">
+          {{ isProfileSelected(profile) ? 'check_circle' : 'radio_button_unchecked' }}
+        </mat-icon>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <!-- Floating Action Button -->
+  <button 
+    mat-fab 
+    color="primary"
+    class="fab-button"
+    (click)="onSubmit()"
+    [disabled]="isCreating">
+    <mat-spinner diameter="24" *ngIf="isCreating"></mat-spinner>
+    <mat-icon *ngIf="!isCreating">check</mat-icon>
+  </button>
+</div>

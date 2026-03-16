@@ -1,0 +1,28 @@
+<div class="dashboard-container">
+  <div class="section-header">
+    <h4 class="section-title">Quick Access</h4>
+    <!-- <p class="section-subtitle">Your favorite shortcuts</p> -->
+  </div>
+
+  <div class="cards-grid">
+    <div *ngFor="let item of authguard.favouriteDashboard; trackBy: trackByAction">
+      <mat-card 
+        class="favorite-card" 
+        matRipple
+        [matRippleColor]="'rgba(35, 76, 88, 0.12)'"
+        (click)="navigateToRoute(item.route)">
+        <div class="card-content">
+          <div class="icon-wrapper">
+            <mat-icon class="favorite-icon">{{item.icon}}</mat-icon>
+          </div>
+          <h6 class="card-title">{{item.label}}</h6>
+        </div>
+      </mat-card>
+    </div>
+  </div>
+  <div class="empty-state" *ngIf="authguard.favouriteDashboard.length === 0">
+    <mat-icon class="empty-icon">star_border</mat-icon>
+    <h5>No Favorites Yet</h5>
+    <p>Add your favorite shortcuts to get started</p>
+  </div>
+</div>

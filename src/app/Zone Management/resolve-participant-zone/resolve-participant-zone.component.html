@@ -1,0 +1,55 @@
+<div class="issues-dialog">
+  <!-- Header -->
+  <div class="dialog-header">
+    <div class="header-content">
+      <mat-icon [class.warning]="data.type === 'unassigned'" [class.error]="data.type === 'conflict'">
+        {{ data.type === 'unassigned' ? 'warning' : 'error_outline' }}
+      </mat-icon>
+      <h2 mat-dialog-title>{{ title }}</h2>
+    </div>
+    <button mat-icon-button (click)="onClose()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Content -->
+  <mat-dialog-content>
+    <p class="message">{{ message }}</p>
+
+    <!-- Unassigned List (Read-only) -->
+    <div *ngIf="data.type === 'unassigned'" class="participants-list">
+      <div class="participant-item" *ngFor="let participant of data.participants; let i = index">
+        <span class="participant-number">{{ i + 1 }}.</span>
+        <span class="participant-name">{{ participant.participantName }}</span>
+      </div>
+    </div>
+
+    <!-- Conflict List (Interactive) -->
+    <div *ngIf="data.type === 'conflict'" class="conflicts-list">
+      <div class="conflict-item" *ngFor="let participant of data.participants; let i = index">
+        <div class="conflict-header">
+          <span class="participant-number">{{ i + 1 }}.</span>
+          <span class="participant-name">{{ participant.participantName }}</span>
+        </div>
+        <div class="zone-selection">
+          <label class="zone-label">Select Zone:</label>
+          <mat-radio-group [(ngModel)]="participant.selectedZone">
+            <mat-radio-button *ngFor="let zoneId of participant.zones" [value]="zoneId" class="zone-option">
+              {{ data.zoneMap[zoneId] }}
+            </mat-radio-button>
+          </mat-radio-group>
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <!-- Actions -->
+  <mat-dialog-actions>
+    <button mat-button (click)="onClose()">
+      {{ data.type === 'unassigned' ? 'Close' : 'Cancel' }}
+    </button>
+    <button *ngIf="data.type === 'conflict'" mat-raised-button color="primary" (click)="onSubmit()">
+      Resolve & Submit
+    </button>
+  </mat-dialog-actions>
+</div>

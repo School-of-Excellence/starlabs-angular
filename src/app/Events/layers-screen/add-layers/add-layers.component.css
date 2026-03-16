@@ -1,0 +1,36 @@
+.field{
+    margin-top: 20px;
+    margin-left: 20px;
+    margin-right: 20px;
+    display: flex;
+}
+.field1{
+    float: right;
+    margin-top: 20px;
+    margin-left: 20px;
+}
+
+.image-preview {
+    margin-right: 10px;
+}
+  
+  
+.image-preview img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 5px;
+}
+.cancelbtn{
+    color: red;
+    border: 1px solid red;
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+  
+  .submitbtn{
+    color: white;
+    background: green;
+  }

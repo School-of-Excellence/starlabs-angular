@@ -1,0 +1,53 @@
+<table mat-table [dataSource]="dataSource" multiTemplateDataRows class="mat-elevation-z8" matSort>
+   <!-- eventref -->
+   <ng-container matColumnDef="eventref">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header> Event </th>
+    <td mat-cell *matCellDef="let row"> {{mapEvent[row.eventref.id]}}</td>
+  </ng-container>
+   <!-- categoryname -->
+   <ng-container matColumnDef="categoryname">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+    <td mat-cell *matCellDef="let row"> {{row.categoryname}} </td>
+  </ng-container>
+   <!-- type -->
+   <ng-container matColumnDef="type">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+    <td mat-cell *matCellDef="let row"> {{row.type}} </td>
+  </ng-container>
+   <!-- created -->
+   <ng-container matColumnDef="created">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
+    <td mat-cell *matCellDef="let row"> {{row.created.toDate() | date : 'short'}} </td>
+  </ng-container>
+  <ng-container matColumnDef="share">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Share</th>
+    <td mat-cell *matCellDef="let row">
+      <button mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
+    </td>
+  </ng-container>
+  <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+  <ng-container matColumnDef="expandedDetail">
+    <td mat-cell *matCellDef="let row" [attr.colspan]="displayedColumns.length">
+      <p class="m-1">{{row.description}}</p>
+      <section class="d-flex flex-row" style="overflow:auto;">
+        <div *ngFor="let list of row.videos;let i = index" class="d-flex flex-column m-2">
+          <div class="d-flex flex-row">
+            <img *ngIf="list.thumbnail != null || list.thumbnail != undefined" width="170" height="300" [src]="list.thumbnail">
+            <video *ngIf="list.video != null || list.video != undefined" class="ml-1" width="170" height="300" controls>
+              <source [src]="list.video">
+            </video>
+          </div>
+          <div class="d-flex justify-content-center">
+            <p>
+              <b>{{list.title}}</b> <span class="hlstest" (click)="testHLS(list['hls'])">(HLS: {{list["hls"] != null && list["hls"] != undefined}})</span>
+            </p>
+          </div>
+        </div>
+      </section>
+    </td>
+  </ng-container>
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns" ></tr>
+  <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr>
+</table>
+<mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" aria-label="Select page of users"></mat-paginator>

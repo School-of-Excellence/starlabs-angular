@@ -1,0 +1,355 @@
+<!-- <div class="text-center" style="padding: 20px;">
+  <h5>{{dialogdata["config"]["mode"]}} Config</h5>
+  <div class="mt-1 mb-2">
+    <form class="queform" [formGroup]="modeconfigForm" (ngSubmit)="null">
+      <div class="w-100 text-left mb-3">
+        <mat-form-field class="inputfield" appearance="outline">
+          <mat-label>Add Tips</mat-label>
+          <input type="text" [(ngModel)]="tipText" matInput #input [ngModelOptions]="{standalone: true}">
+        </mat-form-field>
+        <button mat-icon-button type="button">
+          <mat-icon class="addbtn ml-2" matSuffix (click)="onMessageInput()">add_circle</mat-icon>
+        </button>
+        <br>
+        <mat-label>Reorder Tips</mat-label>
+        <div cdkDropList class="example-list" (cdkDropListDropped)="drop($event)">
+          <div class="example-box" *ngFor="let text of modeconfigForm.get('modetips')?.value; let i = index;"l cdkDrag>            
+            <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+            {{text}}&nbsp;&nbsp;&nbsp;&nbsp;
+            <button mat-icon-button class="addbtn" type="button" (click)="onMessageDelete(i)"><mat-icon>delete</mat-icon></button>
+          </div>
+        </div>
+      </div>
+      <div class="subform text-left" formArrayName="widgets">
+        <div class="mat-elevation-z1 mb-3 p-2" *ngFor="let control of widgetArray.controls;let i = index" [formGroupName]="i">
+          <mat-form-field class="inputfield" appearance="outline">
+            <mat-label>Widget {{i+1}}</mat-label>
+            <mat-select formControlName="widgetid">
+              <mat-option *ngFor="let option of widgetList" [value]="option.widgetid">{{option.title}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-checkbox formControlName="mandatory">Mark Mandatory</mat-checkbox>
+          <div *ngIf="['adsplaylist', 'solarvoice', 'eiflix', 'generalcontent', 'form'].includes(widgetArray.controls[i].get('widgetid').value)">
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>Reference</mat-label>
+              <mat-select formControlName="reference" multiple>
+                <mat-option *ngFor="let option of returnReferenceOption(widgetArray.controls[i].get('widgetid').value)" [value]="option.value">{{option.title}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div *ngIf="['dodont'].includes(widgetArray.controls[i].get('widgetid').value)">
+            <mat-form-field appearance="outline" class="inputfield">
+              <mat-label>Dos</mat-label>
+              <mat-chip-grid #dosChipGrid>
+                <mat-chip-row *ngFor="let item of widgetArray.controls[i].get('dos').value"
+                              [removable]="true"  
+                              (removed)="removeActionItems(i, 'dos', item)">
+                  {{ item }}
+                  <button matChipRemove [attr.aria-label]="'Remove ' + item">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
+                </mat-chip-row>
+                <input placeholder="Add Items"
+                      [matChipInputFor]="dosChipGrid"
+                      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                      (matChipInputTokenEnd)="addActionItems(i, 'dos', $event)" />
+              </mat-chip-grid>
+            </mat-form-field>
+            
+            <mat-form-field appearance="outline" class="inputfield">
+              <mat-label>Don'ts</mat-label>
+              <mat-chip-grid #dontsChipGrid>
+                <mat-chip-row *ngFor="let item of widgetArray.controls[i].get('donts').value"
+                              [removable]="true"
+                              (removed)="removeActionItems(i, 'donts', item)">
+                  {{ item }}
+                  <button matChipRemove [attr.aria-label]="'Remove ' + item">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
+                </mat-chip-row>
+                <input placeholder="Add Items"
+                      [matChipInputFor]="dontsChipGrid"
+                      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                      (matChipInputTokenEnd)="addActionItems(i, 'donts', $event)" />
+              </mat-chip-grid>
+            </mat-form-field>
+          </div>
+          <div class="w-100 text-right">
+            <button mat-icon-button type="button">
+              <mat-icon (click)="removeWidget(i)">remove_circle</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 text-right">
+        <label class="subtitle">Create New Widget</label>
+        <button mat-icon-button type="button">
+          <mat-icon (click)="addWidget()">add_circle</mat-icon>
+        </button>
+      </div>
+      <div class="mt-2">
+        <button class="mr-3 successbtn" mat-stroked-button type="button" (click)="updateConfig(modeconfigForm.value)">Update Config</button>&nbsp;
+        <button class="closebtn" mat-stroked-button type="button" (click)="dialogref.close()">Close</button>
+      </div>
+    </form>
+  </div>
+</div> -->
+
+<div class="dialog-overlay">
+  <div class="dialog-container">
+    <!-- Header -->
+    <div class="dialog-header">
+      <div class="header-content">
+        <span class="product-label">Product :</span>
+        <span class="product-name">{{dialogdata.mapProducts[dialogdata["config"]["productref"].id]['product']}}</span>
+      </div>
+      <button class="close-btn" (click)="dialogref.close()">✕</button>
+    </div>
+
+    <!-- Subheader -->
+    <div class="dialog-subheader">
+      <span class="mode-label">Configuring Mode :</span>
+      <span class="mode-value">{{dialogdata["config"]["mode"]}}</span>
+    </div>
+
+    <!-- Content -->
+    <form [formGroup]="modeconfigForm" (ngSubmit)="null">
+      <div class="dialog-content">
+        <!-- Left Panel - Tips -->
+        <div class="left-panel">
+          <div class="input-group">
+            <input type="text" [(ngModel)]="tipText" [ngModelOptions]="{standalone: true}" placeholder="Type Your Tips here" class="tips-input">
+            <button class="add-btn" type="button" (click)="onMessageInput()">
+              <span class="plus-icon">+</span>
+              Add
+            </button>
+          </div>
+          
+          <!-- Tips List -->
+          <div class="tips-list" cdkDropList (cdkDropListDropped)="drop($event)">
+            <div *ngFor="let text of modeconfigForm.get('modetips')?.value; let i = index;" l cdkDrag>
+              <div class="tip-card">
+                <div *cdkDragPlaceholder></div>
+                <div class="drag-handle">⋮⋮</div>
+                <div class="tip-content">
+                  <div class="tip-header">
+                    <h3 class="tip-title">Tip {{i+1}}</h3>
+                    <button class="delete-btn" type="button" (click)="onMessageDelete(i)">🗑</button>
+                  </div>
+                  <p class="tip-text">
+                    {{text}}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel - Widgets -->
+        <div class="right-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Add New Widget</h2>
+            <button class="add-btn" type="button" (click)="addWidget()">
+              <span class="plus-icon">+</span>
+              Add
+            </button>
+          </div>
+
+          <!-- Widgets List -->
+          <div class="widgets-list">
+            <div formArrayName="widgets">
+              <div *ngFor="let control of widgetArray.controls;let i = index" [formGroupName]="i">
+                <div class="widget-card">
+                  <div class="widget-header">
+                    <h3 class="widget-title">Widget {{i+1}}</h3>
+                    <button class="delete-btn" type="button" (click)="removeWidget(i)">🗑</button>
+                  </div>
+                
+                  <mat-form-field class="widget-mat-field" appearance="outline">
+                  <mat-select formControlName="widgetid" placeholder="Select A Widget">
+                    <mat-option>
+                      <ngx-mat-select-search [(ngModel)]="filteredWidget" [ngModelOptions]="{standalone: true}"
+                        [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                        ngDefaultControl></ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option *ngFor="let option of returnWidget()" [value]="option.widgetid">
+                      {{option.title}}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                
+                  <mat-checkbox class="widget-checkbox" formControlName="mandatory">Mark Mandatory</mat-checkbox>
+                
+                  <div class="reference-section"
+                    *ngIf="['adsplaylist', 'solarvoice', 'eiflix', 'generalcontent', 'form'].includes(widgetArray.controls[i].get('widgetid')?.value)">
+                    <label class="reference-label">Add Reference</label>
+                    <mat-form-field class="widget-mat-field" appearance="outline">
+                      <mat-select formControlName="reference" multiple placeholder="Multiselect your References">
+                        <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="filteredReference" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
+                          [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                        </mat-option>
+                        <mat-option *ngFor="let option of returnReferenceOption(widgetArray.controls[i].get('widgetid')?.value)"
+                          [value]="option.value">{{option.title}}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                
+                  <div class="action-section" *ngIf="['dodont'].includes(widgetArray.controls[i].get('widgetid')?.value)">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Dos</mat-label>
+                      <mat-chip-grid #dosChipGrid>
+                        <mat-chip-row *ngFor="let item of widgetArray.controls[i].get('dos')?.value" [removable]="true"
+                          (removed)="removeActionItems(i, 'dos', item)">
+                          {{ item }}
+                          <button matChipRemove [attr.aria-label]="'Remove ' + item">
+                            <mat-icon>cancel</mat-icon>
+                          </button>
+                        </mat-chip-row>
+                        <input placeholder="Add Items" [matChipInputFor]="dosChipGrid"
+                          [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                          (matChipInputTokenEnd)="addActionItems(i, 'dos', $event)" />
+                      </mat-chip-grid>
+                    </mat-form-field>
+                
+                    <mat-form-field appearance="outline">
+                      <mat-label>Don'ts</mat-label>
+                      <mat-chip-grid #dontsChipGrid>
+                        <mat-chip-row *ngFor="let item of widgetArray.controls[i].get('donts')?.value" [removable]="true"
+                          (removed)="removeActionItems(i, 'donts', item)">
+                          {{ item }}
+                          <button matChipRemove [attr.aria-label]="'Remove ' + item">
+                            <mat-icon>cancel</mat-icon>
+                          </button>
+                        </mat-chip-row>
+                        <input placeholder="Add Items" [matChipInputFor]="dontsChipGrid"
+                          [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                          (matChipInputTokenEnd)="addActionItems(i, 'donts', $event)" />
+                      </mat-chip-grid>
+                    </mat-form-field>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <!-- Footer -->
+    <div class="dialog-footer">
+      <button class="preview-btn" type="button" (click)="showPreview = true">
+        <mat-icon>visibility</mat-icon>
+        Preview
+      </button>
+      <div class="footer-actions">
+        <button class="cancel-btn" type="button" (click)="dialogref.close()">Cancel</button>
+        <button class="configure-btn" type="button" (click)="updateConfig(modeconfigForm.value)" [disabled]="!modeconfigForm.valid">Configure</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Modal Overlay -->
+  <div class="preview-modal-overlay" *ngIf="showPreview" (click)="showPreview = false">
+    <div class="preview-modal-container" (click)="$event.stopPropagation()">
+      <!-- Preview Header -->
+      <div class="preview-modal-header">
+        <div class="preview-header-content">
+          <mat-icon class="preview-header-icon">visibility</mat-icon>
+          <h2 class="preview-modal-title">Configuration Preview</h2>
+        </div>
+        <button class="close-btn" type="button" (click)="showPreview = false">✕</button>
+      </div>
+
+      <!-- Preview Content -->
+      <div class="preview-modal-content">
+        <!-- Tips Preview -->
+        <div class="preview-section">
+          <h3 class="section-title">
+            <mat-icon class="section-icon">tips_and_updates</mat-icon>
+            Tips Configuration ({{modeconfigForm.get('modetips')?.value?.length || 0}})
+          </h3>
+          <div class="tips-preview">
+            <div class="tip-preview-item" *ngFor="let text of modeconfigForm.get('modetips')?.value; let i = index">
+              <div class="tip-number">{{i + 1}}</div>
+              <div class="tip-text">{{text}}</div>
+            </div>
+            <div class="empty-state" *ngIf="!modeconfigForm.get('modetips')?.value?.length">
+              <mat-icon>info_outline</mat-icon>
+              <p>No tips configured</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widgets Preview -->
+        <div class="preview-section">
+          <h3 class="section-title">
+            <mat-icon class="section-icon">widgets</mat-icon>
+            Widgets Configuration ({{widgetArray.controls?.length || 0}})
+          </h3>
+          
+          <div class="widgets-preview">
+            <div class="widget-preview-card" *ngFor="let control of widgetArray.controls; let i = index">
+              <div class="widget-preview-header">
+                <div class="widget-info">
+                  <h4 class="widget-name">{{getWidgetName(control.get('widgetid')?.value) || 'Not Selected'}}</h4>
+                  <span class="mandatory-badge" *ngIf="control.get('mandatory')?.value">Mandatory</span>
+                  <span class="optional-badge" *ngIf="!control.get('mandatory')?.value">Optional</span>
+                </div>
+                <span class="widget-order">#{{i + 1}}</span>
+              </div>
+              <div class="widget-details">
+                <div class="detail-row" *ngIf="control.get('widgetid')?.value">
+                  <span class="detail-label">Type:</span>
+                  <span class="detail-value">{{getWidgetName(control.get('widgetid')?.value)}}</span>
+                </div>
+                <div class="detail-row" *ngIf="control.get('reference')?.value?.length">
+                  <span class="detail-label">References:</span>
+                  <div class="reference-chips">
+                    <span class="chip" *ngFor="let ref of control.get('reference')?.value">
+                      {{getReferenceName(control.get('widgetid')?.value, ref)}}
+                    </span>
+                  </div>
+                </div>
+                
+                <!-- Dos and Don'ts Preview -->
+                <div class="action-preview" *ngIf="control.get('dos')?.value?.length || control.get('donts')?.value?.length">
+                  <div class="action-group" *ngIf="control.get('dos')?.value?.length">
+                    <div class="action-header">
+                      <mat-icon class="success-icon">check_circle</mat-icon>
+                      <span class="action-title">Dos</span>
+                    </div>
+                    <div class="action-items">
+                      <span class="action-chip success" *ngFor="let item of control.get('dos')?.value">{{item}}</span>
+                    </div>
+                  </div>
+                  <div class="action-group" *ngIf="control.get('donts')?.value?.length">
+                    <div class="action-header">
+                      <mat-icon class="error-icon">cancel</mat-icon>
+                      <span class="action-title">Don'ts</span>
+                    </div>
+                    <div class="action-items">
+                      <span class="action-chip error" *ngFor="let item of control.get('donts')?.value">{{item}}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="empty-state" *ngIf="!widgetArray.controls?.length">
+              <mat-icon>widgets</mat-icon>
+              <p>No widgets configured</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Footer -->
+      <div class="preview-modal-footer">
+        <button class="secondary-btn" type="button" (click)="showPreview = false">
+          Close Preview
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

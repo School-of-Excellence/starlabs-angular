@@ -1,0 +1,32 @@
+<div class="mainscreen">
+  <h5 class="title">Product Mode Config</h5>
+  <div class="mt-3" *ngFor="let product of productList">
+    <mat-accordion>
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+          {{product["product"]}} <mat-icon class="editicon" (click)="editProduct(product)">edit</mat-icon>
+          </mat-panel-title>
+          <mat-panel-description></mat-panel-description>
+        </mat-expansion-panel-header>
+        <div *ngIf="product['modeflow'] != null && product['modeflow'] != undefined">
+          <mat-list class="inline-list">
+            <div *ngFor="let mode of product['modeflow']" mat-list-item>
+              <div class="modebox">
+                <div class="modetitle" (click)="updateConfig(mode, product['id'])">{{mode}}</div>
+                <div *ngIf="productmodeConfig[product['id']+mode] != undefined && productmodeConfig[product['id']+mode] != null">
+                  <ul>
+                    <!-- {{productmodeConfig[product['id']+mode] | json}} -->
+                    <li *ngFor="let widget of productmodeConfig[product['id']+mode]['widgets']">
+                      {{widget["title"]}}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </mat-list>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
+  </div>
+</div>

@@ -1,0 +1,101 @@
+<div class="mainscreen">
+  <h4 class="title">Update Playlist Ads</h4>
+  <form [formGroup]="playlistads" (ngSubmit)="submit()">
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Ad Title</mat-label>
+        <input matInput type="text" formControlName="adstitle">
+        <mat-error *ngIf="playlistads.get('adstitle').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Ad Description</mat-label>
+        <textarea matInput type="text" formControlName="adsdescription" rows="4"></textarea>
+        <mat-error *ngIf="playlistads.get('adsdescription').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Ad Link</mat-label>
+        <input matInput type="text" formControlName="adslink">
+        <mat-error *ngIf="playlistads.get('adslink').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Ad Type (Sub Text)</mat-label>
+        <input matInput type="text" formControlName="adstype">
+        <mat-error *ngIf="playlistads.get('adstype').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+        <h5 class="text-left">Ads thumbnail</h5>
+        <!-- Remove matInput from file input -->
+        <input type="file" accept="image/*" (change)="importNoteImages($event)" style="margin-bottom: 10px;">
+        <div class="row ml-2 mt-2">
+        <div class="mr-2 text-center" *ngIf="this.playlistads.get('adsthumbnail').value != null">
+            <img [src]="this.playlistads.get('adsthumbnail').value" height="80" width="80">
+            <br>
+            <label class="removetext" (click)="removeNoteImage()">Remove</label>
+        </div>
+        </div>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Ads Trailer</mat-label>
+        <mat-select formControlName="adstrailer">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterContentName" [ngModelOptions]="{standalone: true}" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterContent()" [value]="option['url']">{{option.title}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="playlistads.get('adstrailer').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Ads Playlist</mat-label>
+        <mat-select formControlName="playlist" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterContentName" [ngModelOptions]="{standalone: true}" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterContent()" [value]="option.docid">{{option.title}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="playlistads.get('playlist').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+
+      <br>
+
+      <div cdkDropList [cdkDropListData]="playlistads.get('playlist').value" class="example-list" (cdkDropListDropped)="drop($event)">
+        <div class="example-box" *ngFor="let item of playlistads.get('playlist').value" cdkDrag>{{this.dailogData.contentMap[item]}}</div>
+      </div>
+
+      <br>
+
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Event Date</mat-label>
+        <mat-date-range-input [rangePicker]="picker">
+          <input matStartDate (click)="picker.open()" formControlName="startdate">
+          <input matEndDate (click)="picker.open()" formControlName="enddate">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker touchUi #picker></mat-date-range-picker>
+        <mat-error *ngIf="playlistads.get('startdate').hasError('required') || playlistads.get('enddate').hasError('required')">
+          Event Date <strong>Required</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-checkbox formControlName="available">Available In App</mat-checkbox>
+      <br><br>
+    </div>
+    <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+    <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Playlist'}}</button>
+  </form>
+</div>

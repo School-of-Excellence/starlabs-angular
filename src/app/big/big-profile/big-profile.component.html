@@ -1,0 +1,263 @@
+
+<div class="dashboard-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <div class="profile-card">
+      <div class="profile-content">
+        <div class="profile-image-container">
+          <img class="profile-image" [src]="profileData.profile" alt="Profile Image" />
+          <div class="online-indicator"></div>
+        </div>
+        
+        <div class="profile-info">
+          <h1>{{profileData.name}}</h1>
+          <p class="section-label">Current Levels</p>
+          <div class="badge-grid">
+            <div class="level-badge" *ngFor="let entry of bigAggregateLevel | keyvalue">
+              <div class="level-indicator">
+                <span class="level-number">{{ entry.value["atcmodel"] }}</span>
+              </div>
+              <span class="level-name">{{ entry.value["levelname"] }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="contact-info">
+          <div class="contact-item">
+            <i class="icon-phone"></i>
+            <span>+91 {{profileData.number}}</span>
+          </div>
+          <div class="contact-item">
+            <i class="icon-email"></i>
+            <span>{{profileData.email}}</span>
+          </div>
+          <div class="remaining-days-badge">
+            <span class="days-count">{{ participantDashboard?.remainingDays }}</span>
+            <span class="days-text">{{ participantDashboard?.remainingDays === 1 ? 'day' : 'days' }} remaining</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Grid -->
+  <div class="content-grid">
+    
+    <!-- Activities Section -->
+    <div class="section-card activities-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="icon-activity"></i>
+          Total Activities
+        </h2>
+      </div>
+      <div class="activities-grid">
+        <div class="activity-card" *ngFor="let card of queueActivitylog | keyvalue">
+          <div class="activity-icon">
+            <i class="icon-chart"></i>
+          </div>
+          <div class="activity-info">
+            <h3 class="activity-name">{{ card.key }}</h3>
+            <p class="activity-count">{{ card.value["count"] }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Evolution Summary Section -->
+    <div class="section-card evolution-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="icon-evolution"></i>
+          Evolution Summary
+        </h2>
+      </div>
+      
+      <div class="evolution-grid">
+        <!-- Adjustment Impact Card -->
+        <div class="evolution-card impact-card">
+          <div class="card-header">
+            <h3>Adjustment Impact</h3>
+            <i class="icon-impact"></i>
+          </div>
+          <div class="card-content">
+            <div class="metric-item">
+              <span class="metric-label">Potential Years</span>
+              <span class="metric-value highlight-red">{{ participantDashboard.evolutionyearwasted }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Saved Years</span>
+              <span class="metric-value highlight-green">{{ participantDashboard.evolutionyearsaved }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Extended Life Impact</span>
+              <span class="metric-value highlight-blue">{{ participantDashboard.extendedlifeimpact }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">BIG Opportunities Used</span>
+              <span class="metric-value highlight-purple">{{ participantDashboard.totalbigopportunitiesused }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Adjustment Progress Card -->
+        <div class="evolution-card progress-card">
+          <div class="card-header">
+            <h3>Adjustment Progress</h3>
+            <i class="icon-progress"></i>
+          </div>
+          <div class="card-content">
+            <div class="metric-item" *ngFor="let row of participantDashboard.evolutionprogress | keyvalue">
+              <span class="metric-label">{{ row.key }}</span>
+              <span class="metric-value">{{ row.value }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Crossover Metrics Card -->
+        <div class="evolution-card crossover-card">
+          <div *ngFor="let row of participantDashboard.ongoingaellist">
+            <div class="card-header">
+              <h3>Crossover Metric (Recent)</h3>
+              <span class="atc-badge">ATC Model: {{row.atcmodel}}</span>
+            </div>
+            <div class="card-content">
+              <div class="metric-item" *ngFor="let entry of row.crossovermetric | keyvalue">
+                <span class="metric-label">{{ entry.key }}</span>
+                <span class="metric-range">{{ entry.value["endpoint"] }} → {{ entry.value["startpoint"] }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Awareness Card -->
+        <div class="evolution-card awareness-card">
+          <div class="card-header">
+            <h3>Adjustment Awareness</h3>
+            <i class="icon-awareness"></i>
+          </div>
+          <div class="card-content">
+            <div class="awareness-stats">
+              <div class="awareness-item aware">
+                <span class="awareness-count">0</span>
+                <span class="awareness-label">Aware</span>
+              </div>
+              <div class="awareness-item unaware">
+                <span class="awareness-count">5</span>
+                <span class="awareness-label">Unaware</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Ask Section -->
+    <div class="section-card video-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="icon-video"></i>
+          Video Ask
+        </h2>
+      </div>
+      
+      <div class="video-content" *ngIf="videoAsk.length > 0">
+        <div class="video-grid">
+          <div class="video-item" *ngFor="let video of videoAsk; let i = index">
+            <div *ngIf="i !== selectedVideoIndex" class="video-thumbnail" (click)="playVideo(i)">
+              <div class="play-button">
+                <i class="icon-play"></i>
+              </div>
+              <div class="video-date">{{ video.created | date:'medium' }}</div>
+            </div>
+            <div *ngIf="i === selectedVideoIndex" class="video-player-container">
+              <video #videoPlayer controls class="video-player">
+                <source [src]="video.fileurl" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div *ngIf="videoAsk.length === 0" class="empty-state">
+        <i class="icon-video-off"></i>
+        <p>No videos available for this profile</p>
+      </div>
+    </div>
+
+    <!-- Big Levels Section -->
+    <div class="section-card levels-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="icon-levels"></i>
+          Big Levels
+        </h2>
+      </div>
+      <div class="levels-content">
+        <app-big-level-dashboard [bigAggregateLevel]="bigAggregateLevel"></app-big-level-dashboard>
+      </div>
+    </div>
+
+    <!-- Mentoring Pivots Section -->
+    <div class="section-card mentoring-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="icon-mentoring"></i>
+          Mentoring Pivots
+        </h2>
+      </div>
+      
+      <div class="table-container">
+        <table mat-table [dataSource]="dataSource" class="modern-table">
+          
+          <ng-container matColumnDef="event">
+            <th mat-header-cell *matHeaderCellDef>Event</th>
+            <td mat-cell *matCellDef="let user">
+              <div class="cell-content">
+                <i class="icon-event"></i>
+                {{ user.queuename }}
+              </div>
+            </td>
+          </ng-container>
+        
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let user">
+              <span class="date-badge">{{ user.createdData | date: 'MMM dd, yyyy' }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="time">
+            <th mat-header-cell *matHeaderCellDef>Time</th>
+            <td mat-cell *matCellDef="let user">
+              <span class="time-badge">{{ user.createdData | date: 'hh:mm a' }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="spaceType">
+            <th mat-header-cell *matHeaderCellDef>A&H Space</th>
+            <td mat-cell *matCellDef="let user">
+              <span class="space-badge">{{ ahSpaceName[user["spaceid"]]["spacename"] }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="summary">
+            <th mat-header-cell *matHeaderCellDef>Consultation Summary</th>
+            <td mat-cell *matCellDef="let user">
+              <div class="summary-content">
+                <div class="summary-item" *ngFor="let track of user.summaryData;">
+                  <i class="icon-check"></i>
+                  {{ track }}
+                </div>
+              </div>
+            </td>
+          </ng-container>
+         
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

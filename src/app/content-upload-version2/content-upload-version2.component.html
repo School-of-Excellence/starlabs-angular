@@ -1,0 +1,152 @@
+<div class="layout">
+  <!-- <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">◈</span>
+      <span class="brand-text">Content Hub</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a routerLink="/content-upload-v2"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }">
+        <span class="nav-icon">⌂</span>
+        Content Home
+      </a>
+      <div class="nav-group" [class.expanded]="solarExpanded">
+      <a class="nav-parent"
+        [class.active]="isAnyChildActive(['audiodashboard','playlistdashboard'])"
+        (click)="toggleSolar($event)">
+        <span class="nav-icon">♬</span>
+        Solar Voice
+        <span class="nav-chevron">›</span>
+      </a>
+
+      <div class="nav-submenu"
+          #solarMenu
+          [style.maxHeight.px]="solarExpanded ? solarMenu.scrollHeight : 0">
+          <a routerLink="audiodashboard" routerLinkActive="active">
+            <span class="nav-icon">⬆</span> Upload Audio
+          </a>
+          <a routerLink="playlistdashboard" routerLinkActive="active">
+            <span class="nav-icon">✚</span> Create Playlist
+          </a>
+        </div>
+      </div>
+      <div class="nav-group" [class.expanded]="eiflixExpanded">
+
+        <a class="nav-parent"
+          (click)="toggleEiflix($event)">
+          <span class="nav-icon">▶</span>
+          EiFlix
+          <span class="nav-chevron">›</span>
+        </a>
+
+        <div class="nav-submenu"
+            #eiflixMenu
+            [style.maxHeight.px]="eiflixExpanded ? eiflixMenu.scrollHeight : 0">
+
+          <a routerLink="videodashboard" routerLinkActive="active">
+            <span class="nav-icon">⬆</span> Upload Video
+          </a>
+
+          <a routerLink="assigncategory" routerLinkActive="active">
+            <span class="nav-icon">◈</span> Assign Category
+          </a>
+
+          <a routerLink="seriesdashboard" routerLinkActive="active">
+            <span class="nav-icon">⊞</span> Series Configuration
+          </a>
+
+          <a routerLink="viewparticipantstieraccess" routerLinkActive="active">
+            <span class="nav-icon">⬡</span> Tier Access
+          </a>
+
+        </div>
+
+      </div>
+
+
+      <a routerLink="ads" routerLinkActive="active">
+        <span class="nav-icon">◎</span>
+        Ads
+      </a>
+      <a routerLink="healthstories" routerLinkActive="active">
+        <span class="nav-icon">✚</span>
+        Medical Breakthroughs
+      </a>
+      <a routerLink="contentupload" routerLinkActive="active">
+        <span class="nav-icon">⬡</span>
+        Home Content
+      </a>
+      <a routerLink="learningmaterial" routerLinkActive="active">
+        <span class="nav-icon">✎</span>
+        Resources
+      </a>
+      <a routerLink="communitymanager" routerLinkActive="active">
+        <span class="nav-icon">🎞</span>
+        Community Manager
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-text">Content Upload</div>
+    </div>
+  </aside> -->
+
+  <main class="content">
+    <div class="home-wrap" *ngIf="isHome">
+      <div class="hero">
+        <div class="hero-badge">Content Status Overview</div>
+        <!-- <h1 class="hero-title">Content Status Overview</h1> -->
+        <p class="hero-desc">
+          Monitor your content ecosystem at a glance. Track the latest updates across
+          audio, video, ads, health stories, and home content — all in one place.
+        </p>
+      </div>
+      <div class="cards">
+        <div class="card" *ngFor="let s of screens; let i = index"
+             [style.animation-delay]="i * 80 + 'ms'"
+             (click)="openScreen(s)">
+
+          <div class="card-accent" [ngClass]="'accent-' + s.key"></div>
+
+          <div class="card-body">
+            <div class="card-header-row">
+              <div class="card-icon" [ngClass]="'icon-' + s.key">
+                {{ getIcon(s.key) }}
+              </div>
+              <div class="card-ago" *ngIf="daysAgoInfo(s.lastUpdated) as ago">
+                <span class="ago-value" [class.today]="ago.value === 'Today'">{{ ago.value }}</span>
+                <span class="ago-label" *ngIf="ago.label">{{ ago.label }}</span>
+              </div>
+            </div>
+
+            <div class="card-title">{{ s.title }}</div>
+
+            <div class="card-item" *ngIf="s.lastItemTitle">
+              {{ s.lastItemTitle }}
+            </div>
+             <br>
+            <div class="card-footer" *ngIf="s.lastUpdated; else na">
+              <div class="card-sub">Last updated</div>
+              <div class="card-date">
+                {{ s.lastUpdated | date : 'dd MMM yyyy, hh:mm a' }}
+              </div>
+            </div>
+
+            <ng-template #na>
+              <div class="card-footer">
+                <div class="card-sub">Last updated</div>
+                <div class="card-date muted">No data available</div>
+              </div>
+            </ng-template>
+
+            <div class="card-arrow">→</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <router-outlet></router-outlet>
+  </main>
+</div>

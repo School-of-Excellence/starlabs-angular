@@ -1,0 +1,751 @@
+<div *ngIf="loading" class="loading">
+  <mat-progress-spinner class="inner" [diameter]="50" strokeWidth="3" mode="indeterminate"></mat-progress-spinner>
+  <br>
+  <span class="font">Fetching Data Please Wait.....</span>
+</div>
+<div  *ngIf="!loading">
+
+  <div class="body">
+
+    <div class="title">Journey Coach Dashboard</div>
+
+    <div>
+      <div class="header">
+
+        <div class="d-flex flex-row">
+          <button class="head-btn-opp" type="button" (click)="toggleSection('grosssale')">
+            G-Sales - <strong>{{currentMonthGrossSale}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button style="display: flex;flex-direction: row;justify-content: center;align-items: center;padding: 8px 12px;gap: 8px;width: 8vw;height: 40px;background: #FFFFFF;border-radius: 8px;border: 1px solid #ff2ae3;color: #ff2ae3;" type="button" (click)="toggleSection('assuredsale')">
+            A-Sales - <strong>{{currentMonthAssuredSale}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button class="head-btn-opp" type="button">
+            G-Value - <strong>{{totalGrossValue.toLocaleString('en-IN')}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button class="head-btn-opp" type="button">
+            A-Value - <strong>{{totalAssuredValue.toLocaleString('en-IN')}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button class="head-btn-opp" type="button">
+            GEV - <strong>{{totalGrossEMI.toLocaleString('en-IN')}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button class="head-btn-opp" type="button">
+            AEV - <strong>{{totalAssuredEMI.toLocaleString('en-IN')}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button class="head-btn-opp" type="button">
+            Avg Waiting days to ASV - <strong>{{currentAvgToASV}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button style="display: flex;flex-direction: row;justify-content: center;align-items: center;padding: 8px 12px;gap: 8px;width: 10vw;height: 40px;background: #FFFFFF;border-radius: 8px;border: 1px solid #ff2ae3;color: #ff2ae3;" type="button" >
+            Avg Waiting days GSV to ASV - <strong>{{currentAvgGSVToASV}}</strong>
+          </button>
+
+          &nbsp;&nbsp;
+
+          <button class="head-btn-opp" type="button" (click)="toggleSection('journeycancelled')">
+            Cancelled - <strong>{{onboardingcount['journeycancelled'].data.length}}</strong>
+          </button>
+        </div>
+      </div>
+
+      <div class="d-flex flex-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Onbaorded Date</mat-label>
+          <mat-date-range-input [rangePicker]="onboardedPicker">
+            <input matStartDate [(ngModel)]="onboardedStartDate" placeholder="Start date">
+            <input matEndDate [(ngModel)]="onboardedEndDate" placeholder="End date">
+          </mat-date-range-input>
+          <mat-datepicker-toggle matSuffix [for]="onboardedPicker"></mat-datepicker-toggle>
+          <mat-date-range-picker #onboardedPicker></mat-date-range-picker>
+        </mat-form-field>
+      
+        <button mat-icon-button (click)="fetchData()"><mat-icon>done_outline</mat-icon></button>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;
+        <div class="d-flex flex-row">
+          <div>
+            <button style="display: flex;flex-direction: row;justify-content: center;align-items: center;padding: 8px 12px;gap: 8px;width: 8vw;height: 40px;background: #FFFFFF;border-radius: 8px;border: 1px solid #2e2aff;color: #2e2aff;" type="button" (click)="openopportunities()"><mat-icon style="font-size: 20px;">contact_phone</mat-icon>Opportunities</button>
+          </div>
+          &nbsp;&nbsp;
+          <div>
+            <button style="display: flex;flex-direction: row;justify-content: center;align-items: center;padding: 8px 12px;gap: 8px;width: 8vw;height: 40px;background: #FFFFFF;border-radius: 8px;border: 1px solid #2ab1ff;color: #2ab1ff;" type="button" (click)="openreshedule()"><mat-icon style="font-size: 20px;">verified</mat-icon>Onboarded</button>
+          </div>
+          &nbsp;&nbsp;
+          <div>
+            <button style="display: flex;flex-direction: row;justify-content: center;align-items: center;padding: 8px 12px;gap: 8px;width: 8vw;height: 40px;background: #FFFFFF;border-radius: 8px;border: 1px solid #16cc6e;color: #16cc6e;" type="button" (click)="opencompleted()"><mat-icon style="font-size: 20px;">check_circle</mat-icon>Completed</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-div">
+        <div class="dashboard-metrics">
+
+          <!-- Waiting for Onboarding Section -->
+          <div class="metric-section">
+  
+            <h3 style="margin-bottom: 20px;font-size: 17px;">Onboarding Status</h3>
+  
+            <div class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+
+              <div class="metric-card" (click)="toggleSection('notassured')" [ngClass]="{'blueborder': activeSection === 'notassured'}">
+                <div class="metric-label" style="color:#3d723d;font-size: 16px;">Not Assured</div>
+                <div class="metric-value darkgreen"><b style="font-weight: 700;">{{this.onboardingcount['notassured'].data.length}}</b></div>
+              </div>
+              
+              <div class="metric-card" (click)="toggleSection('all')" [ngClass]="{'blueborder': activeSection === 'all'}">
+                <div class="metric-label" style="color:#0D6EFD;font-size: 16px;">To Be Onboarded</div>
+                <div class="metric-value blue"><b style="font-weight: 700;">{{this.onboardingcount['all'].data.length}}</b></div>
+              </div>
+  
+              <div class="metric-card" (click)="toggleSection('last15daysnotOnboarded')" [ngClass]="{'redborder': activeSection === 'last15daysnotOnboarded'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">7+ Days</div>
+                <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['last15daysnotOnboarded'].data.length}}</b></div>
+              </div>
+              <!-- <div class="metric-card" (click)="toggleSection('last7to15notOnboarded')" [ngClass]="{'yellowborder': activeSection === 'last7to15notOnboarded'}">
+                <div class="metric-label" style="color: #ffcc00;font-size: 20px; ">7-15 Days</div>
+                <div class="metric-value yellow">{{this.onboardingcount['last7to15notOnboarded']['count']}}</div>
+              </div> -->
+              <div class="metric-card" (click)="toggleSection('last7DaysnotOnboarded')" [ngClass]="{'greenborder': activeSection === 'last7DaysnotOnboarded'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">7 Days</div>
+                <div class="metric-value green"><b style="font-weight: 700;">{{this.onboardingcount['last7DaysnotOnboarded'].data.length}}</b></div>
+              </div>
+
+              <div class="metric-card" (click)="toggleSection('onboarded')" [ngClass]="{'yellowborder': activeSection === 'onboarded'}">
+                <div class="metric-label" style="color: #f3cc30;font-size: 16px;">Onboarded</div>
+                <div class="metric-value yellow"><b style="font-weight: 700;">{{this.onboardingcount['onboarded'].data.length}}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-section">
+            <h3 style="margin-bottom: 20px;font-size: 17px;">Customer Status</h3>
+            <div class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+              <div class="metric-card" (click)="toggleSection('regularstatus')" [ngClass]="{'blueborder': activeSection === 'regularstatus'}">
+                <div class="metric-label" style="color:rgb(77, 140, 235);font-size: 16px">Regular</div>
+                <div class="metric-value blue"><b style="font-weight: 700;">{{this.onboardingcount['regularstatus']['data'].length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('missedstatus')" [ngClass]="{'blueborder': activeSection === 'missedstatus'}">
+                <div class="metric-label" style="color:#3d723d;font-size: 16px;">Missed</div>
+                <div class="metric-value darkgreen"><b style="font-weight: 700;">{{this.onboardingcount['missedstatus'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('defaultedstatus')" [ngClass]="{'redborder': activeSection === 'defaultedstatus'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">Defaulted</div>
+                <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['defaultedstatus'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('lockedstatus')" [ngClass]="{'greenborder': activeSection === 'lockedstatus'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">Locked</div>
+                <div class="metric-value green"><b style="font-weight: 700;">{{this.onboardingcount['lockedstatus'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('fullypaidstatus')" [ngClass]="{'yellowborder': activeSection === 'fullypaidstatus'}">
+                <div class="metric-label" style="color: #f3cc30;font-size: 16px;">Fully paid</div>
+                <div class="metric-value yellow"><b style="font-weight: 700;">{{this.onboardingcount['fullypaidstatus'].data.length}}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-section">
+            <h3 style="margin-bottom: 20px;font-size: 17px;">Customer Support - Open</h3>
+            <div class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+              <div class="metric-card" (click)="toggleSection('eventtickets')" [ngClass]="{'blueborder': activeSection === 'eventtickets'}">
+                <div class="metric-label" style="color:rgb(77, 140, 235);font-size: 16px">Events & Process</div>
+                <div class="metric-value blue"><b style="font-weight: 700;">{{this.onboardingcount['eventtickets'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('journeytickets')" [ngClass]="{'redborder': activeSection === 'journeytickets'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">Journey Related</div>
+                <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['journeytickets'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('cancellationtickets')" [ngClass]="{'greenborder': activeSection === 'cancellationtickets'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">Cancellation</div>
+                <div class="metric-value green"><b style="font-weight: 700;">{{this.onboardingcount['cancellationtickets'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('bigtickets')" [ngClass]="{'yellowborder': activeSection === 'bigtickets'}">
+                <div class="metric-label" style="color: #f3cc30;font-size: 16px;">B!G Support</div>
+                <div class="metric-value yellow"><b style="font-weight: 700;">{{this.onboardingcount['bigtickets'].data.length}}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metric-section">
+            <h3 style="margin-bottom: 20px;font-size: 17px;">Customer Support - Closed this month</h3>
+            <div class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+              <div class="metric-card" (click)="toggleSection('eventticketsclosed')" [ngClass]="{'blueborder': activeSection === 'eventticketsclosed'}">
+                <div class="metric-label" style="color:rgb(77, 140, 235);font-size: 16px">Events & Process</div>
+                <div class="metric-value blue"><b style="font-weight: 700;">{{this.onboardingcount['eventticketsclosed'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('journeyticketsclosed')" [ngClass]="{'redborder': activeSection === 'journeyticketsclosed'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">Journey Related</div>
+                <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['journeyticketsclosed'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('cancellationticketsclosed')" [ngClass]="{'greenborder': activeSection === 'cancellationticketsclosed'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">Cancellation</div>
+                <div class="metric-value green"><b style="font-weight: 700;">{{this.onboardingcount['cancellationticketsclosed'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('bigticketsclosed')" [ngClass]="{'yellowborder': activeSection === 'bigticketsclosed'}">
+                <div class="metric-label" style="color: #f3cc30;font-size: 16px;">B!G Support</div>
+                <div class="metric-value yellow"><b style="font-weight: 700;">{{this.onboardingcount['bigticketsclosed'].data.length}}</b></div>
+              </div>
+            </div>
+          </div>
+        
+          <!-- Minimum Payment Due Section -->
+          <!-- <div class="metric-section">
+            <div style="width: 220px;">
+  
+              <h3 style="margin-bottom: 20px;font-size: 17px;margin-left: 12px;">Minimum Payment Due</h3>
+              
+              <div class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+                <div class="minimundue" (click)="toggleSection('minimumpaymentdue')" [ngClass]="{'redborder': activeSection === 'minimumpaymentdue'}">
+                  <div class="metric-label" style="color: #ff3333;font-size: 16px;">No of Participants</div>
+                  <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['minimumpaymentdue'].data.length}}</b></div>
+                </div>
+              </div>
+  
+            </div>
+          </div> -->
+
+          <br>
+  
+          <div class="metric-section">
+            <h3 style="margin-bottom: 20px;font-size: 17px;">1st Product Status</h3>
+            <div class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+              <div class="metric-card" (click)="toggleSection('alljourneynotstarted')" [ngClass]="{'blueborder': activeSection === 'alljourneynotstarted'}">
+                <div class="metric-label" style="color:rgb(77, 140, 235);font-size: 16px">All</div>
+                <div class="metric-value blue"><b style="font-weight: 700;">{{this.onboardingcount['alljourneynotstarted']['data'].length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('morethan30daysjourneynotstarted')" [ngClass]="{'redborder': activeSection === 'morethan30daysjourneynotstarted'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">30+ Days</div>
+                <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['morethan30daysjourneynotstarted'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('lessthan30daysjourneynotstarted')" [ngClass]="{'greenborder': activeSection === 'lessthan30daysjourneynotstarted'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">30 Days</div>
+                <div class="metric-value green"><b style="font-weight: 700;">{{this.onboardingcount['lessthan30daysjourneynotstarted'].data.length}}</b></div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- journey engagement -->
+          <div class="metric-section">
+            <h3 style="margin-bottom: 20px;font-size: 17px;">Journey Engagement</h3>
+            <!-- <mat-radio-groupclass="radio-group" aria-label="Select an option" [(ngModel)]="selectedEngagementCategory" (change)="onEngagementCategoryChange($event.value)"> -->
+            <!-- <mat-radio-button value="All">All</mat-radio-button>&nbsp;&nbsp;&nbsp; -->
+            <!-- <mat-radio-button value="ActiveOnly">Active Subscription</mat-radio-button>&nbsp;&nbsp;&nbsp;-->
+            <!-- <mat-radio-button value="CustomerActive">Non-Active Subscription</mat-radio-button> -->
+            <div *ngIf="selectedEngagementCategory === 'ActiveOnly'"  class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('disappear')" [ngClass]="{'redborder': activeSection === 'disappear'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">Disappear</div>
+                <div class="red" [ngClass]="activeSection === 'disappear' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['disappear'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'disappear'" (click)="navigatetoTimeline(this.onboardingcount['disappear']['data'],'Disappear')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('minimal')" [ngClass]="{'yellowborder': activeSection === 'minimal'}">
+                <div class="metric-label" style="color: #f3cc30;font-size: 16px;">Minimal</div>
+                <div class="yellow" [ngClass]="activeSection === 'minimal' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['minimal'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'minimal'" (click)="navigatetoTimeline(this.onboardingcount['minimal']['data'],'Minimal')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('average')" [ngClass]="{'darkyellowborder': activeSection === 'average'}">
+                <div class="metric-label" style="color: #a78d29;font-size: 16px;">Average</div>
+                <div class="darkyellow" [ngClass]="activeSection === 'average' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['average'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'average'" (click)="navigatetoTimeline(this.onboardingcount['average']['data'],'Average')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+              
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('optimal')" [ngClass]="{'greenborder': activeSection === 'optimal'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">Optimal</div>
+                <div class="green" [ngClass]="activeSection === 'optimal' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['optimal'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'optimal'" (click)="navigatetoTimeline(this.onboardingcount['optimal']['data'],'Optimal')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('superoptimal')" [ngClass]="{'darkgreenborder': activeSection === 'superoptimal'}">
+                <div style="color: #3d723d;" [ngClass]="activeSection === 'superoptimal' ? 'metric-label-icon' : 'metric-label'">S-Optimal</div>
+                <div class="darkgreen" [ngClass]="activeSection === 'superoptimal' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['superoptimal'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'superoptimal'" (click)="navigatetoTimeline(this.onboardingcount['superoptimal']['data'],'Super Optimal')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+              
+            </div>
+            <!-- In Active -->
+            <div *ngIf="selectedEngagementCategory === 'CustomerActive'"  class="metric-cards" style="border-right: 2px solid rgb(112, 111, 111);">
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('disappearIn')" [ngClass]="{'redborder': activeSection === 'disappearIn'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">Disappear</div>
+                <div class="red" [ngClass]="activeSection === 'disappearIn' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['disappearIn'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'disappearIn'" (click)="navigatetoTimeline(this.onboardingcount['disappearIn']['data'],'Disappear')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('minimalIn')" [ngClass]="{'yellowborder': activeSection === 'minimalIn'}">
+                <div class="metric-label" style="color: #ffcc00;font-size: 16px;">Minimal</div>
+                <div class="yellow" [ngClass]="activeSection === 'minimalIn' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['minimalIn'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'minimalIn'" (click)="navigatetoTimeline(this.onboardingcount['minimalIn']['data'],'Minimal')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('averageIn')" [ngClass]="{'darkyellowborder': activeSection === 'averageIn'}">
+                <div class="darkyellow" [ngClass]="activeSection === 'averageIn' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['averageIn'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'averageIn'" (click)="navigatetoTimeline(this.onboardingcount['averageIn']['data'],'Average')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+              
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('optimalIn')" [ngClass]="{'greenborder': activeSection === 'optimalIn'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">Optimal</div>
+                <div class="green" [ngClass]="activeSection === 'optimalIn' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['optimalIn'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'optimalIn'" (click)="navigatetoTimeline(this.onboardingcount['optimalIn']['data'],'Optimal')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+  
+              <div class="metric-card" style="margin-right: 10px;"  (click)="toggleSection('superoptimalIn')" [ngClass]="{'darkgreenborder': activeSection === 'superoptimalIn'}">
+                <div style="color: #3d723d;" [ngClass]="activeSection === 'superoptimalIn' ? 'metric-label-icon' : 'metric-label'">S-Optimal</div>
+                <div class="darkgreen" [ngClass]="activeSection === 'superoptimalIn' ? 'metric-value-icon' : 'metric-value'"><b style="font-weight: 700;">{{this.onboardingcount['superoptimalIn'].data.length}}</b></div>
+                <div class="icon-container" *ngIf="activeSection === 'superoptimalIn'" (click)="navigatetoTimeline(this.onboardingcount['superoptimalIn']['data'],'Super Optimal')">
+                  <mat-icon>timeline</mat-icon>
+                </div>
+              </div>
+              
+            </div>
+          </div>
+  
+          <div class="metric-section">
+            <h3 style="margin-bottom: 20px;font-size: 17px;">Subscription Status</h3>
+            <div class="metric-cards">
+              <div class="metric-card" (click)="toggleSection('alljourneynotstarted')" [ngClass]="{'blueborder': activeSection === 'alljourneynotstarted'}">
+                <div class="metric-label" style="color:rgb(77, 140, 235);font-size: 16px">Subscription Ended</div>
+                <div class="metric-value blue"><b style="font-weight: 700;">{{this.onboardingcount['alljourneynotstarted']['data'].length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('lastMonth')" [ngClass]="{'redborder': activeSection === 'lastMonth'}">
+                <div class="metric-label" style="color: #ff3333;font-size: 16px;">Previous</div>
+                <div class="metric-value red"><b style="font-weight: 700;">{{this.onboardingcount['lastMonth'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('currentMonth')"[ngClass]="{'yellowborder': activeSection === 'currentMonth'}">
+                <div class="metric-label" style="color: #ffcc00;font-size: 16px;">Current</div>
+                <div class="metric-value yellow"><b style="font-weight: 700;">{{this.onboardingcount['currentMonth'].data.length}}</b></div>
+              </div>
+              <div class="metric-card" (click)="toggleSection('nextMonth')" [ngClass]="{'greenborder': activeSection === 'nextMonth'}">
+                <div class="metric-label" style="color: #33cc33;font-size: 16px;">Next</div>
+                <div class="metric-value green"><b style="font-weight: 700;">{{this.onboardingcount['nextMonth'].data.length}}</b></div>
+              </div>
+            </div>
+          </div>
+  
+        </div>
+  
+        <div>
+          <span style="display: flex; align-items: center; justify-content: space-between; padding-right: 10px;">
+            <h2 style="font-weight: bold; font-size: 20px;margin-left: 25px;"  [ngClass]="{
+              'waiting-onboarding-blue': activeSection === 'all' || activeSection === 'alljourneynotstarted' || activeSection === 'regularstatus' || activeSection === 'eventtickets' || activeSection === 'eventticketsclosed',
+              'waiting-onboarding-red': activeSection === 'last15daysnotOnboarded' || activeSection === 'minimumpaymentdue' || activeSection === 'morethan30daysjourneynotstarted' || activeSection === 'disappear' || activeSection === 'lastMonth' || activeSection === 'defaultedstatus' || activeSection === 'journeytickets' || activeSection === 'journeyticketsclosed',
+              'waiting-onboarding-green': activeSection === 'last7DaysnotOnboarded' || activeSection === 'lessthan30daysjourneynotstarted' || activeSection === 'optimal' || activeSection === 'nextMonth' || activeSection === 'lockedstatus' || activeSection === 'cancellationtickets' || activeSection === 'cancellationticketsclosed',
+              'waiting-onboarding-yellow': activeSection === 'minimal' || activeSection === 'currentMonth' || activeSection === 'onboarded' || activeSection === 'fullypaidstatus' || activeSection === 'bigtickets' || activeSection === 'bigticketsclosed', 
+              'waiting-onboarding-darkyellow': activeSection === 'average',
+              'waiting-onboarding-darkgreen': activeSection === 'superoptimal' || activeSection == 'notassured' || activeSection == 'missedstatus'
+            }">
+              {{
+                { 'all': 'To Be Onboarded',
+                  'last15daysnotOnboarded': 'Waiting for Onboarding',
+                  'last7to15notOnboarded': 'Waiting for Onboarding',
+                  'last7DaysnotOnboarded': 'Waiting for Onboarding',
+                  'minimumpaymentdue': 'Minimum Payment Due',
+                  'alljourneynotstarted': '1st Product Not Started',
+                  'onboarded': 'Onboarded',
+                  'morethan30daysjourneynotstarted': '1st Product Not Started',
+                  'last7to15journeynotstarted': '1st Product Not Started',
+                  'lessthan30daysjourneynotstarted': '1st Product Not Started',
+                  'disappear': 'Journey Engagement',
+                  'minimal': 'Journey Engagement',
+                  'average': 'Journey Engagement',
+                  'optimal': 'Journey Engagement',
+                  'superoptimal': 'Journey Engagement',
+                  'lastMonth': 'Subscription End',
+                  'currentMonth': 'Subscription End',
+                  'nextMonth': 'Subscription End',
+                  'grosssale': 'Gross Sale',
+                  'assuredsale': 'Assured Sale',
+                  'regularstatus': 'Regular Status',
+                  'missedstatus': 'Missed Status',
+                  'defaultedstatus': 'Defaulted Status',
+                  'lockedstatus': 'Locked Status',
+                  'fullypaidstatus': 'Fully Paid Status',
+                  'eventtickets': 'Events & Process',
+                  'journeytickets': 'Journey Related',
+                  'cancellationtickets': 'Cancellation Tickets',
+                  'bigtickets': 'B!G Support',
+                  'notassured': 'Not Assured',
+                  'eventticketsclosed': 'Events & Process',
+                  'journeyticketsclosed': 'Journey Related',
+                  'cancellationticketsclosed': 'Cancellation Tickets',
+                  'bigticketsclosed': 'B!G Support',
+                  'journeycancelled': 'Cancelled'
+                }[activeSection] || ''
+              }} - {{dataSource.data.length}}
+            </h2>
+            
+            <div style="display: flex; align-items: center;">
+              <button 
+                mat-flat-button 
+                [ngStyle]="{'color':'white','background-color': selection.selected.length === 0 ? '' : 'rgb(77, 140, 235)'}" 
+                class="ml-2" 
+                (click)="sendMessagesToSelectedPartiicpant()" 
+                [disabled]="selection.selected.length === 0">
+                <mat-icon style="font-size: 20px;">chat</mat-icon> <b>Send In-App Message</b>
+              </button>
+    
+              <button 
+                mat-flat-button 
+                [ngStyle]="{'color':'white','background-color': selection.selected.length === 0 ? '' : 'rgb(77, 140, 235)', 'margin-right': '70px'}" 
+                class="ml-2" 
+                (click)="sendNotificationinBreakthrough()" 
+                [disabled]="selection.selected.length === 0">
+                <mat-icon style="font-size: 20px;">notifications</mat-icon> <b>Send Notification</b>
+              </button>
+    
+              <form [formGroup]="filterForm" class="d-flex flex-row">
+                <div class="input-wrapper">
+                  <input type="search" formControlName="name" placeholder="Search" class="search-input">
+                </div>
+
+                <span *ngIf="['all','last15daysnotOnboarded','last7daysnotOnboarded','grosssale','assuredsale', 'notassured'].includes(this.activeSection)" style="background-color: white;border-radius: 10px;" >
+                  <mat-form-field appearance="outline" class="small-form-field">
+                  <mat-label>Purchase Date</mat-label>
+                  <mat-date-range-input [rangePicker]="rangePicker">
+                      <input matStartDate formControlName="dateStart" placeholder="Start date">
+                      <input matEndDate formControlName="dateEnd" placeholder="End date">
+                  </mat-date-range-input>
+                  <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+                  <mat-date-range-picker #rangePicker></mat-date-range-picker>
+                  </mat-form-field>
+                </span>
+
+                &nbsp;&nbsp;
+
+                <span style="background-color: white;border-radius: 10px;">
+                  <mat-form-field appearance="outline" class="small-form-field">
+                    <mat-label>Journey</mat-label>
+                    <mat-select placeholder="Select Journey" formControlName="journey" [multiple]="false">
+                      <mat-option *ngFor="let journey of ecosystemJourneys" [value]="journey.id">{{ journey.journey }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </span>
+
+                &nbsp;&nbsp;
+
+                <span style="background-color: white;border-radius: 10px;">
+                  <mat-form-field appearance="outline" class="small-form-field">
+                    <mat-label>Journey Coach</mat-label>
+                    <mat-select placeholder="Select Journey" formControlName="journeycoach" [multiple]="false">
+                      <mat-option *ngFor="let coach of coachesList" [value]="coach.profile_ref.id">{{ mapprofile[coach.profile_ref.id] }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </span>
+
+                &nbsp;&nbsp;
+
+                <mat-checkbox style="margin-right: 10px;color: #ff3333;margin-top: 15px;" formControlName="new" ><b class="font">New Sales</b></mat-checkbox>
+                <mat-checkbox style="margin-right: 10px;color: #ff3333;margin-top: 15px;" formControlName="upgrade" ><b class="font">Upgrade</b></mat-checkbox>
+                <mat-checkbox style="margin-right: 10px;color: #ff3333;margin-top: 15px;" formControlName="DFU" ><b class="font">DFU</b></mat-checkbox>
+
+                <div>
+                  <button mat-mini-fab color="accent" (click)="resetFilters()"><mat-icon style="font-size:18px">refresh</mat-icon></button>
+                </div>
+
+              </form>
+            </div>
+          </span>
+        </div>
+      </div>
+
+      <!-- <h2 style="font-weight: bold;" >{{activeSection === 'last15daysnotOnboarded' || 'last7to15notOnboarded' || 'last7DaysnotOnboarded' ? 'Waiting for Onboarding' : activeSection === 'paymentDue' ? '7 To 15 Days'  : '' }}</h2> -->
+      
+      <div class="mat-elevation-z8 m-4">
+        <table [ngClass]="{
+            'mat-header-blue': activeSection === 'all' || activeSection === 'alljourneynotstarted' || activeSection === 'regularstatus' || activeSection === 'eventtickets' || activeSection === 'eventticketsclosed',
+            'mat-header-red': activeSection === 'last15daysnotOnboarded' || activeSection === 'minimumpaymentdue' || activeSection === 'morethan30daysjourneynotstarted' || activeSection === 'disappear' || activeSection === 'lastMonth' || activeSection === 'defaultedstatus' || activeSection === 'journeytickets' || activeSection === 'journeyticketsclosed',
+            'mat-header-green': activeSection === 'last7DaysnotOnboarded' || activeSection === 'lessthan30daysjourneynotstarted' || activeSection === 'optimal' || activeSection === 'nextMonth' || activeSection === 'lockedstatus' || activeSection === 'cancellationtickets' || activeSection === 'cancellationticketsclosed',
+            'mat-header-yellow': activeSection === 'minimal' || activeSection === 'currentMonth' || activeSection === 'onboarded' || activeSection === 'fullypaidstatus' || activeSection === 'bigtickets' || activeSection === 'bigticketsclosed',
+            'mat-header-darkyellow': activeSection === 'average',
+            'mat-header-darkgreen': activeSection === 'superoptimal' || activeSection == 'notassured' || activeSection == 'missedstatus'
+          }" mat-table [dataSource]="dataSource" matSort>
+          
+          <!-- <ng-container matColumnDef="select">
+            <th mat-header-cell *matHeaderCellDef class="checkbox-cell">
+              <div 
+                class="custom-checkbox" 
+                [ngClass]="{'checked': isAllSelected()}"
+                (click)="toggleAllRows()"
+              ></div>
+            </th>
+            <td mat-cell *matCellDef="let row" class="checkbox-cell">
+              <div 
+                class="custom-checkbox" 
+                [ngClass]="{'checked': selection.isSelected(row)}"
+                (click)="toggleRow(row)"
+              ></div>
+            </td>
+          </ng-container> -->
+
+          <ng-container *ngFor="let column of displayedColumns" [matColumnDef]="column">
+            
+            <th mat-header-cell *matHeaderCellDef mat-sort-header > 
+              <span class="teableHeading" *ngIf="column === 'name'">Name</span>
+              <span class="teableHeading" *ngIf="column === 'number'">Mobile</span>
+              <span class="teableHeading" *ngIf="column === 'journey'">Journey</span>
+              <span class="teableHeading" *ngIf="column === 'purchasevalue'">Purchase Value</span>
+              <span class="teableHeading" *ngIf="column === 'installmentamount'">Payment Plan</span>
+              <span class="teableHeading" *ngIf="column === 'purchasedate'">Purchase Date</span>
+              <span class="teableHeading" *ngIf="column === 'salesperson'">Sales Person</span>
+              <span class="teableHeading" *ngIf="column === 'queries'">No of Queries</span>
+              <span class="teableHeading" *ngIf="column === 'customerstatus'">Cutomerstatus</span>
+              <span class="teableHeading" *ngIf="column === 'schedule'">Schedule</span>
+              <span class="teableHeading" *ngIf="column === 'schedulefor'">Schedule For</span>
+              <span class="teableHeading" *ngIf="column === 'action'">Action</span>
+              <span class="teableHeading" *ngIf="column === 'onboardeddate' ">Onboarded Date</span>
+              <span class="teableHeading" *ngIf="column === 'onboardedby'">Onboarded By</span>
+              <span class="teableHeading" *ngIf="column === 'firstproduct' ">First  Product</span>
+              <span class="teableHeading" *ngIf="column === 'paidamount' ">Paid Amount</span>
+              <span class="teableHeading" *ngIf="column === 'remainingamount'">Remaining Amount</span>
+              <span class="teableHeading" *ngIf="column === 'toggle'">InApp</span>
+              <span class="teableHeading" *ngIf="column === 'viewreport'">View Report</span>
+              <span class="teableHeading" *ngIf="column === 'enddate'">End Date</span>
+              <span class="teableHeading" *ngIf="column === 'viewnotes'">Notes</span>
+              <span class="teableHeading" *ngIf="column === 'addnotes'">+</span>
+              <span class="teableHeading" *ngIf="column === 'journeyplan'">Journey Plan</span>
+              <span class="teableHeading" *ngIf="column === 'tentativestart'">Tentative Start</span>
+              <span class="teableHeading" *ngIf="column === 'minimumpayment'">Minimum Payment</span>
+              <span class="teableHeading" *ngIf="column === 'paymentplanassureddate'">Enach</span>
+              <span class="teableHeading" *ngIf="column === 'finance'">Finance</span>
+              <span class="teableHeading" *ngIf="column === 'initiate'">1st Product</span>
+              <span class="teableHeading" *ngIf="column === 'lasttouchpoint'">Last Touch Point</span>
+              <span class="teableHeading" *ngIf="column === 'engagement'">Engagement</span>
+              <span class="teableHeading" *ngIf="column === 'notes'">Sale Notes</span>
+              <span *ngIf="column === 'select'"class="custom-checkbox" [ngClass]="{'checked': isAllSelected()}"(click)="toggleAllRows()"></span>
+              <!-- <span class="teableHeading" *ngIf="column === 'product+bonus'">Product</span> -->
+              <span class="teableHeading" *ngIf="column === 'presalesperson'">Pre-Sales Person</span>
+              <!-- <span class="teableHeading" *ngIf="column === 'appointmentstatus'">Status</span> -->
+            </th>
+
+            <td mat-cell *matCellDef="let element">
+
+              <span *ngIf="column === 'select'"
+                class="custom-checkbox" 
+                [ngClass]="{'checked': selection.isSelected(element)}"
+                (click)="toggleRow(element)"
+              ></span>
+              <span *ngIf="column === 'name'" [ngClass]="getColumnClass(element.tentativestart)" (click)="navigatetoprofile(element['profileid'])">{{element['profileid'] ? mapprofile[element['profileid']] : element['name']}}</span>
+              <span *ngIf="column === 'number'" [ngClass]="getColumnClass(element.tentativestart)">{{mapphone[element['profileid']]}}</span>
+              <span *ngIf="column === 'journey'">
+
+                <span *ngIf="['grosssale','assuredsale', 'notassured'].includes(activeSection)">
+                  <span *ngIf="element['journeyref'] == null">
+                    <button mat-flat-button class="ml-2 product-status">{{'Addon'}}</button>
+                  </span>
+                  <span *ngIf="element['journeyref'] != null">
+                    <button mat-flat-button class="ml-2 product-status" [ngClass]="![undefined,''].includes(element['journeystatus']) ? getStatusClass(null) : getButtonClass(null)" (click)="openProduct(element)">{{ element['journeyref'] ? mapjourneyname[element['journeyref']?.id]['journey'] : '...'}}</button>
+                  </span>
+                </span>
+
+                <span *ngIf="!['grosssale','assuredsale', 'notassured'].includes(activeSection)">
+                  <button mat-flat-button 
+                    class="ml-2 product-status" [ngClass]="![undefined,''].includes(element['journeystatus']) ? getStatusClass(element['journeystatus']) : getButtonClass(element.tentativestart)" 
+                    (click)="openProduct(element)"
+                    [matTooltip]="![null,''].includes(element['journeystatus']) ? element['journeystatus'] : 'Yet To Start'" 
+                    matTooltipPosition="above">
+                    {{ element['journeyref'] ? mapjourneyname[element['journeyref']?.id]['journey'] : element['activejourney'] }}
+                  </button>
+                </span>
+
+              </span>
+              <span *ngIf="column === 'purchasedate'">{{ [null,undefined,''].includes(element['purchasedate']) ? '' : element['purchasedate'].toDate() | date: 'mediumDate' }}</span>              
+              <span *ngIf="column === 'salesperson'">{{element['salesperson']}}</span> 
+              <span *ngIf="column === 'presalesperson'">{{element['presalesperson'] || 'N/A'}}</span>  
+              <span *ngIf="column === 'purchasevalue'">{{element['totalpurchasevalue'] || ''}}</span>
+              <span *ngIf="column === 'installmentamount'">{{element['installmentamount'] || ''}}</span>
+              <span *ngIf="column === 'queries'" [ngClass]="getColumnClass(element.tentativestart)">{{element['queryCount']}}</span>
+              <span *ngIf="column === 'customerstatus'">{{element['customerstatus']}}</span>
+              <span *ngIf="column === 'tentativestart'" [ngClass]="getColumnClass(element.tentativestart)">
+                <div type="button" [ngClass]="getColumnClass(element.tentativestart)" [ngStyle]="{'padding' : '10px','border-radius': '5px','width' : '80%','text-align' : 'center'}">
+                  <p *ngIf="![null,undefined,''].includes(element['tentativestart'])">{{element['tentativestart'] | date: 'mediumDate'}}</p>
+                </div>
+              </span>
+              <span *ngIf="column === 'minimumpayment'" [ngClass]="getColumnClass(element.tentativestart)">{{element['firstproductminimumpayment'] ? element['firstproductminimumpayment'] :  0}}</span>
+              <!-- <span *ngIf="column === 'product+bonus'" style="cursor: pointer;" (click)="openProduct(element)">{{element['participantproducts'] ? element['participantproducts']?.length : element['participantproductcount']}}</span> -->
+              <!-- <span *ngIf="column === 'schedulefor'">{{element['appointmentid'] ? mapprofile[mapAppointments[element['appointmentid'].id]] : ''}}</span> -->
+
+              <span *ngIf="column === 'schedule'">
+                <span
+                  [ngStyle]="{
+                    'padding' : '10px',
+                    'background-color': element['onboardingscheduled'] ? (element['onboardingscheduled'].toDate() > currentDate ? 'green' : 'red') : element['onboardingscheduled'] == null && element['onreschedule'] == true ? 'red' : 'rgb(61, 134, 230)',
+                    'border': element['onboardingscheduled'] ? (element['onboardingscheduled'].toDate() > currentDate ? '2px solid green' :  '2px solid red') : element['onboardingscheduled'] == null && element['onreschedule'] == true ? '2px solid red' :  '2px solid rgb(61, 134, 230)',
+                    'border-radius': '5px',
+                    'color' : 'white',
+                    'width' : '80%',
+                    'text-align' : 'center'
+                  }"
+                  (click)="openSchedule(element)">
+                  <b>{{ element['onboardingscheduled'] != null ? (element['onboardingscheduled'].toDate() | date: 'medium').toString() : (element['onboardingscheduled'] == null && element['onreschedule'] == true ? 'Re-Schedule Appointment' : 'Schedule Appointment') }}</b>
+                </span> 
+              </span>
+
+              <span *ngIf="column === 'paymentplanassureddate' && element['paymentplanassureddate'] != undefined">
+                <span>
+                  <!-- {{(
+                      (element['paymentplanassureddate'] && element['paymentplanassureddate'].toDate ? element['paymentplanassureddate'].toDate().getTime() : null) -
+                      (element['purchasedate'] ? element['purchasedate'].toDate() : this.totalPaidMap[element['profileid']]['purchasedate']?.toDate()).getTime()
+                    ) / (1000 * 3600 * 24) | number: '1.0-0' 
+                  }} days -->
+                  <b>{{enachDays(element['paymentplanassureddate'])}}&nbsp;</b>Days
+                </span>
+              </span>
+
+              <span *ngIf="column === 'finance'">{{element['financialstatus']}}</span>
+              <span *ngIf="column === 'engagement'">{{![null,undefined].includes(element['lasttouchpoint']) ? element['lasttouchpoint']['activityname'] : ''}}</span>
+              <span *ngIf="column === 'lasttouchpoint'">{{![null,undefined].includes(element['lasttouchpoint']) ? (element['lasttouchpoint']['activitydate'].toDate() | date:'medium') : ''}}</span>
+              <span *ngIf="column === 'schedulefor'">
+                <!-- {{ element['appointmentid'] ? mapAppointments[element['appointmentid'] || ''] || '' : '' }} -->
+                <span *ngFor="let host of mapAppointments[element['appointmentid']]" style="font-size: 16px;">
+                  {{mapprofile[host.id].toString() || 'N/A'}}
+                </span>
+              </span>
+             
+              <!-- <span type="button" *ngIf="column === 'action' && (activeSection == 'all' || activeSection == 'last15daysnotOnboarded' ||  activeSection == 'last7to15notOnboarded' || activeSection == 'last7DaysnotOnboarded')" ><button  mat-flat-button class="ml-2"  [class.active]="element['onboardingscheduled'] && element['onboardingscheduled']?.toDate() < currentDate" [class.inactive]="!element['onboardingscheduled'] || element['onboardingscheduled']?.toDate() > currentDate" [disabled]="!element['onboardingscheduled'] || element['onboardingscheduled']?.toDate() > currentDate" (click)="markOnboarded(element)">Mark as Onboarded</button></span> -->
+              <span type="button" *ngIf="column === 'action' && (activeSection == 'all' || activeSection == 'last15daysnotOnboarded' ||  activeSection == 'last7to15notOnboarded' || activeSection == 'last7DaysnotOnboarded')" >
+                <button 
+                  mat-flat-button 
+                  class="ml-2" 
+                  [ngStyle]="{
+                    'background-color': [null,undefined,''].includes(element['onboardingscheduled']) ? '#e0e0e0' : (element['onboardingscheduled'] && element['onboardingscheduled']?.toDate() > currentDate) ? '#e0e0e0' : '#1976d2',
+                    'color': !element['onboardingscheduled'] || (element['onboardingscheduled'] && element['onboardingscheduled']?.toDate() > currentDate) ? '#9e9e9e' : 'white',
+                    'cursor': (element['onboardingscheduled'] && element['onboardingscheduled']?.toDate() > currentDate) ? 'not-allowed' : 'pointer'
+                  }"
+                  [disabled]="checkMarkOnboarding(element)"
+                  (click)="markOnboarded(element)"
+                  >
+                  Mark as Onboarded
+                </button>
+              </span>
+              <!-- [disabled]="checkMarkOnboarding(element)" -->
+
+              <span *ngIf="column === 'toggle' && (activeSection == 'all' || activeSection == 'last15daysnotOnboarded' || activeSection == 'last7to15notOnboarded' || activeSection == 'last7DaysnotOnboarded')">
+                <mat-slide-toggle [disabled] = 'element.orientationstatus == "planned"' [checked]="isChecked(element)" (change)="onToggleChange($event, element)"></mat-slide-toggle>
+              </span>
+
+              <span *ngIf="column === 'onboardeddate' && element['onboarded'] == true">
+                {{element['onboardedtime']?.toDate() | date}}
+              </span>
+              <span *ngIf="column === 'onboardedby' && element['onboardedby']">
+                  {{element['onboardedby']?.length != 0 ? (mapprofile[element['onboardedby'][0].id] || 'No-Data') : 'NO Data'}}
+              </span>
+
+              <span *ngIf="column === 'initiate'&& element['firstproductminimumpayment'] != undefined" [ngClass]="getColumnClass(element.tentativestart)">
+                <button  mat-stroked-button class="ml-2 initiate-button" (click)="initiateProduct(element)"><b>Initiate</b></button>
+              </span>
+
+              <span *ngIf="column === 'firstproduct'&& element['firstproductminimumpayment'] != undefined" [ngClass]="getColumnClass(element.tentativestart)">{{mapproducts[element['firstproductname']]}}</span>
+              <span *ngIf="column === 'journeyplan'" [ngClass]="getColumnClass(element.tentativestart)"><button  mat-flat-button class="ml-2"   style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"  (click)="navigatejourneyplan(element)">Journey Plan</button></span>
+
+              <span *ngIf="column === 'paidamount' && element['firstproductminimumpayment'] != undefined" [ngClass]="getColumnClass(element.tentativestart)">
+                {{[null,undefined,''].includes(element['totalPaid']) ? ([null,undefined,''].includes(element['pp_totalpaid']) ? '' : element['pp_totalpaid']) : element['totalPaid']}}
+              </span>
+              <span *ngIf="column === 'remainingamount' && element['firstproductminimumpayment'] != undefined && element['firstproductminimumpayment'] - element['totalPaid'] > 0" [ngClass]="getColumnClass(element.tentativestart)">{{element['firstproductminimumpayment'] - element['totalPaid']}}</span>
+
+              <span *ngIf="column === 'enddate'">
+                <span *ngIf="![null,undefined,''].includes(element['subscriptionend'])">
+                  {{element['subscriptionend'].toDate() | date:'medium'}}
+                </span>
+              </span>
+              
+              <span *ngIf="column === 'viewreport' && element['onboardingreportlog']" style="cursor: pointer;" >
+                <div class="notes-container">
+                  <div *ngIf="element['onboardingreportlog']?.length > 0;">
+                    <!-- Display the last added note -->
+                    <div (click)="viewReport(element)">
+                      <span class="note-text" matTooltip="{{ element['onboardingreportlog'][element['onboardingreportlog'].length - 1].report }}">
+                        {{ element['onboardingreportlog'][element['onboardingreportlog'].length - 1].report | slice:0:20 }}...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </span>
+              <!-- (activeSection == 'all' || 
+              activeSection == 'last15daysnotOnboarded' ||  
+              activeSection == 'last7to15notOnboarded' || 
+              activeSection == 'last7DaysnotOnboarded'
+            ) -->
+              <span *ngIf="column === 'viewnotes'" #notesContainer (mouseenter)="showPopup(element, $event, notesContainer)" (mouseleave)="hidePopupWithDelay()">
+                <div class="notes-container">
+                  <div *ngIf="element['generalnotes']?.length > 0;">
+                    <!-- Display the last added note -->
+                    <div>
+                      <span (click)="viewNotes(element)" class="note-text" matTooltip="{{ element['generalnotes'][element['generalnotes'].length - 1].note }}">
+                        {{ element['generalnotes'][element['generalnotes'].length - 1].note | slice:0:20 }}...
+                      </span>
+                    </div>
+                  </div>
+                </div>  
+              </span>
+              
+              <span *ngIf="column === 'notes'">
+                <div class="notes-container">
+                  <div *ngIf="![null,undefined,''].includes(element['notes'])">
+                    <div>
+                      <span class="note-text" matTooltip="{{ element['notes'] }}">
+                        {{ element['notes'] | slice:0:20 }}...
+                      </span>
+                    </div>
+                  </div>
+                </div>  
+              </span>
+
+              <span *ngIf="column === 'addnotes'">
+                <div (click)="addNotes(element)">
+                  <mat-icon class="edit-icon" >edit_note</mat-icon>
+                </div>
+              </span>
+
+            </td>
+          </ng-container>
+          <tr mat-header-row  *matHeaderRowDef="displayedColumns;sticky: true"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+        <mat-paginator [pageSizeOptions]="[25, 100,500,1000,dataSource.data.length]"  aria-label="Select page of users"></mat-paginator>
+      </div>  
+    </div>
+  </div>  
+</div>
+
+
+  
+  
+
+

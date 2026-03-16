@@ -1,0 +1,181 @@
+<div class="mainscreen">
+    <form [formGroup]="form">
+      <mat-icon>filter_list</mat-icon>&nbsp;&nbsp;&nbsp;&nbsp;
+      <!-- name -->
+      <mat-form-field appearance="fill" style="width:30%" class="ml-4">
+        <mat-label>Search Name</mat-label>
+        <mat-chip-grid #chipList0 multiple >
+          <mat-chip-row *ngFor="let profileid of form.get('profileid').value;let i = index" >
+            {{mapparticipant[profileid]}}
+            <mat-icon matChipRemove (click)="onRemove('profileid',i)">cancel</mat-icon>
+          </mat-chip-row>
+          <input 
+            placeholder="add type reference..."
+            [matAutocomplete]="auto"
+            [matChipInputFor]="chipList0"
+            (keyup)="onTextSearch($event,'profileid')"
+          >
+        </mat-chip-grid>
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="selected($event,'profileid')">
+          <mat-option *ngFor="let option of filteredProfileData" [value]="option.id">{{option.name}}</mat-option>
+        </mat-autocomplete>
+        <mat-hint>select to add.</mat-hint>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field *ngIf="!snippetView" appearance="fill" style="width:30%" class="ml-4">
+        <mat-label>Search Template</mat-label>
+        <mat-chip-grid #chipList2 multiple >
+          <mat-chip-row 
+            *ngFor="let docid of form.get('template').value;let i = index" >
+            {{mapVideoAsk[docid]}}
+            <mat-icon matChipRemove (click)="onRemove('template',i)">cancel</mat-icon>
+          </mat-chip-row>
+          <input 
+            [matAutocomplete]="auto2"
+            [matChipInputFor]="chipList2"
+            (keyup)="onTextSearch($event,'template')"
+          >
+        </mat-chip-grid>
+        <mat-autocomplete #auto2="matAutocomplete" (optionSelected)="selected($event,'template')">
+          <mat-option *ngFor="let option of filteredTemplateList" [value]="option.docid">{{option['title']}}</mat-option>
+        </mat-autocomplete>
+        <mat-hint>select to add.</mat-hint>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <!-- event -->
+      <mat-form-field *ngIf="!snippetView" appearance="fill" style="width:30%" class="ml-4">
+        <mat-label>Search Event</mat-label>
+        <mat-chip-grid #chipList1 multiple >
+          <mat-chip-row *ngFor="let docid of form.get('event').value;let i = index" >
+            {{mapEvents[docid] != undefined ? mapEvents[docid]['name'] : mapWorkshop[docid] != undefined ? mapWorkshop[docid]['title'] : mapQueue[docid] != undefined ? mapQueue[docid]['queuename'] : ""}}
+            <mat-icon matChipRemove (click)="onRemove('event',i)">cancel</mat-icon>
+          </mat-chip-row>
+          <input 
+            placeholder="add type reference..."
+            [matAutocomplete]="auto1"
+            [matChipInputFor]="chipList1"
+            (keyup)="onTextSearch($event,'event')"
+            >
+        </mat-chip-grid>
+        <mat-autocomplete #auto1="matAutocomplete" (optionSelected)="selected($event,'event')">
+          <mat-option *ngFor="let option of filteredEventData" [value]="option.docid">
+            {{option['name'] ? option['name'] : option['title'] ? option['title'] : option['queuename'] ? option['queuename'] : null}}
+          </mat-option>
+        </mat-autocomplete>
+        <mat-hint>select to add.</mat-hint>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field *ngIf="!snippetView" appearance="fill" class="ml-4">
+        <mat-label>Enter a date range</mat-label>
+        <mat-date-range-input formGroupName="range" [rangePicker]="picker">
+          <input matStartDate formControlName="start" placeholder="Start date">
+          <input matEndDate formControlName="end" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker #picker></mat-date-range-picker>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <button mat-stroked-button type="button" (click)="onResetForm()">Clear</button>&nbsp;&nbsp;
+    </form>
+    <div class="d-flex flex-row">
+      <mat-slide-toggle [(ngModel)]="snippetView" (change)="changeToSnippetView()">Snippet View</mat-slide-toggle>&nbsp;&nbsp;&nbsp;&nbsp;
+      <h4>Filtered Video : {{dataSource.filteredData.length}}</h4>
+    </div>    
+    <div class="body mat-elevation-z2">
+      <table mat-table  #table [dataSource]="dataSource" matSort>
+
+        <ng-container matColumnDef="profileid">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+          <td mat-cell  *matCellDef="let row">
+            <span *ngIf="!snippetView">{{mapparticipant[row['profileid']]}}</span>
+            <span *ngIf="!snippetView" style="color: red;">{{mapparticipantNew[row['profileid']]['workshoponly'] ? ' (New User)' : ''}}</span>
+            <span *ngIf="snippetView">
+              <!-- container -->
+              <span class="d-flex flex-row">
+                <span>{{mapparticipant[row]}}&nbsp;&nbsp;({{mapProfileToVideoAsk[row].length}})</span>&nbsp;&nbsp;
+                <span class="d-flex flex-row overflow-auto" style="width:80vw">
+                  <span *ngFor="let item of mapProfileToVideoAsk[row]" class="ml-2">
+                    <div *ngIf="item.fileurl">
+                      <video controls width="170" height="300">
+                        <source [src]="item.fileurl" type="video/mp4">
+                      </video>
+                    </div>
+                  </span>
+                </span>
+              </span>
+              <!-- constainer -->
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container *ngIf="!snippetView" matColumnDef="videoaskid">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>videoAsk Template</th>
+          <td mat-cell *matCellDef="let row">{{mapVideoAsk[row['videoaskid']]}}</td>
+        </ng-container>
+    
+        <ng-container *ngIf="!snippetView" matColumnDef="event">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
+          <td mat-cell *matCellDef="let row">
+            <span *ngIf="row['arenaevent'] != null && row['arenaevent'] != undefined">
+              {{mapEvents[row["arenaevent"].id] != undefined && mapEvents[row["arenaevent"].id] != null ? mapEvents[row["arenaevent"].id]['name'] : row["arenaevent"].id}} (Live Event)
+            </span>
+            <span *ngIf="row['workshopref'] != null && row['workshopref'] != undefined">
+              {{mapWorkshop[row["workshopref"].id] != undefined && mapWorkshop[row["workshopref"].id] != null ? mapWorkshop[row["workshopref"].id]['title'] : row["workshopref"].id}} (Workshop)</span>
+            <span *ngIf="row['queueref'] != null && row['queueref'] != undefined">{{mapQueue[row["queueref"].id] != undefined && mapQueue[row["queueref"].id] != null ? mapQueue[row["queueref"].id]['queuename'] : row["queueref"].id}} (Queue Event)</span>
+          </td>
+        </ng-container>
+        <!-- class="video-cell" -->
+        <ng-container *ngIf="!snippetView" matColumnDef="fileurl">
+            <th  mat-header-cell *matHeaderCellDef mat-sort-header>Video</th>
+            <td  mat-cell *matCellDef="let row">
+              <div *ngIf="row.fileurl">
+                <video controls width="170" height="300">
+                  <source [src]="row.fileurl" type="video/mp4">
+                </video>
+              </div>
+            </td>
+        </ng-container>
+
+        <ng-container *ngIf="!snippetView" matColumnDef="uploaded">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Uploaded</th>
+          <td mat-cell *matCellDef="let row">{{row.uploaded != undefined ? (row.uploaded.toDate() | date: 'mediumDate') : null}}</td>
+        </ng-container>
+
+        <!-- <ng-container matColumnDef="addtohighlights">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Add to Highlights</th>
+          <td mat-cell *matCellDef="let row">
+            {{row.addtohighlights != undefined ? (row.addtohighlights ? "Public" : "Private") : null}}
+            <button *ngIf="row.addtohighlights != undefined && row.addtohighlights" mat-icon-button type="button" (click)="onShareToHighlights(row)"><mat-icon>send</mat-icon></button>
+          </td>
+        </ng-container> -->
+
+        <ng-container *ngIf="!snippetView" matColumnDef="addtohighlights">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Add to Highlights</th>
+          <td mat-cell *matCellDef="let row">{{row.addtohighlights != undefined ? (row.addtohighlights ? "Public" : "Private") : null}}</td>
+        </ng-container>
+
+        <ng-container *ngIf="!snippetView" matColumnDef="tag">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Tags</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="tag-checklist-container">
+              <label *ngFor="let tag of videoAskTags" class="tag-checkbox-row">
+                <input 
+                  type="checkbox" 
+                  [checked]="row.tags?.includes(tag.id)"
+                  (change)="updateVideoAdk(row, tag.id)">
+                <span class="checkmark"></span>
+                <span class="tag-checkbox-label">{{ tag.name }}</span>
+              </label>
+            </div>
+          </td>
+        </ng-container>
+    
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+      </table>
+      <mat-paginator [pageSizeOptions]="[5,10,25,50,100]"></mat-paginator>
+    </div>
+</div>
+
+

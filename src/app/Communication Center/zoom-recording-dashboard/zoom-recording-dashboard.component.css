@@ -1,0 +1,63 @@
+.zoom-records-cnt {
+  margin-top: 20px;
+  padding-inline: 20px;
+  padding-bottom: 40px;
+}
+
+table {
+  box-shadow: unset;
+}
+
+table,
+tr,
+th {
+  border-radius: 10px;
+}
+
+th {
+  font-size: 13px;
+}
+
+table th {
+  font-weight: bolder;
+}
+
+.file-popup-btn {
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+}
+
+.filters {
+  display: flex;
+  gap: 20px;
+}
+
+.model-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: #23272c8b;
+  display: grid;
+  place-content: center;
+}
+
+.file-container{
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 300px;
+  transform: scale(0.9);
+  animation: popup 150ms ease-in-out forwards;
+}
+
+.file-container > button{
+  float: right;
+  background-color: rgba(225, 225, 225, 0.607);
+  padding-inline:15px ;
+}
+
+@keyframes popup {
+  to{
+    transform: scale(1);
+  }
+}

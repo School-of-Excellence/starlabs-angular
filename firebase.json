@@ -1,0 +1,78 @@
+{
+  "hosting": {
+    "site": "breakthroughs-test",
+    "public": "dist/atctranscription/browser",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/openmeeting/**",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin"
+          },
+          {
+            "key": "Cross-Origin-Embedder-Policy",
+            "value": "require-corp"
+          }
+        ]
+      },
+      {
+        "source": "/zoommeeting_bigparticipants/**",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin"
+          },
+          {
+            "key": "Cross-Origin-Embedder-Policy",
+            "value": "require-corp"
+          }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin"
+          }
+        ]
+      },
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    ],
+    "redirects": [
+      {
+        "source": "/apple-app-site-association",
+        "destination": "/.well-known/apple-app-site-association",
+        "type": 308
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/openmeeting/**",
+        "destination": "/openmeeting/index.html"
+      },
+      {
+        "source": "/zoommeeting_bigparticipants/**",
+        "destination": "/zoommeeting_bigparticipants/index.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

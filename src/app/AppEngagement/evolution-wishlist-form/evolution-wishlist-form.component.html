@@ -1,0 +1,168 @@
+<mat-toolbar class="toolbar">
+  <a href="http://antanoharini.com" target="_blank" mat-list-item class="logo-container">
+    <img class="logo" src="https://firebasestorage.googleapis.com/v0/b/watson-9878.appspot.com/o/AH%20Black%20Logo%20Only.png?alt=media&token=9ab6b001-7d13-4945-a156-d53c84c79827" alt="Antano & Harini Logo">
+  </a>
+  <span class="headerClass">Evolution Wishlist</span>
+</mat-toolbar>
+
+<div *ngIf="loaded; else loadingTemplate" class="content">
+  <div *ngIf="formSubmitionStatus === 'notsubmitted'" class="form-container">
+    <p style="font-style: italic;font-weight: 400;text-align: center">
+      Thank you for taking the time to contribute to {{participantname}}'s accelerated evolution. You are uniquely situated to help {{participantname}} and your insights will help shape a precise and strategic Capability Acceleration design for their growth, ensuring that they develop the most impactful capabilities for their future .
+    </p>
+    <p style="font-style: italic;font-weight: 400;text-align: center">
+    The speciality of the Antano & Harini Excellence Installation Program is developing personalized, targeted, Poly-contextual capabilities that will help achieve Time Compression, and enhanced performance across all life aspects Business/Career, Health, Family & Relationships, Personal Genius, Happiness and Legacy (Impact) leveraging Excellence Installation Technology. 
+    <p style="font-style: italic;font-weight: 400;text-align: center">
+    Please take a few moments to reflect and share your thoughts below. Your responses will be kept confidential and is designed for access only by the assigned Excellence Installation Specialists in a secure environment, who will help co-design {{participantname}}’s Accelerated Capability Development in this delightful journey. 
+    </p>
+    <p style="font-style: italic;font-weight: 400;text-align: center">
+      Hence, regarding your responses below, there are no right or wrong answers—just your honest observations and aspirations for {{participantname}}.
+    </p>
+    <form [formGroup]="form" class="form">
+      <ng-container *ngFor="let question of questions">
+        <div class="question-container" [class.mat-elevation-z1]="true">
+          <label class="question-label">
+            {{ question.label.replace('{{participantname}}', participantname) }}
+          </label>
+          <!-- Video Display -->
+          <div *ngIf="question.type === 'video'" class="video-container">
+            <video controls class="responsive-video" [src]="question.videoUrl">
+              Your browser does not support the video tag.
+            </video>
+            
+            <!-- Add conditional textarea -->
+            <mat-form-field *ngIf="question.askanswer" appearance="outline" class="full-width video-response">
+              <mat-label>Your response to the video</mat-label>
+              <textarea 
+                matInput 
+                [formControlName]="question.controlName" 
+                required 
+                placeholder="Please share your thoughts about the video"
+                rows="4">
+              </textarea>
+              <mat-error *ngIf="form.get(question.controlName).hasError('required')">
+                Response is required
+              </mat-error>
+            </mat-form-field>
+          </div>
+          <!-- Audio Display -->
+          <div *ngIf="question.type === 'audio'" class="audio-container">
+            <audio controls class="responsive-audio" [src]="question.audioUrl">
+              Your browser does not support the audio tag.
+            </audio>
+            
+            <!-- Add conditional textarea -->
+            <mat-form-field *ngIf="question.askanswer" appearance="outline" class="full-width audio-response">
+              <mat-label>Your response to the audio</mat-label>
+              <textarea 
+                matInput 
+                [formControlName]="question.controlName" 
+                required 
+                placeholder="Please share your thoughts about the audio"
+                rows="4">
+              </textarea>
+              <mat-error *ngIf="form.get(question.controlName).hasError('required')">
+                Response is required
+              </mat-error>
+            </mat-form-field>
+          </div>
+          <!-- Email input field -->
+          <mat-form-field *ngIf="question.type === 'email'" appearance="outline" class="full-width">
+            <input matInput type="email" [formControlName]="question.controlName" required placeholder="Enter your email">
+            <!-- <mat-icon matSuffix>email</mat-icon> -->
+            <mat-error *ngIf="form.get(question.controlName).hasError('required')">
+              Email is required
+            </mat-error>
+            <mat-error *ngIf="form.get(question.controlName).hasError('email') && !form.get(question.controlName).hasError('required')">
+              Please enter a valid email address
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Regular input field -->
+          <mat-form-field *ngIf="question.type === 'input'" appearance="outline" class="full-width">
+            <input matInput [formControlName]="question.controlName" required placeholder="Your answer">
+            <!-- <mat-icon matSuffix>edit</mat-icon> -->
+            <mat-error *ngIf="form.get(question.controlName).hasError('required')">
+              This field is required
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Textarea input -->
+          <mat-form-field *ngIf="question.type === 'textarea'" appearance="outline" class="full-width">
+            <textarea matInput [formControlName]="question.controlName" required placeholder="Your answer" rows="4"></textarea>
+            <!-- <mat-icon matSuffix>description</mat-icon> -->
+            <mat-error *ngIf="form.get(question.controlName).hasError('required')">
+              This field is required
+            </mat-error>
+          </mat-form-field>
+          <mat-radio-group *ngIf="question.type === 'radio'"
+          [formControlName]="question.controlName"
+          class="radio-group">
+          <mat-radio-button *ngFor="let option of question.options" [value]="option" color="primary">
+            {{option}}
+          </mat-radio-button>
+          <mat-radio-button *ngIf="question.additionalradioinput" [value]="question.additionalradioinput" color="primary">
+            {{question.additionalradioinput}}
+          </mat-radio-button>
+        </mat-radio-group>
+        <div *ngIf="question.type === 'radio' && form.get(question.controlName).value === question.additionalradioinput">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{question.additionalradioinput}}</mat-label>
+            <input matInput [formControlName]="question.controlName + 'Additional'" placeholder="Enter your answer">
+            <mat-error *ngIf="form.get(question.controlName + 'Additional').hasError('required')">
+              This field is required
+            </mat-error>
+          </mat-form-field>
+        </div>
+          <div *ngIf="question.type === 'checkbox'" class="checkbox-group">
+            <mat-checkbox *ngFor="let option of question.options"
+              [checked]="isOptionChecked(question.controlName, option)"
+              (change)="onCheckboxChange($event, question.controlName, option)"
+              color="primary">
+              {{option}}
+            </mat-checkbox>
+          </div>
+        </div>
+      </ng-container>
+      <p style="font-style: italic;font-weight: 400;text-align: center">
+        Thank you for sharing your insights! Your contribution will play an essential role in shaping {{participantname}}’s personal and professional evolution. We appreciate your time and thoughtfulness!    
+      </p>
+      <div class="button-container">
+        <button mat-raised-button color="primary" (click)="onSubmit()" [disabled]="form.invalid || questions.length ===0">
+          <mat-icon>send</mat-icon>
+          <span>Submit</span>
+        </button>
+      </div>
+    </form>
+    <br>
+    <!-- <p style="font-style: italic;font-weight: 400;text-align: center">
+      Thank you for sharing your insights! Your contribution will play an essential role in shaping {{participantname}}’s personal and professional evolution. We appreciate your time and thoughtfulness!    
+    </p> -->
+  </div>
+
+  <div *ngIf="formSubmitionStatus === 'submitted'" class="success-message">
+    <mat-icon color="primary" style="font-size: 48px; height: 48px; width: 48px; margin-bottom: 24px;">check_circle</mat-icon>
+    <h4>
+      Thank you! Your response has been submitted. Your inputs will be utilized by Antano & Harini Excellence Installation Specialist in designing {{participantname}}'s next cycle of Personal Evolution which will comprise precise targeted Capability Installations to enable growth across Business/Career, Health, Family & Relationships, Personal Genius, Happiness, and Legacy (Impact) powered by Excellence Installation Technology.
+      <br><br>
+      To know more, please visit: 
+      <a href="http://antanoharini.com" target="_blank" rel="noopener noreferrer" style="color: #0000FF;white-space:nowrap;">
+        <u>Antano & Harini</u>
+      </a>
+      and the Official YouTube channel of Antano & Harini: 
+      <a href="https://www.youtube.com/AntanoHarini" target="_blank" rel="noopener noreferrer" style="color: #0000FF;"><u>youtube.com/AntanoHarini</u></a>
+    </h4>
+  </div>
+
+  <div *ngIf="formSubmitionStatus === 'documentnull'" class="error-message">
+    <mat-icon color="warn" style="font-size: 48px; height: 48px; width: 48px; margin-bottom: 24px;">error</mat-icon>
+    <h1>{{errormessage}}</h1>
+  </div>
+</div>
+
+<ng-template #loadingTemplate>
+  <div class="loading-container">
+    <mat-progress-spinner mode="indeterminate" color="primary" diameter="48"></mat-progress-spinner>
+    <h2>Loading, please wait...</h2>
+  </div>
+</ng-template>

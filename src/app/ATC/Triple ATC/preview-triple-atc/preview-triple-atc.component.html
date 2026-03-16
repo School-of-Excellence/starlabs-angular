@@ -1,0 +1,125 @@
+<div *ngIf="loading" class="loading-container">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="preview-container" *ngIf="!loading && atcData">
+  <!-- Header -->
+  <div class="header">
+    <h1 class="title">Triple ATC Preview</h1>
+  </div>
+
+  <!-- Participant Information Section -->
+  <div class="section-container">
+    <div class="section-header participant-header">
+      <mat-icon>person</mat-icon>
+      <span>Participant Information</span>
+    </div>
+    <div class="section-content">
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">NAME</span>
+          <span class="info-value">{{ profileMap[atcData['profileid']]?.name }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">PRODUCT</span>
+          <span class="info-value">{{ atcData['product'] || 'No Product Mentioned' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">PRESCRIBED DATE</span>
+          <span class="info-value">{{ atcData['prescription_date']?.toDate() | date:'MMM dd, yyyy' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">PRESCRIBED DATE</span>
+            <div *ngFor="let profile of atcData['author']" class="member-badge">
+              <mat-icon>person</mat-icon>
+              {{ profileMap[profile.id]?.name }}
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATC Directive Section -->
+  <div class="section-container">
+    <div class="section-header directive-header">
+      <mat-icon>description</mat-icon>
+      <span>ATC Directive</span>
+    </div>
+    <div class="section-content directive-content">
+      <p>{{ atcData['directive'] }}</p>
+    </div>
+  </div>
+
+  <!-- Adjustments & Procedures Section -->
+  <div class="section-container">
+    <div class="section-header adjustments-header">
+      <mat-icon>build</mat-icon>
+      <span>Adjustments & Procedures</span>
+    </div>
+    <div class="section-content">
+      <div *ngFor="let triple of tripleatclist; let posIndex = index" class="perceptual-position">
+        <div>
+          <div class="position-badge">
+          <span class="position-text"><b>Perceptual Position {{posIndex + 1}}</b></span>
+        </div>
+          {{ triple['perceptualposition'] }}
+        </div>
+        
+        <div *ngFor="let transcription of triple.transcription; let transIndex = index" class="adjustment-item">
+          <div class="adjustment-question">
+            <div class="question-header">
+              <span class="question-number">{{ transIndex + 1 }}</span>
+              <span class="question-text">{{ transcription.adjustment }}</span>
+            </div>
+            <div class="question-meta" *ngIf="transcription['comment'] && transcription['comment'].trim().length > 0">
+              <span class="meta-label">How aware was the person about this before the diagnostic/consultation?:</span>
+              <span class="meta-value">{{ transcription['comment'] }}</span>
+              <span class="meta-label">How many years have you been experiencing this?:</span>
+              <span class="meta-value">10</span>
+            </div>
+          </div>
+
+          <div class="procedures-list">
+            <div *ngFor="let procedure of transcription['procedure']" class="procedure-item">
+              <mat-icon class="procedure-radio">{{ procedure['completed'] ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+              <span class="procedure-name">{{ procedure['procedurename'] }}</span>
+              <span *ngIf="procedure.mandatory" class="mandatory-tag">MANDATORY</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Notes Section -->
+  <div class="section-container">
+    <div class="section-header action-notes-header">
+      <mat-icon>rate_review</mat-icon>
+      <span>Action Notes</span>
+    </div>
+    <div class="section-content">
+      <textarea 
+        class="action-notes-textarea"
+        [(ngModel)]="actionNotes"
+        placeholder="Enter your notes here"></textarea>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-buttons">
+    <button mat-stroked-button class="action-button rework-button" (click)="markForRework()">
+      <mat-icon>refresh</mat-icon>
+      Mark for Rework
+    </button>
+    <button mat-stroked-button class="action-button validate-button" (click)="validateATC()">
+      <mat-icon>verified</mat-icon>
+      ATC Validated
+    </button>
+  </div>
+</div>
+
+<div *ngIf="!loading && !atcData" class="no-data">
+  <mat-icon class="no-data-icon">error_outline</mat-icon>
+  <p>No ATC data found</p>
+  <button mat-raised-button color="primary" (click)="goBack()">Go Back</button>
+</div>

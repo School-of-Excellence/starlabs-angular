@@ -1,0 +1,254 @@
+<div class="export-dialog">
+    <div class="dialog-header">
+        <h4 mat-dialog-title>Export Data</h4>
+        <button mat-icon-button mat-dialog-close>
+            <mat-icon>close</mat-icon>
+        </button>
+    </div>
+
+    <mat-dialog-content>
+        <!-- Filter Type Buttons -->
+        <div class="filter-buttons">
+            <button mat-stroked-button [class.active]="selectedFilter === 'productconsumption'"
+                (click)="selectFilter('productconsumption')">
+                Product Consumption
+            </button>
+        </div>
+
+        <!-- Dynamic Filter Section -->
+        <div class="filter-section" *ngIf="selectedFilter">
+        
+            <!-- Date Range Filter -->
+            <div *ngIf="selectedFilter === 'productconsumption'" class="filter-content">
+                <form [formGroup]="filterForm">
+        
+                    <!-- Consumed Products Section -->
+                    <div class="filter-section">
+                        <h3>Consumed Products</h3>
+                        <div formArrayName="consumedProducts">
+                            <div *ngFor="let product of consumedProducts.controls; let i = index" class="product-row">
+                                <div [formGroupName]="i" class="product-group">
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Product</mat-label>
+                                        <mat-select formControlName="productId">
+                                            <mat-option>
+                                                <ngx-mat-select-search [(ngModel)]="filterproductlist"
+                                                    [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
+                                                    [noEntriesFoundLabel]="'No matching records found'">
+                                                </ngx-mat-select-search>
+                                            </mat-option>
+                                            <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                                                {{option.product}}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('productId')?.hasError('required')">
+                                            Product is required
+                                        </mat-error>
+                                    </mat-form-field>
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Minimum Count</mat-label>
+                                        <input matInput type="number" formControlName="count" placeholder="Min count">
+                                        <mat-error *ngIf="product.get('count')?.hasError('required')">
+                                            Count is required
+                                        </mat-error>
+                                        <mat-error *ngIf="product.get('count')?.hasError('min')">
+                                            Count must be at least 1
+                                        </mat-error>
+                                    </mat-form-field>
+        
+                                    <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)"
+                                        [disabled]="consumedProducts.length === 1" type="button">
+                                        <mat-icon>delete</mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <button mat-stroked-button color="primary" (click)="addConsumedProduct()" type="button">
+                            <mat-icon>add</mat-icon>
+                            Add Consumed Product
+                        </button>
+                    </div>
+        
+                    <!-- Unconsumed Products Section -->
+                    <div class="filter-section">
+                        <h3>Unconsumed Products</h3>
+                        <div formArrayName="unconsumedProducts">
+                            <div *ngFor="let product of unconsumedProducts.controls; let i = index" class="product-row">
+                                <div [formGroupName]="i" class="product-group">
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Product</mat-label>
+                                        <mat-select formControlName="productId">
+                                            <mat-option>
+                                                <ngx-mat-select-search [(ngModel)]="filterunconsumedproductlist"
+                                                    [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
+                                                    [noEntriesFoundLabel]="'No matching records found'">
+                                                </ngx-mat-select-search>
+                                            </mat-option>
+                                            <mat-option *ngFor="let option of onfilterunconsumedproducts()" [value]="option.id">
+                                                {{option.product}}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('productId')?.hasError('required')">
+                                            Product is required
+                                        </mat-error>
+                                    </mat-form-field>
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Minimum Count</mat-label>
+                                        <input matInput type="number" formControlName="count" placeholder="Min count">
+                                        <mat-error *ngIf="product.get('count')?.hasError('required')">
+                                            Count is required
+                                        </mat-error>
+                                        <mat-error *ngIf="product.get('count')?.hasError('min')">
+                                            Count must be at least 1
+                                        </mat-error>
+                                    </mat-form-field>
+        
+                                    <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)"
+                                        [disabled]="unconsumedProducts.length === 1" type="button">
+                                        <mat-icon>delete</mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <button mat-stroked-button color="primary" (click)="addUnconsumedProduct()" type="button">
+                            <mat-icon>add</mat-icon>
+                            Add Unconsumed Product
+                        </button>
+                    </div>
+        
+                    <!-- Filter Actions -->
+                    <div class="filter-actions">
+                        <!-- <button mat-stroked-button (click)="resetFilters()" type="button">
+                            Reset
+                        </button> -->
+                        <button mat-flat-button color="primary" (click)="applyFilter()" type="button" [disabled]="isLoading">
+                            <mat-icon *ngIf="!isLoading">search</mat-icon>
+                            <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+                            {{ isLoading ? 'Searching...' : 'Apply Filter' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Status Filter -->
+            <div *ngIf="selectedFilter === 'status'" class="filter-content">
+                <mat-form-field appearance="outline">
+                    <mat-label>Select Status</mat-label>
+                    <mat-select [(ngModel)]="filters.status" multiple>
+                        <mat-option value="Active">Active</mat-option>
+                        <mat-option value="Pending">Pending</mat-option>
+                        <mat-option value="Completed">Completed</mat-option>
+                        <mat-option value="Cancelled">Cancelled</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <button mat-flat-button color="primary" (click)="applyFilter()">Apply</button>
+            </div>
+
+            <!-- Category Filter -->
+            <div *ngIf="selectedFilter === 'category'" class="filter-content">
+                <mat-form-field appearance="outline">
+                    <mat-label>Select Category</mat-label>
+                    <mat-select [(ngModel)]="filters.category">
+                        <mat-option value="Electronics">Electronics</mat-option>
+                        <mat-option value="Furniture">Furniture</mat-option>
+                        <mat-option value="Clothing">Clothing</mat-option>
+                        <mat-option value="Books">Books</mat-option>
+                        <mat-option value="Sports">Sports</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <button mat-flat-button color="primary" (click)="applyFilter()">Apply</button>
+            </div>
+
+            <!-- Custom Filter -->
+            <div *ngIf="selectedFilter === 'custom'" class="filter-content">
+                <mat-form-field appearance="outline">
+                    <mat-label>Search Term</mat-label>
+                    <input matInput [(ngModel)]="filters.searchTerm" placeholder="Enter search term">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Search In</mat-label>
+                    <mat-select [(ngModel)]="filters.searchField">
+                        <mat-option value="name">Product Name</mat-option>
+                        <mat-option value="id">Order ID</mat-option>
+                        <mat-option value="category">Category</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <button mat-flat-button color="primary" (click)="applyFilter()">Apply</button>
+            </div>
+        </div>
+
+        <!-- Data Preview Table -->
+        <div class="table-container" *ngIf="filteredData.length > 0">
+            <div class="table-info">
+                <span>{{ filteredData.length }} records</span>
+                <button mat-button (click)="exportToExcel()" class="export-btn"> Export </button>
+            </div>
+
+            <div class="table-wrapper">
+                <table mat-table [dataSource]="filteredData" class="participants-table">
+                
+                    <!-- Name Column -->
+                    <ng-container matColumnDef="name">
+                        <th mat-header-cell *matHeaderCellDef>Name</th>
+                        <td mat-cell *matCellDef="let element">
+                            {{ mapProfile[element.profileId] }}
+                        </td>
+                    </ng-container>
+                
+                    <!-- Consumed Column -->
+                    <ng-container matColumnDef="consumed">
+                        <th mat-header-cell *matHeaderCellDef>Consumed</th>
+                        <td mat-cell *matCellDef="let element">
+                            <div class="products-list">
+                                <ng-container *ngFor="let item of element.products | keyvalue">
+                                    <div *ngIf="$any(item.value).consumedCount > 0" class="product-item consumed">
+                                        <span class="product-name">{{ mapProductName[$any(item.value).productId] }}</span>
+                                        <span class="product-count">{{ $any(item.value).consumedCount }}</span>
+                                    </div>
+                                </ng-container>
+                            </div>
+                        </td>
+                    </ng-container>
+                    
+                    <ng-container matColumnDef="unconsumed">
+                        <th mat-header-cell *matHeaderCellDef>Unconsumed</th>
+                        <td mat-cell *matCellDef="let element">
+                            <div class="products-list">
+                                <ng-container *ngFor="let item of element.products | keyvalue">
+                                    <div *ngIf="$any(item.value).unConsumedCount > 0" class="product-item unconsumed">
+                                        <span class="product-name">{{ mapProductName[$any(item.value).productId] }}</span>
+                                        <span class="product-count">{{ $any(item.value).unConsumedCount }}</span>
+                                    </div>
+                                </ng-container>
+                            </div>
+                        </td>
+                    </ng-container>
+                
+                    <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+                    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="no-data" *ngIf="selectedFilter && filteredData.length === 0 && isFiltered">
+            <p>No records found</p>
+        </div>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end">
+        <button mat-button mat-dialog-close>Cancel</button>
+        <!-- <button mat-flat-button color="primary" [disabled]="filteredData.length === 0" (click)="exportData()">
+            Export ({{ filteredData.length }})
+        </button> -->
+    </mat-dialog-actions>
+</div>

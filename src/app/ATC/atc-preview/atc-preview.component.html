@@ -1,0 +1,241 @@
+<div *ngIf="loading" class="loading-container">
+  <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  <p class="loading-text">Loading ATC Preview...</p>
+</div>
+
+<div *ngIf="!loading" class="preview-container">
+
+  <div class="preview-content">
+    <!-- Participant Information Card -->
+    <section class="preview-card participant-card">
+      <div class="card-header">
+        <mat-icon class="header-icon">person</mat-icon>
+        <h2 class="card-title">Participant Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="participant-info">
+          <div *ngIf="selectedParticipant['profileimg'] || selectedParticipant['profile']" class="participant-avatar">
+            <img [src]="selectedParticipant['profileimg'] || selectedParticipant['profile']" alt="Participant">
+          </div>
+          <div class="participant-details">
+            <div class="info-item">
+              <span class="info-label">Name</span>
+              <span class="info-value">{{reportATC.profile_name}}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Product</span>
+              <span class="info-value">{{reportATC.product || 'Not specified'}}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Prescribed Date</span>
+              <span class="info-value">{{reportATC.date | date: 'mediumDate'}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Directive Card -->
+    <section class="preview-card" *ngIf="reportATC.directive">
+      <div class="card-header">
+        <mat-icon class="header-icon">description</mat-icon>
+        <h2 class="card-title">ATC Directive</h2>
+      </div>
+      <div class="card-body">
+        <p class="directive-text">{{reportATC.directive}}</p>
+      </div>
+    </section>
+
+    <!-- Team Members Card -->
+    <section class="preview-card" *ngIf="specialistsByActivity.length > 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">groups</mat-icon>
+        <h2 class="card-title">Team Members & Activities</h2>
+      </div>
+      <div class="card-body">
+        <div class="team-grid">
+          <div *ngFor="let item of specialistsByActivity" class="team-item">
+            <div class="activity-badge">{{item.activity}}</div>
+            <div class="specialist-chips">
+              <span *ngFor="let specialist of item.specialists" class="specialist-chip">
+                <mat-icon>person</mat-icon>{{specialist}}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Adjustments & Procedures Card -->
+    <section class="preview-card adjustments-card" *ngIf="reportATC.transcription.length > 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">playlist_add_check</mat-icon>
+        <h2 class="card-title">Adjustments & Procedures</h2>
+      </div>
+      <div class="card-body">
+        <div *ngFor="let prescription of reportATC.transcription; let i = index" class="adjustment-item">
+          <div class="adjustment-header" [class.deleted]="prescription.adjustmentdelete">
+            <span class="adjustment-number">{{i + 1}}</span>
+            <h3 class="adjustment-title" [class.strikethrough]="prescription.adjustmentdelete">
+              {{prescription.adjustment}}
+            </h3>
+            <span *ngIf="prescription.adjustmentdelete" class="deleted-badge">Deleted</span>
+          </div>
+          
+          <div class="adjustment-meta">
+            <span class="meta-item">
+              <strong>How aware was the person about this before the diagnostics/consultation?:</strong> {{prescription.awarenessdetail}}
+            </span>
+            <span class="meta-item" *ngIf="prescription.potentialyears">
+              <strong>How many years have you been experiencing this?:</strong> {{prescription.potentialyears}}
+            </span>
+          </div>
+
+          <div class="procedures-section" *ngIf="prescription.procedure.length > 0">
+            <div *ngFor="let procedure of prescription.procedure" 
+                 class="procedure-item" 
+                 [class.deleted]="procedure.proceduredelete"
+                 [class.completed]="procedure.completed">
+              <mat-icon class="procedure-icon">
+                {{procedure.proceduredelete ? 'cancel' : (procedure.completed ? 'check_circle' : 'radio_button_unchecked')}}
+              </mat-icon>
+              <span class="procedure-name" [class.strikethrough]="procedure.proceduredelete">{{procedure.name}}</span>
+              <span *ngIf="procedure.mandatory" class="badge mandatory-badge">Mandatory</span>
+              <span *ngIf="procedure.completed" class="badge completed-badge">Completed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Changework Brief Card -->
+    <section class="preview-card" *ngIf="audioUrls.length > 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">audiotrack</mat-icon>
+        <h2 class="card-title">Changework Brief</h2>
+      </div>
+      <div class="card-body">
+        <div class="audio-grid">
+          <div *ngFor="let audio of audioUrls; let i = index" class="audio-item">
+            <div class="audio-label">
+              <mat-icon>mic</mat-icon>
+              <span>Recording {{i + 1}}</span>
+            </div>
+            <audio controls class="audio-player">
+              <source [src]="sanitize(audio)">
+            </audio>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Images Card -->
+    <section class="preview-card" *ngIf="imageUrls.length > 0 || atcImageUrls.length > 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">image</mat-icon>
+        <h2 class="card-title">Images & Documents</h2>
+      </div>
+      <div class="card-body">
+        <!-- Notes Images -->
+        <div *ngIf="imageUrls.length > 0" class="image-section">
+          <h3 class="section-subtitle">Notes Images</h3>
+          <div class="image-grid">
+            <div *ngFor="let image of imageUrls" class="image-item">
+              <img [src]="image" alt="Note image" class="preview-image">
+            </div>
+          </div>
+        </div>
+
+        <!-- ATC Images -->
+        <div *ngIf="atcImageUrls.length > 0" class="image-section">
+          <h3 class="section-subtitle">Prescribed ATC Images</h3>
+          <div class="image-grid">
+            <div *ngFor="let image of atcImageUrls" class="image-item">
+              <img [src]="image" alt="ATC image" class="preview-image">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notes Card -->
+    <section class="preview-card" *ngIf="existingNotes && (existingNotes['consultationsummary'] || existingNotes['consultationpoint'] || existingNotes['notes'])">
+      <div class="card-header">
+        <mat-icon class="header-icon">notes</mat-icon>
+        <h2 class="card-title">Notes</h2>
+      </div>
+      <div class="card-body">
+        <div class="note-item" *ngIf="existingNotes['consultationsummary']">
+          <strong>Consultation Summary:</strong>
+          <p>{{existingNotes['consultationsummary']}}</p>
+        </div>
+        
+        <div class="note-item" *ngIf="existingNotes['consultationpoint']">
+          <strong>Consultation Point:</strong>
+          <p>{{existingNotes['consultationpoint']}}</p>
+        </div>
+        
+        <div class="note-item" *ngIf="existingNotes['notes']">
+          <strong>Case Notes:</strong>
+          <p>{{existingNotes['notes']}}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Action Notes Card -->
+    <section class="preview-card action-card" >
+      <div class="card-header">
+        <mat-icon class="header-icon">edit_note</mat-icon>
+        <h2 class="card-title">Action Notes</h2>
+      </div>
+      <div class="card-body">
+        <mat-form-field appearance="outline" class="notes-field">
+          <mat-label>Enter your notes here</mat-label>
+          <textarea 
+            matInput 
+            [(ngModel)]="actionNotes" 
+            rows="5" 
+            placeholder="Add notes about the ATC review, rework requirements, or completion details..."
+            [disabled]="processing">
+          </textarea>
+        </mat-form-field>
+
+        <div class="action-buttons">
+          <button 
+            mat-raised-button 
+            class="rework-button" 
+            (click)="onRework()"
+            [disabled]="processing || !actionNotes.trim()">
+            <mat-icon>refresh</mat-icon>
+            Mark for Rework
+          </button>
+
+          <button 
+            mat-raised-button 
+            class="completed-button" 
+            (click)="onCompletedActivity()"
+            [disabled]="processing || !actionNotes.trim()">
+            <mat-icon>check_circle</mat-icon>
+            Activity Completed
+          </button>
+          
+          <button 
+            mat-raised-button 
+            class="completed-button" 
+            (click)="onCompletedATC()"
+            [disabled]="processing || !actionNotes.trim()">
+            <mat-icon>check_circle</mat-icon>
+            ATC Validated
+          </button>
+        </div>
+
+        <mat-progress-spinner 
+          *ngIf="processing" 
+          mode="indeterminate" 
+          diameter="30"
+          class="action-spinner">
+        </mat-progress-spinner>
+      </div>
+    </section>
+  </div>
+</div>

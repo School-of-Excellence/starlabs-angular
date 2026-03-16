@@ -1,0 +1,992 @@
+<div class="main-container" [class.panel-open]="showSlotPanel">
+  <!-- Main Content Area -->
+  <div class="content-area">
+    <h2 style="text-align: center;">Queue Planning - Merged View
+      <b *ngIf="this.selectedQueue != null" style="color:#234C58">for {{this.selectedQueue?.['queuename'] || ''}}</b>
+    </h2>
+
+    <div class="header-section">
+      <!-- Queue Selection -->
+      <mat-form-field appearance="outline" class="queue-select">
+        <mat-label>Select Queue</mat-label>
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="searchQueue" placeholderLabel="Search Queue..."
+              noEntriesFoundLabel="No queues found">
+            </ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let queue of returnQueue()" [value]="queue">
+            {{ queue.queuename }} <span *ngIf="queue.queuevariation != null && queue.queuevariation.length > 0"> - (
+              Variations: {{queue.queuevariation.length}} )</span>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      
+
+      <!-- <mat-form-field appearance="outline" class="filter-field overall-segment" *ngIf="this.selectedQueue != null">
+        <mat-label>Filter by Segment</mat-label>
+        <mat-select [(ngModel)]="overallSegmentFilter" multiple [disabled]="panelViewType === 'slot'">
+          <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['id']">
+            {{ segment['segmentname'] }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field> -->
+
+    </div>
+      <div class="row w-100">
+        <div class="col-sm">
+          <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1">
+            <div class="fw-bold mb-2 h5">Live Queue</div>
+            <span *ngFor="let live of liveQueueList">
+              <button mat-stroked-button class="me-2 mb-2"
+                [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
+                (click)="selectedQueue = live; onQueueSelect()">
+                {{live["queuename"]}}
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <mat-form-field appearance="outline" class="filter-field overall-segment" *ngIf="this.selectedQueue != null">
+        <mat-label>Filter by Segment</mat-label>
+        <mat-select [(ngModel)]="overallSegmentFilter" multiple [disabled]="panelViewType === 'slot'">
+          <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['id']">
+            {{ segment['segmentname'] }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    
+
+    <!-- NEW: Overall Counts Section -->
+    <div class="overall-counts-section" *ngIf="selectedQueue && !loading">
+      <div>
+        <div [class]="`overall-count-card queue-tokens-card ${nonSegmentParticipant() > 0 ? 'error':''}`"
+          (click)="openOverallQueueTokensPanel()">
+          <div class="count-icon">
+            <mat-icon>confirmation_number</mat-icon>
+          </div>
+          <div class="count-details">
+            <span class="count-label">Overall Queue Tokens</span>
+            <span class="count-value">{{ getOverallQueueTokenCount() }}</span>
+          </div>
+          <button mat-icon-button class="card-export-btn" matTooltip="Export All Queue Tokens"
+            (click)="exportOverallQueueTokens(); $event.stopPropagation()">
+            <mat-icon>file_download</mat-icon>
+          </button>
+        </div>
+        <div class="error-message" (click)="openOverallInvalidQueueTokensPanel()">
+          ⚠️ Invalid token count. Please verify the queue status.
+        </div>
+      </div>
+
+      <div class="overall-count-card segment-participants-card" (click)="openOverallSegmentParticipantsPanel()">
+        <div class="count-icon">
+          <mat-icon>groups</mat-icon>
+        </div>
+        <div class="count-details">
+          <span class="count-label">Overall Segment Participants</span>
+          <span class="count-value">{{ getOverallSegmentParticipantsCount() }}</span>
+        </div>
+        <button mat-icon-button class="card-export-btn" matTooltip="Export All Segment Participants"
+          (click)="exportOverallSegmentParticipants(); $event.stopPropagation()">
+          <mat-icon>file_download</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div *ngIf="loading" class="loading-container">
+      <mat-spinner diameter="50"></mat-spinner>
+      <p>Loading...</p>
+    </div>
+
+    <!-- Merged Slots Table -->
+    <div *ngIf="selectedQueue && !loading" class="merged-slots-container">
+      <div class="table-wrapper">
+        <table class="merged-table">
+          <thead>
+            <tr>
+              <th *ngFor="let stage of queueStages" class="stage-col" (click)="openSlotPlannerForStage(stage)">
+              <div class="stage-header-card">
+                <div class="stage-header-top">
+                  <mat-icon class="stage-th-icon">view_timeline</mat-icon>
+                  <span class="stage-th-name">{{ stage }}</span>
+                </div>
+                <div class="stage-header-footer">
+                  <span class="open-planner-label">Open Planner</span>
+                  <mat-icon class="stage-th-arrow">arrow_forward</mat-icon>
+                </div>
+              </div>
+            </th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Stage Columns with Slots Below -->
+            <tr class="stages-row">
+              <td *ngFor="let stage of queueStages" class="stage-data-cell">
+                <div class="stage-column-content">
+                  <!-- Slot Cards for this Stage -->
+                  <div *ngFor="let slot of getSlotsForStage(stage)" class="slot-card-wrapper">
+                    <div class="slot-card" (click)="openSlotPanel(slot, stage)">
+                      <!-- Show Dates with Time in Single Box -->
+                      <div class="slot-datetime-box">
+                        <div class="datetime-row">
+                          <mat-icon>event</mat-icon>
+                          <span class="datetime-label">Start:</span>
+                          <span class="datetime-value">{{ slot.startdate | date:'dd MMM yyyy' }} {{
+                            formatTimeTo12Hour(slot.starttime) }}</span>
+                        </div>
+                        <div class="datetime-divider"></div>
+                        <div class="datetime-row">
+                          <mat-icon>event_available</mat-icon>
+                          <span class="datetime-label">End:</span>
+                          <span class="datetime-value">{{ slot.enddate | date:'dd MMM yyyy' }} {{
+                            formatTimeTo12Hour(slot.endtime) }}</span>
+                        </div>
+                      </div>
+
+                      <!-- Counts Display -->
+                      <div class="slot-counts-section">
+                        <div class="count-item segments-count">
+                          <span class="count-label">Seg:</span>
+                          <span class="count-value">{{ getSegmentsCountForSlot(slot, stage) }}</span>
+                        </div>
+                        <div class="count-item remainslot-count">
+                          <span class="count-label">R-Slot:</span>
+                          <span class="count-value">{{ getRemainingSlotsCount(slot, stage) }}</span>
+                        </div>
+                        <div class="count-item confirmed-count">
+                          <span class="count-label">Con:</span>
+                          <span class="count-value">{{ getConfirmedCountForSlot(slot, stage) }}</span>
+                        </div>
+                        <div class="count-item non-confirmed-count">
+                          <span class="count-label">Non-C:</span>
+                          <span class="count-value">{{ getNonConfirmedCountForSlot(slot, stage) }}</span>
+                        </div>
+                        <div class="count-item big-count">
+                          <span class="count-label">B!G:</span>
+                          <span class="count-value">{{ getBigParticipantsCountForSlot(slot, stage) }}</span>
+                        </div>
+                        <div class="count-item invalid-count" *ngIf="getInvalidSlotsCountForSlot(slot, stage) > 0">
+                          <mat-icon class="warning-icon">warning</mat-icon>
+                          <span class="count-label">Invalid:</span>
+                          <span class="count-value">{{ getInvalidSlotsCountForSlot(slot, stage) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- No Slots Message for Stage -->
+                  <div *ngIf="getSlotsForStage(stage).length === 0" class="no-slots-for-stage">
+                    <mat-icon>event_busy</mat-icon>
+                    <p>No slots</p>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- No Slots Message -->
+            <tr *ngIf="mergedSlots.length === 0" class="no-results-row">
+              <td [attr.colspan]="queueStages.length" class="no-results-cell">
+                <div class="no-results-message">
+                  <mat-icon>event_busy</mat-icon>
+                  <p>No slots found for this queue</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slot Details Panel (Right Side) -->
+  <div class="slot-panel" *ngIf="showSlotPanel">
+    <div class="panel-header">
+      <span>
+        <!-- Different header based on panel view type -->
+        <h3 *ngIf="panelViewType === 'slot'">
+          <mat-icon>event</mat-icon>
+          Slot Details - {{ selectedStageForPanel }}
+        </h3>
+        <h3 *ngIf="panelViewType === 'queue-tokens'">
+          <mat-icon>confirmation_number</mat-icon>
+          Queue Tokens - {{ selectedStageForCount }}
+        </h3>
+        <h3 *ngIf="panelViewType === 'segment-participants'">
+          <mat-icon>groups</mat-icon>
+          Segment Participants - {{ selectedStageForCount }}
+        </h3>
+        <h3 *ngIf="panelViewType === 'overall-queue-tokens'">
+          <mat-icon>confirmation_number</mat-icon>
+          Overall Queue Tokens
+          <button mat-icon-button class="header-export-btn" matTooltip="Export All Queue Tokens"
+            (click)="exportOverallQueueTokens(); $event.stopPropagation()">
+            <mat-icon>file_download</mat-icon>
+          </button>
+        </h3>
+        <h3 *ngIf="panelViewType === 'overall-segment-participants'">
+          <mat-icon>groups</mat-icon>
+          Overall Segment Participants
+          <button mat-icon-button class="header-export-btn" matTooltip="Export All Segment Participants"
+            (click)="exportOverallSegmentParticipants(); $event.stopPropagation()">
+            <mat-icon>file_download</mat-icon>
+          </button>
+        </h3>
+
+        <h4 *ngIf="panelViewType === 'slot'">
+          <span class="info-value">
+            {{ selectedSlot?.startdate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.starttime) }}
+            <span class="separator">—</span>
+            {{ selectedSlot?.enddate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.endtime) }}
+          </span>
+        </h4>
+      </span>
+      <button mat-icon-button (click)="closeSlotPanel()" class="close-panel-btn">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="panel-content">
+
+      <!-- NEW: Filters Section (only for overall views) -->
+      <div class="filters-section"
+        *ngIf="(panelViewType === 'overall-queue-tokens' || panelViewType === 'overall-segment-participants') && activePanelSection">
+        <div class="filters-grid">
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Filter by Segment</mat-label>
+            <mat-select [(ngModel)]="selectedSegmentFilter" (selectionChange)="onSegmentFilterChange()" multiple>
+             <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['docid'] || segment['id']">
+                      {{ segment['segmentname'] }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Filter by Stage</mat-label>
+            <mat-select [(ngModel)]="selectedStageFilter" (selectionChange)="onStageFilterChange()" multiple>
+              <mat-option *ngFor="let stage of queueStages" [value]="stage">
+                {{ stage }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- NEW: Overall Status Counts (only for overall views) -->
+      <div class="overall-status-counts"
+        *ngIf="(panelViewType === 'overall-queue-tokens' || panelViewType === 'overall-segment-participants')">
+        <div class="status-count-card queue-participants-status-card"
+          [class.active-status]="currentStatusView === 'queue-participants'" (click)="showOverallQueueParticipants()">
+          <div class="status-icon">
+            <mat-icon>people</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Queue Participants</span>
+            <span class="status-value">
+              {{ getOverallQueueParticipantsCount() }}
+            </span>
+          </div>
+        </div>
+
+        <div class="status-count-card non-queue-status-card" [class.active-status]="currentStatusView === 'non-queue'"
+          (click)="showOverallNonQueueParticipants()">
+          <div class="status-icon">
+            <mat-icon>person_off</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Non-Queue Participants</span>
+            <span class="status-value">
+              {{ getOverallNonQueueParticipantsCount() }}
+            </span>
+          </div>
+        </div>
+
+        <!-- <div class="status-count-card deleted-slots-status-card"
+          [class.active-status]="currentStatusView === 'deleted-slots'" (click)="showOverallDeletedSlotsParticipants()">
+          <div class="status-icon">
+            <mat-icon>delete_forever</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Deleted Slots</span>
+            <span class="status-value">
+              {{ getOverallDeletedSlotsCount() }}
+            </span>
+          </div>
+        </div> -->
+      </div>
+
+      <!-- Stage Filter (only for stage-specific queue-tokens and segment-participants views) -->
+      <div class="stage-filter-section"
+        *ngIf="(panelViewType === 'queue-tokens' || panelViewType === 'segment-participants') && !activePanelSection">
+        <mat-form-field appearance="outline" class="stage-filter">
+          <mat-label>Filter by Stage</mat-label>
+          <mat-select [(ngModel)]="selectedStageFilter">
+            <mat-option value="all">All Stages</mat-option>
+            <mat-option *ngFor="let stage of queueStages" [value]="stage">
+              {{ stage }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <!-- Stage Status Counts (only for stage-specific views) -->
+      <div class="stage-status-counts"
+        *ngIf="(panelViewType === 'queue-tokens' || panelViewType === 'segment-participants') && !activePanelSection">
+        <div class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
+          <div class="status-icon">
+            <mat-icon>check_circle</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Confirmed</span>
+            <span class="status-value">
+              {{ panelViewType === 'queue-tokens' ?
+              getConfirmedQueueTokenCountForStage(selectedStageForCount) :
+              getConfirmedSegmentParticipantsCountForStage(selectedStageForCount) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
+          <div class="status-icon">
+            <mat-icon>schedule</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Non-Confirmed</span>
+            <span class="status-value">
+              {{ panelViewType === 'queue-tokens' ?
+              getNonConfirmedQueueTokenCountForStage(selectedStageForCount) :
+              getNonConfirmedSegmentParticipantsCountForStage(selectedStageForCount) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW: Confirmed/Non-Confirmed Counts (only for stage-specific views) -->
+      <div class="stage-status-counts"
+        *ngIf="panelViewType === 'queue-tokens' || panelViewType === 'segment-participants'">
+        <div class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
+          <div class="status-icon">
+            <mat-icon>check_circle</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Confirmed</span>
+            <span class="status-value">
+              {{ panelViewType === 'queue-tokens' ?
+              getConfirmedQueueTokenCountForStage(selectedStageForCount) :
+              getConfirmedSegmentParticipantsCountForStage(selectedStageForCount) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
+          <div class="status-icon">
+            <mat-icon>schedule</mat-icon>
+          </div>
+          <div class="status-details">
+            <span class="status-label">Non-Confirmed</span>
+            <span class="status-value">
+              {{ panelViewType === 'queue-tokens' ?
+              getNonConfirmedQueueTokenCountForStage(selectedStageForCount) :
+              getNonConfirmedSegmentParticipantsCountForStage(selectedStageForCount) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slot View Sections (only shown when panelViewType === 'slot') -->
+      <ng-container *ngIf="panelViewType === 'slot'">
+        <!-- Merged Variations List -->
+        <span class="merged-variations-section">
+          <div class="section-header-clickable" (click)="toggleVariationsExpansion()">
+            <span>
+              Segments & Variations ({{getSegmentVariationsWithCounts().length}})
+            </span>
+            <mat-icon class="expand-icon">{{ variationsExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </div>
+          <div class="expandable-content" *ngIf="variationsExpanded">
+            <div class="segment-variation-list">
+              <div *ngFor="let sv of getSegmentVariationsWithCounts()">
+                <div class="sv-segment-label">{{ sv.segmentName }}</div>
+                <div class="sv-item" *ngFor="let variation of sv.variations">
+                  <div class="sv-header">
+                    <mat-icon>category</mat-icon>
+                    <span class="sv-name">{{ variation.variationName }}</span>
+                  </div>
+                  <div class="sv-counts">
+                    <span class="count-badge confirmed">Con: {{ variation.confirmedCount }}</span>
+                    <span class="count-badge non-confirmed">Non: {{ variation.nonConfirmedCount }}</span>
+                    <span class="count-badge big">B!G: {{ variation.bigCount }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </span>
+
+        <!-- Stage Range Information -->
+        <span class="stage-range-info" *ngIf="getStageRangeDetails().hasNonConfirmed">
+          <div class="stage-range-header" (click)="toggleStageRange()">
+            <mat-icon>route</mat-icon>
+            <span>Stage Range for Non-Confirmed Participants</span>
+            <mat-icon class="expand-icon" [class.expanded]="isStageRangeExpanded">
+              {{ isStageRangeExpanded ? 'expand_less' : 'expand_more' }}
+            </mat-icon>
+          </div>
+
+          <span class="stage-range-details" *ngIf="isStageRangeExpanded">
+
+            <!-- Visual Flow -->
+            <div class="stage-flow">
+              <ng-container *ngFor="let stage of getStageRangeDetails().stagesList; let i = index">
+                <span class="stage-badge">
+                  {{ stage }}
+                </span>
+                <mat-icon *ngIf="i < getStageRangeDetails().stagesList.length - 1"
+                  class="arrow-icon">arrow_forward</mat-icon>
+              </ng-container>
+            </div>
+
+            <!-- Additional Context -->
+            <div class="stage-note" *ngIf="getStageRangeDetails().lastStageWithSlot">
+              <mat-icon>check_circle</mat-icon>
+              <span>
+                Last stage with slot: <strong>{{ getStageRangeDetails().lastStageWithSlot }}</strong>
+              </span>
+            </div>
+
+            <div class="stage-note" *ngIf="!getStageRangeDetails().lastStageWithSlot">
+              <mat-icon>start</mat-icon>
+              <span>
+                This is the <strong>first stage with a slot</strong> - includes participants without queue tokens
+              </span>
+            </div>
+          </span>
+        </span>
+
+        <!-- Overall Participants Summary -->
+        <span class="summary-grids">
+          <!-- Confirmed Participants Grid -->
+          <div class="summary-card confirmed-card" (click)="showAllConfirmedParticipants()">
+            <div class="summary-content-compact">
+              <span class="summary-label">Confirmed</span>
+              <span class="summary-count">{{ getAllConfirmedCount() }}</span>
+              <span class="invalid-badge" *ngIf="getAllInvalidSlotsCount() > 0">
+                <mat-icon>warning</mat-icon>
+                {{ getAllInvalidSlotsCount() }} Invalid
+              </span>
+            </div>
+          </div>
+
+          <!-- Non-Confirmed Participants Grid -->
+          <div class="summary-card non-confirmed-card" (click)="showAllNonConfirmedParticipants()">
+            <div class="summary-content-compact">
+              <span class="summary-label">Non-Confirmed</span>
+              <span class="summary-count">{{ getAllNonConfirmedCount() }}</span>
+            </div>
+          </div>
+
+          <!-- B!G Participants Grid -->
+          <div class="summary-card big-card" (click)="showAllBigParticipants()">
+            <div class="summary-content-compact">
+              <span class="summary-label">B!G Participants</span>
+              <span class="summary-count">{{ getAllBigParticipantsCount() }}</span>
+            </div>
+          </div>
+        </span>
+      </ng-container>
+
+      <!-- Participants List Section -->
+      <span class="participants-section" *ngIf="activePanelSection">
+        <div class="participants-header">
+          <h4>
+            <mat-icon>{{
+              currentStatusView === 'queue-participants' ? 'people' :
+              currentStatusView === 'non-queue' ? 'person_off' :
+              currentStatusView === 'deleted-slots' ? 'delete_forever' :
+              activePanelSection === 'confirmed' ? 'how_to_reg' :
+              activePanelSection === 'non-confirmed' ? 'schedule' :
+              activePanelSection === 'big' ? 'group' :
+              'people'
+              }}</mat-icon>
+            {{
+            currentStatusView === 'queue-participants' ? 'Queue Participants' :
+            currentStatusView === 'non-queue' ? 'Non-Queue Participants' :
+            currentStatusView === 'deleted-slots' ? 'Deleted Slots Participants' :
+            activePanelSection === 'confirmed' ? 'Confirmed' :
+            activePanelSection === 'non-confirmed' ? 'Non-Confirmed' :
+            activePanelSection === 'big' ? 'B!G' :
+            'All'
+            }}
+            ({{ getFilteredParticipantsList().length }})
+          </h4>
+          <div class="header-actions">
+            <button mat-icon-button *ngIf="currentStatusView === 'queue-participants' 
+                          && nonSegmentParticipant()>0" class="non-segment-icon non-segment-filter"
+              [class.active]="nonSegmentedParticipants" (click)="filterNonSegmentParticipants()"
+              matTooltip="non-Segment Participant">
+              <mat-icon>person_off</mat-icon>
+            </button>
+            <button mat-icon-button class="export-btn" matTooltip="Export to Excel"
+              [disabled]="getSelectedParticipantsCount(activePanelSection || 'all') === 0"
+              (click)="exportParticipantsToExcel()">
+              <mat-icon>file_download</mat-icon>
+            </button>
+            <mat-checkbox [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
+              [indeterminate]="areSomeParticipantsSelected(activePanelSection || 'all')"
+              (change)="toggleAllParticipants($event.checked, activePanelSection || 'all')">
+              <b>Select All</b>
+            </mat-checkbox>
+          </div>
+        </div>
+        <!-- Communication Actions - Moved above Participants Summary -->
+        <span *ngIf="getSelectedParticipantsCount(activePanelSection || 'all') != 0">
+          <div class="action-buttons-horizontal">
+            <button mat-raised-button class="action-btn-compact notification-btn"
+              [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
+              (click)="sendNotification()">
+              <mat-icon>notifications</mat-icon>
+              <span>Notification -</span>
+              <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
+            </button>
+
+            <button mat-raised-button class="action-btn-compact whatsapp-btn"
+              [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
+              (click)="sendWhatsApp()">
+              <mat-icon>chat</mat-icon>
+              <span>WhatsApp -</span>
+              <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
+            </button>
+
+            <button mat-raised-button class="action-btn-compact email-btn"
+              [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
+              (click)="sendEmail()">
+              <mat-icon>email</mat-icon>
+              <span>Email -</span>
+              <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
+            </button>
+          </div>
+        </span>
+
+        <div *ngIf="loadingPanel" class="panel-loading">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading participants...</p>
+        </div>
+
+        <div *ngIf="!loadingPanel && getFilteredParticipantsList().length === 0" class="no-participants">
+          <mat-icon>check_circle</mat-icon>
+          <p>No participants found</p>
+        </div>
+
+        <span *ngIf="!loadingPanel && getFilteredParticipantsList().length > 0" class="participants-list">
+          <div class="participant-card" *ngFor="let participant of getFilteredParticipantsList(); let i = index"
+            [class.invalid-slot-participant]="participant.hasInvalidSlot"
+            [class.deleted-slot-participant]="participant.hasDeletedSlot || currentStatusView === 'deleted-slots'"
+            [class.non-queue-participant]="participant.isNonQueueParticipant"
+            [class.duplicate-participant]="participant.isDuplicate"
+            [class.non-segment-participant]="participant.isNonSegmentParticipant">
+            <div class="participant-details">
+
+              <div class="participant-info">
+                <div class="participant-name">
+                  <div class="participant-number" [class.invalid-number]="participant.hasInvalidSlot"
+                    [class.deleted-slot-number]="participant.hasDeletedSlot || currentStatusView === 'deleted-slots'"
+                    [class.non-queue-number]="participant.isNonQueueParticipant"
+                    [class.duplicate-number]="participant.isDuplicate"
+                    [class.non-segment-number]="participant.isNonSegmentParticipant">
+                    #{{ i + 1 }}
+                    <mat-icon *ngIf="participant.hasInvalidSlot" class="invalid-icon">warning</mat-icon>
+                    <mat-icon *ngIf="participant.hasDeletedSlot || currentStatusView === 'deleted-slots'"
+                      class="deleted-icon">delete</mat-icon>
+                    <mat-icon *ngIf="participant.isDuplicate" class="duplicate-icon">content_copy</mat-icon>
+                    <mat-icon *ngIf="participant.isNonSegmentParticipant" class="non-segment-icon">person_off</mat-icon>
+                  </div>
+                  <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                  <mat-chip *ngIf="participant.hasInvalidSlot" class="invalid-chip">
+                    Invalid Slot
+                  </mat-chip>
+                  <mat-chip *ngIf="participant.hasDeletedSlot || currentStatusView === 'deleted-slots'"
+                    class="deleted-slot-chip">
+                    Deleted Slot
+                  </mat-chip>
+                  <mat-chip *ngIf="participant.isDuplicate" class="duplicate-chip">
+                    Duplicate
+                  </mat-chip>
+                  <mat-chip *ngIf="participant.isNonSegmentParticipant" class="non-segment-chip">
+                    Non-Segment
+                  </mat-chip>
+                </div>
+
+                <!-- Token Details Row (for queue participants) -->
+                <div class="token-details-row"
+                  *ngIf="currentStatusView === 'queue-participants' && !participant.isNonQueueParticipant">
+                  <div class="token-detail-item">
+                    <mat-icon>confirmation_number</mat-icon>
+                    <span><b>Token #:</b> {{ participant.tokenNumber || participant.tokennumber || 'N/A' }}</span>
+                  </div>
+                  <div class="token-detail-item">
+                    <mat-icon>route</mat-icon>
+                    <span><b>Stage:</b> {{ participant.currentstage || 'N/A' }}</span>
+                  </div>
+                  <div class="token-detail-item">
+                    <mat-icon>format_list_numbered</mat-icon>
+                    <span><b>Position:</b> {{ participant.queuePosition || participant.queueposition || 'N/A' }}</span>
+                  </div>
+                </div>
+
+                <!-- Non-Segment Warning -->
+                <div class="participant-meta non-segment-meta" *ngIf="participant.isNonSegmentParticipant">
+                  <mat-icon class="meta-icon non-segment-icon-meta">person_off</mat-icon>
+                  <span>This participant is not found in any segment</span>
+                </div>
+
+                <div class="participant-meta"
+                  *ngIf="participant.isNonQueueParticipant !== undefined && !participant.isNonSegmentParticipant">
+                  <mat-icon class="meta-icon">{{ participant.isNonQueueParticipant ? 'person_off' : 'person'
+                    }}</mat-icon>
+                  <span class="status-badge" [class.warning]="participant.isNonQueueParticipant">
+                    {{ participant.isNonQueueParticipant ? 'Non-Queue' : 'In-Queue' }}
+                  </span>
+                  <div class="participant-meta"
+                    *ngIf="participant.currentstage && currentStatusView !== 'queue-participants'">
+                    <mat-icon class="meta-icon">route</mat-icon>
+                    <span><b>Queue Stage</b>: {{ participant.currentstage }}</span>
+                  </div>
+                </div>
+
+                <div class="participant-meta warning-meta"
+                  *ngIf="participant.hasInvalidSlot && participant.invalidSlotReason">
+                  <mat-icon class="meta-icon warning-icon">error</mat-icon>
+                  <span>{{ participant.invalidSlotReason }}</span>
+                </div>
+                <div class="participant-meta deleted-slot-meta"
+                  *ngIf="(participant.hasDeletedSlot || currentStatusView === 'deleted-slots') && participant.deletedSlotStages">
+                  <mat-icon class="meta-icon deleted-icon">delete_forever</mat-icon>
+                  <span>Selected slots for stages "{{ participant.deletedSlotStages.join(', ') }}" have been deleted
+                    from planning</span>
+                </div>
+                <!-- Duplicate Warning -->
+                <div class="participant-meta duplicate-meta"
+                  *ngIf="participant.isDuplicate && participant.duplicateSegments">
+                  <mat-icon class="meta-icon duplicate-icon">content_copy</mat-icon>
+                  <span>Found in multiple segments: {{ participant.duplicateSegments.join(', ') }}</span>
+                </div>
+                <div class="d-flex flex-row flex-wrap gap-2">
+                  <div class="participant-meta" *ngIf="participant.segmentName">
+                    <mat-icon class="meta-icon">label</mat-icon>
+                    <span><b>Segment</b>: {{ participant.segmentName }}</span>
+                  </div>
+                  <div class="participant-meta" *ngIf="participant.variationName">
+                    <mat-icon class="meta-icon">category</mat-icon>
+                    <span><b>Variation</b>: {{ participant.variationName }}</span>
+                  </div>
+                </div>
+
+                <!-- Display participant's selected slots -->
+                <div class="participant-slots"
+                  *ngIf="participant.selectedSlots && participant.selectedSlots.length > 0">
+                  <div class="slots-header">
+                    <mat-icon>event_note</mat-icon>
+                    <span><b>Selected Slots ({{ participant.selectedSlots.length }})</b></span>
+                  </div>
+                  <div class="slot-list">
+                    <div class="slot-item" *ngFor="let slot of participant.selectedSlots">
+                      <div class="slot-stage">
+                        <mat-icon>flag</mat-icon>
+                        <span>{{ slot.stageName }}</span>
+                      </div>
+                      <div class="slot-details">
+                        <div class="slot-segment">
+                          <mat-icon>label</mat-icon>
+                          <span>{{ slot.segmentName }}</span>
+                        </div>
+                        <div class="slot-time">
+                          <mat-icon>schedule</mat-icon>
+                          <span>{{ slot.startdate?.toDate() | date:'dd MMM yy, HH:mm' }} - {{ slot.enddate?.toDate() |
+                            date:'HH:mm' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <mat-checkbox [(ngModel)]="participant.selected" class="participant-checkbox">
+              </mat-checkbox>
+            </div>
+          </div>
+        </span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<ng-template #slotplanner>
+  <div class="slot-planner" *ngIf="selectedStage">
+    <div class="top-bar">
+      <h1>Slot Planner <span>— {{selectedStage}}</span></h1>
+      <!-- <div class="top-bar-right">
+        <div class="date-range">📅 11 – 13 Feb 2026</div>
+        <div class="live-pulse"><span class="pulse-dot"></span> Live</div>
+      </div> -->
+     <button mat-dialog-close mat-icon-button class="close-btn">
+      <mat-icon>close</mat-icon>
+    </button>
+    </div>
+    <!-- <div class="scoreboard">
+      <div class="score-cell sc-slots">
+        <div class="num">{{getTotalSlotsForStage()}}</div>
+        <div class="lbl">Total Slots</div>
+      </div>
+      <div class="score-cell sc-booked">
+        <div class="num">{{getTotalConfirmedParticipantsForStage()}}</div>
+        <div class="lbl">Booked</div>
+      </div>
+      <div class="score-cell sc-open">
+        <div class="num">{{getTotalSlotsOpenForStage()}}</div>
+        <div class="lbl">Open</div>
+      </div>
+      <div class="score-cell sc-nonconf">
+        <div class="num">160</div>
+        <div class="lbl">Non-Confirmed</div>
+      </div>
+    </div> -->
+    <div class="scoreboard">
+    <div class="score-cell sc-slots">
+      <div class="num">{{ getTotalSlotsForScoreboard() }}</div>
+      <div class="lbl">Total Slots</div>
+    </div>
+    <div class="score-cell sc-booked">
+      <div class="num">{{ getTotalBookedForScoreboard() }}</div>
+      <div class="lbl">Booked</div>
+    </div>
+    <div class="score-cell sc-open">
+      <div class="num">{{ getTotalOpenForScoreboard() }}</div>
+      <div class="lbl">Open</div>
+    </div>
+
+    <!-- Toggle in top right corner -->
+    <div class="scoreboard-toggle">
+      <span class="toggle-label" [class.active-label]="showFromToday">From Today</span>
+      <label class="toggle-switch">
+        <input type="checkbox" [checked]="!showFromToday" (change)="showFromToday = !showFromToday">
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="toggle-label" [class.active-label]="!showFromToday">Overall</span>
+    </div>
+  </div>
+    <div class="controls-bar">
+      <!-- <button class="ctrl-btn" [class.active]="selectedDates.length === 0" (click)="selectAllDays()">All Days</button> -->
+      <!-- <button class="ctrl-btn">11 Feb</button>
+      <button class="ctrl-btn">12 Feb</button>
+      <button class="ctrl-btn">13 Feb</button> -->
+      <div class="day-slider-wrapper">
+        <button class="slider-arrow" (click)="scrollDays('left')" [disabled]="!canScrollLeft">
+          ◀
+        </button>
+
+        <div class="day-buttons-scroll" #dayButtonsScroll (scroll)="onScroll()">
+          <div class="day-buttons-track">
+            <button class="ctrl-btn" [class.active]="selectedDates.length === 0" (click)="selectAllDays()">All
+              Days</button>
+            <button class="ctrl-btn" [class.active]="selectedDates.includes(date)"
+              *ngFor="let date of getSlotDatesOfStage()"
+              (click)="onDateClick(date)">{{getDateAndMonthString(date)}}</button>
+          </div>
+        </div>
+
+        <button class="slider-arrow" (click)="scrollDays('right')" [disabled]="!canScrollRight">
+          ▶
+        </button>
+      </div>
+      <span style="color: #ccc; font-weight: 700; font-size: 16px; margin: 0 4px;">/</span>
+      <!-- <div class="date-picker-wrapper">
+        <input type="date" id="startDate" value="2026-02-11">
+        <span class="date-separator">-</span>
+        <input type="date" id="endDate" value="2026-02-13">
+      </div> -->
+      <mat-form-field appearance="fill">
+        <mat-label>Enter a date range</mat-label>
+
+        <mat-date-range-input [rangePicker]="picker" [dateFilter]="allowedDateForFilter">
+
+          <input matStartDate placeholder="Start date" [(ngModel)]="slotPlannerFilter.startDate">
+          <input matEndDate placeholder="End date" [(ngModel)]="slotPlannerFilter.endDate">
+
+        </mat-date-range-input>
+
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker #picker (closed)="onSlotPlannerDateFilter()">
+        </mat-date-range-picker>
+      </mat-form-field>
+      <mat-form-field appearance="fill" style="min-width: 180px;">
+        <mat-label>Filter by Segment</mat-label>
+        <mat-select [(ngModel)]="slotPlannerSegmentFilter" multiple>
+        <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['docid'] || segment['id']">
+          {{ segment['segmentname'] }}
+        </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="ctrl-spacer"></div>
+      <button class="export-btn" (click)="exportParticipantsDetailsForStage()">📊 Export</button>
+      <button class="expand-toggle" (click)="expandAllRow? expandedAllRows() : collapseAllRows()">{{expandAllRow ?
+        'Expand All':'Collapse All Participants'}}</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="main-table">
+        <thead>
+          <tr>
+            <th style="width:40px;"></th>
+            <th>Slot</th>
+            <th>Timing</th>
+            <th style="text-align:center">Max Slot</th>
+            <th>Booked</th>
+            <th>Available</th>
+            <!-- <th style="min-width:160px;">Capacity Fill</th> -->
+          </tr>
+        </thead>
+        <tbody>
+        <ng-container *ngFor="let dayGroup of getSlotsGroupForStage();let i=index">
+  
+          <!-- Day Header -->
+          <tr class="day-row">
+            <td colspan="6">
+              {{ getDayLabel(dayGroup?.date) }}
+              <span class="day-summary">
+                Booked: {{ dayGroup.totalBooked }} &nbsp;|&nbsp;
+                Open: {{ dayGroup.totalOpen }} &nbsp;|&nbsp;
+                Slots: {{ dayGroup.slots.length }}
+              </span>
+            </td>
+          </tr>
+  
+          <!-- Slots for this day -->
+          <ng-container *ngFor="let slot of dayGroup.slots; let i = index">
+  
+            <!-- Slot Row -->
+            <tr class="slot-row" (click)="toggleRow(slot)">
+              <td>
+                <span class="expand-arrow" [class.expanded]="slot.expanded" *ngIf="slot.showExpand">▶</span>
+              </td>
+              <td><strong>{{ getDateAndMonthString(slot?.startdate) }}</strong></td>
+              <td>{{ getTimeString(slot?.startdate , slot?.enddate) }}</td>
+              <td style="text-align:center">
+                <span class="badge badge-none">{{ getMaxSlotsCount(slot, selectedStage) }}</span>
+              </td>
+              <td style="text-align:center">
+                <span class="badge badge-booked">{{ getConfirmedCountForSlot(slot, selectedStage) }}</span>
+              </td>
+              <td style="text-align:center">
+                <span class="badge badge-open" [class.low-avail]="getRemainingSlotsCount(slot, selectedStage) <= 1">
+                  {{ getRemainingSlotsCount(slot, selectedStage) }}
+                </span>
+              </td>
+            </tr>
+  
+            <!-- Participant Panel -->
+            <tr class="participant-panel" [class.open]="slot.expanded" *ngIf="slot.expanded && slot.showExpand">
+              <td colspan="5">
+                <div class="participant-inner" [@slideDown]="slot.expanded ? 'expanded' : 'collapsed'">
+  
+                  <!-- BIG Participants -->
+                  <!-- <div class="p-section" *ngIf="slot.participants.big?.length > 0">
+                            <div class="p-section-header">
+                              ⭐ BIG Participants ({{ slot.participants.big.length }})
+                            </div>
+                            <div class="p-card" *ngFor="let p of slot.participants.big">
+                              <div class="p-avatar big-av">{{ getInitials(p.name) }}</div>
+                              <div>
+                                <div class="p-name">{{ p.name }}</div>
+                                <div class="p-detail">{{ p.variation }}</div>
+                              </div>
+                              <span class="p-segment-tag" [ngClass]="getSegmentClass(p.segment)">
+                                {{ getSegmentLabel(p.segment) }}
+                              </span>
+                            </div>
+                          </div> -->
+  
+                  <!-- Next Cycle -->
+                  <div class="p-section">
+                    <div *ngFor="let segment of getConfirmedParticipants(slot , selectedStage);">
+                      <div *ngIf="segment.participants?.length > 0 ">
+                        <div class="p-section-header">
+                          {{segment?.segmentName ?? ''}} ({{ segment?.participants?.length }})
+                        </div>
+                        <div class="participant-names">
+                          <div class="p-card" *ngFor="let participant of segment.participants; let i = index;">
+                            <div>
+                              <div class="p-name"><span style="font-weight: normal;">{{i + 1}} {{')'}} </span><span>{{
+                                  getProfileName(participant.profile_id || participant.profileid) }}</span></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <!-- <ng-template #noNext>
+                                <div class="empty-msg">No Next Cycle participants</div>
+                              </ng-template> -->
+                    </div>
+                  </div>
+  
+                  <!-- Standard -->
+                  <!-- <div class="p-section">
+                            <div class="p-section-header">
+                              ✓ Standard ({{ slot.participants.standard.length }})
+                            </div>
+                            <div *ngIf="slot.participants.standard.length > 0; else noStandard">
+                              <div class="p-card" *ngFor="let p of slot.participants.standard">
+                                <div class="p-avatar confirmed-av">{{ getInitials(p.name) }}</div>
+                                <div>
+                                  <div class="p-name">{{ p.name }}</div>
+                                  <div class="p-detail">{{ p.variation }}</div>
+                                </div>
+                                <span class="p-segment-tag" [ngClass]="getSegmentClass(p.segment)">
+                                  {{ getSegmentLabel(p.segment) }}
+                                </span>
+                              </div>
+                            </div>
+                            <ng-template #noStandard>
+                              <div class="empty-msg">No Standard participants</div>
+                            </ng-template>
+                          </div> -->
+  
+                  <!-- Actions -->
+                  <!-- <div class="p-actions-wrapper">
+                            <div class="p-actions">
+                              <button class="p-action-btn btn-notify" (click)="$event.stopPropagation()">
+                                🔔 Send Notification
+                              </button>
+                              <button class="p-action-btn btn-whatsapp" (click)="$event.stopPropagation()">
+                                💬 WhatsApp ({{ slot.booked }})
+                              </button>
+                              <button class="p-action-btn btn-email" (click)="$event.stopPropagation()">
+                                ✉ Email All
+                              </button>
+                              <button class="p-action-btn btn-download" (click)="$event.stopPropagation()">
+                                ⬇ Export
+                              </button>
+                            </div>
+                          </div> -->
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+        </ng-container>
+          <!-- Total Row -->
+          <tr class="total-row">
+            <td></td>
+            <td colspan="2"><strong>TOTAL</strong></td>
+            <td style="text-align:center">
+              <span class="badge badge-none">{{ getTotalMaxSlotsInTable() }}</span>
+            </td>
+            <td style="text-align:center">
+              <span class="badge badge-booked">{{ getTotalConfirmedParticipantInTable() }}</span>
+            </td>
+            <td style="text-align:center">
+              <span class="badge badge-open">{{ getTotalSlotsOpenInTable() }}</span>
+            </td>
+          </tr>
+      </tbody>
+     </table>
+    </div>
+  </div>
+</ng-template>

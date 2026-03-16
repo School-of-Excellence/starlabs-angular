@@ -1,0 +1,1394 @@
+<div class="dashboard-container" [class.panel-open]="isSidePanelOpen">
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>Loading events...</p>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content" *ngIf="!isLoading">
+    <!-- Header Section with Ongoing Events -->
+    <div class="header-section">
+      <!-- Combined Live Events & Queues Banner -->
+      <div class="live-banner" *ngIf="ongoingEvents.length > 0 || (ongoingQueues.length > 0 && selectedEvent)">
+        <div class="live-badge">
+          <span class="pulse-dot"></span>
+          LIVE NOW
+        </div>
+        
+        <div class="live-content">
+          <!-- Live Events Section -->
+          <div class="live-section" *ngIf="ongoingEvents.length > 0">
+            <span class="live-section-label">Events</span>
+            <div class="live-chips">
+              <div 
+                *ngFor="let event of ongoingEvents" 
+                class="live-chip event-chip"
+                [class.active]="selectedEventRef === event.docref"
+                (click)="selectEvent(event)">
+                {{ event['name'] }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="live-divider" *ngIf="ongoingEvents.length > 0 && ongoingQueues.length > 0 && selectedEvent"></div>
+
+          <!-- Live Queues Section (Multi-Select) -->
+          <div class="live-section" *ngIf="ongoingQueues.length > 0 && selectedEvent">
+            <span class="live-section-label">Queues</span>
+            <div class="live-chips">
+              <div 
+                *ngFor="let queue of ongoingQueues" 
+                class="live-chip queue-chip"
+                [class.active]="isQueueSelected(queue)"
+                (click)="toggleQueueSelection(queue)">
+                {{ queue['queuename'] }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dropdowns Row -->
+      <div class="dropdowns-row">
+        <!-- Event Selector -->
+        <div class="event-selector">
+          <label for="eventSelect">Select Event</label>
+          
+          <div class="search-select-container">
+            <div class="search-select-trigger" 
+              (click)="toggleDropdown()"
+              [class.open]="isDropdownOpen"
+              [class.has-value]="selectedEvent">
+              
+              <div class="selected-display" *ngIf="selectedEvent && !isDropdownOpen">
+                <span class="live-indicator" *ngIf="isOngoingEvent(selectedEvent)"></span>
+                <span class="selected-text">{{ selectedEvent['name'] }}</span>
+                <button class="clear-btn" (click)="clearSelection($event)" title="Clear selection">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <input #searchInput
+                *ngIf="isDropdownOpen || !selectedEvent"
+                type="text"
+                class="search-input"
+                [(ngModel)]="searchTerm"
+                (input)="onSearchChange()"
+                (keydown)="onKeyDown($event)"
+                (focus)="openDropdown()"
+                placeholder="Search events..."
+                autocomplete="off">
+              
+              <span class="dropdown-arrow" [class.rotated]="isDropdownOpen">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 10l5 5 5-5z"/>
+                </svg>
+              </span>
+            </div>
+
+            <!-- Event Dropdown List -->
+            <div class="search-select-dropdown event-dropdown" *ngIf="isDropdownOpen">
+              <div class="dropdown-section" *ngIf="ongoingEvents.length > 0 && !searchTerm">
+                <div class="dropdown-section-header">
+                  <span class="live-dot"></span>
+                  Ongoing Events
+                </div>
+                <div 
+                  *ngFor="let event of ongoingEvents; let i = index"
+                  class="dropdown-item ongoing"
+                  [class.highlighted]="highlightedIndex === i"
+                  [class.selected]="selectedEventRef === event.docref"
+                  (click)="selectEvent(event)"
+                  (mouseenter)="highlightedIndex = i">
+                  <span class="live-indicator"></span>
+                  {{ event['name'] }}
+                  <svg *ngIf="selectedEventRef === event.docref" class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                  </svg>
+                </div>
+              </div>
+
+              <div class="dropdown-section">
+                <div class="dropdown-section-header" *ngIf="!searchTerm">All Events</div>
+                <div class="dropdown-section-header" *ngIf="searchTerm">
+                  Search Results ({{ filteredEventsList.length }})
+                </div>
+                
+                <div class="dropdown-items-container">
+                  <div 
+                    *ngFor="let event of filteredEventsList; let i = index"
+                    class="dropdown-item"
+                    [class.highlighted]="highlightedIndex === i"
+                    [class.selected]="selectedEventRef === event.docref"
+                    [class.ongoing]="isOngoingEvent(event)"
+                    (click)="selectEvent(event)"
+                    (mouseenter)="highlightedIndex = i">
+                    <span class="live-indicator" *ngIf="isOngoingEvent(event)"></span>
+                    {{ event['name'] }}
+                    <svg *ngIf="selectedEventRef === event.docref" class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="no-results" *ngIf="filteredEventsList.length === 0 && searchTerm">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                  <span>No events found for "{{ searchTerm }}"</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Queue Selector (Multi-Select) -->
+        <div class="queue-selector" *ngIf="selectedEvent">
+          <label for="queueSelect">Select Queues</label>
+          
+          <div class="search-select-container">
+            <div 
+              class="search-select-trigger" 
+              (click)="toggleQueueDropdown()"
+              [class.open]="isQueueDropdownOpen"
+              [class.has-value]="selectedQueues.length > 0"
+              [class.disabled]="isLoadingQueues">
+              
+              <div *ngIf="isLoadingQueues" class="loading-text">
+                <div class="spinner-small"></div>
+                Loading queues...
+              </div>
+              
+              <div class="selected-display multi-select" *ngIf="selectedQueues.length > 0 && !isQueueDropdownOpen && !isLoadingQueues">
+                <div class="selected-chips">
+                  <div class="selected-chip" *ngFor="let queue of selectedQueues">
+                    <span class="live-indicator" *ngIf="isOngoingQueue(queue)"></span>
+                    <span class="chip-text">{{ queue['queuename'] }}</span>
+                    <button class="chip-remove" (click)="toggleQueueSelection(queue); $event.stopPropagation()">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <button class="clear-btn" (click)="clearQueueSelection($event)" title="Clear all">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <input 
+                #queueSearchInput
+                *ngIf="(isQueueDropdownOpen || selectedQueues.length === 0) && !isLoadingQueues"
+                type="text"
+                class="search-input"
+                [(ngModel)]="queueSearchTerm"
+                (input)="onQueueSearchChange()"
+                (keydown)="onQueueKeyDown($event)"
+                (focus)="openQueueDropdown()"
+                placeholder="Search queues..."
+                autocomplete="off">
+              
+              <span class="dropdown-arrow" [class.rotated]="isQueueDropdownOpen" *ngIf="!isLoadingQueues">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 10l5 5 5-5z"/>
+                </svg>
+              </span>
+            </div>
+
+            <!-- Queue Dropdown List (Multi-Select) -->
+            <div class="search-select-dropdown queue-dropdown" *ngIf="isQueueDropdownOpen && !isLoadingQueues">
+              <!-- Date Range Indicator -->
+              <div class="date-range-indicator" *ngIf="selectedQueues.length > 0 && queueRangeStartDate && queueRangeEndDate">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+                </svg>
+                <span>Date Range: {{ queueRangeStartDate | date:'MMM d, y' }} - {{ queueRangeEndDate | date:'MMM d, y' }}</span>
+              </div>
+
+              <div class="dropdown-section" *ngIf="ongoingQueues.length > 0 && !queueSearchTerm">
+                <div class="dropdown-section-header">
+                  <span class="live-dot"></span>
+                  Ongoing Queues
+                </div>
+                <div 
+                  *ngFor="let queue of ongoingQueues; let i = index"
+                  class="dropdown-item ongoing"
+                  [class.highlighted]="queueHighlightedIndex === i"
+                  [class.selected]="isQueueSelected(queue)"
+                  (click)="toggleQueueSelection(queue)"
+                  (mouseenter)="queueHighlightedIndex = i">
+                  <span class="checkbox-indicator" [class.checked]="isQueueSelected(queue)">
+                    <svg *ngIf="isQueueSelected(queue)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                  </span>
+                  <span class="live-indicator"></span>
+                  {{ queue['queuename'] }}
+                </div>
+              </div>
+
+              <div class="dropdown-section">
+                <div class="dropdown-section-header" *ngIf="!queueSearchTerm">All Queues</div>
+                <div class="dropdown-section-header" *ngIf="queueSearchTerm">
+                  Search Results ({{ filteredQueuesList.length }})
+                </div>
+                
+                <div class="dropdown-items-container">
+                  <div 
+                    *ngFor="let queue of filteredQueuesList; let i = index"
+                    class="dropdown-item"
+                    [class.highlighted]="queueHighlightedIndex === i"
+                    [class.selected]="isQueueSelected(queue)"
+                    [class.ongoing]="isOngoingQueue(queue)"
+                    (click)="toggleQueueSelection(queue)"
+                    (mouseenter)="queueHighlightedIndex = i">
+                    <span class="checkbox-indicator" [class.checked]="isQueueSelected(queue)">
+                      <svg *ngIf="isQueueSelected(queue)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    </span>
+                    <span class="live-indicator" *ngIf="isOngoingQueue(queue)"></span>
+                    {{ queue['queuename'] }}
+                  </div>
+                </div>
+
+                <div class="no-results" *ngIf="filteredQueuesList.length === 0 && queueSearchTerm">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                  <span>No queues found for "{{ queueSearchTerm }}"</span>
+                </div>
+
+                <div class="no-results" *ngIf="queuesList.length === 0 && !queueSearchTerm">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                  </svg>
+                  <span>No queues available for this event</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-mode-toggle" *ngIf="selectedEvent">
+          <label>View Mode</label>
+          <div class="toggle-buttons">
+            <button 
+              class="toggle-btn"
+              [class.active]="participantViewMode === 'registered'"
+              (click)="setParticipantViewMode('registered')">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+              Registered ({{ registeredCount }})
+            </button>
+            <button 
+              class="toggle-btn scanned"
+              [class.active]="participantViewMode === 'scanned'"
+              (click)="setParticipantViewMode('scanned')">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5zM19 13h-1.5v1.5H19V13z"/>
+              </svg>
+              Generated ({{ scannedCount }})
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid" *ngIf="selectedEvent">
+      <!-- Left Column - Arena Overview & Attendance -->
+      <div class="left-column">
+
+        <div class="arena-grid">
+          <!-- Action Queue Widget -->
+          <div class="action-queue-widget" *ngIf="selectedEvent && videoAskTags.length > 0">
+            <div class="widget-header">
+              <h3 class="widget-title action-queue-title">ACTION QUEUE</h3>
+            </div>
+            
+            <div class="action-queue-content" [class.loading]="isLoadingActionQueue">
+              <div class="action-queue-grid">
+                <!-- Column for each tag -->
+                <div class="action-queue-column" *ngFor="let tag of videoAskTags">
+                  <div class="action-queue-column-header clickable" (click)="openActionQueuePanel(tag)">
+                    <span class="tag-icon">{{ getTagIcon(tag) }}</span>
+                    <span class="tag-name">{{ tag }}</span>
+                    <span class="tag-count">{{ getActionQueueCount(tag) }}</span>
+                  </div>
+                  
+                  <div class="action-queue-list">
+                    <div 
+                      class="action-queue-item" 
+                      *ngFor="let participant of actionQueueData[tag]"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <!-- Empty state for column -->
+                    <div class="action-queue-empty" *ngIf="actionQueueData[tag]?.length === 0">
+                      <span>No participants</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="action-queue-loading" *ngIf="isLoadingActionQueue">
+              <div class="spinner small"></div>
+            </div>
+          </div>
+
+          <!-- Arena Followup Widget -->
+          <div class="arena-followup-widget" *ngIf="selectedEvent && selectedQueues.length > 0">
+            <div class="widget-header">
+              <h3 class="widget-title arena-followup-title">ARENA FOLLOWUP</h3>
+              
+              <!-- Filters for Irregular Column -->
+              <div class="followup-filters">
+                <div class="filter-group">
+                  <label>Day:</label>
+                  <select [(ngModel)]="selectedFollowupDayIndex" (change)="onFollowupDayChange()">
+                    <option [value]="-1">Today</option>
+                    <option *ngFor="let day of dayWiseAttendance; let i = index" 
+                            [value]="i" 
+                            [disabled]="day.isFuture">
+                      {{ day.displayLabel }} ({{ day.date }})
+                    </option>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <label>After:</label>
+                  <input type="time" [(ngModel)]="arenaFollowupTimeFilter" (change)="onFollowupTimeChange()">
+                </div>
+              </div>
+            </div>
+            
+            <div class="arena-followup-content">
+              <div class="arena-followup-grid">
+                <!-- Irregular Column -->
+                <div class="followup-column irregular-column">
+                  <div class="followup-column-header clickable" (click)="openIrregularPanel()">
+                    <span class="column-icon irregular-icon">🚫</span>
+                    <span class="column-name">Irregular</span>
+                    <span class="column-count">{{ irregularParticipants.length }}</span>
+                  </div>
+                  
+                  <div class="followup-list" [class.loading]="isLoadingIrregular">
+                    <div 
+                      class="followup-item" 
+                      *ngFor="let participant of irregularParticipants"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="followup-empty" *ngIf="irregularParticipants.length === 0 && !isLoadingIrregular">
+                      <span>No irregular participants</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Not Doing CW Column (Not Done - Others) -->
+                <div class="followup-column not-doing-cw-column">
+                  <div class="followup-column-header clickable" (click)="openArenaNotDoingCWPanel()">
+                    <span class="column-icon not-doing-icon">🟡</span>
+                    <span class="column-name">Not Doing CW</span>
+                    <span class="column-count">{{ changeWorkOverview.notDoneOthers }}</span>
+                  </div>
+                  
+                  <div class="followup-list" [class.loading]="isLoadingCWOverview">
+                    <div 
+                      class="followup-item" 
+                      *ngFor="let participant of getNotDoingCWParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="followup-empty" *ngIf="changeWorkOverview.notDoneOthers === 0 && !isLoadingCWOverview">
+                      <span>All participants doing CW</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- CW Not Received Column (Not Done - Self) -->
+                <div class="followup-column cw-not-received-column">
+                  <div class="followup-column-header clickable" (click)="openArenaCWNotReceivedPanel()">
+                    <span class="column-icon not-received-icon">❌</span>
+                    <span class="column-name">CW Not Received</span>
+                    <span class="column-count">{{ changeWorkOverview.notDoneSelf }}</span>
+                  </div>
+                  
+                  <div class="followup-list" [class.loading]="isLoadingCWOverview">
+                    <div 
+                      class="followup-item" 
+                      *ngFor="let participant of getCWNotReceivedParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="followup-empty" *ngIf="changeWorkOverview.notDoneSelf === 0 && !isLoadingCWOverview">
+                      <span>All participants received CW</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Live CW Column -->
+                <div class="followup-column live-cw-column">
+                  <div class="followup-column-header clickable" (click)="openArenaLiveCWPanel()">
+                    <span class="column-icon live-cw-icon">🔴</span>
+                    <span class="column-name">Live CW</span>
+                    <span class="column-count">{{ liveCWDisplayList.length }}</span>
+                  </div>
+                  
+                  <div class="followup-list" [class.loading]="isLoadingCWOverview">
+                    <div 
+                      class="followup-item live-cw-item" 
+                      *ngFor="let item of liveCWDisplayList"
+                      [title]="item.displayText">
+                      <span class="live-cw-doer">{{ item.doerName }}</span>
+                      <span class="live-cw-separator">→</span>
+                      <span class="live-cw-beneficiary">{{ item.beneficiaryName }}</span>
+                      <span class="live-cw-procedure">({{ item.procedurename }})</span>
+                    </div>
+                    
+                    <div class="followup-empty" *ngIf="liveCWDisplayList.length === 0 && !isLoadingCWOverview">
+                      <span>No live CW</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Day-wise Attendance Widget -->
+        <div class="arena-grid">
+
+          <div class="attendance-widget">
+            <div class="widget-header">
+              <h3 class="widget-title">DAY-WISE ATTENDANCE</h3>
+            </div>
+            
+            <div class="attendance-content" [class.loading]="isLoadingAttendance">
+              <!-- Registered Total Card -->
+              <div class="attendance-card registered-card clickable" (click)="openRegisteredPanel()">
+                <span class="card-label">Registered Total</span>
+                <div class="progress-bar-container">
+                  <div class="progress-bar" [style.width.%]="confirmedPercentage"></div>
+                </div>
+                <span class="card-count">{{ registeredCount }}</span>
+                <span class="card-subtitle">{{ confirmedPercentage }}% of Confirmation</span>
+              </div>
+
+              <!-- Not Scanned Card -->
+              <!-- <div class="attendance-card not-scanned-card clickable" (click)="openNotScannedPanel()">
+                <span class="card-label not-scanned-label">Not Scanned</span>
+                <div class="underline-indicator not-scanned-indicator"></div>
+                <span class="card-count not-scanned-count">{{ notScannedCount }}</span>
+                <span class="card-percentage not-scanned-percentage" *ngIf="registeredCount > 0">
+                  {{ registeredCount > 0 ? (notScannedCount / registeredCount * 100 | number:'1.0-0') : 0 }}%
+                </span>
+              </div> -->
+
+              <div class="attendance-card scanned-card clickable" (click)="openScannedPanel()">
+                <span class="card-label scanned-label">Generated</span>
+                <div class="underline-indicator scanned-indicator"></div>
+                <span class="card-count scanned-count">{{ scannedCount }}</span>
+                <span class="card-percentage scanned-percentage" *ngIf="registeredCount > 0">
+                  {{ registeredCount > 0 ? (scannedCount / registeredCount * 100 | number:'1.0-0') : 0 }}%
+                </span>
+              </div>
+
+              <!-- Day Cards -->
+              <div style="width:20vw;overflow-x: auto;display:flex;flex-direction: row;">
+                <div *ngFor="let day of dayWiseAttendance; let i = index" 
+                  class="attendance-card day-card"
+                  [class.today]="day.isToday"
+                  [class.past]="day.isPast && !day.isToday"
+                  [class.future]="day.isFuture"
+                  [class.clickable]="!day.isFuture"
+                  (click)="openDayPanel(day)">
+                  
+                  <span class="card-label" [class.today-label]="day.isToday">{{ day.displayLabel }}</span>
+                  <div class="underline-indicator" [class.active]="day.isPast || day.isToday"></div>
+                  
+                  <ng-container *ngIf="!day.isFuture; else futureTemplate">
+                    <span class="card-count" [class.highlight]="day.isToday">{{ day.count }}</span>
+                    <span 
+                      class="card-percentage" 
+                      [ngClass]="{
+                        'green': day.percentage >= 90,
+                        'blue': day.percentage >= 70 && day.percentage < 90,
+                        'yellow': day.percentage >= 50 && day.percentage < 70,
+                        'red': day.percentage < 50
+                      }">
+                      {{ day.percentage }}%
+                    </span>
+                  </ng-container>
+                  
+                  <ng-template #futureTemplate>
+                    <span class="card-count future-placeholder">-</span>
+                    <span class="card-percentage empty"></span>
+                  </ng-template>
+                </div>
+              </div>
+
+              <!-- All Day Absent Card -->
+              <div class="attendance-card absent-card clickable" (click)="openAbsentPanel()">
+                <span class="card-label absent-label">All Day Absent</span>
+                <div class="underline-indicator absent-indicator"></div>
+                <span class="card-count absent-count">{{ allDayAbsent }}</span>
+                <span class="card-percentage absent-percentage" *ngIf="registeredCount > 0">
+                  {{ registeredCount > 0 ? (allDayAbsent / registeredCount * 100 | number:'1.0-0') : 0 }}%
+                </span>
+              </div>
+            </div>
+
+            <div class="attendance-loading" *ngIf="isLoadingAttendance">
+              <div class="spinner small"></div>
+            </div>
+          </div>
+
+          <div class="arena-overview-widget engagement-widget" *ngIf="selectedEvent">
+            <div class="widget-header">
+              <h3 class="widget-title engagement-title">ENGAGEMENT OVERVIEW</h3>
+            </div>
+
+            <div class="arena-content" [class.loading]="isLoadingArenaOverview || isLoadingCohorts">
+              <!-- Overall Video Ask -->
+              <div class="arena-card engagement-overall clickable" (click)="openOverallVideoAskPanel()">
+                <span class="arena-label">Overall Video Ask</span>
+                <span class="arena-count-large engagement-overall-count">
+                  {{ participantViewMode === 'scanned' ? filteredArenaOverview.overallVideoAsk : arenaOverview.overallVideoAsk }}
+                </span>
+              </div>
+
+              <!-- Today's Video Ask -->
+              <div class="arena-card engagement-today clickable" (click)="openTodayVideoAskPanel()">
+                <span class="arena-label">Today's Video Ask</span>
+                <span class="arena-count-large engagement-today-count">
+                  {{ participantViewMode === 'scanned' ? filteredArenaOverview.todayVideoAsk : arenaOverview.todayVideoAsk }}
+                </span>
+              </div>
+
+              <!-- Non-Cohort Participants -->
+              <!-- <div class="arena-card engagement-non-cohort clickable" 
+                  [class.disabled]="nonCohortCount === 0"
+                  (click)="openNonCohortPanel()">
+                <span class="arena-label">Non-Cohort Participant</span>
+                <span class="arena-count-large engagement-non-cohort-count">{{ nonCohortCount }}</span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">of {{ registeredCount }} registered</span>
+              </div> -->
+
+              <!-- New Participants -->
+              <!-- <div class="arena-card engagement-new clickable" 
+                  [class.disabled]="newParticipantsCount === 0"
+                  (click)="openNewParticipantsPanel()">
+                <span class="arena-label">New Participants</span>
+                <span class="arena-count-large engagement-new-count">{{ newParticipantsCount }}</span>
+                <span class="arena-subtitle-main">since event start</span>
+              </div> -->
+
+              <div class="arena-card engagement-first-time clickable" 
+                [class.disabled]="(participantViewMode === 'scanned' ? (filteredArenaOverview.firstTimeProfileIds?.length || 0) : firstTimeCount) === 0"
+                (click)="openFirstTimeParticipantsPanel()">
+                <span class="arena-label">1st Time Participants</span>
+                <span class="arena-count-large engagement-first-time-count">
+                  {{ participantViewMode === 'scanned' ? (filteredArenaOverview.firstTimeProfileIds?.length || 0) : firstTimeCount }}
+                </span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">of {{ participantViewMode === 'scanned' ? scannedCount : registeredCount }} {{ participantViewMode === 'scanned' ? 'Generated' : 'registered' }}</span>
+              </div>
+              
+              <!-- 2nd Time+ Participants -->
+              <div class="arena-card engagement-second-time clickable" 
+                [class.disabled]="(participantViewMode === 'scanned' ? (filteredArenaOverview.secondTimeProfileIds?.length || 0) : secondTimeCount) === 0"
+                (click)="openSecondTimeParticipantsPanel()">
+                <span class="arena-label">2nd Time+ Participants</span>
+                <span class="arena-count-large engagement-second-time-count">
+                  {{ participantViewMode === 'scanned' ? (filteredArenaOverview.secondTimeProfileIds?.length || 0) : secondTimeCount }}
+                </span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">of {{ participantViewMode === 'scanned' ? scannedCount : registeredCount }} {{ participantViewMode === 'scanned' ? 'Generated' : 'registered' }}</span>
+              </div>
+
+              <!-- <div class="arena-content" [class.loading]="isLoadingArenaOverview"> -->
+              <!-- ATC Completed -->
+              <div class="arena-card atc-completed clickable" (click)="openAtcCompletedPanel()">
+                <span class="arena-label">ATC Completed</span>
+                <span class="arena-count-large atc-completed-count">
+                  {{ participantViewMode === 'scanned' ? (filteredArenaOverview.atcCompletedProfileIds?.length || 0) : arenaOverview.atcCompletedProfileIds.length }}
+                </span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">
+                  {{ participantViewMode === 'scanned' ? (filteredArenaOverview.atcCompleted || 0) : arenaOverview.atcCompleted }} ATCs
+                </span>
+              </div>
+
+              <!-- ATC to Validate -->
+              <div class="arena-card atc-to-validate clickable" (click)="openAtcToValidatePanel()">
+                <span class="arena-label">ATC to Validate</span>
+                <span class="arena-count-large atc-to-validate-count">
+                  {{ participantViewMode === 'scanned' ? (filteredArenaOverview.atcToValidateProfileIds?.length || 0) : arenaOverview.atcToValidateProfileIds.length }}
+                </span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">
+                  {{ participantViewMode === 'scanned' ? (filteredArenaOverview.atcToValidate || 0) : arenaOverview.atcToValidate }} ATCs
+                </span>
+              </div>
+
+              <!-- ATC Not Completed -->
+              <!-- <div class="arena-card atc-not-completed clickable" (click)="openAtcNotCompletedPanel()">
+                <span class="arena-label">ATC Not Completed</span>
+                <span class="arena-count-large atc-not-completed-count">{{ arenaOverview.atcNotCompleted }}</span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">of {{ registeredCount }} registered</span>
+              </div> -->
+
+              <!-- Live Change Work -->
+              <!-- <div class="arena-card cw-live clickable" [class.disabled]="changeWorkOverview.liveCW === 0"
+                (click)="openCWLivePanel()">
+                <span class="arena-label">Live CW</span>
+                <span class="arena-count cw-live-count">{{ changeWorkOverview.liveCW }}</span>
+              </div> -->
+            <!-- </div> -->
+              
+            </div>
+
+            <div class="arena-loading" *ngIf="isLoadingArenaOverview || isLoadingCohorts">
+              <div class="spinner small"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arena-grid">
+          <!-- Participant Status Widget -->
+          <div class="participant-status-widget" *ngIf="selectedEvent">
+            <div class="widget-header">
+              <h3 class="widget-title participant-status-title">PARTICIPANT STATUS</h3>
+            </div>
+            
+            <div class="participant-status-content">
+              <div class="participant-status-grid">
+                <!-- Registered Not Come Column -->
+                <div class="status-column registered-not-come-column">
+                  <div class="status-column-header clickable" (click)="openRegisteredNotComePanel()">
+                    <span class="status-column-name">Registered Not Come</span>
+                    <span class="status-column-count">{{ notScannedCount }}</span>
+                  </div>
+                  
+                  <div class="status-list">
+                    <div 
+                      class="status-item" 
+                      *ngFor="let participant of getRegisteredNotComeParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="notScannedCount === 0">
+                      <span>All registered came</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Not Finance Clearance Column -->
+                <div class="status-column not-finance-column">
+                  <div class="status-column-header clickable" (click)="openNotFinanceClearancePanel()">
+                    <span class="status-column-name">Not Finance Clearance</span>
+                    <span class="status-column-count">{{ notScannedCount }}</span>
+                  </div>
+                  
+                  <div class="status-list">
+                    <div 
+                      class="status-item" 
+                      *ngFor="let participant of getNotFinanceClearanceParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="notScannedCount === 0">
+                      <span>All cleared</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Came Day 1 but not come today Column -->
+                <div class="status-column came-day1-column">
+                  <div class="status-column-header clickable" (click)="openCameDay1NotTodayPanel()">
+                    <span class="status-column-name">Came Day 1 but not come today</span>
+                    <span class="status-column-count">{{ cameDay1NotTodayParticipants.length }}</span>
+                  </div>
+                  
+                  <div class="status-list">
+                    <div 
+                      class="status-item" 
+                      *ngFor="let participant of cameDay1NotTodayParticipants"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="cameDay1NotTodayParticipants.length === 0">
+                      <span>All Day 1 attendees present</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- No Cohorts Participants Column -->
+                <div class="status-column no-cohort-column">
+                  <div class="status-column-header clickable" (click)="openNoCohortStatusPanel()">
+                    <span class="status-column-name">No Cohorts Participants</span>
+                    <span class="status-column-count">{{ nonCohortCount }}</span>
+                  </div>
+                  
+                  <div class="status-list" [class.loading]="isLoadingCohorts">
+                    <div 
+                      class="status-item" 
+                      *ngFor="let participant of getNoCohortParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="nonCohortCount === 0 && !isLoadingCohorts">
+                      <span>All in cohorts</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- NO ATC Column -->
+                <div class="status-column no-atc-column" *ngIf="selectedQueues.length > 0">
+                  <div class="status-column-header clickable" (click)="openNoAtcStatusPanel()">
+                    <span class="status-column-name">NO ATC</span>
+                    <span class="status-column-count">{{ arenaOverview.atcNotCompleted }}</span>
+                  </div>
+                  
+                  <div class="status-list" [class.loading]="isLoadingArenaOverview">
+                    <div 
+                      class="status-item" 
+                      *ngFor="let participant of getNoAtcParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="arenaOverview.atcNotCompleted === 0 && !isLoadingArenaOverview">
+                      <span>All completed ATC</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- NO Zone Column -->
+                <div class="status-column no-zone-column">
+                  <div class="status-column-header clickable" (click)="openNoZonePanel()">
+                    <span class="status-column-name">No Zone</span>
+                    <span class="status-column-count">{{ noZoneCount }}</span>
+                  </div>
+                  
+                  <div class="status-list" [class.loading]="isLoadingZones">
+                    <div 
+                      class="status-item" 
+                      *ngFor="let participant of getNoZoneParticipants()"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="noZoneCount === 0 && !isLoadingZones">
+                      <span>All in zones</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Draft ATC Column -->
+                <div class="status-column draft-atc-column" *ngIf="selectedQueues.length > 0">
+                  <div class="status-column-header clickable" (click)="openDraftAtcPanel()">
+                    <span class="status-column-name">Draft ATC</span>
+                    <span class="status-column-count">{{ draftAtcCount }}</span>
+                  </div>
+                  
+                  <div class="status-list" [class.loading]="isLoadingDraftAtc">
+                    <div 
+                      class="status-item draft-atc-item" 
+                      *ngFor="let participant of getDraftAtcParticipants()"
+                      [title]="participant.name + ' (' + participant.draftCount + ' drafts)'">
+                      <span class="draft-atc-name">{{ participant.name }}</span>
+                      <span class="draft-atc-badge">{{ participant.draftCount }}</span>
+                    </div>
+                    
+                    <div class="status-empty" *ngIf="draftAtcCount === 0 && !isLoadingDraftAtc">
+                      <span>No draft ATCs</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- First Time Tags Widget -->
+          <div class="first-time-tags-widget" *ngIf="selectedEvent && firstTimeTags.length > 0">
+            <div class="widget-header">
+              <h3 class="widget-title first-time-tags-title">FIRST TIME TAGS</h3>
+            </div>
+            
+            <div class="first-time-tags-content" [class.loading]="isLoadingFirstTimeTags">
+              <div class="first-time-tags-grid">
+                <!-- Column for each tag -->
+                <div class="first-time-tag-column" *ngFor="let tag of firstTimeTags">
+                  <div class="first-time-tag-column-header clickable" (click)="openFirstTimeTagPanel(tag)">
+                    <span class="first-time-tag-icon">{{ getFirstTimeTagIcon(tag) }}</span>
+                    <span class="first-time-tag-name">{{ tag }}</span>
+                    <span class="first-time-tag-count">{{ getFirstTimeTagCount(tag) }}</span>
+                  </div>
+                  
+                  <div class="first-time-tag-list">
+                    <div 
+                      class="first-time-tag-item" 
+                      *ngFor="let participant of firstTimeTagsData[tag]"
+                      [title]="participant.name">
+                      {{ participant.name }}
+                    </div>
+                    
+                    <!-- Empty state for column -->
+                    <div class="first-time-tag-empty" *ngIf="firstTimeTagsData[tag]?.length === 0">
+                      <span>No participants</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="first-time-tags-loading" *ngIf="isLoadingFirstTimeTags">
+              <div class="spinner small"></div>
+            </div>
+          </div>
+
+        </div>        
+
+        <div class="arena-grid">
+          <!-- <div class="arena-overview-widget" *ngIf="selectedQueues.length > 0">
+            <div class="widget-header">
+              <h3 class="widget-title arena-title">ARENA OVERVIEW</h3>
+            </div>
+
+            <div class="arena-content" [class.loading]="isLoadingArenaOverview">
+              <div class="arena-card atc-completed clickable" (click)="openAtcCompletedPanel()">
+                <span class="arena-label">ATC Completed</span>
+                <span class="arena-count-large atc-completed-count">{{ arenaOverview.atcCompletedProfileIds.length }}</span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">{{ arenaOverview.atcCompleted }} ATCs</span>
+              </div>
+
+              <div class="arena-card atc-to-validate clickable" (click)="openAtcToValidatePanel()">
+                <span class="arena-label">ATC to Validate</span>
+                <span class="arena-count-large atc-to-validate-count">{{ arenaOverview.atcToValidateProfileIds.length }}</span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">{{ arenaOverview.atcToValidate }} ATCs</span>
+              </div>
+
+              <div class="arena-card atc-not-completed clickable" (click)="openAtcNotCompletedPanel()">
+                <span class="arena-label">ATC Not Completed</span>
+                <span class="arena-count-large atc-not-completed-count">{{ arenaOverview.atcNotCompleted }}</span>
+                <span class="arena-subtitle-main">participants</span>
+                <span class="arena-count-small">of {{ registeredCount }} registered</span>
+              </div>
+            </div>
+
+            <div class="arena-loading" *ngIf="isLoadingArenaOverview">
+              <div class="spinner small"></div>
+            </div>
+          </div> -->
+
+          <!-- ChangeWork Overview Widget -->
+          <!-- <div class="arena-overview-widget changework-widget" *ngIf="selectedQueues.length > 0">
+            <div class="widget-header">
+              <h3 class="widget-title changework-title">CHANGE WORK OVERVIEW</h3>
+              <div class="cw-toggle-buttons">
+                <button class="cw-toggle-btn" [class.active]="changeWorkViewMode === 'today'"
+                  (click)="setChangeWorkViewMode('today')">
+                  Today
+                </button>
+                <button class="cw-toggle-btn" [class.active]="changeWorkViewMode === 'overall'"
+                  (click)="setChangeWorkViewMode('overall')">
+                  Overall
+                </button>
+              </div>
+            </div>
+
+            <div class="arena-content" [class.loading]="isLoadingCWOverview">
+              <div class="arena-card cw-not-done-others clickable" [class.disabled]="changeWorkOverview.notDoneOthers === 0"
+                (click)="openCWNotDoneOthersPanel()">
+                <span class="arena-label">Not Done - Others</span>
+                <span class="arena-count-large cw-not-done-others-count">{{ changeWorkOverview.notDoneOthers }}</span>
+                <span class="arena-subtitle-main">participants</span>
+              </div>
+
+              <div class="arena-card cw-not-done-self clickable" [class.disabled]="changeWorkOverview.notDoneSelf === 0"
+                (click)="openCWNotDoneSelfPanel()">
+                <span class="arena-label">Not Done - Self</span>
+                <span class="arena-count-large cw-not-done-self-count">{{ changeWorkOverview.notDoneSelf }}</span>
+                <span class="arena-subtitle-main">participants</span>
+              </div>
+
+              <div class="arena-card cw-non-atc clickable" [class.disabled]="changeWorkOverview.nonAtcCW === 0"
+                (click)="openCWNonAtcPanel()">
+                <span class="arena-label">Non ATC CW</span>
+                <span class="arena-count-large cw-non-atc-count">{{ changeWorkOverview.nonAtcCW }}</span>
+                <span class="arena-subtitle-main">participants</span>
+              </div>
+
+              <div class="arena-card cw-live clickable" [class.disabled]="changeWorkOverview.liveCW === 0"
+                (click)="openCWLivePanel()">
+                <span class="arena-label">Live CW</span>
+                <span class="arena-count cw-live-count">{{ changeWorkOverview.liveCW }}</span>
+              </div>
+            </div>
+
+            <div class="arena-loading" *ngIf="isLoadingCWOverview">
+              <div class="spinner small"></div>
+            </div>
+          </div> -->
+
+          <div class="journey-widget" *ngIf="filteredJourneyCounts.length > 0 || missingJourneyCount > 0">
+            <div class="journey-header">
+              <div class="journey-header-left" (click)="openAllJourneysPanel()">
+                <h3 class="journey-title">JOURNEY OVERVIEW</h3>
+                <span class="journey-total-count">{{ totalJourneyParticipants }}</span>
+              </div>
+              
+              <!-- Missing Journey Count Badge -->
+              <div 
+                class="journey-missing-badge clickable" 
+                *ngIf="missingJourneyCount > 0"
+                (click)="openMissingJourneyPanel(); $event.stopPropagation()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <span class="missing-text">Missing</span>
+                <span class="missing-count">{{ missingJourneyCount }}</span>
+              </div>
+            </div>
+            
+            <div class="journey-list" [class.loading]="isLoadingJourneys">
+              <div 
+                *ngFor="let journeyCount of filteredJourneyCounts; let i = index"
+                class="journey-row clickable"
+                (click)="openJourneyPanel(journeyCount)">
+                <div class="journey-category">
+                  <span class="journey-dot" [style.background]="getJourneyColor(i)"></span>
+                  <span class="journey-name">{{ journeyCount.journeyName }}</span>
+                </div>
+                <span class="journey-count has-count">{{ journeyCount.count }}</span>
+              </div>
+              
+              <!-- Empty state when no journeys have participants -->
+              <div class="journey-empty" *ngIf="filteredJourneyCounts.length === 0 && missingJourneyCount > 0">
+                <span>No participants assigned to journeys</span>
+              </div>
+            </div>
+
+            <div class="journey-loading-overlay" *ngIf="isLoadingJourneys">
+              <div class="spinner small"></div>
+            </div>
+          </div>
+
+          <!-- Client Issues Widget - Only show if there are issues with count > 0 -->
+          <div class="client-issues-widget" *ngIf="filteredCategoryCounts.length > 0">
+            <div class="issues-header" (click)="openAllClientIssuesPanel()">
+              <h3 class="issues-title">CUSTOMER SUPPORT</h3>
+              <span class="issues-total-count">{{ totalOpenIssues }}</span>
+            </div>
+            
+            <div class="issues-list" [class.loading]="isLoadingClientIssues">
+              <div 
+                *ngFor="let catCount of filteredCategoryCounts; let i = index"
+                class="issue-row clickable"
+                (click)="openClientIssuePanel(catCount)">
+                <div class="issue-category">
+                  <span class="category-dot" [style.background]="getCategoryColor(i)"></span>
+                  <span class="category-name">{{ catCount.category }}</span>
+                </div>
+                <span class="issue-count has-count">{{ catCount.count }}</span>
+              </div>
+            </div>
+
+            <div class="issues-loading-overlay" *ngIf="isLoadingClientIssues">
+              <div class="spinner small"></div>
+            </div>
+          </div>
+
+        </div>
+
+        
+      </div>
+    </div>
+
+    <!-- No Event Selected State -->
+    <div class="empty-state" *ngIf="!selectedEvent">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="empty-icon">
+        <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
+      </svg>
+      <h3>No Event Selected</h3>
+      <p>Please select an event from the dropdown to view attendance details.</p>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="side-panel" [class.open]="isSidePanelOpen">
+    <!-- Panel Header -->
+    <div class="panel-header">
+      <div class="panel-header-split">
+        <div style="display:flex;flex-direction: row;justify-content: space-between;">
+          <div class="panel-title-section">
+            <h3 class="panel-title">{{ sidePanelTitle }}</h3>
+            <span class="panel-date" *ngIf="sidePanelDate">{{ sidePanelDate }}</span>
+            <span class="panel-count">{{ filteredParticipants.length }} participants</span>
+            <span class="panel-warning" *ngIf="notRegisteredCount > 0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+              </svg>
+              {{ notRegisteredCount }} not registered
+            </span>
+          </div>
+          <div>
+            <button class="panel-close-btn" (click)="closeSidePanel()">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      
+        <!-- Action Buttons -->
+        <div class="panel-actions" *ngIf="selectedParticipantsCount > 0 || filteredParticipants.length > 0">
+          <button class="action-btn export" (click)="exportToExcel()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+            </svg>
+            <span>Export Excel</span>
+          </button>
+          
+          <button class="action-btn notification" (click)="sendNotification()" *ngIf="selectedParticipantsCount > 0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+            </svg>
+            <span>Notification</span>
+          </button>
+
+          <button class="action-btn whatsapp" (click)="sendWhatsApp()" *ngIf="selectedParticipantsCount > 0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            <span>WhatsApp</span>
+          </button>
+
+          <button class="action-btn email" (click)="sendEmail()" *ngIf="selectedParticipantsCount > 0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+            </svg>
+            <span>Email</span>
+          </button>
+
+          <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()" *ngIf="selectedParticipantsCount > 0">
+            <mat-icon>local_offer</mat-icon> Add Tag
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Search & Filters -->
+    <div class="panel-filters">
+      <div class="panel-search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="search-icon">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+        <input 
+          type="text" 
+          placeholder="Search participants..." 
+          [(ngModel)]="participantSearchTerm"
+          (input)="onParticipantSearchChange()">
+      </div>
+      
+      <div class="filter-buttons" *ngIf="sidePanelType !== 'absent' && sidePanelType !== 'atcCompleted' && sidePanelType !== 'atcToValidate' && sidePanelType !== 'atcNotCompleted' && sidePanelType !== 'clientIssue' && sidePanelType !== 'journey' && sidePanelType !== 'notScanned' && sidePanelType !== 'cwNotDoneOthers' && sidePanelType !== 'cwNotDoneSelf' && sidePanelType !== 'cwNonAtc' && sidePanelType !== 'cwLive' && sidePanelType !== 'journeyMissing' && sidePanelType !== 'nonCohort' && sidePanelType !== 'firstTime' && sidePanelType !== 'secondTime' && sidePanelType !== 'actionQueue' && sidePanelType !== 'irregular' && sidePanelType !== 'arenaNotDoingCW' && sidePanelType !== 'arenaCWNotReceived' && sidePanelType !== 'arenaLiveCW' && sidePanelType !== 'registeredNotCome' && sidePanelType !== 'notFinance' && sidePanelType !== 'cameDay1NotToday' && sidePanelType !== 'noCohort' && sidePanelType !== 'noAtc'">                                            
+        <button 
+          class="filter-btn" 
+          [class.active]="participantFilter === 'all'"
+          (click)="participantFilter = 'all'; onFilterChange()">
+          All
+        </button>
+        <button 
+          class="filter-btn present" 
+          [class.active]="participantFilter === 'present'"
+          (click)="participantFilter = 'present'; onFilterChange()">
+          {{ sidePanelType === 'overallVideoAsk' || sidePanelType === 'todayVideoAsk' ? 'Reviewed' : (sidePanelType === 'newParticipants' ? 'Registered' : 'Present') }}
+        </button>
+        <button 
+          class="filter-btn absent" 
+          [class.active]="participantFilter === 'absent'"
+          (click)="participantFilter = 'absent'; onFilterChange()">
+          {{ sidePanelType === 'overallVideoAsk' || sidePanelType === 'todayVideoAsk' ? 'Not Reviewed' : (sidePanelType === 'newParticipants' ? 'Not Registered' : 'Absent') }}
+        </button>
+      </div>
+
+      <!-- Scanned/Not Scanned Filter for Registered Panel -->
+      <div class="filter-buttons scanned-filter" *ngIf="sidePanelType === 'registered'">
+        <button 
+          class="filter-btn" 
+          [class.active]="registeredPanelFilter === 'all'"
+          (click)="registeredPanelFilter = 'all'; onRegisteredFilterChange()">
+          All
+        </button>
+        <button 
+          class="filter-btn scanned-btn" 
+          [class.active]="registeredPanelFilter === 'scanned'"
+          (click)="registeredPanelFilter = 'scanned'; onRegisteredFilterChange()">
+          Generated ({{ scannedProfileIds.length }})
+        </button>
+        <button 
+          class="filter-btn not-scanned-btn" 
+          [class.active]="registeredPanelFilter === 'notScanned'"
+          (click)="registeredPanelFilter = 'notScanned'; onRegisteredFilterChange()">
+          Not Generated ({{ notScannedProfileIds.length }})
+        </button>
+      </div>
+
+      <!-- Tags Filter with Search -->
+      <div class="filter-dropdown-wrapper" *ngIf="availableTags.length > 0">
+        <div class="filter-dropdown-trigger" (click)="tagDropdownOpen = !tagDropdownOpen; onTagDropdownOpen()">
+          <div class="filter-dropdown-label">
+            <mat-icon>local_offer</mat-icon>
+            <span *ngIf="selectedTags.length === 0">Filter by Tags</span>
+            <span *ngIf="selectedTags.length > 0">{{selectedTags.length}} Tag(s) Selected</span>
+          </div>
+          <mat-icon class="dropdown-arrow" [class.rotated]="tagDropdownOpen">expand_more</mat-icon>
+        </div>
+      
+        <div class="filter-dropdown-menu" *ngIf="tagDropdownOpen">
+          <div class="filter-search-box">
+            <mat-icon>search</mat-icon>
+            <input type="text" [(ngModel)]="tagSearchTerm" (input)="filterTags()" (click)="$event.stopPropagation()"
+              placeholder="Search tags...">
+            <button *ngIf="tagSearchTerm" (click)="clearTagSearch(); $event.stopPropagation()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+      
+          <div class="filter-options-list">
+            <div class="filter-option" *ngFor="let tag of filteredTags"
+              (click)="toggleTagSelection(tag.docid); $event.stopPropagation()">
+              <div class="custom-checkbox small" [class.checked]="isTagSelected(tag.docid)">
+                <mat-icon *ngIf="isTagSelected(tag.docid)">check</mat-icon>
+              </div>
+              <span class="option-label">{{tag.name}}</span>
+            </div>
+      
+            <div class="no-results" *ngIf="filteredTags.length === 0">
+              No tags found
+            </div>
+          </div>
+      
+          <div class="filter-dropdown-footer" *ngIf="selectedTags.length > 0">
+            <button class="clear-selection-btn" (click)="selectedTags = []; onTagFilterChange(); $event.stopPropagation()">
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Select All -->
+    <div class="select-all-row">
+      <label class="checkbox-container">
+        <input 
+          type="checkbox" 
+          [checked]="selectAll" 
+          (change)="toggleSelectAll()">
+        <span class="checkmark"></span>
+        <span class="select-all-text">Select All ({{ filteredParticipants.length }})</span>
+      </label>
+      <span class="selected-count" *ngIf="selectedParticipantsCount > 0">
+        {{ selectedParticipantsCount }} selected
+      </span>
+    </div>
+
+    <!-- Participants List -->
+    <div class="participants-list">
+      <div *ngFor="let participant of filteredParticipants" 
+        class="participant-item"
+        [class.selected]="participant.isSelected"
+        [class.not-registered]="participant.isNotRegistered"
+        [class.has-issues]="sidePanelType === 'clientIssue'"
+        (click)="toggleParticipantSelection(participant)">
+        
+        <label class="checkbox-container" (click)="$event.stopPropagation()">
+          <input 
+            type="checkbox" 
+            [checked]="participant.isSelected"
+            (change)="toggleParticipantSelection(participant)">
+          <span class="checkmark"></span>
+        </label>
+        
+        <div class="participant-avatar" [class.not-registered-avatar]="participant.isNotRegistered">
+          {{ getInitials(mapJourneyData[participant.activejourney]?.['journey']) || participant.name.charAt(0).toUpperCase() }}
+        </div>
+        
+        <div class="participant-info">
+          <div class="participant-name-row">
+            <span class="participant-name">{{ participant.name }}</span>
+            <span class="not-registered-badge" *ngIf="participant.isNotRegistered">Not Registered</span>
+          </div>
+          <span class="participant-email" *ngIf="participant.email">{{ participant.email }}</span>
+          <span class="participant-phone" *ngIf="participant.phone && !participant.email">{{ participant.phone }}</span>
+          <span class="participant-phone" *ngIf="participant.activejourney">{{ mapJourneyData[participant.activejourney]?.['journey'] || 'No journey' }}</span>
+          <span class="participant-created" *ngIf="sidePanelType === 'newParticipants' && participant['created']">
+            Joined: {{ getNewParticipantCreatedDate(participant) | date:'MMM d, y h:mm a' }}
+          </span>
+          <span class="participant-referral" *ngIf="sidePanelType === 'newParticipants' && participant['refferedby']">
+            Referred by: {{ participant['refferedby'] }}
+          </span>
+          <!-- Client Issues Display -->
+          <div class="participant-issues" *ngIf="sidePanelType === 'clientIssue'">
+            <div 
+              class="issue-ticket" 
+              *ngFor="let issue of getParticipantIssues(participant.profileid)"
+              [style.border-left-color]="getIssueStatusColor(issue.status?.['status'] || issue.status)">
+              <div class="issue-ticket-header">
+                <span class="issue-ticket-category">{{ issue.category }}</span>
+                <span class="issue-ticket-status" [style.color]="getIssueStatusColor(issue.status?.['status'] || issue.status)">
+                  {{ issue.status?.['status'] || issue.status }}
+                </span>
+              </div>
+              <div class="issue-ticket-subject" *ngIf="issue['subject'] || issue['title']">
+                {{ issue['subject'] || issue['title'] }}
+              </div>
+              <div class="issue-ticket-description" *ngIf="issue['issue'] || issue['description'] || issue['message']">
+                {{ (issue['issue'] || issue['description'] || issue['message']) | slice:0:100 }}{{ (issue['issue'] || issue['description'] || issue['message'])?.length > 100 ? '...' : '' }}
+              </div>
+              <div class="issue-ticket-meta" *ngIf="issue['createdAt'] || issue['created']">
+                <span>{{ (issue['createdAt']?.toDate ? issue['createdAt'].toDate() : issue['created']) | date:'MMM d, y h:mm a' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <span 
+          class="participant-status"
+          [class.present]="participant.isPresent"
+          [class.absent]="!participant.isPresent"
+          *ngIf="sidePanelType !== 'clientIssue'">
+          <!-- ... existing status display code ... -->
+          <ng-container *ngIf="sidePanelType === 'journeyMissing'">
+            Missing
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'overallVideoAsk' || sidePanelType === 'todayVideoAsk'">
+            {{ participant.isPresent ? 'Reviewed' : 'Not Reviewed' }}
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'atcCompleted'">
+            Completed
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'atcToValidate'">
+            To Validate
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'atcNotCompleted'">
+            Not Completed
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'journey'">
+            Active
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'notScanned'">
+            Not Generated
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'cwNotDoneOthers'">
+            Not Done
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'cwNotDoneSelf'">
+            Not Done
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'cwNonAtc'">
+            Non ATC
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'cwLive'">
+            Live
+          </ng-container>
+          <ng-container *ngIf="sidePanelType !== 'overallVideoAsk' && sidePanelType !== 'todayVideoAsk' && sidePanelType !== 'atcCompleted' && sidePanelType !== 'atcToValidate' && sidePanelType !== 'atcNotCompleted' && sidePanelType !== 'journey' && sidePanelType !== 'journeyMissing' && sidePanelType !== 'notScanned' && sidePanelType !== 'cwNotDoneOthers' && sidePanelType !== 'cwNotDoneSelf' && sidePanelType !== 'cwNonAtc' && sidePanelType !== 'cwLive'">
+            {{ participant.isPresent ? 'Present' : 'Absent' }}
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'newParticipants'">
+            {{ participant.isPresent ? 'Registered' : 'Not Registered' }}
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'nonCohort'">
+            Not in Cohort
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'newParticipants'">
+            {{ participant.isPresent ? 'Registered' : 'Not Registered' }}
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'firstTime'">
+            1st Time
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'secondTime'">
+            2nd Time+
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'actionQueue'">
+            {{ actionQueueSelectedTag }}
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'irregular'">
+            Irregular
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'arenaNotDoingCW'">
+            Not Doing CW
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'arenaCWNotReceived'">
+            CW Not Received
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'arenaLiveCW'">
+            Live CW
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'registeredNotCome'">
+            Not Come
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'notFinance'">
+            Not Cleared
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'cameDay1NotToday'">
+            Day 1 Only
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'noCohort'">
+            No Cohort
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'noAtc'">
+            No ATC
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'firstTimeTag'">
+            {{ firstTimeTagsSelectedTag }}
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'scanned'">
+            Generated
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'noZone'">
+            No Zone
+          </ng-container>
+          <ng-container *ngIf="sidePanelType === 'draftAtc'">
+            {{ participant['draftAtcCount'] || 0 }} Draft(s)
+          </ng-container>
+        </span>
+        
+        <!-- Issue count badge for client issues -->
+        <span class="issue-count-badge" *ngIf="sidePanelType === 'clientIssue'">
+          {{ getParticipantIssues(participant.profileid).length }} issue(s)
+        </span>
+      </div>
+
+      <!-- Empty State -->
+      <div class="participants-empty" *ngIf="filteredParticipants.length === 0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+        </svg>
+        <span>No participants found</span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,110 @@
+<div class="_mainContainer">
+  <div class="_container">
+      <mat-form-field style="width:400px">
+          <mat-label>Filter By</mat-label>
+          <input matInput (keyup)="applyFilter($event)" placeholder="Enter product name" #input>
+        </mat-form-field>
+         <span class="spacer"></span>
+        <button  mat-stroked-button color="primary" (click)="addproductdialog()">Add New Product</button>
+  </div>
+  <div class="mat-elevation-z8">
+      <table mat-table [dataSource]="dataSource" matSort>
+        <!-- Product  Column -->
+        <ng-container matColumnDef="product">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> List Of Products</th>
+          <td mat-cell *matCellDef="let row"> {{row.product}} </td>
+        </ng-container>
+
+          <!-- count  Column -->
+          <!-- <ng-container matColumnDef="count">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> List Of count</th>
+            <td mat-cell *matCellDef="let row"> {{row.count}} </td>
+          </ng-container> -->
+
+            <!-- Product  Column -->
+        <ng-container matColumnDef="minimumrequiredamount">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> List Of Minimum Required Amount For Pre-Delivery</th>
+          <td mat-cell *matCellDef="let row"> {{row.minimumrequiredamount}} </td>
+        </ng-container>
+
+        <!-- ATC Model -->
+        <ng-container matColumnDef="atcmodel">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> ATC Model</th>
+          <td mat-cell *matCellDef="let row"> {{row.atcmodel}} </td>
+        </ng-container> 
+
+        <!-- Mode -->
+        <ng-container matColumnDef="mode">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Mode</th>
+          <td mat-cell *matCellDef="let row"> {{row.mode}} </td>
+        </ng-container>
+
+        <!-- Plan -->
+        <ng-container matColumnDef="deliveryplanning">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Delivery Planning</th>
+          <td mat-cell *matCellDef="let row"> {{row.deliveryplanning}} </td>
+        </ng-container>
+
+        <!-- category -->
+        <!-- <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+          <td mat-cell *matCellDef="let row">
+            <span *ngIf="row.category != undefined">
+              <span *ngFor="let item of row.category">{{item}},&nbsp;</span>
+            </span>
+          </td>
+        </ng-container> -->
+
+        <!-- Integration -->
+        <ng-container matColumnDef="integrationdays">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Integration Days</th>
+          <td mat-cell *matCellDef="let row"> {{row.integrationdays}} </td>
+        </ng-container>
+        <!-- Performance -->
+        <ng-container matColumnDef="performancedays">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Performance Days</th>
+          <td mat-cell *matCellDef="let row"> {{row.performancedays}} </td>
+        </ng-container>
+        <!-- Extended Performance -->
+        <ng-container matColumnDef="extendedperformancedays">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Extended Performance Days</th>
+          <td mat-cell *matCellDef="let row"> {{row.extendedperformancedays}} </td>
+        </ng-container>
+        
+        <!-- unlimited -->
+        <ng-container matColumnDef="unlimited">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> UnLimited</th>
+          <td mat-cell *matCellDef="let row"> {{row.unlimited != null ? row.unlimited : false}} </td>
+        </ng-container> 
+
+        <!-- originalfee -->
+        <ng-container matColumnDef="originalfee">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Original Fee</th>
+          <td mat-cell *matCellDef="let row"> {{row.originalfee ? row.originalfee : 0}} </td>
+        </ng-container> 
+      
+        <!-- Edit Column -->
+        <ng-container matColumnDef="Edit">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Edit </th>
+          <td mat-cell *matCellDef="let row"><button mat-mini-fab color="primary" type="button" (click)="onrowedit(row)"><mat-icon> edit</mat-icon></button>  </td>
+        </ng-container>
+  
+        <!-- Delete Column -->
+        <!-- <ng-container matColumnDef="Delete">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
+          <td mat-cell *matCellDef="let row"><button mat-mini-fab color="accent" type="button" (click)="onrowdelete(row.id)"><mat-icon>delete</mat-icon></button> </td>
+        </ng-container> -->
+    
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    
+        <!-- Row shown when there is no matching data. -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+        </tr>
+      </table>
+    
+      <mat-paginator [pageSizeOptions]="[20, 40, 60, 100,1000]"></mat-paginator>
+    </div>
+
+</div>

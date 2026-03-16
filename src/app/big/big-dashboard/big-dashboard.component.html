@@ -1,0 +1,1030 @@
+
+
+<mat-sidenav-container style="padding: 20px;" class="sidenav-container">
+  <mat-sidenav-content>
+    <!-- header -->
+    <div class="mx-4 mt-2" >
+      <div class="row align-items-center py-2">
+        <div class="col">
+          <span class="d-flex flex-row">
+            <span class="d-flex flex-row">  
+              <h3><strong>{{selectedMarathon['title'] != undefined ?  selectedMarathon['title'] : 'No Marathon Selected'}}</strong></h3> &nbsp;&nbsp;
+              <button mat-icon-button type="button" (click)="onEditMarathon()">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </span>&nbsp;&nbsp;&nbsp;&nbsp;
+            <!-- <div class="d-flex flex-column">
+              <div class="input-group" style="width:350px">
+                <select [(ngModel)]="selectedEventFromMarathonRef" (change)="getCohortsByMarathon()" class="custom-select" id="inputGroupSelect02">
+                  <option value="All">All</option>
+                  <option *ngFor="let event of eventCollectionList" [value]="event">{{event['name']}}</option>
+                </select>
+              </div>
+              <footer class="blockquote-footer">Select Event to get cohorts.</footer>
+            </div> -->
+          </span>
+        </div>
+        <div class="col-auto d-flex align-items-center">
+          <button mat-icon-button type="button" (click)="onChangeMarathon('backward')"><mat-icon>arrow_back_ios</mat-icon></button>
+          <button mat-icon-button type="button" (click)="onChangeMarathon('forward')"><mat-icon>arrow_forward_ios</mat-icon></button>
+          <button type="button" class="btn btn-primary d-flex align-items-center" (click)="onCreateMarathon()">
+            Create Marathon
+          </button>
+          <button class="ms-4 me-2" mat-icon-button type="button" (click)="screenType = 'tableView'" [ngClass]="{'icon-selected': screenType === 'tableView'}">
+            <mat-icon>table_view</mat-icon>
+          </button>
+          <button mat-icon-button type="button" (click)="screenType = 'groupView'" [ngClass]="{'icon-selected': screenType === 'groupView'}">
+            <mat-icon>group</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!--selected marathon -->
+    <div *ngIf="filteredEventCollectionList.length > 0; else noEvent" class="row-container">
+      <div class="marquee">
+        <div class="marquee-content">
+          <span *ngFor="let i of filteredEventCollectionList; let idx = index">
+            {{ i["name"] }}<ng-container *ngIf="idx < filteredEventCollectionList.length - 1">, </ng-container>
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    <ng-template #noEvent>
+      <div style="margin-left: 20px;">
+        <span>No events available</span>
+      </div>
+    </ng-template>
+    
+     
+
+    <!-- groupview -->
+    <div *ngIf="screenType == 'groupView'">
+      <!-- first container -->
+      <!-- <div class="d-flex flex-row flex-wrap ms-4 mt-4">
+        <div *ngFor="let item of firstcontainer;let i = index" class="box me-2" style="background-color: white;">
+          <span class="top-left">{{item.key}}</span>
+          <span *ngIf="i === 0" class="bottom-right font-weight-bold" style="font-size: 2rem;">{{item.value}}</span>
+           <span *ngIf="i != 0" class="d-flex flex-row justify-content-between flex-wrap">
+            <span  *ngFor="let atcmodel of item.value | keyvalue">{{atcmodel.key}}&nbsp;:&nbsp;{{atcmodel.value.length}}</span>
+           </span>
+        </div>
+      </div> -->
+
+      <div class="d-flex flex-row flex-wrap ms-4 mt-4">
+        <div *ngFor="let item of firstcontainer; let i = index" class="box me-2" style="background-color: white;">
+          <span class="top-left">{{item.key}}</span>
+          
+          <span *ngIf="i === 0" class="bottom-right font-weight-bold" style="font-size: 2rem;">
+            {{item.value}}
+          </span>
+          
+          <span *ngIf="i !== 0" class="d-flex flex-row justify-content-between flex-wrap">
+            <ng-container *ngFor="let entry of objectToArray(item.value)">
+              <span>{{entry.key}}&nbsp;:&nbsp;{{entry.count}}</span>
+            </ng-container>
+          </span>
+        </div>
+      </div>
+
+
+      <!-- second conatiner -->
+      <div class="d-flex flex-column ms-4 mt-4">
+        <div><h4>Events Attended</h4></div>
+        <!--Up atteneded count-->
+        <div class="d-flex flex-row flex-wrap ms-4 mt-2" >
+          <div *ngFor="let item of eventsAttendedUP | keyvalue" class="box pe-5" style="background-color: #D63384;padding: 10px;">
+            <span class="top-left" style="color: white;cursor: pointer;" (click)="onPatchDataToTable(item.value.participantidlist,item)">{{item.value.name}}</span>
+            <span class="bottom-right font-weight-bold" style="font-size: 40px; color: white;">{{item.value.count}}</span>
+          </div>
+        </div>
+        <!-- B!G Attended Count-->
+        <!-- <div class="d-flex flex-row flex-wrap ms-4 mt-2">
+          <div *ngFor="let item of eventsAttendedBig | keyvalue" class="box me-2" style="background-color:#7013E5;">
+            <span class="top-left" style="color: white;cursor: pointer;" (click)="onPatchDataToTable(item.value.participantidlist)">{{item.value.name}}</span>
+            <span class="bottom-right font-weight-bold" style="font-size: 40px; color: white;">{{item.value.count}}</span>
+          </div>
+        </div> -->
+      </div>
+
+      <!-- third container -->
+      <div class="d-flex flex-column ms-4 mt-4">
+        <div class="d-flex flex-row">
+          <h4 style="margin-top: 9px; padding-right: 10px;" >Cohorts</h4>&nbsp;&nbsp;&nbsp;&nbsp;
+          <!-- <button mat-icon-button type="button" (click)="getCohortsByMarathon()"><mat-icon>refresh</mat-icon></button> -->
+          <div class="d-flex flex-column">
+            <div class="input-group" style="width:350px;min-width:300px;">
+              <mat-form-field appearance="outline">
+                <mat-select matInput [(ngModel)]="selectedEventFromMarathonRef" (change)="getCohortsByMarathon()" class="custom-select" id="inputGroupSelect02">
+                  <mat-option [value]="null">All</mat-option>
+                  <mat-option *ngFor="let event of filteredEventCollectionList" [value]="event.ref">{{event.name}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <br>
+            <footer class="blockquote-footer">Select Event to get cohorts.</footer>
+          </div>
+        </div>
+        <!-- <div class="d-flex flex-row flex-wrap ms-4 mt-2">
+          <div *ngFor="let item of cohorts" class="box me-2" style="background-color: white;margin-top:5px">
+            <div class="top-left">
+              <span style="font-size: 15px;" (click)="onPatchDataToTable(item.participantidlist)" style="cursor: pointer;">{{item.name}}</span>&nbsp;&nbsp;
+              <button mat-icon-button type="button"><mat-icon (click)="onEditCohorts(item)">edit</mat-icon></button>
+            </div>
+            <span class="bottom-right font-weight-bold" style="font-size: 40px;">{{item.participantidlist ? item.participantidlist.length : 0}}</span>
+          </div>
+        </div>
+        <div *ngIf="bigAssignmentList.length != 0">
+          <div *ngFor="let assignment of bigAssignmentList">
+            <div>{{assignment.title}}</div>
+            <div>{{assignment.assignmenttype}}</div>
+          </div>
+        </div> -->
+
+        <div class="cohorts-container">
+          <div class="cohorts-grid">
+            <div *ngFor="let item of cohorts" class="cohort-card">
+              <div class="cohort-header">
+                <span class="cohort-name" (click)="onPatchDataToTable(item.participantidlist,item)">
+                  {{item.name}}
+                </span>
+                <button mat-icon-button type="button" class="edit-btn">
+                  <mat-icon (click)="onEditCohorts(item)">edit</mat-icon>
+                </button>
+              </div>
+              <div class="cohort-count">
+                {{item.participantidlist ? item.participantidlist.length : 0}}
+              </div>
+            </div>
+          </div>
+        
+          <div *ngIf="bigAssignmentList.length != 0" class="assignments-section">
+            <h3 class="assignments-title">Assignments</h3>
+            <div class="assignments-list">
+              <div *ngFor="let assignment of bigAssignmentList" class="assignment-card">
+                <div>
+                  <div class="assignment-title" (click)="onPatchDataToTableFromActivity(assignment.participantidlist)">{{assignment.title}}</div>
+                  <div class="assignment-type">{{assignment.assignmenttype}}</div>
+                </div>
+                <div>
+                  <div class="assignment-title" (click)="onPatchDataToTableFromActivity(assignment.participantidlist)"><h4 style="font-weight:700;font-size:24px">{{assignment.participantidlist.length}}</h4></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- <div class="d-flex flex-column ms-4 mt-4">
+        <div class="row">
+          <h4 style="margin-top: 9px; padding-right: 10px;" >Cohorts</h4>
+          <button type="button" class="btn btn-primary d-flex align-items-center" (click)="onCreateMarathon()">Add New Cohorts </button>
+        </div>
+        <div class="d-flex flex-row flex-wrap ms-4 mt-2">
+          <div *ngFor="let item of cohorts" class="box me-2" style="background-color: white;">
+            <div class="top-left">
+              <span style="font-size: 15px;" >{{item.key}}</span>
+            </div>
+            <span class="bottom-right font-weight-bold" style="font-size: 40px;">{{item.value}}</span>
+          </div>
+        </div>
+      </div> -->
+
+      <!-- <div class="d-flex flex-column ms-4 mt-4">
+        <div><h4>Role (Stabilized)</h4></div>
+        <div class="d-flex flex-row flex-wrap ms-4 mt-2">
+          <div *ngFor="let item of visibleItems" class="box me-2" style="background-color: white;">
+            <span class="top-left">{{item.name}}</span>
+            <span class="bottom-right font-weight-bold" style="font-size: 40px;">{{item.count}}</span>
+          </div>
+          <div *ngIf="role.length > maxVisibleItems" (click)="toggleView()" class="view-more" style="background-color:#4D779D;">
+            <h5 style="color: white; font-weight: bold; ">{{!isExpanded ?"View All Stage" :"View Less Stage"}}</h5>
+            <button  class="viewButton">
+              <i class="material-icons" *ngIf="!isExpanded">arrow_downward</i>
+              <i class="material-icons" *ngIf="isExpanded">arrow_upward</i>
+            </button>
+          </div>
+        </div>
+      </div> -->
+
+    </div>
+
+    <!-- table -->
+    <div class="mx-4">
+      <!-- filter -->
+      <h4>Filter By:-</h4>
+      <div class="ms-4 d-flex flex-row align-item-center mt-2"> 
+        <span>
+          <mat-form-field appearance="outline">
+            <mat-label>Name</mat-label>
+            <input [(ngModel)]="filterForm.name" (keyup)="onFilter()" matInput  placeholder="Ex. ium" #input>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Tag</mat-label>
+            <mat-select [(ngModel)]="filterForm.tags" (selectionChange)="onFilter()" multiple>
+              <mat-option *ngFor="let option of bigTags" [value]="option.tagName">{{option.tagName}}</mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+          <button mat-stroked-button type="button" (click)="onFilterReset()">Clear</button>
+        </span>
+      </div>
+      <!-- button bar -->
+      <div class="row d-flex justify-content-end" *ngIf="!showCompactChipList">
+        <div class="col-auto" style="margin-top: 40px;">
+          <span>Total Participants: {{ dataSource.data.length }}</span>&nbsp;&nbsp;
+          <span>Filtered Participants: {{ dataSource.filteredData.length }}</span>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-primary me-2" mat-stroked-button [disabled]="selection.selected.length == 0" (click)="sendEmailToSelectedParicipant()">Email</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-primary me-2" mat-stroked-button [disabled]="selection.selected.length == 0" (click)="sendWatiMessage()">Wati</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-primary me-2" mat-stroked-button [disabled]="selection.selected.length == 0" (click)="sendNotificationinBreakthrough()">Notification</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-primary me-2" mat-stroked-button (click)="toggleChipListView()">Add Column</button>
+        </div>
+
+        <div class="col-auto">
+          <button *ngIf="!isAddingTag" class="btn btn-primary me-2" mat-stroked-button (click)="toggleAddTagForm()">Add New Tags</button>
+
+          <form *ngIf="isAddingTag" [formGroup]="tagForm" class="d-flex align-items-center">
+            <mat-form-field>
+              <mat-label>Add Tag</mat-label>
+              <input matInput formControlName="newTag" placeholder="Enter tag" />
+            </mat-form-field>
+            <button class="ms-2 me-2" mat-raised-button color="primary" [disabled]="!tagForm?.valid" (click)="addtags()">Add</button>
+          </form>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-outline-primary" mat-stroked-button [disabled]="selection.isEmpty()" (click)="onManageCoherts()">Coherts</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-primary" mat-raised-button [disabled]="selection.isEmpty()" (click)="OnManageTag()">Manage Tag</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-primary" mat-raised-button [disabled]="selection.isEmpty()" (click)="OnManageNotes()">Manage Notes</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-outline-primary" mat-stroked-button type="button" [matMenuTriggerFor]="exportmenu">Export</button>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
+            <mat-icon>upload_file</mat-icon> Import
+          </button>
+          <input type="file" #fileInput style="display: none" (change)="onImportData($event)" accept=".csv,.xlsx,.xls" />
+        </div>
+
+        <mat-menu #exportmenu="matMenu">
+          <button mat-menu-item (click)="exportCSV('all')">All Columns</button>
+          <button mat-menu-item (click)="exportCSV('selected')">Selected Columns</button>
+        </mat-menu>
+      </div>
+
+      
+      <!-- column rearragement -->
+      <div *ngIf="showCompactChipList">
+        <!-- cdkDropList (cdkDropListDropped)="drop($event)" -->
+        <mat-chip-set>
+          <!-- cdkDrag -->
+          <mat-chip *ngFor="let column of availableColumns; let i = index" 
+            [highlighted]="isTagSelected(column.value)"
+            [ngClass]="isTagSelected(column.value) ? 'chip-selected' : 'chip-unselected'"
+            (click)="![0,1].includes(i) ? onColumnChipToggle(column.value) : null">
+            {{ column.label }}
+            <button matChipRemove *ngIf="selectedColumns.includes(column.value)">
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip>
+        </mat-chip-set>
+        <button mat-button (click)="toggleChipListView()">Close</button>
+      </div>
+
+
+      <div class="d-flex flex-row justify-content-start w-100">
+        <!-- table -->
+        <span class="w-100 mb-10" [ngClass]="selection.selected.length != 0 ? 'table-with-selection' : 'w-100'">
+          <table [ngClass]="selection.selected.length != 0 ? 'custom-table2 custom-table' : 'custom-table1 custom-table'" mat-table [dataSource]="dataSource" matSort>
+
+            <ng-container *ngFor="let column of displayedColumns" [matColumnDef]="column">
+
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                <span [ngSwitch]="column">
+                  <mat-checkbox *ngSwitchCase="'select'" (change)="$event ? masterToggle() : null" [checked]="isAllSelected()" [indeterminate]="selection.hasValue() && !isAllSelected()">Select All</mat-checkbox>
+                  <span *ngSwitchCase="'name'">Name</span>
+                  <span *ngSwitchCase="'subscriptionstart'">Subscription Start</span>
+                  <span *ngSwitchCase="'subscriptionend'">Subscription End</span>
+                  <span *ngSwitchCase="'activejourney'">Active Journey</span>
+                  <span *ngSwitchCase="'activeproduct'">Active Product</span>
+                  <span *ngSwitchCase="'lastcompletedjourney'">Last Completed Journey</span>
+                  <span *ngSwitchCase="'atccount'">ATC Count</span>
+                  <span *ngSwitchCase="'atcwritten'">ATC Written</span>
+                  <span *ngSwitchCase="'atcgotmentoring'">ATC GotMentoring</span>
+                  <!-- <span *ngSwitchCase="'atcmentored'">ATC Mentored</span> -->
+                  <span *ngSwitchCase="'notes'">Notes</span>
+                  <span *ngSwitchCase="'currentaelcount'">Current AEL Count</span>
+                  <span *ngSwitchCase="'completedaelcount'">Completed AEL Count</span>
+                  <span *ngSwitchCase="'totalaelcount'">Total AEL Count</span>
+                  <span *ngSwitchCase="'not updated'">not updated (adj)</span>
+                  <span *ngSwitchCase="'No Change'">No Change (adj)</span>
+                  <span *ngSwitchCase="'Somewhat change'">Somewhat Change (adj)</span>
+                  <span *ngSwitchCase="'Changed'">Changed (adj)</span>
+                  <span *ngSwitchCase="'Changed improvement'">Changed Improvement (adj)</span>
+                  <span *ngSwitchCase="'Completely changed'">Completely Changed (adj)</span>
+                  <span *ngSwitchCase="'evolutionyearwasted'">Potential Years</span>
+                  <span *ngSwitchCase="'evolutionyearsaved'">Saved Years</span>
+                  <span *ngSwitchCase="'extendedlifeimpact'">Extended Life Impact</span>
+                  <span *ngSwitchCase="'totalstudioopportunitiesused'">Total Studio Opportunitiesused</span>
+                  <span *ngSwitchCase="'liveeventopportunitiesused'">Live Event Opportunitiesused</span>
+                  <span *ngSwitchCase="'totaladjustmentaware'">Adj aware</span>
+                  <span *ngSwitchCase="'totaladjustmentunaware'">Adj unaware</span>
+                  <span *ngSwitchCase="'touchpoints'">Total Touch Points</span>
+                  <span *ngSwitchCase="'tags'">Tags</span>
+                  <span *ngSwitchCase="'atcmodel'">ATC Model</span>
+                  <!-- <span *ngSwitchCase="'crossovermetrics'">Crossover Metrics</span> -->
+                  <span *ngSwitchCase="'B!G_REG'">B!G-REG</span>
+                  <span *ngSwitchCase="'B!G_FT'">B!G-FT</span>
+                  <span *ngSwitchCase="'LYL_REG'">LYL_REG</span>
+                  <span *ngSwitchCase="'LYL_FT'">LYL_FT</span>
+                  <span *ngSwitchCase="'uP!_REG'">uP!_REG</span>
+                  <span *ngSwitchCase="'uP!_FT'">uP!_FT</span>
+                  <span *ngSwitchCase="'Health Explorative_REG'">Health Explorative_REG</span>
+                  <span *ngSwitchCase="'Health Explorative_FT'">Health Explorative_FT</span>
+                  <span *ngSwitchCase="'CTD_REG'">CTD_REG</span>
+                  <span *ngSwitchCase="'CTD_FT'">CTD_FT</span>
+                  <span *ngSwitchCase="'SMP_REG'">SMP_REG</span>
+                  <span *ngSwitchCase="'SMP_FT'">SMP_FT</span>
+                  <span *ngSwitchCase="'previouscohorts'">Previous Cohorts</span>
+                  <span *ngSwitchCase="'currentcohorts'">Current Cohorts</span>
+                  <span *ngSwitchCase="'Family'">Family</span>
+                  <span *ngSwitchCase="'Health'">Health</span>
+                  <span *ngSwitchCase="'Career'">Career</span>
+                  <span *ngSwitchCase="'Business'">Business</span>
+                  <span *ngSwitchCase="'Personal Genius'">Personal Genius</span>
+                </span>
+              </th>
+
+              <td mat-cell *matCellDef="let element">
+
+                <span [ngSwitch]="column">
+                  <!-- Select -->
+                  <span *ngSwitchCase="'select'">
+                    <mat-checkbox class="ms-2" (click)="$event.stopPropagation()" (change)="$event ? onToggleSelection(element): null" [checked]="selection.isSelected(element)"></mat-checkbox>
+                  </span>
+                  <!-- Display Name -->
+                  <ng-container *ngSwitchCase="'name'">
+                    <a (click)="bigProfile(element)" class="namehover" style="cursor: pointer;">
+                      {{element[column]}}
+                    </a>
+                  </ng-container>
+
+                  <!-- Display Subscription Start Date -->
+                  <ng-container *ngSwitchCase="'subscriptionstart'">
+                    {{ element[column] ? (element[column].toDate() | date: 'medium') : "" }}
+                  </ng-container>
+
+                  <!-- Display Subscription End Date -->
+                  <ng-container *ngSwitchCase="'subscriptionend'">
+                    {{ element[column] ? (element[column].toDate() | date: 'medium') : "" }}
+                  </ng-container>
+
+                  <!-- Display Active Journey -->
+                  <ng-container *ngSwitchCase="'activejourney'">
+                    {{ element[column] ? mapJourney[element[column]] : "" }}
+                  </ng-container>
+
+                  <!-- Display Active Product -->
+                  <ng-container *ngSwitchCase="'activeproduct'">
+                    <ng-container *ngIf="element[column]">
+                      <span *ngFor="let item of element[column] || []">{{ mapProduct[item] }}</span>
+                    </ng-container>
+                  </ng-container>
+
+                  <!-- Display Last Completed Journey -->
+                  <ng-container *ngSwitchCase="'lastcompletedjourney'">
+                    {{ element[column] ? mapJourney[element[column]] : "" }}
+                  </ng-container>
+
+                  <!-- Iterate over multiple cases for each category -->
+                  <ng-container *ngSwitchCase="'B!G_REG'">
+                    <ng-container *ngTemplateOutlet="displayCategory; context: { category: 'B!G' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'LYL_REG'">
+                    <ng-container *ngTemplateOutlet="displayCategory; context: { category: 'LYL' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'uP!_REG'">
+                    <ng-container *ngTemplateOutlet="displayCategory; context: { category: 'uP!' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'Health Explorative_REG'">
+                    <ng-container *ngTemplateOutlet="displayCategory; context: { category: 'Health Explorative'}"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'CTD_REG'">
+                    <ng-container *ngTemplateOutlet="displayCategory; context: { category: 'CTD' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'SMP_REG'">
+                    <ng-container *ngTemplateOutlet="displayCategory; context: { category: 'SMP' }"></ng-container>
+                  </ng-container>
+                  
+                  <!-- Fast Track Display -->
+                  <ng-container *ngSwitchCase="'B!G_FT'">
+                    <ng-container *ngTemplateOutlet="displayFastTrack; context: { category: 'B!G' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'LYL_FT'">
+                    <ng-container *ngTemplateOutlet="displayFastTrack; context: { category: 'LYL' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'uP!_FT'">
+                    <ng-container *ngTemplateOutlet="displayFastTrack; context: { category: 'uP!' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'Health Explorative_FT'">
+                    <ng-container *ngTemplateOutlet="displayFastTrack; context: { category: 'Health Explorative' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'CTD_FT'">
+                    <ng-container *ngTemplateOutlet="displayFastTrack; context: { category: 'CTD' }"></ng-container>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'SMP_FT'">
+                    <ng-container *ngTemplateOutlet="displayFastTrack; context: { category: 'SMP' }"></ng-container>
+                  </ng-container>
+                  
+                  <!-- Template for Regular Display -->
+                  <ng-template #displayCategory let-category="category">
+                    <ng-container *ngIf="bigLevelup[element['profileid']]">
+                      <ng-container *ngIf="bigLevelup[element['profileid']][category]">
+                        <span>{{ bigLevel[bigLevelup[element['profileid']][category].level.id].level }}</span>
+                        <div *ngFor="let j of bigLevelup[element['profileid']][category]['regular']">
+                          <span>{{mapActivity[j.activity.id]}} - {{ j.completed ? j.completed : 0}} / {{ j.metric ? j.metric : 0}}</span>
+                        </div>
+                      </ng-container>
+                    </ng-container>
+                  </ng-template>
+
+                  <!-- Template for Fast Track Display -->
+                  <ng-template #displayFastTrack let-category="category">
+                    <ng-container *ngIf="bigLevelup[element['profileid']]">
+                      <ng-container *ngIf="bigLevelup[element['profileid']][category]">
+                        <div *ngFor="let track of bigLevelup[element['profileid']][category]['fasttrack']" style="cursor: pointer;"(mouseenter)="hoveredTrack = track" (mouseleave)="hoveredTrack = null">
+                          <span>{{ bigLevel[track?.level?.id]?.level }}</span>
+                          <ng-container *ngIf="hoveredTrack === track">
+                            <ng-container *ngIf="track.validation && track.validation.length > 0">
+                              <span *ngFor="let entry of track.validation; let lasts = last">
+                                <br>val- {{ entry?.completed }} / {{ entry?.metric }}<span *ngIf="!lasts"><br></span>
+                              </span>
+                            </ng-container>
+                            <br>
+                            <ng-container *ngIf="track.stabilization && track.stabilization.length > 0">
+                              sta-
+                              <span *ngFor="let entry of track.stabilization; let lasts = last">
+                                {{ entry?.completed }} / {{ entry?.metric }}<span *ngIf="!lasts">, </span>
+                              </span>
+                            </ng-container>
+                          </ng-container>
+                        </div>
+
+                      </ng-container>
+                    </ng-container>
+                  </ng-template>
+                  
+
+                  <!-- <mat-card-title>{{ profile_data[field.profileid]?.name }}</mat-card-title> -->
+                
+                  <ng-container *ngSwitchCase="'Family'">
+                    <ng-container *ngTemplateOutlet="displayCrossover; context: { category: 'Family'}"></ng-container>
+                  </ng-container>
+
+                  <ng-container *ngSwitchCase="'Health'">
+                    <ng-container *ngTemplateOutlet="displayCrossover; context: { category: 'Health' }"></ng-container>
+                  </ng-container>
+                  
+                  <ng-container *ngSwitchCase="'Career'">
+                    <ng-container *ngTemplateOutlet="displayCrossover; context: { category: 'Career' }"></ng-container>
+                  </ng-container>
+                  
+                  <ng-container *ngSwitchCase="'Business'">
+                    <ng-container *ngTemplateOutlet="displayCrossover; context: { category: 'Business' }"></ng-container>
+                  </ng-container>
+                  
+                  <ng-container *ngSwitchCase="'Personal Genius'">
+                    <ng-container *ngTemplateOutlet="displayCrossover; context: { category: 'Personal Genius' }"></ng-container>
+                  </ng-container>
+                  
+                  <ng-template #displayCrossover let-category="category">
+                    <span *ngIf="element['currentael']?.length > 0">
+                      <span *ngFor="let i of element['currentael']">
+                        <span class="crossovermetricscolor" *ngIf="i['crossovermetric'][category]?.startpoint">
+                          <ul>
+                            <li>
+                            {{ i["crossovermetric"][category]?.startpoint }} to  {{ i["crossovermetric"][category]?.endpoint }}
+                          </li>
+                        </ul> 
+                      </span>
+                    </span>
+                  </span>
+                  <span *ngIf="element['completedael']?.length > 0">
+                    <span *ngFor="let i of element['completedael']">
+                      <span class="crossovermetricscolorcomplete" *ngIf="i['crossovermetric'][category]?.startpoint">
+                        <ul>
+                          <li>
+                            {{ i["crossovermetric"][category]?.startpoint }} to  {{ i["crossovermetric"][category]?.endpoint }}
+                          </li>
+                        </ul> 
+                      </span>
+                    </span>
+                  </span>
+                </ng-template>
+                
+                
+
+                <span *ngSwitchCase="'atccount'" [matMenuTriggerFor]="atcCount">{{element[column] != undefined ? element[column] :""}}</span>
+                <mat-menu class="card" #atcCount="matMenu">
+                  <ng-container *ngIf="element['participantatc'] ? element['participantatc'].length > 0 : false">
+                    <ng-container *ngFor="let field of element['participantatc']">
+                      <ng-container *ngIf="element.mapparticipantatc[field]">
+                        <mat-card class="atc-card">
+                          <mat-card-header>
+                            <div mat-card-avatar class="example-header-image"></div>
+                            <mat-card-subtitle>ATC Model:{{element.mapparticipantatc[field].atcmodel}}</mat-card-subtitle>
+                          </mat-card-header>
+                    
+                          <mat-card-content>
+                            <div class="mentor-list" *ngIf="element.mapparticipantatc[field].author?.length > 0">
+                              <!-- <mat-icon color="primary">supervisor_account</mat-icon> -->
+                              <span class="mentor-title">Authored By:</span>
+                              <span *ngFor="let profile of element.mapparticipantatc[field].author ; let i = index">
+                                <p class="mentor-name">{{ profile_data[profile]?.name }}<span *ngIf="i <  element.mapparticipantatc[field].author.length - 1">,</span></p>
+                              </span>
+                            </div> 
+
+                            <div class="mentor-list" *ngIf="element.mapparticipantatc[field].mentor?.length > 0">
+                              <!-- <mat-icon color="primary">supervisor_account</mat-icon> -->
+                              <span class="mentor-title">Mentored By:</span>
+                              <span *ngFor="let profile of element.mapparticipantatc[field].mentor ; let i = index">
+                                <p class="mentor-name">{{ profile_data[profile]?.name }}<span *ngIf="i <  element.mapparticipantatc[field].mentor.length - 1">,</span></p>
+                              </span>
+                            </div>
+                    
+                            <mat-divider></mat-divider>
+
+                            <div class="date-info">
+                              <!-- <mat-icon color="accent">event</mat-icon> -->
+                              <span>Prescription Date: {{ element.mapparticipantatc[field].prescription_date?.toDate() | date:'yyyy-MM-dd' }}</span>
+                            </div>
+                            
+                          </mat-card-content>
+                        </mat-card>
+                      </ng-container>
+                    </ng-container>
+                  </ng-container>
+                  <ng-container *ngIf="element['participantatc'] ? element['participantatc'].length == 0 :false">
+                    <button mat-menu-item disabled>No data available</button>
+                  </ng-container>
+                </mat-menu>
+
+                <span *ngSwitchCase="'atcmodel'">
+                  {{element[column] != undefined ? element[column].join(",") :""}}
+                </span>
+
+
+                <span *ngSwitchCase="'tags'">
+                  <div *ngIf="particpantsTags[element['profileid']] && particpantsTags[element['profileid']]['tags']">
+                    <ul>
+                      <li *ngFor="let option of particpantsTags[element['profileid']]['tags']; let i = index" 
+                          class="tag-item">
+                        {{ option || '' }}
+                        <span class="remove-icon" (click)="removeTag(element['profileid'], i)"><mat-icon>delete</mat-icon></span> 
+                      </li>
+                    </ul>
+                  </div>
+                </span>
+                
+                
+
+                <span *ngSwitchCase="'atcwritten'" [matMenuTriggerFor]="atcMenu">
+                  {{ mapATCWritten[element['profileid']] != undefined ? mapATCWritten[element['profileid']].length : 0 }}
+                </span>
+                <mat-menu class="card" #atcMenu="matMenu">
+                  <ng-container *ngIf="mapATCWritten[element['profileid']]">
+                    <ng-container *ngFor="let field of mapATCWritten[element['profileid']]">
+                      <mat-card class="atc-card">
+                        <mat-card-header>
+                          <div mat-card-avatar class="example-header-image"></div>
+                          <mat-card-title>{{ profile_data[field.profileid]?.name }}</mat-card-title>
+                          <mat-card-subtitle>ATC Model: {{ field.product }}</mat-card-subtitle>
+                        </mat-card-header>
+                  
+                        <mat-card-content>
+
+                          <div class="mentor-list">
+                            <span class="mentor-title">Prescribed By:</span>
+                            <ng-container *ngFor="let profile of field.author; let i = index">
+                              <p class="mentor-name">
+                                {{ profile_data[profile.id]?.name }}<span *ngIf="i < field.author.length - 1">,</span>
+                              </p>
+                            </ng-container>
+                          </div>
+                  
+                          <mat-divider></mat-divider>
+                  
+                          <div class="date-info">
+                            <!-- <mat-icon color="accent">event</mat-icon> -->
+                            <span>Prescription Date: {{ field.prescription_date?.toDate() | date:'yyyy-MM-dd ' }}</span>
+                          </div>
+                        </mat-card-content>
+                      </mat-card>
+                    </ng-container>
+                  </ng-container>
+
+
+                  <ng-container *ngIf="!mapATCWritten[element['profileid']]">
+                    <button mat-menu-item disabled>No data available</button>
+                  </ng-container>
+                </mat-menu>
+
+                  <span *ngSwitchCase="'atcgotmentoring'" [matMenuTriggerFor]="atcMentoring">
+                    {{ mapATCgotMentoring[element['profileid']] != undefined ? mapATCgotMentoring[element['profileid']].length : 0 }}
+                  </span>
+                  <mat-menu class="card" #atcMentoring="matMenu">
+                    <ng-container *ngIf="mapATCgotMentoring[element['profileid']]">
+                      <ng-container *ngFor="let field of mapATCgotMentoring[element['profileid']]">
+                        <mat-card class="atc-card">
+                          <mat-card-header>
+                            <div mat-card-avatar class="example-header-image"></div>
+                            <mat-card-title>Name: {{ profile_data[field.profileid]?.name }}</mat-card-title>
+                            <mat-card-subtitle>ATC Model: {{ field.product }}</mat-card-subtitle>
+                          </mat-card-header>
+                          <mat-card-content>
+                            <div class="mentor-list">
+                              <mat-icon color="primary">supervisor_account</mat-icon>
+                              <span class="mentor-title">Prescribed By:</span>
+                              <span *ngFor="let profile of field.author">
+                                <p class="mentor-name">{{ profile_data[profile.id]?.name }}</p>
+                              </span>
+                              <span class="mentor-title">Validated By:</span>
+                              <span *ngFor="let profile of field.validator || []">
+                                <p class="mentor-name">{{ profile_data[profile.id]?.name }}</p>
+                              </span>
+                            </div>
+                    
+                            <mat-divider></mat-divider>
+                    
+                            <div class="date-info">
+                              <mat-icon color="accent">event</mat-icon>
+                              <span>Prescription Date: {{ field.prescription_date?.toDate() | date:'yyyy-MM-dd hh:mm a' }}</span>
+                            </div>
+                          </mat-card-content>
+                        </mat-card>
+                      </ng-container>
+                    </ng-container>
+                    <ng-container *ngIf="!mapATCWritten[element['profileid']]">
+                      <button mat-menu-item disabled>No data available</button>
+                    </ng-container>
+                  </mat-menu>
+
+                  <!-- <span *ngSwitchCase="'atcmentor'" [matMenuTriggerFor]="atcMentor">{{mapATCMentor[element['profileid']] != undefined ? mapATCMentor[element['profileid']].length : 0 }}</span>
+                  <mat-menu class="card" #atcMentor="matMenu">
+                    <ng-container *ngIf="mapATCMentor[element['profileid']]">
+                      <ng-container *ngFor="let field of mapATCMentor[element['profileid']]">
+                        <mat-card class="atc-card">
+                          <mat-card-header>
+                            <div mat-card-avatar class="example-header-image"></div>
+                            <mat-card-title>Name: {{ profile_data[field.profileid]?.name }}</mat-card-title>
+                            <mat-card-subtitle>ATC Model: {{ field.product }}</mat-card-subtitle>
+                          </mat-card-header>
+                    
+                          <mat-card-content>
+                            <div class="mentor-list">
+                              <mat-icon color="primary">supervisor_account</mat-icon>
+                              <span class="mentor-title">Mentored By:</span>
+                              <span *ngFor="let profile of field.author">
+                                <p class="mentor-name">{{ profile_data[profile.id]?.name }}</p>
+                              </span>
+                            </div>
+                    
+                            <mat-divider></mat-divider>
+                    
+                            <div class="date-info">
+                              <mat-icon color="accent">event</mat-icon>
+                              <span>Prescription Date: {{ field.prescription_date?.toDate() | date:'yyyy-MM-dd hh:mm a' }}</span>
+                            </div>
+                          </mat-card-content>
+                        </mat-card>
+                      </ng-container>
+                    </ng-container>
+                    <ng-container *ngIf="!mapATCWritten[element['profileid']]">
+                      <button mat-menu-item disabled>No data available</button>
+                    </ng-container>
+                  </mat-menu> -->
+
+                  <span *ngSwitchCase="'currentaelcount'">{{element[column] != undefined ? element[column] :""}}</span>
+
+                  <span *ngSwitchCase="'completedaelcount'">{{element[column] != undefined ? element[column] :""}}</span>
+
+                  <span *ngSwitchCase="'totalaelcount'">{{(element['currentaelcount'] || 0) + (element['completedaelcount'] || 0)}}</span>
+
+                  <span *ngSwitchCase="'ongoingaellist'">
+                    <span *ngFor="let item of element[column] || []">
+                      <li>Created at : {{item['created'].toDate() | date : "short"}}</li>
+                      <span>ATC Model : {{item['atcmodel']}}</span>
+                      <span *ngFor="let metric of item['crossovermetric'] | keyvalue" class="ms-1">
+                        {{metric.key}}&nbsp;&nbsp;:&nbsp;&nbsp;{{metric.value['startpoint']}}&nbsp;&nbsp;to&nbsp;&nbsp; {{metric.value['endpoint']}}
+                      </span>
+                    </span>
+                  </span>
+
+
+                  <div *ngSwitchCase="'notes'">
+                    <div *ngIf="bigNotes && bigNotes.length > 0">
+                      <div *ngFor="let note of bigNotes">
+                        <div *ngIf="note.docid == element.profileid">
+                          <div *ngFor="let data of note.notes" class="notesContainer">
+                            <p>{{ data.note || '' }}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                
+
+                  <span *ngSwitchCase="'recentcompletedaeldoc'">
+                    <span *ngIf="element[column] != undefined && element[column]['crossovermetric'] != undefined">
+                      <li>Created at : {{element[column]['created'].toDate() | date : "short"}}</li>
+                      <span>ATC Model : {{element[column]['atcmodel']}}</span>
+                      <span *ngFor="let metric of element[column]['crossovermetric'] | keyvalue" class="ms-1">
+                        {{metric.key}}&nbsp;&nbsp;:&nbsp;&nbsp;{{metric.value['startpoint']}}&nbsp;&nbsp;to&nbsp;&nbsp; {{metric.value['endpoint']}}
+                      </span>
+                    </span>
+                  </span>
+
+                  <span *ngSwitchCase="'not updated'">{{element['evolutionprogress'] != undefined ? (element['evolutionprogress'][column] || 0) : 0}}</span>
+                  <span *ngSwitchCase="'No Change'">{{element['evolutionprogress'] != undefined ? (element['evolutionprogress'][column] || 0) : 0}}</span>
+                  <span *ngSwitchCase="'Somewhat change'">{{element['evolutionprogress'] != undefined ? (element['evolutionprogress'][column] || 0) : 0}}</span>
+                  <span *ngSwitchCase="'Changed'">{{element['evolutionprogress'] != undefined ? (element['evolutionprogress'][column] || 0) : 0}}</span>
+                  <span *ngSwitchCase="'Changed improvement'">{{element['evolutionprogress'] != undefined ? (element['evolutionprogress'][column] || 0) : 0}}</span>
+                  <span *ngSwitchCase="'Completely changed'">{{element['evolutionprogress'] != undefined ? (element['evolutionprogress'][column] || 0) : 0}}</span>
+                  <span *ngSwitchCase="'evolutionyearwasted'">{{element[column] || 0}}</span>
+                  <span *ngSwitchCase="'evolutionyearsaved'">{{element[column] || 0}}</span>
+                  <span *ngSwitchCase="'extendedlifeimpact'">{{element[column] || 0}}</span>
+                  <span *ngSwitchCase="'totalstudioopportunitiesused'" [matMenuTriggerFor]="totalstudioopportunities">{{element["totalstudioopportunitiesused"] || 0}}</span>
+                  <mat-menu class="card" #totalstudioopportunities="matMenu">
+                    <ng-container *ngIf="element['studioevents']?.length > 0">
+                        <ng-container *ngFor="let field of element['studioevents']">
+                            <mat-card class="atc-card">
+                              <mat-card-header>
+                                <div mat-card-avatar class="example-header-image"></div>
+                                <mat-card-subtitle>{{ queueGeneration[field]["queuename"]}}</mat-card-subtitle>
+                              </mat-card-header>
+                            </mat-card>
+                        </ng-container>
+                    </ng-container>
+                    <ng-container *ngIf="!element['studioevents']?.length">
+                      <button mat-menu-item disabled>No data available</button>
+                    </ng-container>
+                  </mat-menu> 
+
+                  <!-- <span *ngSwitchCase="'liveeventopportunitiesused'">
+                    <div  (mouseenter)="hoveredTrack = track" (mouseleave)="hoveredTrack = null" class="count-container" >
+                      {{ countItems(element).count }}
+                    </div>
+                  
+                    <div *ngIf="hoveredTrack === track">
+                      <ul>
+                        <li *ngFor="let name of countItems(element).matchedNames">
+                          {{ name }}
+                        </li>
+                      </ul>
+                    </div>
+                  </span> -->
+
+                  <span *ngSwitchCase="'liveeventopportunitiesused'" [matMenuTriggerFor]="liveeventopportunitiesused">{{ countItems(element).count }}</span>
+                  <mat-menu class="card" #liveeventopportunitiesused="matMenu">
+                    <ng-container *ngFor="let name of countItems(element).matchedNames">
+                        <mat-card class="atc-card">
+                          <mat-card-header>
+                            <div mat-card-avatar class="example-header-image"></div>
+                            <mat-card-subtitle>{{ name }}</mat-card-subtitle>
+                          </mat-card-header>
+                        </mat-card>
+                    </ng-container>
+                  </mat-menu> 
+                  
+
+                  <span *ngSwitchCase="'totaladjustmentaware'">{{element[column] || 0}}</span>
+                  <span *ngSwitchCase="'totaladjustmentunaware'">{{element[column] || 0}}</span>
+
+                  <span *ngSwitchCase="'previouscohorts'">
+                    <li *ngFor="let doc of this.lastCohortsParticipation[element['profileid']] || []">{{doc.name}}</li>
+                  </span>
+
+                  <span *ngSwitchCase="'currentcohorts'">
+                    <li *ngFor="let doc of this.currentCohortsParticipation[element['profileid']] || []">{{doc.name}}</li>
+                  </span>
+
+                </span>
+              </td>
+            </ng-container>
+            
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+          </table>
+          <mat-paginator [pageSizeOptions]="[15,25,50,100]" aria-label="Select page of users"></mat-paginator>
+        </span>
+        
+        <div *ngIf="selection.selected.length != 0" class="selection-card overflow-auto vh-300" style="height: 100vh; width:30%;">
+          <h5 class="selection-header">
+            Total Selected - <b>({{ selection.selected.length }})</b>
+          </h5>
+          <ul class="selection-list">
+            <li *ngFor="let profile of selection.selected" class="selection-item">
+              <span class="profile-name">{{ profile['name'] }}</span>
+              <button mat-icon-button type="button" class="remove-btn" (click)="unselectRow(profile)" title="Remove">
+                <mat-icon>close</mat-icon>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+    </div>
+  </mat-sidenav-content>
+
+  <mat-sidenav class="formnotesclass sidenav-fixed" #sidenav mode="side" position="end">
+    <div class="sidenav-content">
+      <div class="row justify-content-center">
+        <h2 style="text-align: center;">Notes</h2>
+        <button class=" ms-7 justify-content-end" mat-button (click)="sidenav.close()">close
+        </button>
+      </div>
+      
+      <div class="notes-list">
+        <ul style="list-style-type: none;margin-top: 4px;" *ngFor="let notedata of bigNotes ">
+            <li class="containerNotes mt-4" *ngFor="let data of notedata.notes; let i = index" [ngClass]="{'text-left': data.notescreatedby !== profileId, 'text-right': data.notescreatedby === profileId}">
+              <ng-container *ngIf="!data.isEditing; else editMode">
+                <div class="row">
+                  <div class="note-container">
+                    <div class="note-text">
+                      <span>{{data.note}}</span>
+                      <div class="row mt-1 d-flex justify-content-between p-10">
+                        <span>{{ profile_data[data.notescreatedby].name }}</span>
+                        <span>{{ data.created?.toDate() | date:'yyyy-MM-dd hh:mm a' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="button-container">
+                    <div class="column" style="display: flex; flex-direction: column;">
+                      <button mat-button class="color-primary ms-4 me-2" (click)="editNote(i, notedata)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button *ngIf="!data.delete" mat-button class="color-danger" (click)="toggleDeleteConfirmation(i,notedata)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                      <button *ngIf="data.delete" mat-button class="btn btn-danger color-danger" (click)="deleteNote(i, notedata.docid)">
+                        Are you sure you want to delete this note?
+                      </button>
+                      <!-- <button *ngIf="data.delete" mat-button (click)="cancelDelete(i, notr)">Cancel</button> -->
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+              
+              <ng-template #editMode>
+                <textarea [(ngModel)]="data.note" (input)=" ($event)" rows="1" style="overflow:hidden;"></textarea>
+                <button mat-raised-button class="btn btn-success me-2" (click)="saveEditedNote(i, notedata.docid,notedata)">Save</button>
+                <button mat-raised-button class="btn btn-primary" (click)="cancelEdit(i, notedata)">Cancel</button>
+              </ng-template>
+              
+          </li>
+        </ul>
+      </div>
+        
+      <form class="form-bottom" [formGroup]="notesForm" (ngSubmit)="saveNote()">
+        <textarea formControlName="note" placeholder="Write your note here..." rows="4"></textarea>
+        <br>
+        <button mat-raised-button class="btn btn-primary" type="submit">Save Note</button>
+      </form>
+    </div>
+  </mat-sidenav>
+  
+  
+</mat-sidenav-container>
+
+
+
+
+ 
+
+
+
+<!-- <span *ngIf="column === 'select'">
+  <mat-checkbox (change)="$event ? masterToggle() : null" [checked]="isAllSelected()" [indeterminate]="selection.hasValue() && !isAllSelected()">Select All</mat-checkbox>
+</span>
+<span *ngIf="column === 'name'">Name</span>
+<span *ngIf="column === 'subscriptionstart'">Subscription Start</span>
+<span *ngIf="column === 'subscriptionend'">Subscription End</span>
+<span *ngIf="column === 'activejourney'">Active Journey</span>
+<span *ngIf="column === 'activeproduct'">Active Product</span>
+<span *ngIf="column === 'lastcompletedjourney'">Last Completed Journey</span>
+<span *ngIf="column === 'atccount'">ATC Count</span>
+<span *ngIf="column === 'atcwritten'">ATC Written</span>
+<span *ngIf="column === 'atcmentor'">ATC Mentor</span>
+<span *ngIf="column === 'notes'">Notes</span>
+<span *ngIf="column === 'ongoingaelcount'">Ongoing AEL Count</span>
+<span *ngIf="column === 'completedaelcount'">Completed AEL Count</span>
+<span *ngIf="column === 'totalaelcount'">Total AEL Count</span>
+<span *ngIf="column === 'ongoingaellist'">Current CrossOver</span>
+<span *ngIf="column === 'recentcompletedaeldoc'">Prev - CrossOver</span>
+<span *ngIf="column === 'not updated'">not updated (adj)</span>
+<span *ngIf="column === 'No Change'">No Change (adj)</span>
+<span *ngIf="column === 'Somewhat change'">Somewhat Change (adj)</span>
+<span *ngIf="column === 'Changed'">Changed (adj)</span>
+<span *ngIf="column === 'Changed improvement'">Changed Improvement (adj)</span>
+<span *ngIf="column === 'Completely changed'">Completely Changed (adj)</span>
+<span *ngIf="column === 'evolutionyearwasted'">Potential Years </span>
+<span *ngIf="column === 'evolutionyearsaved'">Saved Years</span>
+<span *ngIf="column === 'extendedlifeimpact'">Extended Life Impact</span>
+<span *ngIf="column === 'totalbigopportunitiesused'">B!G oppor..</span>
+<span *ngIf="column === 'totaladjustmentaware'">Adj aware</span>
+<span *ngIf="column === 'totaladjustmentunaware'">Adj unaware</span>
+<span *ngIf="column === 'touchpoints'">Total Touch Points</span>
+<span *ngIf="column === 'tags'">Tags</span>
+<span *ngIf="column === 'atcmodel'">ATC Model</span>
+<span *ngIf="column === 'crossovermetrics'">Crossover Metrics</span>
+
+<span *ngIf="column === 'B!G_REG'">B!G-REG</span>
+<span *ngIf="column === 'B!G_FT'">B!G-FT </span>
+
+<span *ngIf="column === 'LYL_REG'">LYL_REG</span>
+<span *ngIf="column === 'LYL_FT'">LYL_FT </span>
+
+<span *ngIf="column === 'uP!_REG'">uP!_REG</span>
+<span *ngIf="column === 'uP!_FT'">uP!_FT </span>
+
+<span *ngIf="column === 'Health Explorative_REG'">Health Explorative_REG</span>
+<span *ngIf="column === 'Health Explorative_FT'">Health Explorative_FT </span>
+
+<span *ngIf="column === 'CTD_REG'">CTD_REG</span>
+<span *ngIf="column === 'CTD_FT'">CTD_FT </span>
+
+<span *ngIf="column === 'SMP_REG'">SMP_REG</span>
+<span *ngIf="column === 'SMP_FT'">SMP_FT </span> -->
+
+<!-- <span *ngIf="column === 'big levelup'">Big Level</span> -->
+<!-- <ng-container *ngIf="column === 'big levelup'; else defaultHeader">
+  <span class="p-1" *ngFor="let level of bigLevelUpArray">{{ level }} </span>
+</ng-container> -->
+
+<!-- <span *ngIf="column === 'name'"><a (click)="bigProfile(element)" style="cursor: pointer;">{{element[column]}}</a></span>
+<span *ngIf="column === 'subscriptionstart'">{{element[column] != undefined ? (element[column].toDate() | date:'medium') : ""}}</span>
+<span *ngIf="column === 'subscriptionend'">{{element[column] != undefined ? (element[column].toDate() | date:'medium') : ""}}</span>
+<span *ngIf="column === 'activejourney'">{{element[column] != undefined ? mapJourney[element[column]] :""}}</span>
+<span *ngIf="column === 'activeproduct'">
+  <span *ngIf="element[column]">
+    <span *ngFor="let item of element[column] || []">{{mapProduct[item]}}</span>
+  </span>
+</span>
+<span *ngIf="column === 'lastcompletedjourney'">{{element[column] != undefined ? mapJourney[element[column]] :""}}</span> -->
+
+
+<!-- <span *ngIf="column === 'uP!_REG'">
+  <span *ngIf="bigLevelup[element['profileid']]">
+    <span *ngIf="bigLevelup[element['profileid']]['uP!']">
+      <span>{{bigLevel[bigLevelup[element['profileid']]['uP!'].level.id].level}}</span>
+      <div *ngFor="let j of bigLevelup[element['profileid']]['uP!']['regular']">
+          <span>{{j.completed}} / {{j.metric}}</span>
+      </div>
+    </span>
+  </span>
+</span>
+
+<span *ngIf="column === 'uP!_FT'">
+  <span *ngIf="bigLevelup[element['profileid']]">
+    <span *ngIf="bigLevelup[element['profileid']]['uP!']">
+      <div *ngFor="let track of bigLevelup[element['profileid']]['uP!']['fasttrack']">
+          <span>{{bigLevel[track?.level?.id]?.level}}</span>
+          <ng-container *ngIf="track.validation && track.validation.length > 0">
+              <span *ngFor="let entry of track.validation; let lasts = last">
+                <br>
+                  val- {{entry?.completed}} / {{entry?.metric}}<span *ngIf="!lasts"><br></span>
+              </span>
+          </ng-container>
+          <br>
+          <ng-container *ngIf="track.stabilization && track.stabilization.length > 0">
+              sta-
+              <span *ngFor="let entry of track.stabilization; let lasts = last">
+                  {{entry?.completed}} / {{entry?.metric}}<span *ngIf="!lasts">, </span>
+              </span>
+          </ng-container>
+      </div>
+    </span>
+  </span>
+</span> -->

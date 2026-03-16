@@ -1,0 +1,170 @@
+/* Dialog content wrapper */
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-details {
+  margin-top: 20px;
+  text-align: center;
+  color: #666;
+}
+
+.loading-details div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.blur {
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* Header */
+.dialog-header {
+  flex-shrink: 0;
+  background: #f5f5f5;
+}
+
+/* Filter section */
+.filter-section {
+  flex-shrink: 0;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.participant-search-field {
+  width: 350px;
+  max-width: 100%;
+}
+
+.participant-search-field mat-icon[matPrefix] {
+  color: #666;
+  margin-right: 8px;
+}
+
+.result-count {
+  color: #666;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Table container */
+.table-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.table-container table {
+  width: 100%;
+}
+
+/* Sticky header */
+.table-container th {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+/* Table cells */
+.participant-cell,
+.activity-cell {
+  padding: 4px 0;
+  line-height: 1.5;
+}
+
+.pre-assign-info {
+  padding: 8px 0;
+}
+
+.primarylabel {
+  font-weight: 500;
+  color: #1976d2;
+  margin-right: 4px;
+}
+
+.activity-name {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #e3f2fd;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* No data message */
+.no-data-message {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+}
+
+.no-data-message mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: #ccc;
+}
+
+.no-data-cell {
+  text-align: center;
+}
+
+/* Paginator */
+mat-paginator {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: white;
+  z-index: 10;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Dialog actions */
+.dialog-actions {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background: #f5f5f5;
+}
+
+/* Mat-select dropdown */
+::ng-deep .cdk-overlay-container {
+  z-index: 9999 !important;
+}
+
+/* Form field in table */
+mat-form-field {
+  font-size: 14px;
+}
+
+mat-form-field.w-100 {
+  width: 100%;
+}

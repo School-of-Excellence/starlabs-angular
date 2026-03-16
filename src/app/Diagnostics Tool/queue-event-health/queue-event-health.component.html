@@ -1,0 +1,250 @@
+
+
+<div class="container" *ngIf="showDashboard">
+
+  <h1>Queue Status Dashboard</h1>
+
+  <div class="loading-overlay" *ngIf="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- KPI DASHBOARD -->
+  <div class="kpi-grid" *ngIf="reportLoaded">
+    <div class="kpi"
+         (click)="activeKpiFilter=null; applyFilters()"
+         [class.active]="activeKpiFilter===null">
+      <div class="kpi-value">{{ dashboard.total }}</div>
+      <div class="kpi-label">Total Tokens</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('active')"
+        [class.active]="activeKpiFilter==='active'">
+      <div class="kpi-value">{{ dashboard.active }}</div>
+      <div class="kpi-label">Active Tokens</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('inactive')"
+        [class.active]="activeKpiFilter==='inactive'">
+      <div class="kpi-value">{{ dashboard.inactive }}</div>
+      <div class="kpi-label">Inactive Tokens</div>
+    </div>
+
+
+    <div class="kpi"
+         (click)="onKpiClick('completed')"
+         [class.active]="activeKpiFilter==='completed'">
+      <div class="kpi-value">{{ dashboard.completed }}</div>
+      <div class="kpi-label">Completed</div>
+    </div>
+
+    <div class="kpi"
+         (click)="onKpiClick('ongoing')"
+         [class.active]="activeKpiFilter==='ongoing'">
+      <div class="kpi-value">{{ dashboard.ongoing }}</div>
+      <div class="kpi-label">Ongoing</div>
+    </div>
+
+    <div class="kpi"
+         (click)="onKpiClick('cancelled')"
+         [class.active]="activeKpiFilter==='cancelled'">
+      <div class="kpi-value">{{ dashboard.cancelled }}</div>
+      <div class="kpi-label">Cancelled</div>
+    </div>
+
+    <div class="kpi"
+         (click)="onKpiClick('shifted')"
+         [class.active]="activeKpiFilter==='shifted'">
+      <div class="kpi-value">{{ dashboard.shifted }}</div>
+      <div class="kpi-label">shifted</div>
+    </div>
+
+    <div class="kpi"
+         (click)="onKpiClick('valid')"
+         [class.active]="activeKpiFilter==='valid'">
+      <div class="kpi-value">{{ dashboard.total - dashboard.failed }}</div>
+      <div class="kpi-label">Valid</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('invalid_reason')"
+        [class.active]="activeKpiFilter==='invalid_reason'">
+      <div class="kpi-value">{{ invalidByReasonCount }}</div>
+      <div class="kpi-label">Invalid by Flow</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('invalid_product')"
+        [class.active]="activeKpiFilter==='invalid_product'">
+      <div class="kpi-value">{{ invalidByProductCount }}</div>
+      <div class="kpi-label">Participantsproduct Missing</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('invalid_event_status')"
+        [class.active]="activeKpiFilter==='invalid_event_status'">
+      <div class="kpi-value">{{ invalidByEventStatusCount }}</div>
+      <div class="kpi-label">Event Participation Status Missing
+        <button
+          class="btn-fix-all"
+          *ngIf="activeKpiFilter === 'invalid_event_status'"
+          (click)="fixAllInvalidEventStatus()">
+          Fix All
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION ROW -->
+  <div class="action-bar">
+    <div class="left-group">
+      <!-- Queue Dropdown -->
+      <div class="queue-select-container">
+        <input
+          type="text"
+          class="queue-input"
+          placeholder="Select Queue"
+          [(ngModel)]="queueSearchText"
+          (focus)="openQueueDropdown()"
+          (input)="filterQueues()"
+          [readonly]="!showQueueDropdown"
+        />
+
+        <div class="queue-dropdown" *ngIf="showQueueDropdown">
+          <div
+            class="queue-option"
+            *ngFor="let q of filteredQueues; trackBy: trackByQueueId"
+            (click)="selectQueue(q)">
+            {{ q.queuename }}
+          </div>
+
+          <div class="no-results" *ngIf="filteredQueues.length === 0">
+            No queues found
+          </div>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Search..."
+        [(ngModel)]="searchText"
+        (input)="applyFilters()"
+      />
+    </div>
+
+    <!-- Right side button -->
+    <button class="btn-primary" (click)="exportCSV()">
+      Export CSV
+    </button>
+
+  </div>
+
+  <button *ngIf="reportLoaded && allRecords.length > 0" (click)="bulkMarkUnattended()" class="bulk-btn"> Mark As Unattended ({{ selectedCount }}) </button>
+
+  <!-- ALL TOKENS TABLE -->
+<div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0">
+  <table>
+    <thead>
+      <tr>
+        <th>Select</th>
+        <th>Participant Name</th>
+        <th>Token Number</th>
+        <th>Token Status</th>
+        <th>Stage Status</th>
+        <!-- STAGE FILTER -->
+        <th class="filter-header">
+          <span>Current Stage</span>
+          <div class="filter-wrapper">
+            <span class="filter-icon" (click)="toggleFilter('stage')">▼</span>
+            <div class="filter-dropdown" *ngIf="activeFilter === 'stage'">
+              <div class="filter-option" (click)="selectedStage=''; applyFilters()">All</div>
+              <div
+                class="filter-option"
+                *ngFor="let stage of stageOptions"
+                (click)="selectedStage=stage.value; applyFilters()">
+                {{ stage.value }} ({{ stage.count }})
+              </div>
+            </div>
+          </div>
+        </th>
+        <th class="filter-header">
+          <span>Product Name </span>
+          <div class="filter-wrapper">
+            <span class="filter-icon" (click)="toggleFilter('status')">▼</span>
+            <div class="filter-dropdown" *ngIf="activeFilter === 'status'">
+              <div class="filter-option" (click)="selectedProduct=''; applyFilters()">
+                All
+              </div>
+
+              <div
+                class="filter-option"
+                *ngFor="let product of productOptions"
+                (click)="selectedProduct=product.value; applyFilters()">
+                {{ product.value }} ({{ product.count }})
+              </div>
+            </div>
+          </div>
+        </th>
+
+        <!-- MODE FILTER -->
+        <th class="filter-header">
+          <span>Mode</span>
+          <div class="filter-wrapper">
+            <span class="filter-icon" (click)="toggleFilter('mode')">▼</span>
+            <div class="filter-dropdown" *ngIf="activeFilter === 'mode'">
+              <div class="filter-option" (click)="selectedIntegrationMode=''; applyFilters()">All</div>
+              <div
+                class="filter-option"
+                *ngFor="let mode of integrationModeOptions"
+                (click)="selectedIntegrationMode=mode.value; applyFilters()">
+                {{ mode.value }} ({{ mode.count }})
+              </div>
+            </div>
+          </div>
+        </th>
+        <th>Product Status</th>
+        <th>Event Participation Status</th>
+        <th>Validation</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let r of paginatedRecords">
+        <td>
+          <input type="checkbox" [(ngModel)]="r.selected" />
+        </td>
+        <td>{{ r.participantName }}</td>
+        <td>{{ r.TokenID }}</td>
+        <td>{{ r.tokenStatus }}</td>
+        <td>{{ r.stageStatus }}</td>
+        <td>{{ r.tokenStage }}</td>
+        <td>{{ r.productName }}</td>
+        <td>{{ r.integrationMode }}</td>
+        <td>{{ r.productStatus }}</td>
+        <td>{{ r.eventParticipationStatus }}</td>
+        <td>
+          <!-- VALID -->
+          <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
+
+          <!-- INVALID -->
+          <ng-container *ngIf="!r.validationPassed">
+            <span class="fail">✖ Invalid</span>
+            <br />
+          </ng-container>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<div class="pagination" *ngIf="reportLoaded && totalPages > 1">
+    <button (click)="prevPage()">Prev</button>
+    Page {{ currentPage }} / {{ totalPages }}
+    <button (click)="nextPage()">Next</button>
+  </div>
+
+</div>

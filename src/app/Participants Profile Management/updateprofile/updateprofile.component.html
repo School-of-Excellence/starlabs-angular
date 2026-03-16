@@ -1,0 +1,85 @@
+<div style="padding: 20px;">
+    <form class="loginform" [formGroup]="profileForm" (ngSubmit)="createProfile()">    
+      <h5 class="title">{{this.newprofile ? 'Create' : 'Update'}} Profile</h5>
+      <!-- <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Name</mat-label>
+        <input matInput type="text" formControlName="name">
+        <mat-error *ngIf="profileForm.get('name').hasError('required')">
+          Name <strong>required</strong>
+        </mat-error>
+      </mat-form-field> -->
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>First Name</mat-label>
+        <input matInput type="text" formControlName="firstname">
+        <mat-error *ngIf="profileForm.get('firstname').hasError('required')">
+          First Name <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="profileForm.get('firstname').hasError('whitespace')">
+          First Name <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Last Name</mat-label>
+        <input matInput type="text" formControlName="lastname">
+        <mat-error *ngIf="profileForm.get('lastname').hasError('required') || profileForm.get('lastname').hasError('whitespace')">
+          Last Name <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+
+
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Date of Birth</mat-label>
+        <input matInput [matDatepicker]="picker" formControlName="dateofbirth">
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+        <!-- <mat-error *ngIf="profileForm.get('dateofbirth').hasError('required')">
+          Date of Birth is <strong>required</strong>
+        </mat-error> -->
+      </mat-form-field>    
+      <br>
+      <mat-form-field class="countrycode" appearance="outline">
+        <mat-label>Code</mat-label>
+        <input matInput type="tel" formControlName="countrycode">
+        <mat-error *ngIf="profileForm.get('countrycode').hasError('required')">
+          <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="numberinputfields" appearance="outline">
+        <mat-label>Mobile Number</mat-label>
+        <input matInput type="text" formControlName="number">
+        <mat-error *ngIf="profileForm.get('number').hasError('required')">
+          Number <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="profileForm.get('number').hasError('pattern')">
+          <strong>Invalid</strong> Format
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email">
+        <mat-error *ngIf="profileForm.get('email').hasError('required')">
+          Email is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="profileForm.get('email').hasError('email')">
+          <strong>Invalid</strong> Format
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-checkbox formControlName="deliveryonhold">Delivery Onhold</mat-checkbox>
+      <br>
+      <mat-checkbox formControlName="enable">Enable Breakthroughs App</mat-checkbox>
+      <br>
+      <br>
+      <mat-checkbox formControlName="enableahcrm">Enable ahcrm App</mat-checkbox>
+      <br>
+      <mat-checkbox formControlName="testuser">Mark as Testuser</mat-checkbox>
+      <br>
+      <div class="actionbox">
+        <button class="closebtn" mat-stroked-button type="button" (click)="close()" [disabled]="loading">Close</button>
+        <button class="submitbtn" mat-stroked-button type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Submit'}}</button>
+      </div>
+    </form>
+</div>

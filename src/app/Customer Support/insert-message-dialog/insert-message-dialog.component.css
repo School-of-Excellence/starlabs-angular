@@ -1,0 +1,44 @@
+.main-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.textarea {
+    width: 34vw;
+}
+
+.forms {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.forms{
+    margin-right: 8px;
+}
+
+.font2 {
+    font-family: montserrat;
+    text-align: center;
+    font-weight: bold;
+    color: #4E5D9D;
+}
+
+::ng-deep .mat-form-field-appearance-outline .mat-form-field-outline {
+    top: 0.2em;
+}
+
+::ng-deep .mat-form-field-infix {
+    padding: 0.4em 0 !important;
+}
+
+::ng-deep .mat-form-field-wrapper {
+    padding-top: 0 !important;
+}
+
+::ng-deep .mat-form-field-label {
+    top: 0.5em;
+    transform: translateY(-50%);
+}

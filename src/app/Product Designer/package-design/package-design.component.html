@@ -1,0 +1,56 @@
+<div class="background">
+    <h4 class="title">Package Design</h4>
+    <div class="actionbox">
+      <div>
+        <mat-form-field class="filterbox" appearance="outline">
+          <mat-label>Filter Package</mat-label>
+          <input matInput #filterInput (keyup)="filterPackageDesign(filterInput.value)" autocomplete="off">
+        </mat-form-field>
+      </div>
+      <div>
+        <button class="addbtn" mat-stroked-button (click)="createPackageDesign(null)">Add New Package Design</button>
+      </div>
+    </div>
+    <div class="mat-elevation-z3 tablebox">
+      <table mat-table [dataSource]="packageDesignData" matSort>
+        <ng-container matColumnDef="packagelabel">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Package Label</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="designhover" (click)="createPackageDesign(row)">{{row['packagelabel']}}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="currentjourney">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Current Journey</th>
+          <td mat-cell *matCellDef="let row">
+            <span>{{journeyMap[row['currentjourney']]}}</span>
+            <div class="text-secondary font-italic" *ngIf="row['cancelproduct']">
+              *The unconsumed products will be cancelled
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="newjourney">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>New Journey</th>
+          <td mat-cell *matCellDef="let row">{{journeyMap[row['newjourney']]}}</td>
+        </ng-container>
+        <ng-container matColumnDef="packagestatus">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Package Status</th>
+          <td mat-cell *matCellDef="let row">{{row['packagestatus']}}</td>
+        </ng-container>
+        <ng-container matColumnDef="subscriptionfrom">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Subscription From</th>
+          <td mat-cell *matCellDef="let row">{{row['subscriptionfrom'] == "purchaseentered" ? "Purchase Entered" : row['subscriptionfrom'] == "previoussubscription" ? "Previous Subscription End" : ""}}</td>
+        </ng-container>
+        <ng-container matColumnDef="extentionmonths">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Extention Period</th>
+          <td mat-cell *matCellDef="let row">
+            <span *ngIf="row['extentionmonths'] != null">
+              {{row['extentionmonths']}} Months
+            </span>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="packageDesignHeader; sticky: true"></tr>
+        <tr class="tablerow" mat-row *matRowDef="let row; columns: packageDesignHeader"></tr>
+      </table>
+      <mat-paginator [pageSizeOptions]="[25, 50, 100, 200]"></mat-paginator>
+    </div>
+</div>

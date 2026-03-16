@@ -1,0 +1,101 @@
+<div class="video-dialog">
+  <div class="dialog-header">
+    <h2 mat-dialog-title>📺 Assignment Videos</h2>
+    <button mat-icon-button (click)="closeDialog()" class="close-btn">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content>
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="loading-container">
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <p>Loading videos...</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div *ngIf="!isLoading && videos.length > 0" class="progress-section">
+      <div class="progress-info">
+        <span class="progress-text">Progress: {{ playedVideos.size }} / {{ videos.length }}</span>
+        <span class="progress-percentage">{{ getProgress() | number:'1.0-0' }}%</span>
+      </div>
+      <mat-progress-bar 
+        mode="determinate" 
+        [value]="getProgress()"
+        color="primary">
+      </mat-progress-bar>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!isLoading && videos.length === 0" class="empty-state">
+      <mat-icon class="empty-icon">video_library</mat-icon>
+      <p>No videos available</p>
+    </div>
+
+    <!-- Video List -->
+    <div *ngIf="!isLoading && videos.length > 0" class="video-list">
+      <div 
+        *ngFor="let video of videos; let i = index" 
+        class="video-item"
+        [class.watched]="isVideoWatched(i)"
+        [class.locked]="!canPlayVideo(i)"
+        [class.current]="currentPlayingIndex === i">
+        
+        <div class="video-info">
+          <div class="video-number">{{ i + 1 }}</div>
+          
+          <div class="video-details">
+            <h3 class="video-title">{{ video.title }}</h3>
+            <p class="video-description" *ngIf="video.description">
+              {{ video.description }}
+            </p>
+          </div>
+        </div>
+
+        <div class="video-actions">
+          <!-- Progress indicator for partially watched videos -->
+          <div *ngIf="!isVideoWatched(i) && getVideoProgressPercentage(video.id) > 0" class="video-progress-indicator">
+            <mat-progress-bar 
+              mode="determinate" 
+              [value]="getVideoProgressPercentage(video.id)"
+              color="accent">
+            </mat-progress-bar>
+            <span class="progress-label">{{ getVideoProgressPercentage(video.id) | number:'1.0-0' }}%</span>
+          </div>
+
+          <button 
+            mat-raised-button 
+            [color]="isVideoWatched(i) ? 'primary' : 'accent'"
+            [disabled]="!canPlayVideo(i) || currentPlayingIndex !== -1"
+            (click)="playVideo(video, i)"
+            class="play-btn">
+            
+            <mat-icon *ngIf="!canPlayVideo(i)">lock</mat-icon>
+            <mat-icon *ngIf="canPlayVideo(i) && !isVideoWatched(i) && getVideoProgressPercentage(video.id) === 0">play_circle</mat-icon>
+            <mat-icon *ngIf="canPlayVideo(i) && !isVideoWatched(i) && getVideoProgressPercentage(video.id) > 0">replay</mat-icon>
+            <mat-icon *ngIf="isVideoWatched(i)">check_circle</mat-icon>
+            
+            <span *ngIf="!canPlayVideo(i)">Locked</span>
+            <span *ngIf="canPlayVideo(i) && !isVideoWatched(i) && getVideoProgressPercentage(video.id) === 0">Play Video</span>
+            <span *ngIf="canPlayVideo(i) && !isVideoWatched(i) && getVideoProgressPercentage(video.id) > 0">Continue</span>
+            <span *ngIf="isVideoWatched(i)">Completed</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button mat-stroked-button (click)="closeDialog()">
+      Close
+    </button>
+    <button 
+      mat-raised-button 
+      color="primary" 
+      [disabled]="!allCompleted"
+      (click)="completeAssignment()">
+      <mat-icon>check_circle</mat-icon>
+      Complete Assignment
+    </button>
+  </mat-dialog-actions>
+</div>

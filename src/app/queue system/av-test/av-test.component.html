@@ -1,0 +1,12 @@
+<div class="w-100 text-center mb-3" style="padding: 20px;">
+    <h5 class="fw-semibold mb-3 text-dark" style="font-size: 16px;">Audio Video Testing - {{typeof (token) === 'string' ? token : mapProfile[token["profile_id"]]['name']}}</h5>
+    <mat-form-field class="textfield" appearance="outline">
+      <mat-label>Zoom Meeting Link</mat-label>
+      <input matInput [(ngModel)]="zoomLink">
+    </mat-form-field>
+    <div class="w-100 mt-3">
+      <button class="cancelbtn me-3" mat-stroked-button (click)="close()">Close</button>
+      <button class="markbtn me-3" mat-stroked-button (click)="update('success')">Mark as Tested</button>
+      <button class="successbtn" mat-stroked-button (click)="update('invited')" [disabled]="zoomLink.trim().length == 0">Invite for AV Test</button>
+    </div>
+</div>

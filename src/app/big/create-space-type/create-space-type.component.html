@@ -1,0 +1,29 @@
+<div>
+    <div>
+        <mat-form-field appearance="outline">
+            <mat-label>Type Name</mat-label>
+            <input matInput type="text" [(ngModel)]="inputTypeValue">
+        </mat-form-field>
+
+        &nbsp;&nbsp;
+
+        <button mat-raised-button color="primary" (click)="isTypeEdit ? updateTypeField() : createType(inputTypeValue)" [disabled]="addingType">{{isTypeEdit ? 'Update' : 'Create'}}</button>&nbsp;&nbsp;
+        <button mat-icon-button type="button" style="background-color: rgb(182, 186, 183); color: black;" *ngIf="isTypeEdit">
+            <mat-icon>refresh</mat-icon>
+        </button>
+    </div>
+
+    <hr>
+
+    <div>
+        <h4>Types</h4>
+        <div style="margin-top: 10px;">
+            <mat-chip-row>
+                <mat-chip *ngFor="let field of typeMap | keyvalue" (click)="editTypeField(field.value,field.key)">
+                    {{ field.value }}
+                    <mat-icon matChipRemove (click)="editTypeField(field.value,field.key)" [style.color]="'black'">edit</mat-icon>
+                </mat-chip>
+            </mat-chip-row>
+        </div>
+    </div>
+</div>

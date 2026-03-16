@@ -1,0 +1,70 @@
+<div class="audio-dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Categories</h1>
+      <p class="dash-sub">Manage and reorder categories</p>
+    </div>
+    <button class="btn-primary" (click)="openDialog()">
+      <mat-icon>add</mat-icon>
+      <span>Add Category</span>
+    </button>
+  </div>
+
+  <!-- Filter -->
+  <div class="filters-row">
+    <div class="input-box search-box">
+      <mat-icon class="ib-icon">search</mat-icon>
+      <input type="text" class="ib-input" placeholder="Filter categories..."
+        #input (keyup)="ApplyFilter($event)" autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-outer">
+    <div class="table-card">
+      <table mat-table [dataSource]="dataSource" matSort>
+
+        <!-- Category -->
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="c-name">{{ row.category }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Edit -->
+        <ng-container matColumnDef="Edit">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-edit" (click)="onEditDialog(row.id, row.category)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Delete -->
+        <ng-container matColumnDef="Delete">
+          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
+          <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-del" (click)="onDeleteDialog(row.id)">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="empty">
+              <mat-icon>category</mat-icon>
+              <p>No categories matching "{{ input.value }}"</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[10, 25, 100]" showFirstLastButtons class="paginator"></mat-paginator>
+  </div>
+</div>

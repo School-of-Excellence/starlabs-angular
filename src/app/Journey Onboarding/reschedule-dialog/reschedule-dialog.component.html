@@ -1,0 +1,207 @@
+<div *ngIf="loading" class="loading">
+    <mat-progress-spinner class="spinner" [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+    <span class="loading-text">Fetching Data...</span>
+  </div>
+  
+  <div class="content" *ngIf="!loading">
+  
+    <header class="header">
+      <h1 class="title">Completed - {{mapappointments['completed']['data'].length}}</h1>
+      <button mat-icon-button mat-dialog-close class="close-button">
+        <mat-icon style="color: white;">close</mat-icon>
+      </button>
+    </header>
+  
+    <div class="dashboard-container">
+      <!-- Summary Cards -->
+      <div class="dashboard-summary">
+  
+        <!-- Filters Section -->
+        <div [formGroup]="filterForm">
+        
+          <div class="d-flex flex-row">
+    
+            <mat-form-field appearance="outline">
+              <mat-label>Search Name</mat-label>
+              <input type="text" matInput formControlName="name" placeholder="Search">
+            </mat-form-field>
+  
+            &nbsp;&nbsp;
+  
+            <mat-form-field appearance="outline">
+              <mat-label>Onboarded By</mat-label>
+              <mat-select formControlName="onboardedby">
+                <mat-option value="">All Coaches</mat-option>
+                <mat-option *ngFor="let coach of coachesList" [value]="mapProfile[coach]">
+                  {{mapProfile[coach]}}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+  
+            &nbsp;&nbsp;
+    
+            <div formGroupName="dateRange" >
+              <mat-form-field appearance="outline" class="date-range-picker">
+                <mat-label>Onboarded Date</mat-label>
+                <mat-date-range-input [rangePicker]="rangePicker">
+                  <input matStartDate formControlName="start" placeholder="Start date">
+                  <input matEndDate formControlName="end" placeholder="End date">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+                <mat-date-range-picker #rangePicker></mat-date-range-picker>
+              </mat-form-field>
+            </div>
+  
+            &nbsp;&nbsp;
+    
+            <div formGroupName="purchasedate">
+              <mat-form-field appearance="outline"  class="date-range-picker">
+                <mat-label>Purchase Date</mat-label>
+                <mat-date-range-input [rangePicker]="rangePicker2">
+                  <input matStartDate formControlName="start" placeholder="Start date">
+                  <input matEndDate formControlName="end" placeholder="End date">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matSuffix [for]="rangePicker2"></mat-datepicker-toggle>
+                <mat-date-range-picker #rangePicker2></mat-date-range-picker>
+              </mat-form-field>
+            </div>
+  
+            &nbsp;&nbsp;
+    
+            <button mat-mini-fab color="primary" (click)="resetFilters()" class="reset-button">
+              <mat-icon>filter_alt_off</mat-icon>
+            </button>
+          </div>
+        </div>
+  
+        <div class="summary-container">
+          <!-- Total Onboarded Card -->
+          <div class="summary-card">
+            <div class="card-content">
+              <div class="card-header">
+                <div class="icon-wrapper purple">
+                  <mat-icon>groups</mat-icon>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="metric-value">{{dataSourceCompleted.filteredData.length}}</div>
+                <div class="metric-label">Total Onboarded</div>
+              </div>
+            </div>
+          </div>
+      
+          <!-- Average Card -->
+          <div class="summary-card">
+            <div class="card-content">
+              <div class="card-header">
+                <div class="icon-wrapper blue">
+                  <mat-icon>avg_time</mat-icon>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="metric-value">
+                  {{ calculateAverageDeliveryDays() || '' }}
+                  <mat-icon class="trend-indicator" [ngClass]="{
+                    'positive': calculateAverageDeliveryDays() <= 7,
+                    'neutral': calculateAverageDeliveryDays() > 7 && calculateAverageDeliveryDays() <= 10,
+                    'negative': calculateAverageDeliveryDays() >= 10
+                  }">
+                  {{ calculateAverageDeliveryDays() >= 7 ? 'trending_down' : 'trending_up' }}
+                </mat-icon>
+                </div>
+                <div class="metric-label">Average Days to Deliver</div>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+      </div>
+    
+      <!-- Table Section -->
+      <div><strong>Filtered Data - {{dataSourceCompleted.data.length}}</strong></div>
+      <div class="table-container mat-elevation-z8">
+        <table mat-table [dataSource]="dataSourceCompleted" matSort>
+          
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+            <td mat-cell *matCellDef="let element">{{ mapProfile[element['profileid']] }}</td>
+          </ng-container>
+    
+          <ng-container matColumnDef="mobileNumber">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Mobile Number</th>
+            <td mat-cell *matCellDef="let element">{{ mapphone[element['profileid']] }}</td>
+          </ng-container>
+    
+          <ng-container matColumnDef="journey">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Journey</th>
+            <td mat-cell *matCellDef="let element">
+              <div *ngIf="![null,undefined,''].includes(element['journeyref'])">
+                {{mapjourneyname[element['journeyref'].id]['journey']}}
+              </div>
+              <div *ngIf="[null,undefined,''].includes(element['journeyref'])">
+                {{"Addon"}}
+              </div>
+            </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="purchasedate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Purchase Date</th>
+            <td mat-cell *matCellDef="let element">{{ [null,undefined,''].includes(element['purchasedate']) ? '...' : element['purchasedate'].toDate() | date:'medium' }}</td>
+          </ng-container>
+  
+          <ng-container matColumnDef="onboardeddate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Onboarded Date</th>
+            <td mat-cell *matCellDef="let element">{{ [null,undefined,''].includes(element['onboardedtime']) ? '...' : element['onboardedtime'].toDate() | date:'medium' }}</td>
+          </ng-container>
+    
+          <ng-container matColumnDef="salesperson">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+            <td mat-cell *matCellDef="let element">{{element['salesperson']}}</td>
+          </ng-container>
+    
+          <ng-container matColumnDef="deliveryDate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Delivery Date</th>
+            <td mat-cell *matCellDef="let element" class="date-cell">
+              {{ [null,undefined,''].includes(element.onboardedtime) ? '' : element.onboardedtime.toDate() | date:'medium' }}
+            </td>
+          </ng-container>
+  
+          <ng-container matColumnDef="deliveryDate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Delivery Date</th>
+            <td mat-cell *matCellDef="let element" class="date-cell">
+              <span *ngIf="![null,undefined,''].includes(element['purchasedate']) && ![null,undefined,''].includes(element['onboardedtime'])">
+                {{ getDaysDifference(element['purchasedate'],element['onboardedtime']) + ' Days' }}
+              </span>
+            </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="Onborded By">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Onborded By</th>
+            <td mat-cell *matCellDef="let element" [ngClass]="{'past-date': isPastDate(element.onboardedtime)}">
+              <p *ngIf="![null,undefined,''].includes(element.onboardedby) && element.onboardedby.length != 0">
+                {{ [null,undefined,''].includes(mapProfile[element.onboardedby[0].id]) ? '' : mapProfile[element.onboardedby[0].id] }}
+              </p>
+            </td>
+          </ng-container>
+    
+          <ng-container matColumnDef="report">
+            <th mat-header-cell *matHeaderCellDef>Onboarding Remarks</th>
+            <td mat-cell *matCellDef="let element">
+              <button mat-icon-button *ngIf="element.onboardingreport || element.opportunities?.length != 0" (click)="openRemarks(element)" class="remarks-button"><mat-icon>edit_note</mat-icon></button>
+            </td>
+          </ng-container>
+    
+          <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"></tr>
+        </table>
+        <mat-paginator [pageSizeOptions]="[25, 100, 500,dataSourceCompleted.data.length]"  aria-label="Select page of users"></mat-paginator>
+        <!-- No Data Template -->
+        <div class="no-data" *ngIf="dataSourceCompleted.data.length === 0">
+          <mat-icon>search_off</mat-icon>
+          <p>No records found</p>
+        </div>
+      </div>
+    </div>
+  </div>
+    
+  

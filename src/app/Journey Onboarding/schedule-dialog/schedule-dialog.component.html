@@ -1,0 +1,211 @@
+<div *ngIf="loading" class="loading">
+  <mat-progress-spinner class="spinner" [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+  <span class="loading-text">Fetching Data...</span>
+</div>
+<div *ngIf="!loading" class="body">
+  <!-- <div class="mat-elevation-z8 m-4">
+    <table mat-table [dataSource]="dataSource" matSort>
+      <ng-container *ngFor="let column of displayedColumns" [matColumnDef]="column">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header style="background-color: rgb(125, 192, 236);"> 
+          <span *ngIf="column === 'name'">Name</span>
+          <span *ngIf="column === 'phonenumber'">Mobile Number</span>
+          <span *ngIf="column === 'journey'">Journey</span>
+          <span *ngIf="column === 'product+bonus'">Product</span>
+          <span *ngIf="column === 'purchasedate'">Purchase Date</span>
+          <span *ngIf="column === 'onboardingtime'">Onboarding Date&Time</span>
+          <span *ngIf="column === 'action'">Action</span>
+          <span *ngIf="column === 'remarks'">Onboarding Report</span>
+        </th>
+        <td mat-cell *matCellDef="let element">
+          <span *ngIf="column === 'name'">{{mapProfile[element['profileid']]}}</span>
+          <span *ngIf="column === 'phonenumber'">{{mapphone[element['profileid']]}}</span>
+          <span *ngIf="column === 'journey'">{{mapjourneyname[element['journeyref']?.id]}}</span>
+          <span *ngIf="column === 'product+bonus'" style="cursor: pointer;" (click)="openProduct(element)">{{element['participantproducts']?.length}}</span>
+          <span *ngIf="column === 'purchasedate'">{{element['purchasedate']?.toDate() | date: 'mediumDate'}}</span>
+          <span *ngIf="column === 'onboardingtime'">{{element['onboardingscheduled']?.toDate() | date:'medium'}}</span>  
+          <span *ngIf="column === 'action'" style="color: green;cursor: pointer;" (click)="scheduledate()">Schedule</span>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[25, 100,500,1000,dataSource.data.length]"  aria-label="Select page of users"></mat-paginator>
+  </div>  -->
+  
+  <!-- <div  class="appointmentbox">
+    <div *ngFor="let type of appointmenttypes">
+        <label class="producttitle">Your <b>{{mapjourneyname[participantjourneyproduct['journeyref']?.id] | json}} Journey</b>:</label>
+        <br>
+        <mat-radio-group [(ngModel)]="selectedAppointment" (ngModelChange)="onAppointmentSelect()" labelPosition="after">
+          <mat-radio-button class="radionbtn"  [value]="type">
+            <span>{{mapAppointments[type.id]}}</span>
+          </mat-radio-button>
+        </mat-radio-group>
+    </div>
+  </div> -->
+
+
+  <!-- Calendar Section -->
+  <!-- <div *ngIf="opencalender"> -->
+    <!-- <mat-form-field appearance="outline">
+      <input matInput [(ngModel)]="selectedDate" [min]="mindate" [matDatepicker]="picker"  placeholder="MM-DD-YYYY"  (dateChange)="onDateSelect()">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field> -->
+  <!-- </div> -->
+
+  <!-- Calendar Section -->
+
+  <div *ngIf="reschedule != true">
+    <header class="header color-teal">
+      <h1 class="title">Schedule Appointment</h1>
+      <button mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
+        <mat-icon style="color:white">close</mat-icon>
+      </button>
+    </header>
+
+    <div style="margin: 20px;">
+
+      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct.profileid) ? '...' : mapProfile[participantjourneyproduct.profileid]}}</b></p>
+      <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct.journeyref) ? '...' : mapjourneyname[participantjourneyproduct.journeyref.id]}}</b></p>
+      <br>
+    
+      <div class="calendar-container" *ngIf="reschedule == false">
+        <mat-calendar [(selected)]="selectedDate" (selectedChange)="onDateSelect($event)"></mat-calendar>
+      </div>
+    
+      <div class="slots-container">
+        <h4 mat-dialog-title >Selected Date ({{ selectedDate | date: 'dd-MM-yyyy' }})</h4>
+        <!-- Meeting Platform Selector -->
+        <div class="meeting-platform-section">
+          <label class="platform-label">Select Meeting Platform</label>
+          <div class="platform-options">
+            <div
+              class="platform-card"
+              [class.selected]="selectedPlatform === 'zoom'"
+              (click)="selectPlatform('zoom')"
+            >
+              <img src="assets/Images/zoom-icon.png" alt="Zoom" class="platform-icon" />
+              <span>Zoom</span>
+            </div>
+            <div
+              class="platform-card"
+              [class.selected]="selectedPlatform === 'openvidu'"
+              (click)="selectPlatform('openvidu')"
+            >
+              <img src="assets/Images/openvidu-icon.png" alt="OpenVidu" class="platform-icon" />
+              <span>OpenVidu</span>
+            </div>
+          </div>
+          <p class="platform-error" *ngIf="platformError">Please select a meeting platform.</p>
+        </div>
+        <div mat-dialog-content >
+          <div *ngIf="userAvailableSlots.length !== 0">
+            <div class="time-slots-container">
+              <div class="slots-list">
+                <div class="slot-card" *ngFor="let slot of userAvailableSlots">
+                  <div class="slot-info">
+                    <div class="time-badge">
+                      <span class="time">{{ slot.start | date: 'shortTime' }}</span>
+                    </div>
+                    
+                    <div class="specialist-info">
+                      <div class="specialist-name">{{ slot.specialist }}</div>
+                      <div class="availability-tag">{{mapAppointments[slot.appointmentid]}}</div>
+                    </div>
+                  </div>
+            
+                  <button class="book-button" (click)="confirmSlot(slot)">
+                    <span class="button-text">Book Now</span>
+                    <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14"></path>
+                      <path d="M12 5l7 7-7 7"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>          
+          </div>
+        </div>
+        <div *ngIf="userAvailableSlots.length == 0 && ![null,undefined,''].includes(selectedDate)">
+          No Slots Available
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="reschedule == true">
+
+    <header class="header color-red">
+      <h1 class="title">Do you want to cancel Booked Slot?</h1>
+      <button mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
+        <mat-icon style="color:white">close</mat-icon>
+      </button>
+    </header>
+    
+    <div class="onboarding-report">
+
+      <p>Participant : <b>{{mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+      <p>Journey Coach : <b>{{mapProfile[participantjourneyproduct['onboardedby']?.[0]?.id]}}</b></p>
+      <p>Slot : <b>{{ appointmentdata ? (appointmentdata['starttime']?.toDate() | date:'dd-MM-yyyy h:mm a') : null }}</b></p> 
+      <br>
+      <h4><b style="color: #0C6385;text-align: start;">Reason for Cancel</b></h4>
+      <mat-form-field appearance="outline" class="textareafield">
+        <textarea matInput placeholder="Type Here" rows="" [(ngModel)]="generalnote"></textarea>
+      </mat-form-field>
+
+    <button
+      mat-raised-button
+      class="confirmbutton"
+      [disabled]="[null,undefined,''].includes(generalnote)"
+      (click)="cancelAppointment()">
+      Confirm
+    </button>
+    <br>
+    </div>
+  </div>
+  
+
+
+  <!-- <div  class="appointmentbox">
+    <div *ngFor="let type of appointmenttypes">
+        <label class="producttitle">Your <b>{{mapjourneyname[participantjourneyproduct['journeyref']?.id] | json}} Journey</b>:</label>
+        <br>
+        <mat-radio-group [(ngModel)]="selectedAppointment" (ngModelChange)="onAppointmentSelect()" labelPosition="after">
+          <mat-radio-button class="radionbtn"  [value]="type">
+            <span>{{mapAppointments[type.id]}}</span>
+          </mat-radio-button>
+        </mat-radio-group>
+    </div>
+  </div> -->
+
+
+  
+  
+  
+
+  <!-- <div class="slotsbox" *ngIf="userAvailableSlots.length != 0">
+    <h5 class="slotheading">Available Slots</h5>
+    <mat-chip-list [multiple]="false" [selectable]="true">
+      <mat-chip *ngFor="let slot of userAvailableSlots; let i = index" (click)="selectedSlot = i" [selected]="selectedSlot == i">
+        {{slot.start | date:'shortTime'}} - {{slot.end | date:'shortTime'}} with {{slot.specialist}}
+      </mat-chip>
+    </mat-chip-list>
+    <button class="bookbtn" mat-stroked-button (click)="confirmSlot()">Book Appointment</button>
+  </div> -->
+  
+</div>
+
+  <!-- Available Months Section -->
+  <!-- <div class="available-months">
+    <h3>Available Months for WISH:</h3>
+    <div class="month-buttons">
+      <button mat-raised-button *ngFor="let month of availableMonths" [ngClass]="{'selected': month === 'December'}">
+        {{month}}
+      </button>
+    </div>
+  </div> -->
+
+
+

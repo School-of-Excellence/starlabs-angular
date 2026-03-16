@@ -1,0 +1,65 @@
+<div style="padding: 20px;">
+<div>
+  <h3>Map Playlist</h3>
+</div>
+  <div class="d-flex flex-column w-100">
+    <mat-form-field appearance="outline" class="mr-4 w-100">
+      <mat-label>Product</mat-label>
+      <mat-select [compareWith]="compareFn" [(ngModel)]="modePlaylistDoc.productref">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterProductName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterProduct()" [value]="option.ref">{{option.product}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="mr-4 w-100">
+      <mat-label>Mode</mat-label>
+      <mat-select [(ngModel)]="modePlaylistDoc.mode" >
+        <mat-option *ngFor="let option of modesList" [value]="option.mode">{{option.mode}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="mr-4 w-100">
+      <mat-label>Select Eiflix Series</mat-label>
+      <mat-select [compareWith]="compareFn" [(ngModel)]="modePlaylistDoc.eiflix" multiple>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterSeriesName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterSeries()" [value]="option.ref">{{option.seriesName}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="mr-4 w-100">
+      <mat-label>Select SolarVoice Playlist</mat-label>
+      <mat-select [compareWith]="compareFn" [(ngModel)]="modePlaylistDoc.solarvoice" multiple>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterPlaylistName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterPlaylist()" [value]="option.ref">{{option.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="mr-4 w-100">
+      <mat-label>Select General Content</mat-label>
+      <mat-select [compareWith]="compareFn" [(ngModel)]="modePlaylistDoc.generalcontent" multiple>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterContentName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterContent()" [value]="option.ref">{{option.title}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Message</mat-label>
+      <input type="text" matInput (change)="onMessageInput($event)">
+    </mat-form-field>
+    <mat-label>Rearrange message order</mat-label>
+    <div cdkDropList class="example-list" (cdkDropListDropped)="drop($event)">
+      <div class="example-box" *ngFor="let text of modePlaylistDoc.messages;let i = index;" cdkDrag>
+        <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
+        {{text}}&nbsp;&nbsp;&nbsp;&nbsp;
+        <button mat-icon-button type="button" (click)="onMessageDelete(i)"><mat-icon>delete</mat-icon></button>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex flex-row justify-content-center">
+    <button mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
+    <button mat-stroked-button type="button" (click)="onSubmit()">Submit</button>&nbsp;&nbsp;
+  </div>
+</div>

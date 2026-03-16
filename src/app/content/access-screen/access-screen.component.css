@@ -1,0 +1,18 @@
+.btn{
+    margin-top: 20px;
+    margin-left: 10px;
+}
+table{
+    width: 100%;
+
+}
+.filter{
+    margin-top: 20px;
+    margin-left: 20px;
+    width: 250px;
+ }
+ ::ng-deep .mat-tab-label {
+    color: black;
+    font-size: 15px;
+  
+  }

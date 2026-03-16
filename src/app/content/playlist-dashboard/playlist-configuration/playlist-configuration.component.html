@@ -1,0 +1,169 @@
+<div class="audio-dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">{{ isEditMode ? 'Edit Playlist' : 'Create Playlist' }}</h1>
+      <p class="dash-sub">{{ isEditMode ? 'Update playlist details and reorder tracks' : 'Select audio tracks and create a new playlist' }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary"
+        [disabled]="myForm?.invalid || crossmatch || !selection.hasValue()"
+        (click)="onSubmit(); submitButton.disabled = true"
+        #submitButton>
+        <mat-icon>{{ isEditMode ? 'save' : 'cloud_upload' }}</mat-icon>
+        {{ isEditMode ? 'Update' : 'Submit' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="content-layout">
+    <div class="content-col">
+      <form #myForm="ngForm" class="form-fields">
+        <div class="field-group">
+          <label class="label">Playlist Name <span class="required">*</span></label>
+          <div class="input-box" [class.error]="(!nameCtrl.valid && nameCtrl.touched) || crossmatch">
+            <mat-icon class="ib-icon">queue_music</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter playlist name"
+              [(ngModel)]="playlistName" name="playlistName" required minlength="4"
+              #nameCtrl="ngModel" (keyup)="onselect()" />
+          </div>
+          <span class="field-error" *ngIf="!nameCtrl.valid && nameCtrl.touched">Name is required (min 4 characters)</span>
+          <span class="field-error" *ngIf="crossmatch">{{ crossmatcherrormessage }}</span>
+        </div>
+        <div class="field-group">
+          <label class="label">Description <span class="required">*</span></label>
+          <div class="input-box" [class.error]="!descCtrl.valid && descCtrl.touched">
+            <mat-icon class="ib-icon">description</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter description"
+              [(ngModel)]="description" name="description" required minlength="6"
+              #descCtrl="ngModel" />
+          </div>
+          <span class="field-error" *ngIf="!descCtrl.valid && descCtrl.touched">Description is required (min 6 characters)</span>
+        </div>
+        <div class="field-group">
+          <div class="checkbox-row">
+            <mat-checkbox [(ngModel)]="isPrivate" name="isPrivate" color="primary">
+              Private playlist
+            </mat-checkbox>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Playlist Image</label>
+          <input type="file" (change)="previewImage($event)" accept="image/*" />
+          <div *ngIf="imageUrl" style="margin-top: 12px; position: relative; display: inline-block;">
+            <img [src]="imageUrl" alt="Preview" style="max-width: 300px; max-height: 300px; border-radius: 8px;" />
+            <button class="btn-cancel" (click)="removeImage()" style="margin-top: 8px;">
+              <mat-icon>delete</mat-icon> Remove Image
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="content-col">
+      <div class="field-group">
+        <label class="label">Tags</label>
+        <div class="selected-tags" *ngIf="tags.length">
+          <span class="chip" *ngFor="let tag of tags; let i = index">
+            {{ mapTaxonomy[tag] }}
+            <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+          </span>
+        </div>
+        <div class="input-box">
+          <mat-icon class="ib-icon">search</mat-icon>
+          <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+        </div>
+        <div class="available-tags" *ngIf="filteredTaxonomyList.length">
+          <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+            <mat-icon>add_circle_outline</mat-icon>
+            {{ tag['name'] }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 28px;">
+    <div class="dash-header" style="margin-bottom: 14px;">
+      <div>
+        <h1 class="dash-title" style="font-size: 18px;">Select Audio Tracks</h1>
+        <p class="dash-sub">{{ selection.selected.length }} track(s) selected</p>
+      </div>
+    </div>
+    <div class="filters-row">
+      <div class="input-box search-box">
+        <mat-icon class="ib-icon">search</mat-icon>
+        <input type="text" class="ib-input" placeholder="Filter audio tracks..."
+          #input (keyup)="ApplyFilter($event)" autocomplete="off" />
+      </div>
+    </div>
+    <div class="table-outer">
+      <div class="table-card">
+        <table mat-table [dataSource]="dataSource" matSort>
+          <ng-container matColumnDef="Select">
+            <th mat-header-cell *matHeaderCellDef>
+              <mat-checkbox color="primary"
+                (change)="$event ? masterToggle() : null"
+                [checked]="selection.hasValue() && isAllSelected()"
+                [indeterminate]="selection.hasValue() && !isAllSelected()">
+              </mat-checkbox>
+            </th>
+            <td mat-cell *matCellDef="let row">
+              <mat-checkbox color="primary"
+                (click)="$event.stopPropagation()"
+                (change)="selection.toggle(row); updateSelectedRows($event)"
+                [checked]="selection.isSelected(row)">
+              </mat-checkbox>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="Audio">
+            <th mat-header-cell *matHeaderCellDef>Audio</th>
+            <td mat-cell *matCellDef="let row">
+              <audio *ngIf="row.url" [src]="row.url" controls class="audio-player"></audio>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="Name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+            <td mat-cell *matCellDef="let row"><span class="c-name">{{ row.name }}</span></td>
+          </ng-container>
+          <ng-container matColumnDef="tags">
+            <th mat-header-cell *matHeaderCellDef class="col-tags">Taxonomy</th>
+            <td mat-cell *matCellDef="let row" class="col-tags">
+              <div class="tags-wrap">
+                <span class="chip chip-sm" *ngFor="let option of row.tags || []">{{ mapTaxonomy[option] }}</span>
+              </div>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"
+            (click)="selection.toggle(row); updateSelectedRows($event)"></tr>
+        </table>
+      </div>
+      <mat-paginator [pageSizeOptions]="[15, 30, 60, 120]" showFirstLastButtons class="paginator"></mat-paginator>
+    </div>
+  </div>
+
+  <div *ngIf="rearrangedSequence.length > 0" style="margin-top: 28px;">
+    <div class="dash-header" style="margin-bottom: 14px;">
+      <div>
+        <h1 class="dash-title" style="font-size: 18px;">Playlist Preview</h1>
+        <p class="dash-sub">Drag to reorder tracks</p>
+      </div>
+    </div>
+    <div class="drag-list" cdkDropList (cdkDropListDropped)="drop($event)">
+      <div class="drag-item" *ngFor="let row of rearrangedSequence; let i = index" cdkDrag>
+        <div class="drag-handle" cdkDragHandle>
+          <mat-icon>drag_indicator</mat-icon>
+        </div>
+        <span class="drag-index">{{ i + 1 }}</span>
+        <audio *ngIf="row.url" [src]="row.url" controls class="audio-player"></audio>
+        <span class="c-name">{{ row.name }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="back-row">
+    <button class="btn-cancel" (click)="onClose()">
+      <mat-icon class="back-icon">close</mat-icon>
+      Close
+    </button>
+  </div>
+</div>

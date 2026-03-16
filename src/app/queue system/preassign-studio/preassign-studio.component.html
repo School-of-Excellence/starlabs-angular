@@ -1,0 +1,16 @@
+<div class="w-100" style="padding: 20px;">
+    <h5 class="text-center" style="text-align: center;">Pre-Assign the participant for the Stage '{{stagename}}'</h5>
+    <mat-radio-group [(ngModel)]="selectedStudioid">
+      <mat-radio-button class="m-2" *ngFor="let option of studioList" [value]="option['docid']">
+        <span *ngFor="let participant of option['participants']; let j = index">
+          <span>{{mapProfile[participant]}} ({{mapActivity[option["participantsactivity"][participant]]}})</span>
+          <span *ngIf="j+1 != option['participants'].length">,&nbsp;</span>
+        </span>
+      </mat-radio-button>
+      <br>
+    </mat-radio-group>
+    <div class="mt-2 text-center" style="display: flex;justify-content: center;align-items: center;">
+      <button class="mr-2" mat-stroked-button (click)="close()">Go Back</button>
+      <button class="mr-2 text-success border border-success" mat-stroked-button (click)="submit()" [disabled]="selectedStudioid == null">Assign Studio and Move</button>
+    </div>
+</div>

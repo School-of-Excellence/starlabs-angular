@@ -1,0 +1,8 @@
+.formfield1{
+    width: 500px;
+}
+  
+.field2{
+    height: 380px;
+    overflow-y: scroll;
+  }

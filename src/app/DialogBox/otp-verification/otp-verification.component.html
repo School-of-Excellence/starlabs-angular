@@ -1,0 +1,24 @@
+<div class="otp-container">
+  <div class="otp-card">
+    <div class="otp-title">Verify Your Account</div>
+    <button class="close-button" (click)="closeDialog()">&times;</button>
+    <p class="otp-instruction">We've sent a verification code to</p>
+    <p class="otp-phone">({{countryCode}}) {{hiddenNumber}}</p>
+    
+    <div class="otp-input-container">
+      <input type="text" class="otp-input" maxlength="1" [(ngModel)]="otpValues[0]" (keyup)="onKeyUp($event, 0)" (paste)="onPaste($event)"#otpFirst>
+      <input type="text" class="otp-input" maxlength="1" [(ngModel)]="otpValues[1]" (keyup)="onKeyUp($event, 1)" (paste)="onPaste($event)">
+      <input type="text" class="otp-input" maxlength="1" [(ngModel)]="otpValues[2]" (keyup)="onKeyUp($event, 2)" (paste)="onPaste($event)">
+      <input type="text" class="otp-input" maxlength="1" [(ngModel)]="otpValues[3]" (keyup)="onKeyUp($event, 3)" (paste)="onPaste($event)">
+      <input type="text" class="otp-input" maxlength="1" [(ngModel)]="otpValues[4]" (keyup)="onKeyUp($event, 4)" (paste)="onPaste($event)">
+      <input type="text" class="otp-input" maxlength="1" [(ngModel)]="otpValues[5]" (keyup)="onKeyUp($event, 5)" (paste)="onPaste($event)">
+    </div>
+    
+    <button class="verify-button" (click)="verifyOtp()" [disabled]="!isOtpValid() || loading">Verify</button>
+    
+    <button class="resend-button" [disabled]="!canResend" (click)="resendOtp()">
+      {{ canResend ? 'Resend Code' : 'Resend Code (' + formatCountdown() + ')' }}
+    </button>
+  </div>
+</div>
+<div id="recaptcha"></div>

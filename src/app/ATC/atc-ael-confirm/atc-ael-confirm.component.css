@@ -1,0 +1,18 @@
+.mainscreen{
+  padding: 20px;
+}
+
+.title{
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.closebtn{
+  color: red !important;
+  border: 1px solid red !important;
+}
+
+.successbtn{
+  background-color: green !important;
+  color: white !important;
+}

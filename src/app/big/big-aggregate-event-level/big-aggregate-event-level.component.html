@@ -1,0 +1,179 @@
+<div class="mainscreen">
+  <h4 class="title">upload B!G Participant Level</h4>
+  <form [formGroup]="aggregateForm" (ngSubmit)="submit()">
+    <mat-form-field  class="inputfields" appearance="outline" (change)="onatcselect()">
+        <mat-label>Participant</mat-label>
+        <mat-select formControlName="participant">
+            <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">{{client.name}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="aggregateForm.get('participant').hasError('required')">
+            Required
+        </mat-error>
+    </mat-form-field>
+
+    <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>ATC Model</mat-label>
+        <mat-select formControlName="atcmodel" (change)="onatcselect()">
+            <mat-option *ngFor="let option of atcModelList" [value]="option">{{option}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="aggregateForm.get('atcmodel').hasError('required')">
+          Required
+        </mat-error>
+        <mat-hint *ngIf="crossmatch">
+            <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
+        </mat-hint>
+    </mat-form-field>
+
+    <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Level</mat-label>
+        <mat-select formControlName="level" (change) = 'onlevelselect()'>
+            <mat-option *ngFor="let option of levelList" [value]="option.docid">{{option.level}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="aggregateForm.get('level').hasError('required')">
+          Required
+        </mat-error>
+        <mat-hint *ngIf="configurationcheck">
+            <mat-error style="color: red;">{{configurationerrormessage}}</mat-error>
+        </mat-hint>
+    </mat-form-field>
+
+    <button mat-stroked-button class="submitbtn" type="submit" 
+      [disabled]="loading || aggregateForm.invalid || crossmatch || configurationcheck">
+        {{loading ? 'Updating....' : 'Update participant level'}}
+    </button>
+
+  </form>
+
+  <div class="actionitem">
+    Filter By :- 
+    <mat-form-field class="mr-4" appearance="outline" class="w-25">
+        <mat-label>Participants</mat-label>
+        <mat-select [(ngModel)]="filter['participant']" (selectionChange)="onFilter()" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onSearchText('participant')" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filteredProfilelist" [value]="option['profileid']">{{option['name']}}</mat-option>
+        </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <mat-form-field class="mr-4" appearance="outline" class="w-25">
+      <mat-label>Atc Model</mat-label>
+      <mat-select [(ngModel)]="filter['atcmodel']" (selectionChange)="onFilter()" multiple>
+        <mat-option *ngFor="let option of atcModelList" [value]="option">{{option}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <mat-form-field class="mr-4" appearance="outline" class="w-25">
+      <mat-label>Event</mat-label>
+      <mat-select [(ngModel)]="filter['event']" (selectionChange)="onFilter()" multiple>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onSearchText('event')" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filteredQueueList" [value]="option['docid']">{{option['queuename']}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <button type="button" mat-raised-button (click)="onClearFilter()">clear</button>
+  </div>
+  <div>
+    <!-- <span *ngFor="let model of filterPerAtcmodel() | keyvalue;"> -->
+    <span *ngFor="let model of atcModelLevelup | keyvalue;">
+      <label class="h5">{{model.key}}</label> : <label class="h5">{{model.value}}</label>,&nbsp;
+    </span>
+    <label class="h5">Total ATC Model Count</label> : <label class="h5">{{dataSource.filteredData.length}}</label>
+  </div>
+
+
+  <table mat-table [dataSource]="dataSource" matSort>
+
+      <ng-container matColumnDef="participant">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant (total activity) ({{totalActivityCount}})</th>
+        <td mat-cell *matCellDef="let row">
+          {{mapparticipant[row['profileid']]}}&nbsp;&nbsp;({{mapActivityPerParticipant[row['profileid']][row['atcmodel']][row['queueid']]}})
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="atcmodel">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>ATC Model</th>
+        <td mat-cell *matCellDef="let row">{{row["atcmodel"]}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="queueid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
+        <td mat-cell *matCellDef="let row">{{mapQueue[row["queueid"]]}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="currentlevel">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Currentlevel</th>
+        <td mat-cell *matCellDef="let row">{{maplevels[row['level'].id]}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="levelupcount">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Levelup Count</th>
+          <td mat-cell *matCellDef="let row">{{row['levelupcount']}}</td>
+        </ng-container>
+
+      <ng-container matColumnDef="regular">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Regular</th>
+          <td mat-cell *matCellDef="let row">
+              <li *ngFor="let list of row['regular'] || []">
+                  {{mapBigActivity[list['activity'].id]}} - 
+                  <span [ngClass]="list['completed'] > 0 ? 'font-weight-bold text-success' : null">{{list['completed']}}</span>&nbsp;
+                  /&nbsp;{{list['metric']}}
+              </li>
+          </td>
+      </ng-container>
+
+      <ng-container matColumnDef="fasttrack">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Fast Track</th>
+          <td mat-cell *matCellDef="let row">
+              <li *ngFor="let list of row['fasttrack'] || []">
+                  <span>{{maplevels[list['level'].id]}}</span><br>
+                  <span class="ml-4">Validation - <span [ngClass]="list['validation'][0]['completed'] > 0 ? 'font-weight-bold text-success' : null">{{list['validation'][0]['completed']}}</span>&nbsp;/&nbsp;{{list['validation'][0]['metric']}}</span><br>
+                  <span class="ml-4">Stablization - {{list['stabilization'][0]['completed']}}&nbsp;/&nbsp;{{list['stabilization'][0]['metric']}}</span>
+              </li>
+          </td>
+      </ng-container>
+
+      <ng-container matColumnDef="warmup">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Warm Up</th>
+          <td mat-cell *matCellDef="let row">
+              <li *ngFor="let list of row['warmup'] || []">
+                  {{mapBigActivity[list['activity'].id]}} - {{list['completed']}}
+              </li>
+          </td>
+      </ng-container>
+
+      <ng-container matColumnDef="specialactivity">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Special Activity</th>
+          <td mat-cell *matCellDef="let row">
+              <li *ngFor="let list of row['specialactivity'] || []">
+                  {{mapBigActivity[list['activity'].id]}} - {{list['completed']}}
+              </li>
+          </td>
+      </ng-container>
+
+      <ng-container matColumnDef="boosteractivity">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Booster Activity</th>
+          <td mat-cell *matCellDef="let row">
+              <li *ngFor="let list of row['boosteractivity'] || []">
+                  {{mapBigActivity[list['activity'].id]}} - {{list['completed']}}
+              </li>
+          </td>
+      </ng-container>
+
+      <!-- <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef> Delete </th>
+          <td mat-cell *matCellDef="let row"><button type="button" mat-mini-fab color="accent" (click)="openDeleteDialog(row.id)"><mat-icon>delete</mat-icon></button> </td>
+      </ng-container> -->
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  
+      <!-- Row shown when there is no matching data. -->
+      <!-- <tr class="mat-row" *matNoDataRow>
+        <td>No data matching the filter "{{input.value}}"</td>
+      </tr> -->
+  </table>
+  <mat-paginator [pageSizeOptions]="[25, 50, 100, 1000]"></mat-paginator>
+</div>

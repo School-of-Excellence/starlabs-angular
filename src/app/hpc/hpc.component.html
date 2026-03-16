@@ -1,0 +1,552 @@
+  <ng-template #loadingBlock>
+    <div class="loading-overlay">
+      <mat-spinner diameter="50"></mat-spinner>
+      <p>Loading...</p>
+    </div>
+  </ng-template>
+  <ng-container *ngIf="!isLoadingProfiles; else loadingBlock">
+    <mat-tab-group>
+  <mat-tab label="3 Minutes HPC">
+    <div style="padding: 20px;">
+
+      <h2>3 Minutes HPC</h2>
+      <div class="row">
+        <mat-form-field class="participant-select">
+          <mat-label>Select participants to Show</mat-label>
+          <mat-select [(ngModel)]="selectedProfilesToAllow" multiple (selectionChange)="saveProfiles()">
+          <mat-option disabled class="search-option">
+            <ngx-mat-select-search
+              [formControl]="profileFilterCtrl"
+              placeholderLabel="Search users..."
+              noEntriesFoundLabel="No match found"
+            ></ngx-mat-select-search>
+          </mat-option>
+            <mat-option *ngFor="let profileid of filteredNames" [value]="profileid.id">
+              {{ profileid.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div class="selected-chips" *ngIf="selectedProfilesToAllow.length > 0">
+        <h3>Allowed Users:</h3>
+        <mat-chip-set>
+          <mat-chip *ngFor="let profile of selectedProfilesToAllow"
+                    [removable]="true"
+                    (removed)="removeProfileToAllow(profile)">
+            {{ mapProfile[profile] }}
+            <button matChipRemove>
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+      <hr>
+      <div class="row">
+        <mat-form-field class="participant-select">
+          <mat-label>Select For Group HPC</mat-label>
+          <mat-select [(ngModel)]="selectedProfilesGroup" multiple (selectionChange)="saveProfiles()">
+          <mat-option disabled class="search-option">
+            <ngx-mat-select-search
+              [formControl]="profileFilterCtrl"
+              placeholderLabel="Search users..."
+              noEntriesFoundLabel="No match found"
+            ></ngx-mat-select-search>
+          </mat-option>
+            <mat-option *ngFor="let profileid of filteredNames" [value]="profileid.id">
+              {{ profileid.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="selected-chips" *ngIf="selectedProfilesGroup.length > 0">
+        <h3>Selected Users:</h3>
+        <mat-chip-set>
+          <mat-chip *ngFor="let profile of selectedProfilesGroup"
+                    [removable]="true"
+                    (removed)="removeProfile(profile)">
+            {{ mapProfile[profile] }}
+            <button matChipRemove>
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+
+      <div class="row" style="margin-top: 30px;">
+        <mat-form-field class="accelerator-input">
+          <mat-label>Add Accelerator</mat-label>
+          <input matInput [(ngModel)]="newAccelerator" (keyup.enter)="addAccelerator()">
+        </mat-form-field>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <h3>Accelerators</h3>
+        <mat-chip-set>
+          <mat-chip *ngFor="let acc of accelerators"
+                    [removable]="true"
+                    (removed)="confirmRemove(acc)">
+            {{ acc }}
+            <button matChipRemove>
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+      <div *ngIf="hpcadmin.includes(loggedInProfileId)" style="margin-top: 20px;">
+        <h3>Contrast Frame Prompt</h3>
+
+        <mat-form-field appearance="outline" style="width:100%; margin-top:10px;">
+          <mat-label>Prompt</mat-label>
+          <textarea
+            matInput
+            rows="5"
+            [(ngModel)]="contrastFramePrompt">
+          </textarea>
+        </mat-form-field>
+
+        <div class="example-button-container">
+          <button mat-fab extended (click)="saveContrastPrompt()">
+            <mat-icon>save</mat-icon>
+            Save Prompt
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-top: 30px;">
+        <h3>Notification (Individual)</h3>
+        <mat-form-field appearance="outline" class="accelerator-input">
+          <mat-label>Title</mat-label>
+          <input matInput [(ngModel)]="notificationTitle" >
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="width: 100%; margin-top:15px;">
+          <mat-label>Description</mat-label>
+          <textarea matInput rows="4" [(ngModel)]="notificationDescription"></textarea>
+        </mat-form-field>
+      </div>
+      <div style="margin-top: 30px;">
+        <h3>Notification (Group)</h3>
+        <mat-form-field appearance="outline" class="accelerator-input">
+          <mat-label>Title</mat-label>
+          <input matInput [(ngModel)]="notificationTitleGroup" >
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="width: 100%; margin-top:15px;">
+          <mat-label>Description</mat-label>
+          <textarea matInput rows="4" [(ngModel)]="notificationDescriptionGroup"></textarea>
+        </mat-form-field>
+        <div class="example-button-container">
+          <button mat-fab extended (click)="saveProfiles()">
+            <mat-icon>save</mat-icon>
+            Save
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </mat-tab>
+
+<mat-tab label="HPC Dashboard">
+  <div class="dashboard-container">
+    <!-- Header -->
+    <!-- <div class="dashboard-header">
+      <div class="header-content">
+        <h2>
+          <mat-icon class="header-icon">assessment</mat-icon>
+          HPC Dashboard
+        </h2>
+      </div>
+      <div class="header-actions">
+        <div class="expand-collapse-btns">
+          <button mat-mini-fab [color]="allExpanded ? 'primary' : 'accent'" 
+                  (click)="toggleAllCards()" 
+                  [matTooltip]="allExpanded ? 'Collapse All' : 'Expand All'">
+            <mat-icon>{{ allExpanded ? 'unfold_less' : 'unfold_more' }}</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div> -->
+
+    <div class="filter-row" *ngIf="!isLoadingHpc">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search</mat-label>
+        <input matInput [(ngModel)]="searchText" (ngModelChange)="onFilterChange()" placeholder="Search ID, name...">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>Status</mat-label>
+        <mat-select [(ngModel)]="selectedHpcView" (selectionChange)="onFilterChange()">
+          <mat-option value="all">All</mat-option>
+          <mat-option value="completed">Completed</mat-option>
+          <mat-option value="in-progress">In Progress</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>Type</mat-label>
+        <mat-select [(ngModel)]="typeFilter" (selectionChange)="onFilterChange()">
+          <mat-option value="all">All</mat-option>
+          <mat-option value="group">Group</mat-option>
+          <mat-option value="individual">Individual</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>Sort Date</mat-label>
+        <mat-select [(ngModel)]="sortOrder" (selectionChange)="onFilterChange()">
+          <mat-option value="desc">Newest First</mat-option>
+          <mat-option value="asc">Oldest First</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button color="warn" (click)="clearAllFilters()" 
+              class="clear-filters-btn"
+              [disabled]="searchText === '' && selectedHpcView === 'all' && typeFilter === 'all' && sortOrder === 'desc'">
+        <mat-icon>filter_alt_off</mat-icon>
+        Clear
+      </button>
+        <div class="expand-collapse-btns">
+          <button mat-mini-fab [color]="allExpanded ? 'primary' : 'accent'" 
+                  (click)="toggleAllCards()" 
+                  [matTooltip]="allExpanded ? 'Collapse All' : 'Expand All'">
+            <mat-icon>{{ allExpanded ? 'unfold_less' : 'unfold_more' }}</mat-icon>
+          </button>
+        </div>
+    </div>
+
+    <div *ngIf="isLoadingHpc" class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading...</p>
+    </div>
+
+    <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="stats-row">
+      <div class="stat-item clickable" (click)="openStatPanel('total')">
+        <mat-icon class="stat-icon total">folder</mat-icon>
+        <span class="stat-number">{{ allHpcData.length }}</span>
+        <span class="stat-label">Total Sessions</span>
+      </div>
+      <div class="stat-item clickable" (click)="openStatPanel('completed')">
+        <mat-icon class="stat-icon completed">check_circle</mat-icon>
+        <span class="stat-number">{{ completedCount }}</span>
+        <span class="stat-label">Completed</span>
+      </div>
+      <div class="stat-item clickable" (click)="openStatPanel('in-progress')">
+        <mat-icon class="stat-icon pending">pending</mat-icon>
+        <span class="stat-number">{{ inProgressCount }}</span>
+        <span class="stat-label">In Progress</span>
+      </div>
+      <div class="stat-item clickable" (click)="openStatPanel('group')">
+        <mat-icon class="stat-icon multiple">groups</mat-icon>
+        <span class="stat-number">{{ groupCount }}</span>
+        <span class="stat-label">Group Sessions</span>
+      </div>
+      <div class="stat-item clickable" (click)="openStatPanel('individual')">
+        <mat-icon class="stat-icon individual">person</mat-icon>
+        <span class="stat-number">{{ individualCount }}</span>
+        <span class="stat-label">Individual</span>
+      </div>
+    </div>
+    <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="stats-row">
+      <div class="stat-item clickable" (click)="openStatPanel('group-persons')">
+        <mat-icon class="stat-icon group-persons">people_alt</mat-icon>
+        <span class="stat-number">{{ totalPersonsInGroups }}</span>
+        <span class="stat-label">Persons in Groups</span>
+      </div>
+      <div class="stat-item stat-completed clickable" (click)="openStatPanel('group-persons-completed')">
+        <mat-icon class="stat-icon">how_to_reg</mat-icon>
+        <span class="stat-number">{{ totalPersonsInGroupsCompleted }}</span>
+        <span class="stat-label">Group Persons (Completed)</span>
+      </div>
+      <div class="stat-item stat-pending clickable" (click)="openStatPanel('group-persons-inprogress')">
+        <mat-icon class="stat-icon">person_outline</mat-icon>
+        <span class="stat-number">{{ totalPersonsInGroupsInProgress }}</span>
+        <span class="stat-label">Group Persons (In Progress)</span>
+      </div>
+    </div>
+
+    <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="stats-row">
+      <div class="stat-item highlight clickable" (click)="openStatPanel('total-participants')">
+        <mat-icon class="stat-icon overall">supervisor_account</mat-icon>
+        <span class="stat-number">{{ overallParticipants }}</span>
+        <span class="stat-label">Total Participants</span>
+      </div>
+      <div class="stat-item highlight-completed clickable" (click)="openStatPanel('participants-completed')">
+        <mat-icon class="stat-icon">verified</mat-icon>
+        <span class="stat-number">{{ overallParticipantsCompleted }}</span>
+        <span class="stat-label">Participants (Completed)</span>
+      </div>
+      <div class="stat-item highlight-pending clickable" (click)="openStatPanel('participants-inprogress')">
+        <mat-icon class="stat-icon">schedule</mat-icon>
+        <span class="stat-number">{{ overallParticipantsInProgress }}</span>
+        <span class="stat-label">Participants (In Progress)</span>
+      </div>
+    </div>
+    <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="results-count">
+      Showing {{ filteredHpcData.length }} of {{ allHpcData.length }} sessions
+    </div>
+    <div *ngIf="!isLoadingHpc" class="hpc-list">
+        <mat-card *ngFor="let hpc of filteredHpcData; let i = index" class="hpc-card-compact">
+          <div class="card-header-row" (click)="toggleCard(hpc.id)">
+            <div class="header-left">
+              <mat-icon [class]="'status-icon ' + (hpc.status === 'completed' ? 'completed' : 'pending')">
+                {{ hpc.status === 'completed' ? 'check_circle' : 'pending' }}
+              </mat-icon>
+              <!-- <span class="hpc-id">{{ hpc.id }}</span> -->
+              <span class="profile-name">{{ hpc.profileName }}</span>
+              <span class="hpc-id">
+                {{ hpc.multiple ? 'Group' : 'Individual' }}
+              </span>
+              <mat-chip [class]="hpc.status === 'completed' ? 'chip-completed' : 'chip-progress'" class="status-chip">
+                {{ hpc.status | uppercase }}
+              </mat-chip>
+            </div>
+            <div class="header-right">
+              <mat-icon class="expand-icon" [class.expanded]="expandedCards[hpc.id]">
+                {{ expandedCards[hpc.id] ? 'expand_less' : 'expand_more' }}
+              </mat-icon>
+            </div>
+          </div>
+
+
+          <div class="card-content" [class.expanded]="expandedCards[hpc.id]" *ngIf="expandedCards[hpc.id]">
+            <div class="info-grid">
+              <div class="info-cell">
+                <mat-icon>event</mat-icon>
+                <span class="label">Created:</span>
+                <span class="value">{{ hpc.formattedCreatedAt }}</span>
+              </div>
+              <div class="info-cell" *ngIf="hpc.completedAt">
+                <mat-icon>check</mat-icon>
+                <span class="label">Completed:</span>
+                <span class="value">{{ formatTimestamp(hpc.completedAt) }}</span>
+              </div>
+              <div class="info-cell">
+                <mat-icon>timeline</mat-icon>
+                <span class="label">Achievement:</span>
+                <span class="value">{{ hpc.achievementfrom || 'N/A' }}</span>
+              </div>
+              <div class="info-cell">
+                <mat-icon>{{ hpc.multiple ? 'group' : 'person' }}</mat-icon>
+                <span class="label">Type:</span>
+                <span class="value">{{ hpc.multiple ? 'Group' : 'Individual' }}</span>
+              </div>
+              <div class="delete-cell" *ngIf="!hpc.multiple"> 
+                <button mat-icon-button color="warn" (click)="onDelete(hpc)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+
+              <div class="info-cell" *ngIf="hpc.multiple">
+                <mat-icon>people</mat-icon>
+                <span class="label">Persons:</span>
+                <span class="value badge">{{ hpc.currentPerson + 1 }}/{{ hpc.totalPersons }}</span>
+              </div>
+            </div>
+            <div class="individual-section" *ngIf="!hpc.multiple">
+              <div class="person-row individual-row">
+                <div class="person-header-compact">
+                  <mat-icon class="person-icon">person</mat-icon>
+                  <span class="person-name">{{ hpc.profileName }}</span>
+                </div>
+                <div class="person-details-grid">
+                  <div class="detail-cell" *ngIf="hpc.chatgptgeneratedtitleedited">
+                    <span class="label">Title:</span>
+                    <span class="value" [title]="hpc.chatgptgeneratedtitleedited">{{ hpc.chatgptgeneratedtitleedited | slice:0:50 }}{{ hpc.chatgptgeneratedtitleedited.length > 50 ? '...' : '' }}</span>
+                  </div>
+                  <div class="detail-cell" *ngIf="hpc.loggeddate">
+                    <span class="label">Logged:</span>
+                    <span class="value">{{ formatTimestamp(hpc.loggeddate) }}</span>
+                  </div>
+                  <div class="detail-cell" *ngIf="hpc.choosedaccelerators?.length > 0">
+                    <span class="label">Accelerators:</span>
+                    <span class="value chips-inline">
+                      <mat-chip *ngFor="let acc of hpc.choosedaccelerators" class="mini-chip acc-chip">{{ acc }}</mat-chip>
+                    </span>
+                  </div>
+                  <div class="detail-cell" *ngIf="hpc.tellto?.length > 0">
+                    <span class="label">Tell To:</span>
+                    <span class="value chips-inline">
+                      <mat-chip *ngFor="let person of hpc.tellto" class="mini-chip tell-chip">{{ person }}</mat-chip>
+                    </span>
+                  </div>
+                  <div class="detail-cell" *ngIf="hpc.finalrecording && allowtoview">
+                    <a [href]="hpc.finalrecording" target="_blank" class="recording-btn">
+                      <mat-icon>play_circle</mat-icon> Play
+                    </a>
+                  </div>
+                </div>
+
+                <div class="contrast-frames" *ngIf="hpc.chatgptgeneratededitedV1 || hpc.chatgptgeneratededitedV2 || hpc.chatgptgeneratededitedV3">
+                  <div class="frame-row" *ngIf="hpc.chatgptgeneratededitedV1">
+                    <span class="frame-label">Contrast Frame 1:</span>
+                    <span class="frame-text">{{allowtoview ? hpc.chatgptgeneratededitedV1 : '***' }}</span>
+                  </div>
+                  <div class="frame-row" *ngIf="hpc.chatgptgeneratededitedV2">
+                    <span class="frame-label">Contrast Frame 2:</span>
+                    <span class="frame-text">{{ allowtoview ? hpc.chatgptgeneratededitedV2 : '***' }}</span>
+                  </div>
+                  <div class="frame-row" *ngIf="hpc.chatgptgeneratededitedV3">
+                    <span class="frame-label">Contrast Frame 3:</span>
+                    <span class="frame-text">{{ allowtoview ? hpc.chatgptgeneratededitedV3 : '***' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="persons-section-compact" *ngIf="hpc.multiple && hpc.persons && hpc.personsKeys.length > 0">
+              <div class="section-header">
+                <mat-icon>people</mat-icon>
+                <span>Participants ({{ hpc.personsKeys.length }})</span>
+              </div>
+
+              <div class="persons-two-column">
+                <div class="persons-column left-column">
+                  <ng-container *ngFor="let personKey of hpc.personsKeys; let idx = index">
+                    <div class="person-row" *ngIf="idx % 2 === 0">
+                      <div class="person-header-compact">
+                        <span class="person-index">{{ idx + 1 }}</span>
+                        <mat-icon class="person-icon">person</mat-icon>
+                        <span class="person-name">{{ hpc.persons[personKey].personName || personKey }}</span>
+                      </div>
+                      <div class="person-details-grid">
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].chatgptgeneratedtitleedited">
+                          <span class="label">Title:</span>
+                          <span class="value" [title]="hpc.persons[personKey].chatgptgeneratedtitleedited">{{ hpc.persons[personKey].chatgptgeneratedtitleedited | slice:0:40 }}{{ hpc.persons[personKey].chatgptgeneratedtitleedited.length > 40 ? '...' : '' }}</span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].loggeddate">
+                          <span class="label">Logged:</span>
+                          <span class="value">{{ formatTimestamp(hpc.persons[personKey].loggeddate) }}</span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].choosedaccelerators?.length > 0">
+                          <span class="label">Accelerators:</span>
+                          <span class="value chips-inline">
+                            <mat-chip *ngFor="let acc of hpc.persons[personKey].choosedaccelerators" class="mini-chip acc-chip">{{ acc }}</mat-chip>
+                          </span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].tellto?.length > 0">
+                          <span class="label">Tell To:</span>
+                          <span class="value chips-inline">
+                            <mat-chip *ngFor="let person of hpc.persons[personKey].tellto" class="mini-chip tell-chip">{{ person }}</mat-chip>
+                          </span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].finalrecording && allowtoview">
+                          <a [href]="hpc.persons[personKey].finalrecording" target="_blank" class="recording-btn">
+                            <mat-icon>play_circle</mat-icon> Play
+                          </a>
+                        </div>
+                      </div>
+
+                      <div class="contrast-frames" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV1 || hpc.persons[personKey].chatgptgeneratededitedV2 || hpc.persons[personKey].chatgptgeneratededitedV3">
+                        <div class="frame-row" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV1">
+                          <span class="frame-label">Contrast Frame 1:</span>
+                          <span class="frame-text">{{ allowtoview ? hpc.persons[personKey].chatgptgeneratededitedV1 : '***' }}</span>
+                        </div>
+                        <div class="frame-row" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV2">
+                          <span class="frame-label">Contrast Frame 2:</span>
+                          <span class="frame-text">{{ allowtoview ? hpc.persons[personKey].chatgptgeneratededitedV2 : '***' }}</span>
+                        </div>
+                        <div class="frame-row" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV3">
+                          <span class="frame-label">Contrast Frame 3:</span>
+                          <span class="frame-text">{{ allowtoview ? hpc.persons[personKey].chatgptgeneratededitedV3 : '***' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </ng-container>
+                </div>
+                <div class="persons-column right-column">
+                  <ng-container *ngFor="let personKey of hpc.personsKeys; let idx = index">
+                    <div class="person-row" *ngIf="idx % 2 === 1">
+                      <div class="person-header-compact">
+                        <span class="person-index">{{ idx + 1 }}</span>
+                        <mat-icon class="person-icon">person</mat-icon>
+                        <span class="person-name">{{ hpc.persons[personKey].personName || personKey }}</span>
+                      </div>
+                      <div class="person-details-grid">
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].chatgptgeneratedtitleedited">
+                          <span class="label">Title:</span>
+                          <span class="value" [title]="hpc.persons[personKey].chatgptgeneratedtitleedited">{{ hpc.persons[personKey].chatgptgeneratedtitleedited | slice:0:40 }}{{ hpc.persons[personKey].chatgptgeneratedtitleedited.length > 40 ? '...' : '' }}</span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].loggeddate">
+                          <span class="label">Logged:</span>
+                          <span class="value">{{ formatTimestamp(hpc.persons[personKey].loggeddate) }}</span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].choosedaccelerators?.length > 0">
+                          <span class="label">Accelerators:</span>
+                          <span class="value chips-inline">
+                            <mat-chip *ngFor="let acc of hpc.persons[personKey].choosedaccelerators" class="mini-chip acc-chip">{{ acc }}</mat-chip>
+                          </span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].tellto?.length > 0">
+                          <span class="label">Tell To:</span>
+                          <span class="value chips-inline">
+                            <mat-chip *ngFor="let person of hpc.persons[personKey].tellto" class="mini-chip tell-chip">{{ person }}</mat-chip>
+                          </span>
+                        </div>
+                        <div class="detail-cell" *ngIf="hpc.persons[personKey].finalrecording && allowtoview">
+                          <a [href]="hpc.persons[personKey].finalrecording" target="_blank" class="recording-btn">
+                            <mat-icon>play_circle</mat-icon> Play
+                          </a>
+                        </div>
+                      </div>
+                      <div class="contrast-frames" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV1 || hpc.persons[personKey].chatgptgeneratededitedV2 || hpc.persons[personKey].chatgptgeneratededitedV3">
+                        <div class="frame-row" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV1">
+                          <span class="frame-label">Contrast Frame 1:</span>
+                          <span class="frame-text">{{ allowtoview ? hpc.persons[personKey].chatgptgeneratededitedV1 : '***' }}</span>
+                        </div>
+                        <div class="frame-row" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV2">
+                          <span class="frame-label">Contrast Frame 2:</span>
+                          <span class="frame-text">{{ allowtoview ? hpc.persons[personKey].chatgptgeneratededitedV2 : '***' }}</span>
+                        </div>
+                        <div class="frame-row" *ngIf="hpc.persons[personKey].chatgptgeneratededitedV3">
+                          <span class="frame-label">Contrast Frame 3:</span>
+                          <span class="frame-text">{{ allowtoview ? hpc.persons[personKey].chatgptgeneratededitedV3 : '***' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </ng-container>
+                </div>
+              </div>
+            </div>
+          </div>
+        </mat-card>
+      </div>
+      <div *ngIf="!isLoadingHpc && filteredHpcData.length === 0" class="empty-state">
+        <mat-icon class="empty-icon">inbox</mat-icon>
+        <h3>No HPC Sessions Found</h3>
+      </div>
+    </div>
+    <div class="side-panel" [class.open]="isPanelOpen">
+      <div class="panel-header">
+        <h3>{{ panelTitle }}</h3>
+        <button mat-icon-button (click)="closePanel()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    <div class="panel-summary">
+      <span class="summary-count">{{ panelData.length }} {{ (panelType.includes('group-persons') || panelType.includes('participants')) ? 'persons' : 'profiles' }}</span>
+      <span class="summary-total" *ngIf="!panelType.includes('group-persons') && !panelType.includes('participants')">Total: {{ panelData | reduce:'count' }}</span>
+    </div>
+      <div class="panel-content">
+        <div class="profile-list">
+        <ng-container *ngIf="panelType.includes('group-persons') || panelType.includes('participants')">
+          <div class="profile-item simple clickable" *ngFor="let item of panelData; let i = index" (click)="filterByName(item.name)">
+            <span class="profile-rank">{{ i + 1 }}</span>
+            <mat-icon class="person-icon">person</mat-icon>
+            <span class="profile-name">{{ item.name }}</span>
+          </div>
+        </ng-container>
+          <ng-container *ngIf="!panelType.includes('group-persons') && !panelType.includes('participants')">
+            <div class="profile-item" *ngFor="let item of panelData; let i = index" (click)="filterByProfile(item.profileId)">
+              <span class="profile-rank">{{ i + 1 }}</span>
+              <span class="profile-name">{{ item.name }}</span>
+              <span class="profile-count">
+                <mat-icon>{{ panelType.includes('group') ? 'groups' : 'assignment' }}</mat-icon>
+                {{ item.count }}
+              </span>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+    <div class="panel-overlay" [class.open]="isPanelOpen" (click)="closePanel()"></div>
+  </mat-tab>
+</mat-tab-group>
+</ng-container>

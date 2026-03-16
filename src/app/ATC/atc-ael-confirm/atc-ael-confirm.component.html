@@ -1,0 +1,17 @@
+<div class="mainscreen" *ngIf="!loading">
+    <div class="title">{{confirmMessage}}</div>
+    <div class="mt-3" *ngIf="availableAEL != null">
+      <div class="mb-3">
+        Attach this ATC for the participant's Current 'uP!' Cycle
+      </div>
+      <mat-radio-group [(ngModel)]="selecteAEL">
+              <mat-radio-button [value]="availableAEL">Yes</mat-radio-button>
+        <br>
+              <mat-radio-button [value]="false">No</mat-radio-button>
+          </mat-radio-group>
+    </div>
+    <div class="mt-3">
+      <button class="me-3 closebtn" mat-stroked-button type="button" (click)="close()">Go Back</button>
+      <button class="successbtn" mat-stroked-button type="button" (click)="confirmATC()">Submit ATC</button>
+    </div>
+</div>

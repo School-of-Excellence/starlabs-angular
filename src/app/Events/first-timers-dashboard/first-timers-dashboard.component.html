@@ -1,0 +1,568 @@
+<!-- Loading Overlay -->
+<div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-spinner-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text-main">Loading Dashboard...</div>
+        <div class="loading-subtext">Please wait while we fetch your data</div>
+    </div>
+</div>
+
+<!-- Main -->
+<main class="main-container" *ngIf="!isLoading">
+    <div class="main-layout">
+        <!-- Left: CW Table -->
+        <div class="left-content">
+            <!-- Participants Filter Section -->
+            <div class="participants-filter-section">
+                <div class="filter-label">Participants Filter:</div>
+                <div class="filter-checkboxes">
+                    <label class="checkbox-label" [class.active]="participantFilter === 'all'">
+                        <input type="checkbox" [checked]="participantFilter === 'all'"
+                            (change)="setParticipantFilter('all')">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">All</span>
+                    </label>
+                    <label class="checkbox-label" [class.active]="participantFilter === 'firstTimers'">
+                        <input type="checkbox" [checked]="participantFilter === 'firstTimers'"
+                            (change)="setParticipantFilter('firstTimers')">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">First Timers</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Header Section with Ongoing Events -->
+            <div class="header-section">
+                <!-- Combined Live Events & Queues Banner -->
+                <div class="live-banner" *ngIf="ongoingEvents.length > 0 || (ongoingQueues.length > 0 && selectedEvent)">
+                    <div class="live-badge">
+                        <span class="pulse-dot"></span>
+                        LIVE NOW
+                    </div>
+
+                    <div class="live-content">
+                        <!-- Live Events Section -->
+                        <div class="live-section" *ngIf="ongoingEvents.length > 0">
+                            <span class="live-section-label">Events</span>
+                            <div class="live-chips">
+                                <div *ngFor="let event of ongoingEvents" class="live-chip event-chip"
+                                    [class.active]="selectedEventRef === event.docref" (click)="selectEvent(event)">
+                                    {{ event['name'] }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="live-divider"
+                            *ngIf="ongoingEvents.length > 0 && ongoingQueues.length > 0 && selectedEvent">
+                        </div>
+
+                        <!-- Live Queues Section (Multi-Select) -->
+                        <div class="live-section" *ngIf="ongoingQueues.length > 0 && selectedEvent">
+                            <span class="live-section-label">Queues</span>
+                            <div class="live-chips">
+                                <div *ngFor="let queue of ongoingQueues" class="live-chip queue-chip"
+                                    [class.active]="isQueueSelected(queue)" (click)="toggleQueueSelection(queue)">
+                                    {{ queue['queuename'] }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dropdowns Row -->
+                <div class="dropdowns-row">
+                    <!-- Event Selector -->
+                    <div class="event-selector">
+                        <label for="eventSelect">Select Event</label>
+
+                        <div class="search-select-container">
+                            <div class="search-select-trigger" (click)="toggleDropdown()" [class.open]="isDropdownOpen"
+                                [class.has-value]="selectedEvent">
+
+                                <div class="selected-display" *ngIf="selectedEvent && !isDropdownOpen">
+                                    <span class="live-indicator" *ngIf="isOngoingEvent(selectedEvent)"></span>
+                                    <span class="selected-text">{{ selectedEvent['name'] }}</span>
+                                    <button class="clear-btn" (click)="clearSelection($event)" title="Clear selection">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <input #searchInput *ngIf="isDropdownOpen || !selectedEvent" type="text"
+                                    class="search-input" [(ngModel)]="searchTerm" (input)="onSearchChange()"
+                                    (keydown)="onKeyDown($event)" (focus)="openDropdown()"
+                                    placeholder="Search events..." autocomplete="off">
+
+                                <span class="dropdown-arrow" [class.rotated]="isDropdownOpen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 10l5 5 5-5z" />
+                                    </svg>
+                                </span>
+                            </div>
+
+                            <!-- Event Dropdown List -->
+                            <div class="search-select-dropdown event-dropdown" *ngIf="isDropdownOpen">
+                                <div class="dropdown-section" *ngIf="ongoingEvents.length > 0 && !searchTerm">
+                                    <div class="dropdown-section-header">
+                                        <span class="live-dot"></span>
+                                        Ongoing Events
+                                    </div>
+                                    <div *ngFor="let event of ongoingEvents; let i = index" class="dropdown-item ongoing"
+                                        [class.highlighted]="highlightedIndex === i"
+                                        [class.selected]="selectedEventRef === event.docref"
+                                        (click)="selectEvent(event)" (mouseenter)="highlightedIndex = i">
+                                        <span class="live-indicator"></span>
+                                        {{ event['name'] }}
+                                        <svg *ngIf="selectedEventRef === event.docref" class="check-icon"
+                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <div class="dropdown-section">
+                                    <div class="dropdown-section-header" *ngIf="!searchTerm">All Events</div>
+                                    <div class="dropdown-section-header" *ngIf="searchTerm">
+                                        Search Results ({{ filteredEventsList.length }})
+                                    </div>
+
+                                    <div class="dropdown-items-container">
+                                        <div *ngFor="let event of filteredEventsList; let i = index"
+                                            class="dropdown-item" [class.highlighted]="highlightedIndex === i"
+                                            [class.selected]="selectedEventRef === event.docref"
+                                            [class.ongoing]="isOngoingEvent(event)" (click)="selectEvent(event)"
+                                            (mouseenter)="highlightedIndex = i">
+                                            <span class="live-indicator" *ngIf="isOngoingEvent(event)"></span>
+                                            {{ event['name'] }}
+                                            <svg *ngIf="selectedEventRef === event.docref" class="check-icon"
+                                                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    <div class="no-results" *ngIf="filteredEventsList.length === 0 && searchTerm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                                        </svg>
+                                        <span>No events found for "{{ searchTerm }}"</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Queue Selector (Multi-Select) -->
+                    <div class="queue-selector" *ngIf="selectedEvent">
+                        <label for="queueSelect">Select Queues</label>
+
+                        <div class="queue-selector-row">
+                            <div class="search-select-container">
+                            <div class="search-select-trigger" (click)="toggleQueueDropdown()"
+                                [class.open]="isQueueDropdownOpen" [class.has-value]="selectedQueues.length > 0"
+                                [class.disabled]="isLoadingQueues">
+
+                                <div *ngIf="isLoadingQueues" class="loading-text">
+                                    <div class="spinner-small"></div>
+                                    Loading queues...
+                                </div>
+
+                                <div class="selected-display multi-select"
+                                    *ngIf="selectedQueues.length > 0 && !isQueueDropdownOpen && !isLoadingQueues">
+                                    <div class="selected-chips">
+                                        <div class="selected-chip" *ngFor="let queue of selectedQueues">
+                                            <span class="live-indicator" *ngIf="isOngoingQueue(queue)"></span>
+                                            <span class="chip-text">{{ queue['queuename'] }}</span>
+                                            <button class="chip-remove"
+                                                (click)="toggleQueueSelection(queue); $event.stopPropagation()">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    fill="currentColor">
+                                                    <path
+                                                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button class="clear-btn" (click)="clearQueueSelection($event)" title="Clear all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <input #queueSearchInput
+                                    *ngIf="(isQueueDropdownOpen || selectedQueues.length === 0) && !isLoadingQueues"
+                                    type="text" class="search-input" [(ngModel)]="queueSearchTerm"
+                                    (input)="onQueueSearchChange()" (keydown)="onQueueKeyDown($event)"
+                                    (focus)="openQueueDropdown()" placeholder="Search queues..." autocomplete="off">
+
+                                <span class="dropdown-arrow" [class.rotated]="isQueueDropdownOpen"
+                                    *ngIf="!isLoadingQueues">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7 10l5 5 5-5z" />
+                                    </svg>
+                                </span>
+                            </div>
+
+                            <!-- Queue Dropdown List (Multi-Select) -->
+                            <div class="search-select-dropdown queue-dropdown"
+                                *ngIf="isQueueDropdownOpen && !isLoadingQueues">
+                                <!-- Date Range Indicator -->
+                                <div class="date-range-indicator"
+                                    *ngIf="selectedQueues.length > 0 && queueRangeStartDate && queueRangeEndDate">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                        <path
+                                            d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z" />
+                                    </svg>
+                                    <span>Date Range: {{ queueRangeStartDate | date:'MMM d, y' }} - {{
+                                        queueRangeEndDate | date:'MMM d, y' }}</span>
+                                </div>
+
+                                <div class="dropdown-section" *ngIf="ongoingQueues.length > 0 && !queueSearchTerm">
+                                    <div class="dropdown-section-header">
+                                        <span class="live-dot"></span>
+                                        Ongoing Queues
+                                    </div>
+                                    <div *ngFor="let queue of ongoingQueues; let i = index" class="dropdown-item ongoing"
+                                        [class.highlighted]="queueHighlightedIndex === i"
+                                        [class.selected]="isQueueSelected(queue)"
+                                        (click)="toggleQueueSelection(queue)" (mouseenter)="queueHighlightedIndex = i">
+                                        <span class="checkbox-indicator" [class.checked]="isQueueSelected(queue)">
+                                            <svg *ngIf="isQueueSelected(queue)" xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                            </svg>
+                                        </span>
+                                        <span class="live-indicator"></span>
+                                        {{ queue['queuename'] }}
+                                    </div>
+                                </div>
+
+                                <div class="dropdown-section">
+                                    <div class="dropdown-section-header" *ngIf="!queueSearchTerm">All Queues</div>
+                                    <div class="dropdown-section-header" *ngIf="queueSearchTerm">
+                                        Search Results ({{ filteredQueuesList.length }})
+                                    </div>
+
+                                    <div class="dropdown-items-container">
+                                        <div *ngFor="let queue of filteredQueuesList; let i = index"
+                                            class="dropdown-item" [class.highlighted]="queueHighlightedIndex === i"
+                                            [class.selected]="isQueueSelected(queue)"
+                                            [class.ongoing]="isOngoingQueue(queue)"
+                                            (click)="toggleQueueSelection(queue)"
+                                            (mouseenter)="queueHighlightedIndex = i">
+                                            <span class="checkbox-indicator" [class.checked]="isQueueSelected(queue)">
+                                                <svg *ngIf="isQueueSelected(queue)" xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                                </svg>
+                                            </span>
+                                            <span class="live-indicator" *ngIf="isOngoingQueue(queue)"></span>
+                                            {{ queue['queuename'] }}
+                                        </div>
+                                    </div>
+
+                                    <div class="no-results" *ngIf="filteredQueuesList.length === 0 && queueSearchTerm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                                        </svg>
+                                        <span>No queues found for "{{ queueSearchTerm }}"</span>
+                                    </div>
+
+                                    <div class="no-results" *ngIf="queuesList.length === 0 && !queueSearchTerm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+                                        </svg>
+                                        <span>No queues available for this event</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Export Changework Button -->
+                        <button class="export-changework-btn" (click)="exportAllChangework()" 
+                            [disabled]="!selectedEvent"
+                            title="Export all changework data to Excel">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            Export Changework
+                        </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CW Table Card -->
+            <div class="card">
+                <!-- Card Header with Day Filter -->
+                <div class="card-header">
+                    <div class="filter-tabs-container">
+                        <!-- All Days Button -->
+                        <button class="filter-tab all-tab" [class.active]="currentFilter === 'all'"
+                            (click)="setFilter('all')">
+                            All Days
+                        </button>
+
+                        <!-- Divider -->
+                        <div class="filter-divider" *ngIf="eventDays.length > 1"></div>
+
+                        <!-- Left Arrow -->
+                        <button class="scroll-arrow" *ngIf="eventDays.length > 8" [class.disabled]="!hasMoreLeft()"
+                            (click)="scrollDays('left')">
+                            ‹
+                        </button>
+
+                        <!-- Day Tabs -->
+                        <ng-container *ngFor="let day of getVisibleDays()">
+                            <button class="filter-tab day-tab" [class.active]="currentFilter === day.day"
+                                [class.current-day]="isToday(day.dateObj)" (click)="setFilter(day.day)">
+                                {{ getDayLabel(day) }}
+                            </button>
+                        </ng-container>
+
+                        <!-- Right Arrow -->
+                        <button class="scroll-arrow" *ngIf="eventDays.length > 8" [class.disabled]="!hasMoreRight()"
+                            (click)="scrollDays('right')">
+                            ›
+                        </button>
+
+                        <!-- Scroll Indicator -->
+                        <span class="scroll-indicator" *ngIf="eventDays.length > 10">
+                            {{ getScrollRange() }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- CW Table -->
+                <table class="cw-table">
+                    <thead>
+                        <tr>
+                            <th class="col-cw">CW Name</th>
+                            <th class="col-doer" colspan="2">As Doer - <b>Total - {{doerTotal}}</b></th>
+                            <th class="col-beneficiary" colspan="2">As Beneficiary - <b>Total - {{beneficierTotal}}</b></th>
+                            <th class="col-live-changework">Live Changework - <b>Total - {{liveChangeworkTotal}}</b></th>
+                        </tr>
+                        <tr class="sub-header-row">
+                            <th style="border-right: 1px solid var(--border-color);"></th>
+                            <th>Not Started</th>
+                            <th style="border-right: 1px solid var(--border-color);">Completed</th>
+                            <th>Not Started</th>
+                            <th style="border-right: 1px solid var(--border-color);">Completed</th>
+                            <th>Live</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let procedureId of sortedProcedureIds">
+                            <td>
+                                <div class="cw-name-cell">
+                                    <div class="cw-info">
+                                        <div class="cw-name">{{mapProcedureNames[procedureId]}}</div>
+                                        <div class="cw-stats">
+                                            <div class="cw-stat-item"(click)="showParticipants(procedureId, 'Eligible Participants', 'Total Opportunities', mapProcedureData[procedureId].totalOpportunities)">Total Opportunities: <span
+                                                    class="cw-stat-value">{{mapProcedureData[procedureId].totalOpportunities.count}}</span>
+                                            </div>
+                                            <div class="cw-stat-item"(click)="showParticipants(procedureId, 'Beneficiary', 'Completed', mapProcedureData[procedureId].totalCompleted)">Completed: <span
+                                                    class="cw-stat-value">{{mapProcedureData[procedureId].totalCompleted.count}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-box not-started"
+                                    [class.active]="isActive(procedureId, 'Doer', 'Not Started')"
+                                    (click)="showParticipants(procedureId, 'Doer', 'Not Started', mapProcedureData[procedureId].doerNotStarted)">
+                                    <div class="status-value">{{mapProcedureData[procedureId].doerNotStarted.count}}</div>
+                                    <div class="status-label">Not Started</div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-box completed"
+                                    [class.active]="isActive(procedureId, 'Doer', 'Completed')"
+                                    (click)="showParticipants(procedureId, 'Doer', 'Completed', mapProcedureData[procedureId].doerCompleted)">
+                                    <div class="status-value">{{mapProcedureData[procedureId].doerCompleted.count}}</div>
+                                    <div class="status-label">Completed</div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-box not-started"
+                                    [class.active]="isActive(procedureId, 'Beneficiary', 'Not Started')"
+                                    (click)="showParticipants(procedureId, 'Beneficiary', 'Not Started', mapProcedureData[procedureId].beneficierNotStarted)">
+                                    <div class="status-value">{{getUniqueParticipants(mapProcedureData[procedureId].totalOpportunities.data)}}</div>
+                                    <div class="status-label">Not Started</div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-box completed"
+                                    [class.active]="isActive(procedureId, 'Beneficiary', 'Completed')"
+                                    (click)="showParticipants(procedureId, 'Beneficiary', 'Completed', mapProcedureData[procedureId].beneficierCompleted)">
+                                    <div class="status-value">{{mapProcedureData[procedureId].beneficierCompleted.count}}</div>
+                                    <div class="status-label">Completed</div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="status-box live"
+                                    [class.active]="isActive(procedureId, 'Live Changework', 'Live')"
+                                    (click)="showParticipants(procedureId, 'Live Changework', 'Live', mapProcedureData[procedureId].liveChangework)">
+                                    <div class="status-value">{{mapProcedureData[procedureId].liveChangework.count}}</div>
+                                    <div class="status-label">Live</div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- CRM Flags Section -->
+            <div class="card crm-section">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span>🏷️</span>
+                        A&amp;H CRM - Flag Status
+                    </div>
+                </div>
+                <div class="crm-grid">
+                    <div *ngFor="let tag of getTagKeys()" class="crm-card" [ngStyle]="getCardStyles(tag)">
+                        <div class="crm-header">
+                            <div class="crm-title" [ngStyle]="getTitleStyles(tag)">
+                                {{ mapTagNames[tag] }}
+                            </div>
+                            <span class="crm-count" [ngStyle]="getCountStyles(tag)">
+                                {{ mapTags[tag]?.length || 0 }}
+                            </span>
+                        </div>
+
+                        <div class="crm-list">
+                            <div *ngFor="let profileId of mapTags[tag]" class="crm-item">
+                                <div class="crm-item-info">
+                                    <div class="crm-item-name">{{ participantMetadataMap[profileId]?.['name'] }}</div>
+                                </div>
+                            </div>
+
+                            <div *ngIf="!mapTags[tag] || mapTags[tag].length === 0" class="crm-empty">
+                                No participants
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Side Panel Overlay -->
+<div class="side-panel-overlay" [class.open]="isSidePanelOpen" (click)="closeSidePanel()"></div>
+
+<!-- Sliding Side Panel -->
+<div class="side-panel" [class.open]="isSidePanelOpen">
+    <div class="side-panel-header">
+        <div class="side-panel-header-content">
+            <div class="side-panel-title">{{ panelTitle }}</div>
+            <div class="side-panel-subtitle">{{ panelSubtitle }}</div>
+        </div>
+        <button class="side-panel-close" (click)="closeSidePanel()">×</button>
+    </div>
+
+    <div class="side-panel-actions" *ngIf="showActions">
+        <button class="action-btn notify" (click)="sendNotification()">🔔 Notify</button>
+        <button class="action-btn call" (click)="initiateCalling()">📞 Call</button>
+        <button class="action-btn wall" (click)="sendToWall()">📺 B!G Wall</button>
+        <button class="action-btn export" (click)="exportToExcel()">📊 Export</button>
+    </div>
+
+    <div class="side-panel-body">
+        <!-- Empty State -->
+        <div class="empty-state" *ngIf="!selectedParticipants.length">
+            <div class="empty-state-icon">👆</div>
+            <div class="empty-state-text">Click on any number in the table to view the participant list</div>
+        </div>
+
+        <!-- Participant List -->
+        <ng-container *ngIf="selectedParticipants.length">
+            <!-- Live Changework Display -->
+            <ng-container *ngIf="currentSelection?.role === 'Live Changework'">
+                <div class="participant-card live-changework-card" *ngFor="let participant of selectedParticipants;"
+                    [class.selected]="participant.selected" 
+                    (click)="toggleParticipant(participant)">
+                    <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
+                        (click)="$event.stopPropagation()">
+                    <div class="participant-avatar live">
+                       {{ participant.initials }}
+                    </div>
+                    <div class="participant-info">
+                        <div class="participant-name live-display">
+                            {{ participant.name }}
+                            <span *ngIf="participant.count">
+                                ({{participant.count}})
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </ng-container>
+
+            <!-- Completed Display with hours, hourType, sharedNotes -->
+            <ng-container *ngIf="currentSelection?.status === 'Completed'">
+                <div class="participant-card completed-card" *ngFor="let participant of selectedParticipants; let i = index"
+                    [class.selected]="participant.selected" 
+                    (click)="toggleParticipant(participant)">
+                    <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
+                        (click)="$event.stopPropagation()">
+                    <div class="participant-avatar green">
+                       {{ participant.initials }}
+                    </div>
+                    <div class="participant-info">
+                        <div class="participant-name live-display">
+                            {{ participant.name }} 
+                            <span *ngIf="participant.count">
+                                ({{participant.count}})
+                            </span>
+                        </div>
+                        <div class="participant-meta">
+                            <span class="meta-item" *ngIf="participant.hours">
+                                <span class="meta-label">Hours:</span> {{ participant.hours }}
+                            </span>
+                            <span class="meta-item" *ngIf="participant.hourType">
+                                <span class="meta-label">Type:</span> {{ participant.hourType }}
+                            </span>
+                        </div>
+                        <div class="participant-notes" *ngIf="participant.sharedNotes">
+                            <span class="notes-label">Notes:</span>
+                            <span class="notes-text">{{ participant.sharedNotes }}</span>
+                        </div>
+                    </div>
+                </div>
+            </ng-container>
+
+            <!-- Regular Participant Display (Not Started) -->
+            <ng-container *ngIf="currentSelection?.role !== 'Live Changework' && currentSelection?.status !== 'Completed'">
+                <div class="participant-card" *ngFor="let participant of selectedParticipants; let i = index"
+                    [class.selected]="participant.selected" (click)="toggleParticipant(participant)">
+                    <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
+                        (click)="$event.stopPropagation()">
+                    <div class="participant-avatar red">
+                     {{ participant.initials }}
+                    </div>
+                    <div class="participant-info">
+                        <div class="participant-name">
+                            {{ participant.name }}
+                            <span *ngIf="participant.count">
+                                ({{participant.count}})
+                            </span>
+                        </div>
+
+                        <div class="participant-detail">{{ participant.cohort }}</div>
+                    </div>
+                </div>
+            </ng-container>
+        </ng-container>
+    </div>
+</div>

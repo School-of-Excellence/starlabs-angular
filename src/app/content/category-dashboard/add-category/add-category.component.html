@@ -1,0 +1,64 @@
+<div style="padding: 30px;">
+    <div *ngIf="add">
+        <div mat-dialog-title>
+          <h2>Add Category</h2>
+        </div>
+        <div mat-dialog-content style="width: 250px;height: 150px;">
+            <form #myForm="ngForm">
+                <mat-form-field>
+                    <input type="text" placeholder="Category Name" matInput [(ngModel)]="category"
+                           ngModel
+                           name="name"
+                           #name="ngModel"
+                           required (keyup)="onSelect()">
+                           <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Category name required</mat-error>
+                           <mat-hint *ngIf="crossmatch">
+                            <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
+                           </mat-hint>
+                </mat-form-field>
+            </form>
+            <div mat-dialog-actions class="btn">
+                <button  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onSubmit()" [disabled]="myForm.invalid ? true :crossmatch ? true: false">Add</button>
+                <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div *ngIf="edit">
+        <div mat-dialog-title>
+          <h2>Edit Category</h2>
+        </div>
+        <div mat-dialog-content style="width: 250px;height: 150px;">
+            <form #myForm="ngForm">
+                <mat-form-field>
+                    <input type="text" placeholder="Category Name" matInput [(ngModel)]="category"
+                           ngModel
+                           name="name"
+                           required
+                           #name="ngModel" (keyup)="onSelect()">
+                           <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Category name required</mat-error>
+                           <mat-hint *ngIf="crossmatch">
+                            <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
+                           </mat-hint>
+                </mat-form-field>
+            </form>
+            <div mat-dialog-actions class="btn">
+                <button  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onEdit(data.id,category)">Edit</button>
+                <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div *ngIf="delete">
+        <div mat-dialog-title style="width: 350px;">
+            <h3>Are you sure you want to delete?</h3>
+        </div>
+        <div mat-dialog-actions class="btn">
+            <button  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onDelete(data.id)">Delete</button>
+            <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+        </div>
+    </div>
+    
+    
+    
+</div>

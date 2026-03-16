@@ -1,0 +1,14 @@
+<main>
+  <div style="padding: 20px;">
+    <mat-form-field>
+      <mat-label>Add Tags</mat-label>
+      <input matInput type="text" [(ngModel)]="name">
+    </mat-form-field>
+    <div class="d-flex justify-content-center">
+      <button mat-stroked-button type="button" (click)="onsubmit()">
+        {{data.type === 'edit' ? 'Update' : 'Submit'}}
+      </button>&nbsp;&nbsp;&nbsp;&nbsp;
+      <button mat-stroked-button type="button" (click)="dialogRef.close()">Close</button>
+    </div>
+  </div>
+</main>

@@ -1,0 +1,1869 @@
+<div class="workshop-config-container">
+    <div class="sidebar">
+        <mat-card class="menu-card">
+            <mat-card-header>
+                <mat-card-title>
+                    <span style="font-weight: bold;">{{detailPageForm.get('title').value}}</span> {{documentsize}}</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+                <mat-radio-group [(ngModel)]="selectedMenu" (change)="onMenuChange($event.value)" class="menu-radio-group"> 
+                    <div class="menu-item">
+                        <mat-radio-button class="menu-radio" value="detailpage">
+                            Enrollment Page
+                        </mat-radio-button>
+                    </div>
+                    <div class="menu-item">
+                        <mat-radio-button class="menu-radio" value="challenges">
+                            Challenges
+                        </mat-radio-button>
+                    </div>
+                    <div class="menu-item">
+                        <mat-radio-button class="menu-radio" value="challengesettings">
+                            Settings
+                        </mat-radio-button>
+                    </div>
+                    <!-- <div class="menu-item">
+                        <mat-radio-button class="menu-radio" value="payment">
+                            Payment
+                        </mat-radio-button>
+                    </div> -->
+                </mat-radio-group>
+                <button 
+                mat-stroked-button 
+                color="primary" 
+                (click)="routing('addimage',null)" 
+                type="button">
+                <mat-icon>insert_photo</mat-icon> Add Icon / Image
+                </button><br><br>
+                <button *ngIf="selectedMenu === 'detailpage'"
+                    mat-raised-button 
+                    color="primary" 
+                    (click)="saveDetailPage()"
+                    [disabled]="loading || detailPageForm.invalid">
+                    <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+                    <span *ngIf="!loading">Save Enrollment</span>
+                </button><br *ngIf="selectedMenu === 'detailpage'"><br *ngIf="selectedMenu === 'detailpage'">
+                <button *ngIf="selectedMenu === 'challenges'"
+                    mat-raised-button 
+                    color="primary" 
+                    (click)="saveChallengesPage()"
+                    [disabled]="loading || challengesPageForm.invalid">
+                    <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+                    <span *ngIf="!loading">Save Challenges</span>
+                </button><br *ngIf="selectedMenu === 'challenges'"><br *ngIf="selectedMenu === 'challenges'">
+                <button *ngIf="selectedMenu === 'challengesettings'"
+                    mat-raised-button 
+                    color="primary" 
+                    (click)="saveSettings()"
+                    [disabled]="loading">
+                    <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+                    <span *ngIf="!loading">Save Settings</span>
+                </button>
+                <!-- <button 
+                mat-stroked-button 
+                color="primary" 
+                (click)="routing('dashboard',null)" 
+                type="button">
+                Dashboard
+                </button> -->
+                <!-- <br><br> -->
+                <!-- <section class="example-section">
+                <mat-slide-toggle [disabled]="settingsForm.get('active')?.value" class="example-margin"
+                [(ngModel)]="enablesutosave">
+                    Auto save
+                </mat-slide-toggle>
+                </section>
+                <br><br>
+                <h4 *ngIf="autosave" class="autosave-status">
+                <mat-icon>rotate_right</mat-icon>
+                <span>saving...</span>
+                </h4> -->
+            </mat-card-content>
+        </mat-card>
+    </div>
+    <div class="main-content">
+        <div *ngIf="workshopData" class="content-wrapper">
+        <mat-card *ngIf="selectedMenu === 'detailpage'" class="form-card">
+            <mat-card-header>
+            <mat-card-title>    
+            {{detailPageForm.get('title').value}}
+            </mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+            <form [formGroup]="detailPageForm" class="detail-form">
+                <div class="form-section">
+                <h3 class="section-title">Workshop Information</h3>
+                <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Workshop Title</mat-label>
+                    <input matInput formControlName="title" placeholder="Enter workshop title" maxlength="100">
+                    <mat-hint align="end">{{detailPageForm.get('title').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Short Description</mat-label>
+                    <input matInput formControlName="shortdescription" placeholder="Enter workshop shortdescription" maxlength="100" >
+                    <mat-hint align="end">{{detailPageForm.get('shortdescription').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Thumbnail Image URL</mat-label>
+                        <input matInput formControlName="thumbnailImage" placeholder="Enter thumbnail image URL">
+                        <button mat-icon-button (click)="uploadThumbnail()" matSuffix>
+                            <mat-icon>upload</mat-icon>
+                        </button>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Video URL</mat-label>
+                        <input matInput formControlName="titleVideo" placeholder="Enter title video URL" >
+                        <button mat-icon-button (click)="uploadVideo()" matSuffix>
+                            <mat-icon>upload</mat-icon>
+                        </button>
+                    </mat-form-field>
+
+                </div>
+                <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>why?</mat-label>
+                    <input matInput formControlName="whyworkshop" placeholder="Why? Workshop" maxlength="100" >
+                    <mat-hint align="end">{{detailPageForm.get('whyworkshop').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>ATC Taxonomy</mat-label>
+                        <mat-select formControlName="selectedTaxonomies" multiple >
+                        <mat-option *ngFor="let taxonomy of atcTaxonomyData" [value]="taxonomy.id">
+                            {{ taxonomy.name }}
+                        </mat-option>
+                        </mat-select>
+                        <mat-hint>
+                        Selected: {{ detailPageForm.get('selectedTaxonomies')?.value?.length || 0 }} item(s)
+                        </mat-hint>
+                    </mat-form-field>
+                </div>
+                <ng-container *ngFor="let section of iconWithTextSections">
+                    <div class="form-section">
+                        <h3 class="section-title">{{ section.title }}</h3>
+                        <div [formArrayName]="section.key">
+                        <div *ngFor="let control of getFormArray(section.key).controls; let i = index"
+                            [formGroupName]="i"
+                            class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>{{ section.iconLabel }}</mat-label>
+                            <mat-select *ngIf="section.fieldType === 'dropdown'" formControlName="question" >
+                                <mat-option *ngFor="let option of iconData" [value]="option['imageUrl']">
+                                <img [src]="option['imageUrl']" alt="icon" width="50" height="50"
+                                    style="margin-right: 10px; vertical-align: middle;" />
+                                {{ option['description'] }}
+                                </mat-option>
+                            </mat-select>
+                            <input *ngIf="section.fieldType === 'inputfield'" matInput formControlName="question" 
+                                [placeholder]="section.iconLabel" />
+                            </mat-form-field>
+                            <div *ngIf="section.fieldType === 'dropdown' && control.get('question')?.value" class="preview-icon">
+                            <img [src]="control.get('question')?.value" alt="icon preview" width="40" height="40" style="margin-top: 5px;" />
+                            </div>
+
+                            <!-- Description Field -->
+                            <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>{{ section.descriptionLabel }}</mat-label>
+                            <input  matInput formControlName="answer"
+                                [placeholder]="section.descriptionLabel" [maxlength]="section.maxLength" />
+                            <mat-hint align="end">{{ control.get('answer').value?.length || 0 }} / {{section.maxLength}}</mat-hint>
+                            </mat-form-field>
+
+
+                            <button mat-icon-button color="warn" (click)="removeIconWithText(section.key, i)">
+                            <mat-icon>delete</mat-icon>
+                            </button>
+                        </div>
+                        </div>
+
+                        <button mat-stroked-button color="primary" (click)="addIconWithText(section.key, section.maxItems)" type="button">
+                        <mat-icon>add</mat-icon> {{ section.addButtonLabel }}
+                        </button>
+                    </div>
+                </ng-container><br>
+                <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Day</mat-label>
+                    <input  matInput formControlName="day" placeholder="E.g.,14 Day Conversational Programming  Fundamentals Workshop" maxlength="100">
+                    <mat-hint align="end">{{detailPageForm.get('day').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Price striked Text</mat-label>
+                    <input  matInput formControlName="pricestriked" placeholder="price striked" maxlength="50">
+                    <mat-hint align="end">{{detailPageForm.get('pricestriked').value.length}} / 50</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Price Normal Text</mat-label>
+                    <input  matInput formControlName="price" placeholder="price" maxlength="50">
+                    <mat-hint align="end">{{detailPageForm.get('price').value.length}} / 50</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Enroll Button Name</mat-label>
+                    <input  matInput formControlName="enrollbuttonname" placeholder="Button Name" maxlength="20">
+                    <mat-hint align="end">{{detailPageForm.get('enrollbuttonname').value.length}} / 20</mat-hint>
+                    </mat-form-field>
+                </div>
+                <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>What are you creating?</mat-label>
+                    <mat-select  formControlName="type">
+                        <mat-option value="workshop">Workshop</mat-option>
+                        <mat-option value="eiflix">EiFlix</mat-option>
+                    </mat-select>
+                    </mat-form-field>
+                    <!-- <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Category</mat-label>
+                    <mat-select  formControlName="category">
+                        <mat-option value="Web Development">Web Development</mat-option>
+                        <mat-option value="Mobile Development">Mobile Development</mat-option>
+                        <mat-option value="Data Science">Data Science</mat-option>
+                    </mat-select>
+                    </mat-form-field> -->
+                </div>
+                <div class="form-section">
+                <h3 class="section-title">Content Sections</h3>
+                <div *ngFor="let richTextField of richTextFields" class="rich-text-section">
+                    <div class="full-width">
+                    <label class="editor-label">{{ richTextField.label }}</label>
+                    <div class="NgxEditor__Wrapper">
+                        <ngx-editor-menu 
+                        [editor]="editors[richTextField.key]" 
+                        [toolbar]="toolbar">
+                        </ngx-editor-menu>
+                        <ngx-editor
+                        [editor]="editors[richTextField.key]"
+                        [formControlName]="richTextField.key"
+                        [disabled]="false"
+                        [placeholder]="richTextField.placeholder"
+                        (ngModelChange)="onEditorContentChange($event, richTextField.key)" >
+                        </ngx-editor>
+                    </div>
+                    <div class="editor-error" 
+                        *ngIf="detailPageForm.get(richTextField.key)?.hasError('required') && 
+                                detailPageForm.get(richTextField.key)?.touched">
+                        {{ richTextField.label }} is required
+                    </div>
+                    <div class="editor-hint">
+                        {{ richTextField.hint }}
+                    </div>
+                    </div>
+                </div>
+                </div>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="form-section">
+                    <h3 class="section-title">Testimonials</h3>
+                    <!-- Template Selection - NOT stored in form, just for filtering -->
+                    <mat-form-field appearance="outline" class="full-width-max">
+                    <mat-label>Choose Template</mat-label>
+                    <mat-select 
+                        [(ngModel)]="selectedTemplatesForFilter"
+                        [ngModelOptions]="{standalone: true}"
+                        multiple 
+                        (selectionChange)="onTemplateFilterChange($event.value)">
+                        <mat-option 
+                        *ngFor="let template of videoasktemplate" 
+                        [value]="template.id">
+                        {{ template.title }}
+                        </mat-option>
+                    </mat-select>
+                    <mat-hint>
+                        Selected: {{ selectedTemplatesForFilter.length }} / 10 item(s)
+                    </mat-hint>
+                    </mat-form-field>
+
+                    &nbsp;&nbsp;
+
+                    <mat-form-field appearance="outline" class="full-width-max">
+                    <mat-label>Choose Testimonials (Video Ask)</mat-label>
+                    <mat-select 
+                        formControlName="selectedTestimonials" 
+                        multiple 
+                        
+                        [disabled]="selectedTemplatesForFilter.length === 0">
+                        <mat-option 
+                        *ngFor="let testimonial of testimonialData" 
+                        [value]="testimonial.id">
+                        {{ mapProfile[testimonial.profileid] }}
+                        </mat-option>
+                    </mat-select>
+                    <mat-hint *ngIf="selectedTemplatesForFilter.length === 0" style="color: #ff9800;">
+                        Please select at least one template first
+                    </mat-hint>
+                    <mat-hint *ngIf="selectedTemplatesForFilter.length > 0">
+                        Selected: {{ objectKeys(testimonialMap).length }} item(s)
+                    </mat-hint>
+                    </mat-form-field>
+                    <div *ngIf="objectKeys(testimonialMap).length > 0" style="margin-top: 12px;">
+                    <mat-chip-set>
+                        <mat-chip 
+                        *ngFor="let testimonial of getTestimonialsFromMap(); trackBy: trackByTestimonialId"
+                        [removable]="true"
+                        (removed)="removeTestimonialFromMap(testimonial.id)">
+                        {{ mapProfile[testimonial.profileid] }} - {{ formatUploadedDate(testimonial.uploaded) }}
+                        <button matChipRemove>
+                            <mat-icon>cancel</mat-icon>
+                        </button>
+                        </mat-chip>
+                    </mat-chip-set>
+                    </div>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="form-section">
+                <h3 class="section-title">Skills Taught</h3>
+                <mat-form-field class="full-width" appearance="outline">
+                    <mat-chip-grid #chipList>
+                    <mat-chip class="custom-chip"
+                        *ngFor="let skill of primarylyTaughtArray.value; let i = index"
+                        [removable]="true"
+                        (removed)="removeChip(i)">
+                        {{ skill }}
+                        <button matChipRemove>
+                        <mat-icon>cancel</mat-icon>
+                        </button>
+                    </mat-chip>
+                    <input
+                    
+                        placeholder="Type a skill and press Enter"
+                        [matChipInputFor]="chipList"
+                        [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                        [matChipInputAddOnBlur]="true"
+                        (matChipInputTokenEnd)="addChip($event)" />
+                    </mat-chip-grid>
+                </mat-form-field>
+                </div>
+                <div class="form-section">
+                <h3 class="section-title">Bonus</h3>
+                <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Bonus Section</mat-label>
+                    <mat-select  formControlName="enablebonus">
+                    <mat-option [value]=true>Enable</mat-option>
+                    <mat-option [value]=false>Disable</mat-option>
+                    </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Bonus Section Name</mat-label>
+                    <input  matInput formControlName="bonussection" placeholder="Bonus Section" maxlength="50">
+                    <mat-hint align="end">{{detailPageForm.get('bonussection').value.length}} / 50</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Bonus Head</mat-label>
+                    <input  matInput formControlName="bonushead" placeholder="Bonus Head" maxlength="100">
+                    <mat-hint align="end">{{detailPageForm.get('bonushead').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                </div>
+                <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Bonus 1</mat-label>
+                    <input  matInput formControlName="bonus1" placeholder="Bonus 1" maxlength="100">
+                    <mat-hint align="end">{{detailPageForm.get('bonus1').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Bonus 2</mat-label>
+                    <input  matInput formControlName="bonus2" placeholder="Bonus 2" maxlength="100">
+                    <mat-hint align="end">{{detailPageForm.get('bonus2').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Bonus Footer</mat-label>
+                    <input  matInput formControlName="bonusfooter" placeholder="Bonus Footer" maxlength="100">
+                    <mat-hint align="end">{{detailPageForm.get('bonusfooter').value.length}} / 100</mat-hint>
+                    </mat-form-field>
+                </div>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="form-section">
+                <h3 class="section-title">Workshop Dates</h3>
+                
+                <div class="form-row">
+                    <mat-form-field appearance="outline">
+                    <mat-label>Registration Start Date</mat-label>
+                    <input  matInput [matDatepicker]="registrationStartPicker" formControlName="registrationStartDate">
+                    <mat-datepicker-toggle matSuffix [for]="registrationStartPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #registrationStartPicker></mat-datepicker>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                    <mat-label>Registration End Date</mat-label>
+                    <input  matInput [matDatepicker]="registrationEndPicker" formControlName="registrationEndDate">
+                    <mat-datepicker-toggle matSuffix [for]="registrationEndPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #registrationEndPicker></mat-datepicker>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                    <mat-label>Workshop Start Date</mat-label>
+                    <input  matInput [matDatepicker]="workshopStartPicker" formControlName="workshopStartDate">
+                    <mat-datepicker-toggle matSuffix [for]="workshopStartPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #workshopStartPicker></mat-datepicker>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                    <mat-label>Workshop End Date</mat-label>
+                    <input  matInput [matDatepicker]="workshopEndPicker" formControlName="workshopEndDate">
+                    <mat-datepicker-toggle matSuffix [for]="workshopEndPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #workshopEndPicker></mat-datepicker>
+                    </mat-form-field>
+                </div>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="row g-3 align-items-stretch">
+                    <ng-container *ngFor="let section of fieldSections; let i = index">
+                        <div class="col-md-6 d-flex">
+                            <div class="section-wrapper flex-fill p-3 border rounded bg-white d-flex flex-column">
+                                <h3 class="section-title">{{ section.title }}</h3>
+                                <div [formArrayName]="section.key" cdkDropList (cdkDropListDropped)="drop($event, section.key)">
+                                    <div *ngFor="let control of detailPageForm.get(section.key)['controls']; let j = index"
+                                    class="form-row align-items-center" cdkDrag>
+                                    <mat-icon matTooltip="Drag to reorder" class="drag-icon" cdkDragHandle>drag_indicator</mat-icon>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <input 
+                                        matInput 
+                                        [formControlName]="j"
+                                        [maxlength]="section.maxLength || null"
+                                        [placeholder]="section.placeholder" />
+                                        <mat-hint align="end" *ngIf="section.maxLength">
+                                            {{ control.value?.length || 0 }} / {{ section.maxLength }}
+                                        </mat-hint>
+                                        </mat-form-field>
+                                        <button mat-icon-button color="warn" (click)="removeField(section.key, j, section.minMessage)">
+                                            <mat-icon>delete</mat-icon>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button mat-stroked-button color="primary" type="button" (click)="addField(section.key)" *ngIf="isAllFilled(section.key)">
+                                    <mat-icon>add</mat-icon> Add to your response
+                                </button>
+                            </div>
+                        </div>
+                    </ng-container>
+                </div>
+
+            </form>
+            </mat-card-content>
+            
+            <!-- <mat-card-actions>
+            <button 
+                mat-raised-button 
+                color="primary" 
+                (click)="saveDetailPage()"
+                [disabled]="loading || detailPageForm.invalid">
+                <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+                <span *ngIf="!loading">Save Configuration</span>
+            </button>
+            </mat-card-actions> -->
+        </mat-card>
+
+        <mat-card *ngIf="selectedMenu === 'challenges'" class="form-card">
+            <mat-card-header>
+            <mat-card-title style="font-weight: bold;">
+                Workshop Challenges Configuration
+            </mat-card-title>
+            </mat-card-header>
+            
+        <mat-card-content>
+        <form [formGroup]="challengesPageForm" class="detail-form">
+            <div class="form-section">
+            <!-- <div class="form-section" *ngIf="challengesArray.length > 0"> -->
+            <!-- <h3 class="section-title">Workshop Curriculum</h3> -->
+            <div formArrayName="challenges"
+                cdkDropList
+                [cdkDropListData]="getCurriculumControls()"
+                (cdkDropListDropped)="dropChallengeOuter($event)">
+                <mat-card *ngFor="let curriculum of getCurriculumControls(); let i = index" 
+                        [formGroupName]="i" 
+                        class="curriculum-card" cdkDrag [cdkDragDisabled]="settingsForm.get('active')?.value">
+                       
+                 <!-- <mat-card-header style="padding: 20px; display: flex; align-items: center;">
+                    <mat-card-title style="font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                            <mat-icon cdkDragHandle style="cursor: grab; font-size: 20px;">drag_indicator</mat-icon>
+                            Challenge {{ i + 1 }}
+                        </mat-card-title>
+                 </mat-card-header> -->
+                <mat-card-header style="padding: 20px; cursor: pointer;" (click)="toggleChallenge(i)">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <mat-card-title style="font-weight: bold; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <!-- <mat-icon  
+                        cdkDragHandle
+                        [style.cursor]="settingsForm.get('active')?.value ? 'not-allowed' : 'grab'"
+                        style="font-size: 20px;" 
+                        (click)="$event.stopPropagation()">
+                        drag_indicator
+                    </mat-icon>
+
+                    Set {{ i + 1 }}
+                    </mat-card-title> -->
+                    <mat-icon cdkDragHandle
+                        [style.cursor]="settingsForm.get('active')?.value ? 'not-allowed' : 'grab'"
+                        style="font-size: 20px;"
+                        (click)="$event.stopPropagation()">drag_indicator</mat-icon>
+                    <!-- Dynamic Title with Challenge Type -->
+                    <span *ngIf="curriculum.get('heading')?.value || curriculum.get('subheading')?.value; else defaultSet">
+                        {{ curriculum.get('heading')?.value || 'Set ' + (i + 1) }}
+                        <span *ngIf="curriculum.get('subheading')?.value"
+                    style="font-weight: normal; color: #0A0A0A; font-size: 0.9em;">
+                        : {{ curriculum.get('subheading')?.value }}
+                        </span>
+                        <!-- Add Challenge Type with mapping -->
+                        <span *ngIf="curriculum.get('type')?.value"
+                            style="font-weight: normal; color: #3D3C3C; font-size: 0.85em; margin-left: 8px;">
+                        ({{ getChallengeTypeDisplay(curriculum.get('type')?.value) }})
+                        </span>
+                    </span>
+                    <ng-template #defaultSet>
+                        Set {{ i + 1 }}
+                        <!-- Add Challenge Type for default case -->
+                        <span *ngIf="curriculum.get('type')?.value"
+                            style="font-weight: normal; color: #3D3C3C; font-size: 0.85em; margin-left: 8px;">
+                        ({{ getChallengeTypeDisplay(curriculum.get('type')?.value) }})
+                        </span>
+                    </ng-template>
+                    </mat-card-title>
+                    <mat-icon style="cursor: pointer;" 
+                            (click)="$event.stopPropagation(); toggleChallenge(i)">
+                    {{ challengeExpanded[i] ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
+                    </mat-icon>
+                </div>
+                </mat-card-header>
+                <div *ngIf="challengeExpanded[i]">
+                <mat-card-content>
+                    <div class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Challenge Type</mat-label>
+                        <mat-select formControlName="type" >
+                        <mat-option value="zoomcall">Zoom Call</mat-option>
+                        <mat-option value="challenge">Activity</mat-option>
+                        </mat-select>
+                    </mat-form-field>
+                    </div>
+                    <div *ngIf="curriculum.get('type')?.value === 'challenge' || curriculum.get('type')?.value === 'zoomcall'">
+                    <div class="form-row">
+                        <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>choose icon</mat-label>
+                        <mat-select formControlName="headicon" >
+                            <mat-option *ngFor="let option of iconData" [value]="option['imageUrl']">
+                            <img [src]="option['imageUrl']" alt="icon" width="50" height="50"
+                                style="margin-right: 10px; vertical-align: middle;" />
+                            {{ option['description'] }}
+                            </mat-option>
+                        </mat-select>
+                        </mat-form-field>
+                        <div *ngIf="curriculum.get('headicon')?.value" class="preview-icon">
+                        <img [src]="curriculum.get('headicon')?.value" alt="icon preview" width="40" height="40" style="margin-top: 5px;" />
+                        </div>
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Heading</mat-label>
+                            <input matInput formControlName="heading"  placeholder="Enter heading">
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Sub Heading</mat-label>
+                            <input matInput formControlName="subheading"  placeholder="Enter subheading">
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>description</mat-label>
+                            <input matInput formControlName="description"  placeholder="Enter description">
+                        </mat-form-field>
+                    </div>
+                    <div class="form-row">
+                        <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Choose Category</mat-label>
+                        <mat-select formControlName="workshopcategory"  multiple>
+                            <mat-option *ngFor="let categoryId of uniqueWorkshopCategories || []"
+                                        [value]="categoryId">
+                            {{ workshopCategoriesMap[categoryId] }}
+                            </mat-option>
+                        </mat-select>
+                        </mat-form-field>
+                        <!-- <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Choose Facilitator</mat-label>
+                        <mat-select formControlName="facilitator"  multiple>
+                            <mat-option *ngFor="let type of ['facilitator']" [value]="type">
+                            {{ type }}
+                            </mat-option>
+                        </mat-select>
+                        </mat-form-field> -->
+                        <mat-slide-toggle
+                        [checked]="curriculum.get('facilitatoronly')?.value === true"
+                        (change)="curriculum.get('facilitatoronly')?.setValue($event.checked);">
+                        Facilitator Only
+                        </mat-slide-toggle>
+                    </div>
+                    </div>
+                    <div *ngIf="curriculum.get('type')?.value === 'challenge'">
+                        <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Start Date</mat-label>
+                        <input 
+                             
+                            matInput 
+                            [matDatepicker]="startDatePicker" 
+                            formControlName="startdate"
+                            [disabled]="settingsForm.get('active')?.value"
+                            [readonly]="settingsForm.get('active')?.value">
+                        <mat-datepicker-toggle 
+                            matSuffix 
+                            [for]="startDatePicker"
+                            [disabled]="settingsForm.get('active')?.value"></mat-datepicker-toggle>
+                        <mat-datepicker #startDatePicker [disabled]="settingsForm.get('active')?.value"></mat-datepicker>
+                        </mat-form-field>&nbsp;&nbsp;
+
+                        <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Start Time</mat-label>
+                        <input 
+                            matInput 
+                            formControlName="starttime" 
+                            [matTimepicker]="startTimeePicker"
+                            [disabled]="settingsForm.get('active')?.value">
+                        <mat-timepicker-toggle matSuffix [for]="startTimeePicker"/>
+                        <mat-timepicker #startTimeePicker/>
+                        </mat-form-field>
+                        <!-- <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Start Date</mat-label>
+                            <input  matInput [matDatepicker]="startDatePicker" formControlName="startdate">
+                            <mat-datepicker-toggle matSuffix [for]="startDatePicker"></mat-datepicker-toggle>
+                            <mat-datepicker #startDatePicker></mat-datepicker>
+                        </mat-form-field>&nbsp;&nbsp;
+                        <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Start Time</mat-label>
+                            <input  matInput formControlName="starttime" [matTimepicker]="startTimeePicker">
+                            <mat-timepicker-toggle matSuffix [for]="startTimeePicker"/>
+                            <mat-timepicker #startTimeePicker/>
+                        </mat-form-field> -->
+                     <div cdkDropList (cdkDropListDropped)="dropChallenge(curriculum, $event)" formArrayName="challenges"   style="margin-top: 10px;">
+                       <!-- <div *ngFor="let sub of getChallengeArray(curriculum).controls; let j = index" cdkDrag [formGroupName]="j" class="challenge-item-card"> -->
+                    <div *ngFor="let sub of getChallengeArray(curriculum).controls; let j = index" cdkDrag [cdkDragDisabled]="settingsForm.get('active')?.value" [formGroupName]="j" class="challenge-item-card">
+                        <div style="display: flex; align-items: center;">
+                        <mat-icon 
+                        [style.cursor]="settingsForm.get('active')?.value ? 'not-allowed' : 'grab'"
+                        cdkDragHandle>drag_indicator</mat-icon>
+                        <span style="font-weight: bold;">Activity {{ j + 1 }}</span>
+                        <button mat-icon-button (click)="removeSubChallenge(curriculum, j)">
+                        <mat-icon color="warn">delete</mat-icon>
+                        </button>
+                        </div>
+
+
+                             <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Activity Name</mat-label>
+                                    <input matInput formControlName="name" >
+                                </mat-form-field>
+
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Activity Description</mat-label>
+                                    <input matInput formControlName="description" >
+                                </mat-form-field>
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Activity Type</mat-label>
+                                    <mat-select formControlName="type" (selectionChange)="onTypeChange(sub)" >
+                                    <mat-option *ngFor="let type of challengetype" [value]="type">{{type}}</mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                              </div>
+                             <div class="form-row">
+                                <div *ngIf="sub.get('type')?.value === 'video'">
+                                <div style="display: flex; align-items: center;">
+                                    <section class="example-section">
+                                        <mat-slide-toggle class="example-margin"
+                                        formControlName="previewvideo">
+                                            Preview Video
+                                        </mat-slide-toggle>
+                                    </section>&nbsp;&nbsp;
+                                   <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Select Video</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                    <mat-option *ngFor="let content of videocontent" [value]="content.ref">
+                                        {{ refTitleMap[content.ref.path] }}
+                                    </mat-option>
+                                    </mat-select>
+                                     </mat-form-field>
+                                </div>
+                             </div>
+
+                                <div *ngIf="sub.get('type')?.value === 'audio'">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Select Solar Voice</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                    <mat-option *ngFor="let content of audiocontent" [value]="content.ref">
+                                        {{ refTitleMap[content.ref.path] }}
+                                    </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'audio' || sub.get('type')?.value === 'video'">
+                                <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>choose Thumbnail</mat-label>
+                                <mat-select formControlName="thumbnail" >
+                                    <mat-option *ngFor="let option of thumbnailData" [value]="option['imageUrl']">
+                                    <img [src]="option['imageUrl']" alt="icon" width="50" height="50"
+                                        style="margin-right: 10px; vertical-align: middle;" />
+                                    {{ option['description'] }}
+                                    </mat-option>
+                                </mat-select>
+                                </mat-form-field>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'form'">
+                                <div style="display: flex; align-items: center;">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Form</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                    <mat-option *ngFor="let form of deliveryforms" [value]="form.ref">
+                                        {{ refTitleMap[form.ref.path] }}
+                                    </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                                <button mat-icon-button color="primary" (click)="open('form')" style="margin-left: 8px;">
+                                    <mat-icon>note_add</mat-icon>
+                                </button>
+                                </div>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'videoask'">
+                                <div style="display: flex; align-items: center;">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Video Ask</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                        <mat-option *ngFor="let ask of videoAsk" [value]="ask.ref">
+                                        {{ refTitleMap[ask.ref.path] }}
+                                        </mat-option>
+                                    </mat-select>
+                                    </mat-form-field>
+                                    <button mat-icon-button color="primary" (click)="open('videoask')" style="margin-left: 8px;">
+                                    <mat-icon>video_library</mat-icon>
+                                    </button>
+                                    
+                                    <section class="example-section">
+                                    <mat-slide-toggle 
+                                        class="example-margin"
+                                        formControlName="finalevolution"
+                                        [disabled]="!canEnableEvolutionMapping(i, j)"
+                                        (change)="onEvolutionMappingToggle($event, i, j, sub)">
+                                        Final Evolution Mapping
+                                    </mat-slide-toggle>
+                                    </section>&nbsp;&nbsp;
+                                    
+                                    <mat-form-field 
+                                    appearance="outline" 
+                                    class="full-width"
+                                    *ngIf="sub.get('finalevolution')?.value">
+                                    <mat-label>Choose Before/After</mat-label>
+                                    <mat-select 
+                                        formControlName="finalevolutiontype" 
+                                        (selectionChange)="onEvolutionTypeChange($event.value, i, j)"
+                                        >
+                                        <mat-option 
+                                        *ngFor="let evoltype of getAvailableEvolutionTypes(i, j)" 
+                                        [value]="evoltype">
+                                        {{evoltype}}
+                                        </mat-option>
+                                    </mat-select>
+                                    </mat-form-field>
+                                </div>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'quiz'">
+                                <div style="display: flex; align-items: center;">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Quiz (Multiple)</mat-label>
+                                    <mat-select formControlName="quizref" [compareWith]="compareFn"  multiple>
+                                        <mat-option *ngFor="let e of quiz" [value]="e.ref">
+                                        {{ refTitleMap[e.ref.path] }}
+                                        </mat-option>
+                                    </mat-select>
+                                    <mat-hint>
+                                        Selected: {{ sub.get('quizref')?.value?.length || 0 }} quiz(es)
+                                    </mat-hint>
+                                    </mat-form-field>
+                                    <button mat-icon-button color="primary" (click)="open('quiz')" style="margin-left: 8px;">
+                                    <mat-icon>markunread_mailbox</mat-icon>
+                                    </button>
+                                </div>
+                                
+                                <!-- Optional: Display selected quizzes -->
+                                <div *ngIf="sub.get('quizref')?.value?.length > 0" style="margin-top: 8px;">
+                                    <p style="font-size: 14px; color: #666; margin: 4px 0;">Selected Quizzes:</p>
+                                    <mat-chip-set>
+                                    <mat-chip *ngFor="let selectedQuiz of sub.get('quizref')?.value; let i = index">
+                                        {{ refTitleMap[selectedQuiz.path] || 'Quiz ' + (i + 1) }}
+                                        <button matChipRemove (click)="removeQuizFromSelection(sub, i)">
+                                        <mat-icon>cancel</mat-icon>
+                                        </button>
+                                    </mat-chip>
+                                    </mat-chip-set>
+                                </div>
+                                </div>
+                                <!-- <div *ngIf="sub.get('type')?.value === 'quiz'">
+                                <div style="display: flex; align-items: center;">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Quiz</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                    <mat-option *ngFor="let e of quiz" [value]="e.ref">
+                                        {{ refTitleMap[e.ref.path] }}
+                                    </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                                <button mat-icon-button color="primary" (click)="open('quiz')" style="margin-left: 8px;">
+                                    <mat-icon>markunread_mailbox</mat-icon>
+                                </button>
+                                </div>
+                                </div> -->
+                                <div *ngIf="sub.get('type')?.value === 'zoomcall'">
+                                <div style="display: flex; align-items: center;">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Zoom Link</mat-label>
+                                    <input matInput formControlName="zoomlinkchallenge" placeholder="Enter zoom meeting link" >
+                                </mat-form-field>&nbsp;&nbsp;
+                                <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Meet Date</mat-label>
+                                <input matInput [matDatepicker]="meetDatePicker" formControlName="meetdate" >
+                                <mat-datepicker-toggle matSuffix [for]="meetDatePicker"></mat-datepicker-toggle>
+                                <mat-datepicker #meetDatePicker></mat-datepicker>
+                                </mat-form-field>
+                                </div>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'resource'">
+                                <div class="upload-row">
+                                <button 
+                                    mat-raised-button 
+                                    color="warn" 
+                                    (click)="uploadResource(sub)">
+                                    <span>Upload</span>
+                                </button>
+                                <mat-form-field appearance="outline" class="upload-input">
+                                    <mat-label>Resource Title</mat-label>
+                                    <input matInput formControlName="uploadedresourcetitle" >
+                                </mat-form-field>
+                                <mat-form-field appearance="outline" class="upload-input">
+                                    <mat-label>Resource</mat-label>
+                                    <input [readonly]="true" matInput formControlName="uploadedresource" >
+                                </mat-form-field>
+                                <div *ngIf="sub.get('uploadedfilename')?.value" style="margin-top: 4px; color: #555;">
+                                <mat-icon style="font-size: 16px; vertical-align: middle;">insert_drive_file</mat-icon>
+                                <span style="vertical-align: middle;">{{ sub.get('uploadedfilename')?.value }}</span>
+                                </div>
+
+                                <button 
+                                    *ngIf="sub.get('uploadedresource')?.value"
+                                    mat-icon-button 
+                                    color="primary" 
+                                    (click)="openResourceLink(sub.get('uploadedresource')?.value)"
+                                    matTooltip="Open Uploaded Resource"
+                                    class="open-link-button">
+                                    <mat-icon>open_in_new</mat-icon>
+                                </button>
+                                </div>
+
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'offer'">
+                                    <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Reward head</mat-label>
+                                        <input matInput formControlName="rewardhead" >
+                                    </mat-form-field>
+
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Reward Description</mat-label>
+                                        <input matInput formControlName="rewarddescription" >
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Reward Link</mat-label>
+                                        <input matInput formControlName="rewardlink" >
+                                    </mat-form-field>
+                                    </div>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'evolutionmapping'">
+                                    <div class="form-row">
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Evolution Mapping Title</mat-label>
+                                            <input matInput formControlName="evolutionmappingtitle" >
+                                        </mat-form-field>
+
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Evolution Mapping Description</mat-label>
+                                            <input matInput formControlName="evolutionmappingdescription" >
+                                        </mat-form-field>
+                                        
+                                        <!-- Final Before/After Toggle -->
+                                        <section class="example-section">
+                                            <mat-slide-toggle 
+                                                class="example-margin"
+                                                formControlName="finalbeforeafter"
+                                                [disabled]="!canEnableFinalBeforeAfter()"
+                                                (change)="onFinalBeforeAfterToggle($event, sub)">
+                                                Final Before/After
+                                            </mat-slide-toggle>
+                                        </section>
+                                        
+                                        <!-- Show message if toggle is disabled -->
+                                        <div *ngIf="!canEnableFinalBeforeAfter()" 
+                                            style="margin-top: 8px; padding: 8px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+                                            <mat-icon style="color: #856404; font-size: 16px; vertical-align: middle;">info</mat-icon>
+                                            <span style="color: #856404; margin-left: 4px; font-size: 14px;">
+                                                Both 'before' and 'after' types must be selected in VideoAsk activities to enable this option.
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- <div *ngIf="sub.get('type')?.value === 'evolutionmapping'">
+                                    <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Evolution Mapping Title</mat-label>
+                                        <input matInput formControlName="evolutionmappingtitle" >
+                                    </mat-form-field>
+
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Evolution Mapping Description</mat-label>
+                                        <input matInput formControlName="evolutionmappingdescription" >
+                                    </mat-form-field>
+                                    </div>
+                                </div> -->
+                                <!-- <div *ngIf="sub.get('type')?.value === 'note'">
+                                    <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Note head</mat-label>
+                                        <input matInput formControlName="notehead" >
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Note Description</mat-label>
+                                        <input matInput formControlName="notedescription" >
+                                    </mat-form-field>
+                                    </div>
+                                </div> -->
+                                <!-- <div *ngIf="sub.get('type')?.value === 'note'">
+                                    <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Note head</mat-label>
+                                        <input matInput formControlName="notehead" >
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Note Description</mat-label>
+                                        <input matInput formControlName="notedescription" >
+                                    </mat-form-field>
+                                    </div>
+                                    <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Note Description</mat-label>
+                                        <textarea matInput formControlName="notedescriptionrich" rows="5" ></textarea>
+                                    </mat-form-field>
+                                    </div>
+                                </div> -->
+                                <div *ngIf="sub.get('type')?.value === 'note'">
+                                    <div class="form-row">
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Note head</mat-label>
+                                            <input matInput formControlName="notehead" >
+                                        </mat-form-field>
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Note Description</mat-label>
+                                            <input matInput formControlName="notedescription" >
+                                        </mat-form-field>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="rich-text-section full-width">
+                                            <label class="editor-label">Note Description Rich</label>
+                                            <div class="NgxEditor__Wrapper">
+                                                <ngx-editor-menu 
+                                                    [editor]="getNoteEditor(i, j)" 
+                                                    [toolbar]="toolbar">
+                                                </ngx-editor-menu>
+                                                <ngx-editor
+                                                    [editor]="getNoteEditor(i, j)"
+                                                    [formControlName]="'notedescriptionrich'"
+                                                    [disabled]="false"
+                                                    placeholder="Enter detailed note description..."
+                                                    >
+                                                </ngx-editor>
+                                            </div>
+                                            <div class="editor-hint">
+                                                Rich text editor - Format your note description with bold, italic, lists, and more
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div *ngIf="sub.get('type')?.value === 'assignment'">
+                                <div style="display: flex; align-items: center;">
+                                <section class="example-section">
+                                    <mat-slide-toggle class="example-margin"
+                                    formControlName="reviewassignemnt">
+                                        Review Assignment
+                                    </mat-slide-toggle>
+                                </section>&nbsp;&nbsp;
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Assignment Type</mat-label>
+                                    <mat-select formControlName="assignmenttype" >
+                                    <mat-option *ngFor="let assigntype of ['form','question']" [value]="assigntype">{{assigntype}}</mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                                </div>
+                                </div>
+                                <div>
+                                <!-- <div *ngIf="sub.get('assignmenttype')?.value === 'quiz'">
+                                <div style="display: flex; align-items: center;">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Quiz</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                    <mat-option *ngFor="let e of quiz" [value]="e.ref">
+                                        {{ refTitleMap[e.ref.path] }}
+                                    </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                                <button mat-icon-button color="primary" (click)="open('quiz')" style="margin-left: 8px;">
+                                    <mat-icon>markunread_mailbox</mat-icon>
+                                </button>
+                                </div>
+                                </div> -->
+                                <div *ngIf="sub.get('assignmenttype')?.value === 'form'">
+                                <div style="display: flex; align-items: center;">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Choose Form</mat-label>
+                                    <mat-select formControlName="contentref" [compareWith]="compareFn" >
+                                    <mat-option *ngFor="let form of deliveryforms" [value]="form.ref">
+                                        {{ refTitleMap[form.ref.path] }}
+                                    </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                                <button mat-icon-button color="primary" (click)="open('form')" style="margin-left: 8px;">
+                                    <mat-icon>note_add</mat-icon>
+                                </button>
+                                </div>
+                                </div>
+                                <div *ngIf="sub.get('assignmenttype')?.value === 'question'">
+                                    <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Assignment Topic</mat-label>
+                                        <input matInput formControlName="assignmenttopic" >
+                                    </mat-form-field>
+
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Assignment Description</mat-label>
+                                        <input matInput formControlName="assignmentdescription" >
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Choose Submission Format</mat-label>
+                                        <mat-select formControlName="submissionformat" >
+                                        <mat-option *ngFor="let subtype of ['upload','text']" [value]="subtype">{{subtype}}</mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+                                    <div *ngIf="sub.get('submissionformat')?.value === 'upload'">
+                                        <mat-form-field appearance="outline" class="full-width">
+                                            <mat-label>Upload Type</mat-label>
+                                            <mat-select formControlName="uploadtype" >
+                                            <mat-option *ngFor="let uploadtype of ['pdf','doc','image','video','audio','any']" [value]="uploadtype">{{uploadtype}}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+                                    </div>
+                                </div>
+                                    <div class="form-row"style="margin-left: 0; width: fit-content;">
+                                        <div class="rich-text-section full-width">
+                                            <label class="editor-label">Assignment Description Rich</label>
+                                            <div class="NgxEditor__Wrapper">
+                                                <ngx-editor-menu 
+                                                    [editor]="getAssignmentEditor(i, j)" 
+                                                    [toolbar]="toolbar">
+                                                </ngx-editor-menu>
+                                                <ngx-editor
+                                                    [editor]="getAssignmentEditor(i, j)"
+                                                    [formControlName]="'assignmentdescriptionrich'"
+                                                    [disabled]="false"
+                                                    placeholder="Enter detailed Assignment description..."
+                                                    >
+                                                </ngx-editor>
+                                            </div>
+                                            <div class="editor-hint">
+                                                Rich text editor - Format your Assignment description with bold, italic, lists, and more
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                            <mat-divider></mat-divider><br>
+                        </div>
+                    </div>
+                    <button mat-stroked-button color="accent" (click)="addSubChallenge(curriculum)">
+                        <mat-icon>add</mat-icon> Add Activity
+                    </button>
+             </div>
+
+                    <div *ngIf="curriculum.get('type')?.value === 'zoomcall'" class="form-row">
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Zoom Link</mat-label>
+                        <input matInput formControlName="zoomlink" placeholder="Enter zoom meeting link" >
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Completed Zoom Url</mat-label>
+                        <input matInput formControlName="completedzoomurl" placeholder="Enter zoom meeting link" >
+                    </mat-form-field>
+                    <mat-slide-toggle
+                    [checked]="curriculum.get('status')?.value === 'completed'"
+                    (change)="curriculum.get('status')?.setValue($event.checked ? 'completed' : null);">
+                    Completed
+                    </mat-slide-toggle>
+                    <mat-slide-toggle
+                    [checked]="curriculum.get('hidezoom')?.value === true"
+                    (change)="curriculum.get('hidezoom')?.setValue($event.checked);">
+                    Hide Call
+                    </mat-slide-toggle>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Live Call Starts Text</mat-label>
+                        <input matInput formControlName="startlivecall" placeholder="Enter here" >
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Call Start Date</mat-label>
+                        <input  matInput [matDatepicker]="dueDatePicker" formControlName="duedate">
+                        <mat-datepicker-toggle matSuffix [for]="dueDatePicker"></mat-datepicker-toggle>
+                        <mat-datepicker #dueDatePicker></mat-datepicker>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Call Start Time</mat-label>
+                        <input  matInput formControlName="duetime" [matTimepicker]="dueTimeePicker">
+                        <mat-timepicker-toggle matSuffix [for]="dueTimeePicker"/>
+                        <mat-timepicker #dueTimeePicker/>
+                    </mat-form-field>
+
+                </div>
+                </mat-card-content>
+
+                <mat-card-actions align="end">
+                    <button mat-icon-button color="warn" (click)="removeCurriculum(i)">
+                    <mat-icon>delete</mat-icon>
+                    </button>
+                </mat-card-actions>
+                </div>
+                </mat-card>
+            </div>
+            <div class="form-section">
+            <button 
+                mat-stroked-button 
+                color="primary" 
+                (click)="addCurriculum()" 
+                type="button">
+                <mat-icon>add</mat-icon> Add Challenge
+            </button>
+            </div>
+            </div>
+        </form>
+        </mat-card-content>
+
+        <!-- <mat-card-actions align="end">
+        <button 
+            mat-raised-button 
+            color="primary" 
+            (click)="saveChallengesPage()"
+            [disabled]="loading || challengesPageForm.invalid">
+            <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+            <span *ngIf="!loading">Save Configuration</span>
+        </button>
+        </mat-card-actions>         -->
+        </mat-card>
+        <!-- settings page start -->
+        <mat-card *ngIf="selectedMenu === 'challengesettings'" class="form-card">
+            <mat-card-header>
+                <mat-card-title>
+                    Workshop Settings
+                </mat-card-title>
+            </mat-card-header>
+            
+            <mat-card-content>
+                <form [formGroup]="settingsForm" class="detail-form">
+                    <div class="form-section">
+                        <!-- <h3 class="section-title">Workshop Status</h3> -->
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa; flex-wrap: wrap;">
+                            <mat-slide-toggle 
+                                formControlName="testmode"
+                                (change)="onToggleChange('testmode', $event)"
+                                color="primary">
+                                Workshop TestMode
+                            </mat-slide-toggle>
+
+                            <div style="flex: 1;">
+                                <p style="margin: 0; color: #333; font-weight: 500;">
+                                {{ settingsForm.get('testmode')?.value ? 'Active' : 'Inactive' }}
+                                </p>
+                                <p style="margin: 0; color: #666; font-size: 14px;">
+                                {{ settingsForm.get('testmode')?.value ? 
+                                'Workshop is currently in Test Mode' : 
+                                'Workshop is Not in Test Mode' }}
+                                </p>
+                            </div>
+
+                            <mat-icon [style.color]="settingsForm.get('testmode')?.value ? '#4caf50' : '#f44336'">
+                                {{ settingsForm.get('testmode')?.value ? 'check_circle' : 'cancel' }}
+                            </mat-icon>
+                                <div style="flex: 1 1 100%; margin-top: 16px;">
+                                    <mat-form-field appearance="outline" class="w-100">
+                                        <mat-label>Select Profiles</mat-label>
+                                        <mat-select formControlName="testusers" multiple>
+                                            <mat-option *ngFor="let profile of names" [value]="profile.id">
+                                                {{ profile.name }}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-hint>Selected {{ settingsForm.get('testusers')?.value?.length || 0 }} users</mat-hint>
+                                    </mat-form-field>
+                                    
+                                    <div *ngIf="settingsForm.get('testusers')?.value?.length > 0" style="margin-top: 12px;">
+                                        <mat-chip-set>
+                                            <ng-container *ngFor="let profile of names">
+                                                <mat-chip 
+                                                    *ngIf="settingsForm.get('testusers')?.value?.includes(profile.id)"
+                                                    [removable]="true"
+                                                    (removed)="removeUser(profile.id)">
+                                                    {{ profile.name }}
+                                                    <button matChipRemove>
+                                                        <mat-icon>cancel</mat-icon>
+                                                    </button>
+                                                </mat-chip>
+                                            </ng-container>
+                                        </mat-chip-set>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="active"
+                                    (change)="onToggleChange('active', $event)"
+                                    color="primary">
+                                    Workshop Active
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('active')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('active')?.value ? 
+                                        'Workshop is currently active and visible to participants' : 
+                                        'Workshop is inactive and hidden from participants' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('active')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('active')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="qanda"
+                                    (change)="onToggleChange('qanda', $event)"
+                                    color="primary">
+                                    Enable Q&A
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('qanda')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('qanda')?.value ? 
+                                        'Q&A is currently active and visible to participants' : 
+                                        'Q&A is inactive and hidden from participants' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('qanda')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('qanda')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="breakdown"
+                                    (change)="onToggleChange('breakdown', $event)"
+                                    color="primary">
+                                    Workshop Breakdown (Active / Members Completed)
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('breakdown')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('breakdown')?.value ? 
+                                        'Workshop breakdown is currently active and visible to participants' : 
+                                        'Workshop breakdown is inactive and hidden from participants' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('breakdown')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('breakdown')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="enableshare"
+                                    (change)="onToggleChange('enableshare', $event)"
+                                    color="primary">
+                                    Enable Share
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('enableshare')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('enableshare')?.value ? 
+                                        'Workshop is currently able to share with others' : 
+                                        'Workshop is able to share with others' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('enableshare')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('enableshare')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                        </div>
+                        <h3 class="section-title">Workshop For</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="activeparticipants"
+                                    (change)="onToggleChange('activeparticipants', $event)"
+                                    color="primary">
+                                    Workshop only for Active Participants
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('activeparticipants')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('activeparticipants')?.value ? 
+                                        'Workshop is for Active participants' : 
+                                        '' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('activeparticipants')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('activeparticipants')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                        </div>
+                        <!-- for new users -->
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="newusersonly"
+                                    (change)="onToggleChange('newusersonly', $event)"
+                                    color="primary">
+                                    Workshop only for New Users
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('newusersonly')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('newusersonly')?.value ? 
+                                        'Workshop is for New participants' : 
+                                        '' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('newusersonly')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('newusersonly')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa; flex-wrap: wrap;">
+                            <mat-slide-toggle 
+                                formControlName="journeybased"
+                                (change)="onToggleChange('journeybased', $event)"
+                                color="primary">
+                                Journey Based
+                            </mat-slide-toggle>
+
+                            <div style="flex: 1;">
+                                <p style="margin: 0; color: #333; font-weight: 500;">
+                                {{ settingsForm.get('journeybased')?.value ? 'Active' : 'Inactive' }}
+                                </p>
+                                <p style="margin: 0; color: #666; font-size: 14px;">
+                                {{ settingsForm.get('journeybased')?.value ? 
+                                'Workshop is Only for Journey Based' : 
+                                '' }}
+                                </p>
+                            </div>
+
+                            <mat-icon [style.color]="settingsForm.get('journeybased')?.value ? '#4caf50' : '#f44336'">
+                                {{ settingsForm.get('journeybased')?.value ? 'check_circle' : 'cancel' }}
+                            </mat-icon>
+                                <div style="flex: 1 1 100%; margin-top: 16px;">
+                                    <mat-form-field appearance="outline" class="w-100">
+                                        <mat-label>Select Journey</mat-label>
+                                        <mat-select formControlName="selectedjourneys" multiple>
+                                            <mat-option *ngFor="let journey of journeyData" [value]="journey.id">
+                                                {{ journey.journey }}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-hint>Selected {{ settingsForm.get('selectedjourneys')?.value?.length || 0 }} users</mat-hint>
+                                    </mat-form-field>
+                                    
+                                    <div *ngIf="settingsForm.get('selectedjourneys')?.value?.length > 0" style="margin-top: 12px;">
+                                        <mat-chip-set>
+                                            <ng-container *ngFor="let journey of journeyData">
+                                                <mat-chip 
+                                                    *ngIf="settingsForm.get('selectedjourneys')?.value?.includes(journey.id)"
+                                                    [removable]="true"
+                                                    (removed)="removeJourney(journey.id)">
+                                                    {{ journey.journey }}
+                                                    <button matChipRemove>
+                                                        <mat-icon>cancel</mat-icon>
+                                                    </button>
+                                                </mat-chip>
+                                            </ng-container>
+                                        </mat-chip-set>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+                        <br><br>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa; flex-wrap: wrap;">
+                            <mat-slide-toggle 
+                                formControlName="tierbased"
+                                (change)="onToggleChange('tierbased', $event)"
+                                color="primary">
+                                Tier Based
+                            </mat-slide-toggle>
+
+                            <div style="flex: 1;">
+                                <p style="margin: 0; color: #333; font-weight: 500;">
+                                {{ settingsForm.get('tierbased')?.value ? 'Active' : 'Inactive' }}
+                                </p>
+                                <p style="margin: 0; color: #666; font-size: 14px;">
+                                {{ settingsForm.get('tierbased')?.value ? 
+                                'Workshop is for Tier Based' : 
+                                '' }}
+                                </p>
+                            </div>
+
+                            <mat-icon [style.color]="settingsForm.get('tierbased')?.value ? '#4caf50' : '#f44336'">
+                                {{ settingsForm.get('tierbased')?.value ? 'check_circle' : 'cancel' }}
+                            </mat-icon>
+                                <div style="flex: 1 1 100%; margin-top: 16px;">
+                                    <mat-form-field appearance="outline" class="w-100">
+                                        <mat-label>Select Tier</mat-label>
+                                        <mat-select formControlName="selectedtiers" multiple>
+                                            <mat-option *ngFor="let tier of tierData" [value]="tier.id">
+                                                {{ tier.tier }}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-hint>Selected {{ settingsForm.get('selectedtiers')?.value?.length || 0 }} users</mat-hint>
+                                    </mat-form-field>
+                                    
+                                    <div *ngIf="settingsForm.get('selectedtiers')?.value?.length > 0" style="margin-top: 12px;">
+                                        <mat-chip-set>
+                                            <ng-container *ngFor="let tier of tierData">
+                                                <mat-chip 
+                                                    *ngIf="settingsForm.get('selectedtiers')?.value?.includes(tier.id)"
+                                                    [removable]="true"
+                                                    (removed)="removeTier(tier.id)">
+                                                    {{ tier.tier }}
+                                                    <button matChipRemove>
+                                                        <mat-icon>cancel</mat-icon>
+                                                    </button>
+                                                </mat-chip>
+                                            </ng-container>
+                                        </mat-chip-set>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+                        <br><br>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa; flex-wrap: wrap;">
+                            <mat-slide-toggle 
+                                formControlName="categorybased"
+                                (change)="onToggleChange('categorybased', $event)"
+                                color="primary">
+                                Category Based
+                            </mat-slide-toggle>
+
+                            <div style="flex: 1;">
+                                <p style="margin: 0; color: #333; font-weight: 500;">
+                                {{ settingsForm.get('categorybased')?.value ? 'Active' : 'Inactive' }}
+                                </p>
+                                <p style="margin: 0; color: #666; font-size: 14px;">
+                                {{ settingsForm.get('categorybased')?.value ? 
+                                'Workshop is Now Category Based' : 
+                                '' }}
+                                </p>
+                            </div>
+
+                            <mat-icon [style.color]="settingsForm.get('categorybased')?.value ? '#4caf50' : '#f44336'">
+                                {{ settingsForm.get('categorybased')?.value ? 'check_circle' : 'cancel' }}
+                            </mat-icon>
+                                <div style="flex: 1 1 100%; margin-top: 16px;">
+                                    <button 
+                                        mat-stroked-button 
+                                        color="primary" 
+                                        (click)="createCategory()" 
+                                        type="button">
+                                        <mat-icon>category</mat-icon> Create Category
+                                    </button>
+                                    <div style="margin-top: 12px;">
+                                    <h4>Available Categories</h4>
+                                        <mat-chip-set>
+                                        <ng-container *ngFor="let category of workshopCategories">
+                                            <mat-chip (click)="editCategory(category)">
+                                            {{ category.name }} ({{category.description}})
+                                            </mat-chip>
+                                        </ng-container>
+                                        </mat-chip-set>
+
+                                    </div>
+                                    <br>
+                                    <!-- <mat-form-field appearance="outline" class="w-100">
+                                    <mat-label>Select Category for this Workshop</mat-label>
+                                    <mat-select formControlName="categoriesforthisworkshop" multiple>
+                                        <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id">
+                                        {{ categories.name }} ({{categories.description}})
+                                        </mat-option>
+                                    </mat-select>
+                                    <mat-hint>Selected {{ settingsForm.get('categoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
+                                    </mat-form-field> -->
+
+                                    <!-- <mat-form-field appearance="outline" class="w-100">
+                                        <mat-label>Select Category for this Workshop</mat-label>
+                                        <mat-select formControlName="categoriesforthisworkshop" multiple>
+                                            <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id">
+                                                {{ categories.name }}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-hint>Selected {{ settingsForm.get('categoriesforthisworkshop')?.value?.length || 0 }} users</mat-hint>
+                                    </mat-form-field> -->
+                                    <!-- <div *ngIf="settingsForm.get('categoriesforthisworkshop')?.value?.length > 0" style="margin-top: 12px;">
+                                        <mat-chip-set>
+                                            <ng-container *ngFor="let categories of workshopCategories">
+                                                <mat-chip 
+                                                    *ngIf="settingsForm.get('categoriesforthisworkshop')?.value?.includes(categories.id)"
+                                                    [removable]="true"
+                                                    (removed)="removecategoriesforthisworkshop(categories.id)">
+                                                    {{ categories.name }} ({{categories.description}})
+                                                    <button matChipRemove>
+                                                        <mat-icon>cancel</mat-icon>
+                                                    </button>
+                                                </mat-chip>
+                                            </ng-container> 
+                                        </mat-chip-set>
+                                    </div> -->
+                                    <mat-form-field appearance="outline" class="w-100">
+                                    <mat-label>Select Category for this Workshop</mat-label>
+                                    <mat-select formControlName="categoriesforthisworkshop" multiple>
+                                        <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id">
+                                        {{ categories.name }} ({{categories.description}})
+                                        </mat-option>
+                                    </mat-select>
+                                    <mat-hint>Selected {{ settingsForm.get('categoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
+                                    </mat-form-field>
+                                    <div *ngIf="settingsForm.get('categoriesforthisworkshop')?.value?.length > 0" style="margin-top: 12px;">
+                                    <p style="font-size: 13px; color: #666; margin-bottom: 6px;">
+                                        <mat-icon style="font-size: 16px; vertical-align: middle;">drag_indicator</mat-icon>
+                                        Drag to reorder categories:
+                                    </p>
+                                    <div
+                                        cdkDropList
+                                        (cdkDropListDropped)="dropCategory($event)"
+                                        style="display: flex; flex-direction: column; gap: 6px;">
+                                        <div
+                                        *ngFor="let catId of settingsForm.get('categoriesforthisworkshop')?.value; let i = index"
+                                        cdkDrag
+                                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 6px; background: #fff; cursor: grab;">
+                                        <mat-icon cdkDragHandle style="cursor: grab; color: #999;">drag_indicator</mat-icon>
+                                        <span>{{ workshopCategoriesMap[catId] }}</span>
+                                        <span style="color: #999; font-size: 12px;">#{{ i + 1 }}</span>
+                                        <button mat-icon-button color="warn" (click)="removecategoriesforthisworkshop(catId)" style="margin-left: auto;">
+                                            <mat-icon>cancel</mat-icon>
+                                        </button>
+                                        </div>
+                                    </div>
+                                    </div>
+                                    <br>
+                                    <hr>
+                                    <br>
+                                    <!-- <mat-form-field appearance="outline" class="full-width-max">
+                                    <mat-label>Select Cohorts for this Workshop</mat-label>
+                                    <mat-select formControlName="cohortsforthisworkshop" multiple>
+                                        <mat-option *ngFor="let cohort of bigCohorts" [value]="cohort.id">
+                                        {{ cohort.name }} - ({{cohort.participantidlist.length}} Participants)
+                                        </mat-option>
+                                    </mat-select>
+                                    <mat-hint>Selected {{ settingsForm.get('cohortsforthisworkshop')?.value?.length || 0 }} Cohort</mat-hint>
+                                    </mat-form-field> -->
+                                    <mat-form-field appearance="outline" class="full-width-max">
+                                    <mat-label>Select Cohorts for this Workshop</mat-label>
+                                    <mat-select
+                                        formControlName="cohortsforthisworkshop"
+                                        multiple
+                                        (selectionChange)="onCohortSelectionChange($event)"
+                                    >
+                                        <mat-option
+                                        *ngFor="let cohort of bigCohorts"
+                                        [value]="cohort.id"
+                                        [disabled]="isCohortDisabled(cohort.id)"
+                                        >
+                                        {{ cohort.name }} - ({{ cohort.participantidlist?.length || 0 }} Participants)
+                                        </mat-option>
+                                    </mat-select>
+                                    <mat-hint>
+                                        Selected {{ settingsForm.get('cohortsforthisworkshop')?.value?.length || 0 }} Cohort
+                                    </mat-hint>
+                                    </mat-form-field>
+
+                                    &nbsp;&nbsp;
+                                    <mat-form-field appearance="outline" class="full-width-max">
+                                    <mat-label>Select Category for Cohort</mat-label>
+                                    <mat-select formControlName="cohortcategoriesforthisworkshop" multiple
+                                    (selectionChange)="onCohortCategorySelectionChange($event)"
+                                    >
+                                        <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id"
+                                        [disabled]="onCohortCategoryDisabled(categories.id)">
+                                        {{ categories.name }} ({{categories.description}})
+                                        </mat-option>
+                                    </mat-select>
+                                    <mat-hint>Selected {{ settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
+                                    </mat-form-field>
+                                    <br>
+                                    <div *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length > 0" style="margin-top: 12px;">
+                                        <mat-chip-set>
+                                            <ng-container *ngFor="let categories of workshopCategories">
+                                                <mat-chip 
+                                                    *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.includes(categories.id)"
+                                                    [removable]="true"
+                                                    (removed)="removeCohortcategoriesforthisworkshop(categories.id)">
+                                                    {{ categories.name }} ({{categories.description}})
+                                                    <button matChipRemove>
+                                                        <mat-icon>cancel</mat-icon>
+                                                    </button>
+                                                </mat-chip>
+                                            </ng-container> 
+                                        </mat-chip-set>
+                                    </div>
+                                    <br>
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Thumbnail Image URL</mat-label>
+                                        <input matInput formControlName="categorythumbnail" placeholder="Enter thumbnail image URL" >
+                                        <button mat-icon-button (click)="uploadcategoryThumbnail()" matSuffix>
+                                            <mat-icon>upload</mat-icon>
+                                        </button>
+                                    </mat-form-field>&nbsp;&nbsp;
+                                    
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Video URL</mat-label>
+                                        <input matInput formControlName="categoryVideo" placeholder="Enter title video URL" >
+                                        <button mat-icon-button (click)="uploadcategoryVideo()" matSuffix>
+                                            <mat-icon>upload</mat-icon>
+                                        </button>
+                                    </mat-form-field>
+                                </div>
+
+                            </div>
+
+                        </div>
+                        <br>
+                        <h3 class="section-title">Workshop Facilitator</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa; flex-wrap: wrap;">
+                            <mat-slide-toggle 
+                                formControlName="facilitator"
+                                (change)="onToggleChange('facilitator', $event)"
+                                color="primary">
+                                Workshop facilitator
+                            </mat-slide-toggle>
+
+                            <div style="flex: 1;">
+                                <p style="margin: 0; color: #333; font-weight: 500;">
+                                {{ settingsForm.get('facilitator')?.value ? 'Active' : 'Inactive' }}
+                                </p>
+                                <p style="margin: 0; color: #666; font-size: 14px;">
+                                {{ settingsForm.get('facilitator')?.value ? 
+                                'Workshop Facilitator Enabled' : 
+                                '' }}
+                                </p>
+                            </div>
+
+                            <mat-icon [style.color]="settingsForm.get('facilitator')?.value ? '#4caf50' : '#f44336'">
+                                {{ settingsForm.get('facilitator')?.value ? 'check_circle' : 'cancel' }}
+                            </mat-icon>
+                                <div style="flex: 1 1 100%; margin-top: 16px;">
+                                    <mat-form-field appearance="outline" class="w-100">
+                                        <mat-label>Select Facilitators</mat-label>
+                                        <mat-select formControlName="facilitatorprofiles" multiple>
+                                            <mat-option *ngFor="let facilitators of names" [value]="facilitators.id">
+                                                {{ facilitators.name }}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-hint>Selected {{ settingsForm.get('facilitatorprofiles')?.value?.length || 0 }} users</mat-hint>
+                                    </mat-form-field>
+                                    
+                                    <div *ngIf="settingsForm.get('facilitatorprofiles')?.value?.length > 0" style="margin-top: 12px;">
+                                        <mat-chip-set>
+                                            <ng-container *ngFor="let facilitators of names">
+                                                <mat-chip 
+                                                    *ngIf="settingsForm.get('facilitatorprofiles')?.value?.includes(facilitators.id)"
+                                                    [removable]="true"
+                                                    (removed)="removeFacilitator(facilitators.id)">
+                                                    {{ facilitators.name }}
+                                                    <button matChipRemove>
+                                                        <mat-icon>cancel</mat-icon>
+                                                    </button>
+                                                </mat-chip>
+                                            </ng-container>
+                                        </mat-chip-set>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="section-title">Workshop Mail Template Message</h3>
+                        <div formGroupName="mailTemplate">
+                            <div
+                            style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;"
+                            >
+                            <mat-form-field appearance="outline" style="width: 100%;">
+                                <mat-label>Mail Subject</mat-label>
+                                <textarea matInput formControlName="subject" rows="3"></textarea>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" style="width: 100%;">
+                                <mat-label>Mail Description</mat-label>
+                                <textarea matInput formControlName="description" rows="3"></textarea>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" style="width: 100%;">
+                                <mat-label>Live Call Text</mat-label>
+                                <textarea matInput formControlName="liveCallText" rows="3"></textarea>
+                            </mat-form-field>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="section-title">Workshop Watti enrollwattimessage</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                            <mat-form-field appearance="outline" style="width: 100%;">
+                                <mat-label>Message</mat-label>
+                                <textarea matInput formControlName="enrollwattimessage" rows="3"></textarea>
+                            </mat-form-field>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="section-title">Workshop Chat</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-form-field appearance="outline" class="w-100">
+                                    <mat-label>Select Chat Group</mat-label>
+                                    <mat-select formControlName="selectedgroup">
+                                        <mat-option *ngFor="let group of chatgroupslist" [value]="group.id">
+                                            {{ group.group_name }}
+                                        </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="section-title">Workshop Hero Image</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="hero"
+                                    (change)="onToggleChange('hero', $event)"
+                                    color="primary">
+                                    Hero Active
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('hero')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('hero')?.value ? 
+                                        'Workshop Hero is currently active and visible to participants' : 
+                                        'Workshop Hero is inactive and hidden from participants' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('hero')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('hero')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                            <mat-form-field appearance="outline" style="width: 100%;">
+                                <mat-label>Hero Heading</mat-label>
+                                <textarea matInput formControlName="heroHeading" rows="2"></textarea>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" style="width: 100%;">
+                                <mat-label>Hero Description</mat-label>
+                                <textarea matInput formControlName="heroDescription" rows="3"></textarea>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Hero Type</mat-label>
+                            <mat-select  formControlName="heroshowtype">
+                                <mat-option value="image">Image</mat-option>
+                                <mat-option value="video">Video</mat-option>
+                            </mat-select>
+                            </mat-form-field>
+                            <div>
+                                <p>Choose Image - Image Size (3840 / 1350)</p>
+                                <input type="file" (change)="onHeroImageUpload($event)" />
+                                <div *ngIf="settingsForm.get('heroImage')?.value">
+                                <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image" style="max-width: 200px; margin-top: 8px; border-radius: 8px;">
+                                </div>
+                            </div>
+                            <div>
+                            <p>Choose Video</p>
+                            <input type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
+
+                            <div *ngIf="settingsForm.get('heroVideo')?.value">
+                                <video
+                                [src]="settingsForm.get('heroVideo')?.value"
+                                controls
+                                style="max-width: 300px; margin-top: 8px; border-radius: 8px;"
+                                ></video>
+                            </div>
+                            </div>
+
+                            </div>
+
+                        </div>
+                    </div>
+                </form>
+            </mat-card-content>
+            
+            <!-- <mat-card-actions align="end">
+                <button 
+                    mat-raised-button 
+                    color="primary" 
+                    (click)="saveSettings()"
+                    [disabled]="loading">
+                    <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+                    <span *ngIf="!loading">Save Settings</span>
+                </button>
+            </mat-card-actions> -->
+        </mat-card>
+        <!-- settings page end -->
+        
+        <mat-card *ngIf="selectedMenu === 'payment'" class="form-card">
+            <mat-card-header>
+            <mat-card-title>
+                Payment Configuration
+            </mat-card-title>
+            </mat-card-header>
+            
+            <mat-card-content>
+            <!-- <div class="developing-message">
+                <mat-icon class="developing-icon">construction</mat-icon>
+                <p>Payment configuration is currently under development. Please wait for the next update.</p>
+            </div> -->
+            </mat-card-content>
+        </mat-card>
+
+        <mat-card *ngIf="!selectedMenu" class="empty-state-card">
+            <mat-card-content>
+            <div class="empty-state">
+                <mat-icon class="empty-icon">settings</mat-icon>
+                <h3>Select Configuration Type</h3>
+                <p>Please select "Detail Page" or "Challenges" from the menu to start configuring your workshop.</p>
+            </div>
+            </mat-card-content>
+        </mat-card>
+        </div>
+  </div>
+</div>

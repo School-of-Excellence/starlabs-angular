@@ -1,0 +1,800 @@
+<div class="main-container" [class.panel-open]="showParticipantPanel">
+  <!-- Main Content Area -->
+  <div class="content-area">
+    <h2 style="text-align: center;">Queue Planning <b *ngIf="this.selectedQueue != null" style="color:#234C58">for
+        {{this.selectedQueue?.['queuename'] || ''}}</b></h2>
+
+    <div class="header-section">
+      <!-- Queue Selection -->
+      <mat-form-field appearance="outline" class="queue-select">
+        <mat-label>Select Queue</mat-label>
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="searchQueue" placeholderLabel="Search Queue..."
+              noEntriesFoundLabel="No queues found">
+            </ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let queue of returnQueue()" [value]="queue">
+            {{ queue.queuename }} <span *ngIf="queue.queuevariation != null && queue.queuevariation.length > 0"> - (
+              Variations: {{queue.queuevariation.length}} )</span>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button type="button" (click)="managelist()">Lists & Segments</button>
+
+    </div>
+
+    <!-- Loading Spinner -->
+    <div *ngIf="loading" class="loading-container">
+      <mat-spinner diameter="50"></mat-spinner>
+      <p>Loading...</p>
+    </div>
+
+    <!-- Filters Section -->
+    <div *ngIf="selectedQueue && !loading" class="filters-section">
+      <div class="filters-header">
+        <h3>
+          <mat-icon>filter_list</mat-icon>
+          Filters
+        </h3>
+        <button mat-stroked-button class="clear-filters-btn" (click)="clearAllFilters()" *ngIf="hasActiveFilters()">
+          <mat-icon>clear_all</mat-icon>
+          Clear All Filters
+        </button>
+      </div>
+
+      <div class="filters-content">
+        <!-- Date Range Filter -->
+        <div class="filter-group">
+          <div class="date-range-inputs">
+            <mat-form-field appearance="outline" class="date-filter">
+              <mat-label>Start Date</mat-label>
+              <input matInput [matDatepicker]="filterStartPicker" [(ngModel)]="filterDateStart" placeholder="From">
+              <mat-datepicker-toggle matSuffix [for]="filterStartPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterStartPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="date-filter">
+              <mat-label>End Date</mat-label>
+              <input matInput [matDatepicker]="filterEndPicker" [(ngModel)]="filterDateEnd" placeholder="To">
+              <mat-datepicker-toggle matSuffix [for]="filterEndPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterEndPicker></mat-datepicker>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- Segment Search Filter -->
+        <div class="filter-group">
+          <mat-form-field appearance="outline" class="segment-search-filter">
+            <mat-label>Search Segments</mat-label>
+            <input matInput [(ngModel)]="filterSegmentSearch" placeholder="Type segment name...">
+            <mat-icon matPrefix>search</mat-icon>
+            <button mat-icon-button matSuffix *ngIf="filterSegmentSearch" (click)="filterSegmentSearch = ''">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+        </div>
+
+        <!-- Tags Filter -->
+        <div class="filter-group">
+          <mat-form-field appearance="outline" class="tags-filter">
+            <mat-label>Filter by Tags</mat-label>
+            <mat-select [(ngModel)]="filterSelectedTags" multiple placeholder="Select tags">
+              <mat-option *ngFor="let tag of participantTagsList" [value]="tag.id">
+                {{ tag.name }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>label</mat-icon>
+          </mat-form-field>
+        </div>
+
+        <!-- Participant Lists Filter -->
+        <div class="filter-group">
+          <mat-form-field appearance="outline" class="lists-filter">
+            <mat-label>Filter by Participant Lists</mat-label>
+            <mat-select [(ngModel)]="filterSelectedLists" multiple placeholder="Select lists">
+              <mat-option *ngFor="let list of participantListsList" [value]="list.id">
+                {{ list.listname }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>list</mat-icon>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Active Filters Display -->
+      <div class="active-filters" *ngIf="hasActiveFilters()">
+        <div class="active-filters-label">Active Filters:</div>
+        <mat-chip-set class="filter-chips">
+          <mat-chip *ngIf="filterSegmentSearch" (removed)="filterSegmentSearch = ''" [removable]="true">
+            <mat-icon matChipAvatar>search</mat-icon>
+            Search: "{{ filterSegmentSearch }}"
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+
+          <mat-chip *ngIf="filterDateStart || filterDateEnd" (removed)="filterDateStart = null; filterDateEnd = null"
+            [removable]="true">
+            <mat-icon matChipAvatar>date_range</mat-icon>
+            {{ filterDateStart ? (filterDateStart | date:'MMM d, y') : 'Any' }} - {{ filterDateEnd ? (filterDateEnd |
+            date:'MMM d, y') : 'Any' }}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+
+          <mat-chip *ngFor="let tagId of filterSelectedTags" (removed)="removeTagFilter(tagId)" [removable]="true">
+            <mat-icon matChipAvatar>label</mat-icon>
+            {{ getTagName(tagId) }}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+
+          <mat-chip *ngFor="let listId of filterSelectedLists" (removed)="removeListFilter(listId)" [removable]="true">
+            <mat-icon matChipAvatar>list</mat-icon>
+            {{ getParticipantListName(listId) }}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+    </div>
+
+    <!-- Planning Table -->
+    <div *ngIf="selectedQueue && !loading" class="planning-container">
+      <div class="results-summary" *ngIf="hasActiveFilters()">
+        <mat-icon>info</mat-icon>
+        Showing {{ getFilteredPlanningRows().length }} of {{ planningRows.length }} rows
+      </div>
+
+      <div class="table-wrapper">
+        <table class="planning-table">
+          <thead>
+            <tr>
+              <th class="segment-col sticky-col"><b>Segment</b></th>
+              <th class="variation-col sticky-col-2"><b>Variation</b></th>
+              <th *ngFor="let stage of queueStages" class="stage-col">
+                <div class="th-content">
+                  <b>{{ stage }}</b>
+                  <button mat-icon-button type="button" (click)="createSlotMultipleSegments(stage)"
+                    [matTooltip]="'Create Slot for ' + stage">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of getFilteredPlanningRows()" class="planning-row">
+              <!-- Segment Column -->
+              <td class="segment-cell sticky-col">
+                <div class="segment-info">
+                  <div class="segment-name" *ngIf="row.selectedSegment">
+                    <mat-icon class="info-icon">label</mat-icon>
+                    <span>{{ getSegmentName(row.selectedSegment) }}</span>
+                  </div>
+
+                  <!-- Display Tags Below Segment Name -->
+                  <div class="segment-tags"
+                    *ngIf="row.selectedSegment && getSegmentTags(row.selectedSegment).length > 0">
+                    <mat-chip-set>
+                      <mat-chip *ngFor="let tag of getSegmentTags(row.selectedSegment)" class="segment-tag-chip">
+                        <mat-icon class="tag-icon">label</mat-icon>
+                        {{ tag }}
+                      </mat-chip>
+                    </mat-chip-set>
+                  </div>
+
+                  <div class="segment-placeholder" *ngIf="!row.selectedSegment && row.selectedVariation">
+                    <span>No segment selected</span>
+                  </div>
+                  <div class="segment-warning" *ngIf="!row.selectedVariation">
+                    <mat-icon class="warning-icon">warning</mat-icon>
+                    <span>Select variation first</span>
+                  </div>
+                </div>
+
+                <!-- Non-Selected Participants Count -->
+                <div class="segment-actions">
+                  <button mat-stroked-button class="btn-edit-row" (click)="editSegment(row)"
+                    [disabled]="!row.selectedVariation"
+                    [matTooltip]="!row.selectedVariation ? 'Select variation first' : 'Edit segment'">
+                    <mat-icon>edit</mat-icon> Edit Segment
+                  </button>
+
+                  <!-- <button *ngIf="row.selectedSegment" mat-stroked-button class="btn-participants"
+                    [matBadge]="getNonSelectedCount(row.selectedSegment)"
+                    [matBadgeHidden]="getNonSelectedCount(row.selectedSegment) === 0" matBadgeColor="warn"
+                    (click)="showNonSelectedParticipants(row.selectedSegment)">
+                    <mat-icon>person_off</mat-icon>
+                    Non-Queue Participants
+                  </button> -->
+                  <button mat-stroked-button class="btn-delete" (click)="removeRow(row.id)"
+                    [disabled]="planningRows.length === 1">
+                    <mat-icon>delete</mat-icon> Remove Row
+                  </button>
+
+                  <!-- <button *ngIf="row.selectedSegment && row.selectedVariation" mat-stroked-button
+                    class="btn-confirmed-participants"
+                    [matBadge]="getConfirmedParticipantsCount(row.selectedSegment, row.selectedVariation)"
+                    [matBadgeHidden]="getConfirmedParticipantsCount(row.selectedSegment, row.selectedVariation) === 0"
+                    matBadgeColor="primary"
+                    (click)="showConfirmedParticipants(row.selectedSegment, row.selectedVariation)">
+                    <mat-icon>how_to_reg</mat-icon>
+                    Confirmed Participants
+                  </button> -->
+                </div>
+              </td>
+
+              <!-- Variation Column - STICKY -->
+              <td class="variation-cell sticky-col-2">
+                <div class="variation-info">
+                  <div class="variation-name" *ngIf="row.selectedVariation">
+                    <mat-icon class="info-icon">category</mat-icon>
+                    <span>{{ getVariationName(row.selectedVariation) }}</span>
+                  </div>
+                  <div class="variation-placeholder" *ngIf="!row.selectedVariation">
+                    <span>No variation selected</span>
+                  </div>
+                </div>
+
+                <div class="variation-actions">
+                  <button mat-stroked-button class="btn-edit-row" (click)="editVariation(row)">
+                    <mat-icon>edit</mat-icon> Edit Variation
+                  </button>
+                </div>
+              </td>
+
+              <!-- Stage Columns -->
+              <td *ngFor="let stage of queueStages" class="stage-cell">
+                <div *ngIf="isStageAvailableForVariation(row, stage)" class="stage-content">
+                
+                  <!-- Cohort Selection for this stage (Multi-select) -->
+                  <!-- <div style="display: flex;flex-direction: row;gap:5px"> -->
+                    <div class="cohort-selection-wrapper">
+                      <!-- Display Mode: Show cohorts or "Not Set" with Edit icon -->
+                      <div class="cohort-display-mode" *ngIf="!(editingRow === row && editingStageName === stage && editingCohort)">
+                        <div class="cohort-info-container">
+                          <!-- Show warning if no cohorts selected -->
+                          <div class="cohort-info cohort-not-set"
+                            *ngIf="!row.stageData[stage].cohortIds || row.stageData[stage].cohortIds.length === 0">
+                            <mat-icon class="warning-icon">warning</mat-icon>
+                            <span><b>Cohorts Not Set</b></span>
+                          </div>
+                
+                          <!-- Show cohort badges if cohorts are selected -->
+                          <div class="cohort-badges-wrapper"
+                            *ngIf="row.stageData[stage].cohortIds && row.stageData[stage].cohortIds.length > 0">
+                            <div class="cohort-badge" *ngFor="let cohortId of row.stageData[stage].cohortIds">
+                              <mat-icon class="cohort-icon">groups</mat-icon>
+                              <span>{{ getCohortName(cohortId) }}</span>
+                            </div>
+                          </div>
+                        </div>
+                
+                        <mat-icon class="edit-cohort-btn" (click)="editCohort(row, stage)" matTooltip="Edit cohorts">edit</mat-icon>
+                      </div>
+                
+                      <!-- Edit Mode: Show multi-select dropdown -->
+                      <div class="cohort-edit-mode" *ngIf="editingRow === row && editingStageName === stage && editingCohort">
+                        <mat-form-field appearance="outline" class="cohort-select">
+                          <mat-label>Select Cohorts</mat-label>
+                          <mat-select [(ngModel)]="editingCohortData.cohortIds" placeholder="Select Cohorts" [multiple]="true">
+                            <mat-option>
+                              <ngx-mat-select-search [(ngModel)]="searchCohort" placeholderLabel="Search Cohort..."
+                                noEntriesFoundLabel="No cohorts found">
+                              </ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let cohort of cohortsList | cohortsFilter:searchCohort" [value]="cohort.id">
+                              {{ cohort.cohortname || cohort.name || cohort.id }}
+                            </mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                        <div class="cohort-actions">
+                          <button mat-button (click)="cancelCohortEdit()">Cancel</button>
+                          <button mat-raised-button color="primary" (click)="saveCohortEdit()">Submit</button>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- <div style="padding: 4px;background-color: rgb(207, 207, 207);width: 100%;text-align: center;">
+                      Total Slots
+                      {{row.stageData[stage].dates.length}}
+                    </div> -->
+                  <!-- </div> -->
+
+                  <!-- Show slots if they exist -->
+                  <div *ngIf="row.stageData[stage]?.dates && row.stageData[stage].dates.length > 0">
+                    <div *ngFor="let dateEntry of row.stageData[stage].dates; let i = index" class="date-entry"
+                      [class.date-not-set]="!dateEntry.startdate || !dateEntry.enddate">
+                      <div class="slot-header">
+                        <b>Slot : {{i+1}}</b>
+                        <mat-icon class="btn-delete" [matTooltip]="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? 'Participants Confirmed for this slot' : 'Remove slot'" 
+                          (click)="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? null : removeDateFromStage(row, stage, i)">delete</mat-icon>
+                      </div>
+                      <div style="display: flex;flex-direction: row;justify-content: space-between;">
+                        <div class="date-row">
+                          <div class="date-label" [class.error-text]="!dateEntry.startdate || !dateEntry.enddate">
+                            <b>Start</b> : {{ (dateEntry.startdate | date:'dd MMM yyyy') || 'Not Set' }}
+                            <span *ngIf="dateEntry && dateEntry.startdate && dateEntry.starttime"> - {{
+                              formatTimeTo12Hour(dateEntry.starttime) }}</span>
+                          </div>
+                          <div class="date-label" [class.error-text]="!dateEntry.enddate">
+                            <b>End</b>&nbsp;&nbsp; : {{ (dateEntry.enddate | date:'dd MMM yyyy') || 'Not Set' }}
+                            <span *ngIf="dateEntry.endtime && dateEntry.enddate"> - {{
+                              formatTimeTo12Hour(dateEntry.endtime) }}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <mat-icon class="btn-edit" (click)="editDateEntry(row, stage, i)"
+                            matTooltip="Edit slot">edit_note</mat-icon>
+                        </div>
+                      </div>
+
+                      <!-- <div class="slots-row">
+                        <span class="slot-info clickable"
+                          (click)="showBigParticipants(dateEntry.bigparticipants, {stage: stage, row: row, index: i})"
+                          [class.has-data]="dateEntry.bigparticipants?.length > 0"
+                          matTooltip="Click to view B!G participants">
+                          B!G Participants : {{ dateEntry.bigparticipants?.length || 0 }}
+                        </span>
+                        <span *ngIf="dateEntry.startdate && dateEntry.enddate">
+                          <span class="slot-info">Total: {{ dateEntry.maxslot }}</span>
+                        </span>
+                        <span *ngIf="dateEntry.startdate && dateEntry.enddate">
+                          <span class="slot-info clickable"
+                            (click)="showParticipants(dateEntry.participants, {stage: stage, row: row, index: i})"
+                            [class.has-data]="dateEntry.participants?.length > 0"
+                            matTooltip="Click to view participants">
+                            Confirmed: {{ dateEntry.participants?.length || 0 }}
+                          </span>
+                        </span>
+                        <span *ngIf="dateEntry.startdate && dateEntry.enddate && row.selectedVariation">
+                          <span class="slot-info clickable non-confirmed"
+                            (click)="showNonConfirmedParticipants(row.selectedVariation, row.selectedSegment, stage, dateEntry.startdate, dateEntry.enddate, {stage: stage, row: row, index: i})"
+                            [class.has-data]="getNonConfirmedCount(row.selectedVariation, row.selectedSegment, stage, dateEntry.startdate, dateEntry.enddate) > 0"
+                            matTooltip="Click to view non-confirmed participants">
+                            Non-Confirmed: {{ getNonConfirmedCount(row.selectedVariation, row.selectedSegment, stage,
+                            dateEntry.startdate, dateEntry.enddate) }}
+                          </span>
+                        </span>
+                      </div> -->
+                    </div>
+                  </div>
+
+                  <!-- Always show Add New button -->
+                  <button mat-button class="add-date-btn" (click)="addDateToStage(row, stage)">
+                    + Add New Slot
+                  </button>
+                </div>
+                <div *ngIf="!isStageAvailableForVariation(row, stage)" class="no-data">
+                  Not Applicable
+                </div>
+              </td>
+            </tr>
+
+            <!-- No Results Message -->
+            <tr *ngIf="getFilteredPlanningRows().length === 0" class="no-results-row">
+              <td [attr.colspan]="queueStages.length + 2" class="no-results-cell">
+                <div class="no-results-message">
+                  <mat-icon>search_off</mat-icon>
+                  <p>No rows match the current filters</p>
+                  <button mat-stroked-button (click)="clearAllFilters()">
+                    <mat-icon>clear_all</mat-icon>
+                    Clear Filters
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="footer-actions">
+        <div class="left-actions">
+          <div class="segment-summary">
+            <span class="summary-label">Segments:</span>
+            <div class="segment-badges">
+              <ng-container *ngFor="let row of planningRows;let i = index">
+                <span *ngIf="row.selectedSegment && row.selectedVariation" class="segment-badge">
+                  {{i+1}}. {{ getSegmentName(row.selectedSegment) }} - {{ getVariationName(row.selectedVariation) }}
+                </span>
+              </ng-container>
+            </div>
+            <button mat-raised-button class="add-segment-btn" (click)="addRow()">
+              + Add Segment
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Participant Panel (Right Side) -->
+  <div class="participant-panel" *ngIf="showParticipantPanel">
+    <div class="panel-header">
+      <h3>
+        <mat-icon>{{ panelType === 'non-queue' ? 'people_outline' : panelType === 'big-participants' ? 'group' :
+          panelType === 'non-confirmed' ? 'schedule' : 'people' }}</mat-icon>
+        {{ panelTitle }}
+      </h3>
+      <button mat-icon-button (click)="closeParticipantPanel()" class="close-panel-btn">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="panel-content">
+      <!-- Segment Info (only for non-queue participants) -->
+      <div class="segment-details" *ngIf="getSegmentInfoForPanel()">
+        <div class="detail-item">
+          <mat-icon>label</mat-icon>
+          <div class="detail-content">
+            <span class="detail-label">Segment:</span>
+            <span class="detail-value">{{ getSegmentInfoForPanel().segmentName }}</span>
+          </div>
+        </div>
+
+        <div class="detail-item" *ngIf="getSegmentInfoForPanel().participantLists.length > 0">
+          <mat-icon>list</mat-icon>
+          <div class="detail-content">
+            <span class="detail-label">Participant Lists:</span>
+            <div class="detail-value">
+              <mat-chip-set>
+                <mat-chip *ngFor="let list of getSegmentInfoForPanel().participantLists">
+                  {{ list }}
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-item" *ngIf="getSegmentInfoForPanel().tags.length > 0">
+          <mat-icon>sell</mat-icon>
+          <div class="detail-content">
+            <span class="detail-label">Tags:</span>
+            <div class="detail-value">
+              <mat-chip-set>
+                <mat-chip *ngFor="let tag of getSegmentInfoForPanel().tags">
+                  {{ tag }}
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          </div>
+        </div>
+
+        <div class="segment-variation-details"
+          *ngIf="currentSlotInfo && currentSlotInfo.segmentName && currentSlotInfo.variationName">
+          <div class="detail-item">
+            <mat-icon>label</mat-icon>
+            <div class="detail-content">
+              <span class="detail-label">Segment:</span>
+              <span class="detail-value">{{ currentSlotInfo.segmentName }}</span>
+            </div>
+          </div>
+
+          <div class="detail-item">
+            <mat-icon>category</mat-icon>
+            <div class="detail-content">
+              <span class="detail-label">Variation:</span>
+              <span class="detail-value">{{ currentSlotInfo.variationName }}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Communication Actions -->
+      <div class="status-container text-end" *ngIf="selectedQueue != null">
+        <div class="status-item whatsapp" (click)="sendWhatsApp()">
+          <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+            </svg>
+          </div>
+          <span class="status-label">Whatsapp({{ getSelectedParticipantsCount() }})</span>
+        </div>
+
+        <div class="status-item email" (click)="sendEmail()">
+          <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+            </svg>
+          </div>
+          <span class="status-label">Email({{ getSelectedParticipantsCount() }})</span>
+        </div>
+
+        <div class="status-item notification" [class.active]="true" (click)="sendNotification()">
+          <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+            </svg>
+          </div>
+          <span class="status-label">Notification({{ getSelectedParticipantsCount() }})</span>
+        </div>
+
+        <!-- <div class="action-buttons"> -->
+        <!-- <button 
+            mat-raised-button 
+            class="action-btn notification-btn"
+            (click)="sendNotification()"
+            [disabled]="getSelectedParticipantsCount() === 0">
+            <mat-icon>notifications</mat-icon>
+            Notification ({{ getSelectedParticipantsCount() }})
+          </button> -->
+
+        <!-- <button 
+            mat-raised-button 
+            class="action-btn whatsapp-btn"
+            (click)="sendWhatsApp()"
+            [disabled]="getSelectedParticipantsCount() === 0">
+            <mat-icon>chat</mat-icon>
+            WhatsApp ({{ getSelectedParticipantsCount() }})
+          </button> -->
+
+        <!-- <button 
+            mat-raised-button 
+            class="action-btn email-btn"
+            (click)="sendEmail()"
+            [disabled]="getSelectedParticipantsCount() === 0">
+            <mat-icon>email</mat-icon>
+            Email ({{ getSelectedParticipantsCount() }})
+          </button> -->
+        <!-- </div> -->
+      </div>
+
+      <!-- Participants List -->
+      <div class="participants-section">
+        <div class="participants-header">
+          <h4>Participants ({{ nonSelectedParticipants.length }})</h4>
+          <mat-checkbox [checked]="areAllParticipantsSelected()" [indeterminate]="areSomeParticipantsSelected()"
+            (change)="toggleAllParticipants($event.checked)">
+            Select All
+          </mat-checkbox>
+        </div>
+
+        <div *ngIf="loadingParticipants" class="panel-loading">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading participants...</p>
+        </div>
+
+        <div *ngIf="!loadingParticipants && nonSelectedParticipants.length === 0" class="no-participants-panel">
+          <mat-icon>check_circle</mat-icon>
+          <p *ngIf="panelType === 'non-queue'">All participants have selected their slots!</p>
+          <p *ngIf="panelType === 'big-participants'">No B!G participants for this slot</p>
+          <p *ngIf="panelType === 'used-slots'">No participants for this slot</p>
+          <p *ngIf="panelType === 'non-confirmed'">All participants have confirmed this slot!</p>
+        </div>
+
+        <div *ngIf="!loadingParticipants && nonSelectedParticipants.length > 0" class="participants-list-panel">
+          <div class="participant-card" *ngFor="let participant of nonSelectedParticipants; let i = index">
+            <mat-checkbox [(ngModel)]="participant.selected" class="participant-checkbox">
+            </mat-checkbox>
+            <div class="participant-details">
+              <div class="participant-number">#{{ i + 1 }}</div>
+              <div class="participant-info-panel">
+                <div class="participant-name-panel">
+                  <mat-icon>person</mat-icon>
+                  <span>{{ participant.participantData?.name || participant.participantData?.displayName || 'Unknown'
+                    }}</span>
+                </div>
+                <div class="participant-meta" *ngIf="participant.participantData?.email">
+                  <mat-icon class="meta-icon">email</mat-icon>
+                  <span>{{ participant.participantData.email }}</span>
+                </div>
+                <div class="participant-meta" *ngIf="participant.participantData?.phone">
+                  <mat-icon class="meta-icon">phone</mat-icon>
+                  <span>{{ participant.participantData.phone }}</span>
+                </div>
+                <div class="participant-meta" *ngIf="participant.participantData?.tokenstatus">
+                  <mat-icon class="meta-icon">info</mat-icon>
+                  <span class="status-badge" [class.active]="participant.participantData.tokenstatus === 'Active'">
+                    {{ participant.participantData.tokenstatus }}
+                  </span>
+                </div>
+                <div class="participant-meta"
+                  *ngIf="participant.participantData?.currentstage && panelType === 'non-confirmed'">
+                  <mat-icon class="meta-icon">route</mat-icon>
+                  <span>Current Stage: {{ participant.participantData.currentstage }}</span>
+                </div>
+
+                <div class="participant-meta" *ngIf="participant.participantData?.email">
+                  <mat-icon class="meta-icon">email</mat-icon>
+                  <span>{{ participant.participantData.email }}</span>
+                </div>
+
+                <div class="participant-meta" *ngIf="participant.participantData?.phone">
+                  <mat-icon class="meta-icon">phone</mat-icon>
+                  <span>{{ participant.participantData.phone }}</span>
+                </div>
+
+                <div class="participant-meta" *ngIf="participant.participantData?.selectedStage">
+                  <mat-icon class="meta-icon">event</mat-icon>
+                  <span><strong>Stage:</strong> {{ participant.participantData.selectedStage }}</span>
+                </div>
+
+                <div class="participant-meta slot-details" *ngIf="participant.participantData?.slotStartDate">
+                  <mat-icon class="meta-icon">schedule</mat-icon>
+                  <div class="slot-info-detail">
+                    <div><strong>Start:</strong> {{ participant.participantData.slotStartDate | date:'dd MMM yyyy' }} -
+                      {{ participant.participantData.slotStartTime }}</div>
+                    <div><strong>End:</strong> {{ participant.participantData.slotEndDate | date:'dd MMM yyyy' }} - {{
+                      participant.participantData.slotEndTime }}</div>
+                  </div>
+                </div>
+
+                <!-- <div class="participant-meta" *ngIf="participant.participantData?.tokenstatus">
+                  <mat-icon class="meta-icon">info</mat-icon>
+                  <span class="status-badge" [class.active]="participant.participantData.tokenstatus === 'Active'">
+                    {{ participant.participantData.tokenstatus }}
+                  </span>
+                </div> -->
+
+                <div class="participant-meta"
+                  *ngIf="participant.participantData?.currentstage && panelType === 'non-confirmed'">
+                  <mat-icon class="meta-icon">route</mat-icon>
+                  <span>Current Stage: {{ participant.participantData.currentstage }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dialogs -->
+<!-- Variation Edit Dialog -->
+<ng-template #variationEditDialog>
+  <div style="padding:20px">
+    <h2>Edit Variation</h2>
+    <div>
+      <div class="row-edit-form">
+        <mat-form-field appearance="outline">
+          <mat-label>Variation</mat-label>
+          <mat-select [(ngModel)]="editingVariationData.selectedVariation" placeholder="Select Variation">
+            <mat-option *ngFor="let variation of queueVariationList" [value]="variation.id">
+              {{ variation.variationname }}
+            </mat-option>
+          </mat-select>
+          <mat-hint>Changing variation may clear segment if it conflicts</mat-hint>
+        </mat-form-field>
+      </div>
+    </div>
+    <mat-dialog-actions align="end">
+      <button mat-button mat-dialog-close>Cancel</button>
+      <button mat-raised-button color="primary" (click)="saveVariationEdit()">Save</button>
+    </mat-dialog-actions>
+  </div>
+</ng-template>
+
+<!-- Segment Edit Dialog -->
+<ng-template #segmentEditDialog>
+  <div style="padding:20px">
+    <h2>Edit Segment</h2>
+    <div>
+      <div class="row-edit-form">
+        <mat-form-field appearance="outline">
+          <mat-label>Segment</mat-label>
+          <mat-select [(ngModel)]="editingSegmentData.selectedSegment" placeholder="Select Segment">
+            <mat-option *ngFor="let segment of segmentList" [value]="segment.id"
+              [disabled]="isSegmentDisabled(segment.id, editingRowForSegment?.id)">
+              {{ segment.segmentname }}
+            </mat-option>
+          </mat-select>
+          <mat-hint>Disabled options are already used with the selected variation</mat-hint>
+        </mat-form-field>
+      </div>
+    </div>
+  </div>
+  <mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>Cancel</button>
+    <button mat-raised-button color="primary" (click)="saveSegmentEdit()">Save</button>
+  </mat-dialog-actions>
+</ng-template>
+
+<!-- Date Entry Edit Dialog -->
+<ng-template #dateEditDialog>
+  <div style="padding:20px">
+    <h2>
+      {{ slotDialogMode === 'multi' ? 'Create Slot for Multiple Segments' : 'Edit Date Entry' }}
+      <span *ngIf="slotDialogMode === 'multi'"> - {{ editingStageName }}</span>
+    </h2>
+    <div>
+      <div class="date-edit-form">
+
+        <!-- Stage Info Display (only for multi mode) -->
+        <div class="stage-info-display" *ngIf="slotDialogMode === 'multi'">
+          <mat-icon>info</mat-icon>
+          <span>Creating slots for stage: <strong>{{ editingStageName }}</strong></span>
+        </div>
+
+        <mat-form-field appearance="outline" *ngIf="slotDialogMode === 'multi'">
+          <mat-label>Select Segments</mat-label>
+          <mat-select [(ngModel)]="multiSlotData.selectedSegments" multiple placeholder="Select Segments">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="searchSegmentForMulti" placeholderLabel="Search Segment..."
+                noEntriesFoundLabel="No segments found">
+              </ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let segment of getAvailableSegmentsForMultiSlot()" [value]="segment.rowId"
+              [disabled]="segment.disabled">
+              <span [class.disabled-segment]="segment.disabled">
+                {{ getSegmentName(segment.segmentId) }}
+                <span *ngIf="segment.variationId"> - {{ getVariationName(segment.variationId) }}</span>
+                <span *ngIf="segment.disabled" class="not-in-table-label"> (Not in table)</span>
+              </span>
+            </mat-option>
+          </mat-select>
+          <mat-hint>{{ multiSlotData.selectedSegments?.length || 0 }} segment(s) selected</mat-hint>
+        </mat-form-field>
+
+        <!-- Selected Segments Preview (only for multi mode) -->
+        <div class="selected-segments-preview"
+          *ngIf="slotDialogMode === 'multi' && multiSlotData.selectedSegments?.length > 0">
+          <h4>Selected Segments ({{ multiSlotData.selectedSegments.length }}):</h4>
+          <mat-chip-set>
+            <mat-chip *ngFor="let rowId of multiSlotData.selectedSegments" (removed)="removeSegmentFromMultiSlot(rowId)"
+              [removable]="true">
+              {{ getSegmentNameByRowId(rowId) }}
+              <span *ngIf="getVariationNameByRowId(rowId)"> - {{ getVariationNameByRowId(rowId) }}</span>
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+          </mat-chip-set>
+        </div>
+
+        <!-- Date and Time Fields (for both modes) -->
+        <div class="datetime-row">
+          <mat-form-field appearance="outline" class="date-field">
+            <mat-label>Start Date</mat-label>
+            <input matInput [matDatepicker]="startPicker" [(ngModel)]="editingDateEntry.startdate">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="time-field">
+            <mat-label>Start Time</mat-label>
+            <input matInput type="time" [(ngModel)]="editingDateEntry.starttime">
+          </mat-form-field>
+        </div>
+
+        <div class="datetime-row">
+          <mat-form-field appearance="outline" class="date-field">
+            <mat-label>End Date</mat-label>
+            <input matInput [matDatepicker]="endPicker" [(ngModel)]="editingDateEntry.enddate">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="time-field">
+            <mat-label>End Time</mat-label>
+            <input matInput type="time" [(ngModel)]="editingDateEntry.endtime">
+          </mat-form-field>
+        </div>
+
+        <div class="slot-fields-row">
+          <mat-form-field appearance="outline" class="slot-field">
+            <mat-label>Max Slot</mat-label>
+            <input matInput type="number" [(ngModel)]="editingDateEntry.maxslot" min="0">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="slot-field" *ngIf="slotDialogMode === 'single'">
+            <mat-label>Used Slot</mat-label>
+            <input matInput type="number" [(ngModel)]="editingDateEntry.usedslot" min="0" readonly>
+            <mat-hint>Read only - Auto-calculated from participants</mat-hint>
+          </mat-form-field>
+        </div>
+      </div>
+    </div>
+    <mat-dialog-actions align="end">
+      <button mat-button mat-dialog-close>Cancel</button>
+      <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'single'" (click)="saveDateEntry()">
+        Save
+      </button>
+      <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'multi'" (click)="saveMultiSegmentSlot()"
+        [disabled]="!isMultiSlotDataValid()">
+        Create Slots for {{ multiSlotData.selectedSegments?.length || 0 }} Segment(s)
+      </button>
+    </mat-dialog-actions>
+  </div>
+
+</ng-template>

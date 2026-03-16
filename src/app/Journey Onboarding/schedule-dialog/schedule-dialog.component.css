@@ -1,0 +1,475 @@
+.body{
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.loading{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: white;
+  gap: 20px;
+}
+
+.container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  /* border-radius: 8px;
+  background-color: #f9f9f9; */
+  width: 100%;
+}
+
+.slots-container {
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.slots-container h4 {
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+/* Table Styling */
+table {
+  width: 100%;
+}
+
+.product-table {
+  width: 100%;
+  margin-right: 40px;
+}
+
+/* Available Months Styling */
+.available-months {
+  flex: 2;
+  margin: 20px;
+  text-align: center;
+
+  h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+  }
+
+  .month-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+
+    button {
+      width: 120px;
+      height: 40px;
+      font-size: 0.9rem;
+    }
+
+    button.selected {
+      background-color: #03a9f4;
+      color: white;
+    }
+  }
+}
+
+/* Calendar Styling */
+.calendar {
+  flex: 2;
+  margin-left: 40px;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.date-field {
+  width: 150px;
+}
+
+.productbox{
+  margin-left: 15px;
+}
+
+.appointmentbox{
+  margin-bottom: 25px;
+}
+
+.bookbtn{
+  margin-top: 20px;
+  color: green;
+  border: 1px solid green;
+}
+.calendar-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* margin-top: 50px; */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 10PX;
+  background: #fff;
+}
+
+mat-calendar {
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.mat-calendar-table {
+  width: 100%;
+}
+
+.mat-calendar-body-cell {
+  height: 50px; /* Increase the height of the date cells */
+  width: 50px; /* Increase the width of the date cells */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mat-calendar-body-cell-content {
+  margin: 5px; /* Add spacing around the date content */
+  line-height: 24px;
+  font-size: 14px;
+}
+
+.mat-calendar-body-selected {
+  background-color: #007bff !important; /* Adjust the selected date's background color */
+  color: #fff !important; /* Ensure the selected date text is visible */
+  border-radius: 50%; /* Make the selected date circular */
+}
+
+.mat-calendar-body-today {
+  border: 2px solid #007bff !important; /* Highlight today's date with a border */
+  border-radius: 50%;
+}
+
+.selected-date {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 16px;
+  color: #555;
+}
+
+mat-dialog-title {
+  text-align: center;
+  font-weight: bold;
+}
+
+mat-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+button {
+  font-size: 14px;
+}
+
+.onboarding-report{
+  margin: 20px;
+}
+
+.sales-note h4,
+.onboarding-report h4 {
+    font-size: 16px;
+    color: #333;
+    font-weight: bold;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+ }
+
+.sales-note p,
+.onboarding-report p {
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.textareafield {
+  width: 100%;
+}
+
+.textareafield textarea {
+  width: 100%;
+}
+
+.color-red{
+  background-color: #DC3545;
+}
+
+.header {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.title {
+  color: white;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.color-teal {
+  background-color: rgb(0, 101, 135);
+}
+
+.confirmbutton{
+  width: 35%;
+  margin: 15px;
+  background-color: #DC3545;
+  color: white;
+  font-size:22px;
+  float: right;
+  padding: 10px;
+  font-family: 'Nunito Sans', sans-serif;
+  border-radius: 15px;
+}
+
+/* Appointments List */
+.time-slots-container {
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slot-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.slot-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.slot-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.time-badge {
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.time {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.specialist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.specialist-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.availability-tag {
+  font-size: 12px;
+  color: #16a34a;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.book-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #5D3D97;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.book-button:hover {
+  background: #4A2B82;
+  transform: translateX(2px);
+}
+
+.button-text {
+  white-space: nowrap;
+}
+
+.arrow-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.book-button:hover .arrow-icon {
+  transform: translateX(2px);
+}
+
+/* Animation for new slots */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slot-card {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .time-slots-container {
+    padding: 12px;
+  }
+
+  .slot-card {
+    padding: 12px;
+  }
+
+  .time-badge {
+    padding: 6px 10px;
+    min-width: 70px;
+  }
+
+  .specialist-name {
+    font-size: 14px;
+  }
+
+  .book-button {
+    padding: 6px 12px;
+  }
+}
+
+/* Hover Effects for Interactive Elements */
+.slot-card:active {
+  transform: scale(0.98);
+}
+
+.book-button:active {
+  transform: scale(0.95);
+}
+
+/* Additional States */
+.slot-card.booked {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.slot-card.booked .book-button {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Focus States for Accessibility */
+.book-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(93, 61, 151, 0.4);
+}
+
+/* Loading State Animation */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.slot-card.loading {
+  animation: pulse 1.5s infinite;
+  pointer-events: none;
+}
+
+.meeting-platform-section {
+  margin: 16px 0;
+
+  .platform-label {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: #333;
+  }
+
+  .platform-options {
+    display: flex;
+    gap: 12px;
+
+    .platform-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: #7c3aed;
+        background: #f5f3ff;
+      }
+
+      &.selected {
+        border-color: #7c3aed;
+        background: #ede9fe;
+
+        span {
+          color: #7c3aed;
+          font-weight: 600;
+        }
+      }
+
+      .platform-icon {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+      }
+
+      span {
+        font-size: 13px;
+        color: #555;
+      }
+    }
+  }
+
+  .platform-error {
+    color: #e53e3e;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+}

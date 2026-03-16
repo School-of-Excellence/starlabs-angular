@@ -1,0 +1,474 @@
+<div class="segments-container">
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" *ngIf="loading">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading segments...</p>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content-wrapper" [class.side-panel-open]="sidePanelOpen">
+    <!-- Header Section -->
+    <div class="header-section">
+      <div class="header-content">
+        <div class="header-left">
+          <mat-icon class="header-icon">folder_special</mat-icon>
+          <h1 class="page-title">Segments Management</h1>
+          <span class="segment-count">{{ segments.length }} segment(s)</span>
+        </div>
+        <button 
+          mat-raised-button 
+          color="primary" 
+          (click)="toggleCreateForm()"
+          [disabled]="loading">
+          <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
+          {{ showCreateForm ? 'Cancel' : 'Create Segment' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Create Segment Form -->
+    <mat-card class="create-form-card" *ngIf="showCreateForm">
+    
+        <mat-card-title>
+          <mat-icon class="form-icon">add_circle</mat-icon>
+          Create New Segment
+        </mat-card-title>
+      
+      <mat-card-content>
+        <form [formGroup]="createSegmentForm" class="create-form">
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Segment Name</mat-label>
+            <input 
+              matInput 
+              formControlName="segmentname" 
+              placeholder="Enter segment name"
+              autocomplete="off">
+            <mat-icon matPrefix>label</mat-icon>
+            <mat-error *ngIf="createSegmentForm.get('segmentname')?.invalid">
+              {{ getErrorMessage('segmentname', createSegmentForm) }}
+            </mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Participant Lists</mat-label>
+            <mat-select 
+              formControlName="participantlistid" 
+              multiple
+              placeholder="Select participant lists">
+              <mat-option *ngFor="let list of participantLists" [value]="list.docid">
+                {{ list.listname }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>people</mat-icon>
+            <mat-error *ngIf="createSegmentForm.get('participantlistid')?.invalid">
+              {{ getErrorMessage('participantlistid', createSegmentForm) }}
+            </mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="form-field full-width-field">
+            <mat-label>Tags (Optional)</mat-label>
+            <mat-select 
+              formControlName="tagids" 
+              multiple
+              placeholder="Select tags">
+              <mat-select-trigger>
+                <mat-chip-set>
+                  <mat-chip *ngFor="let tagId of createSegmentForm.get('tagids')?.value">
+                    {{ mapParticipantTag[tagId]?.name || 'Unknown' }}
+                  </mat-chip>
+                </mat-chip-set>
+              </mat-select-trigger>
+              <mat-option>
+                <ngx-mat-select-search 
+                  [formControl]="tagSearchCtrl"
+                  placeholderLabel="Search tags..."
+                  noEntriesFoundLabel="No tags found">
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let tag of participantTags" [value]="tag.id">
+                {{ tag.name }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>local_offer</mat-icon>
+          </mat-form-field>
+
+          <div class="form-actions">
+            <div class="selection-info-wrapper">
+              <div class="selection-info" *ngIf="createSegmentForm.get('participantlistid')?.value?.length > 0">
+                <mat-icon>people</mat-icon>
+                <span>{{ createSegmentForm.get('participantlistid')?.value?.length }} list(s) selected</span>
+              </div>
+              <div class="selection-info" *ngIf="createSegmentForm.get('tagids')?.value?.length > 0">
+                <mat-icon>local_offer</mat-icon>
+                <span>{{ createSegmentForm.get('tagids')?.value?.length }} tag(s) selected</span>
+              </div>
+            </div>
+            <button 
+              mat-raised-button 
+              color="primary" 
+              (click)="onCreateSegment()"
+              [disabled]="createSegmentForm.invalid || submitting">
+              <mat-spinner diameter="20" *ngIf="submitting" class="button-spinner"></mat-spinner>
+              <mat-icon *ngIf="!submitting">save</mat-icon>
+              <span>{{ submitting ? 'Creating...' : 'Create Segment' }}</span>
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Segments Table -->
+    <mat-card class="table-card">
+      <mat-card-content>
+        <div class="table-container">
+          <table mat-table [dataSource]="segments" class="segments-table">
+            <!-- Segment Name Column -->
+            <ng-container matColumnDef="segmentname">
+              <th mat-header-cell *matHeaderCellDef>
+                <div class="header-cell">
+                  <mat-icon>label</mat-icon>
+                  <span>Segment Name</span>
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let segment" class="segment-name-cell">
+                <div class="segment-name">
+                  <div style="display: flex;flex-direction: row;gap:10px">
+                    <mat-icon class="segment-icon">folder</mat-icon>
+                    <strong>{{ segment.segmentname }}</strong>
+                  </div>
+                  <div>
+                    <p *ngIf="segment.updateddate == null"><b>Date</b>: {{ segment.createddate.toDate() | date:'medium' }}</p>
+                    <p *ngIf="segment.updateddate != null"><b>Updated</b>: {{ segment.updateddate.toDate() | date:'medium' }}</p>
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Participant Lists Column -->
+            <ng-container matColumnDef="participantlists">
+              <th mat-header-cell *matHeaderCellDef>
+                <div class="header-cell">
+                  <mat-icon>people</mat-icon>
+                  <span>Participant Lists</span>
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let segment" class="participant-lists-cell">
+                <div class="participant-lists-wrapper">
+                  <mat-chip-set *ngIf="segment.participantlistid && segment.participantlistid.length > 0">
+                    <mat-chip *ngFor="let list of segment.participantlistid.slice(0, 3)">
+                      {{ mapParticipantList[list]?.['listname'] || 'removed'}}
+                    </mat-chip>
+                    <mat-chip *ngIf="segment.participantlistid.length > 3" class="more-chip">
+                      +{{ segment.participantlistid.length - 3 }} more
+                    </mat-chip>
+                  </mat-chip-set>
+                  <span class="empty-text" *ngIf="!segment.participantlistid || segment.participantlistid.length === 0">
+                    <mat-icon>info_outline</mat-icon>
+                    No participant lists
+                  </span>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Tags Column -->
+            <ng-container matColumnDef="tags">
+              <th mat-header-cell *matHeaderCellDef>
+                <div class="header-cell">
+                  <mat-icon>local_offer</mat-icon>
+                  <span>Tags</span>
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let segment" class="tags-cell">
+                <div class="tags-wrapper">
+                  <mat-chip-set *ngIf="segment.tagids && segment.tagids.length > 0">
+                    <mat-chip *ngFor="let tagId of segment.tagids.slice(0, 3)" class="tag-chip">
+                      <mat-icon class="tag-chip-icon">label</mat-icon>
+                      {{ mapParticipantTag[tagId]?.name || 'removed' }}
+                    </mat-chip>
+                    <mat-chip *ngIf="segment.tagids.length > 3" class="more-chip">
+                      +{{ segment.tagids.length - 3 }} more
+                    </mat-chip>
+                  </mat-chip-set>
+                  <span class="empty-text" *ngIf="!segment.tagids || segment.tagids.length === 0">
+                    <mat-icon>info_outline</mat-icon>
+                    No tags
+                  </span>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>
+                <div class="header-cell">
+                  <mat-icon>settings</mat-icon>
+                  <span>Actions</span>
+                </div>
+              </th>
+              <td mat-cell *matCellDef="let segment" class="actions-cell">
+                <button 
+                  mat-icon-button 
+                  color="primary"
+                  (click)="onSelectSegment(segment)"
+                  matTooltip="Edit segment">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button 
+                  mat-icon-button 
+                  color="warn"
+                  (click)="deleteSegment(segment, $event)"
+                  matTooltip="Delete segment">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr 
+              mat-row 
+              *matRowDef="let row; columns: displayedColumns;"
+              [class.selected-row]="selectedSegment?.docid === row.docid"
+              (click)="onSelectSegment(row)">
+            </tr>
+
+            <!-- No Data Row -->
+            <tr class="mat-row no-data-row" *matNoDataRow>
+              <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+                <div class="no-data">
+                  <mat-icon class="no-data-icon">folder_off</mat-icon>
+                  <p class="no-data-title">No segments found</p>
+                  <p class="no-data-subtitle">Create your first segment to get started</p>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Side Panel for Editing -->
+  <div class="side-panel" [class.open]="sidePanelOpen">
+    <div class="side-panel-header">
+      <div class="panel-title-section">
+        <mat-icon class="panel-icon">edit</mat-icon>
+        <h2 class="panel-title">Edit Segment</h2>
+      </div>
+      <button mat-icon-button (click)="closeSidePanel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div class="side-panel-content" *ngIf="selectedSegment">
+      <!-- Segment Info -->
+      <div class="segment-info-section">
+        <div class="info-item">
+          <mat-icon class="info-icon">label</mat-icon>
+          <div class="info-content">
+            <span class="info-label">Segment Name</span>
+            <div class="edit-name-wrapper" *ngIf="!isEditingName">
+              <span class="info-value">{{ selectedSegment.segmentname }}</span>
+              <button 
+                mat-icon-button 
+                color="primary"
+                (click)="toggleEditName()"
+                matTooltip="Edit name">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </div>
+            <form [formGroup]="editSegmentForm" *ngIf="isEditingName" class="edit-name-form">
+              <mat-form-field appearance="outline" class="edit-name-field">
+                <input 
+                  matInput 
+                  formControlName="segmentname"
+                  placeholder="Enter new segment name"
+                  autocomplete="off">
+                <mat-error *ngIf="editSegmentForm.get('segmentname')?.invalid">
+                  {{ getErrorMessage('segmentname', editSegmentForm) }}
+                </mat-error>
+              </mat-form-field>
+              <div class="edit-name-actions">
+                <button 
+                  mat-icon-button 
+                  color="primary"
+                  (click)="saveSegmentName()"
+                  [disabled]="editSegmentForm.invalid || updatingSegment"
+                  matTooltip="Save">
+                  <mat-spinner diameter="20" *ngIf="updatingSegment" class="button-spinner"></mat-spinner>
+                  <mat-icon *ngIf="!updatingSegment">check</mat-icon>
+                </button>
+                <button 
+                  mat-icon-button 
+                  (click)="toggleEditName()"
+                  [disabled]="updatingSegment"
+                  matTooltip="Cancel">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="info-item">
+          <mat-icon class="info-icon">people</mat-icon>
+          <div class="info-content">
+            <span class="info-label">Total Lists</span>
+            <span class="info-value">{{ selectedSegment.participantlistid?.length || 0 }}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <mat-icon class="info-icon">local_offer</mat-icon>
+          <div class="info-content">
+            <span class="info-label">Total Tags</span>
+            <span class="info-value">{{ selectedSegment.tagids?.length || 0 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- Current Participant Lists -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <mat-icon>list</mat-icon>
+          Current Participant Lists
+        </h3>
+        
+        <div class="current-lists" *ngIf="selectedSegment.participantlistid && selectedSegment.participantlistid.length > 0">
+          <div class="list-item" *ngFor="let list of selectedSegment.participantlistid">
+            <div class="list-info">
+              <mat-icon class="list-icon">person</mat-icon>
+              <span class="list-name">{{ mapParticipantList[list]['listname']}}</span>
+            </div>
+            <button 
+              mat-icon-button 
+              color="warn"
+              (click)="removeListFromSegment(list)"
+              [disabled]="updatingSegment"
+              matTooltip="Remove list">
+              <mat-icon>remove_circle</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="empty-state" *ngIf="!selectedSegment.participantlistid || selectedSegment.participantlistid.length === 0">
+          <mat-icon class="empty-icon">inbox</mat-icon>
+          <p>No participant lists in this segment</p>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- Add Participant List -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <mat-icon>add_circle</mat-icon>
+          Add Participant List
+        </h3>
+        
+        <form [formGroup]="addListForm" class="add-list-form" *ngIf="availableListsForSelected.length > 0">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Select Participant List</mat-label>
+            <mat-select formControlName="participantlistid" placeholder="Choose a list">
+              <mat-option *ngFor="let list of availableListsForSelected" [value]="list.docid">
+                {{list.listname}}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>person_add</mat-icon>
+          </mat-form-field>
+          
+          <button 
+            mat-raised-button 
+            color="primary" 
+            (click)="addListToSegment()"
+            [disabled]="addListForm.invalid || updatingSegment"
+            class="add-button">
+            <mat-spinner diameter="20" *ngIf="updatingSegment" class="button-spinner"></mat-spinner>
+            <mat-icon *ngIf="!updatingSegment">add</mat-icon>
+            <span>{{ updatingSegment ? 'Adding...' : 'Add to Segment' }}</span>
+          </button>
+        </form>
+
+        <div class="empty-state" *ngIf="availableListsForSelected.length === 0">
+          <mat-icon class="empty-icon">check_circle</mat-icon>
+          <p>All participant lists are already added to this segment</p>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- Current Tags -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <mat-icon>local_offer</mat-icon>
+          Current Tags
+        </h3>
+        
+        <div class="current-tags" *ngIf="selectedSegment.tagids && selectedSegment.tagids.length > 0">
+          <div class="tag-item" *ngFor="let tagId of selectedSegment.tagids">
+            <div class="tag-info">
+              <mat-icon class="tag-icon">label</mat-icon>
+              <span class="tag-name">{{ mapParticipantTag[tagId]?.name || 'Unknown' }}</span>
+            </div>
+            <button 
+              mat-icon-button 
+              color="warn"
+              (click)="removeTagFromSegment(tagId)"
+              [disabled]="updatingSegment"
+              matTooltip="Remove tag">
+              <mat-icon>remove_circle</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="empty-state" *ngIf="!selectedSegment.tagids || selectedSegment.tagids.length === 0">
+          <mat-icon class="empty-icon">inbox</mat-icon>
+          <p>No tags in this segment</p>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- Add Tag -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <mat-icon>add_circle</mat-icon>
+          Add Tag
+        </h3>
+        
+        <form [formGroup]="addTagForm" class="add-tag-form" *ngIf="availableTagsForSelected.length > 0">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Select Tag</mat-label>
+            <mat-select formControlName="tagid" placeholder="Choose a tag">
+              <mat-option *ngFor="let tag of availableTagsForSelected" [value]="tag.id">
+                <mat-icon class="tag-color-icon">label</mat-icon>
+                {{ tag.name }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>local_offer</mat-icon>
+          </mat-form-field>
+          
+          <button 
+            mat-raised-button 
+            color="primary" 
+            (click)="addTagToSegment()"
+            [disabled]="addTagForm.invalid || updatingSegment"
+            class="add-button">
+            <mat-spinner diameter="20" *ngIf="updatingSegment" class="button-spinner"></mat-spinner>
+            <mat-icon *ngIf="!updatingSegment">add</mat-icon>
+            <span>{{ updatingSegment ? 'Adding...' : 'Add to Segment' }}</span>
+          </button>
+        </form>
+
+        <div class="empty-state" *ngIf="availableTagsForSelected.length === 0">
+          <mat-icon class="empty-icon">check_circle</mat-icon>
+          <p>All tags are already added to this segment</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backdrop -->
+  <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+</div>

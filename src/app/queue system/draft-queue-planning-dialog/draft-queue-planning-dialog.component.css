@@ -1,0 +1,84 @@
+.dialog-description {
+  margin-bottom: 20px;
+  color: #666;
+}
+
+.draft-item {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.draft-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.draft-icon {
+  color: #1976d2;
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.draft-info {
+  flex: 1;
+}
+
+.draft-title {
+  font-weight: 500;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.draft-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #666;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.small-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+mat-dialog-actions {
+  padding: 16px 24px;
+  gap: 12px;
+}
+
+mat-selection-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+::ng-deep .mat-mdc-list-option {
+  height: auto !important;
+  padding: 12px 16px !important;
+}
+
+::ng-deep .mat-mdc-list-option:hover {
+  background-color: #f5f5f5;
+}
+
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 20px 24px;
+  background: #f5f5f5;
+}
+
+mat-dialog-content {
+  padding: 24px;
+}

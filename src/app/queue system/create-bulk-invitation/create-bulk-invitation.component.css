@@ -1,0 +1,20 @@
+mat-form-field{
+    width: 300px;
+  }
+  
+  .submitbtn{
+    color: white;
+    background-color: green;
+    margin-left: 20px;
+  }
+  
+  .cancelbtn{
+    color: red;
+    border: 1px solid red;
+  }
+  
+  button:disabled{
+    background-color: white;
+    color: gray;
+    border: 1px solid grey;
+  }

@@ -1,0 +1,367 @@
+<div *ngIf="loading" class="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+<div *ngIf="!loading" class="mainscreen">
+  <div class="row mb-3">
+    <div class="col-sm"></div>
+    <div class="col-sm">
+      <h4 class="title">Mode Dashboard</h4>
+    </div>
+    <div class="col-sm"></div>
+  </div>
+
+  <div *ngIf="modes.length !==0">
+    <p class="mode" *ngFor="let mode of modes">
+      {{mode}}
+    </p>
+  </div>
+  <hr>
+  <div class="mb-5">
+    <mat-form-field appearance="outline">
+      <mat-label>Start Day</mat-label>
+      <input matInput type="number" [(ngModel)]="startDay">
+      <mat-hint>{{returnDate(startDay, true) | date: "mediumDate"}}</mat-hint>
+    </mat-form-field>&nbsp;
+    <mat-form-field class="ml-3" appearance="outline">
+      <mat-label>End Day</mat-label>
+      <input matInput type="number" [(ngModel)]="endDay">
+      <mat-hint>{{returnDate(endDay, false) | date: "mediumDate"}}</mat-hint>
+    </mat-form-field>&nbsp;
+    <button mat-stroked-button class="ml-3" (click)="nextModeChange()">Fetch Data</button>&nbsp;&nbsp;&nbsp;
+    <mat-checkbox [(ngModel)]="hierarchyMode">Hierarchy Only</mat-checkbox>
+  </div>
+  <div class="row">
+    <div class="col-md-8">
+      <!-- Next Mode Section -->
+      <div *ngIf="nextModeList.length !==0" class="row bottomscreen">
+        <div *ngIf="nextModeList.length != 0">
+          <label class="subtitle">Next Mode</label>&nbsp;&nbsp;&nbsp;
+        </div>
+        <div *ngFor="let mode of nextModeList; let i = index">
+          <div *ngIf="hierarchyMode">
+            <div *ngIf="mode['hierarchyprofile'].length != 0">
+              <p (click)="selectMode('nextMode', i)" [ngClass]="{'selected-item': selectedModeType === 'nextMode' && selectedModeIndex === i}">
+                <span class="number">{{i + 1}}.</span> In 
+                <span style="font-weight: bold;font-size: 20;color: #c52829;">
+                  {{startDay != 0 ? (startDay + " -") : ""}} {{endDay}} Days - {{mode["hierarchyprofile"].length}} Participant 
+                </span>
+                will move from 
+                <span style="font-weight: bold;font-size: 20;color: black;">
+                  {{mapProduct[mode["productid"]]}} 
+                  <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                    {{mode["currentmode"]}}
+                  </span> to 
+                  <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                    {{mode["nextmode"]}}
+                  </span>
+                </span>
+                <span>
+                  <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">
+                    <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                    {{ (productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null ? 'Review Current Mode' : 'set up '+mode["currentmode"] }}                 
+                    <span style="font-weight: 700;color: #c52829;">
+                      {{productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                    </span>
+                  </button>
+                </span>
+                <span>
+                  <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['nextmode'], mode['productid'])">
+                    <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['nextmode']] != null || productmodeConfig[mode['productid'] + mode['nextmode']] != undefined) && productmodeConfig[mode['productid'] + mode['nextmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                    <!-- Review Next Mode-->
+                    {{ (productmodeConfig[mode['productid'] + mode['nextmode']] != null || productmodeConfig[mode['productid'] + mode['nextmode']] != undefined) && productmodeConfig[mode['productid'] + mode['nextmode']]?.lastupdate != null ? 'Review Next Mode' : 'set up '+mode["nextmode"] }}                 
+                    <span style="font-weight: 700;color: #c52829;">
+                      {{productmodeConfig[mode['productid'] + mode['nextmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                    </span>
+                  </button>
+                </span>
+                <!-- <button mat-raised-button style="margin-right: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">Review Current mode</button>
+                <button mat-raised-button style="margin-right: 10px;" (click)="updateConfig(mode['nextmode'], mode['productid'])">Review Next mode</button> -->
+              </p>
+            </div>
+          </div>
+          <div *ngIf="!hierarchyMode">
+            <p (click)="selectMode('nextMode', i)" [ngClass]="{'selected-item': selectedModeType === 'nextMode' && selectedModeIndex === i}">
+              <span class="number">{{i + 1}}.</span> In 
+              <span style="font-weight: bold;font-size: 20;color: #c52829;">
+                {{startDay != 0 ? (startDay + " -") : ""}} {{endDay}} Days - {{mode["participantprofile"].length}} Participant 
+              </span>
+              will move from 
+              <span style="font-weight: bold;font-size: 20;color: black;">
+                {{mapProduct[mode["productid"]]}} 
+                <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                  {{mode["currentmode"]}}
+                </span> to 
+                <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                  {{mode["nextmode"]}}
+                </span>
+              </span>
+              <span>
+                <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">
+                  <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                  {{ (productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null ? 'Review Current Mode' : 'set up '+mode["currentmode"] }}            
+                  <span style="font-weight: 700;color: #c52829;">
+                    {{productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                  </span>
+                </button>
+              </span>
+              <span>
+                <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['nextmode'], mode['productid'])">
+                  <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['nextmode']] != null || productmodeConfig[mode['productid'] + mode['nextmode']] != undefined) && productmodeConfig[mode['productid'] + mode['nextmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                  <!-- Review Next Mode                  -->
+                  {{ (productmodeConfig[mode['productid'] + mode['nextmode']] != null || productmodeConfig[mode['productid'] + mode['nextmode']] != undefined) && productmodeConfig[mode['productid'] + mode['nextmode']]?.lastupdate != null ? 'Review Next Mode' : 'set up '+mode["nextmode"] }}                 
+                  <span style="font-weight: 700;color: #c52829;">
+                    {{productmodeConfig[mode['productid'] + mode['nextmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                  </span>
+                </button>
+              </span>
+              <!-- <button mat-raised-button style="margin-right: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">Review Current mode</button>
+              <button mat-raised-button style="margin-right: 10px;" (click)="updateConfig(mode['nextmode'], mode['productid'])">Review Next mode</button> -->
+          </p>
+          </div>
+        </div>
+      </div>
+  
+      <!-- No Next Mode -->
+      <!-- Priority Mode -->
+      <div *ngIf="priorityModeList.length !==0" class="row bottomscreen">
+        <div *ngIf="priorityModeList.length != 0">
+          <label class="subtitle">Priority Mode</label>&nbsp;&nbsp;&nbsp;
+        </div>
+
+        <div *ngFor="let mode of priorityModeList; let i = index">
+          <div *ngIf="hierarchyMode">
+            <div *ngIf="mode['hierarchyprofile'].length != 0" (click)="selectMode('priorityMode', i)" [ngClass]="{'selected-item': selectedModeType === 'priorityMode' && selectedModeIndex === i}">
+              {{i+1}}. 
+              <span style="font-weight: bold;font-size: 20;color: #c52829;">
+                {{mode["hierarchyprofile"].length}} People 
+              </span>
+              are in 
+              <span style="font-weight: bold;font-size: 20;color: black;">
+                {{mapProduct[mode["productid"]]}} 
+                <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                  {{mode["currentmode"]}} 
+                </span>
+              </span>
+              <span>
+                without next mode
+              </span>
+              <span>
+                <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">
+                  <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                  {{ (productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null ? 'Review Current Mode' : 'set up '+mode["currentmode"] }}                 
+                  <span style="font-weight: 700;color: #c52829;">
+                    {{productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                  </span>
+                </button>
+              </span>
+            </div>
+          </div>
+          <div *ngIf="!hierarchyMode" (click)="selectMode('priorityMode', i)" [ngClass]="{'selected-item': selectedModeType === 'priorityMode' && selectedModeIndex === i}">
+            {{i+1}}. 
+            <span style="font-weight: bold;font-size: 20;color: #c52829;">
+              {{mode["participantprofile"].length}} People
+            </span>
+            are in 
+            <span style="font-weight: bold;font-size: 20;color: black;">
+              {{mapProduct[mode["productid"]]}} 
+              <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                {{mode["currentmode"]}} 
+              </span>
+            </span>
+            <span>
+              without next mode
+            </span>
+            <span>
+              <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">
+                <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                {{ (productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null ? 'Review Current Mode' : 'set up '+mode["currentmode"] }}            
+                <span style="font-weight: 700;color: #c52829;">
+                  {{productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                </span>
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Journey Planning Mode -->
+      <div *ngIf="journeyPlanningModeList.length !==0" class="row bottomscreen">
+        <div *ngIf="journeyPlanningModeList.length != 0">
+          <label class="subtitle">Journey (Priority) Planning Mode</label>&nbsp;&nbsp;&nbsp;
+        </div>
+
+        <div *ngFor="let mode of journeyPlanningModeList; let i = index">
+          <div *ngIf="hierarchyMode">
+            <div *ngIf="mode['hierarchyprofile'].length != 0" (click)="selectMode('journeyPlanningMode', i)" [ngClass]="{'selected-item': selectedModeType === 'journeyPlanningMode' && selectedModeIndex === i}">
+              {{i+1}}. 
+              <span style="font-weight: bold;font-size: 20;color: #c52829;">
+                {{mode["hierarchyprofile"].length}} People 
+              </span>
+              are in 
+              <span style="font-weight: bold;font-size: 20;color: black;">
+                {{mapProduct[mode["productid"]]}} 
+                <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                  {{mode["currentmode"]}} 
+                </span>
+              </span>
+              <span>
+                without next mode
+              </span>
+              <span>
+                <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">
+                  <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                  {{ (productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null ? 'Review Current Mode' : 'set up '+mode["currentmode"] }}            
+                  <span style="font-weight: 700;color: #c52829;">
+                    {{productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                  </span>
+                </button>
+              </span>
+            </div>
+          </div>
+          <div *ngIf="!hierarchyMode" (click)="selectMode('journeyPlanningMode', i)" [ngClass]="{'selected-item': selectedModeType === 'journeyPlanningMode' && selectedModeIndex === i}">
+            {{i+1}}. 
+            <span style="font-weight: bold;font-size: 20;color: #c52829;">
+              {{mode["participantprofile"].length}} People
+            </span>
+            are in 
+            <span style="font-weight: bold;font-size: 20;color: black;">
+              {{mapProduct[mode["productid"]]}} 
+              <span style="font-weight: bold;font-size: 20;color: rgb(10, 193, 10);">
+                {{mode["currentmode"]}} 
+              </span>
+            </span>
+            <span>
+              without next mode
+            </span>
+            <span>
+              <button mat-raised-button style="margin-right: 10px; margin-bottom: 10px;" (click)="updateConfig(mode['currentmode'], mode['productid'])">
+                <mat-icon *ngIf="(productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null" style="color: green;">check_circle</mat-icon> 
+                {{ (productmodeConfig[mode['productid'] + mode['currentmode']] != null || productmodeConfig[mode['productid'] + mode['currentmode']] != undefined) && productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate != null ? 'Review Current Mode' : 'set up '+mode["currentmode"] }}                 
+                <span style="font-weight: 700;color: #c52829;">
+                  {{productmodeConfig[mode['productid'] + mode['currentmode']]?.lastupdate?.toDate() | date: ' MMM d, y, HH:mm'}}
+                </span>
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug Mode -->
+      <div class="row bottomscreen">
+        <label class="subtitle">Debug Mode</label>&nbsp;&nbsp;&nbsp;
+        <div class="col-md-8">
+          <h5 (click)="toggleDebugModeParticipants()">{{debugModeList.length}}</h5>        
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 fixed-column">
+      <!-- <h4>Participants List</h4> -->
+      <!-- Next Mode Profiles -->
+      <div *ngIf="selectedModeType === 'nextMode' && selectedModeIndex !== null && !showDebugModeParticipants">
+        <div class="row">
+          <div class="col-md-6">
+            <h4>Next Mode Participants</h4>
+          </div>
+          <div class="col-md-6 text-right">
+            <button mat-raised-button color="primary" (click)="updateNextMode()">UPDATE</button>
+          </div>
+        </div>
+        <div *ngIf="showDropdownAndDatePicker">
+          <mat-form-field appearance="outline">
+            <mat-label>Select Current Mode</mat-label>
+            <mat-select [(value)]="selectedCurrentMode">
+              <mat-option *ngFor="let mode of productCompletedMode" [value]="mode">{{ mode }}</mat-option> 
+            </mat-select>
+          </mat-form-field>
+          <br>
+          <mat-form-field appearance="outline">
+            <mat-label>Select Next Mode</mat-label>
+            <mat-select [(value)]="selectedNextMode"> 
+              <mat-option *ngFor="let mode of productCompletedMode" [value]="mode">{{ mode }}</mat-option> 
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field appearance="outline">
+            <mat-label>Pick a date</mat-label>
+            <input matInput [matDatepicker]="picker" [(ngModel)]="selectedNextModeDate" placeholder="Choose a date">
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+          </mat-form-field><br>
+          <button mat-raised-button  color="primary" (click)="updateComplete()">Change Modes</button>
+        </div>
+        <div class="Participantlist">
+          <ul class="profile-list" *ngIf="hierarchyMode && nextModeList[selectedModeIndex]['hierarchyproduct'].length">
+            <li *ngFor="let profile of nextModeList[selectedModeIndex]['hierarchyproduct']">
+              <span style="font-weight: bold;">
+                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              </span> - {{profile['nextmodedate']?.toDate() | date: 'medium'}}
+            </li>
+          </ul>
+          <ul class="profile-list" *ngIf="!hierarchyMode && nextModeList[selectedModeIndex]['participantproduct'].length">
+            <li *ngFor="let profile of nextModeList[selectedModeIndex]['participantproduct']">
+              <span style="font-weight: bold;">
+                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              </span> - {{profile['nextmodedate']?.toDate() | date: 'medium'}}
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <!-- Priority Mode Profiles -->
+      <div *ngIf="selectedModeType === 'priorityMode' && selectedModeIndex !== null && !showDebugModeParticipants">
+        <h4>Priority Mode Participants List</h4>
+        <div class="Participantlist">
+          <ul class="profile-list" *ngIf="hierarchyMode && priorityModeList[selectedModeIndex]['hierarchyproduct'].length">
+            <li *ngFor="let profile of priorityModeList[selectedModeIndex]['hierarchyproduct']">
+              <span style="font-weight: bold;">
+                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              </span>
+            </li>
+          </ul>
+          <ul class="profile-list" *ngIf="!hierarchyMode && priorityModeList[selectedModeIndex]['participantproduct'].length">
+            <li *ngFor="let profile of priorityModeList[selectedModeIndex]['participantproduct']">
+              <span style="font-weight: bold;">
+                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <!-- Journey Planning Mode Profiles -->
+      <div *ngIf="selectedModeType === 'journeyPlanningMode' && selectedModeIndex !== null && !showDebugModeParticipants" >
+        <h4>Journey Planning Mode Participants List</h4>
+        <div class="Participantlist">
+          <ul class="profile-list" *ngIf="hierarchyMode && journeyPlanningModeList[selectedModeIndex]['hierarchyproduct'].length">
+            <li *ngFor="let profile of journeyPlanningModeList[selectedModeIndex]['hierarchyproduct']">
+              <span style="font-weight: bold;">
+                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              </span>
+            </li>
+          </ul>
+          <ul class="profile-list" *ngIf="!hierarchyMode && journeyPlanningModeList[selectedModeIndex]['participantproduct'].length">
+            <li *ngFor="let profile of journeyPlanningModeList[selectedModeIndex]['participantproduct']">
+              <span style="font-weight: bold;">
+                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Debug Mode Profiles -->
+      <div *ngIf="showDebugModeParticipants && debugModeList.length > 0">
+        <h4>Debug Mode Participants</h4>
+        <div class="Participantlist">
+          <ul class="profile-list">
+            <li *ngFor="let debugProfile of debugModeList">
+              <span style="font-weight: bold;">
+                {{mapProfile[debugProfile['profileid']]}}
+              </span> 
+              <!-- - {{debugProfile['nextmodedate']?.toDate() | date: 'medium'}} -->
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

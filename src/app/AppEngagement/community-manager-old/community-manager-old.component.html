@@ -1,0 +1,270 @@
+<mat-progress-bar *ngIf="uploadpercentage > 0" mode="determinate" [value]="uploadpercentage"></mat-progress-bar>
+<!-- heading -->
+<section class="d-flex justify-content-center mt-2 mb-2" style="letter-spacing: 1px;"><h3 style="font-size: 20px;">Community Manager</h3></section>
+<main class="ml-5 mr-5 mt-1 mb-3 p-2" style="border:1px solid;">
+  <!-- sub heading -->
+  <!-- <section class="d-flex justify-content-center" *ngIf="selectedEvent != null"><h5>{{this.selectedEvent['queuename']}}</h5></section> -->
+  <section class="d-flex justify-content-center mt-2" >
+    <h5 style="font-size: 18px;">{{operationMode === 'Submit' ? 'Create a Community Post' : 'Update a selected community post'}}</h5>&nbsp;&nbsp;
+    <span style="cursor:pointer;" (click)="onReset()">(Reset)</span>
+  </section>
+  <!-- onGoing event select -->
+  <section class="d-flex flex-row justify-content-center">
+    <mat-form-field style="width:800px" class="ml-2" appearance="outline">
+      <mat-label>Select Ongoing Queue 0r Event</mat-label>
+      <mat-select  [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect($event.value)">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="eventSearchText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterEvent()" [value]="option">{{option['type'] === 'queue' ? option['queuename'] : option['name']}} ({{option['type']}})</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </section>
+  <!-- select category -->
+  <section class="d-flex flex-column">
+    <span class="d-flex justify-content-center mb-2">
+      <h5 style="font-size: 16px;">Select a category</h5>
+    </span>
+    <span class="d-flex flex-row">
+      <span></span>
+      <span style="flex:1 1 auto"></span>
+      <span>
+        <!-- Fixed: Use mat-chip-listbox for selection -->
+        <mat-chip-listbox aria-label="Category selection">
+          <mat-chip-option 
+            *ngFor="let option of categorylist; let i = index" 
+            [value]="option"
+            [selected]="selectedCategoryDocId === option['docid']"
+            (click)="onCategorySelect(option)">
+            {{option['categoryname']}}
+          </mat-chip-option>
+        </mat-chip-listbox>
+      </span>
+      <span style="flex:1 1 auto"></span>
+      <span class="d-flex flex-column">
+        <span>category (create/update/delete)</span>
+        <span>
+          <input type="text" 
+                 name="newCategoryName" 
+                 [(ngModel)]="newCategoryName"
+                 placeholder="Category name">&nbsp;
+          <select style="height:30px;" 
+                  name="newCategorytype" 
+                  [(ngModel)]="newCategoryType">
+            <option *ngFor="let option of postTypeList" [value]="option">{{option}}</option>
+          </select>
+          <button mat-icon-button type="button" (click)="addnewcategory('new')">
+            <mat-icon>add</mat-icon>
+          </button>
+          <button mat-icon-button type="button" (click)="addnewcategory('update')">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <span *ngIf="![null,undefined].includes(roles) ? roles['developer'] === true : false">
+            <button mat-icon-button type="button" (click)="deletecategory()">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </span>
+        </span>
+      </span>
+    </span>
+  </section>
+  <!-- preview thumbnail and video which are selected -->
+  <section class="d-flex flex-row example-list" style="overflow:auto;" cdkDropList cdkDropListOrientation="horizontal"  (cdkDropListDropped)="drop($event)">
+    <div class="example-box" *ngFor="let list of createPost.videos;let i = index" class="d-flex flex-column m-2" cdkDrag>
+      <div class="d-flex flex-row">
+        <img width="170" height="300" [src]="![null,undefined].includes(list.thumbnail['url']) ? list.thumbnail['url']: list.thumbnail ">
+        <video *ngIf="list.video != null" class="ml-1" width="170" height="300" controls>
+          <source [src]="![null,undefined].includes(list.video['url']) ? sanitize(list.video['url']): list.video">
+        </video>
+      </div>
+      <div class="d-flex justify-content-center">
+        <span class="w-100 mt-1">
+          <!-- {{![null,undefined].includes(list.title) ? list.title: null}} -->
+          <input class="w-100" type="text" [(ngModel)]="list.title">
+        </span></div>
+      <div class="d-flex justify-content-center">
+        <button class="w-100 mt-1" mat-stroked-button type="button" (click)="onRemoveSnippet(i)">Remove</button>
+      </div>
+    </div>
+  </section>
+  <!-- hint -->
+  <mat-hint>Note : You can sort the above videos as per the required order.</mat-hint>
+  <!-- add thumbnail and video  -->
+  <section class="d-flex flex-column justify-content-start mt-1">
+    <div class="d-flex flex-row justify-content-start">
+      <div>
+        <label>Select thumbnail : </label>
+        <input #thumbnail type="file" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)"required>
+      </div>
+      <div>
+        <label> Select Video : </label>
+        <input #video type="file"  accept=".mp4,.mov,.mkv,.avi" (change)="uploadVideo($event)"required>
+      </div>
+      <div>
+        <button mat-stroked-button type="button" (click)="onAddSnippet()" [disabled]="createPost.type === 'post' ? (createPost.videos.length  === 1) : false">ADD</button>
+      </div>
+    </div>
+  </section>
+  <!-- post description -->
+  <section style="width:100%">
+    <mat-form-field class="w-100"  appearance="outline" >
+      <mat-label>Description</mat-label>
+      <textarea matInput [(ngModel)]="this.createPost.description"></textarea>
+    </mat-form-field>
+  </section>
+  <!-- select tag -->
+  <section class="d-flex flex-column">
+    <span class="d-flex justify-content-center mb-2"><h5>Select a tag</h5></span>
+    <span class="d-flex flex-row">
+      <span></span>
+      <span style="flex:1 1 auto"></span>
+      <span>
+        <!-- <mat-chip-grid #chiptaglist [compareWith]="compareFnt" multiple="true" selectable="true">
+          <mat-chip  *ngFor="let option of taglist;let i = index" (click)="onTagSelect(chiptag,i)" #chiptag="matChip" [value]="option">{{option['tag']}}</mat-chip>
+        </mat-chip-grid> -->
+      </span>
+      <span style="flex:1 1 auto"></span>
+      <span class="d-flex flex-column">
+        <span>Tag (create)</span>
+        <span>
+          <input type="text" name="newTagName" [(ngModel)]="newTagName">&nbsp;
+          <button mat-icon-button type="button" (click)="addnewtag()"><mat-icon>add</mat-icon></button>
+        </span>
+      </span>
+    </span>
+  </section>
+  <!-- submitting post -->
+  <section class="d-flex justify-content-center mt-1 mb-2">
+    <button style="letter-spacing: 3px;" mat-stroked-button type="button" (click)="onSubmitPost()">{{operationMode === 'Submit' ? 'Submit' : 'Update'}}</button>
+  </section>
+</main>
+<!-- <mat-divider class="m-2"></mat-divider> -->
+<!-- Snippet Enable/Disable -->
+<div class="m-5 p-3 border border-secondary">
+  <h5 class="text-center">Active Snippet</h5>
+  <mat-form-field class="mr-3" style="width:800px" appearance="outline">
+    <mat-label>Snippet Title</mat-label>
+    <input matInput [(ngModel)]="activeSnippet['title']">
+  </mat-form-field>
+  <br>
+  <mat-form-field class="mr-3" style="width:800px" appearance="outline">
+    <mat-label>Snippet Highlight</mat-label>
+    <input matInput [(ngModel)]="activeSnippet['highlight']">
+  </mat-form-field>
+  <br>
+  <mat-form-field class="mr-3" style="width:800px" appearance="outline">
+    <mat-label>Event</mat-label>
+    <mat-select [(ngModel)]="activeSnippet['event']" multiple>
+      <mat-option>
+        <ngx-mat-select-search [(ngModel)]="eventSearchText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+      </mat-option>
+      <mat-option *ngFor="let option of filterEvent()" [value]="option['path']">{{option['type'] === 'queue' ? option['queuename'] : option['name']}} ({{option['type']}})</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <br>
+  <section class="d-flex justify-content-center mt-1 mb-2">
+    <button style="letter-spacing: 3px;" mat-stroked-button type="button" (click)="enableEventSnippet()">{{operationMode === 'Submit' ? 'Submit' : 'Update'}}</button>
+  </section>
+</div>
+
+<!-- show video library -->
+<section class="ml-5 mr-5 mt-1 mb-3">
+  <mat-toolbar class="d-flex justify-content-center">
+    <span>Community Post library</span>
+  </mat-toolbar>
+  <!-- table filter -->
+ <div class="mt-4">
+  <!-- Event Filter -->
+    <mat-form-field class="mr-3" appearance="outline">
+      <mat-label>Filter Event</mat-label>
+      <mat-select [(ngModel)]="selectedEventFilter" (selectionChange)="ngAfterViewInit()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="eventSearchText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option value="all">All</mat-option>
+        <mat-option *ngFor="let option of filterEvent()" [value]="option['docid']">{{option['type'] === 'queue' ? option['queuename'] : option['name']}} ({{option['type']}})</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <!-- Type Filter -->
+    <mat-form-field class="mr-3" appearance="outline">
+      <mat-label>Filter Type</mat-label>
+      <mat-select [(ngModel)]="selectedTypeFilter" (selectionChange)="ngAfterViewInit()">
+        <mat-option value="all">All</mat-option>
+        <mat-option *ngFor="let option of filterTypeList" [value]="option['type']">{{option["label"]}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <!-- General Filter -->
+    <mat-form-field appearance="outline">
+      <mat-label>Filter</mat-label>
+      <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Mia" #input>
+    </mat-form-field>
+ </div>
+  <table mat-table [dataSource]="dataSource" multiTemplateDataRows class="mat-elevation-z8" matSort>
+    <!-- index -->
+    <ng-container matColumnDef="index">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Sl.No: </th>
+      <td mat-cell *matCellDef="let row;">{{row.index}}</td>
+    </ng-container>
+     <!-- eventref -->
+     <ng-container matColumnDef="eventref">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Event </th>
+      <td mat-cell *matCellDef="let row"> {{mapEvent[row.eventref.id]}}</td>
+    </ng-container>
+     <!-- categoryname -->
+     <ng-container matColumnDef="categoryname">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+      <td mat-cell *matCellDef="let row"> {{row.categoryname}} </td>
+    </ng-container>
+     <!-- type -->
+     <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+      <td mat-cell *matCellDef="let row"> {{row.type}} </td>
+    </ng-container>
+     <!-- created -->
+     <ng-container matColumnDef="created">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
+      <td mat-cell *matCellDef="let row"> {{row.created.toDate() | date : 'short'}} </td>
+    </ng-container>
+    <!-- Edit -->
+    <ng-container matColumnDef="edit">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Edit </th>
+      <td mat-cell *matCellDef="let row">
+        <button mat-stroked-button type="button" (click)="onPatchCommunityPost(row)">Edit</button>&nbsp;
+        <button class="ml-3" mat-stroked-button type="button" (click)="makeAvailable(row)">{{row["available"] == true ? "Make Unavailable" : "Make Available"}}</button>
+      </td>
+    </ng-container>
+    <!-- delete -->
+    <ng-container matColumnDef="delete">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
+      <td mat-cell *matCellDef="let row">
+        <button mat-stroked-button type="button" (click)="onDelete(row)">delete</button>
+      </td>
+    </ng-container>
+    <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let row" [attr.colspan]="displayedColumns.length">
+        <p class="m-1">{{row.description}}</p>
+        <!-- class="d-flex flex-row" style="overflow:auto;" -->
+        <section class="d-flex flex-row flex-wrap">
+          <div *ngFor="let list of row.videos;let i = index" class="d-flex flex-column m-2">
+            <div class="d-flex flex-row">
+              <img *ngIf="list.thumbnail != null || list.thumbnail != undefined" width="170" height="300" [src]="list.thumbnail">
+              <video *ngIf="list.video != null || list.video != undefined" class="ml-1" width="170" height="300" controls>
+                <source [src]="list.video">
+              </video>
+            </div>
+            <div class="d-flex justify-content-center">
+              <p>
+                <b>{{list.title}}</b> <span class="hlstest" (click)="testHLS(list['hls'])">(HLS: {{list["hls"] != null && list["hls"] != undefined}})</span>
+              </p>
+            </div>
+          </div>
+        </section>
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns" ></tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" ></tr>
+  </table>
+  <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" aria-label="Select page of users"></mat-paginator>
+</section>

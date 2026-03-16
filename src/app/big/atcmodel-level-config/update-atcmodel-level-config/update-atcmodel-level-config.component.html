@@ -1,0 +1,144 @@
+<div class="mainscreen">
+  <h4 class="title">Update ATC Model - Level Config</h4>
+  <form [formGroup]="configForm" (ngSubmit)="submit()">
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>ATC Model</mat-label>
+        <mat-select formControlName="atcmodel">
+          <mat-option *ngFor="let option of atcmodelList" [value]="option">{{option}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="configForm.get('atcmodel').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Level</mat-label>
+        <mat-select formControlName="level">
+          <mat-option *ngFor="let option of levelList" [value]="option.docid">{{option.level}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="configForm.get('level').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Primary Activity</mat-label>
+        <mat-select formControlName="primaryactivity" (selectionChange)="onPrimaryActivityChange()">
+          <mat-option *ngFor="let option of activityList" [value]="option.docid">{{option.activity}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="configForm.get('primaryactivity').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <!-- Metrics -->
+      <div class="text-left" formArrayName="metrics">
+        <div class="mb-2">
+          <label class="subtitle">Metrics to Move To Next Level</label>
+          <button mat-icon-button type="button" (click)="addMetrics()">
+            <mat-icon>add_circle_outline</mat-icon>
+          </button>
+        </div>
+        <div *ngFor="let field of metricFormArray().controls; let i = index" [formGroupName]="i">
+          <mat-form-field class="inputfields" appearance="outline">
+            <mat-label>Activity</mat-label>
+            <mat-select formControlName="activity" >
+              <mat-option *ngFor="let option of activityList" [value]="option.docid">{{option.activity}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="field.get('activity').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Metric</mat-label>
+            <input matInput type="number" formControlName="metric">
+            <mat-error *ngIf="field.get('metric').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <button class="ml-2" mat-icon-button type="button" (click)="removeMetrics(i)">
+            <mat-icon>remove_circle_outline</mat-icon>
+          </button>
+        </div>
+      </div>
+      <!-- Validation -->
+      <div class="text-left" formArrayName="validation">
+        <div class="mb-2">
+          <label class="subtitle">Validation Metrics</label>
+          <!-- <button mat-icon-button type="button" (click)="addValidation()">
+            <mat-icon>add_circle_outline</mat-icon>
+          </button> -->
+        </div>
+        <div *ngFor="let field of validationFormArray().controls; let i = index" [formGroupName]="i">
+          <mat-form-field class="inputfields" appearance="outline">
+            <mat-label>Activity</mat-label>
+            <mat-select formControlName="activity" [disabled]="true">
+              <mat-option *ngFor="let option of activityList" [value]="option.docid">{{option.activity}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="field.get('activity').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Metric</mat-label>
+            <input matInput type="number" formControlName="metric">
+            <mat-error *ngIf="field.get('metric').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <!-- <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Validity</mat-label>
+            <input matInput type="number" formControlName="validity">
+            <mat-error *ngIf="field.get('validity').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field> -->
+          <!-- <button class="ml-2" mat-icon-button type="button" (click)="removeValidation(i)">
+            <mat-icon>remove_circle_outline</mat-icon>
+          </button> -->
+        </div>
+      </div>
+      <!-- Stabilization -->
+      <div class="text-left" formArrayName="stabilization">
+        <div class="mb-2">
+          <label class="subtitle">Stabilization Metrics</label>
+          <!-- <button mat-icon-button type="button" (click)="addStabilization()">
+            <mat-icon>add_circle_outline</mat-icon>
+          </button> -->
+        </div>
+        <div *ngFor="let field of stabilizationFormArray().controls; let i = index" [formGroupName]="i">
+          <mat-form-field class="inputfields" appearance="outline">
+            <mat-label>Activity</mat-label>
+            <mat-select formControlName="activity" [disabled]="true">
+              <mat-option *ngFor="let option of activityList" [value]="option.docid">{{option.activity}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="field.get('activity').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Metric</mat-label>
+            <input matInput type="number" formControlName="metric">
+            <mat-error *ngIf="field.get('metric').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Validity</mat-label>
+            <input matInput type="number" formControlName="validity">
+            <mat-error *ngIf="field.get('validity').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <!-- <button class="ml-2" mat-icon-button type="button" (click)="removeStabilization(i)">
+            <mat-icon>remove_circle_outline</mat-icon>
+          </button> -->
+        </div>
+      </div>
+    </div>
+    <div class="mt-2 text-center">
+      <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Config'}}</button>
+    </div>
+  </form>
+</div>

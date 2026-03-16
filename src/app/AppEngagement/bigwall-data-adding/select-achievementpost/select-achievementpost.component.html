@@ -1,0 +1,50 @@
+<mat-form-field>
+  <mat-label>Filter</mat-label>
+  <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Mia" #input>
+</mat-form-field>
+
+<div class="mat-elevation-z8">
+  <table mat-table [dataSource]="dataSource" matSort>
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+      <td mat-cell *matCellDef="let row"> {{row.name}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="created">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
+      <td mat-cell *matCellDef="let row"> {{row.created != undefined ? (row.created.toDate() | date : "mediumDate") : null}}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="private">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Private/Public</th>
+      <td mat-cell *matCellDef="let row"> {{row.private != undefined ? (row.private ? "Private" : "Public"): "Private"}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="postcategory">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header> Post Category </th>
+      <td mat-cell *matCellDef="let row"> {{row.postcategory != undefined && row.postcategory != null ? (mapPostCategory[row.postcategory.id] != undefined ? mapPostCategory[row.postcategory.id]['type'] : null) : null}}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="paralleltrajectory">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Parallel Trajectory</th>
+      <td mat-cell *matCellDef="let row"> {{row.paralleltrajectory != undefined && row.paralleltrajectory != null ? row.paralleltrajectory : null}}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="share">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Share</th>
+      <td mat-cell *matCellDef="let row">
+        <button mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    <tr class="mat-row" *matNoDataRow>
+      <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+    </tr>
+  </table>
+
+  <mat-paginator [pageSizeOptions]="[10, 25, 100,200,500]"></mat-paginator>
+</div>

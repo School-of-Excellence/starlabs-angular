@@ -1,0 +1,95 @@
+<h2 mat-dialog-title>Workshop Participants</h2> 
+
+<div mat-dialog-content>
+  <div class="mat-elevation-z8">
+    <mat-form-field appearance="outline" style="width: 50%; margin: 10px;">
+    <mat-label>Search</mat-label>
+    <input matInput (keyup)="applyFilter($event)" placeholder="Search participants">
+    </mat-form-field>
+
+    <table mat-table [dataSource]="dataSource" matSort class="full-width-table">
+      <ng-container matColumnDef="profileid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+        <td mat-cell *matCellDef="let element"> {{mapProfile[element.profileid]['name']}} </td>
+      </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
+        <td mat-cell *matCellDef="let element"> {{element.status}} </td>
+      </ng-container>
+      <ng-container matColumnDef="enrollmentdate">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Enrollment Date </th>
+        <td mat-cell *matCellDef="let element"> {{element.enrollmentdate}} </td>
+      </ng-container>
+      <ng-container matColumnDef="workshopStartedAt">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Workshop Started At </th>
+        <td mat-cell *matCellDef="let element"> {{element.workshopStartedAt ?? 'Not Started'}} </td>
+      </ng-container>
+      <!-- <ng-container matColumnDef="enrollid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Enrolled ID </th>
+        <td mat-cell *matCellDef="let element"> {{element.id ? ('workshop participant enrolled/'+element.id) : 'Not Created'}} </td>
+      </ng-container>
+      <ng-container matColumnDef="participantdocid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Participant Wrk ID </th>
+        <td mat-cell *matCellDef="let element">
+          {{ element.participantworkshopid ? ('participant workshop/' + element.participantworkshopid) : 'Not Created' }}
+        </td>
+      </ng-container> -->
+      <ng-container matColumnDef="enrollid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Enrolled ID </th>
+        <td mat-cell *matCellDef="let element">
+          <span>
+            {{ element.id ? ('workshop participant enrolled/' + element.id) : 'Not Created' }}
+          </span>
+
+          <button
+            *ngIf="element.id"
+            mat-icon-button
+            (click)="copyToClipboard('workshop participant enrolled/' + element.id)"
+            matTooltip="Copy"
+          >
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="participantdocid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Participant Wrk ID </th>
+        <td mat-cell *matCellDef="let element">
+          <span>
+            {{ element.participantworkshopid ? ('participant workshop/' + element.participantworkshopid) : 'Not Created' }}
+          </span>
+
+          <button
+            *ngIf="element.participantworkshopid"
+            mat-icon-button
+            (click)="copyToClipboard('participant workshop/' + element.participantworkshopid)"
+            matTooltip="Copy"
+          >
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+    <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef> Actions </th>
+    <td mat-cell *matCellDef="let element">
+        <button mat-icon-button color="warn" (click)="deleteRow(element)">
+        <mat-icon>delete</mat-icon>
+        </button>
+    </td>
+    </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    </table>
+    <mat-paginator 
+      [pageSizeOptions]="[20, 50, 100]" 
+      showFirstLastButtons>
+    </mat-paginator>
+  </div>
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-button (click)="closeDialog()">Close</button>
+</div>

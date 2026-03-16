@@ -1,0 +1,31 @@
+.mainscreen{
+  padding: 25px;
+}
+
+h4{
+  text-align: center;
+  color: rgb(3, 48, 63);
+}
+
+.heading{
+  color: rgb(3, 48, 63);
+  text-decoration: underline;
+  margin-top: 20px;
+  margin-bottom: 15px;
+}
+
+.adjustmentbox{
+  margin-bottom: 20px;
+}
+
+.procedurebox{
+  margin-left: 25px;
+}
+
+.mandatory{
+  color: red;
+}
+
+.changeagent{
+  margin-left: 15px;
+}

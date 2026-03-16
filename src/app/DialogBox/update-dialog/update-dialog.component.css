@@ -1,0 +1,19 @@
+.mainscreen{
+    width: 60vw;
+    padding: 20px;
+  }
+  
+  mat-form-field{
+    width: 60vw;
+  }
+  
+  .cancelbtn{
+    color: red;
+    border: 1px solid red;
+  }
+  
+  .submitbtn{
+    color: white;
+    background-color: green;
+    margin-left: 15px;
+  }

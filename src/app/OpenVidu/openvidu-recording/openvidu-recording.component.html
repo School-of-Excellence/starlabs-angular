@@ -1,0 +1,121 @@
+<div class="container-fluid">
+  <div class="text-center mt-4 mb-4 w-100 fw-bold fs-4">
+    OpenVidu Recordings
+  </div>
+  <div class="row">
+    <!-- Left Panel: Room List -->
+    <div class="col-md-4 border-end">
+      <div class="p-3">
+        <div class="ms-2 mb-1 fs-6 fw-semibold d-flex justify-content-start align-items-center">
+          OpenVidu Rooms
+          <button mat-icon-button (click)="createNewRoom()">
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+        
+        <div *ngIf="loading" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <div *ngIf="!loading && rooms.length === 0 && liveRooms.length === 0" class="alert alert-info">
+          No rooms found
+        </div>
+
+        <div class="list-group">
+          <div class="mb-2" *ngIf="liveRooms.length > 0">
+            <div class="fw-semibold m-2 text-secondary">Live Rooms</div>
+            <button 
+              *ngFor="let room of liveRooms"
+              type="button"
+              class="list-group-item list-group-item-action"
+              [class.active]="selectedRoom?.roomid === room.roomid"
+              (click)="selectRoom(room)">
+              <div class="d-flex w-100 justify-content-between">
+                <div class="mb-1 fw-semibold">{{ room.title }}</div>
+              </div>
+              <span>{{ room.createddate?.toDate() | date:'MMM d, y, hh:mm a' }}</span>
+              -
+              <span [class]="room.roomstatus == 'live' ? 'liveColor' : 'endedColor'">
+                {{room.roomstatus ? `Room ${room.roomstatus}` : "Not Started"}}
+              </span>
+              -
+              <span [class]="room.recordingstatus == 'started' ? 'liveColor' : 'endedColor'">
+                {{room.recordingstatus ? `Recording ${room.recordingstatus}` : ""}}
+              </span>
+            </button>
+          </div>
+
+
+          <div *ngIf="rooms.length > 0">
+            <div class="fw-semibold m-2 text-secondary">Closed Rooms</div>
+            <button 
+              *ngFor="let room of rooms"
+              type="button"
+              class="list-group-item list-group-item-action"
+              [class.active]="selectedRoom?.roomid === room.roomid"
+              (click)="selectRoom(room)">
+              <div class="d-flex w-100 justify-content-between">
+                <div class="mb-1 fw-semibold">{{ room.title }}</div>
+              </div>
+              <span>{{ room.createddate?.toDate() | date:'MMM d, y, hh:mm a' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Event Details -->
+    <div class="col-md-8">
+      <div class="p-3">
+        <div *ngIf="!selectedRoom" class="text-center text-muted py-5">
+          <p>Select a room to view recordings</p>
+        </div>
+
+        <div *ngIf="selectedRoom">
+          <div class="ms-2 mb-3 fs-6 fw-semibold">{{ selectedRoom.title }} - Recordings</div>
+
+          <div *ngIf="eventsLoading" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+
+          <div *ngIf="!eventsLoading && events.length === 0" class="alert alert-info">
+            No recordings found for this room
+          </div>
+
+          <div *ngIf="!eventsLoading && events.length > 0" class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Duration</th>
+                  <th>Size</th>
+                  <th>Started At</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let event of events">
+                  <td>{{ event.payload.egressInfo.file.filename }}</td>
+                  <td>{{ formatDuration(event.payload.egressInfo.file.duration) }}</td>
+                  <td>{{ formatFileSize(event.payload.egressInfo.file.size) }}</td>
+                  <td>{{ formatStartedAt(event.payload.egressInfo.file.startedAt) }}</td>
+                  <td>
+                    <button 
+                      class="btn btn-primary btn-sm"
+                      (click)="getVideoURL(event)">
+                      Play
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

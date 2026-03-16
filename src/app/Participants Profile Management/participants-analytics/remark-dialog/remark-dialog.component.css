@@ -1,0 +1,26 @@
+.heading{
+  text-align: center;
+  color: rgb(0, 50, 67);
+  font-size: 16px;
+}
+
+.textareafield{
+  resize: both;
+}
+
+.btnbox{
+  margin-top: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.cancelbtn{
+  color: red;
+  border: 1px solid red;
+  margin-right: 15px;
+}
+
+.submitbtn{
+  color: white;
+  background-color: green;
+}

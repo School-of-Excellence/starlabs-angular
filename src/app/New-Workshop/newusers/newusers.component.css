@@ -1,0 +1,14 @@
+.users-table {
+  width: 100%;
+}
+.subscriber-label {
+  color: red;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.filter-actions {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: flex-end;
+}

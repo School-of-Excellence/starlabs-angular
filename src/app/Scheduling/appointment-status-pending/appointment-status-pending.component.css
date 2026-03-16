@@ -1,0 +1,25 @@
+.mainscreen{
+  padding: 20px;
+  width: 100%;
+}
+
+.heading{
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  color: rgb(0, 50, 67);
+  margin-bottom: 15px;
+}
+
+table{
+  width: 100%;
+}
+
+.linebreak{
+  white-space: pre-wrap
+}
+
+.emptytext{
+  text-align: center;
+  color: grey;
+}

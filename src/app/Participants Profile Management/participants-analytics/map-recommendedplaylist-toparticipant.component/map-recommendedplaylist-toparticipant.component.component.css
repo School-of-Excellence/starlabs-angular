@@ -1,0 +1,4 @@
+::ng-deep .mat-mdc-dialog-container .mdc-dialog__surface {
+  max-height: 90vh;
+  overflow-y: auto;
+}

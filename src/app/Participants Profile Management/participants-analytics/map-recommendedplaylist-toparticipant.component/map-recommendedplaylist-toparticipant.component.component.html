@@ -1,0 +1,189 @@
+<!-- <div mat-dialog-content class="d-flex flex-column m-4">
+  <span class="d-flex justify-content-center"><h3>{{bufferDoc.personalised ? 'Personalised Curation' : 'Create Recommended Playlist'}}</h3></span>
+  <div class="d-flex flex-column">
+    <div *ngIf="bufferDoc.personalised">
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Recommended By</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.recommendedby">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterRecommendedName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterEis()" [value]="option">{{option.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Select Eiflix Series</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.eiflix" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterSeriesName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterSeries()" [value]="option.ref">{{option.seriesName}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Select SolarVoice Playlist</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.solarvoice" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterPlaylistName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterPlaylist()" [value]="option.ref">{{option.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Select General Content</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.generalcontent" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterContentName" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterContent()" [value]="option.ref">{{option.title}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+  <div>
+    <div>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Notes for creating these recommended playlist</mat-label>
+        <textarea matInput name="notes" id="" rows="5" [(ngModel)]="bufferDoc.notes" placeholder=""></textarea>
+      </mat-form-field>
+    </div>
+  </div>
+  <div class="d-flex flex-column">
+    <div>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Title</mat-label>
+        <input matInput type="text" [(ngModel)]="bufferDoc.title">
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Description</mat-label>
+        <textarea matInput name="description" id="" rows="5" [(ngModel)]="bufferDoc.description"></textarea>
+      </mat-form-field>
+    </div>
+  </div>
+  <div *ngIf="!bufferDoc.personalised">
+    <mat-form-field appearance="outline" class="w-100">
+      <mat-label>Expire Date</mat-label>
+      <input 
+        matInput 
+        [min]="minDate"
+        [matDatepicker]="picker" 
+        [(ngModel)]="bufferDoc.expiredate">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  </div>
+  <div class="d-flex flex-row justify-content-center">
+    <button mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
+    <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="formValidation()">Submit</button>
+  </div>
+</div> -->
+<div class="d-flex flex-column m-4">
+  <span class="d-flex justify-content-center">
+    <h3>Create Recommended Playlist</h3>
+  </span>
+</div>
+<div mat-dialog-content style="max-height: 65vh; overflow-y: auto; padding: 0 24px;">
+  <div class="d-flex flex-column">
+    <div class="mb-3">
+      <mat-slide-toggle [(ngModel)]="bufferDoc.personalised">Personalised Curation</mat-slide-toggle>
+    </div>
+    <div *ngIf="bufferDoc.personalised">
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Recommended By</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.recommendedby">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterRecommendedName" placeholderLabel="Search"
+              noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterEis()" [value]="option">{{option.name}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="submitted && bufferDoc.personalised && !bufferDoc.recommendedby">Required</mat-error>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Select Eiflix Series</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.eiflix" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterSeriesName" placeholderLabel="Search"
+              noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterSeries()" [value]="option.ref">{{option.seriesName}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Select SolarVoice Playlist</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.solarvoice" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterPlaylistName" placeholderLabel="Search"
+              noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterPlaylist()" [value]="option.ref">{{option.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="mr-4 w-100">
+        <mat-label>Select General Content</mat-label>
+        <mat-select [(ngModel)]="bufferDoc.generalcontent" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterContentName" placeholderLabel="Search"
+              noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let option of filterContent()" [value]="option.ref">{{option.title}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+  <div>
+    <mat-form-field appearance="outline" class="w-100">
+      <mat-label>Notes for creating these recommended playlist</mat-label>
+      <textarea matInput name="notes" rows="5" [(ngModel)]="bufferDoc.notes"></textarea>
+    </mat-form-field>
+  </div>
+  <div class="d-flex flex-column">
+    <div>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Title</mat-label>
+        <input matInput type="text" [(ngModel)]="bufferDoc.title">
+        <mat-error *ngIf="submitted && !bufferDoc.title?.trim()">Title is required</mat-error>
+      </mat-form-field>
+    </div>
+    <div>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Description</mat-label>
+        <textarea matInput name="description" rows="5" [(ngModel)]="bufferDoc.description"></textarea>
+      </mat-form-field>
+    </div>
+  </div>
+  <div>
+    <mat-form-field appearance="outline" class="w-100">
+      <mat-label>Expire Date</mat-label>
+      <input matInput [min]="minDate" [matDatepicker]="picker" [(ngModel)]="bufferDoc.expiredate">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  </div>
+</div>
+
+<div mat-dialog-actions class="d-flex flex-column align-items-center" style="padding: 16px;">
+  <div *ngIf="submitted && validationErrors.length > 0" class="validation-errors mb-3 w-100">
+    <div *ngFor="let err of validationErrors" class="text-danger" style="font-size: 13px; margin-bottom: 4px;">
+      ⚠ {{ err }}
+    </div>
+  </div>
+  <div class="d-flex flex-row justify-content-center">
+    <button mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
+    <button mat-stroked-button type="button" (click)="onSubmit()">Submit</button>
+  </div>
+</div>

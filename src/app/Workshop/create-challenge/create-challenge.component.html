@@ -1,0 +1,318 @@
+<div class="m-4"> 
+  <div>
+    <h4 style="text-align: center;">Create Workshop Challenge</h4>
+  </div>
+  <div >
+    <form [formGroup]="workshopChallengeForm">
+
+      <div class="mt-2">
+        <mat-form-field appearance="outline" class="w-50">
+          <mat-label>Workshop Challenge Name</mat-label>
+          <input type="text" matInput formControlName="label">
+        </mat-form-field>
+      </div>
+
+      <div>
+        <mat-checkbox formControlName="bonuschallenge">Create Challenge as bonus</mat-checkbox>
+      </div>
+  
+      <div class="m-1">
+        <span class="d-flex justify-content-center"><h6>Create & ReArrange Task :-</h6></span>
+        <div style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded">
+          <mat-chip-set cdkDropList class="example-list mat-chip-list-stacked" (cdkDropListDropped)="drop($event)">
+              <mat-chip style="width:fit-content" *ngFor="let option of workshopChallengeForm.value.tasks;let i = index" color="primary" cdkDrag>
+                {{i+1}}&nbsp;&nbsp;{{option}}&nbsp;&nbsp;<mat-icon matChipRemove (click)="onTaskRemove('tasks',i)">cancel</mat-icon>
+              </mat-chip>
+          </mat-chip-set>
+        </div>
+        <mat-form-field appearance="fill" class="w-25">
+          <mat-label>Create Task</mat-label>
+          <input type="text" matInput (keydown.enter)="onTaskwrite($event)">
+        </mat-form-field>
+      </div>
+
+      <div class="m-2"><mat-divider></mat-divider></div>
+  
+      <div class="m-1">
+        <div class="d-flex justify-content-center m-2">
+          <h5>Group Task</h5>
+        </div>
+        <div>
+          <!-- create challenge to group it to task -->
+          <div>
+            <mat-form-field appearance="fill" class="w-25">
+              <mat-label>Create Challenge</mat-label>
+              <input type="text" matInput (keydown.enter)="onCreateChallenge($event)">
+            </mat-form-field>
+          </div>
+          <!-- display nested formGroup -->
+          <div formGroupName="groupchallenge">
+            <span *ngFor="let challengename of groupChallengeForm.controls | keyvalue">
+              <li [formGroupName]="challengename.key" style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded">
+                <div class="w-100 d-flex flex-row">
+                  <div class="w-75">
+                    <span>{{challengename.key}}</span>&nbsp;&nbsp;
+  
+                    <mat-form-field appearance="outline">
+                      <mat-label>Title</mat-label>
+                      <input type="text" matInput formControlName="title">
+                    </mat-form-field>&nbsp;&nbsp;
+      
+                    <mat-form-field appearance="outline">
+                      <mat-label>Call to action</mat-label>
+                      <input type="text" matInput formControlName="calltoaction">
+                    </mat-form-field>&nbsp;&nbsp;
+      
+                    <button mat-stroked-button type="button" (click)="onRemoveChallenge(challengename.key)">Remove</button>
+
+                    <br>
+                    <mat-form-field appearance="outline" class="ml-4 w-75">
+                      <mat-label>Description</mat-label>
+                      <textarea matInput formControlName="description" cols="30" rows="5"></textarea>
+                    </mat-form-field>&nbsp;&nbsp;
+
+                    <br>
+                    <mat-form-field appearance="fill" class="w-75 ml-4" >
+                      <mat-label>Add ICON URL</mat-label>
+                      <mat-chip-grid #chipList3 multiple >
+                        <mat-chip-row 
+                          *ngFor="let url of groupChallengeForm.get(challengename.key).value['icon'] | keyvalue;let refIndex = index" >
+                          {{url.key}}:{{url.value}}<mat-icon matChipRemove (click)="onRemoveImage(groupChallengeForm,challengename.key,'icon',url.key)">cancel</mat-icon>
+                        </mat-chip-row>
+                        <input 
+                          placeholder="add type reference..."
+                          [matChipInputFor]="chipList3"
+                          [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                          (matChipInputTokenEnd)="onAddImage(groupChallengeForm,challengename.key,'icon',$event)"
+                          >
+                      </mat-chip-grid>
+                      <mat-hint>paste image url & press enter to add.</mat-hint>
+                    </mat-form-field>
+
+                    <br>
+                    <div class="mt-2">
+                      <span>Rewards : </span>&nbsp;&nbsp;&nbsp;&nbsp;
+                      <button mat-stroked-button color="primary" type="button" (click)="onAddRewards(groupChallengeForm,challengename.key)">Add</button>
+                    </div>
+                     <div *ngIf="groupChallengeForm.get(challengename.key).value['rewards'] != undefined" formArrayName="rewards">
+                      <li class="mt-2" *ngFor="let rewardobj of groupChallengeForm.get(challengename.key).get('rewards')['controls'];let k = index;" [formGroupName]="k">
+                        <mat-form-field appearance="outline">
+                          <mat-label>Title</mat-label>
+                          <input type="text" matInput formControlName="title">
+                        </mat-form-field>&nbsp;&nbsp;
+                        <mat-form-field appearance="outline">
+                          <mat-label>Rewards Count</mat-label>
+                          <input type="number" matInput formControlName="availablecount">
+                        </mat-form-field>&nbsp;&nbsp;
+                        <button mat-icon-button color="accent" type="button" (click)="onRemoveRewards(groupChallengeForm,challengename.key,k)"><mat-icon>remove</mat-icon></button>
+                        <br>
+                        <mat-form-field appearance="fill" class="w-75 ml-4" >
+                          <mat-label>Add image URL</mat-label>
+                          <mat-chip-grid #chipList4>
+                            <mat-chip-row *ngIf="groupChallengeForm.get(challengename.key).get('rewards').value[k]['image'] != null">
+                              {{groupChallengeForm.get(challengename.key).get('rewards').value[k]['image']}}
+                              <mat-icon matChipRemove (click)="onRemoveRewardsImage(groupChallengeForm,challengename.key,k,'image')">cancel</mat-icon>
+                            </mat-chip-row>
+                            <input 
+                              placeholder="add image url..."
+                              [matChipInputFor]="chipList4"
+                              [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                              (matChipInputTokenEnd)="onAddRewardsImage(groupChallengeForm,challengename.key,k,$event,'image')"
+                              >
+                          </mat-chip-grid>
+                          <mat-hint>paste image url & press enter to add.</mat-hint>
+                        </mat-form-field>
+                        <br>
+                        <mat-form-field appearance="fill" class="w-75 ml-4" >
+                          <mat-label>Add Reward Link</mat-label>
+                          <mat-chip-grid #chipList5>
+                            <mat-chip-row *ngIf="groupChallengeForm.get(challengename.key).get('rewards').value[k]['rewardlink'] != null">
+                              {{groupChallengeForm.get(challengename.key).get('rewards').value[k]['rewardlink']}}
+                              <mat-icon matChipRemove (click)="onRemoveRewardsImage(groupChallengeForm,challengename.key,k,'rewardlink')">cancel</mat-icon>
+                            </mat-chip-row>
+                            <input 
+                              placeholder="add link..."
+                              [matChipInputFor]="chipList5"
+                              [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                              (matChipInputTokenEnd)="onAddRewardsImage(groupChallengeForm,challengename.key,k,$event,'rewardlink')"
+                            >
+                          </mat-chip-grid>
+                          <mat-hint>paste link & press enter to add.</mat-hint>
+                        </mat-form-field>
+                      </li>
+                    </div>
+                  </div>
+                  <div class="w-25">
+                    <span class="d-flex justify-content-center m-1"><mat-label>ICON Preview</mat-label></span>
+                    <span class="m-1 d-flex flex-row flex-wrap">
+                      <img class="m-1" *ngFor="let url of groupChallengeForm.get(challengename.key).value['icon'] | keyvalue" [src]="url.value" width="150" height="200">
+                    </span>
+                    <mat-divider></mat-divider>
+                    <span class="d-flex justify-content-center m-1"><mat-label>Rewards Image Preview</mat-label></span>
+                    <span class="m-1 d-flex flex-row flex-wrap" *ngIf="groupChallengeForm.get(challengename.key).value['rewards'] != undefined">
+                      <span *ngFor="let url of groupChallengeForm.get(challengename.key).get('rewards').value || []">
+                        <img *ngIf="url['image'] != null" class="m-1" [src]="url['image']" width="150" height="200">
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </li>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="m-2"><mat-divider></mat-divider></div>
+  
+      <div formGroupName="taskproperty" class="m-2">
+        <div class="d-flex justify-content-center m-2">
+          <h5>Fill Task Detail :-</h5>
+        </div>
+        <span *ngFor="let taskname of taskPropertyGroup.controls | keyvalue;let j = index">
+          <li [formGroupName]="taskname.key" style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded">
+            <div class="d-flex flex-row">
+              <div class="w-75">
+                <span>{{taskname.key}}</span>&nbsp;&nbsp;
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Type</mat-label>
+                  <mat-select formControlName="type" (selectionChange)="taskPropertyGroup.get(taskname.key).value['reference'] = []">
+                    <mat-option *ngFor="let option of tasktype" [value]="option">{{option}}</mat-option>
+                  </mat-select>
+                </mat-form-field>&nbsp;&nbsp;
+      
+                <mat-form-field appearance="outline">
+                  <mat-label>Title</mat-label>
+                  <input type="text" matInput formControlName="title">
+                </mat-form-field>&nbsp;&nbsp;
+      
+                <mat-form-field appearance="outline">
+                  <mat-label>Call to action</mat-label>
+                  <input type="text" matInput formControlName="calltoaction">
+                </mat-form-field>&nbsp;&nbsp;
+
+                <span class="d-flex flex-column" style="width:180px;">
+                  <input type="datetime-local" (change)="onDateChange($event,taskname.key)">
+                  <p> Current:{{taskPropertyGroup.get(taskname.key).value['startdate'] | date :'short'}}</p>
+                </span>
+      
+                <mat-form-field appearance="outline">
+                  <mat-label>Select challenge</mat-label>
+                  <mat-select formControlName="challengename">
+                    <mat-option [value]="null">None</mat-option>
+                    <mat-option *ngFor="let option of groupChallengeForm.controls | keyvalue" [value]="option.key">{{option.key}}</mat-option>
+                  </mat-select>
+                </mat-form-field>&nbsp;&nbsp;
+      
+                <br>
+                <mat-form-field appearance="outline" style="width:90%">
+                  <mat-label>Description</mat-label>
+                  <textarea matInput formControlName="description" cols="30" rows="5"></textarea>
+                </mat-form-field>&nbsp;&nbsp;
+
+                <div style="background-color: rgb(242, 240, 240);" class="border" style="width:90%">
+                  <mat-label class="m-1">Add Key Points</mat-label>
+                  <mat-chip-set class="mat-chip-list-stacked">
+                    <mat-chip style="width:fit-content" 
+                      *ngFor="let option of taskPropertyGroup.get(taskname.key).value['keypoints'];let i = index" >
+                      {{i+1}}&nbsp;&nbsp;{{option}}&nbsp;&nbsp;<mat-icon matChipRemove (click)="onKeyPointRemove(taskname.key,i)">cancel</mat-icon>
+                    </mat-chip>
+                  </mat-chip-set>
+                  <mat-form-field appearance="fill" class="w-75">
+                    <input type="text" matInput (keydown.enter)="onKeyPointWrite(taskname.key,$event)">
+                    <mat-hint>press enter to add.</mat-hint>
+                  </mat-form-field>
+                </div>
+      
+                <br>
+                <mat-form-field appearance="fill" style="width:90%" class="ml-4" *ngIf="![null,undefined].includes(taskPropertyGroup.get(taskname.key).value['type'])">
+                  <mat-label>Select {{taskPropertyGroup.get(taskname.key).value['type'] | uppercase}} Reference</mat-label>
+                  <mat-chip-grid #chipList2 multiple >
+                    <mat-chip-row *ngFor="let ref of taskPropertyGroup.get(taskname.key).value['reference'];let refIndex = index" >
+                      {{ taskPropertyGroup.get(taskname.key).value['type'] != 'livecall' ? pathToDisplayName[ref.path] : ref}}
+                      <mat-icon matChipRemove (click)="onRemoveReference(taskname.key,refIndex)">cancel</mat-icon>
+                    </mat-chip-row>
+                    <input 
+                      *ngIf="taskPropertyGroup.get(taskname.key).value['type'] != 'livecall'"
+                      placeholder="add type reference..."
+                      [matAutocomplete]="auto"
+                      [matChipInputFor]="chipList2"
+                      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                      (keyup)="onTextSearch(mapTypeDataList[taskPropertyGroup.get(taskname.key).value['type']],$event,taskPropertyGroup.get(taskname.key).value['type'])"
+                      >
+                    <input 
+                      *ngIf="taskPropertyGroup.get(taskname.key).value['type'] == 'livecall'"
+                      type="text"
+                      placeholder="add zoom call reference..."
+                      [matChipInputFor]="chipList2"
+                      (matChipInputTokenEnd)="onAddLiveCallReference(taskname.key,$event)"
+                      >
+                  </mat-chip-grid>
+                  <mat-autocomplete #auto="matAutocomplete" (optionSelected)="selected(taskname.key,$event)">
+                    <mat-option *ngFor="let list of mapTypeToFilteredDataList[taskPropertyGroup.get(taskname.key).value['type']]" [value]="list.ref">
+                      {{list[mapTypeToName[taskPropertyGroup.get(taskname.key).value['type']]]}}
+                    </mat-option>
+                  </mat-autocomplete>
+                  <mat-hint>press enter to add.</mat-hint>
+                </mat-form-field>
+      
+                <br>
+                <mat-form-field appearance="fill" class="ml-4" style="width:90%" >
+                  <mat-label>Add ICON URL</mat-label>
+                  <mat-chip-grid #chipList0 multiple >
+                    <mat-chip-row *ngFor="let url of taskPropertyGroup.get(taskname.key).value['icon'] | keyvalue;let refIndex = index" >
+                      {{url.key}}:{{url.value}}<mat-icon matChipRemove (click)="onRemoveImage(taskPropertyGroup,taskname.key,'icon',url.key)">cancel</mat-icon>
+                    </mat-chip-row>
+                    <input 
+                      placeholder="add type reference..."
+                      [matChipInputFor]="chipList0"
+                      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                      (matChipInputTokenEnd)="onAddImage(taskPropertyGroup,taskname.key,'icon',$event)"
+                      >
+                  </mat-chip-grid>
+                  <mat-hint>press enter to add.</mat-hint>
+                </mat-form-field>
+      
+                <br>
+                <mat-form-field appearance="fill" class="ml-4" style="width:90%" >
+                  <mat-label>Add thumbnail URL</mat-label>
+                  <mat-chip-grid #chipList1 multiple >
+                    <mat-chip-row *ngFor="let url of taskPropertyGroup.get(taskname.key).value['thumbnail'] | keyvalue;let refIndex = index" >
+                      {{url.key}}:{{url.value}}<mat-icon matChipRemove (click)="onRemoveImage(taskPropertyGroup,taskname.key,'thumbnail',url.key)">cancel</mat-icon>
+                    </mat-chip-row>
+                    <input 
+                      placeholder="add type reference..."
+                      [matChipInputFor]="chipList1"
+                      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                      (matChipInputTokenEnd)="onAddImage(taskPropertyGroup,taskname.key,'thumbnail',$event)"
+                      >
+                  </mat-chip-grid>
+                  <mat-hint>press enter to add.</mat-hint>
+                </mat-form-field>
+              </div>
+              <div class="w-25 m-2">
+                  <span class="d-flex justify-content-center m-1"><mat-label>ICON Preview</mat-label></span>
+                  <span class="m-1 d-flex flex-row flex-wrap">
+                    <img class="m-1" *ngFor="let url of taskPropertyGroup.get(taskname.key).value['icon'] | keyvalue" [src]="url.value" width="150" height="200">
+                  </span>
+                  <mat-divider ></mat-divider>
+                  <span class="d-flex justify-content-center m-1"><mat-label>Thumbnail Preview</mat-label></span>
+                  <span  class="m-1 d-flex flex-row flex-wrap">
+                    <div class="d-flex flex-column m-1" *ngFor="let url of taskPropertyGroup.get(taskname.key).value['thumbnail'] | keyvalue">
+                      <mat-label>{{url.key}}</mat-label>
+                      <img  [src]="url.value" width="200" height="300">
+                    </div>
+                  </span>
+              </div>
+            </div>
+          </li>
+        </span>
+      </div>
+      <div class="d-flex flex-row justify-content-center">
+        <button mat-stroked-button type="button" (click)="dialogRef.close()">Cancel</button>&nbsp;&nbsp;&nbsp;&nbsp;
+        <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="workshopChallengeForm.invalid">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+  

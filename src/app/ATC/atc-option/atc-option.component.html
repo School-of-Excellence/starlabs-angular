@@ -1,0 +1,42 @@
+<div class="mainscreen">
+    <div *ngIf="initiatedATC.length != 0">
+      <div class="title">ATC Initiated To You</div>
+      <ul>
+        <li *ngFor="let atc of initiatedATC; let i = index">
+          Initiated By - {{mapProfile[atc.data()["initiatedby"].path].name}}
+          <button mat-icon-button class="selectbtn" (click)="selecteATC('initiated', atc)">
+            <mat-icon class="icon">check</mat-icon>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <br>
+    <div *ngIf="draftOption.length != 0">
+      <div class="title">Draft ATC</div>
+      <ul>
+        <li *ngFor="let atc of draftOption; let i = index">
+          <span>Prescription Date - {{atc.data()["lastupdated"] ? (atc.data()["lastupdated"].toDate() | date: "medium") : atc.data()["date"]}}</span>
+          <button mat-icon-button class="selectbtn" (click)="selecteATC('draft', atc)">
+            <mat-icon class="icon">check</mat-icon>
+          </button>
+          <button mat-icon-button class="deletebtn" (click)="deleteDraft(atc, i)">
+            <mat-icon class="icon">delete_outline</mat-icon>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div *ngIf="assignments.length != 0">
+      <span class="d-flex justify-content-center"><h4>ATC Assignments </h4></span>
+      <ul>
+        <li *ngFor="let item of assignments;let i = index;">
+          {{mapProfile[item.data()['profileid']]['name']}} - <b>{{item.data()['directive']}}</b> given by <span *ngFor="let eis of item.data()['author'];let j = index"><b>{{mapProfile[eis]['name']}}, </b></span> on {{item.data()['created'].toDate() | date : 'medium'}}
+          <button mat-icon-button class="selectbtn" (click)="selecteATC('assignment', item)">
+            <mat-icon class="icon">check</mat-icon>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div class="actionbox">
+      <button class="closebtn" mat-stroked-button (click)="close()">Close</button>
+    </div>
+  </div>

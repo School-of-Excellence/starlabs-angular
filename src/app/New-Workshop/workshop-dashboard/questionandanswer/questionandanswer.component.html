@@ -1,0 +1,797 @@
+<!-- <div class="dialog-container">
+  <div class="dialog-header">
+    <h2 class="dialog-title">
+      <span class="header-text">Workshop </span>
+      <span class="header-highlight">Q&A</span>
+    </h2>
+    <button class="close-dialog-button" (click)="closeDialog()" mat-icon-button>
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading Q&A...</p>
+  </div>
+
+  <div *ngIf="!loading" class="qa-container" #scrollContainer>
+  <div class="question-input-section">
+    <div class="question-header">
+      <span class="header-text">Do you have any </span>
+      <span class="header-highlight">questions ?</span>
+    </div>
+    
+    <p class="question-subtitle">
+      Got something on your mind? Post your question and <br>
+      let's explore it together!
+    </p>
+    
+    <div class="question-input-container">
+      <div class="gradient-border">
+        <div class="input-wrapper">
+          <textarea 
+            [(ngModel)]="questionText"
+            placeholder="Type your Question here ?"
+            class="question-textarea"
+            rows="3"
+            (keypress)="onQuestionKeyPress($event)">
+          </textarea>
+        </div>
+      </div>
+    </div>
+    
+    <button 
+      class="ask-now-button"
+      (click)="askQuestion()">
+      Ask Now
+    </button>
+  </div>
+  <div class="content-separator"></div>
+  <div *ngIf="myQuestions.length > 0">
+    <div class="section-header">
+      <span class="header-text">Your </span>
+      <span class="header-highlight">question</span>
+    </div>
+    
+    <div *ngFor="let question of myQuestions" class="question-item">
+      <div class="question-header-row">
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="user-info">
+          <div class="user-name-container">
+            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span *ngIf="question.isadmin" class="admin-badge">
+              <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                   alt="Admin Badge" class="admin-icon">
+            </span>
+          </div>
+          <div class="question-meta">
+            <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
+            <button 
+              class="delete-button"
+              (click)="deleteItem(question.docid)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="question-content">
+        {{ question.question }}
+      </div>
+      <div class="main-reply-section">
+        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+             class="reply-link"
+             (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
+          Reply
+        </div>
+        
+        <div *ngIf="isActiveReply('main_' + question.docid)" class="active-reply-section">
+          <div class="reply-input-row">
+            <input 
+              [(ngModel)]="replyText"
+              placeholder="Type Your Reply"
+              class="reply-input"
+              (keypress)="onReplyKeyPress($event)"
+              #replyInput>
+            
+            <button class="reply-send-button" (click)="postReply()">
+              <mat-icon>send</mat-icon>
+            </button>
+            
+            <button class="reply-cancel-button" (click)="cancelReply()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="replies-section">
+        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+             class="view-all-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
+          <mat-icon>expand_more</mat-icon>
+        </div>
+        <div *ngIf="shouldShowHideReplies(question.docid)" 
+             class="hide-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>Hide Replies</span>
+          <mat-icon>expand_less</mat-icon>
+        </div>
+        <div *ngFor="let reply of getRepliesToShow(question.docid)" class="reply-item">
+          <div class="reply-header">
+            <div class="reply-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="reply-info">
+              <div class="reply-meta-row">
+                <span class="reply-user-name-container">
+                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span *ngIf="reply.isadmin" class="admin-badge small">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                         alt="Admin Badge" class="admin-icon small">
+                  </span>
+                </span>
+                <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
+                <button 
+                  class="delete-button small"
+                  (click)="deleteItem(reply.docid)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              
+              <div class="reply-content">
+                <span *ngIf="reply.tag" class="tagged-user">
+                  {{ '@' + getTaggedDisplayName(reply.tag, findParentItem(reply)) + ' ' }}
+                </span>
+                {{ reply.question }}
+              </div>
+              <div class="reply-to-reply-section">
+                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                     class="reply-to-reply-link"
+                     (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
+                  Reply
+                </div>
+                
+                <div *ngIf="isActiveReply('reply_' + reply.docid)" class="active-reply-section small">
+                  <div class="reply-input-row">
+                    <input 
+                      [(ngModel)]="replyText"
+                      placeholder="Type Your Reply"
+                      class="reply-input small"
+                      (keypress)="onReplyKeyPress($event)">
+                    
+                    <button class="reply-send-button small" (click)="postReply()">
+                      <mat-icon>send</mat-icon>
+                    </button>
+                    
+                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div *ngIf="myQuestions.length > 0 && othersQuestions.length > 0" class="content-separator"></div>
+  <div *ngIf="othersQuestions.length > 0">
+    <div class="section-header">
+      <span class="header-text">Others Asked </span>
+      <span class="header-highlight">questions</span>
+    </div>
+    
+    <div *ngFor="let question of othersQuestions" class="question-item">
+      <div class="question-header-row">
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="user-info">
+          <div class="user-name-container">
+            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span *ngIf="question.isadmin" class="admin-badge">
+              <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                   alt="Admin Badge" class="admin-icon">
+            </span>
+          </div>
+          <div class="question-meta">
+            <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
+            <button 
+              class="delete-button"
+              (click)="deleteItem(question.docid)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="question-content">
+        {{ question.question }}
+      </div>
+      <div class="main-reply-section">
+        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+             class="reply-link"
+             (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
+          Reply
+        </div>
+        
+        <div *ngIf="isActiveReply('main_' + question.docid)" class="active-reply-section">
+          <div class="reply-input-row">
+            <input 
+              [(ngModel)]="replyText"
+              placeholder="Type Your Reply"
+              class="reply-input"
+              (keypress)="onReplyKeyPress($event)">
+            
+            <button class="reply-send-button" (click)="postReply()">
+              <mat-icon>send</mat-icon>
+            </button>
+            
+            <button class="reply-cancel-button" (click)="cancelReply()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="replies-section">
+        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+             class="view-all-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
+          <mat-icon>expand_more</mat-icon>
+        </div>
+        <div *ngIf="shouldShowHideReplies(question.docid)" 
+             class="hide-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>Hide Replies</span>
+          <mat-icon>expand_less</mat-icon>
+        </div>
+        <div *ngFor="let reply of getRepliesToShow(question.docid)" class="reply-item">
+          <div class="reply-header">
+            <div class="reply-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="reply-info">
+              <div class="reply-meta-row">
+                <span class="reply-user-name-container">
+                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span *ngIf="reply.isadmin" class="admin-badge small">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                         alt="Admin Badge" class="admin-icon small">
+                  </span>
+                </span>
+                <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
+                <button 
+                  class="delete-button small"
+                  (click)="deleteItem(reply.docid)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              
+              <div class="reply-content">
+                <span *ngIf="reply.tag" class="tagged-user">
+                  {{ '@' + getTaggedDisplayName(reply.tag, findParentItem(reply)) + ' ' }}
+                </span>
+                {{ reply.question }}
+              </div>
+              <div class="reply-to-reply-section">
+                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                     class="reply-to-reply-link"
+                     (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
+                  Reply
+                </div>
+                
+                <div *ngIf="isActiveReply('reply_' + reply.docid)" class="active-reply-section small">
+                  <div class="reply-input-row">
+                    <input 
+                      [(ngModel)]="replyText"
+                      placeholder="Type Your Reply"
+                      class="reply-input small"
+                      (keypress)="onReplyKeyPress($event)">
+                    
+                    <button class="reply-send-button small" (click)="postReply()">
+                      <mat-icon>send</mat-icon>
+                    </button>
+                    
+                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div *ngIf="questions.length === 0" class="empty-state">
+    <p>No questions yet. Be the first to ask!</p>
+  </div>
+</div>
+</div> -->
+
+<div class="dialog-container">
+  <div class="dialog-header">
+    <h2 class="dialog-title">
+      <span class="header-text">Workshop </span>
+      <span class="header-highlight">Q&A</span>
+    </h2>
+    <button class="close-dialog-button" (click)="closeDialog()" mat-icon-button>
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading Q&A...</p>
+  </div>
+
+  <div *ngIf="!loading" class="qa-container" #scrollContainer>
+  <div class="question-input-section">
+    <div class="question-header">
+      <span class="header-text">Do you have any </span>
+      <span class="header-highlight">questions ?</span>
+    </div>
+    
+    <p class="question-subtitle">
+      Got something on your mind? Post your question and <br>
+      let's explore it together!
+    </p>
+    
+    <div class="question-input-container">
+      <div class="gradient-border">
+        <div class="input-wrapper">
+          <textarea 
+            [(ngModel)]="questionText"
+            placeholder="Type your Question here ?"
+            class="question-textarea"
+            rows="3"
+            (keypress)="onQuestionKeyPress($event)">
+          </textarea>
+        </div>
+      </div>
+    </div>
+    
+    <button 
+      class="ask-now-button"
+      (click)="askQuestion()">
+      Ask Now
+    </button>
+  </div>
+  <!-- Pinnded Start -->
+  <!-- <div class="content-separator"></div> -->
+  <div *ngIf="pinQuestions.length > 0" class="content-separator"></div>
+  <div *ngIf="pinQuestions.length > 0">
+    <div class="section-header">
+      <span class="header-text">Pinned </span>
+      <span class="header-highlight">question</span>
+    </div>
+    
+    <div *ngFor="let question of pinQuestions" class="question-item">
+      <div class="question-header-row">
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="user-info">
+          <div class="user-name-container">
+            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
+            <span *ngIf="question.isadmin" class="admin-badge">
+              <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                   alt="Admin Badge" class="admin-icon">
+            </span>
+          </div>
+          <div class="question-meta">
+            <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
+            <button 
+              class="delete-button"
+              (click)="deleteItem(question.docid)">
+              <mat-icon>delete</mat-icon>
+            </button>
+            <button *ngIf="question['onetoone'] !== true"
+              class="pin-button"
+              (click)="pinQuestion(question.docid,'unpin')">
+              <mat-icon>push_pin</mat-icon>
+            </button>
+            <span class="question-date">Pinned on {{ formatDate(question.pindate) }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="question-content">
+        {{ question.question }}
+      </div>
+      <div class="main-reply-section">
+        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+             class="reply-link"
+             (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
+          Reply
+        </div>
+        
+        <div *ngIf="isActiveReply('main_' + question.docid)" class="active-reply-section">
+          <div class="reply-input-row">
+            <textarea 
+              [(ngModel)]="replyText"
+              placeholder="Type Your Reply"
+              class="reply-textarea"
+              rows="2"
+              (keypress)="onReplyKeyPress($event,question)"
+              #replyInput>
+            </textarea>
+            
+            <button class="reply-send-button" (click)="postReply(question)">
+              <mat-icon>send</mat-icon>
+            </button>
+            
+            <button class="reply-cancel-button" (click)="cancelReply()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="replies-section">
+        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+             class="view-all-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
+          <mat-icon>expand_more</mat-icon>
+        </div>
+        <div *ngIf="shouldShowHideReplies(question.docid)" 
+             class="hide-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>Hide Replies</span>
+          <mat-icon>expand_less</mat-icon>
+        </div>
+        <div *ngFor="let reply of getRepliesToShow(question.docid)" class="reply-item">
+          <div class="reply-header">
+            <div class="reply-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="reply-info">
+              <div class="reply-meta-row">
+                <span class="reply-user-name-container">
+                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span style="font-weight: bold;color: red;size: 18;">{{reply['onetoone']? 'Private': ''}}</span>
+                  <span *ngIf="reply.isadmin" class="admin-badge small">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                         alt="Admin Badge" class="admin-icon small">
+                  </span>
+                </span>
+                <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
+                <button 
+                  class="delete-button small"
+                  (click)="deleteItem(reply.docid)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              
+              <div class="reply-content">
+                <span *ngIf="reply.tag" class="tagged-user">
+                  {{ '@' + getTaggedDisplayName(reply.tag, findParentItem(reply)) + ' ' }}
+                </span>
+                {{ reply.question }}
+              </div>
+              <div class="reply-to-reply-section">
+                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                     class="reply-to-reply-link"
+                     (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
+                  Reply
+                </div>
+                
+                <div *ngIf="isActiveReply('reply_' + reply.docid)" class="active-reply-section small">
+                  <div class="reply-input-row">
+                    <textarea 
+                      [(ngModel)]="replyText"
+                      placeholder="Type Your Reply"
+                      class="reply-textarea"
+                      rows="2"
+                      (keypress)="onReplyKeyPress($event,reply)">
+                    </textarea>
+                    
+                    <button class="reply-send-button small" (click)="postReply(reply)">
+                      <mat-icon>send</mat-icon>
+                    </button>
+                    
+                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+   <!-- Pinnded End -->
+  <div class="content-separator"></div>
+  <div *ngIf="myQuestions.length > 0">
+    <div class="section-header">
+      <span class="header-text">Your </span>
+      <span class="header-highlight">question</span>
+    </div>
+    
+    <div *ngFor="let question of myQuestions" class="question-item">
+      <div class="question-header-row">
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="user-info">
+          <div class="user-name-container">
+            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
+            <span *ngIf="question.isadmin" class="admin-badge">
+              <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                   alt="Admin Badge" class="admin-icon">
+            </span>
+          </div>
+          <div class="question-meta">
+            <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
+            <button 
+              class="delete-button"
+              (click)="deleteItem(question.docid)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="question-content">
+        {{ question.question }}
+      </div>
+      <div class="main-reply-section">
+        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+             class="reply-link"
+             (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
+          Reply
+        </div>
+        
+        <div *ngIf="isActiveReply('main_' + question.docid)" class="active-reply-section">
+          <div class="reply-input-row">
+            <textarea 
+              [(ngModel)]="replyText"
+              placeholder="Type Your Reply"
+              class="reply-textarea"
+              rows="2"
+              (keypress)="onReplyKeyPress($event,question)"
+              #replyInput>
+            </textarea>
+            
+            <button class="reply-send-button" (click)="postReply(question)">
+              <mat-icon>send</mat-icon>
+            </button>
+            
+            <button class="reply-cancel-button" (click)="cancelReply()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="replies-section">
+        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+             class="view-all-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
+          <mat-icon>expand_more</mat-icon>
+        </div>
+        <div *ngIf="shouldShowHideReplies(question.docid)" 
+             class="hide-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>Hide Replies</span>
+          <mat-icon>expand_less</mat-icon>
+        </div>
+        <div *ngFor="let reply of getRepliesToShow(question.docid)" class="reply-item">
+          <div class="reply-header">
+            <div class="reply-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="reply-info">
+              <div class="reply-meta-row">
+                <span class="reply-user-name-container">
+                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span style="font-weight: bold;color: red;size: 18;">{{reply['onetoone']? 'Private': ''}}</span>
+                  <span *ngIf="reply.isadmin" class="admin-badge small">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                         alt="Admin Badge" class="admin-icon small">
+                  </span>
+                </span>
+                <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
+                <button 
+                  class="delete-button small"
+                  (click)="deleteItem(reply.docid)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              
+              <div class="reply-content">
+                <span *ngIf="reply.tag" class="tagged-user">
+                  {{ '@' + getTaggedDisplayName(reply.tag, findParentItem(reply)) + ' ' }}
+                </span>
+                {{ reply.question }}
+              </div>
+              <div class="reply-to-reply-section">
+                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                     class="reply-to-reply-link"
+                     (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
+                  Reply
+                </div>
+                
+                <div *ngIf="isActiveReply('reply_' + reply.docid)" class="active-reply-section small">
+                  <div class="reply-input-row">
+                    <textarea 
+                      [(ngModel)]="replyText"
+                      placeholder="Type Your Reply"
+                      class="reply-textarea"
+                      rows="2"
+                      (keypress)="onReplyKeyPress($event,reply)">
+                    </textarea>
+                    
+                    <button class="reply-send-button small" (click)="postReply(reply)">
+                      <mat-icon>send</mat-icon>
+                    </button>
+                    
+                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div *ngIf="myQuestions.length > 0 && othersQuestions.length > 0" class="content-separator"></div>
+  <div *ngIf="othersQuestions.length > 0">
+    <div class="section-header">
+      <span class="header-text">Others Asked </span>
+      <span class="header-highlight">questions</span>
+    </div>
+    
+    <div *ngFor="let question of othersQuestions" class="question-item">
+      <div class="question-header-row">
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="user-info">
+          <div class="user-name-container">
+            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
+            <button *ngIf="question['onetoone'] !== true"
+              class="move-button"
+              (click)="moveItem(question.docid)">
+              <mat-icon>open_with</mat-icon>
+            </button>
+            <button *ngIf="question['onetoone'] !== true"
+              class="pin-button"
+              (click)="pinQuestion(question.docid,'pin')">
+              <mat-icon>push_pin</mat-icon>
+            </button>
+            <span *ngIf="question.isadmin" class="admin-badge">
+              <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                   alt="Admin Badge" class="admin-icon">
+            </span>
+          </div>
+          <div class="question-meta">
+            <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
+            <button 
+              class="delete-button"
+              (click)="deleteItem(question.docid)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="question-content">
+        {{ question.question }}
+      </div>
+      <div class="main-reply-section">
+        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+             class="reply-link"
+             (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
+          Reply
+        </div>
+        
+        <div *ngIf="isActiveReply('main_' + question.docid)" class="active-reply-section">
+          <div class="reply-input-row">
+            <textarea 
+              [(ngModel)]="replyText"
+              placeholder="Type Your Reply"
+              class="reply-textarea"
+              rows="2"
+              (keypress)="onReplyKeyPress($event,question)">
+            </textarea>
+            
+            <button class="reply-send-button" (click)="postReply(question)">
+              <mat-icon>send</mat-icon>
+            </button>
+            
+            <button class="reply-cancel-button" (click)="cancelReply()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="replies-section">
+        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+             class="view-all-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
+          <mat-icon>expand_more</mat-icon>
+        </div>
+        <div *ngIf="shouldShowHideReplies(question.docid)" 
+             class="hide-replies"
+             (click)="toggleShowAllReplies(question.docid)">
+          <span>Hide Replies</span>
+          <mat-icon>expand_less</mat-icon>
+        </div>
+        <div *ngFor="let reply of getRepliesToShow(question.docid)" class="reply-item">
+          <div class="reply-header">
+            <div class="reply-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="reply-info">
+              <div class="reply-meta-row">
+                <span class="reply-user-name-container">
+                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span style="font-weight: bold;color: red;size: 18;">{{reply['onetoone']? 'Private': ''}}</span>
+                  <span *ngIf="reply.isadmin" class="admin-badge small">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
+                         alt="Admin Badge" class="admin-icon small">
+                  </span>
+                </span>
+                <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
+                <button 
+                  class="delete-button small"
+                  (click)="deleteItem(reply.docid)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              
+              <div class="reply-content">
+                <span *ngIf="reply.tag" class="tagged-user">
+                  {{ '@' + getTaggedDisplayName(reply.tag, findParentItem(reply)) + ' ' }}
+                </span>
+                {{ reply.question }}
+              </div>
+              <div class="reply-to-reply-section">
+                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                     class="reply-to-reply-link"
+                     (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
+                  Reply
+                </div>
+                
+                <div *ngIf="isActiveReply('reply_' + reply.docid)" class="active-reply-section small">
+                  <div class="reply-input-row">
+                    <textarea 
+                      [(ngModel)]="replyText"
+                      placeholder="Type Your Reply"
+                      class="reply-textarea"
+                      rows="2"
+                      (keypress)="onReplyKeyPress($event,reply)">
+                    </textarea>
+                    
+                    <button class="reply-send-button small" (click)="postReply(reply)">
+                      <mat-icon>send</mat-icon>
+                    </button>
+                    
+                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div *ngIf="questions.length === 0" class="empty-state">
+    <p>No questions yet. Be the first to ask!</p>
+  </div>
+</div>
+</div>

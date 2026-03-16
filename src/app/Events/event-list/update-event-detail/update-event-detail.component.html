@@ -1,0 +1,291 @@
+<div *ngIf="loading" class="loading-container">
+    <mat-progress-spinner [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+    <span class="loading-text">Fetching Data...</span>
+</div>
+
+<div class="container">
+    <div *ngIf="!loading">
+        <header class="header">
+            <h1 class="title">{{ (capturedData['edit'] ? "Edit" : "Create") + " Event"}}</h1>
+            <button mat-icon-button class="close-button" mat-dialog-close>
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+    
+        <main class="main-content">
+            <div class="createevent">
+                <div [formGroup]="eventform">
+              
+                    <mat-form-field class="inputfields">
+                        <mat-label>Event Name</mat-label>
+                        <input matInput formControlName="eventname" (input)="!capturedData['edit'] ? generateToken() : null">
+                        <mat-error *ngIf="eventform.get('eventname').hasError('required')">
+                        Event Name <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                
+                    <mat-form-field class="inputfields">
+                        <mat-label>ATC Model</mat-label>
+                        <mat-select formControlName="atcmodel">
+                            <mat-option *ngFor="let member of atcModelList" [value]="member.atcmodel">{{member.atcmodel | uppercase}}</mat-option>
+                        </mat-select>
+                        <mat-error *ngIf="eventform.get('atcmodel').hasError('required')">
+                            <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                
+                    <mat-form-field class="inputfields">
+                        <mat-label>Event Date</mat-label>
+                        <mat-date-range-input [rangePicker]="picker">
+                        <input matStartDate (click)="picker.open()" formControlName="startdate">
+                        <input matEndDate (click)="picker.open()" formControlName="enddate">
+                        </mat-date-range-input>
+                        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                        <mat-date-range-picker touchUi #picker></mat-date-range-picker>
+                        <mat-error *ngIf="eventform.get('startdate').hasError('required') || eventform.get('enddate').hasError('required')">
+                        Event Date <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                
+                    <mat-form-field class="inputfields">
+                        <mat-label>Event Address</mat-label>
+                        <textarea matInput cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="1" cdkAutosizeMaxRows="4" formControlName="address"></textarea>
+                        <mat-error *ngIf="eventform.get('address').hasError('required')">
+                        Address <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                
+                    <mat-form-field class="inputfields">
+                        <mat-label>Event Venue</mat-label>
+                        <mat-select formControlName="venue" (selectionChange)="!capturedData['edit'] ? generateToken() : null">
+                        <mat-option *ngFor="let place of venueList" [value]="place.location">{{place.location}}</mat-option>
+                        </mat-select>
+                        <mat-error *ngIf="eventform.get('venue').hasError('required')">
+                        Address <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                
+                    <mat-form-field class="inputfields">
+                        <mat-label>Hosts</mat-label>
+                        <mat-select formControlName="hosts" multiple>
+                        <mat-option *ngFor="let member of ahmemberList" [value]="member.profile">{{member.name}}</mat-option>
+                        </mat-select>
+                        <mat-error *ngIf="eventform.get('hosts').hasError('required')">
+                        Hosts <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                
+                    <mat-form-field class="inputfields">
+                        <mat-label>Last Registration Date</mat-label>
+                        <input matInput formControlName="lastregistrationdate" [matDatepicker]="lrd">
+                        <mat-datepicker-toggle matSuffix [for]="lrd"></mat-datepicker-toggle>
+                        <mat-datepicker #lrd></mat-datepicker>
+                        <mat-error *ngIf="eventform.get('lastregistrationdate').hasError('required')">
+                        Last registration date <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                    <mat-form-field class="inputfields">
+                        <mat-label>Event Description</mat-label>
+                        <textarea matInput cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4" formControlName="description"></textarea>
+                        <mat-error *ngIf="eventform.get('description').hasError('required')">
+                        Description <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                    <mat-form-field class="inputfields">
+                        <mat-label>B!G Event Description</mat-label>
+                        <textarea matInput cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4" formControlName="bigdescription"></textarea>
+                        <mat-error *ngIf="eventform.get('bigdescription').hasError('required')">
+                        B!G Event Description <strong>Required</strong>
+                        </mat-error>
+                    </mat-form-field>
+                    <br>
+                    <div class="arenaeventbox" formArrayName="products">
+                        <div class="text-center h5 fw-bold mb-2">Manage Arena Events</div>
+                        <div *ngFor="let control of productsArray.controls;let i = index" [formGroupName]="i">
+                            <mat-form-field class="inputfields me-2">
+                                <mat-label>Event Display Name</mat-label>
+                                <input matInput formControlName="title">
+                            </mat-form-field>
+                            <mat-form-field class="inputfields">
+                                <mat-label>Eligible Product</mat-label>
+                                <mat-select [compareWith]="compareFn" formControlName="productref">
+                                    <mat-option *ngFor="let product of productsList" [value]="product.ref">{{product.product}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                            &nbsp;&nbsp;
+                            <mat-form-field class="inputfields">
+                                <mat-label>Event Date</mat-label>
+                                <mat-date-range-input [rangePicker]="picker">
+                                <input matStartDate (click)="picker.open()" formControlName="startdate">
+                                <input matEndDate (click)="picker.open()" formControlName="enddate">
+                                </mat-date-range-input>
+                                <mat-datepicker-toggle matSuffix [for]="picker" ></mat-datepicker-toggle>
+                                <mat-date-range-picker touchUi #picker></mat-date-range-picker>
+                            </mat-form-field>
+                            &nbsp;&nbsp;
+                            <mat-checkbox formControlName="heroevent" class="me-2">Hero Event</mat-checkbox>
+                            <mat-slide-toggle *ngIf="control.value['deliveryref'] != null" formControlName="delete">{{control.value['delete'] ? "Deleted" : "Delete"}}</mat-slide-toggle>
+                            <button *ngIf="control.value['deliveryref'] == null" class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)"><mat-icon>close</mat-icon></button>
+                            
+                            <!-- <div class="mt-2 mb-2" style="display: inline-block; vertical-align: top;">
+                                <label style="display: block; margin-bottom: 5px;">Arena Event Image:</label>
+                                <input #productFileUpload type="file" accept="image/png, image/jpeg" 
+                                    (change)="uploadProductImage($event, i)"
+                                    [disabled]="productImages[i]?.previewurl != null || productImages[i]?.url != null"
+                                    style="display: block;">
+                                <div *ngIf="productImages[i]?.previewurl != null || productImages[i]?.url != null" 
+                                    style="margin-top: 10px;">
+                                    <img [src]="productImages[i]?.previewurl || productImages[i]?.url" 
+                                        alt="Product image" 
+                                        height="150" 
+                                        width="200" 
+                                        style="display: block; margin-bottom: 5px;">
+                                    <button mat-stroked-button type="button" (click)="onProductImageRemove(i)">
+                                        Remove Image
+                                    </button>
+                                </div>
+                            </div>
+                            <br> -->
+
+                            <div class="image-upload-container" [class.has-image]="productImages[i]?.previewurl != null || productImages[i]?.url != null">
+                                <label class="image-upload-label">
+                                    <mat-icon>photo_library</mat-icon>
+                                    Arena Event Image
+                                </label>
+                                
+                                <div class="file-input-wrapper">
+                                    <input #productFileUpload type="file" accept="image/png, image/jpeg, image/jpg" 
+                                        (change)="uploadProductImage($event, i)" 
+                                        [id]="'productFileUpload-' + i">
+                                    <label [for]="'productFileUpload-' + i" 
+                                        class="file-input-button" 
+                                        [class.disabled]="productImages[i]?.previewurl != null || productImages[i]?.url != null">
+                                        <mat-icon>add_photo_alternate</mat-icon>
+                                        <span>{{ (productImages[i]?.previewurl != null || productImages[i]?.url != null) ? 'Image Uploaded' : 'Choose Image' }}</span>
+                                    </label>
+                                </div>
+
+                                <div *ngIf="productImages[i]?.previewurl != null || productImages[i]?.url != null" class="image-preview-container">
+                                    <div class="image-preview-wrapper arena-image-preview">
+                                        <img [src]="productImages[i]?.previewurl || productImages[i]?.url" alt="Arena Event Image">
+                                        <!-- <span class="image-badge">Arena Image</span> -->
+                                    </div>
+                                    <button mat-stroked-button type="button" class="remove-image-btn" (click)="onProductImageRemove(i)">
+                                        <mat-icon>delete</mat-icon>
+                                        Remove Image
+                                    </button>
+                                </div>
+                            </div>
+
+                            
+                            <!-- <button *ngIf="productsArray.controls.length - 1 == i" class="buttons me-2" mat-icon-button type="button" (click)="addproductsArray()"><mat-icon>add</mat-icon></button> -->
+                            <!-- <button class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)" [disabled]="control.value['delete']"><mat-icon>remove</mat-icon></button> -->
+                        </div>
+                        <button class="buttons mt-2" mat-stroked-button (click)="addproductsArray()">Add New Arena Events</button>
+
+                        <div class="mt-3" *ngFor="let delivery of eventform.value['products']">
+                            <span *ngIf="delivery['productref'] != undefined">
+                            <mat-divider></mat-divider>
+                            <br>
+                            <label class="fw-bold">{{mapProduct[delivery['productref'].id]}}</label>
+                            <div class="h6 mt-1" *ngIf="mapProductToDeliverySequence[delivery['productref'].id] != undefined; else nosequence">
+                                <div *ngIf="mapProductToDeliverySequence[delivery['productref'].id][mapProductToDeliverySequence[delivery['productref'].id].length - 1]['deliverysequence'] as sequence; else nosequence">
+                                    <h6 *ngIf="sequence.length == 0">No Delivery Sequence Found.</h6>
+                                    <li *ngFor="let deliveryitem of sequence">
+                                        <span *ngIf="deliveryitem['activity'] != undefined">
+                                            {{
+                                            deliveryitem['activity'].path.includes('events') ? (mapDeliveryEvents[deliveryitem['activity'].id] != undefined ? mapDeliveryEvents[deliveryitem['activity'].id] : "") : 
+                                            deliveryitem['activity'].path.includes('forms') ? (mapDeliveryForms[deliveryitem['activity'].id] != undefined ? mapDeliveryForms[deliveryitem['activity'].id] : "") : 
+                                            deliveryitem['activity'].path.includes('queue') ? (mapDeliveryQueue[deliveryitem['activity'].id] != undefined ? mapDeliveryQueue[deliveryitem['activity'].id] : "") : 
+                                            deliveryitem['activity'].path.includes('appointmenttype') ? (mapDeliveryAppointment[deliveryitem['activity'].id] != undefined ? mapDeliveryAppointment[deliveryitem['activity'].id] : "") : 
+                                            deliveryitem['activity'].path.includes('fieldwork') ? (mapDeliveryFieldwork[deliveryitem['activity'].id] != undefined ? mapDeliveryFieldwork[deliveryitem['activity'].id] : "") : 
+                                            "Unknown {{deliveryitem['activity'].path}}"
+                                            }}
+                                        </span>
+                                    </li>
+                                </div>
+                            </div>
+                            <ng-template #nosequence>
+                                <div class="h5">No Delivery Sequence Configured.</div>
+                            </ng-template>
+                            <br>
+                            </span>
+                        </div>
+                    </div>
+                    <br>
+                    <app-auto-complete-with-chip
+                        label="Select Marathon"
+                        [form]="eventform"
+                        controlName="bigmarathonref"
+                        [data]="bigMarathonList"
+                        datatype="arrayofmap"
+                        displayname="title"
+                        valuetype="ref"
+                        valuelabel="ref"
+                        [multiple]="false"
+                        >
+                    </app-auto-complete-with-chip>
+                    <br>
+                    <mat-checkbox formControlName="notifyparticipants">Notify Participants</mat-checkbox>
+                    <br>
+                    <mat-checkbox formControlName="addtocalendar">Add to Calendar</mat-checkbox>
+                    <br>
+                    <div class="loadingarea" *ngIf="loading">
+                        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                        <label>Updating Event...</label>
+                    </div>
+
+                    <!-- <label for="fileupload">Event Display Upload :</label>&nbsp;&nbsp;
+                    <input #fileupload type="file" accept="image/png" (change)="uploadImage($event)"
+                        [disabled]="eventimage.previewurl != null || eventimage.url != null">
+                    <div *ngIf="eventimage.previewurl != null || eventimage.url != null" style="display:flex;flex-direction: column;">
+                        <img [src]="eventimage.previewurl || eventimage.url" alt="" height="200" width="310">
+                        <button mat-stroked-button type="button" (click)="onImageRemove()">Remove Image</button>
+                    </div> -->
+
+                    <div class="image-upload-container" [class.has-image]="eventimage.previewurl != null || eventimage.url != null">
+                        <label class="image-upload-label">
+                            <mat-icon>image</mat-icon>
+                            Event Display Image
+                        </label>
+                        
+                        <div class="file-input-wrapper">
+                            <input #fileupload type="file" accept="image/png, image/jpeg, image/jpg" 
+                                (change)="uploadImage($event)" 
+                                id="eventFileUpload">
+                            <label for="eventFileUpload" 
+                                class="file-input-button" 
+                                [class.disabled]="eventimage.previewurl != null || eventimage.url != null">
+                                <mat-icon>cloud_upload</mat-icon>
+                                <span>{{ (eventimage.previewurl != null || eventimage.url != null) ? 'Image Uploaded' : 'Choose Image' }}</span>
+                            </label>
+                        </div>
+
+                        <div *ngIf="eventimage.previewurl != null || eventimage.url != null" class="image-preview-container">
+                            <div class="image-preview-wrapper event-image-preview">
+                                <img [src]="eventimage.previewurl || eventimage.url" alt="Event Display Image">
+                                <span class="image-badge">Event Image</span>
+                            </div>
+                            <button mat-stroked-button type="button" class="remove-image-btn" (click)="onImageRemove()">
+                                <mat-icon>delete</mat-icon>
+                                Remove Image
+                            </button>
+                        </div>
+                    </div>
+            
+                    <div class="d-flex justify-content-center">
+                        <button class="buttons submtbtn" *ngIf="!loading" mat-stroked-button type="submit" [disabled]="loading" (click)="saveEventDetail(eventform.getRawValue())">{{(capturedData['edit'] ? "Update" : "Create")}} Event Data</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>

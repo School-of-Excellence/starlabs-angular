@@ -1,0 +1,606 @@
+<div class="workshop-dashboard">
+  <div class="dashboard-main" [class.slide-left]="panelVisible">
+    <div class="dashboard-content">
+      <mat-card class="header-card">
+        <mat-card-content>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div>
+              <h1 style="margin: 0; font-weight: bold; font-size: 28px;">
+                Engagement Dashboard: <span class="month" style="color:#FFD600;">{{ selectedMonth }}</span>
+              </h1>
+              <button mat-raised-button color="primary" (click)="exportFullDashboardToCsv()" style="margin-top: 12px;">
+                <mat-icon>file_download</mat-icon> Export Month
+              </button>
+              <button mat-raised-button color="accent" (click)="confirmAndSaveEngagement()"
+                [disabled]="loading || isSavingSnapshot || snapshotStatus === 'locked' || !canSaveEngagement()"
+                [matTooltip]="getSaveButtonTooltip()" matTooltipPosition="below" matTooltipClass="save-button-tooltip"
+                style="margin-left: 20px; margin-top: 12px;">
+                <mat-spinner *ngIf="isSavingSnapshot" diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+                <mat-icon *ngIf="!isSavingSnapshot">{{ snapshotStatus === 'locked' ? 'check_circle' : 'save' }}</mat-icon>
+                {{ isSavingSnapshot ? 'Saving...' : (snapshotStatus === 'locked' ? 'Saved' : 'Save Engagement') }}
+              </button>
+            </div>
+            <div class="calendar-picker-container">
+              <button class="calendar-toggle-btn" (click)="toggleMonthPicker()" matTooltip="Change Month">
+                <mat-icon>calendar_month</mat-icon>
+                <span>{{ getMonthLabel() }}</span>
+              </button>
+              <div class="month-picker-popup" *ngIf="monthPickerOpen" [@slideIn]>
+                <div class="year-navigation">
+                  <button mat-icon-button (click)="decrementYear()" class="year-nav-btn"><mat-icon>chevron_left</mat-icon></button>
+                  <span class="year-display">{{ currentYear }}</span>
+                  <button mat-icon-button (click)="incrementYear()" class="year-nav-btn"><mat-icon>chevron_right</mat-icon></button>
+                </div>
+                <div class="month-grid">
+                  <button *ngFor="let month of months; let i = index" class="month-btn"
+                    [class.selected]="currentMonth === i && currentYear === getMonthPickerYear()" (click)="selectMonth(i)">
+                    {{ month.substring(0, 3) }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="filter-toggle-container" style="margin-top: 35px; text-align: right; margin-left:0px">
+            <mat-button-toggle-group [value]="engagementFilter" exclusive="true" appearance="legacy" class="filter-toggle-group"
+              (change)="onEngagementFilterChange($event.value)">
+              <mat-button-toggle value="both">Both</mat-button-toggle>
+              <mat-button-toggle value="product">Content</mat-button-toggle>
+              <mat-button-toggle value="event">Events</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+          <div class="dashboard-status-toggle-bar" style="margin-top: 16px; margin-right: 0px;">
+            <button mat-raised-button color="accent" [ngClass]="{'selected-status-btn': participantStatusMode === 'active'}"
+              (click)="onStatusToggle('active')">Active</button>
+            <button mat-raised-button color="accent" [ngClass]="{'selected-status-btn': participantStatusMode === 'inactive'}"
+              (click)="onStatusToggle('inactive')">Non active</button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <div class="month-picker-overlay" *ngIf="monthPickerOpen" (click)="closeMonthPicker()"></div>
+      <div *ngIf="loading" class="loading-section">
+        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+        <p>Loading engagement data...</p>
+      </div>
+
+      <div *ngIf="!loading" class="metrics-grid">
+        <mat-card class="metric-card clickable-metric" (click)="openAllActiveParticipantsPanel()">
+          <mat-card-content class="metric-content" style="padding-left: 10px;">
+            <mat-icon class="metric-icon" style="margin-left: 20px;">group</mat-icon>
+            <div class="metric-info">
+              <p class="metric-value">{{ getActiveParticipants() }}</p>
+              <p class="metric-label" style="padding: 5px;">{{ participantStatusMode === 'active' ? 'Active Participants' : 'Non Active Participants' }}</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="metric-card clickable-metric" (click)="openAllEngagedParticipantsPanel()">
+          <mat-card-content class="metric-content" style="padding-left: 10px;">
+            <mat-icon class="metric-icon" style="margin-left: 20px; color: #4caf50;">check_circle</mat-icon>
+            <div class="metric-info">
+              <p class="metric-value">{{ getEngagedParticipants() }}</p>
+              <p class="metric-label" style="padding: 5px;">Participants Engaged</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="metric-card clickable-metric" (click)="openAllNotEngagedParticipantsPanel()">
+          <mat-card-content class="metric-content" style="padding-left: 10px;">
+            <mat-icon class="metric-icon" style="margin-left: 20px; color: #f44336;">cancel</mat-icon>
+            <div class="metric-info">
+              <p class="metric-value" style="padding: 5px;">{{ getNotEngagedParticipants() }}</p>
+              <p class="metric-label">Participants Not Engaged</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="metric-card">
+          <mat-card-content class="metric-content" style="padding-left: 10px;">
+            <mat-icon class="metric-icon" style="margin-left: 20px; color: #ff9800;">trending_up</mat-icon>
+            <div class="metric-info">
+              <p class="metric-value" style="padding: 5px;">{{ getEngagementRate() }}%</p>
+              <p class="metric-label">Engagement Rate</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <mat-card *ngIf="!loading && engagementFilter === 'product'">
+        <mat-card-header>
+          <mat-card-title style="font-size: 20px; font-weight: 600;">Engagement Breakdown By Content</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-accordion>
+            <mat-expansion-panel *ngFor="let j of journeysDisplay; let i = index" class="challenge-panel" style="padding: 6px;">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <div class="challenge-title-container">
+                    <span class="challenge-number">{{ i + 1 }}</span>
+                    <span class="challenge-title">{{ j.name }}</span>
+                  </div>
+                </mat-panel-title>
+                <mat-panel-description>
+                  <div class="challenge-summary-chips">
+                    <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
+                    <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
+                    <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
+                  </div>
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+              <div class="challenge-summary-section">
+                <div class="custom-progress-bar">
+                  <div class="progress-segment completed" [style.width.%]="j.count > 0 ? (j.engaged / j.count) * 100 : 0"></div>
+                  <div class="progress-segment notstarted" [style.width.%]="j.count > 0 ? ((j.count - j.engaged) / j.count) * 100 : 0"></div>
+                </div>
+                <div class="status-indicators">
+                  <div class="status-item clickable" (click)="openEngagedPanel(j)">
+                    <span class="status-dot completed"></span>
+                    <span>{{ j.engaged }} Engaged</span>
+                  </div>
+                  <div class="status-item clickable" (click)="openNotEngagedPanel(j)">
+                    <span class="status-dot notstarted"></span>
+                    <span>{{ j.count - j.engaged }} Not Engaged</span>
+                  </div>
+                </div>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card *ngIf="!loading && engagementFilter === 'event'">
+        <mat-card-header>
+          <mat-card-title style="font-size: 20px; font-weight: 600;">Engagement Breakdown By Events</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="event-tabs-container">
+            <button class="event-tab" [class.active]="selectedEventTab === 'journey'" (click)="selectedEventTab = 'journey'">
+              <mat-icon>category</mat-icon>
+              <span>Journey-wise Events({{ getJourneyEventUniqueCount() }})</span>
+            </button>
+            <button class="event-tab" [class.active]="selectedEventTab === 'individual'" (click)="selectedEventTab = 'individual'">
+              <mat-icon>event</mat-icon>
+              <span>Individual Events({{ getIndividualEventUniqueCount() }})</span>
+            </button>
+            <button class="event-tab" [class.active]="selectedEventTab === 'appointment'" (click)="selectedEventTab = 'appointment'">
+              <mat-icon>schedule</mat-icon>
+              <span>Appointments({{ getAppointmentUniqueCount() }})</span>
+            </button>
+          </div>
+
+          <div *ngIf="selectedEventTab === 'journey'" class="tab-content">
+            <div *ngIf="journeysEventDisplay.length === 0" style="color:#999; padding:18px">No journey data available for {{ selectedMonth }}.</div>
+            <mat-accordion>
+              <mat-expansion-panel *ngFor="let j of journeysEventDisplay; let i = index" class="challenge-panel" style="padding: 6px;">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <div class="challenge-title-container">
+                      <span class="challenge-number">{{ i + 1 }}</span>
+                      <span class="challenge-title">{{ j.name }}</span>
+                    </div>
+                  </mat-panel-title>
+                  <mat-panel-description>
+                    <div class="challenge-summary-chips">
+                      <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
+                      <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
+                      <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
+                    </div>
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
+                <div class="challenge-summary-section">
+                  <div class="custom-progress-bar">
+                    <div class="progress-segment completed" [style.width.%]="j.count > 0 ? (j.engaged / j.count) * 100 : 0"></div>
+                    <div class="progress-segment notstarted" [style.width.%]="j.count > 0 ? ((j.count - j.engaged) / j.count) * 100 : 0"></div>
+                  </div>
+                  <div class="status-indicators">
+                    <div class="status-item clickable" (click)="openEngagedPanel(j)">
+                      <span class="status-dot completed"></span>
+                      <span>{{ j.engaged }} Engaged in events</span>
+                    </div>
+                    <div class="status-item clickable" (click)="openNotEngagedPanel(j)">
+                      <span class="status-dot notstarted"></span>
+                      <span>{{ j.count - j.engaged }} Not Engaged</span>
+                    </div>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            </mat-accordion>
+          </div>
+
+          <div *ngIf="selectedEventTab === 'individual'" class="tab-content">
+            <div *ngIf="eventEngagementDisplay.length === 0" style="color:#999; padding:18px">No events found for {{ selectedMonth }}.</div>
+            <mat-accordion>
+              <mat-expansion-panel *ngFor="let event of eventEngagementDisplay; let i = index" class="challenge-panel" style="padding: 8px;">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <div class="challenge-title-container">
+                      <span class="event-icon-small"><mat-icon>event</mat-icon></span>
+                      <span class="challenge-title">{{ event.name }}</span>
+                      <span class="event-date-inline">{{ event.date | date:'MMM d, y' }}</span>
+                    </div>
+                  </mat-panel-title>
+                  <mat-panel-description>
+                    <div class="challenge-summary-chips">
+                      <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEventEngagedPanel(event)">{{ event.engagedCount }} Engaged</mat-chip>
+                      <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openEventNotEngagedPanel(event)">{{ event.notEngagedCount }} Not Engaged</mat-chip>
+                      <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openEventAllPanel(event)">{{ event.engagedCount + event.notEngagedCount }} Total</mat-chip>
+                      <span *ngIf="event.date > today" class="upcoming-tag-inline">Upcoming</span>
+                      <span *ngIf="eventType(event) === 'workshop'" class="workshop-tag-inline">Workshop</span>
+                      <span *ngIf="eventType(event) === 'queue'" class="queue-tag-inline">queue</span>
+                    </div>
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
+                <div class="challenge-summary-section">
+                  <div class="custom-progress-bar">
+                    <div class="progress-segment completed" [style.width.%]="(event.engagedCount + event.notEngagedCount) > 0 ? (event.engagedCount / (event.engagedCount + event.notEngagedCount)) * 100 : 0"></div>
+                    <div class="progress-segment notstarted" [style.width.%]="(event.engagedCount + event.notEngagedCount) > 0 ? (event.notEngagedCount / (event.engagedCount + event.notEngagedCount)) * 100 : 0"></div>
+                  </div>
+                  <div class="status-indicators">
+                    <div class="status-item clickable" (click)="openEventEngagedPanel(event)">
+                      <span class="status-dot completed"></span>
+                      <span>{{ event.engagedCount }} Engaged</span>
+                    </div>
+                    <div class="status-item clickable" (click)="openEventNotEngagedPanel(event)">
+                      <span class="status-dot notstarted"></span>
+                      <span>{{ event.notEngagedCount }} Not Engaged</span>
+                    </div>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            </mat-accordion>
+          </div>
+          <div *ngIf="selectedEventTab === 'appointment'" class="tab-content">
+            <div *ngIf="appointmentEngagementDisplay.length === 0" style="color:#999; padding:18px">No appointments found for {{ selectedMonth }}.</div>
+            <mat-accordion>
+              <mat-expansion-panel *ngFor="let appt of appointmentEngagementDisplay; let i = index" class="challenge-panel" style="padding: 6px;">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <div class="challenge-title-container">
+                      <span class="event-icon-small appointment-icon-color"><mat-icon>schedule</mat-icon></span>
+                      <span class="challenge-title">{{ appt.name }}</span>
+                    </div>
+                  </mat-panel-title>
+                  <mat-panel-description>
+                    <div class="challenge-summary-chips">
+                      <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openAppointmentEngagedPanel(appt)">{{ appt.engagedCount }} Attended</mat-chip>
+                      <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openAppointmentNotEngagedPanel(appt)">{{ appt.notEngagedCount }} Cancelled</mat-chip>
+                      <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAppointmentAllPanel(appt)">{{ appt.engagedCount + appt.notEngagedCount }} Total</mat-chip>
+                    </div>
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
+                <div class="challenge-summary-section">
+                  <div class="custom-progress-bar">
+                    <div class="progress-segment completed" [style.width.%]="(appt.engagedCount + appt.notEngagedCount) > 0 ? (appt.engagedCount / (appt.engagedCount + appt.notEngagedCount)) * 100 : 0"></div>
+                    <div class="progress-segment notstarted" [style.width.%]="(appt.engagedCount + appt.notEngagedCount) > 0 ? (appt.notEngagedCount / (appt.engagedCount + appt.notEngagedCount)) * 100 : 0"></div>
+                  </div>
+                  <div class="status-indicators">
+                    <div class="status-item clickable" (click)="openAppointmentEngagedPanel(appt)">
+                      <span class="status-dot completed"></span>
+                      <span>{{ appt.engagedCount }} Attended</span>
+                    </div>
+                    <div class="status-item clickable" (click)="openAppointmentNotEngagedPanel(appt)">
+                      <span class="status-dot notstarted"></span>
+                      <span>{{ appt.notEngagedCount }} Cancelled</span>
+                    </div>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            </mat-accordion>
+          </div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card *ngIf="!loading && engagementFilter === 'both'">
+        <mat-card-header>
+          <mat-card-title style="font-size: 20px; font-weight: 600;">Engagement Breakdown</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div *ngIf="journeysCombinedDisplay.length === 0" style="color:#999; padding:18px">No journey data available for {{ selectedMonth }}.</div>
+          <mat-accordion>
+            <mat-expansion-panel *ngFor="let j of journeysCombinedDisplay; let i = index" class="challenge-panel" style="padding: 6px;">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <div class="challenge-title-container">
+                    <span class="challenge-number">{{ i + 1 }}</span>
+                    <span class="challenge-title">{{ j.name }}</span>
+                  </div>
+                </mat-panel-title>
+                <mat-panel-description>
+                  <div class="challenge-summary-chips">
+                    <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
+                    <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
+                    <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
+                  </div>
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+              <div class="challenge-summary-section">
+                <div class="custom-progress-bar">
+                  <div class="progress-segment completed" [style.width.%]="j.count > 0 ? (j.engaged / j.count) * 100 : 0"></div>
+                  <div class="progress-segment notstarted" [style.width.%]="j.count > 0 ? ((j.count - j.engaged) / j.count) * 100 : 0"></div>
+                </div>
+                <div class="status-indicators">
+                  <div class="status-item clickable" (click)="openEngagedPanel(j)">
+                    <span class="status-dot completed"></span>
+                    <span>{{ j.engaged }} Engaged (content OR events)</span>
+                  </div>
+                  <div class="status-item clickable" (click)="openNotEngagedPanel(j)">
+                    <span class="status-dot notstarted"></span>
+                    <span>{{ j.count - j.engaged }} Not Engaged (no activity)</span>
+                  </div>
+                </div>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+  <div class="participant-panel" [class.panel-visible]="panelVisible">
+    <div class="panel-header">
+      <div class="panel-title-section">
+        <div class="panel-title-row">
+          <mat-icon class="panel-icon">{{ panelType === 'engaged' ? 'check_circle' : panelType === 'not-engaged' ? 'cancel' : 'group' }}</mat-icon>
+          <h3 class="panel-title-text">{{ panelTitle }}</h3>
+        </div>
+        <p class="panel-subtitle-text">{{ panelSubtitle }}</p>
+      </div>
+      <div class="panel-actions">
+        <button *ngIf="showPanelFilter" mat-icon-button class="filter-button" [class.filter-active]="panelEventFilter !== 'all'"
+          (click)="togglePanelFilter()" matTooltip="Filter Events">
+          <mat-icon>filter_list</mat-icon>
+        </button>
+        <button mat-icon-button class="notification-button email-button" (click)="sendMail()"
+          matTooltip="Send Email to Selected Participants" [disabled]="panelParticipants.length === 0">
+          <mat-icon>mail</mat-icon>
+        </button>
+        <button mat-icon-button class="notification-button whatsapp-button" (click)="$event.stopPropagation(); sendWatti()"
+          matTooltip="Send WhatsApp to Selected Participants" [disabled]="panelParticipants.length === 0">
+          <i class="fa-brands fa-whatsapp" style="color: #25D366; font-size: 20px;"></i>
+        </button>
+        <button mat-icon-button class="notification-button inapp-button" (click)="sendNotificationinBreakthrough()"
+          matTooltip="Send In-App Notification" [disabled]="panelParticipants.length === 0">
+          <mat-icon>notifications_active</mat-icon>
+        </button>
+        <button mat-icon-button class="close-button" (click)="closePanel()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel-content">
+      <div class="panel-filter-section" *ngIf="showPanelFilterDropdown" [@slideIn]>
+        <mat-card style="margin-bottom: 16px; background: #f5f5f5;">
+          <mat-card-content style="padding: 12px;">
+            <mat-form-field appearance="outline" style="width: 100%;">
+              <mat-label>Filter by Event</mat-label>
+              <mat-select [(value)]="panelEventFilter" (selectionChange)="onPanelFilterChange()">
+                <mat-option value="all">All Events</mat-option>
+                <mat-option *ngFor="let event of eventEngagementDisplay" [value]="event.id">
+                  {{ event.name }} ({{ event.date | date:'MMM d' }})
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div class="participant-container">
+        <div class="participant-count">
+          <span class="count">{{ panelParticipants.length }}</span>
+          <span class="label">{{ panelType === 'engaged' ? 'Engaged' : panelType === 'not-engaged' ? 'Not Engaged' : 'Total' }} Participants</span>
+        </div>
+        <button class="export-btn" (click)="exportParticipants()" matTooltip="Export to CSV">
+          <mat-icon>download</mat-icon>
+        </button>
+      </div>
+      <div *ngIf="panelType === 'engaged' || panelType === 'not-engaged' || panelType === 'all'" class="participants-list">
+        <div *ngFor="let p of panelParticipants" class="participant-item-detailed clickable-participant"
+          [class.not-engaged-item]="panelType === 'not-engaged' || p.status === 'not-engaged'"
+          (click)="navigateToProfile(p.profileid)" [attr.title]="'Click to view ' + p.name + '\'s profile'">
+
+          <div class="participant-header">
+            <div class="participant-avatar" [class.not-engaged-avatar]="panelType === 'not-engaged' || p.status === 'not-engaged'">
+              <mat-icon>{{ panelType === 'not-engaged' || p.status === 'not-engaged' ? 'person_off' : 'person' }}</mat-icon>
+            </div>
+            <div class="participant-info-text">
+              <span class="participant-name">{{ p.name }}</span>
+              <mat-chip *ngIf="panelType === 'all'" class="status-chip-inline"
+                [class.engaged-chip-inline]="p.status === 'engaged'" [class.not-engaged-chip-inline]="p.status === 'not-engaged'">
+                {{ p.status === 'engaged' ? 'Engaged' : 'Not Engaged' }}
+              </mat-chip>
+            </div>
+            <mat-icon class="navigate-icon">arrow_forward</mat-icon>
+          </div>
+
+          <div class="participant-metadata">
+            <ng-container *ngIf="panelOrigin === 'product'">
+              <div class="metadata-row">
+                <mat-icon class="metadata-icon">play_circle</mat-icon>
+                <div class="metadata-content">
+                  <span class="metadata-label">Last Content:</span>
+                  <span class="metadata-value">{{ p.lastContent }}</span>
+                </div>
+              </div>
+              <div class="metadata-row">
+                <mat-icon class="metadata-icon">schedule</mat-icon>
+                <div class="metadata-content">
+                  <span class="metadata-label">Last Active:</span>
+                  <span class="metadata-value" [class.no-activity]="!p.lastDate">{{ p.lastDate ? (p.lastDate | date:'MMM d, y, h:mm a') : 'activity not recorded' }}</span>
+                </div>
+              </div>
+            </ng-container>
+            <ng-container *ngIf="panelOrigin === 'event'">
+              <ng-container *ngIf="p.queueName">
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">queue</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">QUEUE:</span>
+                    <span class="metadata-value">{{ p.queueName }}</span>
+                  </div>
+                </div>
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">{{ p.tokenstatus === 'Active' ? 'check_circle' : 'cancel' }}</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Token Status:</span>
+                    <span class="metadata-value" [style.color]="p.tokenstatus === 'Active' ? '#4caf50' : '#f44336'">{{ p.tokenstatus }}</span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="p.activities && p.activities.length > 0">
+                  <mat-icon class="metadata-icon">task_alt</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Activities:</span>
+                    <span class="metadata-value">
+                      <span *ngFor="let activity of p.activities; let last = last" style="display: inline-block; background: #e3f2fd; padding: 2px 8px; border-radius: 12px; margin-right: 4px; font-size: 12px;">
+                        {{ activity }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="!p.activities || p.activities.length === 0">
+                  <mat-icon class="metadata-icon">info</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-value no-activity">No activity this month</span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="p.lastActivityDate">
+                  <mat-icon class="metadata-icon">schedule</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Last Activity:</span>
+                    <span class="metadata-value">{{ p.lastActivityDate | date:'MMM d, y, h:mm a' }}</span>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="p.appointmentName && !p.queueName">
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">schedule</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">APPOINTMENT:</span>
+                    <span class="metadata-value">{{ p.appointmentName }}</span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="p.appointmentDatesFormatted">
+                  <mat-icon class="metadata-icon">calendar_today</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Appointment Date(s):</span>
+                    <span class="metadata-value">{{ p.appointmentDatesFormatted }}</span>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="p.eventName && !p.queueName && !p.appointmentName">
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">event</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">EVENT:</span>
+                    <span class="metadata-value">{{ p.eventName }}</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <div class="metadata-row">
+                <mat-icon class="metadata-icon">category</mat-icon>
+                <div class="metadata-content">
+                  <span class="metadata-label">Journey:</span>
+                  <span class="metadata-value">{{ p.journeyName || '-' }}</span>
+                </div>
+              </div>
+            </ng-container>
+            <ng-container *ngIf="!panelOrigin">
+              <ng-container *ngIf="engagementFilter === 'event'">
+                <div class="metadata-row" *ngIf="p.events && p.events.length > 0">
+                  <mat-icon class="metadata-icon">event</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">EVENT(S):</span>
+                    <span class="metadata-value">
+                      <div *ngFor="let evt of p.events" style="margin-bottom: 4px;">
+                        {{ evt.name }} <span style="font-size: 11px; color: #666; margin-left: 8px;">({{ evt.date | date:'MMM d, y' }})</span>
+                      </div>
+                    </span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="p.appointments && p.appointments.length > 0">
+                  <mat-icon class="metadata-icon">schedule</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">APPOINTMENT(S):</span>
+                    <span class="metadata-value">
+                      <div *ngFor="let apt of p.appointments" style="margin-bottom: 4px;">
+                        {{ apt.name }} <span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">{{ apt.dates }}</span>
+                      </div>
+                    </span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="(!p.events || p.events.length === 0) && (!p.appointments || p.appointments.length === 0)">
+                  <mat-icon class="metadata-icon">info</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-value no-activity">No event or appointment participation</span>
+                  </div>
+                </div>
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">category</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Journey:</span>
+                    <span class="metadata-value">{{ p.journeyName || '-' }}</span>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="engagementFilter === 'product'">
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">{{ p.status === 'engaged' ? 'play_circle' : 'play_circle_outline' }}</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Last Content:</span>
+                    <span class="metadata-value">{{ p.lastContent }}</span>
+                  </div>
+                </div>
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">schedule</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Last Active:</span>
+                    <span class="metadata-value" [class.no-activity]="!p.lastDate">{{ p.lastDate ? (p.lastDate | date:'MMM d, y, h:mm a') : 'activity not recorded' }}</span>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="engagementFilter === 'both'">
+                <div class="metadata-row" *ngIf="p.events && p.events.length > 0">
+                  <mat-icon class="metadata-icon">event</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">EVENT(S):</span>
+                    <span class="metadata-value">
+                      <div *ngFor="let evt of p.events" style="margin-bottom: 4px;">
+                        {{ evt.name }} <span style="font-size: 11px; color: #666; margin-left: 8px;">({{ evt.date | date:'MMM d, y' }})</span>
+                      </div>
+                    </span>
+                  </div>
+                </div>
+                <div class="metadata-row" *ngIf="p.appointments && p.appointments.length > 0">
+                  <mat-icon class="metadata-icon">schedule</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">APPOINTMENT(S):</span>
+                    <span class="metadata-value">
+                      <div *ngFor="let apt of p.appointments" style="margin-bottom: 4px;">
+                        {{ apt.name }} <span style="font-size: 11px; color: #666; display: block; margin-top: 2px;">{{ apt.dates }}</span>
+                      </div>
+                    </span>
+                  </div>
+                </div>
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">category</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Journey:</span>
+                    <span class="metadata-value">{{ p.journeyName || '-' }}</span>
+                  </div>
+                </div>
+                <div class="metadata-row">
+                  <mat-icon class="metadata-icon">calendar_today</mat-icon>
+                  <div class="metadata-content">
+                    <span class="metadata-label">Subscription End:</span>
+                    <span class="metadata-value">{{ p.subscriptionEnd ? (p.subscriptionEnd | date:'MMM d, y') : 'N/A' }}</span>
+                  </div>
+                </div>
+              </ng-container>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-overlay" [class.overlay-visible]="panelVisible" (click)="closePanel()"></div>
+</div>

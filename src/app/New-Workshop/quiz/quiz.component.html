@@ -1,0 +1,250 @@
+<div class="quiz-dialog-container">
+  <div class="dialog-header">
+    <h2 class="dialog-title">
+      <mat-icon>quiz</mat-icon>
+      {{ isEdit ? 'Edit Quiz' : 'Create New Quiz' }}
+    </h2>
+    <button mat-icon-button (click)="closeDialog()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-divider></mat-divider>
+  <div class="dialog-content">
+    <form [formGroup]="quizForm" (ngSubmit)="saveQuiz()">
+      <mat-card class="form-section">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>help_outline</mat-icon>
+            Question
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Enter your question</mat-label>
+            <textarea
+              matInput
+              formControlName="question"
+              placeholder="Type your quiz question here..."
+              rows="3">
+            </textarea>
+            <mat-error *ngIf="quizForm.get('question')?.invalid && quizForm.get('question')?.touched">
+              {{ getErrorMessage('question') }}
+            </mat-error>
+          </mat-form-field>
+
+          <!-- SELECT type -->
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Question Type</mat-label>
+            <mat-select formControlName="type">
+              <mat-option value="withResponse">With Response</mat-option>
+              <mat-option value="withoutResponse">Without Response</mat-option>
+            </mat-select>
+            <mat-error *ngIf="quizForm.get('type')?.invalid && quizForm.get('type')?.touched">
+              Type is required
+            </mat-error>
+          </mat-form-field>
+          <div *ngIf="quizForm.get('type')?.value === 'withoutResponse'">
+            <mat-form-field class="full-width" appearance="outline">
+              <mat-label>Select Event</mat-label>
+              <mat-select formControlName="eventref" (selectionChange)="onEventSelect($event)">
+                <mat-option *ngFor="let option of eventList" [value]="option.ref">
+                  {{ option.name }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+            <!-- <mat-progress-spinner *ngIf="productloading" diameter="30"></mat-progress-spinner>
+            <mat-form-field *ngIf="productloaded" class="full-width" appearance="outline">
+              <mat-label>Select Products</mat-label>
+              <mat-select formControlName="productref" multiple>
+                <mat-option *ngFor="let item of productsList" [value]="item.productRef">
+                  {{ item.productName }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field> -->
+
+            <mat-slide-toggle
+              *ngIf="quizForm.get('type')?.value === 'withoutResponse'"
+              formControlName="active"
+              color="primary">
+              Active
+            </mat-slide-toggle>
+
+          </div>
+
+        </mat-card-content>
+        <!-- <mat-card-content>
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Enter your question</mat-label>
+            <textarea matInput formControlName="question" placeholder="Type your quiz question here..." rows="3"></textarea>
+            <mat-error *ngIf="quizForm.get('question')?.invalid && quizForm.get('question')?.touched">
+              {{ getErrorMessage('question') }}
+            </mat-error>
+          </mat-form-field>
+        </mat-card-content> -->
+      </mat-card>
+      <mat-card class="form-section">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>list</mat-icon>
+            Answer Options
+          </mat-card-title>
+          <mat-card-subtitle>
+            <!-- Select one correct answer. You can add up to 10 options. -->
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div formArrayName="options">
+            <div 
+              *ngFor="let option of optionsArray.controls; let i = index" 
+              [formGroupName]="i" 
+              class="option-container"
+            >
+              <div class="option-header">
+                <span class="option-label">Option {{ i + 1 }}</span>
+                <button 
+                  mat-icon-button 
+                  color="warn" 
+                  type="button" 
+                  (click)="removeOption(i)"
+                  [disabled]="optionsArray.length <= 1"
+                >
+                  <mat-icon>remove_circle_outline</mat-icon>
+                </button>
+              </div>
+
+              <div class="option-content">
+                <div class="option-fields">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Option Text</mat-label>
+                    <input matInput formControlName="text" placeholder="Enter option text">
+                    <mat-error *ngIf="option.get('text')?.invalid && option.get('text')?.touched">
+                      {{ getOptionErrorMessage(i, 'text') }}
+                    </mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Explanation (Optional)</mat-label>
+                    <input matInput formControlName="explanation" placeholder="Why is this correct/incorrect?">
+                  </mat-form-field>
+                  <mat-form-field
+                    *ngIf="quizForm.get('type')?.value === 'withoutResponse'"
+                    appearance="outline">
+                    <mat-label>Select Cohort</mat-label>
+                    <mat-select formControlName="cohortref">
+                      <mat-option *ngFor="let cohort of bigCohorts" [value]="cohort.ref">
+                        {{ cohort.name }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-radio-button
+                  *ngIf="quizForm.get('type')?.value === 'withResponse'"
+                  [checked]="option.get('isCorrect')?.value"
+                  (change)="setCorrectAnswer(i)"
+                  color="primary"
+                >
+                  Correct Answer
+                </mat-radio-button>
+
+                <!-- <mat-radio-button 
+                  [checked]="option.get('isCorrect')?.value" 
+                  (change)="setCorrectAnswer(i)"
+                  color="primary"
+                >
+                  Correct Answer
+                </mat-radio-button> -->
+              </div>
+            </div>
+          </div>
+          <div class="add-option-container">
+            <button 
+              mat-stroked-button 
+              color="primary" 
+              type="button" 
+              (click)="addOption()"
+            >
+              <mat-icon>add_circle_outline</mat-icon>
+              Add Option
+            </button>
+          </div>
+
+          <div class="validation-error" *ngIf="optionsArray.hasError('noCorrectAnswer') && optionsArray.touched">
+            <mat-icon>error</mat-icon>
+            Please select at least one correct answer
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <div class="form-actions">
+        <button mat-button type="button" (click)="resetForm()">
+          <mat-icon>refresh</mat-icon>
+          Reset Form
+        </button>
+        <button mat-raised-button color="primary" type="submit">
+          <mat-icon>{{ isEdit ? 'update' : 'save' }}</mat-icon>
+          {{ isEdit ? 'Update Quiz' : 'Save Quiz' }}
+        </button>
+      </div>
+    </form>
+
+    <mat-divider></mat-divider>
+    <mat-card class="form-section">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>library_books</mat-icon>
+          All Quizzes
+        </mat-card-title>
+        <mat-card-subtitle>
+          {{ quizList.length }} quiz available
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <table mat-table [dataSource]="quizList" *ngIf="quizList.length > 0">
+          <ng-container matColumnDef="question">
+            <th mat-header-cell *matHeaderCellDef>Question</th>
+            <td mat-cell *matCellDef="let quiz">{{ quiz.question }}</td>
+          </ng-container>
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let quiz">{{ quiz.type || 'With Response' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="optionsCount">
+            <th mat-header-cell *matHeaderCellDef>Options</th>
+            <td mat-cell *matCellDef="let quiz">{{ quiz.options?.length || 0 }}</td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let quiz">
+              <button 
+                mat-icon-button 
+                color="accent" 
+                (click)="editQuiz(quiz)"
+                matTooltip="Edit Quiz"
+              >
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button 
+                mat-icon-button 
+                color="warn" 
+                (click)="deleteQuiz(quiz.id)"
+                matTooltip="Delete Quiz"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="['question', 'type', 'optionsCount', 'actions']"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['question', 'type', 'optionsCount', 'actions']"></tr>
+        </table>
+
+        <div class="empty-state" *ngIf="quizList.length === 0">
+          <mat-icon>quiz</mat-icon>
+          <h3>No quizzes yet</h3>
+          <p>Create your first quiz using the form above</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

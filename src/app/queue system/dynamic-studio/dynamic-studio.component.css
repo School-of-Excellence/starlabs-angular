@@ -1,0 +1,377 @@
+.mainscreen{
+  width: 100%;
+  padding: 20px;
+}
+
+.title{
+  text-align: center;
+  color: rgb(0, 50, 67);
+}
+
+.primarystudio{
+  background-color: green;
+  color: white;
+}
+
+.secondarystudio{
+  background-color: rgba(0, 128, 0, 0.664);
+  color: white;
+}
+
+.stagename{
+  font-size: 0.9em;
+  text-align: center;
+  font-weight: bold;
+  padding: 15px;
+  padding-bottom: 10px;
+}
+
+.stagequeue{
+  margin: 5px;
+  min-height: 65vh;
+}
+
+.token{
+  width: 90%;
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid rgb(238, 238, 238);
+  line-height: 1.5;
+}
+
+.label{
+  color: gray;
+}
+
+.btnarea{
+  width: 100%;
+  text-align: right;
+}
+
+.stagebtn{
+  color: green;
+  border: 1px solid green;
+}
+
+.otherstudio{
+  width: 100%;
+  border: 1px grey dotted;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.secondtitle{
+  color: rgb(0, 50, 67);
+  font-weight: bold;
+}
+
+/* Live Assignment */
+
+.mainheading{
+  width: 100%;
+  margin-top: 30px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.studiopeople{
+  margin-top: 5px;
+  color: rgb(2, 37, 49);
+  font-size: 15;
+  font-weight: normal;
+}
+
+.statusmessage{
+  margin: 12px;
+  font-size: 1.1em;
+  font-style: italic;
+}
+
+.zoomlink{
+  color: rgb(77, 141, 224);
+  text-decoration: underline;
+}
+
+.widgetbox{
+  width: 100%;
+  text-align: left;
+  margin-top: 30px;
+  padding: 15px;
+  border-radius: 6px;
+}
+
+.actiontitle{
+  color: green;
+  font-size: large;
+  text-decoration: underline;
+}
+
+.actionbtn{
+  color: rgb(0, 50, 67);
+  border: 1px solid rgb(0, 50, 67);;
+}
+
+.actiontitle{
+  color: green;
+  font-size: medium;
+}
+
+.steplabel{
+  font-weight: normal;
+  margin-top: 5px;
+  margin-left: 10px;
+  color: white;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: black;
+}
+
+.adjustmentlabel{
+  font-style: italic;
+  font-weight: normal;
+  margin-top: 10px;
+  margin-left: 20px;
+}
+
+.procedurelabel{
+  margin-left: 30px;
+  margin-top: 10px;
+}
+
+.subtitle{
+  text-decoration: underline;
+}
+
+.editbtn{
+  -webkit-text-stroke-width: 0px;
+  color: rgb(15, 114, 121);
+  border: 1px solid rgb(15, 114, 121);
+  margin-left: 10px;
+}
+
+.marked{
+  background-color: rgb(15, 114, 121);
+  color: white;
+}
+
+.tomark{
+  color: rgb(15, 114, 121);
+  border: 1px solid rgb(15, 114, 121);
+}
+
+/* button  */
+.button-36 {
+  background-image: linear-gradient(92.88deg, #455EB5 9.16%, #5643CC 43.89%, #673FD7 64.72%);
+  border-radius: 8px;
+  border-style: none;
+  box-sizing: border-box;
+  color: #FFFFFF !important;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: "Inter UI","SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Open Sans","Helvetica Neue",sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  height: 2rem;
+  padding: 0 1.6rem;
+  text-align: center;
+  text-shadow: rgba(0, 0, 0, 0.25) 0 3px 8px;
+  transition: all .5s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.button-36:hover {
+  box-shadow: rgba(80, 63, 205, 0.5) 0 1px 30px;
+  transition-duration: .1s;
+}
+
+@media (min-width: 768px) {
+  .button-36 {
+    padding: 0 2.6rem;
+  }
+}
+
+/* Ensure the parent container is relatively positioned */
+.widget-container {
+  position: relative;
+}
+
+
+
+/* Style for the participant list box */
+.participant-box {
+  position: absolute;
+  width: 200px; /* Adjust width as needed */
+  background: white;
+  color: black;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 10; /* Ensure it is on top of the widget */
+}
+
+/* Style for each participant item */
+.participant-item {
+  margin: 5px 0;
+  padding: 5px;
+  background: #f3ede6; /* Adjust color as needed */
+  border-radius: 4px;
+  text-align: center;
+}
+
+.example-container {
+  margin: 0 25px 25px 0;
+  vertical-align: top;
+  min-width: fit-content;
+  /* width: 00px; */
+  position: absolute;
+  right: 0; /* Align the container to the right side */
+  top: 2; /* Align the container to the top */
+  background: white;
+  color: black;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 10; /* Ensure it is on top of the widget */
+  height: 50%;
+}
+
+.chat-container {
+  margin: 0 25px 25px 0;
+  vertical-align: top;
+  min-width: fit-content;
+  /* width: 00px; */
+  position: absolute;
+  right: 0; /* Align the container to the right side */
+  top: 15%; /* Align the container to the top */
+  background: white;
+  margin-bottom: 10px;
+  color: black;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 10; /* Ensure it is on top of the widget */
+}
+
+.talk-bubble {
+    margin: 10px;
+  display: inline-block;
+  position: relative;
+    max-width: 75%;
+    min-width: 50%;
+    height: auto;
+    background-color:#e3effd;
+}
+
+.talk-bubble1{
+    margin: 10px;
+  display: inline-block;
+  position: relative;
+    max-width: 75%;
+    min-width: 50%;
+    height: auto;
+    background-color: #abd2ff;
+}
+
+.talk-bubblep{
+    margin: 10px;
+  display: inline-block;
+  position: relative;
+    max-width: 75%;
+    min-width: 50%;
+    height: auto;
+    background-color: #ffb2ce;;
+}
+
+.round{
+  border-radius: 15px;
+    -webkit-border-radius: 15px;
+    -moz-border-radius: 15px;
+}
+
+/* talk bubble contents */
+.talktext{
+  padding: 10px;
+    text-align: left;
+  line-height: 1.5em;
+}
+.talktext p{
+  /* remove webkit p margins */
+  -webkit-margin-before: 0em;
+  -webkit-margin-after: 0em;
+}
+
+.tri-right.right-in:after{
+    content: ' ';
+    position: absolute;
+    width: 0;
+    height: 0;
+  left: auto;
+    right: -20px;
+  top: 38px;
+    bottom: auto;
+    border: 12px solid;
+    border-color: rgb(206, 209, 202);
+}
+
+.tri-right.left-in:after{
+    content: ' ';
+    position: absolute;
+    width: 0;
+    height: 0;
+  left: -20px;
+    right: auto;
+  top: 38px;
+    bottom: auto;
+    border: 12px solid;
+    border-color: rgb(206, 209, 202);
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 48
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.white{
+  color:black
+}
+.golden{
+  color:goldenrod;
+}
+.forestgreen{
+  color:forestgreen;
+}
+
+.textbtn:hover{
+  color: green;
+  text-decoration: underline;
+}
+
+.bluetickleft{
+  font-size: 14px;
+  float:left;
+  display: inline-flex;
+  justify-content: left;
+  flex-direction: row;
+}
+
+.aelValidated{
+  color: white;
+  background-color: green;
+}
+
+.aelNotValidated{
+  color: white;
+  background-color: rgb(204, 74, 74);
+}
+  
+  

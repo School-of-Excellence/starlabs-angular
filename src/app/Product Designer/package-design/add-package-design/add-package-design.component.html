@@ -1,0 +1,91 @@
+
+<div class="mainscreen">
+    <h4 class="title">Add Package Design</h4>
+    <form [formGroup]="packagedesignForm" (ngSubmit)="submit()">
+      <div>
+        <mat-form-field class="inputfields " appearance="outline">
+          <mat-label>Package Label</mat-label>
+          <input matInput type="text" formControlName="packagelabel">
+          <mat-error *ngIf="packagedesignForm.get('packagelabel').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Current Journey</mat-label>
+          <mat-select formControlName="currentjourney">
+            <mat-option *ngFor="let journey of journeyList" [value]="journey['id']">{{journey['journey']}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="packagedesignForm.get('currentjourney').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div>
+        <mat-form-field class="inputfields " appearance="outline">
+          <mat-label>Package Status</mat-label>
+          <mat-select formControlName="packagestatus" (selectionChange)="onPackageStatusChange()">
+            <mat-option *ngFor="let status of packageStatusOption" [value]="status['value']">{{status['label']}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="packagedesignForm.get('packagestatus').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field class="inputfields" appearance="outline" *ngIf="packagedesignForm.get('packagestatus').value == 'upgraded'">
+          <mat-label>{{packagedesignForm.get('packagestatus').value == null ? 'New' : packagedesignForm.get('packagestatus').value}} Journey</mat-label>
+          <mat-select formControlName="newjourney">
+            <mat-option *ngFor="let journey of journeyList" [value]="journey['id']">{{journey['journey']}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="packagedesignForm.get('newjourney').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="w-100 text-left">
+        <mat-form-field class="mr-3" appearance="outline">
+          <mat-label>Original Fee</mat-label>
+          <input matInput type="number" formControlName="originalfee">
+          <mat-error *ngIf="packagedesignForm.get('originalfee').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="w-100 text-left" *ngIf="packagedesignForm.get('packagestatus').value == 'upgraded'">
+        <label class="labelheader">What to do with the unconsumed product(s) in the existing package? <span *ngIf="packagedesignForm.get('currentjourney').value != null">({{journeyMap[packagedesignForm.get('currentjourney').value]}})</span></label><br>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Product option</mat-label>
+          <mat-select formControlName="cancelproduct">
+            <mat-option *ngFor="let option of productCancelOption" [value]="option['value']">{{option['label']}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="packagedesignForm.get('cancelproduct').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="w-100 text-left" *ngIf="packagedesignForm.get('packagestatus').value == 'upgraded'">
+        <label class="labelheader">Subscription Starts From</label><br>
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Subscription Option</mat-label>
+          <mat-select formControlName="subscriptionfrom">
+            <mat-option *ngFor="let subscription of subscriptionOption" [value]="subscription['value']">{{subscription['label']}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="packagedesignForm.get('newjourney').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="w-100 text-left">
+        <label class="labelheader">Subscription Period</label><br>
+        <mat-form-field class="mr-3" appearance="outline">
+          <mat-label>Month(s)</mat-label>
+          <input matInput type="number" formControlName="extentionmonths">
+          <mat-error *ngIf="packagedesignForm.get('newjourney').hasError('required')">
+            Required
+          </mat-error>
+        </mat-form-field>
+      </div>
+      <div class="w-100 text-center mt-3">
+        <button mat-stroked-button class="btn cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+        <button mat-stroked-button class="btn submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Save Package Design'}}</button>
+      </div>
+    </form>
+</div>

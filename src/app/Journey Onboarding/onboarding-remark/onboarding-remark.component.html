@@ -1,0 +1,285 @@
+<div *ngIf="loading" class="loading">
+  <mat-progress-spinner class="spinner" [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+  <span class="loading-text">Fetching Data...</span>
+</div>
+
+<div *ngIf="!loading" class="onboard-remark-card">
+
+    <div class="header">
+
+      <h3 *ngIf="participantjourneyproduct['addnotes'] === true"><b>Add Note</b></h3>
+      <h3 *ngIf="participantjourneyproduct['markonboard'] === true"><b>Onboard Remark</b></h3>
+      <h3 *ngIf="participantjourneyproduct['viewnotes'] === true"><b>View Note</b></h3>
+      <h3 *ngIf="participantjourneyproduct['viewreport'] === true"><b>OnBoarding Report</b></h3>
+
+      <button mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
+        <mat-icon style="color:white">close</mat-icon>
+      </button>
+
+    </div>
+
+    <!-- Adding Notes -->
+    <div *ngIf="participantjourneyproduct['addnotes'] === true">
+    
+      <div class="onboarding-report">
+    
+        <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,
+            undefined, ""].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+            mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+        <!-- <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' : [null, undefined, ""].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' : mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></p> -->
+        <br>
+        <p><b style="color: #0C6385;text-align: start;">Notes</b></p>
+    
+        <div class="notes-container">
+          <mat-form-field appearance="outline" class="textareafield">
+            <textarea matInput name="genearlnotes" placeholder="Type Here" [(ngModel)]="generalnote" rows="8"></textarea>
+          </mat-form-field>
+    
+          <button type="button" class="submit-button" mat-stroked-button
+            [disabled]="[null,undefined,''].includes(generalnote)" (click)="addnotes()">Add Note</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Notes -->
+    <div *ngIf="participantjourneyproduct['viewnotes'] === true">
+    
+      <div class="onboarding-report">
+    
+        <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,
+            undefined, ""].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+            mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+        <!-- <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' : [null, undefined, ""].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' : mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></p> -->
+        <br>
+        <p><b style="color: #0C6385;text-align: start;">Notes</b></p>
+        <div class="displaynotes" *ngIf="participantjourneyproduct['allnotes']">
+          <div *ngFor="let note of participantjourneyproduct['allnotes'] ">
+            <div style="width:90%;padding-bottom:10px">
+              <h5><b style="font-size: 14px;">{{participantjourneyproduct['mapProfile'][note.updatedby]}}</b></h5>
+              <p *ngIf="![null,undefined,''].includes(note.updated)">
+                {{note.updated.toDate() | date:"medium"}}
+              </p>
+              <span style="font-size: 18px;">{{note.note}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- mark as onboarded -->
+    <div *ngIf="participantjourneyproduct['viewreport'] === true">
+
+      <div class="onboarding-report">
+        <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null, undefined, ""].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+        <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' : [null, undefined, ""].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' : mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></p>
+        <p *ngIf="!participantjourneyproduct['onboardedby'] && participantjourneyproduct['onboardedby'].length != 0">Journey Coach : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardedby'][0]?.id) ? '...' : mapProfile[participantjourneyproduct['onboardedby'][0]?.id]}}</b></p>
+        <p>Onboarded Date : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardingscheduled']) ? '...' : participantjourneyproduct['onboardingscheduled'].toDate() | date:"medium"}}</b></p>
+        <!-- <p>Onboarded Date : <b>{{[null,undefined,''].includes(participantjourneyproduct.emailsent) ? '...' : (participantjourneyproduct.emailsent == true ? 'sent' : 'Not-sent')}}</b></p> -->
+        <br>
+  
+        <p><b style="color: #0C6385;text-align: start;">Report Log</b></p>
+        <div class="displaynotes" *ngIf="participantjourneyproduct['onboardingreportlog']">
+          <div *ngFor="let note of participantjourneyproduct['onboardingreportlog']">
+            <div style="width:80%">
+              <p *ngIf="![null,undefined,''].includes(note.updated)">{{note.updated.toDate() | date:"medium"}}</p>
+              <span>{{note.report}}</span>
+            </div>
+          </div>
+        </div>
+        <br>
+        <div *ngIf="participantjourneyproduct['opportunities'].length != 0">
+          <p><b style="color: #0C6385;text-align: start;">Opportunities</b></p>
+          <div *ngFor="let opportunity of participantjourneyproduct['opportunities']">
+            {{opportunity}}
+          </div>
+        </div>
+  
+        <!-- <div *ngIf='!participantjourneyproduct.onboardingscheduled  && participantjourneyproduct.onboarded === true && participantjourneyproduct.orientationstatus != "attended"' class="user-info">
+          <span class="username">{{mapProfile[participantjourneyproduct['profileid']]}}</span> Onboarded to <strong>{{mapjourneyname[participantjourneyproduct['journeyref'].id]}}</strong> by
+          <mat-form-field  style="width: 200px; margin-left: 10px;">
+            <mat-select placeholder="Select Specialist" [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
+              <mat-option *ngFor="let member of ahmember" [value]="member.profile_ref">{{ member.name }}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="!participantjourneyproduct['onboardedby']">
+              Please select a specialist
+            </mat-error>
+          </mat-form-field>
+        </div> -->
+  
+        <div *ngIf='participantjourneyproduct.orientationstatus === "attended"' class="user-info">
+          <span class="username">{{mapProfile[participantjourneyproduct['profileid']]}}</span> Onboarded to <strong>{{mapjourneyname[participantjourneyproduct['journeyref'].id]}}</strong> on 
+          <span class="date" *ngIf="![null,undefined,''].includes(participantjourneyproduct['onboardingscheduled'])">{{participantjourneyproduct['onboardingscheduled'].toDate()  | date: 'dd-MMM-yyyy' }}</span>
+          <span class="owner">{{mapProfile[participantjourneyproduct['onboardedby'][0].id]}}</span>
+        </div>
+    
+        <div *ngIf="![null,undefined,'',false].includes(participantjourneyproduct['salenotes'])" class="sales-note">
+          <p><b style="color: #0C6385;text-align: start;">Sale Note</b></p>
+          <p>
+            {{participantjourneyproduct['salenotes']}}
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- appointment -->
+    <div  *ngIf="participantjourneyproduct['appointment'] === true" class="user-info">
+      <span>JourneyCoach Appointment scheduled with {{mapProfile[participantjourneyproduct['onboardedby'][0].id]}}</span>
+      <span>This Appointment Happened?</span>
+      <div class="options" *ngIf="participantjourneyproduct['view'] === false">
+        <label><input type="radio" [(ngModel)]= 'attended' [value]=true /> Attended</label>
+        <label><input type="radio" [(ngModel)]= 'attended'  [value]=false/> Cancelled</label>
+      </div>
+      <button *ngIf="participantjourneyproduct['view'] === false" class="submit-button" (click)="onmark()">Submit</button>
+    </div>
+  
+    <!-- Mark As Onboarded -->
+    <div *ngIf="participantjourneyproduct['markonboard'] === true">
+      
+      <div class="onboarding-report">
+        <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null, undefined, ""].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+        <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' : [null, undefined, ""].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' : mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></p>
+        <p *ngIf="![null,undefined,''].includes(participantjourneyproduct['onboardedby']) && participantjourneyproduct['onboardedby'].length != 0">Journey Coach : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardedby'][0]?.id) ? '...' : mapProfile[participantjourneyproduct['onboardedby'][0]?.id]}}</b></p>
+        <p>Onboarding Scheduled Date : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardingscheduled']) ? 'Not-Scheduled' : participantjourneyproduct['onboardingscheduled'].toDate() | date:'medium'}}</b></p>
+        <p>Onboarded Date : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardedtime']) ? '...' : participantjourneyproduct['onboardedtime'] | date:'medium'}}</b></p>
+        <br>
+
+        <div class="d-flex flex-column justify-content-start align-items-start text-align-start">
+          
+          <div class="d-inline-flex flex-row justify-content-space-between w-100">
+            <mat-form-field appearance="outline">
+              <mat-label>Current Journey</mat-label>
+              <input matInput type="text" [(ngModel)]="currentJourney" readonly>
+            </mat-form-field>
+            &nbsp;&nbsp;
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>Journey Status</mat-label>
+              <mat-select [(ngModel)]="currentJourneyStatus" [disabled]="true">
+                <mat-option [value]="null">Clear Status</mat-option>
+                <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          
+          <div *ngIf="participantjourneyproduct['journeytype'] == 'upgrade'" class="d-inline-flex flex-row justify-content-space-between w-100">
+            
+            <mat-form-field appearance="outline">
+              <mat-label>Previous Journey</mat-label>
+              <input matInput type="text" [(ngModel)]="previousJourney" readonly>
+            </mat-form-field>
+            &nbsp;&nbsp;
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>Journey Status</mat-label>
+              <mat-select [(ngModel)]="previouseJourneyStatus" [disabled]="true">
+                <mat-option [value]="null">Clear Status</mat-option>
+                <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+          </div>
+
+        </div>
+
+        <div class="d-flex flex-column justify-content-start align-items-start text-align-start">
+          <div>
+            <span style="font-size: 16px;color: #0C6385;"><b>Onboard Done?</b></span>
+          </div>
+          <div>
+            <mat-radio-group [(ngModel)]="participantjourneyproduct['onboarded']">
+              <mat-radio-button [value]="true" style="margin: 10px;">Yes</mat-radio-button>
+              <mat-radio-button [value]="false">No</mat-radio-button>
+            </mat-radio-group>
+          </div>
+        </div>
+
+        <div *ngIf="participantjourneyproduct['onboarded'] == true && [null,undefined,''].includes(participantjourneyproduct['appointmentid']) && [null,undefined,''].includes(participantjourneyproduct['onboardingscheduled'])">
+
+          <div>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Select Specialist" [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
+                <mat-option *ngFor="let member of ahmember.sort()" [value]="member.profile_ref">{{ member.name }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <p style="color: red;line-height: 0px;" *ngIf="[null,undefined,''].includes(participantjourneyproduct['onboardedby']) || participantjourneyproduct['onboardedby'].length == 0">
+              Please select a specialist
+            </p>
+          </div>
+
+          <div class="d-flex flex-row justify-content-space-between">
+            <!-- Date Picker -->
+            <div>
+              <mat-form-field appearance="outline" class="no-padding-time-input">
+                <mat-label>Scheduled Date</mat-label>
+                <input matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()" placeholder="MM/DD/YYYY">
+                <mat-datepicker-toggle matSuffix [for]="picker">
+                  <mat-icon matDatepickerToggleIcon>calendar_today</mat-icon>
+                </mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+              </mat-form-field>
+              <p style="color: red;line-height: 0px;" *ngIf="[null,undefined,''].includes(selectedDate)">
+                Please select a Date
+              </p>
+            </div>
+            &nbsp;&nbsp;
+            <!-- Time Picker -->
+            <div>
+              <mat-form-field appearance="outline" class="no-padding-time-input">
+                <mat-label>Scheduled Time</mat-label>
+                <input matInput type="time" [(ngModel)]="selectedTime" (change)="getCombinedDateTime()" placeholder="HH:MM">
+              </mat-form-field>
+              <p style="color: red;line-height: 0px;" *ngIf="[null,undefined,''].includes(selectedTime)">
+                Please select a Time
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <div>
+          <h4 style="font-size: 16px;color: #0C6385;">Onboarding Report</h4>
+          <mat-form-field appearance="outline" class="textareafield">
+            <textarea matInput name="genearlnotes" placeholder="Type Here" [(ngModel)]="note" rows="5"></textarea>
+          </mat-form-field>
+        </div>
+
+        <div>
+          <div class="d-flex flex-column justify-content-start align-items-start ">
+            <div>
+              <span style="font-size: 16px;color: #0C6385;"><b>Referral</b></span>
+            </div>
+            <mat-chip-listbox [(ngModel)]="participantjourneyproduct['referral']">
+                @for (status of ['Yes', 'No']; track status) {
+                <mat-chip-option>{{status}}</mat-chip-option>
+                }
+            </mat-chip-listbox>
+            <!-- <div class="options" >
+              <label><input type="checkbox" [(ngModel)]="continuity" /> Continuity</label>&nbsp;&nbsp;
+              <label><input type="checkbox" [(ngModel)]="upgrade" /> Upgrade</label>&nbsp;&nbsp;
+              <label><input type="checkbox" [(ngModel)]="referral" /> Referral</label>&nbsp;&nbsp;
+              <label><input type="checkbox" [(ngModel)]="addon"/> Add-on</label>&nbsp;&nbsp;
+            </div> -->
+          </div>
+        </div>
+
+        <div class="d-flex flex-column justify-content-start align-items-start ">
+          <div>
+            <span style="font-size: 16px;color: #0C6385;"><b>Welcome Email Sent?</b></span>
+          </div>
+          <div>
+            <mat-radio-group [(ngModel)]="participantjourneyproduct['emailsent']">
+              <mat-radio-button [value]="true" style="margin-right: 10px;">Yes</mat-radio-button>
+              <mat-radio-button [value]="false">No</mat-radio-button>
+            </mat-radio-group>
+          </div>
+        </div>
+      
+      </div>
+  
+      <div class="d-flex justify-content-center">
+        <button type="button" class="submit-button" [ngStyle]="{'background-color': validateOnboard() ? '#e0e0e0' : '#0056b3'}" mat-stroked-button [disabled]="validateOnboard()" (click)="onSubmit()">Submit</button>
+      </div>
+    </div>
+</div>
+
+    
+  

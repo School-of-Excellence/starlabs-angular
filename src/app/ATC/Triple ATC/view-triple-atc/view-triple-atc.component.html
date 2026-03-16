@@ -1,0 +1,174 @@
+<div *ngIf="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <div class="heading">Triple ATC List</div>
+
+  <div class="filterrow">
+    <div>
+      <mat-form-field appearance="outline" class="filterfield">
+        <mat-label>Filter By Event</mat-label>
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="queueFilterCtrl" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let queue of returnQueue()" [value]="queue.docid">{{queue.queuename}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field *ngIf="superRoles" appearance="outline" class="filterfield">
+        <mat-label>Participant Name</mat-label>
+        <mat-select [(ngModel)]="selectedClient" (selectionChange)="onClientSelect()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="clientFilterCtrl" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option value="all">ALL</mat-option>
+          <mat-option *ngFor="let client of returnClient()" [value]="client.profileid">{{client.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button class="clearbtn ms-3" *ngIf="filterMode" mat-stroked-button (click)="resetFilter()">
+        Reset
+      </button>
+      <button *ngIf="atcChangeAvailable" class="border-success text-success ms-3" mat-stroked-button (click)="reloadATC()">
+        Reload ATC
+      </button>
+    </div>
+
+    <div></div>
+  </div>
+
+  <div *ngIf="!filterMode && mergedATCdata.length != 0 && superRoles">
+    <div *ngFor="let atc of mergedATCdata; let i = index">
+      <div class="atcheading">
+        <div class="atccount">{{atc['prescription_date']?.toDate() | date:'medium'}}</div>
+      </div>
+      <div class="atcdetail">
+        <label class="highlight">Participant Name:</label>
+        <label class="profilename" (click)="selectedClient = atc['profileid']; onClientSelect()">{{profileMap[atc['profileid']]?.name}}</label>
+        <br>
+        <label class="highlight">Product:</label>
+        <label>{{atc['product'] == null ? 'No Product Mentioned' : atc['product']}}</label>
+      </div>
+      <mat-divider class="divider"></mat-divider>
+    </div>
+  </div>
+
+  <div *ngIf="filterMode || !superRoles">
+    <div *ngFor="let atc of reportATC.slice(start, end); let i = index">
+      <div class="atcheading">
+        <div class="atccount">
+          {{atc['prescription_date']?.toDate() | date:'medium'}}
+        </div>
+        <button *ngIf="atc['status'] == 'atc given'" mat-stroked-button class="editatc" (click)="onEditATC(atc['atcid'])">
+          Edit ATC
+        </button>
+        <label [ngClass]="atc['status'] == 'validated' ? 'green' : 'yellow'">{{atc['status'] == 'validated' ? "Validated" : atc['status']}}</label>
+      </div>
+      <div class="atcbody">
+        <div class="atcdetail">
+          <label class="highlight">Participant Name:</label>
+          <label>{{profileMap[atc['profileid']]?.name}}</label>
+          <br>
+          <label class="highlight">Product:</label>
+          <label>{{atc['product']}}</label>
+          <br>
+          <div *ngIf="atc['author'] != null && atc['author']?.length != 0">
+            <label class="highlight">Author(s):</label>
+            <label *ngFor="let profile of atc['author']">{{profileMap[profile.id]?.name}}, </label>
+            <br>
+          </div>
+          <div *ngIf="atc['observer'] != null && atc['observer']?.length != 0">
+            <label class="highlight">Observer(s):</label>
+            <label *ngFor="let profile of atc['observer']">{{profileMap[profile.id]?.name}}, </label>
+            <br>
+          </div>
+          <div *ngIf="atc['validator'] != null && atc['validator']?.length != 0">
+            <label class="highlight">Validator(s):</label>
+            <label *ngFor="let profile of atc['validator']">{{profileMap[profile.id]?.name}}, </label>
+            <br>
+          </div>
+          <div *ngIf="atc['mentee'] != null && atc['mentee']?.length != 0">
+            <label class="highlight">Mentee(s):</label>
+            <label *ngFor="let profile of atc['mentee']">{{profileMap[profile]?.name}}, </label>
+            <br>
+          </div>
+        </div>
+  
+        <div class="transcription">
+          <div *ngFor="let triple of atc['tripleatclist']; let a = index">
+            <div class="mt-4 mb-2">
+              <label class="highlight" (click)="onPreviewATC(atc['atcid'])"><u>Perceptual Position {{a+1}}:</u></label><label>{{triple['perceptualposition']}}</label>
+            </div>
+            <div *ngFor="let transcription of triple.transcription; let j = index">
+              <div class="ml-4" [ngStyle]="{'color' : transcription['isdelete'] ? 'grey' : 'black'}">
+                <div class="adjustment">
+                  <label class="fw-bold">Adjustment:</label>
+                  <label *ngIf="transcription['newlyadded']" class="addednew">&nbsp;(New)</label>&nbsp;
+                  <label>{{transcription.adjustment}}</label>
+                </div>
+                <div class="font-italic" *ngIf="transcription['comment'] != null && transcription['comment']?.trim().length != 0">
+                  <u>Comment:&nbsp;</u> <label>{{transcription['comment']}}</label>
+                </div>
+                <div class="text-secondary font-italic mb-2" *ngIf="transcription['editedby'] != null && !atc['authorid'].includes(transcription['editedby']?.id)">
+                  * This adjustment has been {{mentorProfileid.includes(transcription['editedby']?.id) ? 'enhanced' : ' last edited'}} by <b>{{profileMap[transcription['editedby']?.id]?.name}}</b>
+                </div>
+                <table class="tablebox">
+                  <tr class="tableheading">
+                    <th>Procedure</th>
+                  </tr>
+                  <tr class="tabledata" *ngFor="let procedure of transcription['procedure']; let k = index" [ngStyle]="{'color' : transcription['isdelete'] || procedure['isdelete'] ? 'grey' : 'black'}">
+                    <td>
+                      <label [ngStyle]="{'text-decoration' : transcription['isdelete'] || procedure['isdelete'] ? 'line-through' : 'none'}">
+                        {{procedure['procedurename']}} <label *ngIf="procedure['completed']" class="proceduredone">( Completed )</label>
+                      </label>
+                      <label class="mandatory" *ngIf="procedure.mandatory">*</label>
+                      <label class="addednew" *ngIf="procedure.newlyadded">(new)</label>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!--         
+        <div class="notesbox" *ngIf="atc['notesid'] != null">
+          <button mat-raised-button *ngIf="mapATCnotes[atc['notesid']] == null || mapATCnotes[atc['notesid']] == undefined" (click)="getNotes(atc['atcid'], atc['notesid'])">Get Notes</button>
+          <div *ngIf="mapATCnotes[atc['notesid']] != null && mapATCnotes[atc['notesid']] != undefined">
+            <div *ngIf="mapATCnotes[atc['notesid']]['mentornote'] != null">
+              <label><b>Mentoring Notes:</b> {{mapATCnotes[atc['notesid']]['mentornote']['mentoringnote']}}</label>
+            </div>
+            <label><b>Consultation Points:</b> {{mapATCnotes[atc['notesid']]['consultationpoint']}}</label><br>
+            <label><b>Case Notes:</b> {{mapATCnotes[atc['notesid']]['notes']}}</label><br>
+            <label><b>Consultation Summary:</b> {{mapATCnotes[atc['notesid']]['consultationsummary']}}</label><br>
+            <label><b>Changework Brief: </b></label><br>
+            <div *ngIf="mapATCnotes[atc['notesid']]['changeworkbrief'] != null">
+              <div *ngFor="let audio of mapATCnotes[atc['notesid']]['changeworkbrief']">
+                <audio controls="">
+                  <source [src]="audio" type="audio/wav">
+                </audio>
+              </div>
+            </div>
+            <div *ngIf="mapATCnotes[atc['notesid']]['imagenotes'] != null">
+              <label><b>Image Notes: </b></label><br>
+              <div class="row">
+                <div class="mt-2 ml-3" *ngFor="let image of mapATCnotes[atc['notesid']]['imagenotes']">
+                  <img [src]="image" height="80" width="80" (click)="viewImage(image)">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> 
+        -->
+      </div>
+      <mat-divider class="divider" *ngIf="(i + 1) != atc['transcription'].length"></mat-divider>
+    </div>
+  
+    <div>
+      <button mat-raised-button class="previousbtn" *ngIf="start >= 10" (click)="previousATC()">Previous</button>
+      <button mat-raised-button class="nextbtn" *ngIf="mergedATCdata.length > end" (click)="nextATC()">Next</button>
+    </div>
+  </div>
+
+</div>

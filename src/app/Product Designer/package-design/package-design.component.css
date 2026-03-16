@@ -1,0 +1,43 @@
+.background{
+    padding: 30px;
+    width: 100%;
+  }
+  
+  .title{
+    color: rgb(0, 45, 60);
+    text-align: center;
+  }
+  
+  .designhover:hover{
+    color: rgb(172, 36, 58);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  
+  .actionbox{
+    margin-bottom: 10px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    vertical-align: middle;
+  }
+  
+  .addbtn{
+    color: green;
+    border: 1px solid green;
+    margin-left: 10px;
+  }
+  
+  .editbtn{
+    color: grey;
+  }
+  
+  table{
+    width: 100%;
+  }
+  
+  th, td{
+    padding: 15px;
+    width: 18%;
+  }

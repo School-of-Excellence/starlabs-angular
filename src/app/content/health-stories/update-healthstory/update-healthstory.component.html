@@ -1,0 +1,113 @@
+<!-- <div class="mainscreen">
+  <h4 class="title">Update Health Story</h4>
+  <form [formGroup]="healthStoryForm" (ngSubmit)="submit()">
+    <div>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Subject (Brief)</mat-label>
+        <textarea matInput type="text" formControlName="subject" rows="6"></textarea>
+        <mat-error *ngIf="healthStoryForm.get('subject').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Description (Continuous)</mat-label>
+        <textarea matInput type="text" formControlName="description" rows="6"></textarea>
+        <mat-error *ngIf="healthStoryForm.get('description').hasError('required')">
+          Required
+        </mat-error>
+      </mat-form-field>
+      <br>
+      <h5 class="text-left">Images</h5>
+      <input type="file" accept="image/*" (change)="importImages($event)" multiple>
+      <div class="row ml-2 mt-2">
+        <div class="mr-2 text-center" *ngFor="let image of this.healthStoryForm.get('images').value; let i = index">
+          <img [src]="image" height="80" width="80">
+          <br>
+          <label class="removetext" (click)="removeImage(i)">Remove</label>
+        </div>
+      </div>
+      <mat-checkbox formControlName="delete">Delete this Story</mat-checkbox>
+      <br><br>
+    </div>
+    <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+    <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Health Story'}}</button>
+  </form>
+</div> -->
+<!-- UPDATE HEALTH STORY DIALOG -->
+<div class="dialog-wrap">
+  <div class="dialog-header">
+    <div class="dialog-icon edit-icon">
+      <mat-icon>auto_stories</mat-icon>
+    </div>
+    <div>
+      <h2 class="dialog-title">Update Health Story</h2>
+      <p class="dialog-sub">Edit story content and images</p>
+    </div>
+    <button class="dialog-close" (click)="close()" [disabled]="loading">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content class="dialog-body">
+    <form [formGroup]="healthStoryForm" (ngSubmit)="submit()" class="form-fields">
+
+      <!-- Subject -->
+      <div class="field-group">
+        <label class="label">Subject <span class="required">*</span></label>
+        <div class="input-box textarea-box" [class.error]="healthStoryForm.get('subject')?.touched && healthStoryForm.get('subject')?.hasError('required')">
+          <textarea class="ib-input ib-textarea" placeholder="Enter a brief subject..." formControlName="subject" rows="4"></textarea>
+        </div>
+        <span class="field-error" *ngIf="healthStoryForm.get('subject')?.touched && healthStoryForm.get('subject')?.hasError('required')">Subject is required</span>
+      </div>
+
+      <!-- Description -->
+      <div class="field-group">
+        <label class="label">Description <span class="required">*</span></label>
+        <div class="input-box textarea-box" [class.error]="healthStoryForm.get('description')?.touched && healthStoryForm.get('description')?.hasError('required')">
+          <textarea class="ib-input ib-textarea" placeholder="Enter continuous description..." formControlName="description" rows="5"></textarea>
+        </div>
+        <span class="field-error" *ngIf="healthStoryForm.get('description')?.touched && healthStoryForm.get('description')?.hasError('required')">Description is required</span>
+      </div>
+
+      <!-- Images -->
+      <div class="field-group">
+        <label class="label">Images</label>
+        <div class="upload-zone" (click)="storyImgInput.click()">
+          <input #storyImgInput type="file" accept="image/*" (change)="importImages($event)" multiple hidden />
+          <div class="upload-zone-content">
+            <mat-icon class="upload-icon">add_photo_alternate</mat-icon>
+            <span class="upload-text">Click to upload images</span>
+            <span class="upload-hint">Select multiple images at once</span>
+          </div>
+        </div>
+
+        <!-- Image previews -->
+        <div class="story-images" *ngIf="healthStoryForm.get('images')?.value?.length">
+          <div class="story-img-card" *ngFor="let image of healthStoryForm.get('images').value; let i = index">
+            <img class="story-img" [src]="image" />
+            <button class="img-remove-overlay" type="button" (click)="removeImage(i)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete checkbox -->
+      <div class="field-group delete-check">
+        <mat-checkbox formControlName="delete" color="warn">
+          <span class="delete-check-text">Delete this Story</span>
+        </mat-checkbox>
+      </div>
+
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" type="button" (click)="close()" [disabled]="loading">Cancel</button>
+    <button class="btn-primary" type="button" (click)="submit()" [disabled]="loading">
+      <mat-icon>{{ loading ? 'hourglass_empty' : 'save' }}</mat-icon>
+      {{ loading ? 'Updating...' : 'Update Story' }}
+    </button>
+  </mat-dialog-actions>
+</div>

@@ -1,0 +1,563 @@
+<div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ "Loading Dashboard.." }}</div>
+    <div class="loading-progress">
+      <div class="progress-bar-container">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <h1 class="header-title">Business Dashboard</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <!-- Total Revenue -->
+    <div class="stat-card" (click)="openModal('totalRevenue')">
+      <div class="stat-header">
+        <span class="stat-label">Total Revenue</span>
+        <span class="stat-badge badge-primary"
+          >{{ this.activeParticipantsCount }} Active</span
+        >
+      </div>
+      <div class="stat-value">{{ formatCurrency(assuredRevenue) }}</div>
+      <div class="stat-subvalue">
+        <div class="subvalue-item">
+          <span class="subvalue-label">Assured Revenue</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- This Month -->
+    <div class="stat-card card">
+      <div class="stat-header">
+        <span class="stat-label">This Month (As of 1st)</span>
+      </div>
+      <div class="stat-value">{{ formatCurrency(thisMonthDue) }}</div>
+      <div class="stat-subvalue">
+        <div class="subvalue-item">
+          <span class="subvalue-label">EMI Paid</span>
+          <span class="subvalue-amount amount-success" style="color: green">{{
+            formatCurrency(thisMonthEMIPaid)
+          }}</span>
+        </div>
+        <div class="subvalue-item">
+          <span class="subvalue-label">Total Received</span>
+          <span class="subvalue-amount amount-success" style="color: green">{{
+            formatCurrency(thisMonthReceived)
+          }}</span>
+        </div>
+        <div class="subvalue-item">
+          <span class="subvalue-label">Yet to Receive</span>
+          <span class="subvalue-amount amount-danger" style="color: red">{{
+            formatCurrency(thisMonthDue - thisMonthReceived)
+          }}</span>
+        </div>
+      </div>
+      <div class="stat-sub">
+        <div class="subvalue-item">
+          <span class="subvalue-label">New Payment</span>
+          <span class="subvalue-amount amount-success" style="color: green">{{
+            formatCurrency(thisMonthNewPayment)
+          }}</span>
+        </div>
+
+        <div class="subvalue-item">
+          <span class="subvalue-label">Additional</span>
+          <span class="subvalue-amount amount-success" style="color: green">{{
+            formatCurrency(thisMonthAdditional)
+          }}</span>
+        </div>
+
+        <div class="subvalue-item">
+          <span class="subvalue-label">Revived</span>
+          <span class="subvalue-amount amount-success" style="color: green">{{
+            formatCurrency(thisMonthRevived)
+          }}</span>
+        </div>
+
+        <div class="subvalue-item">
+          <span class="subvalue-label">Unschedule</span>
+          <span class="subvalue-amount amount-success" style="color: green">{{
+            formatCurrency(thisMonthUnschedule)
+          }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expenditure -->
+    <div class="stat-card">
+      <div class="stat-header">
+        <div>
+          <span class="stat-label">Expenditure</span>
+          <span class="stat-date"
+            >( {{ currentDate | date : "MMM yyyy" }} )</span
+          >
+        </div>
+        <button
+          class="dashboard-link"
+          (click)="navigateToExpensePlanner('home')"
+        >
+          Dashboard →
+        </button>
+      </div>
+      <div class="mini-table">
+        <div class="mini-table-row">
+          <span class="mini-label">Planned</span>
+          <span class="mini-indicator indicator-warning"
+            >₹{{ formatCurrency(expenditure.planned) }}</span
+          >
+        </div>
+        <div class="mini-table-row">
+          <span class="mini-label">Paid</span>
+          <span class="mini-indicator indicator-warning"
+            >₹{{ formatCurrency(expenditure.paid) }}</span
+          >
+        </div>
+        <div class="mini-table-row">
+          <span class="mini-label">Additional</span>
+          <span class="mini-indicator indicator-warning"
+            >₹{{ formatCurrency(expenditure.paid - expenditure.planned) }}</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Next Month -->
+    <div class="stat-card">
+      <div class="stat-header">
+        <div>
+          <span class="stat-label">Next Month</span>
+          <span class="stat-date">( {{ nextMonth | date : "MMM yyyy" }} )</span>
+        </div>
+        <button
+          class="dashboard-link"
+          (click)="navigateToExpensePlanner('next')"
+        >
+          Dashboard →
+        </button>
+      </div>
+      <div class="mini-table">
+        <div class="mini-table-row">
+          <span class="mini-label">Income</span>
+          <span class="mini-indicator indicator-info">{{
+            formatCurrency(nextMonthDue)
+          }}</span>
+        </div>
+        <div class="mini-table-row">
+          <span class="mini-label">Outflow</span>
+          <span class="mini-indicator indicator-info"
+            >₹{{ formatCurrency(nextMonthExpenditurePlanned) }}</span
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Section -->
+  <div class="activity-section">
+    <div class="section-header">
+      <h2 class="section-title">Activity Overview</h2>
+      <div class="time-filters">
+        <button
+          class="time-filter"
+          [class.active]="timeFrameFilter === 'last7days'"
+          (click)="selectTimeFrame('last7days')"
+        >
+          Last 7 Days
+        </button>
+        <button
+          class="time-filter"
+          [class.active]="timeFrameFilter === 'last30days'"
+          (click)="selectTimeFrame('last30days')"
+        >
+          Last 30 Days
+        </button>
+        <mat-form-field
+          appearance="outline"
+          style="width: 250px; margin-left: 0.5rem"
+        >
+          <mat-label>Date Range</mat-label>
+          <mat-date-range-input [rangePicker]="picker">
+            <input
+              matStartDate
+              placeholder="Start date"
+              [(ngModel)]="salesStartDate"
+              (dateChange)="onDateRangeChange()"
+            />
+            <input
+              matEndDate
+              placeholder="End date"
+              [(ngModel)]="salesEndDate"
+              (dateChange)="onDateRangeChange()"
+            />
+          </mat-date-range-input>
+          <mat-datepicker-toggle
+            matIconSuffix
+            [for]="picker"
+          ></mat-datepicker-toggle>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- Activity Grid -->
+    <div class="activity-grid">
+      <!-- Main Activity List -->
+      <div class="activity-list">
+        <div class="activity-item" (click)="openModal('newSales')">
+          <div class="activity-icon icon-primary">{{ newSalesCount }}</div>
+          <div class="activity-details">
+            <h4>New Sales</h4>
+            <p class="activity-meta">
+              {{
+                timeFrameFilter === "last7days" ? "Last 7 days" : "Last 30 days"
+              }}
+            </p>
+          </div>
+          <div class="activity-count">
+            <span class="activity-count-number">{{ newSalesCount }}</span>
+            <span class="activity-count-label">New</span>
+          </div>
+          <div class="activity-amount">
+            <span class="activity-amount-value"
+              >₹{{ formatCurrency(newSalesSum) }}</span
+            >
+            <span class="activity-amount-label">Total Amount</span>
+          </div>
+        </div>
+
+        <div class="activity-item" (click)="openModal('upgradeSales')">
+          <div class="activity-icon icon-secondary">{{ upgradesCount }}</div>
+          <div class="activity-details">
+            <h4>Upgrades</h4>
+            <p class="activity-meta">
+              {{
+                timeFrameFilter === "last7days" ? "Last 7 days" : "Last 30 days"
+              }}
+            </p>
+          </div>
+          <div class="activity-count">
+            <span class="activity-count-number">{{ upgradesCount }}</span>
+            <span class="activity-count-label">Upgrade</span>
+          </div>
+          <div class="activity-amount">
+            <span class="activity-amount-value"
+              >₹{{ formatCurrency(upgradesSum) }}</span
+            >
+            <span class="activity-amount-label">Total Amount</span>
+          </div>
+        </div>
+
+        <div class="activity-item" (click)="openModal('dfuSales')">
+          <div class="activity-icon icon-secondary">{{ dfuSalesCount }}</div>
+          <div class="activity-details">
+            <h4>DFU</h4>
+            <p class="activity-meta">
+              {{
+                timeFrameFilter === "last7days" ? "Last 7 days" : "Last 30 days"
+              }}
+            </p>
+          </div>
+          <div class="activity-count">
+            <span class="activity-count-number">{{ dfuSalesCount }}</span>
+            <span class="activity-count-label">DFU</span>
+          </div>
+          <div class="activity-amount">
+            <span class="activity-amount-value"
+              >₹{{ formatCurrency(dfuSalesSum) }}</span
+            >
+            <span class="activity-amount-label">Total Amount</span>
+          </div>
+        </div>
+
+        <div
+          class="activity-item ads-entry"
+          (click)="navigateToAdsEntry()"
+          matTooltip="Dashboard →"
+          matTooltipPosition="right"
+          matTooltipClass="nav-tooltip"
+        >
+          <div class="activity-icon icon-primary">{{ adsCampaigns }}</div>
+          <div class="activity-details">
+            <h4>Ads Spent</h4>
+            <p class="activity-meta">
+              {{
+                timeFrameFilter === "last7days" ? "Last 7 days" : "Last 30 days"
+              }}
+            </p>
+            <p class="activity-meta">
+              Last Update :
+              {{ lastUpdatedAdsDate | date : "medium" }}
+            </p>
+          </div>
+          <div class="activity-count">
+            <span class="activity-count-number">{{ adsCampaigns }}</span>
+            <span class="activity-count-label">Leads</span>
+          </div>
+          <div class="activity-amount">
+            <span class="activity-amount-value"
+              >₹{{ formatCurrency(adsSpent) }}</span
+            >
+            <span class="activity-amount-label">Total Amount</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <div class="activity-icon icon-secondary">{{ incentiveCount }}</div>
+          <div class="activity-details">
+            <h4>Incentive</h4>
+            <p class="activity-meta">
+              {{
+                timeFrameFilter === "last7days" ? "Last 7 days" : "Last 30 days"
+              }}
+            </p>
+          </div>
+          <div class="activity-count">
+            <span class="activity-count-number">{{ incentiveCount }}</span>
+            <span class="activity-count-label">Payouts</span>
+          </div>
+          <div class="activity-amount">
+            <span class="activity-amount-value">{{
+              formatCurrency(incentiveSum)
+            }}</span>
+            <span class="activity-amount-label">Total Amount</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Participants -->
+      <div class="participants-section">
+        <h3 class="participants-title">Active Participants</h3>
+        <div class="participants-grid">
+          <div class="participant-item" (click)="openModal('big')">
+            <span class="participant-label">BIG</span>
+            <span class="participant-count">{{ this.bigCount }}</span>
+          </div>
+          <div class="participant-item" (click)="openModal('up')">
+            <span class="participant-label">UP</span>
+            <span class="participant-count">{{ this.upCount }}</span>
+          </div>
+          <div class="participant-item" (click)="openModal('lyl')">
+            <span class="participant-label">LYL</span>
+            <span class="participant-count">{{ this.lylCount }}</span>
+          </div>
+          <div class="participant-item" (click)="openModal('cpm')">
+            <span class="participant-label">CPM</span>
+            <span class="participant-count">{{ this.cpmCount }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Engagement Section -->
+    <div class="engagement-section">
+      <h3 class="engagement-title">Engagement (Last 6 Months)</h3>
+      <div class="engagement-grid">
+        <div class="engagement-item" (click)="openModal('journeyCoaching')">
+          <span class="engagement-label">Journey Coaching</span>
+          <span class="engagement-count">{{ allEngProfileIds['journeyCoaching'].length }}</span>
+        </div>
+        <div class="engagement-item">
+          <span class="engagement-label">Email</span>
+          <span class="engagement-count">0</span>
+        </div>
+        <div class="engagement-item" (click)="openModal('app')">
+          <span class="engagement-label">App</span>
+          <span class="engagement-count">{{ allEngProfileIds['appUser'].length }}</span>
+        </div>
+        <div class="engagement-item" (click)="openModal('workshop')">
+          <span class="engagement-label">Workshop</span>
+          <span class="engagement-count">{{ allEngProfileIds['workshop'].length }}</span>
+        </div>
+        <div class="engagement-item" (click)="openModal('dfu')">
+          <span class="engagement-label">DFU</span>
+          <span class="engagement-count">{{ allEngProfileIds['dfuProduct'].length }}</span>
+        </div>
+        <div class="engagement-item">
+          <span class="engagement-label">A&H</span>
+          <span class="engagement-count">0</span>
+        </div>
+      </div>
+      <div class="total-participants" (click)="openModal('activeParticipant')">
+        <div class="engagement-item">
+          <span class="engagement-label">Total Active Participants</span>
+          <span class="engagement-count"
+            >{{ getActiveParticipants() }} /
+            {{ this.activeParticipantsCount }}</span
+          >
+        </div>
+      </div>
+      <div
+        class="total-participants"
+        (click)="openModal('nonActiveParticipant')"
+      >
+        <div class="engagement-item">
+          <span class="engagement-label">Total Non-Active Participants</span>
+          <span class="engagement-count"
+            >{{ getNonActiveParticipants() }} /
+            {{ this.nonActiveParticipantsCount }}</span
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Breakdown -->
+  <div class="breakdown-section">
+    <div class="section-header">
+      <h2 class="section-title">Daily Breakdown</h2>
+    </div>
+    <table class="breakdown-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>New Sales</th>
+          <th>Upgrades</th>
+          <th>Total</th>
+          <th>Activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let day of dailySalesData">
+          <td class="date-cell">
+            {{ formatDate(day.date) }}
+            <span class="day-label">{{ getWeekday(day.date) }}</span>
+          </td>
+          <td class="number-cell">{{ day.newSales }}</td>
+          <td class="number-cell">{{ day.upgrades }}</td>
+          <td class="number-cell">{{ day.total }}</td>
+          <td class="progress-cell">
+            <ng-container *ngIf="day.total > 0; else noSales">
+              <div class="daily-progress-bar">
+                <div
+                  class="daily-progress-segment daily-progress-new"
+                  [style.width.%]="day.newPercent"
+                ></div>
+                <div
+                  class="daily-progress-segment daily-progress-upgrade"
+                  [style.width.%]="day.upgradePercent"
+                ></div>
+              </div>
+              <div class="daily-progress-label">
+                {{ day.newPercent }}%
+                <span style="color: #3b82f6; font-weight: 600">New</span> +
+                {{ day.upgradePercent }}%
+                <span style="color: #10b981; font-weight: 600">Upgrades</span>
+              </div>
+            </ng-container>
+            <ng-template #noSales>
+              <div class="daily-progress-bar">
+                <div class="daily-progress-segment" style="width: 0%"></div>
+              </div>
+              <div class="daily-progress-label">No sales</div>
+            </ng-template>
+          </td>
+        </tr>
+
+        <tr *ngIf="dailySalesData.length === 0">
+          <td
+            colspan="5"
+            style="text-align: center; padding: 40px; color: var(--text-muted)"
+          >
+            No sales data available for the last 7 days
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<ng-template #modalTemplate>
+  <div class="modal-container" *ngIf="dialogConfig">
+    <!-- Header -->
+    <div class="modal-header">
+      <div class="header-content">
+        <h2 mat-dialog-title>{{ dialogConfig.title }}</h2>
+        <span class="header-subtitle">{{ dialogConfig.table.data.length }} records</span>
+      </div>
+
+      <button mat-icon-button class="close-button" mat-dialog-close>
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <mat-dialog-content>
+      <!-- Search -->
+      <!-- <div class="search-bar">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"></circle>
+          <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+        </svg>
+
+        <input type="text" placeholder="Search..." class="search-input">
+      </div> -->
+
+      <!-- Table -->
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-index">S.NO</th>
+              <th *ngFor="let col of dialogConfig.table.columns" class="col-header">
+                @if (['isActive', 'isNonActive'].includes(col.key)) {
+                  <span (click)="sortParticipants()">{{ col.header }}</span>
+                } @else {
+                  <span>{{ col.header }}</span>
+                }
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr *ngFor="let row of dialogConfig.table.data; let i = index">
+              <td class="col-index">{{ i + 1 }}</td>
+              <td *ngFor="let col of dialogConfig.table.columns">
+                {{ formatCellValue(row, col) }}
+              </td>
+            </tr>
+            <tr *ngIf="dialogConfig?.table.data.length === 0">
+            <td
+              [attr.colspan]="(dialogConfig?.table?.columns?.length || 0) + 1"
+              class="no-data"
+            >
+              <div class="no-data-message">
+                <svg
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1"
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                <p>No data available</p>
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </mat-dialog-content>
+
+    <!-- Footer -->
+    <mat-dialog-actions>
+      <button mat-button mat-dialog-close class="btn-close">Close</button>
+      <!-- <button mat-raised-button color="primary" class="btn-export">Export</button> -->
+    </mat-dialog-actions>
+  </div>
+</ng-template>
+

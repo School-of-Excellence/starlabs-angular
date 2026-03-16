@@ -1,0 +1,65 @@
+<div *ngIf="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div class="mainscreen">
+  <div class="heading">Appointment Status Unmarked</div>
+  <div class="actionitem">
+    <mat-form-field appearance="outline">
+      <mat-label>Search Appointment</mat-label>
+      <input matInput #search (input)="applyAppointmentFilter($event)" #input autocomplete="off">
+    </mat-form-field>
+  </div>
+  <table class="mat-elevation-z3" mat-table matSort [dataSource]="appointmentSource">
+    <!-- Booked Name -->
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Client</th>
+      <td mat-cell *matCellDef="let element">
+        <label>{{element.name}}</label>
+      </td>
+    </ng-container>
+    <!-- Appointment Name -->
+    <ng-container matColumnDef="appointmentname">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Appointment Name</th>
+      <td mat-cell *matCellDef="let element">
+        <label>{{element.appointmentname}}</label>
+      </td>
+    </ng-container>
+    <!-- Slot Date -->
+    <ng-container matColumnDef="slotdate">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Appointment Date</th>
+      <td mat-cell *matCellDef="let element">
+        <label>{{element.slotdate.toDate() | date:'longDate'}}</label>
+      </td>
+    </ng-container>
+    <!-- Slot Time -->
+    <ng-container matColumnDef="starttime">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Slot Time</th>
+      <td mat-cell *matCellDef="let element">
+        <label>{{element.starttime.toDate() | date:'shortTime'}} - {{element.endtime.toDate() | date:'shortTime'}}</label>
+      </td>
+    </ng-container>
+    <!-- Host Data -->
+    <ng-container matColumnDef="hosts">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Host</th>
+      <td mat-cell *matCellDef="let element">
+        <label class="linebreak">{{element.hosts}}</label>
+      </td>
+    </ng-container>
+    <!-- Action -->
+    <ng-container matColumnDef="action">
+      <th mat-header-cell *matHeaderCellDef>Action</th>
+      <td mat-cell *matCellDef="let element">
+        <button mat-stroked-button (click)="updateStatus(element)">Update</button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="appointmentHeader"></tr>
+    <tr mat-row *matRowDef="let row; columns: appointmentHeader"></tr>
+    <tr class="mat-row" *matNoDataRow>
+      <td class="mat-cell emptytext" colspan="6">
+        <label>No Appointments</label>
+      </td>
+    </tr>
+  </table>
+</div>

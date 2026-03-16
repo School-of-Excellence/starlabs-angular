@@ -1,0 +1,123 @@
+.title{
+  color: rgb(0, 50, 67);
+  text-align: center;
+}
+
+.mainscreen{
+  width: 100%;
+  padding: 20px;
+}
+
+.btnarea{
+  margin-top: 20px;
+  text-align: center;
+}
+
+.closebtn{
+  margin-right: 20px;
+}
+/* .card{
+  width:300px;
+  overflow: auto;
+  height: 500px;
+} */
+
+.formfield{
+  width: 280px;
+}
+
+.formfield1{
+  width: 500px;
+  height: auto;
+}
+.formfield2{
+  width: 280px;
+}
+.form{
+  height: auto;
+}
+
+.field{
+  width: 500px;
+  height: auto;
+}
+
+
+.field2{
+  height: 380px;
+  /* overflow-y: scroll; */
+}
+
+.main{
+  display: flex;
+  flex-direction: row;
+}
+
+mat-card{
+  border: grey  solid 2px;
+}
+#myTextarea {
+  margin-bottom: 10px;
+  height: 100px; 
+  display: block;
+  word-wrap: break-word !important;
+}
+
+.myDIV:hover + .hide {
+  display: block;
+  color: red;
+}
+
+.hide{
+  display: none;
+}
+
+td{
+  line-height: 1.5;
+}
+
+.imagebox{
+  margin: 5px;
+  display: inline;
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.removeimg{
+  position: absolute;
+  font-size: 10px !important;
+  top: -10;
+  right: -20px;
+  background-color: red;
+  color: white;
+}
+img{
+  width: 100px;
+  height: 100px;
+}
+img.fullscreen {
+  position: fixed;
+  top: 0%;
+  left: 10%;
+  right: 10%;
+  width: auto;
+  height: 100vh;
+  /* object-fit: contain; */
+  z-index: 9999;
+  cursor: zoom-out;
+}
+
+
+.status-action {
+  background-color: #ffffcc; 
+}
+
+
+.status-resolved {
+  background-color: rgb(212, 240, 170); 
+}
+
+.iconContainer{
+  color: red;
+}

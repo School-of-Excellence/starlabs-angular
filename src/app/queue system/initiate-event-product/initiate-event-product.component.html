@@ -1,0 +1,357 @@
+<div class="mainscreen">
+    <h3 class="main-title">Initiate Participant Product (Event Base)</h3>
+    
+    <mat-form-field class="w-100" appearance="outline">
+      <mat-label>Select Queue</mat-label>
+      <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="searchQueue" [ngModelOptions]="{standalone: true}"
+            placeholderLabel="Columns" [placeholderLabel]="'Search'"
+            [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let item of returnEvent()" [value]="item">{{item.name}} ({{item.type.toUpperCase()}})</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <div class="arena-events-list">
+      <div class="arena-event-item" *ngFor="let arena of arenaEventList"
+        [class.selected]="selectedArena?.docid === arena.docid" [attr.data-type]="arena['type']">
+        <div class="event-info" (click)="onArenaEventSelect(arena)">
+          <div class="event-title-row">
+            <h4 class="event-title">{{mapProduct[arena["productref"].id]}}</h4>
+            <span class="participant-count">
+              {{(eventParticipationRequestMap[arena['docid']] || {})["all"]?.length}}
+            </span>
+          </div>
+          <div class="event-meta">
+            <ng-container *ngFor="let arenaStatus of (eventParticipationRequestMap[arena['docid']] || {}) | keyvalue;">
+              <span *ngIf="arenaStatus.key != 'all'" class="meta-item">
+                <i class="fa fa-cube"></i>
+                <strong>{{arenaStatus.key | uppercase}}:</strong> {{arenaStatus.value?.length || 0}}
+              </span>
+            </ng-container>
+            <!-- <span class="meta-item">
+                <i class="fa fa-cube"></i>
+                <strong>Requested:</strong> {{(eventParticipationRequestMap[arena['docid']] || {})["requested"]?.length || 0}}
+              </span>
+              <span class="meta-item">
+                <i class="fa fa-cube"></i>
+                <strong>Approved:</strong> {{(eventParticipationRequestMap[arena['docid']] || {})["approved"]?.length || 0}}
+              </span>
+              <span class="meta-item">
+                <i class="fa fa-cube"></i>
+                <strong>Denied:</strong> {{(eventParticipationRequestMap[arena['docid']] || {})["denied"]?.length || 0}}
+              </span>
+              <span class="meta-item">
+                <i class="fa fa-cube"></i>
+                <strong>Attended:</strong> {{(eventParticipationRequestMap[arena['docid']] || {})["attended"]?.length || 0}}
+              </span> -->
+              <!-- <span class="meta-item">
+                <i class="fa fa-cube"></i>
+                <strong>Product:</strong> {{mapProduct[arena["productref"].id]}}
+              </span> -->
+              <!-- <span class="meta-item">
+                <i class="fa fa-tag"></i>
+                <strong>ID:</strong> {{arena["docid"]}}
+              </span> -->
+          </div>
+        </div>
+        <div class="event-actions">
+          <button mat-icon-button matTooltip="View Participants" (click)="viewArenaParticipants(arena, $event)">
+            <mat-icon>visibility</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Export Participants" (click)="exportArenaParticipants(arena, $event)">
+            <mat-icon>download</mat-icon>
+          </button>
+        </div>
+      </div>
+      <!-- <mat-form-field class="formfield w-100" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Select Arena Event</mat-label>
+        <mat-select [(ngModel)]="selectedArena" [compareWith]="compareFnc" (selectionChange)="onArenaEventSelect()" appearance="outline">
+          <mat-select-trigger *ngIf="selectedArena">
+            {{selectedArena["eventname"]}}
+          </mat-select-trigger>
+          <mat-option style="margin-bottom: 20px;" *ngFor="let event of arenaEventList" [value]="event">
+            <div><span class="font-weight-bold" style="margin-bottom: 5px;">Event ({{event["type"]}}):</span> {{event["eventname"]}}</div>
+            <div><span class="font-weight-bold">Product:</span> {{mapProduct[event["productref"].id]}} {{event["docid"]}}</div>
+          </mat-option>
+        </mat-select>
+      </mat-form-field> -->
+    </div>
+  
+    <div *ngIf="selectedArena">
+      <div class="setupbox">
+        <div *ngIf="eventRequestedNonEligibleProfile.length != 0" class="d-flex align-items-center mb-3">
+          <mat-icon class="text-danger me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedNonEligibleProfile)" (click)="openBottomSheet(eventRequestedNonEligibleProfile)">warning</mat-icon>
+          <span>
+            {{eventRequestedNonEligibleProfile.length}} Participant(s) requested for participation but no <b>{{mapProduct[selectedArena["productref"].id]}}</b> product available in their purchase.
+          </span>
+        </div>
+        <div *ngIf="eventRequestedEligibleProfile.length != 0" class="d-flex align-items-center mb-3">
+          <mat-icon class="text-success me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedEligibleProfile)" (click)="openBottomSheet(eventRequestedEligibleProfile)">pan_tool</mat-icon>
+          <span>
+            {{eventRequestedEligibleProfile.length}} Participant(s) are eligible for participation and have the <b>{{mapProduct[selectedArena['productref'].id]}}</b> product in their purchase.
+          </span>
+        </div>
+        <div class="setup-section mt-2" *ngIf="deliverySetList.length != 0">
+          <div class="section-title">Select Product Delivery Sequence to Initiate Product</div>
+          <mat-form-field class="formfield w-100" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Delivery Set</mat-label>
+            <mat-select [(ngModel)]="selectedDeliverySet" (selectionChange)="ngAfterViewInit()">
+              <mat-select-trigger *ngIf="selectedDeliverySet">
+                {{selectedDeliverySet}}
+              </mat-select-trigger>
+              <mat-option *ngFor="let set of deliverySetList; let i = index" [value]="set['deliverytype']">
+                <div><strong>{{set['deliverytype']}}</strong></div>
+                <div class="text-secondary" style="line-height: 1;">
+                  <strong>Sequence:&nbsp;</strong>
+                  <span *ngFor="let activity of set['deliverysequence']; let last = last">
+                    {{mapDeliveryItem[activity["activity"].path]}}{{last ? '' : ', '}}
+                  </span>&nbsp;
+                </div>
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+  
+        <div class="setup-section mt-4" *ngIf="selectedArena['type'] == 'queue'">
+          <div class="section-title">Choose Queue Variation</div>
+          <div class="no-data-message" *ngIf="queueVariationList.length == 0">
+            No variation available. Default flow will be alloted.
+          </div>
+          <mat-form-field *ngIf="queueVariationList.length != 0" class="formfield w-100 mb-2" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Stage Variation</mat-label>
+            <mat-select [(ngModel)]="selectedQueueVariation">
+              <mat-select-trigger *ngIf="selectedQueueVariation">
+                {{mapQueueVariation[selectedQueueVariation]}}
+              </mat-select-trigger>
+              <mat-option *ngFor="let variation of queueVariationList" [value]="variation.id">
+                <div *ngIf="variation.data() as variationData">
+                  <div><strong>{{variationData["variationname"]}}</strong></div>
+                  <div class="text-secondary" style="line-height: 1;">
+                    <strong>Stages:&nbsp;</strong>
+                    <span *ngFor="let stage of variationData['stages']; let last = last">
+                      {{stage}}{{last ? '' : ', '}}
+                    </span>&nbsp;
+                  </div>
+                </div>
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+  
+      <div class="mat-elevation-z2" *ngIf="selectedDeliverySet">
+        <div class="action-container">
+          <div class="action-row">
+            <div class="action-left">
+              <mat-form-field appearance="outline" class="formfield filter-field" subscriptSizing="dynamic">
+                <mat-label>Filter Participants</mat-label>
+                <input matInput (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
+                <mat-icon matSuffix>search</mat-icon>
+              </mat-form-field>
+            </div>
+            <div class="action-right">
+              <button mat-raised-button class="btn-initiate" *ngIf="selection.selected.length != 0" (click)="initiateEventProduct()">
+                Initiate Product for {{selection.selected.length}} Participants
+              </button>
+
+              <button mat-mini-fab (click)="downloadSampleExcel()" matTooltip="Download Sample Excel">
+                <mat-icon>download</mat-icon>
+              </button>
+
+              <button mat-raised-button color="primary" class="btn-import ml-2" (click)="importParticipant()">
+                Import Participants
+              </button>
+            </div>
+          </div>
+
+          <div class="ms-4">
+            <div *ngIf="eventRequestedProfile.length != 0" class="d-flex align-items-center mt-3 mb-3">
+              <mat-icon class="text-success me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedProfile)">pan_tool</mat-icon>
+              {{eventRequestedEligibleProfile.length}}/{{eventRequestedProfile.length}} Participant(s) eligible for approval.
+            </div>
+            <div *ngIf="alreadyInQueue.length != 0" class="d-flex align-items-center mb-3">
+              <mat-icon class="text-danger me-2 pointer" [matTooltip]="viewParticipantName(alreadyInQueue)">warning</mat-icon>
+              {{alreadyInQueue.length}} Participant(s) requested for participation but already in queue. 
+            </div>
+          </div>
+
+          <div class="missing-participants-section" *ngIf="missingParticipants && missingParticipants.length > 0">s
+            <div class="missing-card">
+              <div class="missing-header">
+                <mat-icon class="warning-icon">warning</mat-icon>
+                <h5>Missing Participants ({{missingParticipants.length}})</h5>
+              </div>
+              <div class="missing-content">
+                <div class="missing-participants-header">
+                  <p>The following participants from your Excel file were not found in the system:</p>
+                  <button mat-mini-fab color="primary" type="button" (click)="exportMissingParticipants()">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                  </button>
+                </div>
+                <div class="missing-table">
+                  <div class="missing-row missing-header-row">
+                    <div class="missing-cell">Name</div>
+                    <div class="missing-cell">Email</div>
+                  </div>
+                  <div class="missing-row" *ngFor="let missing of missingParticipants">
+                    <div class="missing-cell"><strong>{{missing.name}}</strong></div>
+                    <div class="missing-cell">{{missing.email}}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <table  mat-table [dataSource]="tableDatasource" matSort>
+          <ng-container matColumnDef="sno">
+            <th mat-header-cell *matHeaderCellDef>S No</th>
+            <td mat-cell *matCellDef="let element; let i = index">
+              <div class="d-flex align-items-center">
+                {{(i+1) + (paginator ? (paginator.pageIndex * paginator.pageSize) : 0)}}
+                <mat-icon *ngIf="element['eventrequested']" class="text-success ms-2">pan_tool</mat-icon>
+              </div>
+            </td>
+          </ng-container>
+  
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+            <td mat-cell *matCellDef="let element">{{element.name}} <span class="fst-italic">({{(element.email || "No Email Found")}})</span></td>
+          </ng-container>
+          
+          <ng-container matColumnDef="product">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Product</th>
+            <td mat-cell *matCellDef="let element">{{mapProduct[element.productref.id]}}</td>
+          </ng-container>
+          
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+            <td mat-cell *matCellDef="let element">{{element.status || "No Status"}}</td>
+          </ng-container>
+  
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef>
+              <mat-checkbox
+                (change)="$event ? masterToggle() : null"
+                [checked]="selection.hasValue() && isAllSelected()"
+                [indeterminate]="selection.hasValue() && !isAllSelected()"
+              >
+              </mat-checkbox>
+            </th>
+            <td mat-cell *matCellDef="let row">
+              <mat-checkbox
+                (click)="$event.stopPropagation()"
+                (change)="$event ? selection.toggle(row) : null"
+                [checked]="selection.isSelected(row)"
+              >
+              </mat-checkbox>
+            </td>
+          </ng-container>
+  
+          <tr mat-header-row *matHeaderRowDef="tableHeader"></tr>
+          <tr mat-row *matRowDef="let row; columns: tableHeader;"></tr>
+          
+          <!-- Row shown when there is no matching data -->
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" colspan="5" class="text-secondary text-center fst-italic p-2">
+              <span *ngIf="input.value.length != 0">No data matching the filter "{{input.value}}"</span>
+              <span *ngIf="input.value.length == 0 && tableDatasource.data.length == 0">No data matching the filter "{{input.value}}"</span>
+            </td>
+          </tr>
+        </table>
+        <mat-paginator [pageSizeOptions]="[25, 50, 100]" [pageSize]="25"></mat-paginator>
+      </div>
+    </div>
+  </div>
+
+ <ng-template #participantSheet let-data>
+  <div class="participant-sheet-container">
+    <div class="sheet-header">
+      <div class="header-left">
+        <div>
+          <h2 class="sheet-title">Participants List</h2>
+          <p class="sheet-subtitle">
+            Total: {{ data.length }} participant(s)
+            <span *ngIf="bottomSheetSelection.selected.length > 0" class="selected-count">
+              • {{ bottomSheetSelection.selected.length }} of {{ data.length }} selected
+            </span>
+          </p>
+        </div>
+      </div>
+      <button mat-icon-button (click)="closeSheet()" class="close-btn">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="sheet-controls">
+      <div class="controls-left">
+        <mat-checkbox 
+          (change)="masterToggleBottomSheet()"
+          [checked]="isAllBottomSheetSelected()"
+          [indeterminate]="bottomSheetSelection.hasValue() && !isAllBottomSheetSelected()"
+          class="select-all-checkbox">
+          Select All
+        </mat-checkbox>
+        
+      </div>
+
+      <!-- Status Container in Row -->
+      <div class="status-container" *ngIf="bottomSheetSelection.selected.length > 0">
+        <button mat-stroked-button class="status-btn whatsapp" (click)="sendWhatsApp()">
+          <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+            </svg>
+          </div>
+          <span class="status-label">WhatsApp ({{bottomSheetSelection.selected.length}})</span>
+        </button>
+
+        <button mat-stroked-button class="status-btn email" (click)="sendEmail()">
+          <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+            </svg>
+          </div>
+          <span class="status-label">Email ({{bottomSheetSelection.selected.length}})</span>
+        </button>
+
+        <button mat-stroked-button class="status-btn notification" (click)="sendNotification()">
+          <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+            </svg>
+          </div>
+          <span class="status-label">Notification ({{bottomSheetSelection.selected.length}})</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sheet-content">
+      <div class="participant-list">
+        <div class="participant-item" 
+            *ngFor="let participant of data; let i = index"
+            [class.selected]="isBottomSheetSelected(participant.profileId)"
+            (click)="toggleBottomSheetSelection(participant.profileId)">
+          <mat-checkbox 
+            [checked]="isBottomSheetSelected(participant.profileId)"
+            (click)="$event.stopPropagation()"
+            (change)="toggleBottomSheetSelection(participant.profileId)"
+            class="participant-checkbox">
+          </mat-checkbox>
+          <div class="participant-number">{{ i + 1 }}</div>
+          <div class="participant-info">
+            <span class="participant-name">{{ participant.name }}</span>
+            <span class="participant-email">{{ participant.email }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+

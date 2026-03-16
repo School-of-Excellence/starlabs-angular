@@ -1,0 +1,51 @@
+.update-snackbar-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 320px;
+    max-width: 400px;
+  }
+
+  .update-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .update-icon {
+    color: #2196F3;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .update-message {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.87);
+  }
+
+  .update-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .dismiss-btn {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .update-btn {
+    background-color: #2196F3;
+    color: white;
+  }
+
+  .update-btn:hover {
+    background-color: #1976D2;
+  }
+
+  /* Ensure snackbar doesn't interfere with content */
+  :host {
+    pointer-events: auto;
+  }

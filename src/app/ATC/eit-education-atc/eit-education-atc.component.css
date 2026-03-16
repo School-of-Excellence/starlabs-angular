@@ -1,0 +1,88 @@
+.card-body{
+  padding:0.75rem!important;
+}
+.card{
+  min-width:400px!important;
+}
+
+.heading{
+  background-color: #126e82;
+  color: white;
+  text-align: center;
+  padding: 15px;
+}
+
+.adjustmentbox{
+  width: 50%;
+  /* background-color: #f6fcff; */
+  padding: 15px;
+  box-sizing: content-box;
+}
+
+tr:nth-child(even){
+  background-color: #f6fcff; 
+}
+
+.procedurebox{
+  padding: 15px;
+  width: 50%;
+  /* background-color: #f6fcff; */
+}
+
+.strikeDelete{
+  text-decoration: line-through;
+}
+
+.container100{
+  width:100%
+}
+.container40{
+  width:40%;
+  height:75vh;
+  overflow-y: auto;
+}
+.container60{
+  width:60%;
+  height:75vh;
+  overflow-y: auto;
+}
+
+.title{
+  /* text-align: center; */
+  color: rgb(3, 48, 63);
+  font-weight: bold;
+  /* margin-bottom: 10px; */
+}
+
+.atcdetail{
+  margin-top: 20px;
+  padding-top: 20px;
+  padding-bottom: 15px;
+  padding-left: 30px;
+  padding-right: 30px;
+  border-top-right-radius: 10px;
+  border-top-left-radius: 10px;
+  background-color: #99bbad;
+  color: white;
+}
+
+.highlight{
+  font-weight: bold;
+  display: inline-block;
+  margin-right: 5px;
+  color: white;
+}
+
+.yellow{
+  color:#bd8d06;
+  font-size: 1.25rem;
+  margin: 0px;
+  margin-left:10px;
+}
+
+.green{
+  color:#228B22;
+  font-size: 1.25rem;
+  margin: 0px;
+  margin-left:10px;
+}

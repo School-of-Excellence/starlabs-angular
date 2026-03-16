@@ -1,0 +1,31 @@
+<div class="mainscreen">
+  <div class="title" mat-dialog-title>Assign Role to EIS</div>
+  <div [formGroup]="assignrolestoeisForm" mat-dialog-content >
+    <mat-form-field appearance="outline">
+      <mat-label>Roles</mat-label>
+      <mat-select formControlName="selectedRole">
+        <mat-option class="matOption" *ngFor="let list of roleList" [value]="list['id']">{{list['role']}}</mat-option>
+      </mat-select>
+      <mat-error *ngIf="assignrolestoeisForm.get('selectedRole').hasError('required')">
+        Role Required
+      </mat-error>
+      <mat-error *ngIf="assignrolestoeisForm.get('selectedRole').hasError('exist')">
+        Already users added!
+      </mat-error>
+    </mat-form-field>
+    <br><br>
+    <mat-form-field appearance="outline">
+      <mat-label>EIS Names</mat-label>
+      <mat-select formControlName="selectedEISNames" ngDefaultControl multiple>
+        <mat-option class="matOption" *ngFor="let list of profileList" [value]="list['id']">{{list['name']}}</mat-option>
+      </mat-select>
+      <mat-error *ngIf="assignrolestoeisForm.get('selectedEISNames').hasError('required')">
+        At least select 1 Person
+      </mat-error>
+    </mat-form-field>
+  </div>
+  <div mat-dialog-action>
+    <button class="text-danger border border-danger" mat-stroked-button (click)="close()">Close</button>
+    <button class="text-light bg-success" [disabled]="assignrolestoeisForm.invalid || loading" mat-stroked-button (click)="onformsubmit(assignrolestoeisForm.value)">Submit</button>
+  </div>
+</div>

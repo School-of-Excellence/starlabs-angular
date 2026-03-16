@@ -1,0 +1,1360 @@
+<div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+        <div class="loading-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-container">
+    <!-- Header Section -->
+    <div class="dashboard-header">
+        <h1 class="main-title">📊 Sales Report</h1>
+
+        <div class="compact-date-picker" *ngIf="!selectedAssuredDateFilter">
+            <!-- Toggle Button -->
+            <button class="toggle-btn" (click)="toggleDateMode()">
+                <mat-icon>{{ pickerMode === 'month' ? 'date_range' : 'calendar_view_month' }}</mat-icon>
+                <span>{{ pickerMode === 'month' ? 'Switch to Range' : 'Switch to Month' }}</span>
+            </button>
+
+            <!-- Month Picker -->
+            <div *ngIf="pickerMode === 'month'" class="month-picker">
+                <button mat-icon-button class="nav-btn" (click)="goToPreviousMonth()">
+                    <mat-icon>chevron_left</mat-icon>
+                </button>
+
+                <div class="month-display">
+                    <mat-icon class="calendar-icon">calendar_month</mat-icon>
+                    <span class="month-text">{{ displayMonth }}</span>
+                </div>
+
+                <button mat-icon-button class="nav-btn" (click)="goToNextMonth()">
+                    <mat-icon>chevron_right</mat-icon>
+                </button>
+            </div>
+
+            <!-- Date Range Picker -->
+            <div *ngIf="pickerMode === 'range'" class="range-picker">
+                <mat-form-field appearance="outline" class="compact-field">
+                    <mat-date-range-input [rangePicker]="picker">
+                        <input matStartDate [(ngModel)]="customStartDate" placeholder="Start date">
+                        <input matEndDate [(ngModel)]="customEndDate" placeholder="End date">
+                    </mat-date-range-input>
+                    <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                    <mat-date-range-picker #picker (closed)="onCustomDateChange()"></mat-date-range-picker>
+                </mat-form-field>
+            </div>
+        </div>
+
+        <div *ngIf="selectedAssuredDateFilter" class="filter-info-message"
+            style="text-align: center; padding: 10px; background: #e3f2fd; border-radius: 8px; margin: 10px 0;">
+            <mat-icon style="vertical-align: middle; color: #1976d2;">info</mat-icon>
+            <span style="margin-left: 8px; color: #1565c0; font-weight: 500;">
+                Filtering by {{ selectedAssuredDateFilter === 'last7days' ? 'Last 7 Days' : 'Last 30 Days' }} based on
+                Assured Date ({{ assuredFilterStartDate }} to {{ assuredFilterEndDate }})
+            </span>
+        </div>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="filter-bar">
+        <!-- LEFT SECTION -->
+        <div class="left-section">
+            <div class="title">Journey</div>
+            <div class="filters">
+                <button class="filter-btn" [class.active]="selectedFilter === 'ecosystem'" (click)="onJourneyClick('ecosystem')">
+                    EcoSystem
+                </button>
+                <button class="filter-btn" [class.active]="selectedFilter === 'dfu'" (click)="onJourneyClick('dfu')">
+                    DFU
+                </button>
+                <button class="filter-btn" [class.active]="selectedFilter === 'gifts'" (click)="onJourneyClick('gifts')">
+                    Gifts
+                </button>
+            </div>
+        </div>
+
+        <div class="vertical-divider"></div>
+
+        <!-- RIGHT SECTION -->
+        <div class="right-section">
+            <div class="title">Assured</div>
+            <div class="filters">
+                <button class="filter-btn" [class.active]="selectedAssuredDateFilter === 'last7days'"
+                    (click)="onAssuredDateFilterClick('last7days')">
+                    Last 7 Days
+                </button>
+                <button class="filter-btn" [class.active]="selectedAssuredDateFilter === 'last30days'"
+                    (click)="onAssuredDateFilterClick('last30days')">
+                    Last 30 Days
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="metrics-grid">
+        <!-- Gross Sales Card -->
+        <div class="metric-card">
+            <div class="metric-header">
+                <span class="metric-title">Gross Sales</span>
+            </div>
+            <div class="metric-value" (click)="onBoxClick('grossSales')" style="cursor: pointer;">
+                {{metric.gross.data.length}} + {{metric.grosspending.length}} </div>
+            <div class="metric-subvalue">
+                ₹{{formatIndianCurrency(metric.gross.totalValue)}} Value |
+                ₹{{formatIndianCurrency(metric.gross.totalEMI)}} EMI
+            </div>
+            <div class="metric-breakdown">
+                <div class="breakdown-item new" (click)="onGrossSplitClick($event, 'grossNewSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">New</div>
+                    <div class="breakdown-value">{{metric['grossnew'].data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['grossnew']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item upgrade" (click)="onGrossSplitClick($event, 'grossUpgradeSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Upgrades</div>
+                    <div class="breakdown-value">{{metric['grossupgrade']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['grossupgrade']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item addon" (click)="onGrossSplitClick($event, 'grossAddonSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Add-On</div>
+                    <div class="breakdown-value">{{metric['grossaddons']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['grossaddons']?.totalValue)}}</div>
+                </div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="breakdown-item cancelled" (click)="onCancelledClick($event, 'grossCancelledSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Cancelled</div>
+                    <div class="breakdown-value">{{metric['grosscancelled']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['grosscancelled']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item downgrade-old" (click)="onDowngradeClick($event, 'grossDowngradeToOldSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Downgrade To Old</div>
+                    <div class="breakdown-value">{{metric['grossdowngradetoold'].data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['grossdowngradetoold'].totalValue)}}</div>
+                </div>
+                <div class="breakdown-item downgrade-new" (click)="onDowngradeClick($event, 'grossDowngradeToNewSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Downgrade To New</div>
+                    <div class="breakdown-value">{{metric['grossdowngradetonew'].data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['grossdowngradetonew'].totalValue)}}</div>
+                </div>
+                <div class="breakdown-item"></div>
+            </div>
+        </div>
+
+        <!-- Assured Sales Card -->
+        <div class="metric-card">
+            <div class="metric-header">
+                <span class="metric-title">Assured Sales</span>
+            </div>
+            <div class="metric-value" (click)="onBoxClick('assuredSales')" style="cursor: pointer;">
+                {{metric.assured.data.length}} </div>
+            <div class="metric-subvalue">
+                ₹{{formatIndianCurrency(metric.assured.totalValue)}} Value |
+                ₹{{formatIndianCurrency(metric.assured.totalEMI)}} EMI
+            </div>
+            <div class="metric-breakdown">
+                <div class="breakdown-item new" (click)="onAssuredSplitClick($event, 'assuredNewSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">New</div>
+                    <div class="breakdown-value">{{metric['assurednew']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['assurednew']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item upgrade" (click)="onAssuredSplitClick($event, 'assuredUpgradeSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Upgrades</div>
+                    <div class="breakdown-value">{{metric['assuredupgrade']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['assuredupgrade']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item addon" (click)="onAssuredSplitClick($event, 'assuredAddonSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Add-On</div>
+                    <div class="breakdown-value">{{metric['assuredaddons']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['assuredaddons']?.totalValue)}}</div>
+                </div>
+            </div>
+            <div class="metric-breakdown">
+                <div class="breakdown-item cancelled" (click)="onCancelledClick($event, 'assuredCancelledSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Cancelled</div>
+                    <div class="breakdown-value">{{metric['assuredcancelled']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['assuredcancelled']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item downgrade-old" (click)="onDowngradeClick($event, 'assuredDowngradeToOldSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Downgrade To Old</div>
+                    <div class="breakdown-value">{{metric['assureddowngradetoold']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['assureddowngradetoold']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item downgrade-new" (click)="onDowngradeClick($event, 'assuredDowngradeToNewSales')"
+                    style="cursor: pointer;">
+                    <div class="breakdown-label">Downgrade To New</div>
+                    <div class="breakdown-value">{{metric['assureddowngradetonew']?.data.length}}</div>
+                    <div class="metric-subvalue" style="font-size: 0.7rem;">
+                        ₹{{formatIndianCurrency(metric['assureddowngradetonew']?.totalValue)}}</div>
+                </div>
+                <div class="breakdown-item"></div>
+            </div>
+        </div>
+    </div>
+    <div class="table-section2" *ngIf="showTable">
+        <div class="filter-row">
+            <form [formGroup]="filterForm">
+                <div class="filter-container">
+                    <!-- Search Box -->
+                    <div class="search-box" *ngIf="currentTableConfig?.filters?.includes('search')">
+                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" class="search-input" placeholder="Search by Name, Mobile, Email..."
+                            formControlName="search" (input)="filterTableData(filterForm.value)" />
+                    </div>
+
+                    <div class="date-search-box" *ngIf="currentTableConfig?.filters?.includes('purchasedate')">
+                        <mat-form-field appearance="outline" class="date-range-field">
+                            <mat-label class="date-label">Purchase Date</mat-label>
+                            <mat-date-range-input [rangePicker]="picker2" class="date-range-input">
+                                <input matStartDate formControlName="purchaseStart" placeholder="MM/DD/YYYY" />
+                                <input matEndDate formControlName="purchaseEnd" placeholder="MM/DD/YYYY" />
+                            </mat-date-range-input>
+                            <mat-datepicker-toggle matSuffix [for]="picker2" class="date-toggle">
+                                <mat-icon matDatepickerToggleIcon>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                </mat-icon>
+                            </mat-datepicker-toggle>
+                            <mat-date-range-picker #picker2
+                                (closed)="filterTableData(filterForm.value)"></mat-date-range-picker>
+                        </mat-form-field>
+                    </div>
+
+                    <div *ngIf="currentTableConfig?.filters?.includes('journey')">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Journey</mat-label>
+                            <mat-select placeholder="Select Journey" formControlName="journey"
+                                (selectionChange)="filterTableData(filterForm.value)" multiple>
+                                <mat-option *ngFor="let journey of journeyList" [value]="journey.id">
+                                    {{ journey.name }}
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div *ngIf="currentTableConfig?.filters?.includes('journeycoach')">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Journey Coach</mat-label>
+                            <mat-select placeholder="Select Journey Coach" formControlName="journeycoach"
+                                (selectionChange)="filterTableData(filterForm.value)">
+                                <mat-option *ngFor="let coach of coachesList" [value]="coach.profile_ref.id">{{
+                                    mapprofile[coach.profile_ref.id]}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div *ngIf="currentTableConfig?.filters?.includes('assured')">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Assured</mat-label>
+                            <mat-select placeholder="FIlter Assured Data" formControlName="assured"
+                                (selectionChange)="filterTableData(filterForm.value)">
+                                <mat-option *ngFor="let assured of assuredList"
+                                    [value]="assured">{{assured.toLocaleUpperCase()}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div *ngIf="currentTableConfig?.filters?.includes('status')">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Status</mat-label>
+                            <mat-select placeholder="Filter Status" formControlName="status"
+                                (selectionChange)="filterTableData(filterForm.value)">
+                                <mat-option *ngFor="let status of statusList"
+                                    [value]="status">{{status.toLocaleUpperCase()}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div *ngIf="currentTableConfig?.filters?.includes('saleType')">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Sale Type</mat-label>
+                            <mat-select placeholder="Filter Sale Type" formControlName="saleType"
+                                (selectionChange)="filterTableData(filterForm.value)">
+                                <mat-option *ngFor="let saleType of saleTypeList"
+                                    [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div *ngIf="currentTableConfig?.filters?.includes('customerStatus')">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Customer Status</mat-label>
+                            <mat-select placeholder="Filter Customer Status" formControlName="customerStatus"
+                                (selectionChange)="filterTableData(filterForm.value)">
+                                <mat-option *ngFor="let status of customerStatusList"
+                                    [value]="status">{{status}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <button mat-mini-fab color="primary" (click)="refreshFilter()"><mat-icon>refresh</mat-icon></button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-container2">
+            <div class="table-header2">
+                <h2>{{ currentTableConfig?.title }}</h2>
+                <div class="table-actions2">
+                    <div *ngIf="tableType == 'grossSales'"
+                        style="display: flex; flex-direction: row; background-color: white; padding: 12px 20px; gap: 24px; border-radius: 8px; align-items: center; color: grey; font-size: 14px; font-weight: 500;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            <span
+                                style="width: 14px; height: 14px; border-radius: 50%; background-color: #dc3545; display: inline-block;"></span>
+                            <span>Pending : <span style="color:#dc3545;">{{getPendingCount()}}</span></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            <span
+                                style="width: 14px; height: 14px; border-radius: 50%; background-color: #4CAF50; display: inline-block;"></span>
+                            <span>Assured : <span style="color: #4CAF50;">{{getAssuredCount()}}</span></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            <span
+                                style="width: 14px; height: 14px; border-radius: 50%; background-color: #9E9E9E; display: inline-block;"></span>
+                            <span>Not Assured : <span style="color:#9E9E9E;">{{getNotAssuredCount()}}</span></span>
+                        </div>
+                    </div>
+
+                    <div *ngIf="tableType == 'overallParticipants'"
+                        style="display: flex; flex-direction: row; background-color: white; padding: 12px 20px; gap: 24px; border-radius: 8px; align-items: center; color: grey; font-size: 14px; font-weight: 500;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            <span
+                                style="width: 14px; height: 14px; border-radius: 50%; background-color: #4CAF50; display: inline-block;"></span>
+                            <span>Active : <span style="color: #4CAF50;">{{getActiveCount()}}</span></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            <span
+                                style="width: 14px; height: 14px; border-radius: 50%; background-color: #dc3545; display: inline-block;"></span>
+                            <span>Non-Active : <span style="color:#dc3545;">{{getNonactiveCount()}}</span></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                            <span
+                                style="width: 14px; height: 14px; border-radius: 50%; background-color: #9E9E9E; display: inline-block;"></span>
+                            <span>Discontinued : <span style="color:#9E9E9E;">{{getDiscontinuedCount()}}</span></span>
+                        </div>
+                    </div>
+
+                    <button class="export-btn" (click)="exportTableData()">
+                        <span>Export</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                    <button class="close-btn" (click)="closeTable()">×</button>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>S.No</th>
+                            <th *ngFor="let column of currentTableConfig?.columns" [style.width]="column.width"
+                                [class.sortable]="isSortable(column)"
+                                (click)="isSortable(column) && sortTable(column.key)">
+                                <span class="th-content">
+                                    {{ column.header }}
+                                    <span class="sort-icon" *ngIf="isSortable(column)">
+                                        {{ getSortIcon(column.key) }}
+                                    </span>
+                                </span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let row of getSalesData(updatePaginatedData); let i = index" [ngClass]="highlightRow(row)"
+                            [class.even-row]="i % 2 === 0">
+                            <td>{{ (currentPage - 1) * itemsPerPage + i + 1 }}.</td>
+                            <td *ngFor="let column of currentTableConfig?.columns"
+                                [class.highlight-cell]="shouldHighlightCell(column.key)">
+
+                                <span [class.badge-cell]="isBadgeColumn(column.key)"
+                                    *ngIf="column.header !== 'Name' && !['schedule', 'schedulefor', 'action', 'notes', 'journeyplan', 'addnotes', 'generalnotes', 'waitingperiod', 'delayeddays', 'menubutton', 'salenotes'].includes(column.key)">
+                                    {{ formatCellValue(row, column) }}
+                                </span>
+
+                                <span *ngIf="column.header === 'Name'" class="clickable-name"
+                                    (click)="navigatetoprofile(row['profileid'])">
+                                    {{ formatCellValue(row, column) }}
+                                </span>
+
+                                <span *ngIf="column.key === 'addnotes'">
+                                    <div (click)="addNotes(row)">
+                                        <mat-icon class="edit-icon">edit_note</mat-icon>
+                                    </div>
+                                </span>
+
+                                <span *ngIf="column.key === 'menubutton'">
+                                    <div (click)="showParticipantMenu(row, $event)"
+                                        [matMenuTriggerFor]="participantMenu">
+                                        <mat-icon class="edit-icon">menu</mat-icon>
+                                    </div>
+
+                                    <mat-menu #participantMenu="matMenu">
+                                        <span *ngFor="let tableName of participantTableLocations" mat-menu-item
+                                            style="color: black; background: white;">
+                                            {{ tableName }}
+                                        </span>
+                                        <span *ngIf="participantTableLocations.length === 0" mat-menu-item
+                                            style="color: black; background: white;">
+                                            No tables found
+                                        </span>
+                                    </mat-menu>
+                                </span>
+
+                                <span *ngIf="column.key === 'waitingperiod'">
+                                    {{ formatCellValue(row, column) }} days
+                                </span>
+
+                                <span *ngIf="column.key === 'delayeddays'">
+                                    {{ formatCellValue(row, column) }} days
+                                </span>
+
+                                <span *ngIf="column.key === 'generalnotes'" #notesContainer
+                                    (mouseenter)="showPopup(row, $event, notesContainer)"
+                                    (mouseleave)="hidePopupWithDelay()">
+                                    <div class="notes-container">
+                                        <div *ngIf="row['generalnotes']?.length > 0">
+                                            <div>
+                                                <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                    matTooltip="{{ row['generalnotes'][row['generalnotes'].length - 1].note }}">
+                                                    {{ row['generalnotes'][row['generalnotes'].length - 1].note |
+                                                    slice:0:20 }}...
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </span>
+
+                                <span *ngIf="column.key === 'salenotes'" #saleNotesContainer
+                                    (mouseenter)="showPopup(row, $event, saleNotesContainer)"
+                                    (mouseleave)="hidePopupWithDelay()">
+                                    <div class="notes-container">
+                                        <div *ngIf="row['salenotes'] && row['salenotes'].length > 0">
+                                            <div>
+                                                <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                    matTooltip="{{ row['salenotes'] }}">
+                                                    {{ row['salenotes'] | slice:0:40 }}...
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </span>
+
+                                <span *ngIf="column.key === 'notes'" #notesContainer
+                                    (mouseenter)="showPopup(row, $event, notesContainer)"
+                                    (mouseleave)="hidePopupWithDelay()">
+                                    <div class="notes-container">
+                                        <div *ngIf="row['notes'] && row['notes'].length > 0">
+                                            <div>
+                                                <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                    matTooltip="{{ row['notes'] }}">
+                                                    {{ row['notes'] | slice:0:50 }}...
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </span>
+                            </td>
+                        </tr>
+
+                        <!-- No data row -->
+                        <tr *ngIf="currentTableConfig?.data.length === 0">
+                            <td [attr.colspan]="(currentTableConfig?.columns?.length || 0) + 1" class="no-data">
+                                <div class="no-data-message">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                        <path d="M2 17l10 5 10-5"></path>
+                                        <path d="M2 12l10 5 10-5"></path>
+                                    </svg>
+                                    <p>{{ tableSearchText ? 'No matching records found' : 'No data available' }}</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="table-footer">
+                <div class="row-info">
+                    Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to
+                    {{ Math.min(currentPage * itemsPerPage, currentTableConfig?.data.length) }} of
+                    {{ filteredTableData.length }} entries
+                    <span *ngIf="filteredTableData.length !== currentTableConfig?.data?.length">
+                        (filtered from {{ filteredTableData?.length }} total entries)
+                    </span>
+                </div>
+
+                <div class="pagination">
+                    <!-- First page button -->
+                    <button class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
+                        </svg>
+                    </button>
+
+                    <!-- Previous button -->
+                    <button class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
+                        Previous
+                    </button>
+
+                    <!-- Page numbers -->
+                    <div class="page-numbers">
+                        <button *ngFor="let page of getPageNumbers()" class="page-number"
+                            [class.active]="page === currentPage" (click)="goToPage(page)">
+                            {{ page }}
+                        </button>
+                    </div>
+
+                    <!-- Next button -->
+                    <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                        Next
+                    </button>
+
+                    <!-- Last page button -->
+                    <button class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages"
+                        title="Last Page">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="items-per-page">
+                    <label>Show:</label>
+                    <select [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+                        <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{option}}</option>
+                    </select>
+                    <span>entries</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <mat-form-field appearance="fill" class="filter-field">
+            <mat-label>Sale Type Filter</mat-label>
+            <mat-select [(ngModel)]="selectedSaleTypeFilter" (selectionChange)="filterBySalesType()" multiple>
+                <mat-option value="grossCount">Gross Sales</mat-option>
+                <mat-option value="assuredCount">Assured Sales</mat-option>
+                <mat-option value="grossCancelledNumber">Gross Cancelled</mat-option>
+                <mat-option value="assuredCancelledNumber">Assured Cancelled</mat-option>
+                <mat-option value="grossDowngradeNumber">Gross Downgrade</mat-option>
+                <mat-option value="assuredDowngradeNumber">Assured Downgrade</mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="filter-field">
+            <mat-label>Journey</mat-label>
+            <mat-select [(ngModel)]="selectedJourney" (selectionChange)="onJourneyChange($event.value)" multiple>
+                <mat-option *ngFor="let journey of getFilteredJourneyList()" [value]="journey.id">
+                    {{ journey.name }}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <!-- Pre-Sale Person Filter - Replace with multiple select -->
+        <mat-form-field appearance="fill" class="filter-field">
+            <mat-label>Pre-Sale Person</mat-label>
+            <mat-select [(ngModel)]="selectedPreSalesPerson" (selectionChange)="onPreSalesPersonChange($event.value)"
+                multiple>
+                <mat-option *ngFor="let person of preSalesPersonList" [value]="person">
+                    {{ person }}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+
+        <!-- Sales Person Filter - Replace with multiple select -->
+        <mat-form-field appearance="fill" class="filter-field">
+            <mat-label>Sales Person</mat-label>
+            <mat-select [(ngModel)]="selectedSalesPerson" (selectionChange)="onSalesPersonChange($event.value)"
+                multiple>
+                <mat-option *ngFor="let person of salesPersonList" [value]="person">
+                    {{ person }}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+    </div>
+
+    <!-- PRE-SALES TABLE -->
+    <div class="tables-container">
+        <!-- PRE-SALES PERSON TABLE -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3 class="table-title">Sales Data by Pre-Sale Person</h3>
+                <div class="table-actions">
+                    <span class="record-count">Total Records: {{ preSalesDataSource.data.length }}</span>
+                </div>
+            </div>
+            <div class="table-container">
+                <table mat-table [dataSource]="preSalesDataSource" matSort #preSalesSort="matSort" class="data-table">
+                    <ng-container matColumnDef="person">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Pre-Sale Person</th>
+                        <td mat-cell *matCellDef="let element">
+                            <div class="person-cell">
+                                <div class="avatar">{{element.person.charAt(0)}}</div>
+                                <span>{{ element.person }}</span>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="grossCount">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Count</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'grossCount', true)"
+                            style="cursor: pointer;">
+                            <span class="count-badge">{{ element.grossCount }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="assuredCount">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Count</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'assuredCount', true)"
+                            style="cursor: pointer;">
+                            <span class="count-badge">{{ element.assuredCount }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="grossCancelledNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Cancelled</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'grossCancelled', true)"
+                            style="cursor: pointer;">
+                            <span class="cancelled-badge">{{ element.grossCancelledNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="assuredCancelledNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Cancelled</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'assuredCancelled', true)"
+                            style="cursor: pointer;">
+                            <span class="cancelled-badge">{{ element.assuredCancelledNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="grossDowngradeNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Downgrade</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'grossDowngrade', true)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.grossDowngradeNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                     <ng-container matColumnDef="assuredDowngradeNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Downgrade</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'assuredDowngrade', true)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.assuredDowngradeNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="actualGrossNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Actual Gross</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'actualGross', true)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.actualGrossNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="actualAssuredNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Actual Assured</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'actualAssured', true)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.actualAssuredNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="expandedDetail">
+                        <td mat-cell *matCellDef="let element" [attr.colspan]="preSalesColumns.length">
+                            <div class="detail-container" [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                <div class="detail-header">
+                                    <h4 class="detail-title">
+                                        <mat-icon>info</mat-icon>
+                                        Details for {{ element.person }}
+                                    </h4>
+                                    <button class="export-btn" (click)="exportTableData()">
+                                        <span>Export</span>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                    </button>
+                                    <button mat-icon-button (click)="closeExpandedRow(element, true)" class="close-btn2"
+                                        title="Close">
+                                        <mat-icon>close</mat-icon>
+                                    </button>
+                                </div>
+                                <table class="detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Journey</th>
+                                            <th>Type</th>
+                                            <th>Purchase Value</th>
+                                            <th>Purchase Date</th>
+                                            <th>Sales Person</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                            <td>{{ detail.name }}</td>
+                                            <td>{{ mapjourneyname[detail.journey] }}</td>
+                                            <td>{{ detail.journeytype }}</td>
+                                            <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                            <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                            <td>{{ detail.salespersonname }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="preSalesColumns; sticky: true"></tr>
+                    <tr mat-row *matRowDef="let row; columns: preSalesColumns;" class="table-row"
+                        [class.expanded-row]="row.expanded"></tr>
+                    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded" class="detail-row">
+                    </tr>
+                    <tr class="mat-row" *matNoDataRow>
+                        <td class="mat-cell no-data-cell" [attr.colspan]="preSalesColumns.length">
+                            <div class="no-data-message">
+                                <mat-icon>info</mat-icon>
+                                <span>No data available</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <mat-paginator #preSalesPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                showFirstLastButtons></mat-paginator>
+        </div>
+
+        <!-- SALES PERSON TABLE -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3 class="table-title">Sales Data by Sales Person</h3>
+                <div class="table-actions">
+                    <span class="record-count">Total Records: {{ salesPersonDataSource.data.length }}</span>
+                </div>
+            </div>
+            <div class="table-container">
+                <table mat-table [dataSource]="salesPersonDataSource" matSort #salesPersonSort="matSort"
+                    class="data-table">
+                    <ng-container matColumnDef="person">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+                        <td mat-cell *matCellDef="let element">
+                            <div class="person-cell">
+                                <div class="avatar">{{element.person.charAt(0)}}</div>
+                                <span>{{ element.person }}</span>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="grossCount">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Count</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'grossCount', false)"
+                            style="cursor: pointer;">
+                            <span class="count-badge">{{ element.grossCount }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="assuredCount">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Count</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'assuredCount', false)"
+                            style="cursor: pointer;">
+                            <span class="count-badge">{{ element.assuredCount }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="grossCancelledNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Cancelled</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'grossCancelled', false)"
+                            style="cursor: pointer;">
+                            <span class="cancelled-badge">{{ element.grossCancelledNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="assuredCancelledNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Cancelled</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'assuredCancelled', false)"
+                            style="cursor: pointer;">
+                            <span class="cancelled-badge">{{ element.assuredCancelledNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="grossDowngradeNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Downgrade</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'grossDowngrade', false)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.grossDowngradeNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="assuredDowngradeNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Downgrade</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'assuredDowngrade', false)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.assuredDowngradeNumber }}</span>
+                        </td>
+                    </ng-container>
+
+
+                    <ng-container matColumnDef="actualGrossNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Actual Gross</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'actualGross', false)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.actualGrossNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="actualAssuredNumber">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Actual Assured</th>
+                        <td mat-cell *matCellDef="let element" (click)="onCellClick(element, 'actualAssured', false)"
+                            style="cursor: pointer;">
+                            <span class="downgrade-badge">{{ element.actualAssuredNumber }}</span>
+                        </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="expandedDetail">
+                        <td mat-cell *matCellDef="let element" [attr.colspan]="salesPersonColumns.length">
+                            <div class="detail-container" [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                <div class="detail-header">
+                                    <h4 class="detail-title">
+                                        <mat-icon>info</mat-icon>
+                                        Details for {{ element.person }}
+                                    </h4>
+                                    <button class="export-btn"
+                                        (click)="exportExpandedData(element.expandedData, element.person, false)">
+                                        <span>Export</span>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                    </button>
+                                    <button mat-icon-button (click)="closeExpandedRow(element, false)"
+                                        class="close-btn2" title="Close">
+                                        <mat-icon>close</mat-icon>
+                                    </button>
+                                </div>
+                                <table class="detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Journey</th>
+                                            <th>Type</th>
+                                            <th>Purchase Value</th>
+                                            <th>Purchase Date</th>
+                                            <th>Pre-Sales Person</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                            <td>{{ detail.name }}</td>
+                                            <td>{{ mapjourneyname[detail.journey] }}</td>
+                                            <td>{{ detail.journeytype }}</td>
+                                            <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                            <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                            <td>{{ detail.presalespersonname }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="salesPersonColumns; sticky: true"></tr>
+                    <tr mat-row *matRowDef="let row; columns: salesPersonColumns;" class="table-row"
+                        [class.expanded-row]="row.expanded"></tr>
+                    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded" class="detail-row">
+                    </tr>
+                    <tr class="mat-row" *matNoDataRow>
+                        <td class="mat-cell no-data-cell" [attr.colspan]="salesPersonColumns.length">
+                            <div class="no-data-message">
+                                <mat-icon>info</mat-icon>
+                                <span>No data available</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <mat-paginator #salesPersonPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                showFirstLastButtons></mat-paginator>
+        </div>
+    </div>
+
+    <!-- NEW SALES PRE-SALES TABLE -->
+    <div class="tables-grid">
+        <div class="table-row-grid">
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">New Sales by Pre-Sale Person</h3>
+                    <div class="table-actions">
+                        <span class="record-count">Total Records: {{ newSalesPreSalesDataSource.data.length }}</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table mat-table [dataSource]="newSalesPreSalesDataSource" matSort #newSalesPreSalesSort="matSort"
+                        class="data-table">
+                        <ng-container matColumnDef="person">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Pre-Sale Person</th>
+                            <td mat-cell *matCellDef="let element">
+                                <div class="person-cell">
+                                    <div class="avatar">{{element.person.charAt(0)}}</div>
+                                    <span>{{ element.person }}</span>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="grossCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'grossCount', true, 'new')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.grossCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="assuredCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'assuredCount', true, 'new')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.assuredCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="expandedDetail">
+                            <td mat-cell *matCellDef="let element" [attr.colspan]="newSalesColumns.length">
+                                <div class="detail-container"
+                                    [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                    <div class="detail-header">
+                                        <h4 class="detail-title">
+                                            <mat-icon>info</mat-icon>
+                                            Details for {{ element.person }}
+                                        </h4>
+                                        <button class="export-btn" (click)="exportTableData()">
+                                            <span>Export</span>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                        </button>
+                                        <button mat-icon-button
+                                            (click)="closeExpandedRowJourneyType(element, true, 'new')"
+                                            class="close-btn2" title="Close">
+                                            <mat-icon>close</mat-icon>
+                                        </button>
+                                    </div>
+                                    <table class="detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Journey</th>
+                                                <th>Purchase Value</th>
+                                                <th>Purchase Date</th>
+                                                <th>Sales Person</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                <td>{{ detail.name }}</td>
+                                                <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                <td>{{ detail.salespersonname }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <tr mat-header-row *matHeaderRowDef="newSalesColumns; sticky: true"></tr>
+                        <tr mat-row *matRowDef="let row; columns: newSalesColumns;" class="table-row"
+                            [class.expanded-row]="row.expanded"></tr>
+                        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                            class="detail-row"></tr>
+                    </table>
+                </div>
+                <mat-paginator #newSalesPreSalesPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                    showFirstLastButtons></mat-paginator>
+            </div>
+
+            <!-- NEW SALES SALES PERSON TABLE -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">New Sales by Sales Person</h3>
+                    <div class="table-actions">
+                        <span class="record-count">Total Records: {{ newSalesSalesPersonDataSource.data.length
+                            }}</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table mat-table [dataSource]="newSalesSalesPersonDataSource" matSort
+                        #newSalesSalesPersonSort="matSort" class="data-table">
+                        <ng-container matColumnDef="person">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+                            <td mat-cell *matCellDef="let element">
+                                <div class="person-cell">
+                                    <div class="avatar">{{element.person.charAt(0)}}</div>
+                                    <span>{{ element.person }}</span>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="grossCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'grossCount', false, 'new')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.grossCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="assuredCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'assuredCount', false, 'new')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.assuredCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="expandedDetail">
+                            <td mat-cell *matCellDef="let element" [attr.colspan]="newSalesColumns.length">
+                                <div class="detail-container"
+                                    [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                    <div class="detail-header">
+                                        <h4 class="detail-title">
+                                            <mat-icon>info</mat-icon>
+                                            Details for {{ element.person }}
+                                        </h4>
+                                        <button class="export-btn" (click)="exportTableData()">
+                                            <span>Export</span>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                        </button>
+                                        <button mat-icon-button
+                                            (click)="closeExpandedRowJourneyType(element, false, 'new')"
+                                            class="close-btn2" title="Close">
+                                            <mat-icon>close</mat-icon>
+                                        </button>
+                                    </div>
+                                    <table class="detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Journey</th>
+                                                <th>Purchase Value</th>
+                                                <th>Purchase Date</th>
+                                                <th>Pre-Sales Person</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                <td>{{ detail.name }}</td>
+                                                <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                <td>{{ detail.presalespersonname }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <tr mat-header-row *matHeaderRowDef="newSalesColumns; sticky: true"></tr>
+                        <tr mat-row *matRowDef="let row; columns: newSalesColumns;" class="table-row"
+                            [class.expanded-row]="row.expanded"></tr>
+                        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                            class="detail-row"></tr>
+                    </table>
+                </div>
+                <mat-paginator #newSalesSalesPersonPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                    showFirstLastButtons></mat-paginator>
+            </div>
+        </div>
+
+        <!-- Row 2: Upgrades Tables -->
+        <div class="table-row-grid">
+            <!-- UPGRADE PRE-SALES TABLE -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">Upgrades by Pre-Sale Person</h3>
+                    <div class="table-actions">
+                        <span class="record-count">Total Records: {{ upgradePreSalesDataSource.data.length }}</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table mat-table [dataSource]="upgradePreSalesDataSource" matSort #upgradePreSalesSort="matSort"
+                        class="data-table">
+                        <ng-container matColumnDef="person">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Pre-Sale Person</th>
+                            <td mat-cell *matCellDef="let element">
+                                <div class="person-cell">
+                                    <div class="avatar">{{element.person.charAt(0)}}</div>
+                                    <span>{{ element.person }}</span>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="grossCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'grossCount', true, 'upgrade')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.grossCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="assuredCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'assuredCount', true, 'upgrade')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.assuredCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="expandedDetail">
+                            <td mat-cell *matCellDef="let element" [attr.colspan]="upgradeColumns.length">
+                                <div class="detail-container"
+                                    [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                    <div class="detail-header">
+                                        <h4 class="detail-title">
+                                            <mat-icon>info</mat-icon>
+                                            Details for {{ element.person }}
+                                        </h4>
+                                        <button class="export-btn" (click)="exportTableData()">
+                                            <span>Export</span>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                        </button>
+                                        <button mat-icon-button
+                                            (click)="closeExpandedRowJourneyType(element, true, 'upgrade')"
+                                            class="close-btn2" title="Close">
+                                            <mat-icon>close</mat-icon>
+                                        </button>
+                                    </div>
+                                    <table class="detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Journey</th>
+                                                <th>Purchase Value</th>
+                                                <th>Purchase Date</th>
+                                                <th>Sales Person</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                <td>{{ detail.name }}</td>
+                                                <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                <td>{{ detail.salespersonname }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <tr mat-header-row *matHeaderRowDef="upgradeColumns; sticky: true"></tr>
+                        <tr mat-row *matRowDef="let row; columns: upgradeColumns;" class="table-row"
+                            [class.expanded-row]="row.expanded"></tr>
+                        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                            class="detail-row"></tr>
+                    </table>
+                </div>
+                <mat-paginator #upgradePreSalesPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                    showFirstLastButtons></mat-paginator>
+            </div>
+
+            <!-- UPGRADE SALES PERSON TABLE -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">Upgrades by Sales Person</h3>
+                    <div class="table-actions">
+                        <span class="record-count">Total Records: {{ upgradeSalesPersonDataSource.data.length
+                            }}</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table mat-table [dataSource]="upgradeSalesPersonDataSource" matSort
+                        #upgradeSalesPersonSort="matSort" class="data-table">
+                        <ng-container matColumnDef="person">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Sales Person</th>
+                            <td mat-cell *matCellDef="let element">
+                                <div class="person-cell">
+                                    <div class="avatar">{{element.person.charAt(0)}}</div>
+                                    <span>{{ element.person }}</span>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="grossCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Gross Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'grossCount', false, 'upgrade')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.grossCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="assuredCount">
+                            <th mat-header-cell *matHeaderCellDef mat-sort-header>Assured Count</th>
+                            <td mat-cell *matCellDef="let element"
+                                (click)="onCellClickJourneyType(element, 'assuredCount', false, 'upgrade')"
+                                style="cursor: pointer;">
+                                <span class="count-badge">{{ element.assuredCount }}</span>
+                            </td>
+                        </ng-container>
+
+                        <ng-container matColumnDef="expandedDetail">
+                            <td mat-cell *matCellDef="let element" [attr.colspan]="upgradeColumns.length">
+                                <div class="detail-container"
+                                    [@detailExpand]="element.expanded ? 'expanded' : 'collapsed'">
+                                    <div class="detail-header">
+                                        <h4 class="detail-title">
+                                            <mat-icon>info</mat-icon>
+                                            Details for {{ element.person }}
+                                        </h4>
+                                        <button class="export-btn" (click)="exportTableData()">
+                                            <span>Export</span>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                        </button>
+                                        <button mat-icon-button
+                                            (click)="closeExpandedRowJourneyType(element, false, 'upgrade')"
+                                            class="close-btn2" title="Close">
+                                            <mat-icon>close</mat-icon>
+                                        </button>
+                                    </div>
+                                    <table class="detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Journey</th>
+                                                <th>Purchase Value</th>
+                                                <th>Purchase Date</th>
+                                                <th>Pre-Sales Person</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr *ngFor="let detail of getSalesData(element.expandedData)">
+                                                <td>{{ detail.name }}</td>
+                                                <td>{{ mapjourneyname[detail.journey] }}</td>
+                                                <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
+                                                <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
+                                                <td>{{ detail.presalespersonname }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </ng-container>
+
+                        <tr mat-header-row *matHeaderRowDef="upgradeColumns; sticky: true"></tr>
+                        <tr mat-row *matRowDef="let row; columns: upgradeColumns;" class="table-row"
+                            [class.expanded-row]="row.expanded"></tr>
+                        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']; when: isExpanded"
+                            class="detail-row"></tr>
+                    </table>
+                </div>
+                <mat-paginator #upgradeSalesPersonPaginator [pageSizeOptions]="[5, 10, 25, 50]" [pageSize]="5"
+                    showFirstLastButtons></mat-paginator>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-section"
+        style="margin: 20px 0; padding: 24px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #1d1d1f;">Sales Performance Comparison</h3>
+
+            <div style="display: flex; gap: 8px; background: #f5f5f7; padding: 4px; border-radius: 8px;">
+                <button [class.active]="selectedPersonType === 'presales'" (click)="togglePersonType('presales')"
+                    style="padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+                    [style.background]="selectedPersonType === 'presales' ? '#007AFF' : 'transparent'"
+                    [style.color]="selectedPersonType === 'presales' ? 'white' : '#86868b'">
+                    Pre-Sales Person
+                </button>
+                <button [class.active]="selectedPersonType === 'sales'" (click)="togglePersonType('sales')"
+                    style="padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
+                    [style.background]="selectedPersonType === 'sales' ? '#007AFF' : 'transparent'"
+                    [style.color]="selectedPersonType === 'sales' ? 'white' : '#86868b'">
+                    Sales Person
+                </button>
+            </div>
+        </div>
+
+        <div id="chart">
+            <apx-chart [series]="barChartOptions.series!" [chart]="barChartOptions.chart!"
+                [xaxis]="barChartOptions.xaxis!" [yaxis]="barChartOptions.yaxis!"
+                [dataLabels]="barChartOptions.dataLabels!" [plotOptions]="barChartOptions.plotOptions!"
+                [grid]="barChartOptions.grid!" [stroke]="barChartOptions.stroke!" [colors]="barChartOptions.colors!"
+                [tooltip]="barChartOptions.tooltip!" [legend]="barChartOptions.legend!">
+            </apx-chart>
+        </div>
+    </div>
+</div>

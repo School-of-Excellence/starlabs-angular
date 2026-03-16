@@ -1,0 +1,52 @@
+<div class="mainscreen">
+  <label class="title">Book Appointment</label>
+  <div *ngIf="superRole" class="selectbox">
+    <mat-form-field class="w-25" appearance="outline">
+      <mat-label>Select Profile</mat-label>
+      <mat-select [(ngModel)]="selectedUser" (selectionChange)="onProfileSelect()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let user of returnClient()" [value]="user.id">{{user.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div *ngIf="selectedUser != null && clientJourney.length != 0" class="appointmentbox">
+    <div *ngFor="let journey of clientJourney">
+      <label class="noappointment" *ngIf="journey.products.length == 0"> No active products for the Client</label>
+      <div class="productbox" *ngFor="let product of journey.products">
+        <label class="producttitle">Your <b>'{{mapProduct[product.productid]}}''</b> Product:</label>
+        <label class="noappointment" *ngIf="product.appointment.length == 0"> No Appointment currently available</label>
+        <br>
+        <mat-radio-group [(ngModel)]="selectedAppointment" (ngModelChange)="onAppointmentSelect()" labelPosition="after">
+          <mat-radio-button class="radionbtn" *ngFor="let appointment of product.appointment" [value]="appointment">
+            <label style="font-size: 16px;" [ngClass]="{'notready':appointment['status'] != 'ready'}">{{mapAppointments[appointment.id]}}</label>
+          </mat-radio-button>
+        </mat-radio-group>
+      </div>
+    </div>
+  </div>
+  <!-- <div *ngIf="selectedUser != null && selectedAppointment == null && journeycoachData.active">
+    Your have completed '{{mapProduct[journeycoachData.productid]}}''. You're now eligible to <span class="hyperlink" (click)="bookjourneycoach()">Book Journey Coach Appointment</span> with our specialist!
+  </div> -->
+
+  <div *ngIf="selectedAppointment != null">
+    <mat-form-field appearance="outline">
+      <mat-label>Prefered Date</mat-label>
+      <input matInput [(ngModel)]="selectedDate" [min]="mindate" [matDatepicker]="picker" (click)="picker.open()" (dateChange)="onDateSelect()" placeholder="MM-DD-YYYY">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  <div class="slotsbox" *ngIf="userAvailableSlots.length != 0">
+    <label class="slotheading">Available Slots</label>
+    <mat-chip-listbox [multiple]="false" [selectable]="true">
+      <mat-chip-option *ngFor="let slot of userAvailableSlots; let i = index" (click)="selectedSlot = i" [selected]="selectedSlot == i">
+        {{slot.start | date:'shortTime'}} - {{slot.end | date:'shortTime'}} with {{slot.specialist}}
+      </mat-chip-option>
+    </mat-chip-listbox>
+    <button class="bookbtn" mat-stroked-button (click)="confirmSlot()">Book Appointment</button>
+  </div>
+</div>

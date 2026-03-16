@@ -1,0 +1,126 @@
+<div class="loginscreen">
+  <!-- <div class="logo">
+    <img width="300px" src="https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/AH%20Logo%20Black%20Trans.png?alt=media&token=6ef24702-de38-4829-bd21-b37d4a638ebe">
+  </div> -->
+
+  <div class="formscreen">
+    <form *ngIf="!registerUser" class="loginform" [formGroup]="loginform" (ngSubmit)="dologin(loginform.value)">
+    <img width="300px" src="https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/AH%20Logo%20Black%20Trans.png?alt=media&token=6ef24702-de38-4829-bd21-b37d4a638ebe">
+      
+      <!-- <img width="50px" src="https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/AH%20Black%20Logo%20Only.png?alt=media&token=094f9119-8eb2-470f-a71b-c168954e5992"> -->
+
+      <h2></h2>
+
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email">
+        <mat-error *ngIf="loginform.get('email').hasError('required')">
+          Email is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="loginform.get('email').hasError('email')">
+          <strong>Incorrect</strong> Format
+        </mat-error>
+      </mat-form-field>
+      <br>
+
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Password</mat-label>
+        <input matInput [type]="visiblePassword ? 'text' : 'password'" formControlName="password" autocomplete="off">
+        <button type="button" mat-icon-button matSuffix (click)="visiblePassword = !visiblePassword">
+          <mat-icon>{{visiblePassword ? 'visibility_off' : 'visibility'}}</mat-icon>
+        </button>
+        <mat-error *ngIf="loginform.get('email').hasError('required')">
+          Password is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+
+      <div class="forgotpasswordholder">
+        <label class="forgotPassword" (click)="resetPassword()">Forgot Password?</label>
+      </div>
+
+      <button class="submitbtn" mat-raised-button type="submit" [disabled]="loading">Login</button>
+      <br><br>
+      <label class="notelable" (click)="registerUser = true">No Account? Register</label>
+    </form>
+  
+    <form *ngIf="registerUser" class="loginform" [formGroup]="registerform" (ngSubmit)="doregister(registerform.value)">
+      
+      <img width="50px" src="https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/AH%20Black%20Logo%20Only.png?alt=media&token=094f9119-8eb2-470f-a71b-c168954e5992">
+      
+      <h2>Register</h2>
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Name</mat-label>
+        <input matInput type="email" formControlName="name">
+        <mat-error *ngIf="registerform.get('name').hasError('required')">
+          Name is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+  
+      <mat-form-field class="countrycode" appearance="outline">
+        <mat-label>Code</mat-label>
+        <input matInput type="tel" formControlName="countrycode">
+        <mat-error *ngIf="registerform.get('countrycode').hasError('required')">
+          <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="numberinputfields" appearance="outline">
+        <mat-label>Mobile Number</mat-label>
+        <input matInput type="email" formControlName="number">
+        <mat-error *ngIf="registerform.get('number').hasError('required')">
+          Number is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="registerform.get('number').hasError('pattern')">
+          Only <strong>number</strong> required
+        </mat-error>
+        <!-- <mat-error *ngIf="registerform.get('number').hasError('minlength')">
+          Number length must be <strong>10</strong>
+        </mat-error>
+        <mat-error *ngIf="registerform.get('number').hasError('maxlength')">
+          Number length must be <strong>10</strong>
+        </mat-error> -->
+      </mat-form-field>
+      <br>
+  
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email">
+        <mat-error *ngIf="registerform.get('email').hasError('required')">
+          Email is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="registerform.get('email').hasError('email')">
+          <strong>Incorrect</strong> Format
+        </mat-error>
+      </mat-form-field>
+      <br>
+  
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Password</mat-label>
+        <input matInput type="password" formControlName="password" (keyup)="checkpassword()">
+        <mat-error *ngIf="registerform.get('password').hasError('required')">
+          Password is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="registerform.get('password').hasError('minlength')">
+          Password must be <strong>At least 6 Characters</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+
+      <mat-form-field class="inputfields" appearance="outline">
+        <mat-label>Confirm Password</mat-label>
+        <input matInput type="password" formControlName="confirmpassword" (keyup)="checkpassword()">
+        <mat-error *ngIf="registerform.get('confirmpassword').hasError('required')">
+          Password is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="registerform.get('confirmpassword').hasError('error')">
+          Password doesn't <strong>Match</strong>
+        </mat-error>
+      </mat-form-field>
+      <br>
+  
+      <button class="submitbtn" mat-raised-button type="submit" [disabled]="loading">Register</button>
+      <br><br>
+      <label class="notelable" (click)="registerUser = false">Already has Account? Login</label>
+    </form>
+  </div>  
+</div>

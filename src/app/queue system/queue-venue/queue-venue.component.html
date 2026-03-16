@@ -1,0 +1,86 @@
+<div class="queueheader mat-elevation-z4">
+    <div class="queuecontent row">
+      <div style="margin-right: 10px;text-align: left;" class="col">
+        <img height="60" width="250" src="https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/AH%20Logo%20White%20Trans.png?alt=media&token=1d1b692c-7915-42e5-84d6-81c139fcf2c2">
+      </div>
+      <!-- <span style="flex:1 1 auto"></span> -->
+      <div class="queuetitle col-sm">
+        <div class="text1">
+          <mat-label>Are you a Game Changer?</mat-label>
+        </div>
+        <div class="text2">
+          <mat-label> You are in the right place.</mat-label>
+        </div>
+      </div>
+      <div class="col-sm">
+  
+      </div>
+      <!-- <span style="flex:1 1 auto"></span> -->
+    </div>
+  </div>
+  
+  
+  <div *ngIf="loading" class="loading">
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
+  
+  <div *ngIf="!loading" class="mainscreen">
+    
+  <div class="row m-2">
+    <div class="col-sm">
+      <button *ngIf="hide == false" class="btn btn-secondary" (click)="hide = true">Go to Queue List</button>
+    </div>
+  
+    <div class="col-sm">
+      <h4 class="heading">Queue Venue</h4>
+    </div>
+  
+    <div class="col-sm"></div>
+  </div>
+  
+  <div *ngIf="hide == true">
+    <label id="example-radio-group-label"><h5>Queue List</h5></label>
+    <mat-radio-group
+      aria-labelledby="example-radio-group-label"
+      class="example-radio-group">
+      <mat-radio-button class="example-radio-button" *ngFor="let item of queuelist" [value]="item" (change)="drag($event)">
+        {{item.queuedata.queuename}}
+      </mat-radio-button>
+    </mat-radio-group>
+  </div>
+  
+  
+  
+    <div *ngIf="hide == false">
+        <div style="margin-left: 20px;margin-right: 20px; margin-top: 20px;">
+          <div class="main" *ngFor="let drag of draganddropData ; let i=index" cdkDropListGroup>
+              <div class="stage" >
+                <div class="container">{{drag.heading.toUpperCase()}}</div>
+                <div cdkDropList 
+                    [id]="drag.heading"
+                    [cdkDropListData]="drag.data"
+                    class="list"
+                    (cdkDropListDropped)="drop($event)"
+                    [cdkDropListConnectedTo]="connectedTo"
+                    >
+                  <div class="box" *ngFor="let item of drag.data;let j = index">
+                    <div class="data">
+                      {{j+1}})&nbsp;&nbsp;{{item.profile_name}}
+                    </div> 
+                  </div> 
+                </div>    
+              </div> 
+          </div>
+      </div>
+      </div>
+    </div>
+  
+  <div class="footer">
+    <div class="text3">
+      * Haven't gone through your diagnostics yet? You could save 12.75 lakhs and also gain exclusive bonuses.
+    </div>
+    <div class="text4">
+      Ask for it now!
+    </div>
+  </div>
+  

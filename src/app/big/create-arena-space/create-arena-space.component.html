@@ -1,0 +1,610 @@
+<!-- <div *ngIf="loading">
+    <app-loading-spinner></app-loading-spinner>
+</div> -->
+
+<div *ngIf="!loading" class="main-content">
+
+    <mat-horizontal-stepper #stepper>
+        
+        <mat-step label="Create By :" state="edit">
+          <mat-radio-group class="radio-button" aria-label="Select an option">
+            <mat-radio-button [value]="'manual'" [checked]="selectedType === 'manual'" (change)="selectOption('manual')">
+              <b>Manual Creation</b>
+            </mat-radio-button>
+            <br>
+            <mat-radio-button [value]="'import'" [checked]="selectedType === 'import'" (change)="selectOption('import')">
+              <b>Import from Sheets</b>
+            </mat-radio-button>
+          </mat-radio-group>
+          <div>
+            <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+          </div>
+        </mat-step>
+        
+        <!-- Rest of your stepper code remains the same -->
+        <mat-step label="Select Event" state="edit">
+
+            <h4><b style="text-transform: capitalize;">{{selectedType}}</b></h4>
+
+            <div>
+
+                <div class="row" style="justify-content: space-evenly;">
+                    
+                    <mat-form-field appearance="outline" class="col-md-2">
+                        <mat-label>Event Type</mat-label>
+                        <mat-select [(ngModel)]="eventType" (selectionChange)="getRefData()">
+                            <mat-option *ngFor="let type of ['Live Event', 'Big Accelerator Event', 'Big Assignment Event']" [value]="type">
+                                {{type}}
+                            </mat-option>
+                        </mat-select>
+                    </mat-form-field>
+        
+                    <mat-form-field appearance="outline" class="col-md-2" *ngIf="![null, undefined,''].includes(eventType)">
+                        <mat-label>Event</mat-label>
+                        <mat-select [(ngModel)]="eventName" (selectionChange)="updateref()">
+                            <mat-option *ngFor="let event of eventArray" [value]="![null, undefined, ''].includes(event.name) ? event.name : event.title">
+                                {{![null, undefined, ''].includes(event.name) ? event.name : event.title}}
+                            </mat-option>
+                        </mat-select>
+                    </mat-form-field>
+        
+                    <mat-form-field appearance="outline" class="col-md-2">
+                        <mat-label>Choose a date</mat-label>
+                        <input matInput [matDatepicker]="picker" [(ngModel)]="eventDate">
+                        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                        <mat-datepicker #picker></mat-datepicker>
+                    </mat-form-field>
+
+                </div>
+            </div>
+
+            <br><br>
+            <div class="d-flex flex-row justify-content-center gap-10" >
+                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+            </div>
+        </mat-step>
+
+        <mat-step *ngIf="selectedType == 'manual'" label="Create Arena" state="edit">
+            
+            <div class="form-container">
+                <div class="form-grid">
+                  <!-- Row 1 - Two columns -->
+                    <div class="form-row">
+                        <!-- Participant Field -->
+                        <div class="form-field">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Participant</mat-label>
+                            <mat-select [(ngModel)]="arenaSpaceData['participantslist']" multiple>
+                            <mat-option>
+                                <ngx-mat-select-search 
+                                [(ngModel)]="filteredProfile" 
+                                [ngModelOptions]="{standalone: true}"
+                                [placeholderLabel]="'Search'" 
+                                [noEntriesFoundLabel]="'No matching records found'"
+                                ngDefaultControl>
+                                </ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let participant of returnFilterProflie()" [value]="participant">
+                                {{participant}}
+                            </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                        </div>
+                    
+                        <!-- Doer Field -->
+                        <div class="form-field">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Doer</mat-label>
+                            <mat-select [(ngModel)]="arenaSpaceData['mentor']" multiple>
+                            <mat-option>
+                                <ngx-mat-select-search 
+                                [(ngModel)]="filteredMentor" 
+                                [ngModelOptions]="{standalone: true}"
+                                [placeholderLabel]="'Search'" 
+                                [noEntriesFoundLabel]="'No matching records found'"
+                                ngDefaultControl>
+                                </ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let mentor of returnMentor()" [value]="mentor">
+                                {{mentor}}
+                            </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+                </div>
+            
+                <!-- Row 2 - Three columns -->
+                <div class="form-row">
+                    
+                    <!-- A&H Space Field -->
+                    <div class="form-field">
+                      <mat-form-field appearance="outline">
+                        <mat-label>A&H Space</mat-label>
+                        <mat-select [(ngModel)]="arenaSpaceData['spaceid']">
+                          <mat-option *ngFor="let space of spaceNames" [value]="space">
+                            {{space}}
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+                    
+                    <!-- Engagement Field -->
+                    <div class="form-field">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Engagement</mat-label>
+                        <mat-select [(ngModel)]="arenaSpaceData['pivottype']">
+                          <mat-option *ngFor="let type of typeNames" [value]="type">
+                            {{type}}
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <!-- Cohorts Field -->
+                    <div class="form-field">
+                        <mat-form-field *ngIf="returnCohorts().length != 0" appearance="outline">
+                            <mat-label>CoHorts</mat-label>
+                            <mat-select [(ngModel)]="arenaSpaceData['cohortsid']" [multiple]="true" >
+                                <mat-option>
+                                    <ngx-mat-select-search 
+                                        [(ngModel)]="filteredCohorts" 
+                                        [ngModelOptions]="{standalone: true}"
+                                        [placeholderLabel]="'Search'" 
+                                        [noEntriesFoundLabel]="'No matching records found'"
+                                        ngDefaultControl
+                                        class="search-field">
+                                    </ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let cohorts of returnCohorts()" [value]="cohorts" class="custom-option">
+                                    <div class="option-text">{{cohorts}}</div>
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+                </div>
+                  
+              
+                  <!-- Row 3 - Full width -->
+                  <div class="form-row">
+                    <div class="form-field full-width">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Consultation Summary</mat-label>
+                        <textarea matInput [(ngModel)]="arenaSpaceData['summary']" rows="4"></textarea>
+                      </mat-form-field>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            <div class="d-flex justify-content-center">
+                <br><br>
+                <button mat-stroked-button type="button" (click)="createArenaManually()">Create Arena Space</button>
+            </div>
+        </mat-step>
+      
+        <mat-step *ngIf="selectedType == 'import'" label="Upload File">
+
+            <h3 style="display:flex;justify-content: center; align-items: center;" *ngIf="![null,undefined,''].includes(fileName)">{{fileName}}</h3>
+
+            <div style="display:flex;justify-content: center; align-items: center;">
+                <div *ngIf="![null, undefined,''].includes(eventName) && ![null, undefined,''].includes(eventDate)" >
+                    <label for="file1" class="custum-file-upload">
+                        <div class="icon">
+                            <svg viewBox="0 0 24 24" fill="" xmlns="http://www.w3.org/2000/svg">
+                                <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+                                <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                                <g id="SVGRepo_iconCarrier">
+                                    <path fill-rule="evenodd" clip-rule="evenodd"d="M10 1C9.73478 1 9.48043 1.10536 9.29289 1.29289L3.29289 7.29289C3.10536 7.48043 3 7.73478 3 8V20C3 21.6569 4.34315 23 6 23H7C7.55228 23 8 22.5523 8 22C8 21.4477 7.55228 21 7 21H6C5.44772 21 5 20.5523 5 20V9H10C10.5523 9 11 8.55228 11 8V3H18C18.5523 3 19 3.44772 19 4V9C19 9.55228 19.4477 10 20 10C20.5523 10 21 9.55228 21 9V4C21 2.34315 19.6569 1 18 1H10ZM9 7H6.41421L9 4.41421V7ZM14 15.5C14 14.1193 15.1193 13 16.5 13C17.8807 13 19 14.1193 19 15.5V16V17H20C21.1046 17 22 17.8954 22 19C22 20.1046 21.1046 21 20 21H13C11.8954 21 11 20.1046 11 19C11 17.8954 11.8954 17 13 17H14V16V15.5ZM16.5 11C14.142 11 12.2076 12.8136 12.0156 15.122C10.2825 15.5606 9 17.1305 9 19C9 21.2091 10.7909 23 13 23H20C22.2091 23 24 21.2091 24 19C24 17.1305 22.7175 15.5606 20.9844 15.122C20.7924 12.8136 18.858 11 16.5 11Z"fill=""></path>
+                                </g>
+                            </svg>
+                        </div>
+                        <div class="text">
+                            <span>Click to upload Excel</span>
+                        </div>
+                        <input id="file1" type="file" (change)="onChange($event)" #inputFile>
+                    </label>
+                </div>
+            </div>
+            
+            <br><br>
+            <div class="d-flex flex-row justify-content-center gap-10" >
+                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+            </div>
+
+        </mat-step>
+
+        <mat-step *ngIf="selectedType == 'import'" label="Map Participants">
+            <div>
+                <h4><b>Ammend Participant Names</b></h4>
+                <div class="participant-grid-container">
+                    <div class="participant-grid">
+                        <div *ngFor="let participant of participantNameExistInDatabase | keyvalue; let i = index" 
+                            class="participant-card" 
+                            [class.active]="i == showInput"
+                             [class.selected]="hasProfile(participant.value)">
+                        <div class="participant-info" (click)="showInput = i;filteredProfile = participant.key">
+                          <div class="participant-label">{{splitByCommaWithNullishCheck(documentlist[0]['Doer Name']).includes(participant.key) ? 'Doer : ' : ''}} {{participant.key | titlecase}}</div>
+                          <div class="participant-value">{{participant.value['profile'] || 'Not assigned'}}</div>
+                          <div class="participant-value" *ngIf="returnCohorts().length != 0">{{participant.value['cohorts'] || 'Not assigned'}}</div>
+                          <div class="card-icons">
+                            <div class="status-indicator"*ngIf="hasProfileOrCohorts(participant.value)">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                              </svg>
+                            </div>
+                            <div class="edit-icon" (click)="showInput = -1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div *ngIf="i == showInput" class="participant-form">
+                          <mat-form-field appearance="outline" class="profile-select">
+                            <mat-label>Profile</mat-label>
+                            <mat-select [(ngModel)]="participantNameExistInDatabase[participant.key]['profile']" [multiple]="true">
+                              <mat-option>
+                                <ngx-mat-select-search 
+                                  [(ngModel)]="filteredProfile" 
+                                  [ngModelOptions]="{standalone: true}"
+                                  [placeholderLabel]="'Search'" 
+                                  [noEntriesFoundLabel]="'No matching records found'"
+                                  ngDefaultControl
+                                  class="search-field">
+                                </ngx-mat-select-search>
+                              </mat-option>
+                              <mat-option *ngFor="let participantname of returnFilterProflie()" [value]="participantname" class="custom-option">
+                                <div class="option-text">{{participantname}}</div>
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+
+                          <mat-form-field *ngIf="returnCohorts().length != 0" appearance="outline" class="profile-select">
+                            <mat-label>CoHorsts</mat-label>
+                            <mat-select [(ngModel)]="participantNameExistInDatabase[participant.key]['cohorts']" [multiple]="true">
+                              <mat-option>
+                                <ngx-mat-select-search 
+                                  [(ngModel)]="filteredCohorts" 
+                                  [ngModelOptions]="{standalone: true}"
+                                  [placeholderLabel]="'Search'" 
+                                  [noEntriesFoundLabel]="'No matching records found'"
+                                  ngDefaultControl
+                                  class="search-field">
+                                </ngx-mat-select-search>
+                              </mat-option>
+                              <mat-option *ngFor="let cohorts of returnCohorts()" [value]="cohorts" class="custom-option">
+                                <div class="option-text">{{cohorts}}</div>
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          
+                          <!-- <div class="action-buttons">
+                            <button class="save-btn" (click)="showInput = -1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
+                              Save
+                            </button>
+                            <button class="cancel-btn" (click)="showInput = -1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                              Cancel
+                            </button>
+                          </div> -->
+                        </div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <br><br>
+            <div class="d-flex flex-row justify-content-center gap-10" >
+                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+            </div>
+        </mat-step>
+
+        <mat-step *ngIf="selectedType == 'import'" label="Map ArenaSpace">
+
+            <div>
+                <h4><b>Ammend Arena Space</b></h4>
+                <div class="participant-grid-container">
+                    <div class="participant-grid">
+                      <div *ngFor="let space of spaceNamesExistInDatabase | keyvalue; let i = index" 
+                          class="participant-card" 
+                          [class.active]="i == showInput"
+                          [class.selected]="space.value && space.value !== ''">
+                        
+                        <div class="participant-info" (click)="showInput = i">
+                          <div class="participant-label">{{space.key | titlecase}}</div>
+                          <div class="participant-value">{{space.value || 'Not assigned'}}</div>
+                          
+                          <div class="card-icons">
+                            <div class="status-indicator" *ngIf="space.value && space.value !== ''">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                              </svg>
+                            </div>
+                            <div class="edit-icon" (click)="showInput = -1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div *ngIf="i == showInput" class="participant-form">
+                          <mat-form-field appearance="outline" class="profile-select">
+                            <mat-label>Arena Space</mat-label>
+                            <mat-select [(ngModel)]="spaceNamesExistInDatabase[space.key]" >
+                              <mat-option>
+                                <ngx-mat-select-search 
+                                  [(ngModel)]="filteredArenaSpace" 
+                                  [ngModelOptions]="{standalone: true}"
+                                  [placeholderLabel]="'Search'" 
+                                  [noEntriesFoundLabel]="'No matching records found'"
+                                  ngDefaultControl
+                                  class="search-field">
+                                </ngx-mat-select-search>
+                              </mat-option>
+                              <mat-option *ngFor="let arena of returnArenaSpace()" [value]="arena" class="custom-option">
+                                <div class="option-text">{{arena}}</div>
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <br><br>
+            <div class="d-flex flex-row justify-content-center gap-10" >
+                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+            </div>
+        </mat-step>
+
+        <mat-step *ngIf="selectedType == 'import'" label="Map Engagement Type">
+
+            <div>
+                <h4><b>Ammend Arena Space Type</b></h4>
+                <div class="participant-grid-container">
+                    <div class="participant-grid">
+                      <div *ngFor="let type of typeNamesExistInDatabase | keyvalue; let i = index" 
+                          class="participant-card" 
+                          [class.active]="i == showInput"
+                          [class.selected]="type.value && type.value !== ''">
+                        
+                        <div class="participant-info" (click)="showInput = i">
+                          <div class="participant-label">{{type.key | titlecase}}</div>
+                          <div class="participant-value">{{type.value || 'Not assigned'}}</div>
+                          
+                          <div class="card-icons">
+                            <div class="status-indicator" *ngIf="type.value && type.value !== ''">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                              </svg>
+                            </div>
+                            <div class="edit-icon" (click)="showInput = -1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div *ngIf="i == showInput" class="participant-form">
+                          <mat-form-field appearance="outline" class="profile-select">
+                            <mat-label>Arena Space Type</mat-label>
+                            <mat-select [(ngModel)]="typeNamesExistInDatabase[type.key]" >
+                              <mat-option>
+                                <ngx-mat-select-search 
+                                  [(ngModel)]="filteredArenaSpaceType" 
+                                  [ngModelOptions]="{standalone: true}"
+                                  [placeholderLabel]="'Search'" 
+                                  [noEntriesFoundLabel]="'No matching records found'"
+                                  ngDefaultControl
+                                  class="search-field">
+                                </ngx-mat-select-search>
+                              </mat-option>
+                              <mat-option *ngFor="let arenatype of returnArenaSpaceType()" [value]="arenatype" class="custom-option">
+                                <div class="option-text">{{arenatype}}</div>
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <br><br>
+            <div class="d-flex flex-row justify-content-center" >
+                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+            </div>
+        </mat-step>
+
+        <mat-step *ngIf="selectedType == 'import'" label="View Participants">
+            <br>
+            <div class="d-flex flex-row justify-content-end ">
+                <button mat-raised-button type="button" style="background-color: rgb(44, 141, 44);color:white" (click)="onUploadAll()">Upload All</button>
+                &nbsp;&nbsp;
+                <button mat-raised-button type="button" style="background-color: rgb(33, 92, 160);color:white" (click)="onValidateImportSheet()">Validate Import Sheet</button>
+            </div>
+
+            <div class="pending-container" *ngIf="pendingMap != null">
+                <div class="pending-header">
+                  <h3 class="pending-title">{{pendingMap['title'] | titlecase}}</h3>
+                  <span class="pending-count">{{pendingMap['pendinglist'].length}}</span>
+                </div>
+                
+                <div class="pending-grid-container">
+                  <div class="pending-grid">
+                    <div class="pending-item" *ngFor="let item of pendingMap['pendinglist']; let i = index">
+                      <div class="item-number">{{i + 1}}</div>
+                      <div class="item-content">{{item}}</div>
+                      <button class="item-action" title="View details">
+                        <i class="fa fa-chevron-right"></i>
+                      </button>
+                    </div>
+                    
+                    <!-- Empty state shown when no items -->
+                    <div class="empty-state" *ngIf="pendingMap['pendinglist'].length === 0">
+                      <div class="empty-icon">📋</div>
+                      <p class="empty-text">No pending items to display</p>
+                    </div>
+                  </div>
+                </div>
+            </div>
+              
+            <!-- Displaying After Correction -->
+            <div class="table-container" *ngIf="newArenaSpaceListDisplay.length != 0">
+                <h4 style="font-size: 26px;font-weight: 600;">Validated</h4>
+                <table class="native-table">
+                    <thead class="table-head">
+                        <tr>
+                            <th>S.No</th>
+                            <ng-container *ngFor="let fields of tableFields">
+                                <th><b>{{ fields }}</b></th>
+                            </ng-container>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+            
+                    <tbody class="table-body">
+                        <tr *ngFor="let data of newArenaSpaceListDisplay; let i = index" [ngClass]="data['validation'] == true ? 'error' : ''">
+                        
+                            <td [ngStyle]="data['exist'] ? {'background-color': 'rgb(255 180 188)'} : {}">{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                        
+                            <ng-container *ngFor="let fields of tableFields">
+                                <td [ngStyle]="data['exist'] ? {'background-color': 'rgb(255 180 188)'} : {}" >{{data[fields]}}</td>
+                            </ng-container>
+
+                            <td [ngStyle]="data['exist'] ? {'background-color': 'rgb(255 180 188)'} : {}">
+                                <button mat-raised-button type="button" style="background-color: rgb(23, 177, 9);color:white" (click)="uploadData(data, i)">{{data['exist'] ? 'Re-Upload' : 'Upload'}}</button>
+                                &nbsp;&nbsp;
+                                <button mat-raised-button type="button" style="background-color: red;color:white" (click)="removeData(i)">Remove</button>
+                            </td>
+                        </tr>
+                    </tbody>
+
+                </table>
+          
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} entries
+                    </div>
+                
+                    <div class="pagination-controls">
+                        <button class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">Previous</button>
+                        
+                        <button class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">1</button>
+                        
+                        <span class="ellipsis" *ngIf="pageNumbers[0] > 2">...</span>
+                        
+                        <button *ngFor="let page of pageNumbers" class="pagination-button page-number" [class.active]="currentPage === page"(click)="goToPage(page)">{{ page }}</button>
+                        
+                        <span class="ellipsis" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages - 1">...</span>
+                        
+                        <button class="pagination-button page-number" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" (click)="goToPage(totalPages)">{{ totalPages }}</button>
+                        
+                        <button class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+                    </div>
+                    
+                    <div class="pagination-size">
+                        <label for="page-size">Items per page:</label>
+                        <select id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container" *ngIf="documentlist.length != 0">
+                <h4 style="font-size: 26px;font-weight: 600;">Uploaded Data</h4>
+                <table class="native-table">
+                    <thead class="table-head">
+                        <tr>
+                            <th>S.No</th>
+                            <ng-container *ngFor="let fields of tableFields">
+                                <th *ngIf="!fields['docid'] && !fields['exist']"><b>{{ fields }}</b></th>
+                            </ng-container>
+                        </tr>
+                    </thead>
+            
+                    <tbody class="table-body">
+                        <tr *ngFor="let data of paginatedData; let i = index" [ngClass]="data['validation'] == true ? 'error' : ''">
+                        <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                        <ng-container *ngFor="let fields of tableFields">
+                            <td *ngIf="!fields['docid'] && !fields['exist']" [ngStyle]="data['exist'] ? {'background-color': 'rgb(255 180 188)'} : {}" >{{data[fields]}}</td>
+                        </ng-container>
+                        </tr>
+                    </tbody>
+
+                </table>
+          
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, totalItems) }} of {{ totalItems }} entries
+                    </div>
+                
+                    <div class="pagination-controls">
+                        <button class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">Previous</button>
+                        
+                        <button class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">1</button>
+                        
+                        <span class="ellipsis" *ngIf="pageNumbers[0] > 2">...</span>
+                        
+                        <button *ngFor="let page of pageNumbers" class="pagination-button page-number" [class.active]="currentPage === page"(click)="goToPage(page)">{{ page }}</button>
+                        
+                        <span class="ellipsis" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages - 1">...</span>
+                        
+                        <button class="pagination-button page-number" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" (click)="goToPage(totalPages)">{{ totalPages }}</button>
+                        
+                        <button class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+                    </div>
+                    
+                    <div class="pagination-size">
+                        <label for="page-size">Items per page:</label>
+                        <select id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+        </mat-step>
+      
+        <!-- Icon overrides. -->
+        <ng-template matStepperIcon="phone">
+          <mat-icon>call_end</mat-icon>
+        </ng-template>
+        <ng-template matStepperIcon="chat">
+          <mat-icon>forum</mat-icon>
+        </ng-template>
+      </mat-horizontal-stepper>
+
+
+</div>
+
+
+
+

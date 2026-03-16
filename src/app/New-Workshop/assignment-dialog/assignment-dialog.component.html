@@ -1,0 +1,211 @@
+<div class="assignment-dialog" 
+     [class.old-result-view]="isOldResult"
+     [class.completed-view]="status === 'completed'"
+     [class.rework-view]="status === 'rework'">
+  <div class="dialog-header">
+    <h2 mat-dialog-title>
+      <mat-icon *ngIf="isOldResult">history</mat-icon>
+      <mat-icon *ngIf="status === 'completed' && !isOldResult">check_circle</mat-icon>
+      <mat-icon *ngIf="status === 'rework' && !isOldResult">refresh</mat-icon>
+      <mat-icon *ngIf="!isOldResult && status !== 'completed' && status !== 'rework'">assignment</mat-icon>
+      {{ dialogTitle }}
+    </h2>
+    <button mat-icon-button (click)="closeDialog()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Status Info Banner -->
+  <div *ngIf="showStatusBanner" class="status-banner" 
+       [class.old-result-banner]="isOldResult"
+       [class.completed-banner]="status === 'completed'"
+       [class.rework-banner]="status === 'rework'">
+    <mat-icon>{{ bannerIcon }}</mat-icon>
+    <div class="banner-content">
+      <p><strong>{{ bannerTitle }}:</strong> {{ bannerMessage }}</p>
+      <p *ngIf="bannerSubMessage">{{ bannerSubMessage }}</p>
+    </div>
+  </div>
+
+  <mat-dialog-content class="dialog-content">
+    <div class="assignment-content">
+      <!-- Assignment Results Display -->
+      <div class="assignment-results">
+        <h3>{{ submissionsTitle }}</h3>
+        <div *ngFor="let url of data.assignmentresult; let i = index" class="result-item">
+          <div class="result-header">
+            <span class="result-number">Submission {{i + 1}}</span>
+            <span class="result-type">{{ fileTypeLabel }}</span>
+            <button 
+              mat-raised-button 
+              color="primary" 
+              (click)="openInNewTab(url)"
+              class="open-button">
+              <mat-icon>open_in_new</mat-icon>
+              Open in New Tab
+            </button>
+          </div>
+          
+          <div class="result-content" [ngSwitch]="fileCategory">
+            <!-- PDF Display -->
+            <div *ngSwitchCase="'pdf'" class="pdf-container">
+              <embed [src]="getTrustedResourceUrl(i)" 
+                     type="application/pdf" 
+                     class="pdf-viewer">
+            </div>
+
+            <!-- Image Display - FIXED -->
+            <div *ngSwitchCase="'image'" class="image-container">
+              <!-- Loading indicator -->
+              <div *ngIf="imageLoadStates[i] === 'loading'" class="image-loading">
+                <mat-icon class="loading-icon">hourglass_empty</mat-icon>
+                <p>Loading image...</p>
+              </div>
+              
+              <!-- Error state -->
+              <div *ngIf="imageLoadStates[i] === 'error'" class="image-error">
+                <mat-icon class="error-icon">broken_image</mat-icon>
+                <p>Failed to load image</p>
+                <button mat-button (click)="openInNewTab(url)">
+                  <mat-icon>open_in_new</mat-icon>
+                  Try opening in new tab
+                </button>
+              </div>
+              
+              <!-- Actual image - using raw URL -->
+              <img 
+                *ngIf="imageLoadStates[i] !== 'error'"
+                [src]="getRawImageUrl(i)" 
+                class="assignment-image" 
+                [class.image-loaded]="imageLoadStates[i] === 'loaded'"
+                alt="Assignment submission"
+                (load)="onImageLoad(i)"
+                (error)="onImageError(i)"
+                crossorigin="anonymous">
+            </div>
+
+            <!-- Video Display -->
+            <div *ngSwitchCase="'video'" class="video-container">
+              <video controls class="assignment-video" preload="metadata">
+                <source [src]="getRawImageUrl(i)" type="video/mp4">
+                <source [src]="getRawImageUrl(i)" type="video/webm">
+                <source [src]="getRawImageUrl(i)" type="video/ogg">
+                Your browser does not support video playback.
+              </video>
+            </div>
+            
+            <!-- Audio Display -->
+            <div *ngSwitchCase="'audio'" class="audio-container">
+              <audio controls class="assignment-audio" preload="metadata">
+                <source [src]="getRawImageUrl(i)" type="audio/mpeg">
+                <source [src]="getRawImageUrl(i)" type="audio/wav">
+                <source [src]="getRawImageUrl(i)" type="audio/ogg">
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+
+            <!-- Document Display -->
+            <div *ngSwitchCase="'document'" class="document-container">
+              <div class="document-preview">
+                <mat-icon class="document-icon">description</mat-icon>
+                <div class="document-info">
+                  <p>Document file</p>
+                  <span class="file-note">Click "Open in New Tab" above to view this document</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Other/Unknown file types -->
+            <div *ngSwitchDefault class="unknown-file-container">
+              <div class="unknown-file-preview">
+                <mat-icon class="file-icon">attachment</mat-icon>
+                <div class="file-info">
+                  <p>{{ fileTypeLabel }} file</p>
+                  <span class="file-note">Click "Open in New Tab" above to view this file</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Review Notes Section -->
+      <div class="notes-section" *ngIf="shouldShowNotesSectionValue">
+        <h4>{{ notesTitle }}</h4>
+        <div class="notes-container">
+          <div *ngFor="let noteControl of getNotesControls(); let i = index" class="note-item">
+            <mat-form-field 
+              appearance="outline" 
+              class="note-textarea"
+              [class.readonly-note]="isOldResult || status === 'completed' || status === 'rework'">
+              <mat-label>Note {{i + 1}}</mat-label>
+              <textarea 
+                matInput 
+                [formControl]="getNoteControl(i)"
+                [readonly]="isOldResult || status === 'completed' || status === 'rework'"
+                rows="3" 
+                [placeholder]="notePlaceholder"
+                maxlength="500"
+                (input)="onNoteChange()">
+              </textarea>
+              <mat-hint *ngIf="canPerformActionsValue" align="end">{{getNoteControl(i).value?.length || 0}}/500</mat-hint>
+              <mat-hint *ngIf="!canPerformActionsValue" align="start">{{ readonlyHint }}</mat-hint>
+            </mat-form-field>
+            
+            <!-- Only show action buttons for editable notes -->
+            <div class="note-actions" *ngIf="canPerformActionsValue">
+              <button 
+                *ngIf="i === reviewNotesForm.length - 1"
+                mat-mini-fab 
+                color="primary" 
+                (click)="addNote()"
+                [disabled]="!canAddNoteValue"
+                class="add-note-button"
+                matTooltip="Add another note">
+                <mat-icon>add</mat-icon>
+              </button>
+              
+              <button 
+                *ngIf="canRemoveNoteValue"
+                mat-mini-fab 
+                color="warn" 
+                (click)="removeNote(i)"
+                class="remove-note-button"
+                matTooltip="Remove this note">
+                <mat-icon>remove</mat-icon>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Show message if no notes for readonly views -->
+          <div *ngIf="!canPerformActionsValue && reviewNotesForm.length === 0" class="no-notes-message">
+            <mat-icon>info</mat-icon>
+            <p>{{ noNotesMessage }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <!-- Action buttons - only show when actions can be performed -->
+  <mat-dialog-actions class="dialog-actions" *ngIf="canPerformActionsValue">
+    <button mat-button (click)="closeDialog()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="completeAssignment()">
+      <mat-icon>check_circle</mat-icon>
+      Assignment Complete
+    </button>
+    <button mat-raised-button color="warn" (click)="reworkAssignment()">
+      <mat-icon>refresh</mat-icon>
+      Rework Required
+    </button>
+  </mat-dialog-actions>
+
+  <!-- Close button for readonly views -->
+  <mat-dialog-actions class="dialog-actions" *ngIf="!canPerformActionsValue">
+    <button mat-raised-button color="primary" (click)="closeDialog()">Close</button>
+    <div class="readonly-message" *ngIf="readonlyMessage">
+      <mat-icon>info_outline</mat-icon>
+      <span>{{ readonlyMessage }}</span>
+    </div>
+  </mat-dialog-actions>
+</div>

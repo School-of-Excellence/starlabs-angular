@@ -1,0 +1,50 @@
+<div class="w-100" style="padding: 20px;">
+    <h5 class="text-center m-2" style="font-size: 20px;">{{title}}</h5>
+    <form [formGroup]="activityForm" (ngSubmit)="submit()">
+      <mat-form-field *ngIf="activityForm.controls['selectedstudio'].enabled" class="w-100 mt-3" appearance="outline">
+        <mat-label>Studio Specialist</mat-label>
+        <mat-select formControlName="selectedstudio">
+          <mat-option *ngFor="let option of studioList" [value]="option.value">{{option.name}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="activityForm.get('selectedstudio').hasError('required')">Required</mat-error>
+      </mat-form-field>
+      <br>
+      <div formArrayName="bonusactivity">
+        <div *ngFor="let field of bonusActivityForm().controls; let i = index" [formGroupName]="i">
+          <mat-form-field class="inputfields me-3" appearance="outline">
+            <mat-label>Activity</mat-label>
+            <mat-select formControlName="activity">
+              <mat-option *ngFor="let option of mapActivity | keyvalue" [value]="option.key">{{option.value}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="field.get('activity').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field class="inputfields me-3" appearance="outline">
+            <mat-label>Participant</mat-label>
+            <mat-select formControlName="participants" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of filterProfileList()" [value]="option.profileid">{{option.name}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="field.get('participants').hasError('required')">
+              Required
+            </mat-error>
+          </mat-form-field>
+          <button mat-icon-button type="button" (click)="removeBonusArray(i)">
+            <mat-icon>remove_circle_outline</mat-icon>
+          </button>
+        </div>
+      </div>
+      <button mat-raised-button (click)="addBonusArray()">
+        Add Other Specialists
+      </button>
+      <div class="w-100 text-center mt-4">
+        <button mat-stroked-button class="cancelbtn me-3" type="button" (click)="dialogRef.close(null)">Close</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="activityForm.invalid">Assign Specialist</button>
+      </div>
+    </form>
+</div>
+  
+  

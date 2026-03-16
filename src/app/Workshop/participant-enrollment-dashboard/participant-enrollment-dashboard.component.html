@@ -1,0 +1,72 @@
+<!-- <div class="d-flex flex-column mt-3">
+  <span class="d-flex justify-content-center"><h4>Eiflix Workshop Dashboard</h4></span>
+  <span class="d-flex justify-content-center"><h5>Total Participant Enrolled - <span style="color:forestgreen">{{totalParticipantEnrolled()}}</span></h5></span>
+</div> -->
+<div class="ms-4 mt-2 d-flex flex-column">
+  <div class="d-flex flex-row">
+    <mat-form-field appearance="fill" class="w-25">
+      <mat-label>Select Workshop</mat-label>
+      <mat-select (selectionChange)="onSelectWorkshop($event.value)">
+        <mat-option *ngFor="let option of workshop" [value]="option">{{option.title}}</mat-option>
+      </mat-select>
+    </mat-form-field>&nbsp;&nbsp;
+    <span style="flex: 1 1 auto;"></span>
+    <span class="mt-2"><h4>Total Participant Enrolled - <span style="color:forestgreen">{{totalParticipantEnrolled()}}</span></h4></span>&nbsp;&nbsp;
+    <button *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-stroked-button type="button" (click)="showbonus ? showbonus = false : showbonus = true;">Add Bonus To All Participants</button>&nbsp;&nbsp;
+    <button mat-stroked-button type="button" [disabled]="selectedWorkshop === null" (click)="exportCSV()">Export</button>&nbsp;&nbsp;
+  </div>
+  <div *ngIf="showbonus" class="d-flex flex-row ms-4">
+    <mat-form-field appearance="outline" class="w-25">
+      <mat-label>Select Bonus Challenge</mat-label>
+      <mat-select (selectionChange)="onSelectBonusChallenge($event.value)">
+        <mat-option *ngFor="let option of bonusChallengeList" [value]="option">{{option.label}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+</div>
+<div class="example-container ms-4 mt-4"  *ngFor="let task of tasklist;let i = index">
+  <div class="d-flex flex-column headContainer">
+    <div class="d-flex flex-row justify-content-center">
+      <span class="stagename">{{task != 'completed' && task != 'missing' ? challengedoc['taskproperty'][task]['title'] : task}}-({{mapTaskToProfileList[task] != undefined ? mapTaskToProfileList[task].length : 0}})</span>
+    </div>
+    <div *ngIf="task != 'completed' && task != 'missing' && selectedWorkshopAccessAdmin.includes(loggedinprofileid)" class="pl-1 d-flex flex-row justify-content-center mb-1">
+      <span>{{challengedoc['taskproperty'][task]['challengename']}}</span>&nbsp;&nbsp;
+      <!-- <span><mat-icon (click)="onMoveProfile(task,tasklist[i+1])">cancel</mat-icon></span> -->
+      <!-- <span class="material-symbols-outlined" (click)="onMoveProfile(task,tasklist[i+1])">
+        move_item
+        </span> -->
+        <span ><mat-checkbox [indeterminate]="checkIndeterminate(task)" [checked]="allSelected(task)" (change)="onSelectAllProfile(task,$event)">All</mat-checkbox></span>&nbsp;&nbsp;
+        <span *ngIf="challengedoc['taskproperty'][task]['type'] === 'livecall'" >
+          <mat-checkbox (change)="markAttendedForSelectedProfile($event)">Atd</mat-checkbox>
+        </span>&nbsp;&nbsp;
+        <span  matRipple style="cursor: pointer;margin-right: 5px;text-decoration: underline;color:forestgreen;" (click)="onMoveProfile(task,tasklist[i+1])">Move</span>
+    </div>
+  </div>
+  <div class="example-list">
+    <div *ngFor="let profileid of mapTaskToProfileList[task] || []" class="mt-1">
+        <span style="padding: 5px 10px 5px 10px;background-color: white;">
+          <mat-checkbox [checked]="this.selectedProfile.includes(profileid)" (change)="onSelectProfile(task,profileid,$event)">
+            <b>{{mapProfileData[profileid]['name']}}</b> &nbsp;&nbsp;
+            <!-- <span *ngFor="let item of mapProfileToLivecallAttendance[profileid] || []">
+              <span class="material-symbols-outlined" [ngClass]="item?'live':'nolive'">video_chat</span>
+            </span>&nbsp;&nbsp; -->
+          </mat-checkbox>&nbsp;&nbsp;
+          <button *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-icon-button type="button" (click)="onParticipantDelete(profileid)">
+            <mat-icon>delete</mat-icon>
+          </button>
+          <button *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-icon-button type="button" (click)="resetParticipant(profileid)">
+            <mat-icon>undo</mat-icon>
+          </button>
+        </span>
+        <mat-divider></mat-divider>
+    </div>
+    <!-- <div *ngFor="let challenge of mapProfileToWorkshop | keyvalue">
+      <span *ngIf="checkChallengeReady(task,challenge.value['taskproperty'],challenge.key)">
+        <span class="example-box">
+          <mat-checkbox (click)="onSelectProfile(challenge.key,$event)">{{mapProfileData[challenge.key]}}</mat-checkbox>
+        </span>
+        <mat-divider></mat-divider>
+      </span>
+    </div> -->
+  </div>
+</div>

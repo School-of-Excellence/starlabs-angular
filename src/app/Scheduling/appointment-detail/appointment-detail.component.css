@@ -1,0 +1,43 @@
+.mainscreen{
+  width: 100%;
+  padding: 15px 20px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.title{
+  width: 100%;
+  text-align: center !important;
+  color: rgb(0, 43, 58) !important;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.btnarea{
+  width: 100%;
+  text-align: right;
+  margin-top: 10px;
+}
+
+.cancelbtn{
+  color: red !important;
+  border: 1px solid red !important;
+}
+
+.statusbtn{
+  margin-left: 20px;
+  color: green !important;
+  border: 1px solid green !important;
+}
+
+.closebtn{
+  margin-left: 20px;
+  color: white !important;
+  background-color: rgb(4, 150, 202) !important;
+}
+
+.successnote{
+  font-style: italic !important;
+  color: rgb(168, 168, 168) !important;
+}

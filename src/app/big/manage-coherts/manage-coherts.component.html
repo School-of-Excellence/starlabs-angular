@@ -1,0 +1,506 @@
+<div class="dialog-container">
+  <!-- Header -->
+  <div class="dialog-header">
+    <h2 class="dialog-title">{{getDialogTitle()}}</h2>
+    <button mat-icon-button class="close-btn" (click)="onCancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Form Content -->
+  <div class="dialog-content">
+    <form [formGroup]="cohortsForm" class="cohort-form">
+      
+      <!-- Cohort Name -->
+      <div class="form-group">
+        <label class="form-label">Cohort Name <span class="required">*</span></label>
+        <input matInput type="text" formControlName="name" placeholder="Enter cohort name" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Cohort Description</label>
+        <textarea matInput type="text" formControlName="description" placeholder="Enter Description" class="form-input"></textarea>
+      </div>
+
+      <!-- Category Selection -->
+      <div class="form-group">
+        <label class="form-label">Category <span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" formControlName="cohortCategory" value="studio" >
+            <span class="radio-label">Studio Group</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" formControlName="cohortCategory" value="readiness" (click)="clearActivity()">
+            <span class="radio-label">Readiness</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" formControlName="cohortCategory" value="educational" (click)="clearActivity()">
+            <span class="radio-label">Educational</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" formControlName="cohortCategory" value="operational" (click)="clearActivity()">
+            <span class="radio-label">Operational</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="cohortsForm.controls['cohortCategory'].value == 'studio'">
+        <label class="form-label">Select Activity <span class="required">*</span></label>
+        <mat-select formControlName="bigactivity" class="form-select" placeholder="Choose an Activity">
+          <mat-option *ngFor="let activity of bigActivityList" [value]="activity.docid">
+            {{activity.activity}}
+          </mat-option>
+        </mat-select>
+      </div>
+
+      <!-- Type Selection -->
+      <div class="form-group">
+        <label class="form-label">Type <span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" formControlName="cohortType" value="general">
+            <span class="radio-label">General (Default Marathon)</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" formControlName="cohortType" value="event">
+            <span class="radio-label">Event</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Event Selection (only visible when type is 'event') -->
+      <div class="form-group" *ngIf="isEventType()">
+        <label class="form-label">Select Event <span class="required">*</span></label>
+        <mat-select formControlName="eventref" [compareWith]="compareFn" (selectionChange)="onChangeEvent()" class="form-select" placeholder="Choose an event">
+          <mat-option *ngFor="let event of data?.eventCollectionList" [value]="event.ref">
+            {{event.name}}
+          </mat-option>
+        </mat-select>
+        
+        <!-- Approved Participants Count Display -->
+        <div class="invitation-info" *ngIf="bigInvitationCount > 0 || loadingInvitations">
+          <div class="invitation-loading" *ngIf="loadingInvitations">
+            <mat-icon class="spin">sync</mat-icon>
+            <span>Fetching approved participants...</span>
+          </div>
+          <div class="invitation-count" *ngIf="!loadingInvitations && bigInvitationCount > 0">
+            <mat-icon class="success-icon">check_circle</mat-icon>
+            <span><strong>{{bigInvitationCount}}</strong> approved participant(s) found for this event</span>
+          </div>
+          <div class="invitation-count warning" *ngIf="!loadingInvitations && bigInvitationCount === 0 && cohortsForm.get('eventref')?.value">
+            <mat-icon class="warning-icon">warning</mat-icon>
+            <span>No approved participants found for this event</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Level Selection -->
+      <div class="form-group">
+        <label class="form-label">Level</label>
+        <mat-select formControlName="level" class="form-select">
+          <mat-option *ngFor="let level of levelOptions" [value]="level.value">
+            {{level.label}}
+          </mat-option>
+        </mat-select>
+      </div>
+
+      <!-- Status Selection -->
+      <div class="form-group">
+        <label class="form-label">Status <span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" formControlName="status" value="active">
+            <span class="radio-label">Active</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" formControlName="status" value="nonactive">
+            <span class="radio-label">Non Active</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Temporary Cohort -->
+      <div class="form-group">
+        <label class="checkbox-container">
+          <input type="checkbox" formControlName="isTemporary">
+          <span class="checkbox-label">Temporary Cohort</span>
+        </label>
+        
+        <!-- Date Range for Temporary Cohorts -->
+        <div class="date-range" *ngIf="cohortsForm.get('isTemporary')?.value">
+          <div class="date-field">
+            <label class="date-label">Start Date</label>
+            <input matInput [matDatepicker]="startPicker" formControlName="startDate" placeholder="Select start date" class="form-input">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </div>
+          <div class="date-field">
+            <label class="date-label">End Date</label>
+            <input matInput [matDatepicker]="endPicker" formControlName="endDate" placeholder="Select end date" class="form-input">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tags Selection -->
+      <div class="form-group">
+        <label class="form-label">Tags</label>
+        <div class="tags-dropdown" (click)="tagDropdownOpen = !tagDropdownOpen; $event.stopPropagation()">
+          <span class="tags-display">{{getSelectedTagsDisplay()}}</span>
+          <mat-icon class="dropdown-arrow">{{tagDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
+          
+          <div class="tags-dropdown-menu" *ngIf="tagDropdownOpen" (click)="$event.stopPropagation()">
+            <div class="tags-search">
+              <mat-icon>search</mat-icon>
+              <input type="text" placeholder="Search tags..." [(ngModel)]="tagSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onTagSearch()">
+            </div>
+            <div class="tags-header" *ngIf="selectedTags.length > 0">
+              <span>{{selectedTags.length}} selected</span>
+              <button class="clear-tags" (click)="clearTags(); $event.stopPropagation()">Clear</button>
+            </div>
+            <div class="tags-list">
+              <div class="tag-item" *ngFor="let tag of filteredTagsList" 
+                   [class.selected]="selectedTags.includes(tag.id)"
+                   (click)="toggleTagSelection(tag.id); $event.stopPropagation()">
+                <mat-icon>{{selectedTags.includes(tag.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <span>{{tag.name || tag.tagname}}</span>
+              </div>
+              <div class="tags-empty" *ngIf="filteredTagsList.length === 0">No tags found</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mentors Selection -->
+      <div class="form-group">
+        <label class="form-label">
+          Mentors
+          <span class="mentor-count" *ngIf="selectedMentors.length > 0">({{selectedMentors.length}} selected)</span>
+        </label>
+        <div class="mentors-dropdown" (click)="mentorDropdownOpen = !mentorDropdownOpen; $event.stopPropagation()">
+          <span class="mentors-display" [class.has-selection]="selectedMentors.length > 0">
+            {{getSelectedMentorsDisplay()}}
+          </span>
+          <mat-icon class="dropdown-arrow">{{mentorDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
+          
+          <div class="mentors-dropdown-menu" *ngIf="mentorDropdownOpen" (click)="$event.stopPropagation()">
+            <div class="mentors-search">
+              <mat-icon>search</mat-icon>
+              <input type="text" placeholder="Search mentors..." [(ngModel)]="mentorSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onMentorSearch()">
+            </div>
+            
+            <!-- Loading State -->
+            <div class="mentors-loading" *ngIf="loadingMentors">
+              <mat-icon class="spin">sync</mat-icon>
+              <span>Loading mentors...</span>
+            </div>
+            
+            <div class="mentors-header" *ngIf="selectedMentors.length > 0 && !loadingMentors">
+              <span>{{selectedMentors.length}} selected</span>
+              <button class="clear-mentors" (click)="clearMentors($event)">Clear</button>
+            </div>
+
+            <div class="select-all-option" *ngIf="!loadingMentors && filteredMentorsList.length > 0" 
+                (click)="isAllMentorsSelected() ? clearMentors($event) : selectAllMentors($event)">
+              <mat-icon>{{isAllMentorsSelected() ? 'check_box' : 'select_all'}}</mat-icon>
+              <span>{{isAllMentorsSelected() ? 'Deselect All' : 'Select All'}} ({{filteredMentorsList.length}})</span>
+            </div>
+            
+            <!-- Mentors List -->
+            <div class="mentors-list" *ngIf="!loadingMentors">
+              <div class="mentor-item" *ngFor="let mentor of filteredMentorsList" 
+                   [class.selected]="isMentorSelected(mentor.profileid)"
+                   (click)="toggleMentorSelection(mentor.profileid, $event)">
+                <mat-icon>{{isMentorSelected(mentor.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <div class="mentor-info">
+                  <span class="mentor-name">{{mentor.name || mentor.displayName || 'Unknown'}}</span>
+                  <span class="mentor-email" *ngIf="mentor.email">{{mentor.email}}</span>
+                </div>
+              </div>
+              <div class="mentors-empty" *ngIf="filteredMentorsList.length === 0 && !loadingMentors">
+                {{mentorSearchQuery ? 'No mentors found matching "' + mentorSearchQuery + '"' : 'No mentors available'}}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Selected Mentors Chips -->
+        <div class="selected-mentors" *ngIf="selectedMentors.length > 0">
+          <div class="mentor-chip" *ngFor="let mentorId of selectedMentors">
+            <mat-icon class="mentor-chip-icon">person</mat-icon>
+            <span>{{getMentorName(mentorId)}}</span>
+            <mat-icon class="remove-mentor" (click)="toggleMentorSelection(mentorId, $event)">close</mat-icon>
+          </div>
+        </div>
+        
+        <p class="help-text mentor-help" *ngIf="selectedMentors.length > 0 && cohortsForm.get('enableGroupChat')?.value">
+          <mat-icon class="info-icon">info</mat-icon>
+          <span>Mentors will be added to the group chat</span>
+        </p>
+      </div>
+
+      <!-- Team DropDown-->
+      <div class="form-group">
+        <label class="form-label">
+          Team
+          <span class="mentor-count" *ngIf="selectedTeam.length > 0">({{selectedTeam.length}} selected)</span>
+        </label>
+        <div class="mentors-dropdown" (click)="teamDropdownOpen = !teamDropdownOpen; $event.stopPropagation()">
+          <span class="mentors-display" [class.has-selection]="selectedTeam.length > 0">
+            {{getSelectedTeamDisplay()}}
+          </span>
+          <mat-icon class="dropdown-arrow">{{teamDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
+          
+          <div class="mentors-dropdown-menu" *ngIf="teamDropdownOpen" (click)="$event.stopPropagation()">
+            <div class="mentors-search">
+              <mat-icon>search</mat-icon>
+              <input type="text" placeholder="Search Team..." [(ngModel)]="teamSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onTeamSearch()">
+            </div>
+            
+            <!-- Loading State -->
+            <div class="mentors-loading" *ngIf="loadingTeam">
+              <mat-icon class="spin">sync</mat-icon>
+              <span>Loading team members...</span>
+            </div>
+            
+            <div class="mentors-header" *ngIf="selectedTeam.length > 0 && !loadingTeam">
+              <span>{{selectedTeam.length}} selected</span>
+              <button class="clear-mentors" (click)="clearTeam($event)">Clear</button>
+            </div>
+
+            <div class="select-all-option" *ngIf="!loadingTeam && filteredTeamList.length > 0" 
+                (click)="isAllTeamSelected() ? clearTeam($event) : selectAllTeam($event)">
+              <mat-icon>{{isAllTeamSelected() ? 'check_box' : 'select_all'}}</mat-icon>
+              <span>{{isAllTeamSelected() ? 'Deselect All' : 'Select All'}} ({{filteredTeamList.length}})</span>
+            </div>
+            
+            <!-- Team List -->
+            <div class="mentors-list" *ngIf="!loadingTeam">
+              <div class="mentor-item" *ngFor="let team of filteredTeamList" 
+                   [class.selected]="isTeamSelected(team.profileid)"
+                   (click)="toggleTeamSelection(team.profileid, $event)">
+                <mat-icon>{{isTeamSelected(team.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <div class="mentor-info">
+                  <span class="mentor-name">{{team.name || team.displayName || 'Unknown'}}</span>
+                  <span class="mentor-email" *ngIf="team.email">{{team.email}}</span>
+                </div>
+              </div>
+              <div class="mentors-empty" *ngIf="filteredTeamList.length === 0 && !loadingTeam">
+                {{teamSearchQuery ? 'No Team found matching "' + teamSearchQuery + '"' : 'No Team available'}}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Selected Team Chips -->
+        <div class="selected-mentors" *ngIf="selectedTeam.length > 0">
+          <div class="mentor-chip" *ngFor="let teamId of selectedTeam">
+            <mat-icon class="mentor-chip-icon">person</mat-icon>
+            <span>{{getTeamName(teamId)}}</span>
+            <mat-icon class="remove-mentor" (click)="toggleTeamSelection(teamId, $event)">close</mat-icon>
+          </div>
+        </div>
+        
+        <p class="help-text mentor-help" *ngIf="selectedTeam.length > 0 && cohortsForm.get('enableGroupChat')?.value">
+          <mat-icon class="info-icon">info</mat-icon>
+          <span>Team Members will be added to the group chat</span>
+        </p>
+      </div>
+
+      <!-- Participants Selection - Dropdown Style with Import Button -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label class="form-label">
+            Participants 
+            <span class="participant-count">({{getSelectedParticipantCount()}} selected)</span>
+          </label>
+          
+          <!-- Import Excel Button -->
+          <button 
+            type="button" 
+            class="import-excel-btn"
+            (click)="participantExcelInput.click()"
+            [disabled]="isImportingParticipants"
+            matTooltip="Import participants from Excel file">
+            <mat-icon *ngIf="!isImportingParticipants">upload_file</mat-icon>
+            <mat-spinner *ngIf="isImportingParticipants" diameter="16"></mat-spinner>
+            <span>{{ isImportingParticipants ? 'Importing...' : 'Import Excel' }}</span>
+          </button>
+        </div>
+
+        <!-- Hidden Excel Input -->
+        <input 
+          #participantExcelInput
+          type="file" 
+          accept=".xlsx,.xls,.csv" 
+          (change)="importParticipantsFromExcel($event)" 
+          style="display: none"/>
+
+        <!-- Import Results Alert -->
+        <div class="import-results" *ngIf="participantImportResults">
+          <div class="result-summary" [class.has-errors]="participantImportResults.notFound.length > 0">
+            <mat-icon *ngIf="participantImportResults.notFound.length === 0">check_circle</mat-icon>
+            <mat-icon *ngIf="participantImportResults.notFound.length > 0">warning</mat-icon>
+            <span>{{ participantImportResults.matched }} participant(s) imported</span>
+            <span *ngIf="participantImportResults.notFound.length > 0" class="not-found-count">
+              ({{ participantImportResults.notFound.length }} not found)
+            </span>
+            <button mat-icon-button (click)="clearParticipantImportResults()" matTooltip="Dismiss" class="dismiss-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          
+          <div class="not-found-list" *ngIf="participantImportResults.notFound.length > 0">
+            <div class="not-found-emails">
+              <span class="not-found-email" *ngFor="let email of participantImportResults.notFound">
+                {{ email }}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Info message when event is selected -->
+        <div class="participant-filter-info" *ngIf="isEventType() && cohortsForm.get('eventref')?.value">
+          <mat-icon class="filter-icon">filter_list</mat-icon>
+          <span>Showing only approved participants for the selected event</span>
+        </div>
+        
+        <div class="participants-dropdown" (click)="participantDropdownOpen = !participantDropdownOpen; $event.stopPropagation()">
+          <span class="participants-display" [class.has-selection]="selectedParticipants.length > 0">
+            {{getSelectedParticipantsDisplay()}}
+          </span>
+          <mat-icon class="dropdown-arrow">{{participantDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
+          
+          <div class="participants-dropdown-menu" *ngIf="participantDropdownOpen" (click)="$event.stopPropagation()">
+            <div class="participants-search">
+              <mat-icon>search</mat-icon>
+              <input type="text" placeholder="Search participants..." [(ngModel)]="participantSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onParticipantSearch()">
+            </div>
+            
+            <div class="participants-header" *ngIf="getParticipantsInListCount() > 0">
+              <span>{{getParticipantsInListCount()}} selected from list</span>
+              <button class="clear-participants" (click)="clearParticipants($event)">Clear All</button>
+            </div>
+
+            <div class="select-all-option" *ngIf="filteredParticipantsList.length > 0" 
+                (click)="isAllParticipantsSelected() ? clearParticipants($event) : selectAllParticipants($event)">
+              <mat-icon>{{isAllParticipantsSelected() ? 'check_box' : 'select_all'}}</mat-icon>
+              <span>{{isAllParticipantsSelected() ? 'Deselect All' : 'Select All'}} ({{filteredParticipantsList.length}})</span>
+            </div>
+            
+            <!-- Participants List -->
+            <div class="participants-list">
+              <div class="participant-item" *ngFor="let participant of filteredParticipantsList" 
+                   [class.selected]="isParticipantSelected(participant.profileid)"
+                   (click)="toggleParticipantSelection(participant.profileid, $event)">
+                <mat-icon>{{isParticipantSelected(participant.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <div class="participant-info">
+                  <span class="participant-name">{{participant.name || participant.displayName || 'Unknown'}}</span>
+                  <span class="participant-email" *ngIf="participant.email">{{participant.email}}</span>
+                </div>
+              </div>
+              <div class="participants-empty" *ngIf="filteredParticipantsList.length === 0">
+                {{participantSearchQuery ? 'No participants found matching "' + participantSearchQuery + '"' : 'No participants available'}}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Selected Participants Chips (from current list only) -->
+        <div class="selected-participants" *ngIf="getParticipantsInListCount() > 0">
+          <ng-container *ngFor="let participantId of selectedParticipants">
+            <div class="participant-chip" *ngIf="check(participantId)">
+              <mat-icon class="participant-chip-icon">person</mat-icon>
+              <span>{{getParticipantName(participantId)}}</span>
+              <mat-icon class="remove-participant" (click)="toggleParticipantSelection(participantId, $event)">close</mat-icon>
+            </div>
+          </ng-container>
+        </div>
+        
+        <!-- ============ EXISTING PARTICIPANTS SECTION ============ -->
+        <div class="existing-participants-section" *ngIf="existingParticipantsNotInList.length > 0">
+          <div class="existing-participants-header">
+            <div class="existing-header-left">
+              <mat-icon class="existing-icon">history</mat-icon>
+              <span class="existing-title">Existing Participants</span>
+              <span class="existing-count">({{existingParticipantsNotInList.length}} not in current list)</span>
+            </div>
+            <button class="clear-existing-btn" (click)="clearExistingParticipants($event)" matTooltip="Remove all existing participants">
+              <mat-icon>delete_sweep</mat-icon>
+              <span>Remove All</span>
+            </button>
+          </div>
+          
+          <p class="existing-help-text">
+            <mat-icon class="info-icon">info</mat-icon>
+            <span>These participants were previously selected but are not in the current event/participant list. They will still be included when you save.</span>
+          </p>
+          
+          <div class="existing-participants-chips">
+            <div class="existing-participant-chip" *ngFor="let participant of existingParticipantsNotInList">
+              <mat-icon class="existing-chip-icon">person_outline</mat-icon>
+              <div class="existing-chip-info">
+                <span class="existing-chip-name">{{participant.name || participant.displayName || 'Unknown'}}</span>
+                <span class="existing-chip-email" *ngIf="participant.email">{{participant.email}}</span>
+              </div>
+              <mat-icon class="remove-existing" (click)="removeExistingParticipant(participant.profileid, $event)" matTooltip="Remove from cohort">close</mat-icon>
+            </div>
+          </div>
+        </div>
+        <!-- ============ END EXISTING PARTICIPANTS SECTION ============ -->
+        
+        <!-- Participant Summary -->
+        <div class="participant-summary" *ngIf="getSelectedParticipantCount() > 0">
+          <div class="summary-item total">
+            <mat-icon>people</mat-icon>
+            <span>Total Selected: <strong>{{getSelectedParticipantCount()}}</strong></span>
+          </div>
+          <div class="summary-item in-list" *ngIf="getParticipantsInListCount() > 0 && existingParticipantsNotInList.length > 0">
+            <mat-icon>checklist</mat-icon>
+            <span>From Current List: <strong>{{getParticipantsInListCount()}}</strong></span>
+          </div>
+          <div class="summary-item existing" *ngIf="existingParticipantsNotInList.length > 0">
+            <mat-icon>history</mat-icon>
+            <span>Existing: <strong>{{existingParticipantsNotInList.length}}</strong></span>
+          </div>
+          <div class="summary-item invitation" *ngIf="bigInvitationCount > 0">
+            <mat-icon>event_available</mat-icon>
+            <span>Approved for Event: <strong>{{bigInvitationCount}}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enable Group Chat -->
+      <div class="form-group">
+        <label class="checkbox-container" >
+          <input type="checkbox" formControlName="enableGroupChat" [attr.disabled]="isGroupChatDisabled() ? true : null">
+          <span class="checkbox-label">Enable Group Chat</span>
+        </label>
+        
+        <!-- Help text for new cohort or newly enabling group chat -->
+        <p class="help-text" *ngIf="cohortsForm.get('enableGroupChat')?.value && !isGroupChatDisabled()">
+          <mat-icon class="info-icon">info</mat-icon>
+          <span *ngIf="!isEditMode()">A support chat group will be created for this cohort</span>
+          <span *ngIf="isEditMode() && !originalGroupChatEnabled">A support chat group will be created for this cohort</span>
+        </p>
+        
+        <!-- Help text when group chat is already enabled (disabled checkbox in edit mode) -->
+        <p class="help-text group-chat-active" *ngIf="isGroupChatDisabled()">
+          <mat-icon class="success-icon">check_circle</mat-icon>
+          <span>Group chat is active. New participants, mentors, and team members will be automatically added to the chat.</span>
+        </p>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Footer Actions -->
+  <div class="dialog-footer">
+    <button class="btn btn-secondary" (click)="onCancel()">Cancel</button>
+    <button class="btn btn-primary" (click)="onSubmit()" [disabled]="cohortsForm.invalid || loadingInvitations || loadingMentors || loadingTeam || isImportingParticipants">
+      {{getSubmitButtonText()}}
+    </button>
+  </div>
+</div>

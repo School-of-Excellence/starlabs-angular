@@ -1,0 +1,29 @@
+<div class="mainscreen">
+  <div class="title">{{metaData["appointmenttype"]}}</div>
+  <div>
+    <label><b>Booked For:</b> {{metaData["clientname"]}}</label>
+    <br>
+    <label><b>Booked On:</b> {{metaData["created"].toDate() | date: 'medium'}}</label>
+    <br>
+    <label><b>Appointment Date:</b> {{metaData["starttime"].toDate() | date: 'mediumDate'}}</label>
+    <br>
+    <label>
+      <b>Slot Time:</b>
+      {{(metaData["appointmentstart"] != null ? metaData["appointmentstart"].toDate() : metaData["starttime"].toDate()) | date: 'shortTime'}}
+      - 
+      {{(metaData["appointmentend"] != null ? metaData["appointmentend"].toDate() : metaData["endtime"].toDate()) | date: 'shortTime'}}
+    </label>
+    <br>
+    <label><b>Specialist/Agent:</b></label>
+    <ul>
+      <li *ngFor="let agent of metaData['hostdata']">{{agent}}</li>
+    </ul>
+    <label *ngIf="metaData['cancelled']"><b>Cancelled On:</b> {{metaData["cancelledon"].toDate() | date: 'medium'}}</label>
+    <label *ngIf="metaData['attended']" class="successnote">*This Appointment has happened successfully!</label>
+  </div>
+  <div class="btnarea">
+    <button class="cancelbtn" *ngIf="enableCancel" mat-stroked-button (click)="cancel()">Cancel Appointment</button>
+    <button class="statusbtn" *ngIf="enableStatus" mat-stroked-button (click)="updateStatus()">Update Status</button>
+    <button class="closebtn" mat-stroked-button (click)="close()">Close</button>
+  </div>
+</div>

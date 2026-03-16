@@ -1,0 +1,399 @@
+<main class="m-4">
+    <div *ngIf="loading" class="center">
+        <mat-progress-spinner diameter=50 mode="indeterminate" color="primary"></mat-progress-spinner>
+    </div>
+    <div *ngIf="!loading" class="dialog-container">
+        <div class="dialog-header">
+            <h2 class="title">Support Configure</h2>
+            <button mat-icon-button (click)="dialogRef.close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </div>
+
+        <div class="dialog-content">
+            <form [formGroup]="configurationform">
+
+                <!-- ==================== NEGLIGENCE SECTION ==================== -->
+                <div class="section-card negligence-section">
+                    <div class="section-header">
+                        <span class="section-title">Negligence</span>
+                        <button *ngIf="!negligenceEditMode" mat-stroked-button color="primary" (click)="editNegligence()">
+                            <mat-icon>edit</mat-icon> Edit
+                        </button>
+                        <div *ngIf="negligenceEditMode" class="action-buttons">
+                            <button mat-stroked-button color="primary" (click)="saveNegligence()">
+                                <mat-icon>save</mat-icon> Save
+                            </button>
+                            <button mat-stroked-button color="warn" (click)="cancelNegligence()">
+                                <mat-icon>close</mat-icon> Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Mode -->
+                    <div *ngIf="!negligenceEditMode" class="preview-content">
+                        <div class="preview-row">
+                            <span class="preview-label">Validators:</span>
+                            <div class="validator-names">
+                                <span *ngFor="let name of getValidatorNamesList()" class="validator-chip">{{ name }}</span>
+                                <span *ngIf="getValidatorNamesList().length === 0" class="preview-value">No validators assigned</span>
+                            </div>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-label">Categories:</span>
+                            <div class="chip-preview">
+                                <span *ngFor="let cat of getNegligenceCategories()" class="preview-chip">{{ cat }}</span>
+                                <span *ngIf="getNegligenceCategories().length === 0" class="preview-value">No categories</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div *ngIf="negligenceEditMode" class="edit-content">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Validators</mat-label>
+                            <mat-select formControlName="validators" multiple>
+                                <mat-option>
+                                    <ngx-mat-select-search [(ngModel)]="searchvalidator" [ngModelOptions]="{standalone: true}"
+                                        placeholderLabel="Search" [noEntriesFoundLabel]="'No matching records found'"
+                                        ngDefaultControl></ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let item of returnvalidators()" [value]="item.id">{{item.name}}</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Negligence Categories</mat-label>
+                            <mat-chip-grid #chipList2 formControlName="negligencecategories">
+                                <mat-chip-row *ngFor="let item of configurationform.controls['negligencecategories'].value">
+                                    {{item}}
+                                    <mat-icon (click)="removeNegligence(item)" matChipRemove>cancel</mat-icon>
+                                </mat-chip-row>
+                                <input placeholder="Type and press Enter..."
+                                    [matChipInputFor]="chipList2"
+                                    [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                                    [matChipInputAddOnBlur]="true"
+                                    (matChipInputTokenEnd)="addNegligence($event)">
+                            </mat-chip-grid>
+                        </mat-form-field>
+                    </div>
+                </div>
+
+                <!-- ==================== CATEGORIES SECTION ==================== -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span class="section-title">Categories</span>
+                        <button mat-stroked-button color="primary" (click)="addNewCategory()"
+                            [disabled]="categoryEditIndex !== -1">
+                            <mat-icon>add</mat-icon> Add Category
+                        </button>
+                    </div>
+
+                    <div formArrayName="categories" class="categories-list" 
+                        cdkDropList [cdkDropListData]="categories.controls" (cdkDropListDropped)="dropCategory($event)">
+                        <div *ngFor="let item of categories.controls; let i = index" [formGroupName]="i" cdkDrag [cdkDragDisabled]="categoryEditIndex !== -1">
+
+                            <!-- Preview Mode for Category -->
+                            <div *ngIf="categoryEditIndex !== i" class="category-preview-card"
+                                [ngClass]="{'disabled-category': !isCategoryEnabled(i)}">
+                                <div class="category-preview-content">
+                                    <div class="drag-handle" cdkDragHandle>
+                                        <mat-icon>drag_indicator</mat-icon>
+                                    </div>
+                                    <div class="category-status">
+                                        <mat-icon [ngClass]="isCategoryEnabled(i) ? 'status-enabled' : 'status-disabled'">
+                                            {{ isCategoryEnabled(i) ? 'check_circle' : 'cancel' }}
+                                        </mat-icon>
+                                    </div>
+                                    <div class="category-info">
+                                        <div class="category-name">{{ getCategoryName(i) }}</div>
+                                        <div class="category-assigned">{{ getAssignedNames(i) }}</div>
+                                        <div *ngIf="getSubcategories(i).length > 0" class="category-subcategories">
+                                            <span class="subcategory-label">Subcategories:</span>
+                                            <span *ngFor="let sub of getSubcategories(i)" class="subcategory-chip">{{ sub }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="category-actions">
+                                        <button mat-icon-button color="primary" (click)="editCategory(i)"
+                                            [disabled]="categoryEditIndex !== -1" matTooltip="Edit">
+                                            <mat-icon>edit</mat-icon>
+                                        </button>
+                                        <button mat-icon-button color="warn" (click)="deleteCategory(i)"
+                                            [disabled]="categoryEditIndex !== -1" matTooltip="Delete">
+                                            <mat-icon>delete</mat-icon>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Edit Mode for Category -->
+                            <div *ngIf="categoryEditIndex === i" class="category-edit-card">
+                                <div class="edit-form">
+                                    <div class="toggle-row">
+                                        <mat-slide-toggle formControlName="show">
+                                            <span *ngIf="item.get('show').value == false" class="status-text disabled">Disabled</span>
+                                            <span *ngIf="item.get('show').value == true" class="status-text enabled">Enabled</span>
+                                        </mat-slide-toggle>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <mat-form-field appearance="outline" class="category-input">
+                                            <mat-label>Category</mat-label>
+                                            <input matInput placeholder="Enter Category" formControlName="category" required>
+                                            <mat-error *ngIf="item.get('category').hasError('required')">
+                                                Category is required
+                                            </mat-error>
+                                        </mat-form-field>
+
+                                        <mat-form-field appearance="outline" class="assign-input">
+                                            <mat-label>Assign To</mat-label>
+                                            <mat-select formControlName="assignto" multiple>
+                                                <mat-option>
+                                                    <ngx-mat-select-search [(ngModel)]="searchProfile"
+                                                        [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
+                                                        [noEntriesFoundLabel]="'No matching records found'"
+                                                        ngDefaultControl></ngx-mat-select-search>
+                                                </mat-option>
+                                                <mat-option *ngFor="let profile of returnProfile()" [value]="profile.id">
+                                                    {{profile.name}}
+                                                </mat-option>
+                                            </mat-select>
+                                            <mat-error *ngIf="item.get('assignto').hasError('required')">
+                                                Assign to is required
+                                            </mat-error>
+                                        </mat-form-field>
+                                    </div>
+
+                                    <!-- Subcategories -->
+                                    <div formArrayName="subcategories" class="subcategories-section">
+                                        <label class="subcategory-title">Subcategories</label>
+                                        <div *ngFor="let subcat of getSubCategoryItems(i); let j = index" [formGroupName]="j"
+                                            class="subcategory-row">
+                                            <mat-form-field appearance="outline" class="subcategory-input">
+                                                <mat-label>Subcategory {{j + 1}}</mat-label>
+                                                <input type="text" matInput formControlName="subcategory">
+                                            </mat-form-field>
+                                            <button mat-mini-fab color="primary" type="button" (click)="addSubCategory(i)">
+                                                <mat-icon>add</mat-icon>
+                                            </button>
+                                            <button *ngIf="j > 0" mat-mini-fab color="warn" type="button"
+                                                (click)="removeSubCategory(i, j)">
+                                                <mat-icon>remove</mat-icon>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="edit-actions">
+                                        <button mat-stroked-button color="primary" (click)="saveCategory(i)"
+                                            [disabled]="item.get('category').hasError('required') || item.get('assignto').hasError('required')">
+                                            <mat-icon>save</mat-icon> Save
+                                        </button>
+                                        <button mat-stroked-button (click)="cancelCategory(i)">
+                                            <mat-icon>close</mat-icon> Cancel
+                                        </button>
+                                        <button *ngIf="!isAddingNewCategory" mat-stroked-button color="warn"
+                                            (click)="deleteCategory(i)">
+                                            <mat-icon>delete</mat-icon> Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== AUTOMATED MESSAGE SECTION ==================== -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span class="section-title">Automated Message</span>
+                        <button *ngIf="!automatedMessageEditMode" mat-stroked-button color="primary" (click)="editAutomatedMessage()">
+                            <mat-icon>edit</mat-icon> Edit
+                        </button>
+                        <div *ngIf="automatedMessageEditMode" class="action-buttons">
+                            <button mat-stroked-button color="primary" (click)="saveAutomatedMessage()">
+                                <mat-icon>save</mat-icon> Save
+                            </button>
+                            <button mat-stroked-button color="warn" (click)="cancelAutomatedMessage()">
+                                <mat-icon>close</mat-icon> Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Mode -->
+                    <div *ngIf="!automatedMessageEditMode" class="preview-content">
+                        <div *ngFor="let msg of getAutomatedMessages(); let i = index" class="message-preview-item">
+                            <div class="message-preview-text">{{ msg.message }}</div>
+                            <!-- <div class="message-preview-index">Index: {{ msg.index }}</div> -->
+                        </div>
+                        <div *ngIf="getAutomatedMessages().length === 0" class="preview-value">No automated messages</div>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div *ngIf="automatedMessageEditMode" formArrayName="messages" class="messages-list">
+                        <div *ngFor="let element of messages.controls; let j = index" [formGroupName]="j" class="message-row">
+                            <mat-form-field appearance="outline" class="message-input">
+                                <mat-label>Message</mat-label>
+                                <textarea matInput placeholder="Enter Message" formControlName="message" required rows="3"></textarea>
+                                <mat-error *ngIf="element.get('message').hasError('required')">Message is required</mat-error>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" class="index-input">
+                                <mat-label>Index</mat-label>
+                                <input matInput type="number" placeholder="Enter Index" formControlName="index" required>
+                                <mat-error *ngIf="element.get('index').hasError('required')">Index is required</mat-error>
+                            </mat-form-field>
+
+                            <button mat-mini-fab color="primary" type="button" (click)="addMessage()">
+                                <mat-icon>add</mat-icon>
+                            </button>
+                            <button mat-mini-fab color="warn" type="button" (click)="removeMessage(j)" [disabled]="messages.length === 1">
+                                <mat-icon>remove</mat-icon>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== WARNING MESSAGE SECTION ==================== -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <div class="section-header-left">
+                            <span class="section-title">Warning Message</span>
+                            <span class="section-subtitle">Sent when client doesn't respond for 4 days</span>
+                        </div>
+                        <button *ngIf="!warningMessageEditMode" mat-stroked-button color="primary" (click)="editWarningMessage()">
+                            <mat-icon>edit</mat-icon> Edit
+                        </button>
+                        <div *ngIf="warningMessageEditMode" class="action-buttons">
+                            <button mat-stroked-button color="primary" (click)="saveWarningMessage()">
+                                <mat-icon>save</mat-icon> Save
+                            </button>
+                            <button mat-stroked-button color="warn" (click)="cancelWarningMessage()">
+                                <mat-icon>close</mat-icon> Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Mode -->
+                    <div *ngIf="!warningMessageEditMode" class="preview-content">
+                        <div *ngFor="let msg of getWarningMessages(); let i = index" class="message-preview-item">
+                            <div class="message-preview-text">{{ msg.message }}</div>
+                            <!-- <div class="message-preview-index">Index: {{ msg.index }}</div> -->
+                        </div>
+                        <div *ngIf="getWarningMessages().length === 0" class="preview-value">No warning messages</div>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div *ngIf="warningMessageEditMode" formArrayName="warningmessages" class="messages-list">
+                        <div *ngFor="let element of warningmessages.controls; let j = index" [formGroupName]="j" class="message-row">
+                            <mat-form-field appearance="outline" class="message-input">
+                                <mat-label>Warning Message</mat-label>
+                                <textarea matInput placeholder="Enter warning message" formControlName="message" required rows="3"></textarea>
+                                <mat-error *ngIf="element.get('message').hasError('required')">Message is required</mat-error>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" class="index-input">
+                                <mat-label>Index</mat-label>
+                                <input matInput type="number" placeholder="Index" formControlName="index" required>
+                                <mat-error *ngIf="element.get('index').hasError('required')">Index is required</mat-error>
+                            </mat-form-field>
+
+                            <button mat-mini-fab color="primary" type="button" (click)="addWarningMessage()">
+                                <mat-icon>add</mat-icon>
+                            </button>
+                            <button mat-mini-fab color="warn" type="button" (click)="removeWarningMessage(j)" [disabled]="warningmessages.length === 1">
+                                <mat-icon>remove</mat-icon>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CLOSING MESSAGE SECTION ==================== -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <div class="section-header-left">
+                            <span class="section-title">Closing Message</span>
+                            <span class="section-subtitle">Sent when ticket is auto-closed after 24 hours</span>
+                        </div>
+                        <button *ngIf="!closingMessageEditMode" mat-stroked-button color="primary" (click)="editClosingMessage()">
+                            <mat-icon>edit</mat-icon> Edit
+                        </button>
+                        <div *ngIf="closingMessageEditMode" class="action-buttons">
+                            <button mat-stroked-button color="primary" (click)="saveClosingMessage()">
+                                <mat-icon>save</mat-icon> Save
+                            </button>
+                            <button mat-stroked-button color="warn" (click)="cancelClosingMessage()">
+                                <mat-icon>close</mat-icon> Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Mode -->
+                    <div *ngIf="!closingMessageEditMode" class="preview-content">
+                        <div *ngFor="let msg of getClosingMessages(); let i = index" class="message-preview-item">
+                            <div class="message-preview-text">{{ msg.message }}</div>
+                            <!-- <div class="message-preview-index">Index: {{ msg.index }}</div> -->
+                        </div>
+                        <div *ngIf="getClosingMessages().length === 0" class="preview-value">No closing messages</div>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div *ngIf="closingMessageEditMode" formArrayName="closingmessages" class="messages-list">
+                        <div *ngFor="let element of closingmessages.controls; let j = index" [formGroupName]="j" class="message-row">
+                            <mat-form-field appearance="outline" class="message-input">
+                                <mat-label>Closing Message</mat-label>
+                                <textarea matInput placeholder="Enter closing message" formControlName="message" required rows="3"></textarea>
+                                <mat-error *ngIf="element.get('message').hasError('required')">Message is required</mat-error>
+                            </mat-form-field>
+
+                            <mat-form-field appearance="outline" class="index-input">
+                                <mat-label>Index</mat-label>
+                                <input matInput type="number" placeholder="Index" formControlName="index" required>
+                                <mat-error *ngIf="element.get('index').hasError('required')">Index is required</mat-error>
+                            </mat-form-field>
+
+                            <button mat-mini-fab color="primary" type="button" (click)="addClosingMessage()">
+                                <mat-icon>add</mat-icon>
+                            </button>
+                            <button mat-mini-fab color="warn" type="button" (click)="removeClosingMessage(j)" [disabled]="closingmessages.length === 1">
+                                <mat-icon>remove</mat-icon>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ISSUE STATUS SECTION (UNCHANGED) ==================== -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span class="section-title">Issue Status</span>
+                    </div>
+
+                    <mat-form-field appearance="outline" style="width: 100%;">
+                        <mat-label>Issue Status</mat-label>
+                        <mat-chip-grid #chipList formControlName="status">
+                            <mat-chip-row *ngFor="let item of configurationform.controls['status'].value">
+                                {{item}}
+                                <mat-icon (click)="remove(item)" matChipRemove>cancel</mat-icon>
+                            </mat-chip-row>
+                            <input placeholder="Type and press Enter..."
+                                [matChipInputFor]="chipList"
+                                [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                                [matChipInputAddOnBlur]="true"
+                                (matChipInputTokenEnd)="add($event)">
+                        </mat-chip-grid>
+                    </mat-form-field>
+                </div>
+
+                <!-- ==================== FOOTER BUTTONS ==================== -->
+                <div class="dialog-footer">
+                    <button mat-stroked-button (click)="dialogRef.close()">Close</button>
+                    <button mat-flat-button color="primary" [disabled]="configurationform.invalid"
+                        (click)="submit(configurationform.value)">
+                        Save All Changes
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</main>

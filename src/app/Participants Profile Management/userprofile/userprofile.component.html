@@ -1,0 +1,1033 @@
+<div class="profile-info-section">
+  <h2 class="section-title">Profile Info</h2>
+  
+  <div class="profile-card">
+    <div class="profile-avatar">
+      <img [src]="profileimage[profileId] ? profileimage[profileId] : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'" 
+      alt="Profile Picture" class="profile-image">
+      <h3 class="profile-name">{{ userData['name'] }}</h3>
+    </div>
+
+    <div class="profile-details">
+      <div class="detail-row">
+        <div class="detail-item">
+          <i class="fas fa-phone detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Mobile Number</span>
+            <span class="detail-value">{{ userData['phonenumber'] || 'Not available' }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-item">
+          <i class="fas fa-birthday-cake detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Age</span>
+            <span class="detail-value">{{userData['dateofbirth'] ? calculateAge(userData['dateofbirth'].toDate()) + " years old" : 'Not available'}}</span>
+          </div>
+        </div>
+
+       
+        
+        <div class="detail-item">
+          <i class="fas fa-hands-helping detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Mode</span>
+            <span class="detail-value">{{userData['participantmode'] || 'Not available'}}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-row">
+        <div class="detail-item">
+          <i class="fas fa-envelope detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Email</span>
+            <span class="detail-value">{{ userData['email'] }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-item">
+          <i class="fas fa-map-marker-alt detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Address</span>
+            <span class="detail-value">{{ mapAddress[profileId] || 'Not available' }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-item">
+          <i class="fas fa-user detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Active Journey</span>
+            <span class="detail-value">{{ mapjourney[userData['activejourney']] || 'Not available' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-row">
+        <div class="detail-item">
+          <i class="fas fa-calendar-alt detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">DOB</span>
+            <span class="detail-value">{{ userData['dateofbirth'] ? formattedDateOfBirth : 'Not available' }}</span>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <i class="fas fa-calendar detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Subscription Ends</span>
+            <span class="detail-value"> {{userData['subscriptionend'] ? (userData['subscriptionend'].toDate() | date:'dd/MM/yyyy h:mm a') : 'Not available' }} </span>
+          </div>
+        </div>
+        
+        
+        <div class="detail-item">
+          <i class="fas fa-chart-line detail-icon"></i>
+          <div class="detail-content">
+            <span class="detail-label">Financial Status/Customer Status</span>
+            <span class="detail-value">{{userData['financialstatus'] || 'Not available'}}/{{userData['customerstatus'] || 'Not available'}}</span>
+          </div>
+          <span (click)="openStatusEditor()" style="cursor: pointer;"><i class="fas fa-edit detail-icon"></i></span>
+        </div>
+        <!-- Edit customer status -->
+        <div class="status-editor-overlay" *ngIf="showStatusEditor" (click)="closeStatusEditor()">
+          <div class="status-editor-card" (click)="$event.stopPropagation()">
+            <div class="editor-header">
+              <h3>Edit Customer Status</h3>
+              <i class="fas fa-times close-icon" (click)="closeStatusEditor()"></i>
+            </div>
+            
+            <div class="editor-body">
+              <div class="current-status">
+                <p><strong>Current CustomerStatus:</strong> {{userData['customerstatus'] || 'Not available'}}</p>
+              </div>
+        
+              <div class="status-selector">
+                <label for="statusSelect">Select New Status</label>
+                <select id="statusSelect" [(ngModel)]="selectedStatus" class="status-dropdown">
+                  <option value="">-- Select Status --</option>
+                  <option value="banned">Banned</option>
+                  <option value="late">Late</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+            </div>
+        
+            <div class="editor-footer">
+              <button class="btn-cancel" (click)="closeStatusEditor()">Cancel</button>
+              <button class="btn-save" 
+                      [disabled]="!selectedStatus" 
+                      (click)="updateCustomerStatus()">
+                Update Status
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+ <!-- Activities Section -->
+<div class="activities-section">
+<h2 class="section-title">Your Activities</h2>
+
+<!-- Navigation Tabs -->
+<div class="nav-tabs">
+  <button 
+    *ngFor="let tab of tabs" 
+    [class.active]="activeTab === tab"
+    (click)="selectTab(tab)"
+    class="nav-tab">
+    {{ tab }}
+  </button>
+</div>
+
+<!-- Activities Content -->
+<!-- profile journey -->
+<div class="activities-content">
+  <div  *ngIf="activeTab === 'Journey'">
+    <div *ngFor="let journey of participantjourney; let i = index">
+      <div class="card">
+          <div class="journey-header">
+              <div class="products-section">
+                <div class="header">
+                  <h5 class="journey-title">{{ mapjourney[journey['journeyref']?.id] || 'Addon' }}</h5>
+                  <div class="header-actions">
+                      <span class="badge ongoing">{{ journey.journeystatus || 'addon product' }}</span>
+                      <span class="badge journey-dates">{{ journey.subscriptionstart?.toDate() | date: 'mediumDate' }} - {{ journey.subscriptionend?.toDate() | date: 'mediumDate' }}</span>
+                      <button mat-icon-button (click)="toggleProductSection(journey)" class="toggle-btn">
+                          <mat-icon *ngIf="!journey.showProductSection">keyboard_arrow_down</mat-icon>
+                          <mat-icon *ngIf="journey.showProductSection">keyboard_arrow_up</mat-icon>
+                      </button>
+                  </div>
+              </div>
+              </div>
+              <!-- <div class="journey-status-dates">
+                  <span class="badge ongoing">{{ journey.journeystatus || 'addon product' }}</span>
+                  <span class="badge journey-dates">{{ journey.subscriptionstart?.toDate() | date: 'mediumDate' }} - {{ journey.subscriptionend?.toDate() | date: 'mediumDate' }}</span>
+              </div> -->
+          </div>
+          <div *ngIf="journey.showProductSection">
+              <div class="products-section" *ngIf="products.length != 0">
+                  <div class="section-header">
+                      <h6 style="font-size: 12px;" class="section-title">Products</h6>
+                      <button mat-icon-button class="add-button" [routerLink]="'/participantpurchase/' + profileId">
+                          <mat-icon>add</mat-icon>
+                      </button>
+                  </div>
+              </div>
+              <div class="table-responsive">
+                  <table class="product-table">
+                      <ng-container *ngFor="let product of journey['participantproducts']; let i = index">
+                          <tr *ngIf="mapPackage[participantproductlist[product['participantproductid']]['packageref'].id] !== 'Bonus'">
+                              <!-- <td class="index-column">{{ i + 1 }}.</td> -->
+                              <td class="product-name-column">{{ mapproduct[product['productref']?.id] }}</td>
+                              <td class="status-column">
+                                <span class="badge status" [ngClass]="getStatusClass(participantproductlist[product['participantproductid']]?.status)">
+                                    {{ getStatusText(participantproductlist[product['participantproductid']]?.status) }}
+                                </span>
+                            </td>
+                              <!-- <td class="dates-column">
+                                  <span class="badge journey-dates">
+                                    {{ participantproductlist[product['participantproductid']]?.statusdate?.ongoing ? 
+                                      (participantproductlist[product['participantproductid']].statusdate.ongoing.toDate() | date: 'mediumDate') : 'N/A' }} 
+                                    - 
+                                    {{ participantproductlist[product['participantproductid']]?.statusdate?.completed ? 
+                                      (participantproductlist[product['participantproductid']].statusdate.completed.toDate() | date: 'mediumDate') : 'N/A' }}  
+                                  </span>
+                              </td> -->
+                          </tr>
+                      </ng-container>
+                  </table>
+              </div>
+              <div class="products-section">
+                  <div class="section-header">
+                      <h6  class="section-title">Bonus</h6>
+                  </div>
+              </div>
+              <div class="table-responsive">
+                  <table class="product-table">
+                      <ng-container *ngFor="let product of journey['participantproducts']; let i = index">
+                          <tr *ngIf="mapPackage[participantproductlist[product['participantproductid']]['packageref'].id] === 'Bonus'">
+                              
+                              <td class="product-name-column">{{ mapproduct[product['productref']?.id] }}</td>
+                              <td class="status-column">
+                                <span class="badge status" [ngClass]="getStatusClass(participantproductlist[product['participantproductid']]?.status)">
+                                    {{ getStatusText(participantproductlist[product['participantproductid']]?.status) }}
+                                </span>
+                            </td>
+                              <!-- <td class="dates-column">
+                                  <span class="badge journey-dates">
+                                      {{ participantproductlist[product['participantproductid']]?.statusdate?.ongoing ?  (participantproductlist[product['participantproductid']].statusdate.ongoing.toDate() | date: 'mediumDate') : 'N/A'}} 
+                                      - 
+                                      {{ participantproductlist[product['participantproductid']]?.statusdate?.completed ? (participantproductlist[product['participantproductid']]?.statusdate?.completed?.toDate() | date: 'mediumDate') : 'N/A'}}  
+                                  </span>
+                              </td> -->
+                          </tr>
+                      </ng-container>
+                  </table>
+              </div>
+          </div>
+      </div>
+    </div>  
+    <!-- <div *ngFor="let product of participantsproduct"> -->
+      <div class="card">
+        <div class="journey-header">
+            <div class="products-section">
+              <div class="header">
+                <h5 class="journey-title">Products</h5>
+                <div class="header-actions">
+                    <button mat-icon-button (click)="openAllproduct()" class="toggle-btn">
+                        <mat-icon *ngIf="!openProductsection">keyboard_arrow_down</mat-icon>
+                        <mat-icon *ngIf="openProductsection">keyboard_arrow_up</mat-icon>
+                    </button>
+                </div>
+              </div>
+            </div>
+        </div>  
+        <div *ngIf="openProductsection">
+        
+          <!-- Mat Table -->
+          <div class="table-container">
+            <table mat-table [dataSource]="productdataSource" class="product-table mat-elevation-2">
+              
+              <!-- Product Name Column -->
+              <ng-container matColumnDef="productName">
+                <th mat-header-cell *matHeaderCellDef >Product</th>
+                <td mat-cell *matCellDef="let element">
+                  {{ mapproduct[element['productref']?.id] }}
+                </td>
+              </ng-container>
+        
+              <!-- Package Column -->
+              <ng-container matColumnDef="packageName">
+                <th mat-header-cell *matHeaderCellDef>Package</th>
+                <td mat-cell *matCellDef="let element">
+                  {{ mapPackage[participantproductlist[element['docid']]['packageref'].id] }}
+                </td>
+              </ng-container>
+        
+              <!-- Mode Column -->
+              <ng-container matColumnDef="mode">
+                <th mat-header-cell *matHeaderCellDef>Mode</th>
+                <td mat-cell *matCellDef="let element">
+                  {{ element.mode }}
+                </td>
+              </ng-container>
+        
+              <!-- Next Mode Column -->
+              <ng-container matColumnDef="nextmode">
+                <th mat-header-cell *matHeaderCellDef>Next Mode</th>
+                <td mat-cell *matCellDef="let element">
+                  {{ element.nextmode || 'N/A' }}
+                </td>
+              </ng-container>
+        
+              <!-- Next Mode Date Column -->
+              <ng-container matColumnDef="nextmodedate">
+                <th mat-header-cell *matHeaderCellDef>Next Mode Date</th>
+                <td mat-cell *matCellDef="let element">
+                  {{ element['nextmodedate'] ? (element['nextmodedate'].toDate()| date:"mediumDate") : 'N/A' }}
+                </td>
+              </ng-container>
+        
+              <!-- Status Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let element">
+                  <span class="badge status" [ngClass]="getStatusClass(element?.status)">
+                    {{ getStatusText(element?.status) }}
+                </span>
+                </td>
+              </ng-container>
+        
+              <!-- Journey Dates Column -->
+              <ng-container matColumnDef="statusdates">
+                <th mat-header-cell *matHeaderCellDef>Status Dates</th>
+                <td mat-cell *matCellDef="let element">
+                  <span class="badge journey-dates">
+                    {{ element?.statusdate?.ongoing ? 
+                      (element.statusdate.ongoing.toDate() | date: 'mediumDate') : 'N/A' }} 
+                    - 
+                    {{ element?.statusdate?.completed ? 
+                      (element.statusdate.completed.toDate() | date: 'mediumDate') : 'N/A' }}  
+                  </span>
+                </td>
+              </ng-container>
+        
+              <!-- Header and Row Declarations -->
+              <tr mat-header-row *matHeaderRowDef="productdisplayedColumns; sticky: true"></tr>
+              <tr mat-row *matRowDef="let row; columns: productdisplayedColumns;"></tr>
+        
+              <!-- No Data Row -->
+              <tr class="mat-row" *matNoDataRow>
+                <td class="mat-cell" [attr.colspan]="productdisplayedColumns.length">
+                  No products found
+                </td>
+              </tr>
+        
+            </table>
+          </div>
+        
+          <!-- Paginator -->
+          <mat-paginator 
+            #paginator2
+            [pageSizeOptions]="[5, 10, 20, 50]"
+            [pageSize]="10"
+            showFirstLastButtons
+            aria-label="Select page of products">
+          </mat-paginator>
+        </div>
+      </div>
+        
+    </div>  
+      
+    <!-- </div> -->
+</div>
+
+<div *ngIf="isloading" class="loading-container">
+  <mat-spinner diameter="40"></mat-spinner>
+  <p>Loading data...</p>
+</div>
+
+
+<!-- Events -->
+<div class="activities-content">
+  <div class="events-section" *ngIf="activeTab === 'Events' && !isloading">
+    <h4 style="margin-left: 10px;font-weight: bold;">Your Events</h4>
+    <div class="tabs-container">
+      <div class="tabs">
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'All'}" (click)="seteventTab('All')">All</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Events Attended'}" (click)="seteventTab('Events Attended')">Events Attended</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Events Not Attended'}" (click)="seteventTab('Events Not Attended')">Events Not Attended</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Upcoming Events'}" (click)="seteventTab('Upcoming Events')">Upcoming Events</button>
+      </div>
+    </div> 
+    <div *ngIf="eventTab === 'All'">
+      <div *ngIf="participantevents.length != 0; else noData">
+        <div class="card">
+            <table class="product-table">
+              <thead>
+                <tr>
+                  <th style="padding-left: 16px;">S.No</th>
+                  <th style="padding-left: 16px;">Event Name</th>
+                  <th style="padding-left: 16px;">Your State</th>
+                  <th style="padding-left: 16px;">Event Date</th>
+                </tr>
+              </thead> 
+              <ng-container *ngFor="let event of paginatedAllEvents; let i = index">
+                <tr>
+                  <td>{{ i + 1 }}.</td>
+                  <td>{{ mapevents[event['eventref'].id]['name'] }} ({{event['eventref'].parent.id == "event collection" ? "Live Event" : "Queue Event"}})</td>
+                  <td>
+                      <span class="badge status" [ngClass]="{
+                          'completed': event['status'] === 'attended',
+                          'ongoing':event['status'] === 'approved' ,
+                          'not-attended' : event['status'] === 'unattended'
+
+                      }">{{ event['status'] === 'approved' ?  'upcoming' : event['status'] }}</span>
+                  </td>
+                  <td>
+                      <span>
+                        <mat-icon style="font-size: 12px;padding-top: 12px">calendar_today</mat-icon>
+                          {{ mapevents[event['eventref'].id]['start_date'] ?  (mapevents[event['eventref'].id]['start_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                          -
+                          {{ mapevents[event['eventref'].id]['end_date'] ? (mapevents[event['eventref'].id]['end_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                      </span>
+                  </td>
+                </tr>
+              </ng-container>
+            </table>
+            <mat-paginator 
+              [length]="getTotalCount('allEvents')"
+              [pageSize]="pageSize"
+              [pageIndex]="currentPages.allEvents"
+              [pageSizeOptions]="[10,50,100,participantevents.length]"
+              [showFirstLastButtons]="true"
+              (page)="onPageChange($event, 'allEvents')">
+            </mat-paginator>
+        </div>
+      </div>
+      <ng-template #noData>
+        <p style="text-align: center;">No data available.</p>
+      </ng-template> 
+    </div>
+
+    <div *ngIf="eventTab === 'Events Attended' && !isloading">
+      <div *ngIf="attendedEvent.length != 0; else noData">
+        <div class="card">
+            <table class="product-table">
+              <thead>
+                <tr>
+                  <th style="padding-left: 16px;">S.No</th>
+                  <th style="padding-left: 16px;">Event Name</th>
+                  <th style="padding-left: 16px;">Your State</th>
+                  <th style="padding-left: 16px;">Event Date</th>
+                </tr>
+              </thead> 
+              <ng-container *ngFor="let event of paginatedAttendedEvents; let i = index">
+                <tr>
+                  <td>{{ i + 1 }}.</td>
+                  <td>{{ mapevents[event['eventref'].id]['name'] }} ({{event['eventref'].parent.id == "event collection" ? "Live Event" : "Queue Event"}})</td>
+                  <td>
+                      <span class="badge status" [ngClass]="{
+                          'completed':event['status'] === 'attended', 
+                      }">{{ event['status'] }}</span>
+                  </td>
+                  <td>
+                      <span>
+                        <mat-icon style="font-size: 12px;padding-top: 12px">calendar_today</mat-icon>
+                          {{ mapevents[event['eventref'].id]['start_date'] ?  (mapevents[event['eventref'].id]['start_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                          -
+                          {{ mapevents[event['eventref'].id]['end_date'] ? (mapevents[event['eventref'].id]['end_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                      </span>
+                  </td>
+                </tr>
+              </ng-container>
+            </table>
+            <mat-paginator 
+              [length]="getTotalCount('attendedEvents')"
+              [pageSize]="pageSize"
+              [pageIndex]="currentPages.attendedEvents"
+              [pageSizeOptions]="[10,50,100,attendedEvent.length]"
+              [showFirstLastButtons]="true"
+              (page)="onPageChange($event, 'attendedEvents')">
+            </mat-paginator>
+        </div>
+      </div>
+      <ng-template #noData>
+        <p style="text-align: center;">No data available.</p>
+      </ng-template> 
+    </div>
+
+    <div *ngIf="eventTab === 'Events Not Attended'">
+      <div *ngIf="unattendedEvent.length != 0; else noData">
+        <div class="card">
+            <table class="product-table">
+              <thead>
+                <tr>
+                  <th style="padding-left: 16px;">S.No</th>
+                  <th style="padding-left: 16px;">Event Name</th>
+                  <th style="padding-left: 16px;">Your State</th>
+                  <th style="padding-left: 16px;">Event Date</th>
+                </tr>
+              </thead> 
+              <ng-container *ngFor="let event of paginatedUnattendedEvents; let i = index">
+                <tr>
+                  <td>{{ i + 1 }}.</td>
+                  <td>{{ mapevents[event['eventref'].id]['name'] }} ({{event['eventref'].parent.id == "event collection" ? "Live Event" : "Queue Event"}})</td>
+                  <td>
+                      <span class="badge status" [ngClass]="{
+                          'not-attended' : event['status'] === 'unattended'
+                      }">{{ event['status'] }}</span>
+                  </td>
+                  <td>
+                      <span>
+                        <mat-icon style="font-size: 12px;padding-top: 12px">calendar_today</mat-icon>
+                          {{ mapevents[event['eventref'].id]['start_date'] ?  (mapevents[event['eventref'].id]['start_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                          -
+                          {{ mapevents[event['eventref'].id]['end_date'] ? (mapevents[event['eventref'].id]['end_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                      </span>
+                  </td>
+                </tr>
+              </ng-container>
+            </table>
+            <mat-paginator 
+              [length]="getTotalCount('unattendedEvents')"
+              [pageSize]="pageSize"
+              [pageIndex]="currentPages.unattendedEvents"
+              [pageSizeOptions]="[10,50,100,unattendedEvent.length]"
+              [showFirstLastButtons]="true"
+              (page)="onPageChange($event, 'unattendedEvents')">
+            </mat-paginator>
+        </div>
+      </div>
+      <ng-template #noData>
+        <p style="text-align: center;">No data available.</p>
+      </ng-template> 
+    </div>
+
+    <div *ngIf="eventTab === 'Upcoming Events'">
+      <div *ngIf="upcomingEvent.length != 0; else noData">
+        <div class="card">
+            <table class="product-table">
+              <thead>
+                <tr>
+                  <th style="padding-left: 16px;">S.No</th>
+                  <th style="padding-left: 16px;">Event Name</th>
+                  <th style="padding-left: 16px;">Your State</th>
+                  <th style="padding-left: 16px;">Event Date</th>
+                </tr>
+              </thead> 
+              <ng-container *ngFor="let event of upcomingEvent; let i = index">
+                <tr>
+                  <td>{{ i + 1 }}.</td>
+                  <td>{{ mapevents[event['eventref'].id]['name'] }} ({{event['eventref'].parent.id == "event collection" ? "Live Event" : "Queue Event"}})</td>
+                  <td>
+                      <span class="badge status" [ngClass]="{
+                          'ongoing': event['status'] === 'approved'
+                      }">{{ 'upcoming' }}</span>
+                  </td>
+                  <td>
+                      <span>
+                        <mat-icon style="font-size: 12px;padding-top: 12px">calendar_today</mat-icon>
+                          {{ mapevents[event['eventref'].id]['start_date'] ?  (mapevents[event['eventref'].id]['start_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                          -
+                          {{ mapevents[event['eventref'].id]['end_date'] ? (mapevents[event['eventref'].id]['end_date'].toDate() | date: 'mediumDate') : 'N/A'}}
+                      </span>
+                  </td>
+                </tr>
+              </ng-container>
+            </table>
+            <mat-paginator 
+              [length]="getTotalCount('upcomingEvents')"
+              [pageSize]="pageSize"
+              [pageIndex]="currentPages.upcomingEvents"
+              [pageSizeOptions]="[10,50,100,upcomingEvent.length]"
+              [showFirstLastButtons]="true"
+              (page)="onPageChange($event, 'upcomingEvents')">
+            </mat-paginator>
+        </div>
+      </div>
+      <ng-template #noData>
+        <p style="text-align: center;">No data available.</p>
+      </ng-template> 
+    </div>
+ 
+  </div>
+</div>
+
+<!-- Appointments -->
+<div class="events-section" *ngIf="activeTab === 'Appointments' && !isloading">
+  <div *ngIf="participantAppointments.length != 0; else noData">
+      <div class="card">
+          <table class="product-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Appointment Type</th>
+                <th>Product</th>
+                <th>Status</th>
+                <th>Specialist</th>
+              </tr>
+            </thead>
+              <ng-container *ngFor="let appointment of paginatedAppointments; let i = index">
+                  <tr>
+                    <td>{{ i + 1 }}.</td>
+                    <td>{{ mapAppointment[appointment['appointment'].id] }}</td>
+                    <td>{{ mapproduct[appointment['productid']] ||'N/A' }}</td>
+                    <td>{{ appointment['attended'] === true ? 'Attended' : 'Cancelled' }}</td>
+                    <td><span *ngFor="let host of appointment['hosts']">{{mapProfile[host.id]}}, </span></td>
+                  </tr>
+              </ng-container>
+          </table>
+          <mat-paginator 
+            [length]="getTotalCount('appointments')"
+            [pageSize]="pageSize"
+            [pageIndex]="currentPages.appointments"
+            [pageSizeOptions]="[10,50,100,participantAppointments.length]"
+            [showFirstLastButtons]="true"
+            (page)="onPageChange($event, 'appointments')">
+          </mat-paginator>
+      </div>
+  </div>
+  <ng-template #noData>
+      <p style="text-align: center;">No data available.</p>
+  </ng-template>  
+</div>
+
+<!-- Customer Tickets -->
+<div *ngIf="activeTab === 'Customer Tickets' && !isloading">
+  <div class="activities-content">
+    <div class="customer-tickets-container">
+    
+      <!-- Tickets Content -->
+      <div class="tickets-content">
+        <div *ngFor="let ticket of customerticket;" class="ticket-card">
+          <!-- Ticket Header -->
+          <div class="ticket-header">
+            <div class="ticket-info">
+              <span class="ticket-number">Ticket No : {{ ticket.issueno }}</span>
+            </div>
+            <div class="ticket-actions">
+              <div class="reported-date">
+                <i class="fas fa-calendar"></i>
+                <span>Reported on {{ ticket.status.date.toDate() | date:'mediumDate' }}</span>
+              </div>
+              <button [ngClass]="{'status-open' : ticket.status.status === 'Open', 'status-closed' : ticket.status.status === 'Closed' }" class="status-btn">
+                {{ getStatusText(ticket.status.status) }}
+              </button>
+              
+              <!-- <button [class]="getStatusClass(ticket.status.status)" class="status-btn">
+                {{ getStatusText(ticket.status.status) }}
+              </button> -->
+            </div>
+          </div>
+          
+          <!-- Ticket Details -->
+          <div class="ticket-details">
+            <div class="category-section">
+              <span class="label">Category :</span>
+              <span class="value">{{ ticket.category }}</span>
+            </div>
+            <div class="reason-section">
+              <span class="label">Reason :</span>
+              <span class="value">{{ ticket.issue }}</span>
+            </div>
+          </div>
+        </div>
+    
+        <!-- Empty State (if no tickets) -->
+        <div *ngIf="customerticket.length === 0" class="empty-state">
+          <i class="fas fa-ticket-alt empty-icon"></i>
+          <h3>No Customer Tickets Found</h3>
+          <p>There are no customer tickets to display at this time.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+ <!-- Profile Forms -->
+<div class="forms-section" *ngIf="activeTab === 'Forms Filled' && !isloading">
+  <div *ngIf="participantforms.length != 0; else noData">
+      <div class="card">
+          <div class="table-responsive">
+              <table class="form-table product-table-form">
+                  <thead>
+                      <tr>
+                          <th>S.No</th>
+                          <th style="padding-left: 14px;">Form Name</th>
+                          <th style="padding-left: 14px;">Workshop</th>
+                          <th style="padding-left: 14px;">Queue</th>
+                          <th *ngIf="fullAccess" style="padding-left: 14px;">Submitted In</th>
+                          <th style="padding-left: 14px;">Date</th>
+                      </tr>
+                  </thead>
+                  <ng-container *ngFor="let form of paginatedForms; let i = index">
+                      <tr (click)="onFormPreview(form)" style="cursor: pointer;"> 
+                          <td>{{ i + 1 }}.</td>
+                          <td class="product-name-column">{{ form['formname'] }}</td>
+                          <td>{{ mapWorkshop[form['workshopref']?.id] || 'N/A'}}</td>
+                          <td>{{ mapQueue[form['queueref']?.id] || 'N/A' }}</td>
+                          <td *ngIf="fullAccess">{{ form.submittedin }}</td>
+                          <td style="font-weight: 700;">{{ form['date'] ? (form['date'].toDate() | date: 'dd/MM/yyyy') : 'N/A'}}
+                          </td>
+                      </tr>
+                  </ng-container>
+              </table>
+              <mat-paginator 
+                [length]="getTotalCount('forms')"
+                [pageSize]="pageSize"
+                [pageIndex]="currentPages.forms"
+                [pageSizeOptions]="[10,50,100,participantforms.length]"
+                [showFirstLastButtons]="true"
+                (page)="onPageChange($event, 'forms')">
+              </mat-paginator>
+          </div>
+      </div>  
+  </div>   
+
+  <ng-template #noData>
+      <p style="text-align: center;">No data available.</p>
+  </ng-template>  
+</div> 
+
+<!-- interim reports -->
+  <div class="section"  *ngIf="activeTab === 'Interim Reports' && !isloading">
+    <div *ngIf="participantreports.length != 0; else noData">
+        <table class="product-table">
+            <thead>
+                <tr>
+                    <th style="padding-left: 15px;">#</th>
+                    <th style="padding-left: 15px;">Reports Done</th>
+                    <th style="padding-left: 15px;">Status</th>
+                    <th style="padding-left: 15px;">Last Update</th>
+                    <th style="padding-left: 15px;">Due Date</th>
+                    <th style="padding-left: 15px;">Lock Date</th>
+                    <th style="padding-left: 15px;">Remainder Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                <ng-container *ngFor="let report of paginatedReports; let i = index">
+                    <tr style="cursor: pointer;" (click)="reportView(report)">
+                        <td>{{ i + 1 }}.</td>
+                        <td>
+                          <ul>
+                            <li *ngFor="let item of mapReport | keyvalue">
+                                <span style="font-weight: bold;">{{ item.value }}</span>
+                                <mat-icon style="padding-top: 3px;"
+                                  [style.color]="(report['reports'] || []).includes(item.key) ? '#28a745' : '#dc3545'"
+                                  [style.margin-left]="'8px'">
+                                  {{ (report['reports'] || []).includes(item.key) ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </li>
+                          </ul>
+                        </td>
+                        <td>
+                            <span>{{report.status || 'N/A'}}</span>
+                        </td>
+                        <td>
+                            <span>{{ (report['lastupdate']?.toDate() | date: 'mediumDate') || 'N/A' }}</span>
+                        </td>
+                        <td>
+                            <span>{{ (report['duedate']?.toDate() | date: 'mediumDate') || 'N/A' }}</span>
+                        </td>
+                        <td>
+                            <span>{{ (report['lockdate']?.toDate() | date: 'mediumDate') || 'N/A'}}</span>
+                        </td>
+                        <td>
+                            <span>
+                            {{  (report['remainderdate']?.toDate() | date: 'mediumDate') || 'N/A'}} 
+                            </span>
+                        </td>
+                    </tr>
+                </ng-container>
+            </tbody>    
+        </table>
+        <mat-paginator 
+          [length]="getTotalCount('reports')"
+          [pageSize]="pageSize"
+          [pageIndex]="currentPages.reports"
+          [pageSizeOptions]="[10,50,100,participantreports.length]"
+          [showFirstLastButtons]="true"
+          (page)="onPageChange($event, 'reports')">
+        </mat-paginator>
+    </div> 
+    <ng-template  #noData>
+        <p style="text-align: center;">No data available.</p>
+    </ng-template>   
+</div>  
+
+
+<!-- breakthroughs -->
+<div class="section"  *ngIf="activeTab === 'Breakthroughs' && !isloading">
+  <div *ngIf="breakthroughs.length != 0; else noData">
+    <div class="breakthroughs-content">
+      <div *ngFor="let post of breakthroughs let i = index" class="breakthrough-card">
+        
+        <!-- Card Header -->
+        <div class="card-header">
+          <div class="category-section">
+            <i [class]="getCategoryIcon(mappostcategory[post['postcategory'].id])" 
+              [style.color]="getCategoryColor(mappostcategory[post['postcategory'].id])"
+              class="category-icon"></i>
+            <span class="category-label">Category :</span>
+            <span class="category-value">{{ mappostcategory[post['postcategory'].id] }}</span>
+          </div>
+          
+          <div class="card-actions">
+            <div class="likes-section">
+              <button 
+                class="like-btn"
+                [class.liked]="post.isLiked">
+                <i class="far fa-heart" [class.fas]="post.isLiked"></i>
+                <span>{{ post.likesCount }} Likes</span>
+              </button>
+            </div>
+            <div class="posted-date">
+              <span>Posted on {{ post.created.toDate() | date: "dd/MM/yyyy" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Content -->
+        <div class="card-content">
+          <!-- Content Layout -->
+          <div class="content-layout" [class.with-image]="post.postimagelist">
+            
+            <!-- Image Section (if available) -->
+            <div *ngIf="post.postimagelist" class="image-section">
+              <h4 class="section-title">Image</h4>
+              <div *ngFor="let image of post.postimagelist">
+                <div class="image-container">
+                  <img [src]="image" [alt]="'breakthrough'" class="breakthrough-image">
+                </div>
+              </div>  
+            </div>
+        
+            <!-- Behavior Sections Container -->
+            <div class="behavior-sections">
+              <!-- Old Behaviour Section -->
+              <div class="behaviour-section">
+                <h4 class="section-title">Old Behaviour</h4>
+                <div class="behaviour-content">
+                  <p>{{ post.paralleltrajectory }}</p>
+                </div>
+              </div>
+        
+              <!-- New Behaviour Section -->
+              <div class="behaviour-section" *ngIf="post.postmessage">
+                <h4 class="section-title">New Behaviour</h4>
+                <div class="behaviour-content">
+                  <p>{{ post.postmessage }}</p>
+                </div>
+              </div>
+        
+              <!-- Empty New Behaviour Section -->
+              <div class="behaviour-section empty" *ngIf="!post.postmessage">
+                <h4 class="section-title">New Behaviour</h4>
+                <div class="behaviour-content empty-content">
+                  <p class="empty-text">No new behaviour recorded yet.</p>
+                </div>
+              </div>
+            </div>
+        
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Empty State -->
+  <ng-template class="empty-state" #noData>
+    <div class="empty-icon" style="text-align: center;">
+      <i class="fas fa-lightbulb"></i>
+      <h3 >No Breakthroughs Yet</h3>
+    </div>
+    <!-- <p>Start documenting your breakthrough moments and personal growth journey.</p> -->
+  </ng-template>
+
+</div>
+<!-- AEL -->
+  <div *ngIf="activeTab === 'AEL'" class="section" style="overflow: hidden;">
+    <div class="mat-elevation-z8" style="height: 100%; overflow-y: auto;" *ngIf="aeldata.length != 0; else noData">
+        <table mat-table [dataSource]="dataSource" matSort>
+            <!-- <ng-container matColumnDef="edit">
+                <th mat-header-cell *matHeaderCellDef class="edit-column"> Edit </th>
+                <td mat-cell *matCellDef="let row" class="edit-column">
+                    <button [disabled]="loggedInProfileId !== 'tGE64OoJuurjayW3tJKa' && loggedInProfileId !== 'l0ApFnXuM5Ac8tpqJQnk'" mat-icon-button (click)="editRow(row)">
+                        <mat-icon>edit</mat-icon>
+                    </button>
+                </td>
+            </ng-container> -->
+            <ng-container matColumnDef="sno">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="sno-column"> S.No </th>
+                <td mat-cell *matCellDef="let row; let i = index" class="sno-column">
+                    {{ i + 1 }}
+                </td>                    
+            </ng-container>
+            
+            <ng-container matColumnDef="created">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="date-column"> Date </th>
+                <td mat-cell *matCellDef="let row" class="date-column"> 
+                    {{row.created.toDate() | date: 'MMM d, yyyy'}} 
+                </td>
+            </ng-container>
+    
+        <ng-container matColumnDef="business">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Business </th>
+            <td mat-cell *matCellDef="let row">
+                <ul>
+                    <li *ngFor="let item of row.business | keyvalue">
+                    <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                    </li>
+                </ul>
+            </td>
+        </ng-container>
+        
+        <ng-container matColumnDef="career">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Career </th>
+            <td mat-cell *matCellDef="let row">
+                <ul>
+                    <li *ngFor="let item of row.career | keyvalue">
+                        <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                    </li>
+                </ul>
+            </td>
+        </ng-container>
+        
+        <ng-container matColumnDef="family">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Family </th>
+            <td mat-cell *matCellDef="let row">
+                <ul>
+                    <li *ngFor="let item of row.family | keyvalue">
+                        <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                    </li>
+                </ul>
+            </td>
+        </ng-container>
+        
+        <ng-container matColumnDef="health">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Health </th>
+            <td mat-cell *matCellDef="let row">
+                <ul>
+                    <li *ngFor="let item of row.health | keyvalue">
+                        <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                    </li>
+                </ul>
+            </td>
+        </ng-container>
+        
+        <ng-container matColumnDef="personalGenius">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> Personal Genius </th>
+            <td mat-cell *matCellDef="let row">
+                <ul>
+                    <li *ngFor="let item of row.personalGenius | keyvalue">
+                        <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                    </li>
+                </ul>
+            </td>
+        </ng-container>
+                            
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+        <mat-paginator 
+        #paginator1
+        [pageSizeOptions]="[10, 20, 50,dataSource.data.length]"
+        [pageSize]="10"
+        showFirstLastButtons
+        aria-label="Select page of products">
+      </mat-paginator>
+    </div>
+    <ng-template  #noData>
+      <p style="text-align: center;">No data available.</p>
+  </ng-template>
+</div>
+
+<!-- Notifications -->
+<div class="events-section" *ngIf="activeTab === 'Notifications' && !isloading">
+  <div *ngIf="notificationList.length != 0; else noData">
+      <div class="card">
+          <table class="product-table">
+            <thead>
+              <tr>
+                <th style="padding-left: 15px;">#</th>
+                <th style="padding-left: 15px;">Log Date</th>
+                <th style="padding-left: 15px;">Type</th>
+                <th style="padding-left: 15px;">Message</th>
+              </tr>
+            </thead>
+              <ng-container *ngFor="let log of paginatedNotifications; let i = index">
+                  <tr>
+                    <td>{{ i + 1 }}.</td>
+                    <td>{{ log['date']?.toDate() | date:'dd/MM/yyyy h:mm a'  }}</td>
+                    <td>{{ log['type'] }}</td>
+                    <td>{{ log['message'] }}</td>
+                  </tr>
+              </ng-container>
+          </table>
+          <mat-paginator 
+            [length]="getTotalCount('notificatons')"
+            [pageSize]="pageSize"
+            [pageIndex]="currentPages.notifications"
+            [pageSizeOptions]="[10,50,100,notificationList.length]"
+            [showFirstLastButtons]="true"
+            (page)="onPageChange($event, 'notificatons')">
+          </mat-paginator>
+      </div>
+  </div>
+  <ng-template #noData>
+      <p style="text-align: center;">No data available.</p>
+  </ng-template>  
+</div>
+
+<!-- Touch Point -->
+ <div class="events-section" *ngIf="activeTab === 'Touch Point' && !isloading && fullAccess">
+  <div *ngIf="touchpointList.length != 0; else noData">
+    <div class="ps-1">
+      <mat-label class="timedelaymetric">
+        Selected Average Time Interval: {{timeDelayAvg}}.
+        <!-- <span class="text-secondary"> (Includes: {{timedelayTouchPoint.join(", ")}})</span> -->
+      </mat-label>
+      <mat-checkbox class="me-1" *ngFor="let touchpoint of selectedTouchPoint;" [checked]="timedelayTouchPoint.includes(touchpoint)" (change)="updateTimeDelayTouchPoint(touchpoint)">{{touchpoint}}</mat-checkbox>
+    </div>
+    <div class="card">
+        <table class="product-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Touch Point Type</th>
+              <th>Label</th>
+              <th>Touch Point Time</th>
+              <th>Notes</th>
+              <th>Log Date</th>
+            </tr>
+          </thead>
+            <ng-container *ngFor="let log of paginatedTouchpoint; let i = index">
+                <tr>
+                  <td>{{ i + 1 }}.</td>
+                  <td>{{ log['touchpoint'] }}</td>
+                  <td>{{ log['label'] }}</td>
+                  <td>{{ log['touchpointdate']?.toDate() | date:'dd/MM/yyyy h:mm a'  }}</td>
+                  <td>{{ log['notes'] }}</td>
+                  <td>{{ log['logdate']?.toDate() | date:'dd/MM/yyyy h:mm a'  }}</td>
+                </tr>
+            </ng-container>
+        </table>
+        <mat-paginator 
+          [length]="getTotalCount('touchpoint')"
+          [pageSize]="pageSize"
+          [pageIndex]="currentPages.touchpoint"
+          [pageSizeOptions]="[25, 50, 100, touchpointList.length]"
+          [showFirstLastButtons]="true"
+          (page)="onPageChange($event, 'touchpoint')">
+        </mat-paginator>
+    </div>
+  </div>
+  <ng-template #noData>
+      <p style="text-align: center;">No data available.</p>
+  </ng-template>  
+</div>
+

@@ -1,0 +1,14 @@
+<mat-tab-group mat-align-tabs="center" animationDuration="0ms">
+    <mat-tab *ngFor="let tab of tabs">
+        <ng-template mat-tab-label>
+            <span>{{tab}}</span>
+        </ng-template>
+
+        <div class="mattab-content">
+            <app-view-arena-space *ngIf="tab == 'View Arena Space'"></app-view-arena-space>
+            <app-create-arena-space *ngIf="tab == 'Create Arena Space'"></app-create-arena-space>
+            <app-create-space *ngIf="tab == 'Create/Edit Space'"></app-create-space>
+            <app-create-space-type *ngIf="tab == 'Create/Edit Type'"></app-create-space-type>
+        </div>
+    </mat-tab>
+</mat-tab-group> 

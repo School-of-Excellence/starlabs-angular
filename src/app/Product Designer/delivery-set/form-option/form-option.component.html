@@ -1,0 +1,19 @@
+<div class="mainscreen m-4">
+    <div *ngIf="draftOption.length != 0">
+      <h5 class="title">Draft Forms</h5>
+      <ul>
+        <li *ngFor="let form of draftOption; let i = index">
+          Draft Date - {{form.data()["date"].toDate() | date:"medium"}}
+          <button mat-icon-button class="selectbtn" (click)="selecteForm('draft', form)">
+            <mat-icon class="icon">check</mat-icon>
+          </button>
+          <button mat-icon-button class="deletebtn" (click)="deleteDraft(form.id, i)">
+            <mat-icon class="icon">delete_outline</mat-icon>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div class="actionbox">
+      <button class="closebtn" mat-stroked-button (click)="close()">Close</button>
+    </div>
+</div>

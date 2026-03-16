@@ -1,0 +1,238 @@
+<div *ngIf="loading">
+  Connecting...
+</div>
+
+<!-- Preview - Not Joined the meeting -->
+<div *ngIf="!room() && !loading && meetingRoomStatus == null" class="prejoin-container">
+  
+  <div class="title">{{roomDetail.title}}</div>
+  
+  <!-- Video Preview -->
+  <div class="video-preview">
+    <app-openvidu-video-element
+      *ngIf="localParticipant()"
+      [track]="localParticipant()"
+      [participantIdentity]="'You'">
+    </app-openvidu-video-element>
+
+    <!-- Placeholder if video not yet allowed -->
+    <div class="video-placeholder" *ngIf="!localParticipant()">
+      <span class="material-icons">videocam_off</span>
+    </div>
+  </div>
+
+  <!-- Status Row -->
+  <div class="status-row">
+    <!-- Camera Status -->
+    <div class="status-item">
+      <span class="material-icons" [ngClass]="'status-' + cameraStatus">
+        {{ cameraStatus === 'granted' ? 'videocam' : 'videocam_off' }}
+      </span>
+      <div>
+        <div class="status-label">Camera</div>
+        <div class="status-value" [ngClass]="'status-' + cameraStatus">
+          {{ cameraStatus === 'granted' ? 'Ready' : cameraStatus === 'denied' ? 'Blocked' : 'Not enabled' }}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Microphone Status -->
+    <div class="status-item">
+      <span class="material-icons" [ngClass]="'status-' + micStatus">
+        {{ micStatus === 'granted' ? 'mic' : 'mic_off' }}
+      </span>
+      <div>
+        <div class="status-label">Microphone</div>
+        <div class="status-value" [ngClass]="'status-' + micStatus">
+          {{ micStatus === 'granted' ? 'Ready' : micStatus === 'denied' ? 'Blocked' : 'Not enabled' }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="buttons">
+    <button class="btn-enable" (click)="prepareParticipant()" [disabled]="isRequesting">
+      Enable Access
+    </button>
+    <button class="btn-join" (click)="joinCall()" [disabled]="cameraStatus !== 'granted' || micStatus !== 'granted'">
+      Join Call
+    </button>
+  </div>
+
+  <!-- Warning hint for denied permissions -->
+  <p class="hint" *ngIf="cameraStatus === 'denied' || micStatus === 'denied'">
+    ⚠️ Permissions blocked. Please allow camera & microphone in browser settings.
+  </p>
+
+</div>
+
+<!-- Connecting to the Meeting -->
+<div *ngIf="!loading && meetingRoomStatus == 'connecting'" class="text-center w-100 p-5 fw-700 fs-4">
+  Connecting the Call...
+</div>
+
+<!-- Connected to the Meeting -->
+<div #meetingContainer *ngIf="room() && meetingRoomStatus == 'connected'" class="zoom-container">
+  
+
+  <!-- Zoom-style Header -->
+  <div class="zoom-header">
+    <span class="header-title">
+      <strong>{{ roomDetail["title"] ?? loggedinProfileRole["name"] }}</strong>  
+    </span>
+
+    <!-- Recording Status -->
+    <div class="recording-status">
+      <!-- Status visible to all -->
+      <span *ngIf="roomDetail.recordingstatus === 'started'">This meeting is being recorded</span>
+      <span *ngIf="roomDetail.recordingstatus === 'starting'">Recording is starting...</span>
+      <span *ngIf="roomDetail.recordingstatus === 'ending'">Recording is stopping...</span>
+      <span *ngIf="roomDetail.recordingstatus === 'ended' || roomDetail?.recordingstatus === 'idle'">Recording is stopped</span>
+
+      <!-- Host buttons only -->
+      <button 
+        *ngIf="(
+          roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']
+        ) && roomDetail.recordingstatus === 'started'" 
+        class="zoom-btn stop-record-btn"
+        (click)="toggleRecording()">
+        Stop Recording
+      </button>
+
+      <button 
+        *ngIf="(
+          roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']
+        ) && (roomDetail?.recordingstatus === 'ended' || roomDetail?.recordingstatus === 'idle')" 
+        class="zoom-btn start-record-btn"
+        (click)="toggleRecording()">
+        Start Recording
+      </button>
+    </div>
+  </div>
+
+  <!-- VIDEO GRID -->
+  <div class="zoom-video-grid" [attr.data-count]="getVideoParticipantCount()">
+
+    <!-- LOCAL VIDEO (now inside grid like Zoom) -->
+    <div class="zoom-video-tile">
+      <app-openvidu-video-element
+        [track]="localParticipant()"
+        [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
+      </app-openvidu-video-element>
+
+      <!-- Name badge -->
+      <div class="zoom-name-badge">
+        {{ loggedinProfileRole["name"] }} (You)
+        <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+      </div>
+    </div>
+
+    <!-- REMOTE PARTICIPANTS -->
+    <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
+      <div class="zoom-video-tile" *ngIf="remote.trackPublication.kind === 'video'">
+
+        <app-openvidu-video-element
+          [track]="remote.trackPublication.videoTrack"
+          [participantIdentity]="remote.participantName">
+        </app-openvidu-video-element>
+
+        <!-- Name badge -->
+        <div class="zoom-name-badge">
+          {{ remote.participantName }}
+          <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+          <mat-icon class="material-icons text-primary" *ngIf="activeSpeakers.includes(remote.participantIdentity)">record_voice_over</mat-icon>
+        </div>
+      </div>
+    </ng-container>
+
+  </div>
+
+  <!-- AUDIO ONLY -->
+  <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
+    <app-openvidu-audio-element
+      *ngIf="remote.trackPublication.kind === 'audio'"
+      [track]="remote.trackPublication.audioTrack">
+    </app-openvidu-audio-element>
+  </ng-container>
+
+  <!-- FIXED BOTTOM TOOLBAR (Zoom-style design) -->
+  <div class="zoom-toolbar">
+
+    <div class="zoom-controls">
+
+      <button class="zoom-btn" [class.muted]="isAudioMuted()" (click)="toggleMute()">
+        <span class="material-icons">{{isAudioMuted() ? "mic_off" : "mic"}}</span>
+        <span class="zoom-btn-label">{{isAudioMuted() ? "Unmute" : "Mute"}}</span>
+      </button>
+
+      <button class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
+        <span class="material-icons">{{isVideoHidden() ? "videocam_off" : "videocam"}}</span>
+        <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
+      </button>
+
+      <button class="zoom-btn" [class.active]="isSharing" (click)="toggleScreenShare()">
+        <span class="material-icons">{{isSharing ? "stop_screen_share" : "screen_share"}}</span>
+        <span class="zoom-btn-label">{{isSharing ? "Stop Share" : "Share"}}</span>
+      </button>
+
+      <button class="zoom-btn" [class.fullscreen]="isFullscreen" (click)="toggleFullscreen()">
+        <span class="material-icons">fullscreen</span>
+        <span class="zoom-btn-label">Full Screen</span>
+      </button>
+
+      <!-- <button class="zoom-btn" [class.active]="roomDetail.recordingstatus == 'started'" (click)="toggleRecording()">
+        <span class="material-icons">{{roomDetail.recordingstatus == 'started' ? "stop_circle" : "fiber_manual_record"}}</span>
+        <span class="zoom-btn-label">{{roomDetail.recordingstatus == 'started' ? "Stop Recording" : "Record"}}</span>
+      </button> -->
+
+      <!-- <button class="zoom-btn" (click)="takeSnapshot()">
+        <span class="material-icons">photo_camera</span>
+        <span class="zoom-btn-label">Snapshot</span>
+      </button> -->
+
+    </div>
+
+    <button 
+      *ngIf="roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']; else leaveMenu"
+      class="zoom-btn-end" mat-icon-button [matMenuTriggerFor]="userMenu"
+    >
+      <span class="material-icons">call_end</span>
+      <span class="zoom-btn-label">End Meeting</span>
+    </button>
+    <mat-menu #userMenu="matMenu">
+      <button class="text-danger" mat-menu-item (click)="endCall()">
+        <mat-icon>call_end</mat-icon>
+        <span>End Meeting for All</span>
+      </button>
+      <button mat-menu-item (click)="leaveRoom(true)">
+        <mat-icon>exit_to_app</mat-icon>
+        <span>Leave Meeting</span>
+      </button>
+    </mat-menu>
+
+    <ng-template #leaveMenu>
+      <button class="zoom-btn-end" (click)="leaveRoom(true)">
+        <span class="material-icons">call_end</span>
+        <span class="zoom-btn-label">Leave Meeting</span>
+      </button>
+    </ng-template>
+
+  </div>
+
+</div>
+
+<div *ngIf="!loading && meetingRoomStatus == 'left'" class="text-center w-100 p-5 fw-700 fs-4">
+  You left the Meeting.
+  <br>
+  Refresh to Join the Call again
+</div>
+
+<div *ngIf="!loading && meetingRoomStatus == 'ended'" class="text-center w-100 p-5 fw-700 fs-4">
+  <div *ngIf="roomDetail.hosts.includes(loggedinProfileid); else nonHostTest">
+    The Meeting is Ended. Close and Join Meeting to start again
+  </div>
+  <ng-template #nonHostTest>
+    The Meeting is Closed or not Started yet. Only Host can Start the Meeting.
+  </ng-template>
+</div>

@@ -1,0 +1,434 @@
+<!-- 
+  EVENT ZONE MANAGEMENT COMPONENT TEMPLATE
+  
+  This template provides an interface for managing zone assignments for events.
+  It uses Bootstrap 5 for layout and styling.
+  
+  LAYOUT STRUCTURE:
+  - Header with event selector and statistics
+  - Main content area with 2 columns:
+    - Left: Event zones list (8 columns)
+    - Right: Available cohorts sidebar (4 columns)
+-->
+
+<div class="zone-management-container">
+  
+  <!-- ========================================================================
+  HEADER SECTION
+  - Event selector dropdown
+  - Statistics cards
+  - Submit button
+  ======================================================================== -->
+  <div class="header-section">
+    <div class="container-fluid">
+      <div class="row align-items-center">
+        
+        <!-- Left: Title and Event Selector -->
+        <div class="col-md-8">
+          <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="zone-icon">
+              <mat-icon>location_on</mat-icon>
+            </div>
+            <div>
+              <h2 class="page-title">Zone Configuration</h2>
+            </div>
+          </div>
+          
+          <mat-form-field appearance="outline" style="width: 400px;">
+            <mat-label>Select Event</mat-label>
+            <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
+              <mat-option *ngFor="let event of eventList" [value]="event">
+                {{event["name"]}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Right: Statistics in Row -->
+        <div class="col-md-4" *ngIf="selectedEvent">
+          <div class="stats-row">
+            <div class="stat-mini">
+              <div class="stat-value">{{ zonesCreated }}</div>
+              <div class="stat-label">Zones</div>
+            </div>
+            <div class="stat-mini">
+              <div class="stat-value">{{ cohortsAssigned }}</div>
+              <div class="stat-label">Assigned</div>
+            </div>
+            <div class="stat-mini">
+              <div class="stat-value">{{ unassignedCohortsCount }}</div>
+              <div class="stat-label">Unassigned</div>
+            </div>
+            <div class="stat-mini highlight" (click)="returnMappedParticipants()">
+              <div class="stat-value">{{ participantsMapped }}/{{ totalParticipants }}</div>
+              <div class="stat-label">Mapped</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+  MAIN CONTENT SECTION
+  Shows event zones and available cohorts side by side
+  ======================================================================== -->
+  <div *ngIf="selectedEvent">
+    <div class="container-fluid">
+      <div class="row">
+        <!-- ====================================================================
+        LEFT COLUMN: EVENT ZONES
+        Shows all zones with their assigned cohorts
+        ==================================================================== -->
+        <div class="col-lg-8">
+          <div class="zones-section">
+            <!-- Section Header -->
+            <div class="section-header">
+              <h3 class="section-title">Event Zones</h3>
+              <div class="section-actions">
+                <button mat-raised-button color="accent" class="create-zone-btn" (click)="openCreateZoneDialog(null)">
+                  <mat-icon>add</mat-icon>
+                  Create Zone
+                </button>
+                <button 
+                  mat-raised-button 
+                  class="view-participant-btn"
+                  (click)="openParticipantZoneOverlay()">
+                  <mat-icon>visibility</mat-icon>
+                  View Participant Zone
+                </button>
+                <button 
+                  mat-raised-button 
+                  color="primary" 
+                  class="submit-btn"
+                  (click)="submitConfiguration()">
+                  <mat-icon>check_circle</mat-icon>
+                  Update Participant Zone
+                </button>
+              </div>
+            </div>
+
+            <!-- Zone Cards -->
+            <div class="zones-list">
+              <!-- Empty State: No zones -->
+              <div class="empty-state" *ngIf="eventZoneList.length === 0">
+                <mat-icon>inbox</mat-icon>
+                <p>No zones created yet</p>
+                <button mat-raised-button color="primary">Create First Zone</button>
+              </div>
+
+              <!-- Zones Grid -->
+              <div class="zones-grid">
+                <div class="zone-card" *ngFor="let zone of eventZoneList">
+                  
+                  <!-- Zone Header -->
+                  <div class="zone-header">
+                    <div class="zone-info">
+                      <h4 class="zone-name">{{ zone["zonename"] }}</h4>
+                      <div class="zone-meta">
+                        <span class="meta-item" *ngIf="zone['starttime']">
+                          <mat-icon>schedule</mat-icon>
+                          {{ formatTime(zone["starttime"]) }}
+                        </span>
+                        <span class="meta-item" style="cursor: pointer;">
+                          <mat-icon>people</mat-icon>
+                          {{ (zone["_participantlist"] || []).length }} participants
+                        </span>
+                      </div>
+                      <!-- Coordinators & Mentors -->
+                      <div class="zone-team">
+                        <span class="team-label">
+                          <strong>Coordinator:&nbsp;</strong>
+                          <span *ngFor="let name of zone['coordinators']; let islast = last">{{mapProfile[name]}}{{!islast ? ", " : ""}}</span>
+                        </span>
+                        <br>
+                        <span class="team-label">
+                          <strong>Mentor:&nbsp;</strong> 
+                          <span *ngFor="let name of zone['mentors']; let islast = last">{{mapProfile[name]}}{{!islast ? ", " : ""}}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div class="zone-actions">
+                      <button mat-icon-button color="primary" (click)="openCreateZoneDialog(zone)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <mat-slide-toggle color="primary" [checked]="zone['status'] === 'open'" (change)="toggleZoneStatus($event, zone)"></mat-slide-toggle>
+                    </div>
+                  </div>
+
+                  <!-- Zone Body: Cohort Names List (Fixed Height with Scroll) -->
+                  <div class="zone-body">
+                    <div class="no-cohorts" *ngIf="!zone['_assignedCohorts'] || zone['_assignedCohorts'].length === 0">
+                      <mat-icon>group_add</mat-icon>
+                      <p>No cohorts assigned</p>
+                    </div>
+
+                    <div class="cohorts-names-list" *ngIf="zone['_assignedCohorts'] && zone['_assignedCohorts'].length > 0">
+                      <div class="cohort-name-item" *ngFor="let cohort of zone['_assignedCohorts']">
+                        <div class="cohort-line-1">
+                          <span class="cohort-name">{{ cohort["name"] }}</span>
+                          <button mat-icon-button class="cohort-remove-btn" (click)="removeCohortFromZone(cohort['docid'], zone['docid'])">
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </div>
+                        <div class="cohort-line-2">
+                          <span class="cohort-badge" [ngClass]="getCategoryBadgeClass(cohort['cohortCategory'])">
+                            {{ cohort["cohortCategory"] | uppercase }}
+                          </span>
+                          <span class="cohort-count">{{ getCohortParticipantCount(cohort) }} participants</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Zone Footer -->
+                  <div class="zone-footer" style="cursor: pointer;">
+                    {{ (zone["_assignedCohorts"] || []).length }} cohorts • {{ (zone["_participantlist"] || []).length }} participants
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+        RIGHT COLUMN: AVAILABLE COHORTS
+        Shows unassigned cohorts that can be added to zones
+        ==================================================================== -->
+        <div class="col-lg-4">
+          <div class="cohorts-sidebar">
+            
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+              <h3 class="sidebar-title">Available Cohorts ({{ getUnassignedCohorts().length }}/{{ operationalCohortList.length + educationalCohortList.length }})</h3>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="cohort-filters">
+              <button 
+                class="filter-btn"
+                [class.active]="cohortFilter === 'all'"
+                (click)="setCohortFilter('all')">
+                All
+              </button>
+              <button 
+                class="filter-btn"
+                [class.active]="cohortFilter === 'operational'"
+                (click)="setCohortFilter('operational')">
+                Operational <!-- ({{ operationalCohortList.length }}) -->
+              </button>
+              <button 
+                class="filter-btn"
+                [class.active]="cohortFilter === 'educational'"
+                (click)="setCohortFilter('educational')">
+                Educational <!-- ({{ educationalCohortList.length }}) -->
+              </button>
+            </div>
+
+            <!-- Search Box -->
+            <div class="search-box">
+              <mat-form-field appearance="outline" class="w-100">
+                <mat-label>Search cohorts...</mat-label>
+                <input matInput [(ngModel)]="searchTerm" placeholder="Type to search">
+                <mat-icon matPrefix>search</mat-icon>
+              </mat-form-field>
+            </div>
+
+            <!-- Bulk Actions Bar (shown when cohorts are selected) -->
+            <div class="bulk-actions" *ngIf="hasSelectedCohorts">
+              <div class="bulk-actions-content">
+                <span class="selected-count">{{ selectedCount }} cohort(s) selected</span>
+                <button mat-button (click)="clearSelection()">Clear</button>
+              </div>
+              
+              <!-- Zone Selector for Bulk Assignment -->
+              <mat-form-field appearance="outline" class="w-100 mt-2">
+                <mat-label>Assign to Zone</mat-label>
+                <mat-select (selectionChange)="assignSelectedCohortsToZone($event.value)">
+                  <mat-option *ngFor="let zone of eventZoneList" [value]="zone['docid']">
+                    {{ zone["zonename"] }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <!-- Cohorts List -->
+            <div class="available-cohorts-list">
+              
+              <!-- Empty State: No unassigned cohorts -->
+              <div class="empty-state" *ngIf="getUnassignedCohorts().length === 0">
+                <mat-icon>check_circle</mat-icon>
+                <p>All cohorts have been assigned!</p>
+              </div>
+
+              <!-- Cohort Item (repeated for each unassigned cohort) -->
+              <div 
+                class="cohort-item"
+                *ngFor="let cohort of getUnassignedCohorts()"
+                [class.selected]="isCohortSelected(cohort['docid'])"
+                (click)="toggleCohortSelection(cohort['docid'])">
+                
+                <!-- Checkbox -->
+                <mat-checkbox 
+                  [checked]="isCohortSelected(cohort['docid'])"
+                  (change)="toggleCohortSelection(cohort['docid'])"
+                  (click)="$event.stopPropagation()">
+                </mat-checkbox>
+
+                <!-- Cohort Icon -->
+                <div class="cohort-item-icon">
+                  <mat-icon>groups</mat-icon>
+                </div>
+
+                <!-- Cohort Details -->
+                <div class="cohort-item-details">
+                  <div class="cohort-item-name">{{ cohort["name"] }}</div>
+                  <div class="cohort-item-meta">
+                    <span 
+                      class="cohort-badge"
+                      [ngClass]="getCategoryBadgeClass(cohort['cohortCategory'])">
+                      {{ cohort["cohortCategory"] | uppercase }}
+                    </span>
+                    <span class="cohort-item-count">
+                      {{ getCohortParticipantCount(cohort) }} participants
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+  EMPTY STATE: No Event Selected
+  ======================================================================== -->
+  <div class="empty-container" *ngIf="!selectedEvent">
+    <div class="empty-state-large">
+      <mat-icon>event</mat-icon>
+      <h3>Select an Event to Begin</h3>
+      <p>Choose an event from the dropdown above to view and manage zone configurations</p>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+  PARTICIPANT ZONE OVERLAY
+  Shows all participants with their zone assignments
+  ======================================================================== -->
+  <div class="participant-zone-overlay" *ngIf="showParticipantZoneOverlay">
+    <div class="overlay-backdrop" (click)="closeParticipantZoneOverlay()"></div>
+    <div class="overlay-content">
+      <!-- Overlay Header -->
+      <div class="overlay-header">
+        <div class="overlay-title-section">
+          <mat-icon class="overlay-icon">people</mat-icon>
+          <div>
+            <h2 class="overlay-title">Participant Zone Assignments</h2>
+            <p class="overlay-subtitle">{{ selectedEvent?.name }} • {{ participantZoneList.length }} participants</p>
+          </div>
+        </div>
+        <div class="overlay-actions">
+          <button 
+            mat-raised-button 
+            color="primary" 
+            class="export-btn"
+            (click)="exportParticipantZonesToExcel()"
+            [disabled]="participantZoneList.length === 0">
+            <mat-icon>file_download</mat-icon>
+            Export to Excel
+          </button>
+          <button mat-icon-button class="close-btn" (click)="closeParticipantZoneOverlay()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Box -->
+      <div class="overlay-search">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Search participants...</mat-label>
+          <input matInput [(ngModel)]="participantZoneSearchTerm" placeholder="Search by name, email, or zone">
+          <mat-icon matPrefix>search</mat-icon>
+          <button mat-icon-button matSuffix *ngIf="participantZoneSearchTerm" (click)="participantZoneSearchTerm = ''">
+            <mat-icon>clear</mat-icon>
+          </button>
+        </mat-form-field>
+        <div class="search-results-count">
+          Showing {{ getFilteredParticipantZones().length }} of {{ participantZoneList.length }} participants
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="overlay-loading" *ngIf="isLoadingParticipantZones">
+        <mat-icon class="spin">sync</mat-icon>
+        <p>Loading participant zones...</p>
+      </div>
+
+      <!-- Participant List -->
+      <div class="overlay-body" *ngIf="!isLoadingParticipantZones">
+        <!-- Empty State -->
+        <div class="overlay-empty" *ngIf="participantZoneList.length === 0">
+          <mat-icon>inbox</mat-icon>
+          <p>No participant zone assignments found</p>
+          <span>Run "Update Zone Detail" to create assignments</span>
+        </div>
+
+        <!-- No Search Results -->
+        <div class="overlay-empty" *ngIf="participantZoneList.length > 0 && getFilteredParticipantZones().length === 0">
+          <mat-icon>search_off</mat-icon>
+          <p>No participants match your search</p>
+          <span>Try a different search term</span>
+        </div>
+
+        <!-- Participant Cards -->
+        <div class="participant-list" *ngIf="getFilteredParticipantZones().length > 0">
+          <div class="participant-card" *ngFor="let participant of getFilteredParticipantZones(); let i = index">
+            <div class="participant-number">{{ i + 1 }}</div>
+            <div class="participant-main">
+              <div class="participant-header">
+                <div class="participant-identity">
+                  <h4 class="participant-name">{{ participant.participantName }}</h4>
+                  <span class="participant-email">{{ participant.participantEmail }}</span>
+                </div>
+                <div class="participant-zone-badge">
+                  <mat-icon>location_on</mat-icon>
+                  {{ participant.selectedZoneName }}
+                </div>
+              </div>
+              
+              <div class="participant-details">
+                <div class="detail-row">
+                  <span class="detail-label">Eligible Zones:</span>
+                  <div class="detail-chips">
+                    <span class="detail-chip zone-chip" *ngFor="let zone of participant.eligibleZoneNames">
+                      {{ zone }}
+                    </span>
+                    <span class="no-data" *ngIf="participant.eligibleZoneNames.length === 0">None</span>
+                  </div>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Eligible Cohorts:</span>
+                  <div class="detail-chips">
+                    <span class="detail-chip cohort-chip" *ngFor="let cohort of participant.eligibleCohortNames">
+                      {{ cohort }}
+                    </span>
+                    <span class="no-data" *ngIf="participant.eligibleCohortNames.length === 0">None</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="participant-footer">
+                <span class="assignment-type" [class.manual]="participant.addedflow === 'manual'" [class.automatic]="participant.addedflow === 'automatic'">
+                  <mat-icon>{{ participant.addedflow === 'manual' ? 'touch_app' : 'auto_mode' }}</mat-icon>
+                  {{ participant.addedflow === 'manual' ? 'Manual Assignment' : 'Auto Assignment' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

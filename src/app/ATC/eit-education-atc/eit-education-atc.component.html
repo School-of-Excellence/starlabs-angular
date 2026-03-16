@@ -1,0 +1,196 @@
+<main>
+  <header class="d-flex justify-content-center m-3"><h4>ATC Education - {{![null,undefined].includes(ongoingQueue) ? ongoingQueue['queuename']: '' }}</h4></header>
+  <button *ngIf="onViewSelectedParticipantATC" style="height:50px;float: right;margin-right: 10px;margin-bottom:10px;" mat-stroked-button  type="button" (click)="showParticipants()">Back to Participant List</button>
+  <!-- event select -->
+  <section *ngIf="!onViewSelectedParticipantATC">
+    <section class="d-flex flex-row justify-content-start">
+      &nbsp;&nbsp;&nbsp;
+      <mat-form-field class="w-50" appearance="outline">
+        <mat-select [compareWith]="compareFn" [(ngModel)]="this.ongoingQueue" (selectionChange)="getSpecialist();getParticipantListBySelectedQueue()">
+          <mat-option *ngFor="let list of queueList" [value]="list">{{list['queuename']}}</mat-option>
+        </mat-select>
+      </mat-form-field>&nbsp;&nbsp;&nbsp;
+      <mat-form-field appearance="outline">
+        <mat-label>Filter by participant</mat-label>
+        <input type="text" matInput [(ngModel)]="participantFilterValue"  (keyup)="filterparticipantname()">
+      </mat-form-field>&nbsp;&nbsp;&nbsp;
+      <mat-form-field>
+        <mat-label>Filter by status</mat-label>
+        <mat-select [(ngModel)]="statusFilterValue" (selectionChange)="filterparticipantname()">
+          <mat-option *ngFor="let list of ['','validated','atc given']" [value]="list">{{list === '' ? 'all':list}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <!-- <button style="height:65px" mat-stroked-button  type="button" (click)="showParticipants()">Participant List</button>&nbsp;&nbsp;&nbsp; -->
+      <!-- <button style="height:65px" mat-stroked-button  type="button" (click)="showSelectedParticipantATC()">ATC View</button>&nbsp;&nbsp;&nbsp; -->
+      <!-- <button style="height:65px" mat-stroked-button  type="button" (click)="showConsolidateATCView()"  >Consolidated View</button> -->
+    </section>
+    <!-- show participant list -->
+    <section *ngIf="onViewParticipantList" style="margin-left:25%;margin-right:25%;height:100vh;overflow: auto;margin-bottom: 300px;">
+      <div class="card" *ngFor="let list of filteredParticipants">
+        <div class="card-body">
+          Participant : <span style="cursor: pointer;" (click)="getTheirATC(list.profileid)"><b>{{mapProfile[list.profileid]}}</b></span>&nbsp;&nbsp;&nbsp;<span style="float:right;" [ngClass]="list.atcref.path.indexOf('atc_alpha') === 0 ? 'green' :'yellow'">{{list.status | titlecase}}</span><br>
+          Stage : <span>{{list.stagename}}</span><br>
+          Prescribed Author(s): <span *ngFor="let eis of list['author']">{{mapProfile[eis.id]}} , </span><br>
+          Validators(s): <span *ngFor="let eis of list['validator'] || []">{{mapProfile[eis.id]}} , </span><br>
+          Presscription Date : {{list.prescription_date.toDate() | date : 'medium'}}
+        </div>
+      </div>
+    </section>
+  </section>
+  <!-- show alpha atc as horizontal view -->
+  <!-- *ngIf="chosenParticipant != null ? ![null,undefined].includes(mapATCByProfile[chosenParticipant]) : false" -->
+  <section *ngIf="onViewSelectedParticipantATC" class="ml-2">
+    <section >
+      <div class="container-fluid py-2">
+        <h4 class="title">{{mapProfile[chosenParticipant]}}-Accelerated Time Compression-Final View.</h4>
+        <div class="d-flex flex-row flex-nowrap" style="width:100vw;overflow-x: auto;overflow-y: hidden;">
+          <div style="height:100vh;overflow-y: auto;overflow-x: hidden;min-width:40vw" class="border d-flex flex-column ml-1" *ngFor="let atc of mapATCByProfile[chosenParticipant]">
+            <section *ngIf="![null,undefined].includes(mapATC[atc.atcref.path])" class="mb-2">
+              <div class="atcdetail">
+                <label class="highlight">Stage:</label>
+                <label>{{atc['stagename']}}</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                <span style="float:right;">
+                  <button style="color:black;" mat-stroked-button type="button" (click)="onEditATC(atc)">Edit</button>&nbsp;&nbsp;
+                  <button style="color:black" mat-stroked-button type="button" (click)="onCancelATC(atc)">Cancel</button>&nbsp;&nbsp;
+                  <button *ngIf="atc.atcref.path.indexOf('atc_to_validate') === 0" style="color:black;" mat-stroked-button type="button" (click)="onValidateATC(atc,'validated')">Validate</button>&nbsp;&nbsp;
+                  <button *ngIf="atc.atcref.path.indexOf('atc_alpha') === 0" style="color:black;" mat-stroked-button type="button" (click)="onInvalidateATC(atc,'unvalidated')">Unvalidate</button>&nbsp;&nbsp;
+                  <label style="color:black;font-size: 1.25rem;">{{atc.status === 'atc given' ? 'Yet to validate' : (atc.status | titlecase)}}</label>
+                </span>
+                <br>
+                <label class="highlight">Prescribed Author(s):</label>
+                <label><span *ngFor="let item of atc['author']"><strong>{{mapProfile[item.id]}},</strong></span></label>
+                <br>
+                <label class="highlight">Prescribed Date:</label>
+                <label>{{atc['prescription_date'].toDate() | date : "medium"}}</label>
+                <br>
+                <label class="highlight">Validator(s):</label>
+                <label><span *ngFor="let item of atc['validator'] || []"><strong>{{mapProfile[item.id]}},</strong></span></label>
+              </div>
+              <table *ngIf="![null,undefined].includes(mapATC[atc.atcref.path]['prescription'])" style="width:100%">
+                <tr>
+                    <th class="heading">
+                        Adjustments
+                    </th>
+                    <th class="heading">
+                        Procedures
+                    </th>
+                </tr>
+                <tr *ngFor="let prescription of mapATC[atc.atcref.path]['prescription']; let i = index" class="mb-1">
+                  <td class="adjustmentbox">
+                      <label [ngClass]="prescription.isdelete ? 'strikeDelete' : null">
+                        {{prescription.name}} <span *ngIf="![null,undefined].includes(prescription.newlyadded)" style="color:#228B22">(New)</span>
+                        <span *ngIf="mentorProfile.includes(![null,undefined].includes(prescription.editedby) ? prescription.editedby.id : null)">
+                          (Enhanced by <b>{{mapProfile[prescription.editedby.id]}}</b> : <b>{{prescription.editedon != undefined ? (prescription.editedon.toDate() | date : 'mediumDate') : null}}</b>)
+                        </span>
+                      </label>
+                      <br>
+                  </td>
+                  <td class="procedurebox">
+                      <div *ngFor="let procedure of prescription.procedures; let j = index">
+                          <label [ngClass]="procedure.isdelete ? 'strikeDelete' : null">- {{mapProcedures[procedure.name['id']]}}</label>
+                          <br>
+                      </div>
+                  </td>
+                </tr>
+              </table>
+            </section>
+            <section *ngIf="![null,undefined].includes(mapATCTrajectory[atc['atcid']])">
+              <section *ngFor="let atcref of mapATCTrajectory[atc['atcid']];let i = index;" class="mb-2">
+                <div *ngIf="![null,undefined].includes(mapATC[atcref.path]) && i != 0" class="atcdetail">
+                  <label class="highlight">Stage:</label>
+                  <label>{{mapATC[atcref.path]['stagename']}}</label>
+                  <label style="float:right;color:black;font-size: 1.25rem;">{{mapATC[atcref.path].status | titlecase}}</label>
+                  <br>
+                  <label class="highlight">Prescribed Author(s):</label>
+                  <label><span *ngFor="let item of mapATC[atcref.path]['author']"><strong>{{mapProfile[item.id]}},</strong></span></label>
+                  <br>
+                  <label class="highlight">Prescribed Date:</label>
+                  <label>{{mapATC[atcref.path]['prescription_date'].toDate() | date : 'medium'}}</label>
+                  <br>
+                  <label class="highlight">Validator(s):</label>
+                  <label><span *ngFor="let item of mapATC[atcref.path]['validator'] || []"><strong>{{mapProfile[item.id]}},</strong></span></label>
+                </div>
+                <table *ngIf="![null,undefined].includes(mapATC[atcref.path]) && ![null,undefined].includes(mapATC[atcref.path]['prescription']) && i != 0" style="width:100%">
+                  <tr>
+                      <th class="heading">
+                          Adjustments
+                      </th>
+                      <th class="heading">
+                          Procedures
+                      </th>
+                  </tr>
+                  <tr *ngFor="let prescription of mapATC[atcref.path]['prescription']; let i = index" style="padding-bottom: 10px;">
+                    <td class="adjustmentbox">
+                        <label [ngClass]="prescription.isdelete ? 'strikeDelete' : null">
+                          {{prescription.name}}<span *ngIf="![null,undefined].includes(prescription.newlyadded)" style="color:#228B22">(New)</span>
+                          <span *ngIf="mentorProfile.includes(![null,undefined].includes(prescription.editedby) ? prescription.editedby.id : null)">
+                            (Enhanced by <b>{{mapProfile[prescription.editedby.id]}}</b> : <span>{{prescription.editedon.toDate() | date : 'mediumDate'}}</span>)
+                          </span>
+                        </label>
+                        <br>
+                    </td>
+                    <td class="procedurebox">
+                        <div *ngFor="let procedure of prescription.procedures; let j = index">
+                            <label [ngClass]="procedure.isdelete ? 'strikeDelete' : null">- {{mapProcedures[procedure.name['id']]}}</label>
+                            <br>
+                        </div>
+                    </td>
+                  </tr>
+                </table>
+              </section>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+    <mat-divider class="m-1"></mat-divider>
+    <!-- consolidated view -->
+    <!-- *ngIf="onViewSelectedParticipantConsolidatedATC" -->
+    <!-- {{mapProfile[chosenParticipant]}}-Accelerated Time Compression- -->
+    <section>
+      <div class="container-fluid py-2">
+        <h4 class="title">Consolidate View.</h4>
+        <div class="d-flex flex-row flex-nowrap" style="width:100vw;overflow-x: auto;overflow-y: hidden;">
+          <div style="height:100vh;overflow-y: auto;overflow-x: hidden;min-width:40vw" class="border d-flex flex-column ml-1" *ngFor="let atc of filterAlphaAtc(mapATCByProfile[chosenParticipant])">
+            <section *ngIf="![null,undefined].includes(mapATC[atc.atcref.path])" class="mb-2">
+              <div class="atcdetail">
+                <label class="highlight">Stage:</label>
+                <label>{{atc['stagename']}}</label>
+                <br>
+                <label class="highlight">Prescribed Author(s):</label>
+                <label><span *ngFor="let item of atc['author']"><strong>{{mapProfile[item.id]}},</strong></span></label>
+                <br>
+                <label class="highlight">Prescribed Date:</label>
+                <label>{{atc['prescription_date'].toDate() | date : 'medium'}}</label>
+              </div>
+              <table *ngIf="![null,undefined].includes(mapATC[atc.atcref.path]['prescription'])" style="width:100%">
+                <tr>
+                    <th class="heading">
+                        Adjustments
+                    </th>
+                    <th class="heading">
+                        Procedures
+                    </th>
+                </tr>
+                <tr *ngFor="let prescription of mapATC[atc.atcref.path]['prescription']; let i = index" class="mb-1">
+                  <td class="adjustmentbox">
+                      <label *ngIf="prescription.isdelete != true">{{prescription.name}}</label>
+                      <br>
+                  </td>
+                  <td class="procedurebox">
+                      <div *ngFor="let procedure of prescription.procedures; let j = index">
+                          <label *ngIf="procedure.isdelete != true">- {{mapProcedures[procedure.name['id']]}}</label>
+                          <br>
+                      </div>
+                  </td>
+                </tr>
+              </table>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+
+

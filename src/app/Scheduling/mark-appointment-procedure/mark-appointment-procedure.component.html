@@ -1,0 +1,23 @@
+<div *ngIf="loading" class="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  <label>Fetchin Your Changeworks......</label>
+</div>
+
+<div class="mainscreen" *ngIf="!loading">
+  <div class="heading">Mark Changework Status</div>
+  <div *ngIf="adjustmentList.length == 0">
+    No ATC List available to update status!
+  </div>
+  <div class="adjustmentbox" *ngFor="let adjustment of adjustmentList; let i = index">
+    {{i+1}}. {{adjustment.adjusmtent}}
+    <div class="procedurebox" *ngFor="let procedure of adjustment.procedure; let j = index">
+      - {{procedure.name}}
+      <mat-checkbox class="matcheckbox" (change)="$event.checked ? null : (procedure.autogenralized = false)" [(ngModel)]="procedure.completed">Completed</mat-checkbox>
+      <mat-checkbox class="matcheckbox" (change)="$event.checked ? (procedure.completed = true) : null" [(ngModel)]="procedure.autogenralized">Auto Genralized</mat-checkbox>
+    </div>
+  </div>
+  <div class="actionbox">
+    <button class="closebtn" mat-stroked-button (click)="close()">Close</button>
+    <button class="submitbtn" mat-stroked-button (click)="submit()">Mark As Completed</button>
+  </div>
+</div>

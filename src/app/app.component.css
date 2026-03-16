@@ -1,0 +1,248 @@
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  max-height: 64px;
+  background-color: #234c58!important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-left: 16px;
+  color: #FFFFFF;
+  font-family: Josefin Sans;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-decoration: none;
+}
+
+.menuicon{
+  padding: 0 !important;
+  align-items: center !important;
+  font-size: 36px !important;
+  width: max-content !important;
+  height: max-content !important;
+  margin-right: 10px;
+  color: white;
+}
+
+.mainscreen{
+  height: max-content;
+}
+
+.drawer-container{
+  height: 100vh;
+  width: 100%;
+}
+
+.routerbox{
+  padding: 0 15px;
+  width: 100%;
+}
+
+.categorybox{
+  padding: 15px 10px;
+  text-decoration: none;
+  background-color: rgb(240, 245, 248);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: #04181f;
+  font-weight: 500;
+  border-left: 4px solid rgb(11, 59, 114);
+  border-radius: 8px;
+}
+
+.categorybox:hover{
+  cursor: pointer;
+  background-color: rgb(210, 214, 216);
+}
+
+.routerscreen{
+  padding: 15px 10px;
+  text-decoration: none;
+  background-color: whitesmoke;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: black;
+}
+
+.routerscreen:hover .pinbutton{
+  cursor: pointer;
+  background-color: rgba(205, 209, 211, 0.411);
+  visibility: visible;
+
+}
+
+.routerscreen .pinbutton{
+  margin-left: auto;
+  visibility: hidden;
+  background-color: transparent !important;
+}
+
+.pinnedicon{
+  color: green;
+  transform: rotate(45deg);
+}
+
+.activeroute{
+  background-color: rgb(88, 101, 109);
+  border-radius: 8px;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.openscreenbutton {
+  background-color: white !important;
+  color: green !important;
+  border-color: green !important;
+  box-shadow: 3px 3px 8px green !important;
+  transition: box-shadow 0.3s ease, background-color 0.3s ease !important;
+}
+
+.openscreenbutton:hover {
+  color: white !important;
+  background-color: green !important;
+  box-shadow: 0 0 15px green, 0 0 25px green !important;
+}
+
+.notification-menu {
+  width: 400px;
+  max-width: 90vw;
+}
+
+.notification-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notification-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.notification-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.no-notifications {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.no-notifications mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: #ccc;
+}
+
+.notification-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.notification-item:hover {
+  background-color: #f5f5f5;
+}
+
+.notification-item.unread {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+}
+
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.notification-image img {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.notification-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-text h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.notification-text .subtitle {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.notification-text .message {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #333;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  /* -webkit-line-clamp: 2; */
+  -webkit-box-orient: vertical;
+}
+
+.notification-text .timestamp {
+  font-size: 11px;
+  color: #999;
+}
+
+.notification-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notification-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .notification-menu {
+    width: 300px;
+  }
+  
+  .notification-item {
+    padding: 8px 12px;
+  }
+}
+

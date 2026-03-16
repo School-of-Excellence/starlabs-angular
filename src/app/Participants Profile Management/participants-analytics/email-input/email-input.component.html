@@ -1,0 +1,628 @@
+<body class="body">
+  <div class="email-composer-container">
+
+    <!-- ══════════════ HEADER ══════════════ -->
+    <div class="composer-header">
+      <div class="header-left">
+        <div class="header-logo-mark">✉</div>
+        <div class="header-title-group">
+          <h2 class="header-title">Email Campaign Composer</h2>
+          <span class="header-sub">{{bufferDoc.broadcastname || 'New Campaign'}}</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button class="hdr-btn ghost" (click)="onCreateTemplate()">
+          <mat-icon>add_circle_outline</mat-icon>
+          New Template
+        </button>
+
+        <button class="hdr-btn chip" (click)="onShowRecipients()" *ngIf="getRecipientCount() > 0">
+          <mat-icon>group</mat-icon>
+          {{getRecipientCount()}} recipient{{getRecipientCount() !== 1 ? 's' : ''}}
+          <mat-icon class="chevron">{{showRecipients ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </button>
+
+        <button class="hdr-btn danger" (click)="onDialogCancel()">
+          <mat-icon>close</mat-icon>
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- ══════════════ RECIPIENTS DRAWER ══════════════ -->
+    <div class="recipients-drawer" [class.open]="showRecipients && getRecipientCount() > 0">
+      <div class="drawer-inner">
+        <div class="drawer-label">
+          <mat-icon>people_outline</mat-icon>
+          Campaign Recipients
+        </div>
+        <div class="recipients-grid">
+          <div class="recipient-pill" *ngFor="let r of getRecipientList()">
+            <div class="pill-avatar">
+              <img *ngIf="r.photoURL || r.avatar" [src]="r.photoURL || r.avatar" [alt]="r.name">
+              <mat-icon *ngIf="!r.photoURL && !r.avatar">account_circle</mat-icon>
+            </div>
+            <div class="pill-info">
+              <span class="pill-name">{{r.name || r.displayName || 'Unknown'}}</span>
+              <span class="pill-email">{{r.email}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TABS ══════════════ -->
+    <mat-tab-group [(selectedIndex)]="selectedTabIndex" class="composer-tabs" animationDuration="180ms">
+
+      <!-- ── TAB 1: Templates ── -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">library_books</mat-icon>
+          Templates
+        </ng-template>
+
+        <div class="tab-content">
+
+          <!-- Campaign name banner -->
+          <div class="campaign-banner">
+            <mat-icon>campaign</mat-icon>
+            <span class="campaign-name-display">{{bufferDoc.broadcastname}}</span>
+            <span class="campaign-badge">{{filteredTemplates.length}} templates</span>
+          </div>
+
+          <!-- Filters -->
+          <div class="filter-row">
+            <mat-form-field appearance="outline" class="search-ff">
+              <mat-label>Search templates</mat-label>
+              <input matInput [(ngModel)]="templateSearchQuery" (input)="onTemplateSearch()"
+                placeholder="Name, subject, category…">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="filter-ff">
+              <mat-label>Category</mat-label>
+              <mat-select [(ngModel)]="selectedCategory" (selectionChange)="filterTemplate()" multiple>
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}"
+                    placeholderLabel="Search…" noEntriesFoundLabel="Not found" ngDefaultControl>
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let o of onSearchCategory()" [value]="o">{{o}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="filter-ff">
+              <mat-label>Sub-category</mat-label>
+              <mat-select [(ngModel)]="selectedSubCategory" (selectionChange)="filterTemplate()" multiple>
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}"
+                    placeholderLabel="Search…" noEntriesFoundLabel="Not found" ngDefaultControl>
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let o of onSearchSubCategory()" [value]="o">{{o}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button class="hdr-btn ghost small" (click)="clearFilters()">
+              <mat-icon>filter_alt_off</mat-icon>
+              Clear
+            </button>
+          </div>
+
+          <!-- Active filter chips -->
+          <div class="active-filters" *ngIf="selectedCategory.length || selectedSubCategory.length">
+            <span class="filter-label">Active:</span>
+            <mat-chip-grid>
+              <mat-chip-row *ngFor="let c of selectedCategory" (removed)="removeCategory(c); filterTemplate()">
+                {{c}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+              </mat-chip-row>
+              <mat-chip-row *ngFor="let s of selectedSubCategory" (removed)="removeSubCategory(s); filterTemplate()">
+                {{s}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+              </mat-chip-row>
+            </mat-chip-grid>
+          </div>
+
+          <!-- Section sub-header -->
+          <div class="template-section-header" *ngIf="filteredTemplates.length > 0">
+            <div class="tsh-left">
+              <span class="tsh-title">Recent Templates</span>
+              <span class="tsh-count">showing {{getVisibleTemplates().length}} of {{filteredTemplates.length}}</span>
+            </div>
+            <div class="tsh-hint" *ngIf="filteredTemplates.length > visibleTemplateCount">
+              <mat-icon>info_outline</mat-icon>
+              Use search to find older templates
+            </div>
+          </div>
+
+          <!-- Template grid — last 12 (or visibleTemplateCount) -->
+          <div class="template-grid" *ngIf="filteredTemplates.length > 0">
+            <div class="template-card"
+              *ngFor="let t of getVisibleTemplates(); let i = index"
+              [class.selected]="selectedTemplate['docid'] === t['docid']"
+              (click)="onTemplateChange(t)">
+
+              <!-- Selected tick -->
+              <div class="tc-selected-tick" *ngIf="selectedTemplate['docid'] === t['docid']">✓</div>
+
+              <div class="tc-header">
+                <div class="tc-index">{{i + 1}}</div>
+                <span class="tc-name">{{t.templatename}}</span>
+                <span class="tc-badge">{{t.category}}</span>
+              </div>
+
+              <div class="tc-preview" [innerHTML]="sanitizeHTML(t.htmlbody)"></div>
+
+              <div class="tc-footer">
+                <mat-icon class="tc-footer-icon">subject</mat-icon>
+                <span class="tc-subject">{{t.subject}}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Load more -->
+          <div class="template-load-more"
+            *ngIf="filteredTemplates.length > visibleTemplateCount && !templateSearchQuery.trim()">
+            <button class="load-more-btn" (click)="loadMoreTemplates()">
+              <mat-icon>expand_more</mat-icon>
+              Load more templates ({{filteredTemplates.length - visibleTemplateCount}} remaining)
+            </button>
+          </div>
+
+          <!-- Empty state -->
+          <div class="empty-block" *ngIf="filteredTemplates.length === 0">
+            <div class="empty-icon">📭</div>
+            <h3>No templates found</h3>
+            <p>Adjust your filters or create a new template.</p>
+            <button class="hdr-btn primary" (click)="onCreateTemplate()">
+              <mat-icon>add</mat-icon> Create Template
+            </button>
+          </div>
+
+        </div>
+      </mat-tab>
+
+      <!-- ── TAB 2: Queued Emails ── -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">schedule_send</mat-icon>
+          Queued
+          <span class="tab-badge" *ngIf="filteredQueuedEmails.length">{{filteredQueuedEmails.length}}</span>
+        </ng-template>
+
+        <div class="tab-content">
+
+          <div class="section-header">
+            <div class="sh-left">
+              <mat-icon>queue</mat-icon>
+              <span>Queued Emails</span>
+            </div>
+            <mat-form-field appearance="outline" class="search-ff compact">
+              <mat-label>Search queued</mat-label>
+              <input matInput [(ngModel)]="queuedEmailSearchQuery" (input)="onQueuedEmailSearch()"
+                placeholder="Subject, name, notes…">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div class="loading-block" *ngIf="isLoadingQueuedEmails">
+            <mat-spinner diameter="36"></mat-spinner>
+            <span>Loading queued emails…</span>
+          </div>
+
+          <div class="queued-list" *ngIf="!isLoadingQueuedEmails">
+
+            <div class="queued-card" *ngFor="let qe of filteredQueuedEmails"
+              [class.selected]="selectedQueuedEmail === qe"
+              (click)="onQueuedEmailSelect(qe)">
+
+              <div class="qc-meta">
+                <span class="qc-name">{{qe.broadcastname || 'Untitled Campaign'}}</span>
+                <span class="qc-date">
+                  <mat-icon class="qc-icon">access_time</mat-icon>
+                  {{getQueuedEmailDate(qe.date)}}
+                </span>
+              </div>
+
+              <div class="qc-subject">{{qe.subject || 'No subject'}}</div>
+
+              <div class="qc-preview" *ngIf="qe.body" [innerHTML]="sanitizeHTML(qe.body)"></div>
+
+              <div class="qc-footer">
+                <span class="qc-note" *ngIf="qe.notes">{{qe.notes}}</span>
+                <span class="qc-note" *ngIf="!qe.notes">No notes</span>
+                <span class="qc-recipients">
+                  <mat-icon>people</mat-icon>
+                  {{getQueuedEmailRecipientCount(qe)}}
+                </span>
+              </div>
+
+            </div>
+
+            <div class="empty-block" *ngIf="filteredQueuedEmails.length === 0">
+              <div class="empty-icon">📬</div>
+              <h3>No queued emails</h3>
+              <p>All emails have been sent or the queue is empty.</p>
+            </div>
+
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- ── TAB 3: Preview ── -->
+      <mat-tab [disabled]="!isTemplatePresent()">
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">visibility</mat-icon>
+          Preview
+        </ng-template>
+
+        <div class="tab-content preview-tab-content" *ngIf="isTemplatePresent()">
+
+          <!-- Preview controls bar -->
+          <div class="preview-bar">
+            <div class="preview-bar-left">
+              <mat-icon>visibility</mat-icon>
+              <span>
+                {{isQueuedEmailSelected()
+                  ? selectedQueuedEmail['broadcastname']
+                  : selectedTemplate['templatename'] || 'Preview'}}
+              </span>
+              <span class="preview-source-tag">
+                {{isQueuedEmailSelected() ? 'Queued' : 'Template'}}
+              </span>
+            </div>
+
+            <div class="preview-bar-right">
+              <mat-form-field appearance="outline" class="from-ff">
+                <mat-label>From</mat-label>
+                <mat-select [(ngModel)]="fromemail">
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="searchfromemail" [ngModelOptions]="{standalone: true}"
+                      placeholderLabel="Search…" noEntriesFoundLabel="Not found" ngDefaultControl>
+                    </ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let o of onSearchEmail()" [value]="o">{{o}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-button-toggle-group [(value)]="previewMode" class="mode-toggle">
+                <mat-button-toggle value="desktop">
+                  <mat-icon>desktop_mac</mat-icon>
+                </mat-button-toggle>
+                <mat-button-toggle value="mobile">
+                  <mat-icon>phone_android</mat-icon>
+                </mat-button-toggle>
+              </mat-button-toggle-group>
+            </div>
+          </div>
+
+          <!-- Gmail shell -->
+          <div class="gmail-shell" [class.mobile]="previewMode === 'mobile'">
+
+            <!-- macOS chrome -->
+            <div class="gmail-chrome">
+              <div class="gc-dots">
+                <div class="gc-dot" style="background:#ff5f57"></div>
+                <div class="gc-dot" style="background:#febc2e"></div>
+                <div class="gc-dot" style="background:#28c840"></div>
+              </div>
+              <div class="gc-url">gmail.com — {{fromemail}}</div>
+              <div class="gc-right"></div>
+            </div>
+
+            <!-- Gmail toolbar -->
+            <div class="gmail-toolbar">
+              <div class="gt-left">
+                <mat-icon class="gt-icon">menu</mat-icon>
+                <div class="gmail-wordmark">
+                  <span style="color:#4285f4">G</span><span style="color:#ea4335">m</span><span style="color:#fbbc05">a</span><span style="color:#34a853">i</span><span style="color:#4285f4">l</span>
+                </div>
+              </div>
+              <div class="gt-search">
+                <mat-icon>search</mat-icon>
+                <span>Search in mail</span>
+              </div>
+              <div class="gt-right">
+                <mat-icon>help_outline</mat-icon>
+                <div class="gt-avatar">T</div>
+              </div>
+            </div>
+
+            <!-- Email pane -->
+            <div class="gmail-body">
+
+              <div class="email-subject-row">
+                <span class="es-title">{{bufferDoc.subject || 'Email Subject'}}</span>
+                <div class="es-actions">
+                  <mat-icon>print</mat-icon>
+                  <mat-icon>open_in_new</mat-icon>
+                </div>
+              </div>
+
+              <div class="email-sender-row">
+                <div class="esr-avatar">T</div>
+                <div class="esr-info">
+                  <div class="esr-top">
+                    <span class="esr-name">Team Antano &amp; Harini</span>
+                    <span class="esr-addr">&lt;{{fromemail}}&gt;</span>
+                    <span class="esr-time">{{bufferDoc.date | date:'MMM d, h:mm a'}}</span>
+                  </div>
+                  <div class="esr-bottom">
+                    <span class="esr-to">to</span>
+                    <span class="esr-recip" (click)="onShowRecipients()">
+                      {{getRecipientCount() === 1 ? 'me' : getRecipientCount() + ' recipients'}}
+                    </span>
+                  </div>
+                </div>
+                <div class="esr-btns">
+                  <mat-icon>reply</mat-icon>
+                  <mat-icon>more_vert</mat-icon>
+                </div>
+              </div>
+
+              <!-- Full HTML body render -->
+              <div class="email-html-body">
+                <div *ngIf="selectedTemplate['htmlbody']" [innerHTML]="sanitizeHTML(selectedTemplate['htmlbody'])"></div>
+                <div class="email-placeholder" *ngIf="!selectedTemplate['htmlbody']">
+                  <mat-icon>email</mat-icon>
+                  <p>Select a template to preview email content here</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Variable chips summary -->
+          <div class="variable-chip-row"
+            *ngIf="extractVariables(selectedTemplate['htmlbody']).length > 0">
+            <span class="vcr-label">Variables:</span>
+            <div class="var-chip"
+              *ngFor="let v of extractVariables(selectedTemplate['htmlbody'])"
+              [class.configured]="isVariableConfigured(v)"
+              [class.unconfigured]="!isVariableConfigured(v)">
+              <mat-icon class="vc-icon">{{isVariableConfigured(v) ? 'check_circle' : 'radio_button_unchecked'}}</mat-icon>
+              {{v}}
+            </div>
+          </div>
+
+        </div>
+      </mat-tab>
+
+    </mat-tab-group>
+
+    <!-- ══════════════ VARIABLE CONFIG PANEL ══════════════ -->
+    <div class="var-panel"
+      *ngIf="isTemplatePresent() && extractVariables(selectedTemplate['htmlbody']).length > 0">
+
+      <div class="var-panel-header">
+        <div class="vph-left">
+          <mat-icon>tune</mat-icon>
+          Variable Configuration
+        </div>
+        <div class="config-progress">
+          <span class="cp-text">
+            {{configuredCount()}} / {{extractVariables(selectedTemplate['htmlbody']).length}} configured
+          </span>
+          <div class="cp-bar">
+            <div class="cp-fill"
+              [style.width.%]="extractVariables(selectedTemplate['htmlbody']).length
+                ? (configuredCount() / extractVariables(selectedTemplate['htmlbody']).length) * 100
+                : 0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="var-list">
+        <div class="var-row"
+          *ngFor="let variable of extractVariables(selectedTemplate['htmlbody'])"
+          [class.configured]="isVariableConfigured(variable)">
+
+          <!-- Variable name + status -->
+          <div class="vr-name">
+            <div class="vr-tag">
+              <mat-icon class="vr-tag-icon">code</mat-icon>
+              {{variable}}
+              <span class="vr-multi-badge" *ngIf="ensureConfig(variable).isMulti">multi</span>
+            </div>
+            <mat-icon class="vrs-icon ok" *ngIf="isVariableConfigured(variable)">check_circle</mat-icon>
+            <mat-icon class="vrs-icon pending" *ngIf="!isVariableConfigured(variable)">pending</mat-icon>
+          </div>
+
+          <!-- Source toggle buttons -->
+          <div class="vr-source-selector">
+            <button class="src-btn" [class.active]="ensureConfig(variable).source === 'static'"
+              (click)="setVariableSource(variable, 'static')">
+              <mat-icon>edit</mat-icon> Static
+            </button>
+            <button class="src-btn" [class.active]="ensureConfig(variable).source === 'analytics'"
+              (click)="setVariableSource(variable, 'analytics')">
+              <mat-icon>analytics</mat-icon> Metadata
+            </button>
+            <button class="src-btn" [class.active]="ensureConfig(variable).source === 'sheet'"
+              (click)="setVariableSource(variable, 'sheet')">
+              <mat-icon>table_chart</mat-icon> Sheet
+            </button>
+          </div>
+
+          <!-- Input area -->
+          <div class="vr-input-area" *ngIf="ensureConfig(variable).source">
+
+            <!-- STATIC -->
+            <div *ngIf="ensureConfig(variable).source === 'static'">
+              <mat-form-field appearance="outline" class="chip-ff">
+                <mat-chip-grid #chipGrid>
+                  <mat-chip-row
+                    *ngFor="let val of ensureConfig(variable).staticValues; let j = index"
+                    (removed)="removeStaticValue(variable, j)">
+                    {{val}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+                  </mat-chip-row>
+                </mat-chip-grid>
+                <input
+                  [placeholder]="ensureConfig(variable).isMulti
+                    ? 'Add multiple values — press Enter'
+                    : 'Enter value — press Enter'"
+                  [matChipInputFor]="chipGrid"
+                  [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                  (matChipInputTokenEnd)="addStaticValue(variable, $event)">
+              </mat-form-field>
+              <div class="input-hint"
+                *ngIf="!ensureConfig(variable).isMulti && ensureConfig(variable).staticValues.length > 1">
+                <mat-icon>info</mat-icon>
+                Only the first value will be used for this variable.
+              </div>
+            </div>
+
+            <!-- ANALYTICS / METADATA -->
+            <div *ngIf="ensureConfig(variable).source === 'analytics'">
+              <mat-form-field appearance="outline" class="analytics-ff">
+                <mat-label>Metadata field</mat-label>
+                <mat-select [(ngModel)]="ensureConfig(variable).analyticsKey"
+                  [multiple]="ensureConfig(variable).isMulti">
+                  <mat-option *ngFor="let k of metaDataFields" [value]="k">{{k}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <!-- SHEET -->
+            <div *ngIf="ensureConfig(variable).source === 'sheet'">
+              <div *ngIf="!uploadedFile" class="sheet-upload-zone">
+                <input type="file" class="file-input" (change)="onFileSelected($event)" accept=".xlsx,.xls,.csv">
+                <mat-icon class="sz-icon">cloud_upload</mat-icon>
+                <span>Click to upload Excel / CSV</span>
+              </div>
+
+              <div *ngIf="uploadedFile" class="sheet-uploaded">
+                <mat-icon>description</mat-icon>
+                <span class="su-name">{{uploadedFile.name}}</span>
+                <button mat-icon-button (click)="removeUploadedFile()"><mat-icon>close</mat-icon></button>
+              </div>
+
+              <div class="sheet-meta" *ngIf="sheetVariables.length">
+                <span>{{excelData.length - 1}} rows</span>
+                <span class="sm-sep">·</span>
+                <span>Cols: {{sheetVariables.join(', ')}}</span>
+              </div>
+
+              <div class="validation-chip error" *ngIf="sheetValidationError">
+                <mat-icon>error_outline</mat-icon>{{sheetValidationError}}
+              </div>
+              <div class="validation-chip success" *ngIf="isSheetValid && !sheetValidationError">
+                <mat-icon>check_circle</mat-icon>Validated — {{validEmails.length}} valid emails
+              </div>
+              <div class="validation-chip loading" *ngIf="isValidatingEmails">
+                <mat-icon class="spin">refresh</mat-icon>Validating…
+              </div>
+            </div>
+
+          </div><!-- /vr-input-area -->
+
+        </div><!-- /var-row -->
+      </div><!-- /var-list -->
+
+    </div><!-- /var-panel -->
+
+    <!-- ══════════════ ACTION BAR ══════════════ -->
+    <div class="action-bar">
+      <button class="action-btn ghost" (click)="onDialogCancel()">
+        <mat-icon>close</mat-icon>
+        Cancel
+      </button>
+
+      <div class="action-right" *ngIf="isTemplatePresent()">
+        <button class="action-btn outline accent"
+          [disabled]="formValidation()"
+          [matTooltip]="getButtonTooltip('test')"
+          (click)="onShowTestEmailDialog()">
+          <mat-icon>science</mat-icon>
+          Send Test
+        </button>
+
+        <button class="action-btn outline primary"
+          [disabled]="formValidation() || isQueuedEmailSelected()"
+          [matTooltip]="getButtonTooltip('queue')"
+          (click)="onAddToQueue()">
+          <mat-icon>playlist_add</mat-icon>
+          Add to Queue
+        </button>
+
+        <button class="action-btn filled primary"
+          [disabled]="formValidation()"
+          [matTooltip]="getButtonTooltip('send')"
+          (click)="onSubmit()">
+          <mat-icon>{{isQueuedEmailSelected() ? 'send' : 'check_circle'}}</mat-icon>
+          {{isQueuedEmailSelected() ? 'Send Queued Email' : 'Send to Participants'}}
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /email-composer-container -->
+
+  <!-- ══════════════ TEST EMAIL MODAL ══════════════ -->
+  <div class="modal-backdrop" *ngIf="showTestEmailDialog" (click)="onCloseTestEmailDialog()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <div class="modal-title">
+          <mat-icon>science</mat-icon>
+          Send Test Email
+        </div>
+        <button mat-icon-button (click)="onCloseTestEmailDialog()"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <div class="modal-body">
+        <mat-form-field appearance="outline" class="full-ff">
+          <mat-label>Search profiles</mat-label>
+          <input matInput [(ngModel)]="searchTestRecipient" placeholder="Name or email…">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <div class="profile-list">
+          <div class="profile-row" *ngFor="let p of getFilteredProfiles()" (click)="addTestRecipient(p)">
+            <div class="pr-avatar">
+              <img *ngIf="p.avatar" [src]="p.avatar" [alt]="p.name">
+              <mat-icon *ngIf="!p.avatar">account_circle</mat-icon>
+            </div>
+            <div class="pr-info">
+              <div class="pr-name">{{p.name}}</div>
+              <div class="pr-email">{{p.email}}</div>
+            </div>
+            <button mat-icon-button><mat-icon>add_circle_outline</mat-icon></button>
+          </div>
+        </div>
+
+        <div class="custom-email-row">
+          <mat-form-field appearance="outline" class="flex-ff">
+            <mat-label>Or enter email manually</mat-label>
+            <input matInput type="email" [(ngModel)]="customTestEmail" placeholder="user@example.com">
+          </mat-form-field>
+          <button class="action-btn outline accent small"
+            (click)="addCustomTestEmail()"
+            [disabled]="!isValidEmail(customTestEmail)">
+            <mat-icon>add</mat-icon> Add
+          </button>
+        </div>
+
+        <div class="selected-chip-row" *ngIf="testEmailRecipients.length">
+          <span class="scr-label">Selected ({{testEmailRecipients.length}}):</span>
+          <mat-chip-set>
+            <mat-chip *ngFor="let r of testEmailRecipients; let i = index" (removed)="removeTestRecipient(i)">
+              {{r.name}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+            </mat-chip>
+          </mat-chip-set>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="action-btn ghost" (click)="onCloseTestEmailDialog()">Cancel</button>
+        <button class="action-btn filled primary"
+          [disabled]="testEmailRecipients.length === 0"
+          (click)="onSendTest()">
+          <mat-icon>send</mat-icon> Send Test Email
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</body>

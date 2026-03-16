@@ -1,0 +1,335 @@
+<div class="changefont" style="margin: 0;" *ngIf="showcontent">
+    <p style="margin: 0px;">
+      <mat-toolbar >
+        <span style="flex: 1 1 auto;"></span>
+        <span *ngIf="participantformtemplateid">{{participantformtemplateid.name}}</span>&nbsp;&nbsp;
+        <span>{{clientform.formname}}</span>
+        <span *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'"><mat-icon>edit</mat-icon></span>
+        <span style="flex: 1 1 auto;"></span>
+      </mat-toolbar>
+    </p>
+    <p style="margin-top:2.5%;margin-left:10%;margin-right:10%;">{{clientform.formdescription}}</p>
+  <!-- form -->
+  <div style="display: flex;flex-direction:flex-start;margin-top:2.5%;margin-bottom:5%;margin-left:3%;margin-right:3%;">
+    <!-- <div [ngClass]="formpatch ? 'w-60' : 'w-100'"> -->
+      <div class="form-container" [ngStyle]="{'width': formpatch && !viewFilledForm ? '60%' : '100%'}">
+      <form [formGroup]="deliveryForm" class="Acontainer" *ngFor="let form of clientform.formarray;let i = index">
+  
+        <!-- label -->
+        <div *ngIf="['label'].includes(form.type)">
+          <h5><mat-label>{{form.fieldname}}</mat-label></h5>
+          <p>{{form.fielddescription}}</p>
+        </div>
+  
+        <!-- video -->
+        <div *ngIf="['video'].includes(form.type)">
+          <h5><mat-label>{{form.fieldname}}</mat-label></h5>
+          <p>{{form.fielddescription}}</p>
+          <video controls>
+            <source [src]="sanitizer.bypassSecurityTrustResourceUrl(form.options[0])" type="video/mp4">
+            Your browser does not support the video tag or check the format should be "mp4".
+          </video>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes: {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- audio -->
+        <div *ngIf="['audio'].includes(form.type)">
+          <h5><mat-label>{{form.fieldname}}</mat-label></h5>
+          <p>{{form.fielddescription}}</p>
+          <audio controls>
+            <source [src]="sanitizer.bypassSecurityTrustResourceUrl(form.options[0])" type="audio/mpeg">
+            Your browser does not support the audio tag or check the format should be "mpeg".
+          </audio>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes: {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- 'Text','number','time','email' -->
+        <div *ngIf="['Text','number','time','email'].includes(form.type)">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <mat-form-field appearance="outline" class="w-100">
+            <input [type]=form.type matInput [formControlName]="form.formcontrol" [required]="![null,undefined].includes(form.required) ? form.required :false" (keyup)="autoSave(this.deliveryForm.value)">
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">The above field is mandatory.Do not leave it blank.</mat-error>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('email')">Enter a valid email.</mat-error>
+          </mat-form-field>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes: {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- date -->
+        <div *ngIf="['date'].includes(form.type)">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput [matDatepicker]="i" [formControlName]="form.formcontrol" [required]="![null,undefined].includes(form.required) ? form.required :false" (dateChange)="autoSave(this.deliveryForm.value)">
+            <mat-datepicker-toggle matSuffix [for]="i"></mat-datepicker-toggle>
+            <mat-datepicker #i ></mat-datepicker>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">The above field is mandatory.Please select a date.</mat-error>
+          </mat-form-field>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- 'DropDown','MultiSelect' -->
+        <div *ngIf="['DropDown','MultiSelect'].includes(form.type)">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-select [formControlName]="form.formcontrol" [multiple]="form.type == 'MultiSelect' ? true :false" [required]="![null,undefined].includes(form.required) ? form.required :false" (selectionChange)="autoSave(this.deliveryForm.value)">
+              <mat-option *ngFor="let item of form.options" [value]="item">{{item}}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol)?.hasError('required')">The above field is mandatory.Please select an option.</mat-error>
+          </mat-form-field>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- Paragraph -->
+        <div *ngIf="['Paragraph'].includes(form.type)">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <mat-form-field appearance="fill" class="w-100">
+            <textarea matInput [formControlName]="form.formcontrol" rows="6" col="200" [required]="![null,undefined].includes(form.required) ? form.required :false" (keyup)="autoSave(this.deliveryForm.value)"></textarea>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">The above field is mandatory.Do not leave it blank.</mat-error>
+          </mat-form-field>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{!['',null,undefined].includes(form.fieldnotes) ? form.fieldnotes : null}}</p>
+        </div>
+  
+        <!-- checkbox -->
+        <div *ngIf="['Checkbox'].includes(form.type)" class="mt10">
+          <span class="d-flex flex-row">
+            <mat-checkbox [formControlName]="form.formcontrol" [required]="![null,undefined].includes(form.required) ? form.required :false">{{form.fieldname}}</mat-checkbox>&nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false" (change)="autoSave(this.deliveryForm.value)">star</mat-icon>
+          </span>
+          <mat-error *ngIf="deliveryForm.get(form.formcontrol).touched">
+            <span *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">
+              The above field is mandatory.Please check it.
+            </span>
+          </mat-error>
+        </div>
+  
+        <!-- slider -->
+        <div *ngIf="['slider'].includes(form.type)" class="mt10">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}} </p>
+          <span class="d-flex flex-row">
+            <mat-label style="padding-top: 20px;">{{form.options[0]}}</mat-label>
+            <mat-slider
+              style="width:100%"
+              min="1"
+              [max]="form.options.length"
+              step="1"
+              tickInterval="1"
+              [formControlName]="form.formcontrol"
+              [required]="![null,undefined].includes(form.required) ? form.required :false"
+              (change)="onSliderValueChange($event,deliveryForm.get(form.formcontrol),form.options); autoSave(this.deliveryForm.value)"
+              >
+            </mat-slider>
+            <mat-label style="padding-top: 20px;">{{form.options[form.options.length - 1]}}</mat-label>
+          </span>
+          <span class="d-flex justify-content-center">{{deliveryForm.get(form.formcontrol).value}}</span>
+          <mat-error *ngIf="deliveryForm.get(form.formcontrol).touched">
+            <span *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">
+              The above field is mandatory.Please check it.
+            </span>
+          </mat-error>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{!['',null,undefined].includes(form.fieldnotes) ? form.fieldnotes : null}}</p>
+        </div>
+  
+        <!-- multicheckbox -->
+        <div *ngIf="['multicheckbox'].includes(form.type)" class="mt10">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <mat-selection-list [formControlName]="form.formcontrol" (selectionChange)="onMultiSelectionChange($event,form.formcontrol,form); autoSave(this.deliveryForm.value)">
+            <mat-list-option checkboxPosition="before" *ngFor="let cbitem of form.options;let mcb = index" [value]="cbitem">{{cbitem}}</mat-list-option>
+          </mat-selection-list>
+          <span *ngIf="deliveryForm.get(form.formcontrol).touched">
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">The above field is mandatory.Atleast select one.</mat-error>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('minArrayLength')">Minimum {{form.mincount}} items are required.</mat-error>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('maxArrayLength')">Maximum {{form.maxcount}} items are allowed.</mat-error>
+          </span>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)"> Notes : {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- radio -->
+        <div *ngIf="['radio'].includes(form.type)" class="mt10">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <mat-radio-group  [formControlName]="form.formcontrol" class="example-radio-group w-100" [required]="![null,undefined].includes(form.required) ? form.required :false" (change)="autoSave(this.deliveryForm.value)">
+            <mat-radio-button class="m10" *ngFor="let list of form.options" [value]="list">{{list}}</mat-radio-button>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol).touched">
+              <span *ngIf="deliveryForm.get(form.formcontrol).hasError('required')">
+                The above field is mandatory.Please check it.
+              </span>
+            </mat-error>
+          </mat-radio-group>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{form.fieldnotes}}</p>
+        </div>
+  
+        <!-- flipping question -->
+        <div *ngIf="['multicheckbox','multiselect'].includes(form.type)" class="mt10 ml-4">
+          <div *ngIf="form.flipping === true">
+            <span class="d-flex flex-row">
+              <h5><mat-label>{{form.flippingquestion.fieldname}}</mat-label></h5> &nbsp;&nbsp;
+              <mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.flippingquestion.required) ? form.flippingquestion.required :false">star</mat-icon>
+            </span>
+            <p>{{form.fielddescription}} </p>
+            <div *ngIf="['slider'].includes(form.flippingquestion.type)" class="mt10">
+              <span  *ngFor="let flippingvalue of (form.flippingquestion.value || {}) | keyvalue">
+                <mat-label>{{flippingvalue.key}}&nbsp;:&nbsp;&nbsp;<b>{{form.flippingquestion.value$any([flippingvalue.key])}}</b></mat-label>
+                <span class="d-flex flex-row">
+                  <mat-label style="padding-top: 20px;">{{form.flippingquestion.options[0]}}</mat-label>
+                  <mat-slider
+                    style="width:100%"
+                    thumbLabel="true"
+                    min="1"
+                    [max]="form.flippingquestion.options.length"
+                    step="1"
+                    tickInterval="1"
+                    (change)="onSliderFlippingValueChange($event,flippingvalue.key,form); autoSave(this.deliveryForm.value)"
+                    >
+                    <input matSliderThumb [value]="+clientform.formarray[i].flippingquestion.value$any([flippingvalue.key])">
+                  </mat-slider>
+                  <mat-label style="padding-top: 20px;">{{form.flippingquestion.options[form.flippingquestion.options.length  - 1]}}</mat-label>
+                </span>
+              </span>
+            </div>
+            <p *ngIf="!['',null,undefined].includes(form.flippingquestion.fieldnotes)">Notes : {{!['',null,undefined].includes(form.flippingquestion.fieldnotes) ? form.flippingquestion.fieldnotes : null}}</p>
+          </div>
+        </div>
+        
+        <!-- form array -->
+        <div *ngIf="['array'].includes(form.type)" class="w-100">
+          <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
+          <p>{{form.fielddescription}}</p>
+          <div [formArrayName]="form.formcontrol" >
+              <li class="fr card-body" *ngFor="let list of this.deliveryForm.get(form.formcontrol)['controls'];let j = index" [formGroupName]="j" >
+                <div *ngFor="let obj of form.array;let k = index">
+  
+                  <div  *ngIf="['Text','number','time','email'].includes(obj.type)">
+                    <span class="d-flex flex-row m10"><h6><mat-label>{{obj.fieldname}}</mat-label></h6> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 12px;" *ngIf="![null,undefined].includes(obj.required) ? obj.required :false">star</mat-icon></span>
+                    <mat-form-field class="m10" appearance="outline">
+                      <input [type]=obj.type matInput [formControlName]="obj.formarraycontrol" [required]="![null,undefined].includes(obj.required) ? obj.required : false" (keyup)="autoSave(this.deliveryForm.value)"/>
+                      <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j]?.get(obj.formarraycontrol).hasError('required')">The above field is mandatory.Do not leave it blank.</mat-error>
+                      <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).hasError('email')">Enter a valid email.</mat-error>
+                    </mat-form-field>
+                  </div>
+  
+                  <div *ngIf="['date'].includes(obj.type)">
+                    <span class="d-flex flex-row m10"><h6><mat-label>{{obj.fieldname}}</mat-label></h6> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 12px;" *ngIf="![null,undefined].includes(obj.required) ? obj.required :false">star</mat-icon></span>
+                    <mat-form-field class="m10" appearance="outline">
+                      <input matInput [matDatepicker]="j10" [formControlName]="obj.formarraycontrol" [required]="![null,undefined].includes(obj.required) ? obj.required : false" (dateChange)="autoSave(this.deliveryForm.value)" />
+                      <mat-datepicker-toggle matSuffix [for]="j10"></mat-datepicker-toggle>
+                      <mat-datepicker #j10 ></mat-datepicker>
+                      <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).hasError('required')">The above field is mandatory.Please select a date.</mat-error>
+                    </mat-form-field>
+                  </div>
+  
+                  <div *ngIf="['DropDown','MultiSelect'].includes(obj.type)">
+                    <span class="d-flex flex-row m10"><h6><mat-label>{{obj.fieldname}}</mat-label></h6> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 12px;" *ngIf="![null,undefined].includes(obj.required) ? obj.required :false">star</mat-icon></span>
+                    <mat-form-field class="m10" appearance="outline">
+                      <mat-select [formControlName]="obj.formarraycontrol" [multiple]="obj.type == 'MultiSelect' ? true :false" [required]="![null,undefined].includes(obj.required) ? obj.required : false" (selectionChange)="autoSave(this.deliveryForm.value)">
+                        <mat-option *ngFor="let item of obj.options" [value]="item">{{item}}</mat-option>
+                      </mat-select>
+                      <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).hasError('required')">The above field id mandatory.Please select an option.</mat-error>
+                    </mat-form-field>
+                  </div>
+  
+                  <div *ngIf="['Paragraph'].includes(obj.type)">
+                    <span class="d-flex flex-row m10"><h6><mat-label>{{obj.fieldname}}</mat-label></h6> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 12px;" *ngIf="![null,undefined].includes(obj.required) ? obj.required :false">star</mat-icon></span>
+                    <mat-form-field class="m10" appearance="fill">
+                      <textarea matInput [formControlName]="obj.formarraycontrol" placeholder="Ex. It makes me feel..." [required]="![null,undefined].includes(obj.required) ? obj.required : false" (keyup)="autoSave(this.deliveryForm.value)"></textarea>
+                      <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).hasError('required')">The above field id mandatory.Do not leave it blank.</mat-error>
+                    </mat-form-field>
+                  </div>
+  
+                  <div *ngIf="['Checkbox'].includes(obj.type)" class="ml10">
+                    <mat-checkbox class="m10" [formControlName]="obj.formarraycontrol" [required]="![null,undefined].includes(obj.required) ? obj.required : false" (change)="autoSave(this.deliveryForm.value)">{{obj.fieldname}}</mat-checkbox>
+                    <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).touched">
+                      <span *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).hasError('required')">
+                        The above field is mandatory.Please check it.
+                      </span>
+                    </mat-error>
+                  </div>
+  
+                  <div *ngIf="['radio'].includes(obj.type)" class="ml10">
+                    <span class="d-flex flex-row m10"><h6><mat-label>{{obj.fieldname}}</mat-label></h6> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 12px;" *ngIf="![null,undefined].includes(obj.required) ? obj.required :false">star</mat-icon></span>
+                    <mat-radio-group  class="m10" [formControlName]="obj.formarraycontrol" class="example-radio-group" [required]="![null,undefined].includes(obj.required) ? obj.required : false" (change)="autoSave(this.deliveryForm.value)">
+                      <mat-radio-button class="m10" *ngFor="let list of obj.options" [value]="list">{{list}}</mat-radio-button>
+                      <mat-error *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).touched">
+                        <span *ngIf="deliveryForm.get(form.formcontrol)['controls']?.[j].get(obj.formarraycontrol).hasError('required')">
+                          The above field is mandatory.Please check an option.
+                        </span>
+                      </mat-error>
+                    </mat-radio-group>
+                  </div>
+  
+                </div>
+  
+                <span class="d-flex flex-row justify-content-start ml-2">
+                  <button style="margin-left: 16px;" *ngIf="j == (deliveryForm.get(form.formcontrol)['controls']?.length - 1)" type="button" mat-mini-fab color="primary" (click)="onAdd(form.formcontrol,form.array); autoSave(this.deliveryForm.value)" ><mat-icon>add</mat-icon></button>
+                  <button  style="margin-left: 16px;"  *ngIf="j != 0 && j == (deliveryForm.get(form.formcontrol)['controls']?.length - 1)" type="button" mat-mini-fab color="accent" (click)="onRemove(form.formcontrol,j); autoSave(this.deliveryForm.value)"><mat-icon>remove</mat-icon></button>
+                </span>
+  
+              </li>
+          </div>
+          <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{form.fieldnotes}}</p>
+        </div>
+      </form> 
+      <br>
+      <!-- {{deliveryForm.value | json}} -->
+      <div *ngIf="!formpatch" class="Acontainer mt10" style="display: flex;justify-content: center;">
+          <button class="button-css" style="width: 150px;font-size: 1rem;letter-spacing:2px ;" mat-raised-button color="primary" type="submit" [disabled]="deliveryForm.invalid || !submissionAccess" (click)="onSubmit(this.deliveryForm.value)">Submit</button>
+      </div>
+  
+      <div *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" class="Acontainer mt10" style="display: flex;justify-content: center;">
+        <button class="button-css" style="width: 150px;font-size: 1rem;letter-spacing:2px ;" mat-raised-button color="primary" type="button" [disabled]="deliveryForm.invalid || !submissionAccess" (click)="onUpdate(this.deliveryForm.value)">Update</button>
+      </div>
+    </div>&nbsp;&nbsp;&nbsp;
+    <form *ngIf="formpatch && !reviewLastForm && !viewFilledForm && !viewCompleted" [formGroup]="notesForm" class="notes-form">
+      <div formArrayName="notes" class="notes-container">
+        <div *ngFor="let note of notesArray.controls; let i = index" class="note-item">
+          <mat-form-field appearance="outline" class="note-input">
+            <mat-label>Notes...</mat-label>
+            <textarea matInput [formControlName]="i" class="textarea"></textarea>
+            <mat-error *ngIf="notesArray.at(i).touched && notesArray.at(i).invalid">
+              Note is required
+            </mat-error>
+          </mat-form-field>
+          <button mat-mini-fab color="primary" class="add-button" *ngIf="i === notesArray.length - 1 && notesArray.at(i).value?.trim()" (click)="addNote()" class="add-button">
+            <mat-icon>add</mat-icon>
+          </button>
+          <!-- <button mat-icon-button color="primary" *ngIf="i === notesArray.length - 1 && notesArray.at(i).value?.trim()"
+            type="button" (click)="addNote()" class="add-button">
+            <mat-icon>add</mat-icon>
+          </button> -->
+          <button mat-mini-fab color="warn" class="add-button" *ngIf="notesArray.length > 1"  (click)="removeNote(i)" class="remove-button">
+            <mat-icon>remove</mat-icon>
+          </button>
+          <!-- <button mat-icon-button color="warn" *ngIf="notesArray.length > 1" 
+            type="button" (click)="removeNote(i)" class="remove-button">
+            <mat-icon>remove</mat-icon>
+          </button> -->
+        </div>
+      </div>
+    
+      <div class="button-container">
+        <button mat-raised-button color="primary" type="button" (click)="reworkNotes()" [disabled]="!reviewAccess" class="button-css">Re-Work</button>
+        <button mat-raised-button color="accent" type="submit" (click)="completeNotes()" [disabled]="!reviewAccess" class="button-css">Complete</button>
+      </div>
+      <br>
+      <p *ngIf="!reviewAccess" style="color: rgb(229, 66, 66);">*you do not have access to review</p>    
+    </form>
+    
+    <div *ngIf="(reviewLastForm || viewCompleted) && submissionAccess" class="review-container">
+      <h5 class="review-title">{{ reviewLastForm ? 'Review Notes' : 'Summary' }}</h5>
+      <ul class="review-list">
+        <ng-container *ngIf="reviewNotes && reviewNotes.length > 0">
+          <li *ngFor="let note of reviewNotes" class="review-item">
+            <mat-icon class="review-icon">notes</mat-icon>
+            <span>{{note}}</span>
+          </li>
+        </ng-container>
+      </ul>
+    </div>
+    
+  </div>
+  <!-- formEnd -->
+  </div>
+  

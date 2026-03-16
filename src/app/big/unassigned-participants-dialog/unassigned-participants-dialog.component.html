@@ -1,0 +1,68 @@
+<div class="dialog-container">
+  <div class="dialog-header">
+    <h2 class="dialog-title">
+      <mat-icon>person_off</mat-icon>
+      Unassigned Participants
+    </h2>
+    <button class="close-btn" (click)="onClose()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-info">
+    <div class="info-item" *ngIf="data.selectedEvents?.length > 0">
+      <mat-icon>event</mat-icon>
+      <span>{{data.selectedEvents.length}} Event(s) selected</span>
+    </div>
+    <div class="info-item" *ngIf="data.selectedQueues?.length > 0">
+      <mat-icon>queue</mat-icon>
+      <span>{{data.selectedQueues.length}} Queue(s) selected</span>
+    </div>
+  </div>
+
+  <div class="dialog-search">
+    <mat-icon>search</mat-icon>
+    <input type="text" placeholder="Search participants..." [(ngModel)]="searchQuery" (input)="onSearch()">
+    <mat-icon class="clear-icon" *ngIf="searchQuery" (click)="searchQuery = ''; onSearch()">close</mat-icon>
+  </div>
+
+  <div class="dialog-content">
+    <div class="empty-state" *ngIf="filteredParticipants.length === 0">
+      <mat-icon>check_circle</mat-icon>
+      <p *ngIf="!searchQuery">All participants are assigned to cohorts</p>
+      <p *ngIf="searchQuery">No participants match "{{searchQuery}}"</p>
+    </div>
+
+    <div class="participants-list" *ngIf="filteredParticipants.length > 0">
+      <div class="participant-item" *ngFor="let participant of filteredParticipants">
+        <div class="participant-info">
+          <div class="participant-avatar">
+            {{(participant.name || 'P')[0] | uppercase}}
+          </div>
+          <div class="participant-details">
+            <span class="participant-name">{{participant.name}}</span>
+            <span class="participant-event">
+              <mat-icon>event</mat-icon>
+              {{participant.eventName}}
+            </span>
+          </div>
+        </div>
+        <div class="participant-badges">
+          <span class="source-badge" [ngClass]="getSourceClass(participant)">
+            <mat-icon *ngIf="participant.inEventRequest && participant.inBigInvitation">link</mat-icon>
+            <mat-icon *ngIf="participant.inEventRequest && !participant.inBigInvitation">assignment</mat-icon>
+            <mat-icon *ngIf="!participant.inEventRequest && participant.inBigInvitation">card_membership</mat-icon>
+            {{getSourceLabel(participant)}}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-footer">
+    <span class="footer-count">
+      {{filteredParticipants.length}} of {{data.participants?.length || 0}} participant(s)
+    </span>
+    <button class="close-dialog-btn" (click)="onClose()">Close</button>
+  </div>
+</div>

@@ -1,0 +1,186 @@
+<div class="bugs-container">
+  <!-- Header -->
+  <div class="header">
+    <h1 class="font">App Flow Breaks</h1>
+    <div class="header-info">
+      <span class="total-count">Total: {{ filteredBugs.length }} bugs</span>
+      <button *ngIf="getActiveFiltersCount() > 0" 
+              class="clear-all-btn" 
+              (click)="clearAllFilters()">
+        Clear All Filters ({{ getActiveFiltersCount() }})
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading indicator -->
+  <div *ngIf="isLoading" class="loading">
+    <div class="spinner"></div>
+    <p>Loading bugs...</p>
+  </div>
+
+  <div *ngIf="!isLoading">
+    <!-- Type Filter Chips -->
+    <div class="filter-section">
+      <h3 class="font">Filter by Type</h3>
+      <div class="chips-container">
+        <div *ngFor="let type of availableTypes" 
+             class="chip"
+             [class.chip-selected]="isTypeSelected(type)"
+             (click)="toggleTypeFilter(type)">
+          {{ type }}
+          <span class="chip-count">
+            ({{ (allBugs | filter:type:'type').length }})
+          </span>
+        </div>
+        <button *ngIf="selectedTypes.size > 0" 
+                class="clear-types-btn" 
+                (click)="clearTypeFilters()">
+          Clear Types
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Filters -->
+    <div class="search-section">
+      <div class="search-inputs">
+        <div class="search-field">
+          <label for="profileName">Profile Name</label>
+          <input 
+            id="profileName"
+            type="text" 
+            [(ngModel)]="searchProfileName" 
+            (input)="onSearchChange()"
+            placeholder="Search by profile name..."
+            class="search-input">
+        </div>
+        
+        <div class="search-field">
+          <label for="email">Email</label>
+          <input 
+            id="email"
+            type="text" 
+            [(ngModel)]="searchEmail" 
+            (input)="onSearchChange()"
+            placeholder="Search by email..."
+            class="search-input">
+        </div>
+        
+        <div class="search-field">
+          <label for="phone">Phone Number</label>
+          <input 
+            id="phone"
+            type="text" 
+            [(ngModel)]="searchPhone" 
+            (input)="onSearchChange()"
+            placeholder="Search by phone..."
+            class="search-input">
+        </div>
+      </div>
+    </div>
+
+    <!-- Bugs List -->
+    <div class="bugs-list">
+      <div *ngIf="bugs.length === 0" class="no-results">
+        <p>No bugs found matching your filters.</p>
+      </div>
+
+      <div *ngFor="let bug of bugs" class="bug-card">
+        <div class="bug-header">
+          <span class="bug-type-badge" [attr.data-type]="bug.type">
+            {{ bug.type }}
+          </span>
+          <span class="bug-date">{{ formatDate(bug.date) }}</span>
+        </div>
+
+        <div class="bug-profile">
+          <div class="profile-line">
+            <span class="profile-name">{{ bug.profileName || 'Unknown' }}</span>
+            <span class="profile-separator">•</span>
+            <span class="profile-email">{{ bug.profileEmail || 'No email' }}</span>
+          </div>
+          <div class="profile-phone" *ngIf="bug.profilePhone">
+            📞 {{ bug.profilePhone }}
+          </div>
+        </div>
+
+        <div class="bug-note" *ngIf="bug.note">
+          <strong>Note:</strong> {{ bug.note }}
+        </div>
+
+        <div class="bug-log" *ngIf="bug.log && bug.log.length > 0">
+          <strong>Log:</strong>
+          <ul>
+            <li *ngFor="let logEntry of bug.log; let i = index">
+              <span class="log-number">{{ i }}.</span> {{ logEntry }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="filteredBugs.length > 0">
+      <div class="pagination-info">
+        Showing {{ currentPage * pageSize + 1 }} - 
+        {{ Math.min((currentPage + 1) * pageSize, filteredBugs.length) }} 
+        of {{ filteredBugs.length }}
+      </div>
+
+      <div class="pagination-controls">
+        <button 
+          class="pagination-btn"
+          [disabled]="currentPage === 0"
+          (click)="previousPage()">
+          Previous
+        </button>
+
+        <div class="page-numbers">
+          <button 
+            *ngIf="getPageNumbers()[0] > 0"
+            class="page-number"
+            (click)="goToPage(0)">
+            1
+          </button>
+          
+          <span *ngIf="getPageNumbers()[0] > 1" class="page-ellipsis">...</span>
+
+          <button 
+            *ngFor="let page of getPageNumbers()"
+            class="page-number"
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)">
+            {{ page + 1 }}
+          </button>
+
+          <span *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages - 2" 
+                class="page-ellipsis">...</span>
+
+          <button 
+            *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1"
+            class="page-number"
+            (click)="goToPage(totalPages - 1)">
+            {{ totalPages }}
+          </button>
+        </div>
+
+        <button 
+          class="pagination-btn"
+          [disabled]="currentPage >= totalPages - 1"
+          (click)="nextPage()">
+          Next
+        </button>
+      </div>
+
+      <div class="page-size-selector">
+        <label>Items per page:</label>
+        <select [(ngModel)]="pageSize" (change)="currentPage = 0; applyFilters()">
+          <option [value]="10">10</option>
+          <option [value]="20">20</option>
+          <option [value]="30">30</option>
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>

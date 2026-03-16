@@ -1,0 +1,137 @@
+<div style="padding:10px;">
+  <h2 style="text-align: center;">Create workshop </h2>
+  <div>
+    <!-- {{createForm.value | json}}{{createForm.invalid}} -->
+
+    <form  [formGroup]="createForm">
+      <mat-form-field appearance="outline" class="w-50">
+          <mat-label>Title</mat-label>
+          <input type="text" matInput formControlName="title" placeholder="enter a name">
+          <mat-error *ngIf="createForm.get('title').hasError('required')">Enter a title</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Description</mat-label>
+        <input type="text" matInput formControlName="description" placeholder="enter a name">
+        <mat-error *ngIf="createForm.get('title').hasError('required')">Enter a description</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Select Challenge</mat-label>
+        <mat-select formControlName="challengeref">
+          <mat-option *ngFor="let option of challengelist" [value]="option.docid">{{option.label}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="createForm.get('challengeref').hasError('required')">select a challenge</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Select Enrollment</mat-label>
+        <mat-select formControlName="enrolmentref">
+          <mat-option *ngFor="let option of enrollmentlist" [value]="option.docid">{{option.label}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="createForm.get('enrolmentref').hasError('required')">select a enrollment</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field class="w-75" appearance="fill">
+        <mat-label>Workshop Admin</mat-label>
+        <mat-chip-grid #chipList3  >
+          <ng-container *ngFor="let admin of createForm.get('workshopadmin').value; let adminIndex = index">
+            <mat-chip-row *ngIf="admin?.id">
+                {{ mapUserRefToName[admin.id] }}
+                <mat-icon matChipRemove (click)="onRemoveWorkshopAdmin('workshopadmin', adminIndex)">cancel</mat-icon>
+            </mat-chip-row>
+          </ng-container>
+          <input 
+            placeholder="add admin..."
+            [matChipInputFor]="chipList3"
+            (keyup)="onTextSearch('workshopadmin',$event)"
+            [matAutocomplete]="auto3"
+            >
+        </mat-chip-grid>
+        <mat-autocomplete #auto3="matAutocomplete" (optionSelected)="onAddFromChipList('workshopadmin',$event)">
+          <mat-option *ngFor="let option of filteredProfileData" [value]="option.user_ref" >
+            {{option.name}}
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <!-- <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Workshop Admin</mat-label>
+        <mat-select [compareWith]="compareFn" formControlName="workshopadmin" multiple>
+          <mat-option *ngFor="let option of profileData | keyvalue" [value]="option.value.user_ref">{{option.value.name}}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="createForm.get('workshopadmin').hasError('required')">select a admin</mat-error>
+      </mat-form-field>&nbsp;&nbsp; -->
+
+      <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Chat Group Name</mat-label>
+        <input type="text" matInput formControlName="workshopgroupname" placeholder="enter a name">
+        <mat-error *ngIf="createForm.get('workshopgroupname').hasError('required')">Create a chat group name</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <!-- <mat-form-field class="w-50">
+          <mat-label>Start Date</mat-label>
+          <input matInput [matDatepicker]="startDatePicker" formControlName="startdate" >
+          <mat-datepicker-toggle matSuffix [for]="startDatePicker"></mat-datepicker-toggle>
+          <mat-datepicker #startDatePicker></mat-datepicker>
+          <mat-error *ngIf="createForm.get('startdate').hasError('required')">Pick Start Date</mat-error>
+      </mat-form-field>&nbsp;&nbsp; -->
+
+      <mat-form-field class="w-50">
+        <mat-label>Start Date</mat-label>
+        <input matInput type="datetime-local" formControlName="startdate" >
+        <mat-error *ngIf="createForm.get('startdate').hasError('required')">Pick Start Date</mat-error>
+    </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field class="w-50">
+          <mat-label>End Date</mat-label>
+          <input matInput [matDatepicker]="endDatePicker" formControlName="enddate" > 
+          <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
+          <mat-datepicker #endDatePicker></mat-datepicker>
+          <mat-error *ngIf="createForm.get('enddate').hasError('required')">Pick End Date</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field class="w-50">
+        <mat-label>Registration Date</mat-label>
+        <input matInput [matDatepicker]="registrationDatePicker" formControlName="lastregistrationdate">
+        <mat-datepicker-toggle matSuffix [for]="registrationDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #registrationDatePicker></mat-datepicker>
+        <mat-error *ngIf="createForm.get('lastregistrationdate').hasError('required')">Pick Registration Date</mat-error>
+      </mat-form-field>&nbsp;&nbsp;
+
+      <mat-form-field appearance="fill" class="w-75" >
+        <mat-label>Add Thumbnail</mat-label>
+        <mat-chip-grid #chipList0 multiple >
+          <mat-chip-row *ngFor="let url of workshopThumbnailValue | keyvalue;let refIndex = index" >
+            {{url.key}}:{{url.value}}
+            <mat-icon matChipRemove (click)="onRemoveImage(url.key)">cancel</mat-icon>
+          </mat-chip-row>
+          <input 
+            placeholder="add type reference..."
+            [matChipInputFor]="chipList0"
+            (keydown.enter)="onAddImage($event)"
+            >
+        </mat-chip-grid>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-75" >
+        <mat-label>Add WorkShop Trailer URL</mat-label>
+        <mat-chip-grid #chipList1 multiple >
+          <mat-chip-row *ngFor="let url of createForm.get('workshoptrailer').value;let refIndex = index" >
+            {{url}}<mat-icon matChipRemove (click)="onRemoveVideo(refIndex)">cancel</mat-icon>
+          </mat-chip-row>
+          <input 
+            placeholder="add type reference..."
+            [matChipInputFor]="chipList1"
+            (keydown.enter)="onAddVideo($event)"
+            >
+        </mat-chip-grid>
+      </mat-form-field>
+
+      <section style="margin-top: 20px;justify-content:center;display: flex;">
+        <button type="button" mat-stroked-button (click)="dialogClose()">Back</button>&nbsp;&nbsp;
+        <button class="submit" type="submit" mat-stroked-button color="primary"  [disabled]="createForm.invalid"  (click)="submit()">Submit</button>
+      </section>
+    </form>
+  </div>
+</div>

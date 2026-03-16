@@ -1,0 +1,493 @@
+<main class="m-4">
+  <input type="file" id="emailImportInput" accept=".xlsx,.xls,.csv"  (change)="onImportEmails($event)" style="display: none;">
+  <div class="top-bar" [formGroup]="filterForm">
+    <mat-form-field appearance="outline" class="compact-field date-field">
+      <mat-label>Date Range</mat-label>
+      <mat-date-range-input [rangePicker]="picker">
+        <input matStartDate [(ngModel)]="startDate" [ngModelOptions]="{standalone: true}" placeholder="Start">
+        <input matEndDate [(ngModel)]="endDate" [ngModelOptions]="{standalone: true}" placeholder="End">
+      </mat-date-range-input>
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-date-range-picker #picker></mat-date-range-picker>
+    </mat-form-field>
+
+    <button mat-stroked-button color="primary" type="button" (click)="fetchData()">Fetch</button>
+
+    <mat-form-field appearance="outline" class="compact-field">
+      <mat-label>Participant</mat-label>
+      <mat-select formControlName="name" multiple (selectionChange)="onFilter(filterForm.value)">
+        <mat-option>
+          <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search..."
+            noEntriesFoundLabel="No match"></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let participant of filteredParticipantList" [value]="participant.profileId">
+          {{participant.name}}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="compact-field">
+      <mat-label>Queue</mat-label>
+      <mat-select formControlName="queue" multiple (selectionChange)="onFilter(filterForm.value)">
+        <mat-option>
+          <ngx-mat-select-search [formControl]="queueFilterCtrl" placeholderLabel="Search..."
+            noEntriesFoundLabel="No match"></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let list of filteredQueueList" [value]="list.docid">{{list['queuename']}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="compact-field">
+      <mat-label>Workshop</mat-label>
+      <mat-select formControlName="workshop" multiple (selectionChange)="onFilter(filterForm.value)">
+        <mat-option>
+          <ngx-mat-select-search [formControl]="workshopFilterCtrl" placeholderLabel="Search..."
+            noEntriesFoundLabel="No match"></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let list of filteredCombinedWorkshopList" [value]="list.docid">
+          {{ list.displayTitle }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="compact-field">
+      <mat-label>Form</mat-label>
+      <mat-select formControlName="formname" multiple (selectionChange)="onFilter(filterForm.value)">
+        <mat-option>
+          <ngx-mat-select-search [formControl]="formFilterCtrl" placeholderLabel="Search..."
+            noEntriesFoundLabel="No match"></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let list of filteredFormList" [value]="list.formname">{{list.formname}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+      <button mat-stroked-button color="accent" (click)="triggerFileInput()"  matTooltip="Column name of email should be 'Email' (Case-insensitive)">
+        <mat-icon>upload_file</mat-icon> Import Emails
+      </button>
+    </div>
+
+    <button mat-stroked-button (click)="toggleLikeFilter()" [color]="filterLiked ? 'warn' : ''" matTooltip="Filter liked forms">
+      <mat-icon>{{ filterLiked ? 'favorite' : 'favorite_border' }}</mat-icon>
+      Liked
+    </button>
+
+    <button mat-stroked-button (click)="toggleFlagFilter()" [color]="filterFlagged ? 'accent' : ''" matTooltip="Filter flagged forms">
+      <mat-icon>{{ filterFlagged ? 'flag' : 'outlined_flag' }}</mat-icon>
+      Flagged
+    </button>
+
+    <button mat-stroked-button color="primary" matTooltip="Save forms selected in 'Form' dropdown to My Forms"
+      [disabled]="filterForm.get('formname')?.value?.length === 0" (click)="addSelectedFormsToMyForms()">
+      <mat-icon>bookmark_add</mat-icon> Save to My Forms
+    </button>
+
+    <button mat-icon-button matTooltip="Clear all filters" (click)="ngOnInit();onFilter(filterForm.value)">
+      <mat-icon>restart_alt</mat-icon>
+    </button>
+  </div>
+
+  <!-- My Forms Bar -->
+  <div class="my-forms-bar" *ngIf="myForms.length > 0">
+    <div class="my-forms-left">
+      <mat-icon class="my-forms-icon">bookmark</mat-icon>
+      <span class="my-forms-label">My Forms</span>
+      <div class="my-forms-chips">
+        <div class="my-form-chip" *ngFor="let form of myForms" [class.chip-active]="selectedMyForms.includes(form.formname)"
+          (click)="toggleMyFormChip(form.formname)">
+          <span class="chip-text">{{ form.formname }}</span>
+          <mat-icon class="chip-remove" (click)="$event.stopPropagation(); removeFromMyForms(form.formname)">close</mat-icon>
+        </div>
+      </div>
+    </div>
+    <div class="my-forms-right">
+      <button mat-stroked-button class="compact-btn" *ngIf="selectedMyForms.length > 0" (click)="clearMyFormsSelection()">
+        Clear Filter
+      </button>
+    </div>
+  </div>
+
+  <div class="my-forms-bar" *ngIf="showImportedEmailsFilter" style="background-color: #e3f2fd;">
+    <div class="my-forms-left">
+      <mat-icon class="my-forms-icon" style="color: #1976d2;">cloud_upload</mat-icon>
+      <span class="my-forms-label" style="color: #1976d2;">Imported Emails Filter Active</span>
+      <button mat-stroked-button (click)="openImportSummaryModal('matched')"
+              style="font-size: 12px; color: #2e7d32; border-color: #2e7d32; margin-left: 8px;">
+         Matched {{ matchedEmailsCount }}
+      </button>
+
+      <button mat-stroked-button *ngIf="unmatchedEmailsCount > 0" 
+              (click)="openImportSummaryModal('notfound')"
+              style="font-size: 12px; color: #c62828; border-color: #c62828; margin-left: 8px;">
+         Not Found {{ unmatchedEmailsCount }}
+      </button>
+    </div>
+    <div class="my-forms-right">
+      <button mat-stroked-button class="compact-btn" color="accent" (click)="clearImportedEmailsFilter()">
+        Clear Import Filter
+      </button>
+    </div>
+  </div>
+
+  <!-- Bulk Actions Bar -->
+  <div class="bulk-actions" *ngIf="selection.hasValue()">
+    <span class="selection-count">{{selection.selected.length}} item(s) selected</span>
+
+    <button mat-flat-button color="accent" (click)="viewMergedOverlay()">
+      <mat-icon>merge_type</mat-icon>
+      View Merged
+    </button>
+
+    <button mat-flat-button color="primary" [matMenuTriggerFor]="downloadMenu">
+      <mat-icon>download</mat-icon>
+      Download Options
+      <mat-icon>arrow_drop_down</mat-icon>
+    </button>
+
+    <mat-menu #downloadMenu="matMenu">
+      <button mat-menu-item (click)="downloadSelectedAsExcel()">
+        <mat-icon>table_chart</mat-icon>
+        <span>Download as Excel</span>
+      </button>
+      <button mat-menu-item (click)="downloadSelectedAsMergedPDF()">
+        <mat-icon>picture_as_pdf</mat-icon>
+        <span>Download as Merged PDF</span>
+      </button>
+      <button mat-menu-item (click)="downloadSelectedPDFs()">
+        <mat-icon>folder_zip</mat-icon>
+        <span>Download Individual PDFs</span>
+      </button>
+    </mat-menu>
+
+    <button mat-stroked-button color="warn" (click)="clearSelection()">
+      Clear Selection
+    </button>
+  </div>
+
+  <div class="mat-elevation-z8">
+    <table mat-table [dataSource]="dataSource" matSort>
+
+      <!-- Checkbox Column -->
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef>
+          <mat-checkbox (change)="$event ? toggleAllRows() : null" [checked]="selection.hasValue() && isAllSelected()"
+            [indeterminate]="selection.hasValue() && !isAllSelected()">
+          </mat-checkbox>
+        </th>
+        <td mat-cell *matCellDef="let row">
+          <mat-checkbox (click)="$event.stopPropagation()" (change)="$event ? selection.toggle(row) : null"
+            [checked]="selection.isSelected(row)">
+          </mat-checkbox>
+        </td>
+      </ng-container>
+
+      <!-- Name Column -->
+      <ng-container matColumnDef="profileid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+        <td mat-cell *matCellDef="let row">
+          <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
+            {{ mapProfile[row.profileid] }}
+          </ng-container>
+          <ng-template #newUserBlock>
+            {{ mapProfileNew[row.profileid] }}
+            <span style="color: red;">(New User)</span>
+          </ng-template>
+        </td>
+      </ng-container>
+
+      <!-- Queue Column -->
+      <ng-container matColumnDef="queueref">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Queue </th>
+        <td mat-cell *matCellDef="let row"> {{row.queueref != undefined ? mapQueue[row.queueref.id] : null}}</td>
+      </ng-container>
+
+      <!-- Workshop Column -->
+      <ng-container matColumnDef="workshopref">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Workshop </th>
+        <td mat-cell *matCellDef="let row">
+          {{ row.workshopref != undefined ? (mapWorkshop[row.workshopref.id] ?? mapWorkshopNew[row.workshopref.id]) : null }}
+        </td>
+      </ng-container>
+
+      <!-- Form Column -->
+      <ng-container matColumnDef="formname">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Form </th>
+        <td mat-cell *matCellDef="let row"> {{row.formname}} </td>
+      </ng-container>
+
+      <!-- Submitted From Column -->
+      <ng-container matColumnDef="submittedin">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Submitted From</th>
+        <td mat-cell *matCellDef="let row"> {{row.submittedin === 'starlabs' ? row.submittedin + "-link" : row.submittedin + "-app"}} </td>
+      </ng-container>
+
+      <!-- Date Column -->
+      <ng-container matColumnDef="date">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+        <td mat-cell *matCellDef="let row"> {{![null,undefined].includes(row.date) ? (row.date.toDate() | date: 'short') : ''}} </td>
+      </ng-container>
+
+      <!-- Notes Column -->
+      <ng-container matColumnDef="notes">
+        <th mat-header-cell *matHeaderCellDef>Notes</th>
+        <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <div class="notes-cell">
+            <button mat-icon-button (click)="openNotes(row)"
+              [color]="row.notes && row.notes.length > 0 ? 'primary' : ''">
+              <mat-icon>{{ row.notes && row.notes.length > 0 ? 'sticky_note_2' : 'note_add' }}</mat-icon>
+            </button>
+            <span class="notes-preview" *ngIf="row.notes && row.notes.length > 0">
+              {{ row.notes[row.notes.length - 1].notes }}
+            </span>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- Like Column -->
+      <ng-container matColumnDef="like">
+        <th mat-header-cell *matHeaderCellDef>Like</th>
+        <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <div class="like-flag-cell">
+            <button mat-icon-button (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''">
+              <mat-icon>{{ row.liked ? 'favorite' : 'favorite_border' }}</mat-icon>
+            </button>
+            <div class="like-flag-meta" *ngIf="row.liked && row.likedetails">
+              <span class="meta-user">{{ mapProfile[row.likedetails.user] || mapProfileNew[row.likedetails.user] || '-' }}</span>
+              <span class="meta-time">{{ row.likedetails.time?.toDate ? (row.likedetails.time.toDate() | date: 'short') : '' }}</span>
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- Flag Column -->
+      <ng-container matColumnDef="flag">
+        <th mat-header-cell *matHeaderCellDef>Flag</th>
+        <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <div class="like-flag-cell">
+            <button mat-icon-button (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''">
+              <mat-icon>{{ row.tagged ? 'flag' : 'outlined_flag' }}</mat-icon>
+            </button>
+            <div class="like-flag-meta" *ngIf="row.tagged && row.tagdetails">
+              <span class="meta-user">{{ mapProfile[row.tagdetails.user] || mapProfileNew[row.tagdetails.user] || '-' }}</span>
+              <span class="meta-time">{{ row.tagdetails.time?.toDate ? (row.tagdetails.time.toDate() | date: 'short') : '' }}</span>
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
+        <td mat-cell *matCellDef="let row">
+          <div class="action-buttons">
+            <button mat-stroked-button (click)="$event.stopPropagation(); viewFormOverlay(row)">View</button>
+            <button mat-icon-button (click)="$event.stopPropagation(); onFormPreview(row)" matTooltip="Open in New Tab">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+            <button mat-icon-button (click)="$event.stopPropagation(); downloadFormPDF(row)" matTooltip="Download PDF">
+              <mat-icon>download</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="selection.toggle(row)"
+        [class.selected-row]="selection.isSelected(row)"></tr>
+
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell" [colSpan]="displayedColumns.length">
+          <ng-container *ngIf="isSelectedParticipantOutOfRange(); else noDataDefault">
+            <div style="padding: 24px; text-align: center; color: #f57c00; font-size: 15px;">
+              <mat-icon style="vertical-align: middle; margin-right: 6px;">person_search</mat-icon>
+              Participant not found in this date range. 
+            </div>
+          </ng-container>
+          <ng-template #noDataDefault>
+            No data matching the filter.
+          </ng-template>
+        </td>
+      </tr>
+    </table>
+
+    <mat-paginator [pageSizeOptions]="[25, 100, 200, 500, 1000]" aria-label="Select page of users"></mat-paginator>
+  </div>
+</main>
+
+<!-- ========== OVERLAY ========== -->
+<div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+  <div class="overlay-panel" (click)="$event.stopPropagation()">
+    <div class="overlay-header">
+      <h2>{{ overlayTitle }}</h2>
+      <div class="overlay-header-actions">
+        <button mat-icon-button matTooltip="Open in New Tab"
+          (click)="overlayMode === 'individual' ? onFormPreview(currentOverlayRow) : openMergedInNewTabs()">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
+        <button mat-icon-button (click)="closeOverlay()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="overlay-content">
+      <div *ngIf="overlayLoading" class="loading-spinner">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <!-- Individual View -->
+      <ng-container *ngIf="!overlayLoading && overlayMode === 'individual' && overlayFormData">
+        <div class="form-view">
+          <div class="form-banner"></div>
+          <div class="form-participant">{{ overlayFormData.participantName }}</div>
+          <div class="form-title">{{ overlayFormData.formTitle }}</div>
+          <div class="form-description" *ngIf="overlayFormData.formDescription">{{ overlayFormData.formDescription }}</div>
+          <div class="form-meta">
+            Queue: {{ overlayFormData.queue }} | Workshop: {{ overlayFormData.workshop }} | Submitted: {{ overlayFormData.date }}
+          </div>
+          <hr class="form-divider">
+          <div *ngFor="let field of overlayFormData.fields" class="form-field-item">
+            <div *ngIf="field.type === 'label'" class="form-section-label">
+              <div class="section-title">{{ field.fieldname }}</div>
+              <div class="section-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+            </div>
+            <div *ngIf="field.type === 'field'" class="form-question">
+              <div class="question-title">
+                {{ field.number }}. {{ field.fieldname }}
+                <span class="required-star" *ngIf="field.required">*</span>
+              </div>
+              <div class="question-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+              <div class="question-value" [class.empty-value]="field.isEmpty">
+                <ng-container *ngIf="field.fieldType === 'array'; else plainValue">
+                  <div *ngFor="let line of field.value.split('\n')" class="array-sub-item">
+                    <ng-container *ngIf="line.includes(':'); else noColon">
+                      <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
+                      <div class="sub-item-answer">{{ line.split(':').slice(1).join(':') }}</div>
+                    </ng-container>
+                    <ng-template #noColon>{{ line }}</ng-template>
+                  </div>
+                </ng-container>
+                <ng-template #plainValue>{{ field.value }}</ng-template>
+              </div>
+              <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Merged View -->
+      <ng-container *ngIf="!overlayLoading && overlayMode === 'merged'">
+        <div *ngIf="overlayMergedForms.length === 0" class="no-data">No form data found.</div>
+        <div *ngFor="let form of overlayMergedForms; let i = index" class="form-view">
+          <div class="form-banner"></div>
+          <div class="form-count">Form {{ i + 1 }} of {{ overlayMergedForms.length }}</div>
+          <div class="form-participant">{{ form.participantName }}</div>
+          <div class="form-title">{{ form.formTitle }}</div>
+          <div class="form-description" *ngIf="form.formDescription">{{ form.formDescription }}</div>
+          <div class="form-meta">
+            Queue: {{ form.queue }} | Workshop: {{ form.workshop }} | Submitted: {{ form.date }}
+          </div>
+          <hr class="form-divider">
+          <div *ngFor="let field of form.fields" class="form-field-item">
+            <div *ngIf="field.type === 'label'" class="form-section-label">
+              <div class="section-title">{{ field.fieldname }}</div>
+              <div class="section-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+            </div>
+            <div *ngIf="field.type === 'field'" class="form-question">
+              <div class="question-title">
+                {{ field.number }}. {{ field.fieldname }}
+                <span class="required-star" *ngIf="field.required">*</span>
+              </div>
+              <div class="question-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+              <div class="question-value" [class.empty-value]="field.isEmpty">
+                <ng-container *ngIf="field.fieldType === 'array'; else plainValue">
+                  <div *ngFor="let line of field.value.split('\n')" class="array-sub-item">
+                    <ng-container *ngIf="line.includes(':'); else noColon">
+                      <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
+                      <div class="sub-item-answer">{{ line.split(':').slice(1).join(':') }}</div>
+                    </ng-container>
+                    <ng-template #noColon>{{ line }}</ng-template>
+                  </div>
+                </ng-container>
+                <ng-template #plainValue>{{ field.value }}</ng-template>
+              </div>
+              <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
+            </div>
+          </div>
+          <hr *ngIf="i < overlayMergedForms.length - 1" class="form-separator">
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<!-- ========== NOTES OVERLAY ========== -->
+<div class="overlay-backdrop" *ngIf="showNotesOverlay" (click)="closeNotes()">
+  <div class="notes-panel" (click)="$event.stopPropagation()">
+    <div class="overlay-header">
+      <h2>Notes - {{ notesParticipantName }}</h2>
+      <button mat-icon-button (click)="closeNotes()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="notes-content">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Add a note</mat-label>
+        <textarea matInput [(ngModel)]="notesText" rows="3" placeholder="Write your notes here..."></textarea>
+      </mat-form-field>
+
+      <div class="notes-history" *ngIf="notesRecord?.notes && notesRecord.notes.length > 0">
+        <h4>Previous Notes</h4>
+        <div *ngFor="let note of getReversedNotes()" class="note-item">
+          <div class="note-meta">
+            <span class="note-user">{{ mapProfile[note.user] || mapProfileNew[note.user] || note.user }}</span>
+            <span class="note-time">{{ note.time?.toDate ? (note.time.toDate() | date: 'medium') : (note.time | date: 'medium') }}</span>
+          </div>
+          <div class="note-text">{{ note.notes }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-actions">
+      <button mat-stroked-button (click)="closeNotes()">Cancel</button>
+      <button mat-raised-button color="primary" (click)="saveNotes()" [disabled]="!notesText?.trim()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Summary Modal -->
+<div class="overlay-backdrop" *ngIf="showImportSummaryModal" (click)="closeImportSummaryModal()">
+  <div class="notes-panel" (click)="$event.stopPropagation()" style="max-width: 400px;">
+    <div class="overlay-header">
+      <h2 *ngIf="importSummaryMode === 'matched'" style="color: #2e7d32;">
+         Matched Participants ({{ matchedEmailsCount }})
+      </h2>
+      <h2 *ngIf="importSummaryMode === 'notfound'" style="color: #c62828;">
+         Not Found ({{ unmatchedEmailsCount }})
+      </h2>
+      <button mat-icon-button (click)="closeImportSummaryModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="notes-content">
+      <!-- Matched -->
+      <ng-container *ngIf="importSummaryMode === 'matched'">
+        <div *ngFor="let name of matchedParticipantNames" 
+             style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">
+          <mat-icon style="font-size: 16px; color: #2e7d32; vertical-align: middle;">person</mat-icon>
+          {{ name }}
+        </div>
+      </ng-container>
+      <!-- Not Found -->
+      <ng-container *ngIf="importSummaryMode === 'notfound'">
+        <div *ngFor="let name of notFoundEmails"
+             style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; color: #c62828;">
+          <mat-icon style="font-size: 16px; vertical-align: middle;">person</mat-icon>
+          {{ name }}
+        </div>
+      </ng-container>
+    </div>
+    <div class="notes-actions">
+      <button mat-raised-button color="primary" (click)="closeImportSummaryModal()">Close</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,279 @@
+<!-- tag-management-dialog.component.html -->
+
+<div class="dialog-overlay">
+    <div class="dialog-container">
+        <!-- Header -->
+        <div class="dialog-header">
+            <h2>Tag Management</h2>
+            <button class="close-btn" mat-dialog-close (click)="dialogRef.close()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="dialog-tabs">
+            <button class="tab-btn" [class.active]="activeTab === 'manage'" (click)="activeTab = 'manage'">
+                <i class="fas fa-tags"></i> Manage Tags
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'assign'" (click)="activeTab = 'assign'">
+                <i class="fas fa-user-tag"></i> Assign to Participants ({{ selectedParticipants.length }})
+            </button>
+        </div>
+
+        <!-- Content -->
+        <div class="dialog-content">
+            
+            <!-- Tab 1: Manage Tags -->
+            <div class="tab-panel" [class.active]="activeTab === 'manage'">
+                <!-- Add Tag Form -->
+                <div class="add-tag-form">
+                    <div class="tag-input-wrapper">
+                        <input class="tag-name-input" type="text" placeholder="Enter tag name..." [(ngModel)]="newTagName" />
+                        <mat-select class="tagsfor-inline" multiple [(ngModel)]="newTagsFor" placeholder="Tags For">
+                            <mat-option *ngFor="let option of tagsForOptions" [value]="option">
+                                {{ option }}
+                            </mat-option>
+                        </mat-select>
+                    </div>
+                    <button class="btn-primary" (click)="addTag()">
+                        <i class="fas fa-plus"></i> Add Tag
+                    </button>
+                </div>
+
+                <!-- Tags List -->
+                <div class="tag-item" *ngFor="let tag of activeTags">
+                    
+                    <!-- VIEW MODE -->
+                    <div class="tag-info" *ngIf="editTagId != tag.id">
+                        <span class="tag-name">{{ tag.name }}</span>
+                    </div>
+
+                    <!-- EDIT MODE - same wrapper as add form -->
+                    <div class="tag-input-wrapper" *ngIf="isEditing && editTagId == tag.id">
+                        <input
+                            type="text"
+                            class="tag-name-input"
+                            [(ngModel)]="tag.name"
+                            (keyup.enter)="saveTagEdit(tag)"
+                        />
+                        <mat-select class="tagsfor-inline" multiple [(ngModel)]="tag.tagsfor" placeholder="Tags For">
+                            <mat-option *ngFor="let option of tagsForOptions" [value]="option">
+                                {{ option }}
+                            </mat-option>
+                        </mat-select>
+                    </div>
+
+                    <!-- show tags when not editing -->
+                    <div class="tag-for-display" *ngIf="editTagId != tag.id">
+                        <span class="tagsfor-badge" *ngFor="let t of tag.tagsfor">{{ t }}</span>
+                        <span class="tagsfor-empty" *ngIf="!tag.tagsfor?.length">—</span>
+                    </div>
+
+                    <div class="tag-actions">
+                        <!-- save button when editing -->
+                        <ng-container *ngIf="isEditing && editTagId == tag.id">
+                            <button class="btn-icon save" (click)="saveTagEdit(tag)">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="btn-icon cancel" (click)="cancelEdit()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </ng-container>
+                        <!-- edit + delete when not editing -->
+                        <ng-container *ngIf="editTagId != tag.id">
+                            <button class="btn-icon edit" (click)="editTag(tag)">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                            <button class="btn-icon delete" (click)="deleteTag(tag)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </ng-container>
+                    </div>
+
+                </div>
+
+                <div class="empty-state" *ngIf="activeTags.length === 0">
+                    <i class="fas fa-tags"></i>
+                    <p>No tags yet. Create your first tag above!</p>
+                </div>
+            </div>
+
+            <!-- Tab 2: Bulk Assign Tags to Selected Participants -->
+            <div class="tab-panel" [class.active]="activeTab === 'assign'">
+                
+                <!-- Bulk Actions Section -->
+                <div class="bulk-actions-container" *ngIf="selectedParticipants.length != 0">
+                    
+                    <!-- Action 1: Assign Tag -->
+                    <div class="action-card">
+                        <div class="action-header">
+                            <div class="action-info">
+                                <h3 class="action-title">Assign Tag</h3>
+                            </div>
+                        </div>
+
+                        <div class="tag-selector">
+                            <label>Select tag to assign:</label>
+
+                            <mat-form-field appearance="outline">
+                                <mat-label>Assign Tag</mat-label>
+                                <mat-select [(ngModel)]="selectedTagToAssign" name="selectedTagToAssign" multiple [disabled]="selectedTagToRemove || selectedTagToReplace || selectedTagReplaceWith">
+                                    <mat-option>
+                                        <ngx-mat-select-search [(ngModel)]="filterAssignList" name="filterAssignList"
+                                            [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                                            ngDefaultControl></ngx-mat-select-search>
+                                    </mat-option>
+                                    <mat-option *ngFor="let option of onfilterassignlist()" [value]="option.id">
+                                        {{option.name}}
+                                    </mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+                        
+                        <div class="action-body">
+                            <button 
+                                class="btn-action assign" 
+                                [disabled]="selectedTagToAssign.length == 0"
+                                (click)="bulkAssignTag()">
+                                <i class="fas fa-check"></i> Assign to All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Action 2: Remove/Untag -->
+                    <div class="action-card">
+                        <div class="action-header">
+                            <div class="action-info">
+                                <h3 class="action-title">Remove Tag</h3>
+                            </div>
+                        </div>
+
+                        <div class="tag-selector">
+                            <label>Select tag to remove:</label>
+
+                            <mat-form-field appearance="outline">
+                                <mat-label>Remove Tag</mat-label>
+                                <mat-select [(ngModel)]="selectedTagToRemove" name="selectedTagToRemove" [disabled]="selectedTagToAssign.length != 0 || selectedTagToReplace || selectedTagReplaceWith">
+                                    <mat-option>
+                                        <ngx-mat-select-search [(ngModel)]="filterAssignList" name="filterAssignList"
+                                            [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                                            ngDefaultControl></ngx-mat-select-search>
+                                    </mat-option>
+                                    <mat-option [value]="null">None</mat-option>
+                                    <mat-option *ngFor="let option of onfilterassignlist()" [value]="option.id">
+                                        {{option.name}}
+                                    </mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+                        
+                        <div class="action-body">
+                            <button 
+                                class="btn-action remove" 
+                                [disabled]="!selectedTagToRemove"
+                                (click)="bulkRemoveTag()">
+                                <i class="fas fa-trash"></i> Remove from All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Action 3: Replace Tag -->
+                    <div class="action-card">
+                        <div class="action-header">
+                            <div class="action-info">
+                                <h3 class="action-title">Replace Tag</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="action-body">
+                            <div class="tag-selector">
+                                <label>From tag:</label>
+
+                                <mat-form-field appearance="outline">
+                                    <mat-label>From Tag</mat-label>
+                                    <mat-select [(ngModel)]="selectedTagToReplace" name="selectedTagToReplace" [disabled]="selectedTagToRemove || selectedTagToAssign.length != 0">
+                                        <mat-option>
+                                            <ngx-mat-select-search [(ngModel)]="filterReplaceToList" name="filterReplaceToList" [placeholderLabel]="'Search'"
+                                                [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                        </mat-option>
+                                        <mat-option [value]="null">None</mat-option>
+                                        <mat-option *ngFor="let option of onfilterreplacetolist()" [value]="option.id">
+                                            {{option.name}}
+                                        </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+
+                            <!-- <div class="replace-arrow">
+                                <i class="fas fa-arrow-down"></i>
+                            </div> -->
+
+                            <div class="tag-selector">
+                                <label>To tag:</label>
+
+                                <mat-form-field appearance="outline">
+                                    <mat-label>To Tag</mat-label>
+                                    <mat-select [(ngModel)]="selectedTagReplaceWith" name="selectedTagReplaceWith" [disabled]="!selectedTagToReplace || selectedTagToRemove || selectedTagToAssign.length != 0">
+                                        <mat-option>
+                                            <ngx-mat-select-search [(ngModel)]="filterReplaceWithList" name="filterReplaceWithList" [placeholderLabel]="'Search'"
+                                                [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                        </mat-option>
+                                        <mat-option [value]="null">None</mat-option>
+                                        <mat-option *ngFor="let option of getReplacementTags()" [value]="option.id">
+                                            {{option.name}}
+                                        </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+                            
+                            <button 
+                                class="btn-action replace" 
+                                [disabled]="!selectedTagToReplace || !selectedTagReplaceWith"
+                                (click)="bulkReplaceTag()">
+                                <i class="fas fa-sync"></i> Replace for All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selected Participants Preview -->
+                <div class="participants-preview-section">
+                    <h3 class="section-subtitle">
+                        <i class="fas fa-list"></i> Selected Participants - {{selectedParticipants.length}}
+                    </h3>
+                    
+                    <div class="participants-preview-list">
+                        <div class="participant-preview-card" *ngFor="let participant of selectedParticipants">
+                            <div class="participant-preview-info">
+                                <div class="participant-preview-details">
+                                    <span class="preview-name">{{ participant.name }}</span>
+                                    <span class="preview-email">{{ participant.email }}</span>
+                                </div>
+                            </div>
+                            <div class="participant-preview-tags">
+                                <!-- <span 
+                                    class="tag-badge-small" 
+                                    *ngFor="let tag of participant.tags"
+                                    [style.background]="tag.color"
+                                    [title]="tag.name">
+                                    {{ tag.name }}
+                                </span> -->
+                                <!-- <span class="no-tags-small" *ngIf="participant?.tags.length === 0">No tags</span> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="empty-state" *ngIf="selectedParticipants.length === 0">
+                    <i class="fas fa-users-slash"></i>
+                    <p>No participants selected. Please select participants from the main view.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="dialog-footer">
+            <button class="btn-secondary" mat-dialog-close (click)="dialogRef.close()">Cancel</button>
+        </div>
+    </div>
+</div>

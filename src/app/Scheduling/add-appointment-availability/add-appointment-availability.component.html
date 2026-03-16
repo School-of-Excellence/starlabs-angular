@@ -1,0 +1,82 @@
+<div class="mainscreen">
+  <div *ngIf="adminRole || schedulerRole" class="selectprofilebox">
+    <mat-form-field class="namefield" appearance="outline">
+      <mat-label>Select Profile</mat-label>
+      <mat-select [(ngModel)]="selectedUser" (selectionChange)="onProfileSelect()">
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filtereduser" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let user of returnClient()" [value]="user.id">{{user.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div *ngIf="selectedUser != null" class="appointmentbox">
+    <label><b>Appointment Types: </b></label>
+    <label *ngIf="!loading">{{myAppointment.length == 0 ? 'No Appointment Roles Assigned' : ''}}</label>
+  </div>
+
+  <div class="form">
+    <form [formGroup]="dataForm" (ngSubmit)="onSubmit(dataForm.value)">
+      <div *ngIf="myAppointment.length != 0" formGroupName="slotList">
+        <ul>
+          <li *ngFor="let slot of slots().controls; let i = index" [formGroupName]="i">
+            <!-- Slot Appointments -->
+            <mat-form-field class="namefield inputfield" appearance="outline">
+              <mat-label>Prefered Appointments</mat-label>
+              <mat-select multiple formControlName="appointment" (selectionChange)="onAppointSelect(i, event)">
+                <mat-option [value]="1" (click)="deSelectAll(i, event)" #event>SelectAll</mat-option>
+                <mat-option class="matoption" *ngFor="let appointment of myAppointment" [value]="appointment">{{mapAppointment[appointment].name}}</mat-option>
+              </mat-select>
+              <mat-error *ngIf="dataForm.get('slotList')['controls'][i].get('appointment').hasError('required')">
+                Date <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+            <!-- Slot Date -->
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>Date</mat-label>
+              <input matInput formControlName="date" [matDatepicker]="picker" [min]="minDate" (click)="picker.open()" (dateChange)="onDateChange(i)" placeholder="MM-DD-YYYY">
+              <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-datepicker #picker></mat-datepicker>
+              <mat-error *ngIf="dataForm.get('slotList')['controls'][i].get('date').hasError('required')">
+                Date <strong>Required</strong>
+              </mat-error>
+              <mat-error *ngIf="dataForm.get('slotList')['controls'][i].get('date').hasError('invalid')">
+                Already availability exist
+              </mat-error>
+            </mat-form-field>
+            <!-- Slot Start -->
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>Start Time</mat-label>
+              <input matInput type="time" formControlName="starttime" #starttime (change)="onStartDateChange(i)" required>
+              <mat-error *ngIf="dataForm.get('slotList')['controls'][i].get('starttime').hasError('required')">
+                Start Time <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+            <!-- Slot End -->
+            <mat-form-field class="inputfield" appearance="outline">
+              <mat-label>End Time</mat-label>
+              <input matInput type="time" formControlName="endtime" (change)="onEndDateChange(i)" required>
+              <mat-error *ngIf="dataForm.get('slotList')['controls'][i].get('endtime').hasError('required')">
+                End Time <strong>Required</strong>
+              </mat-error>
+              <mat-error *ngIf="dataForm.get('slotList')['controls'][i].get('endtime').hasError('invalid')">
+                {{endDateError}}
+              </mat-error>
+            </mat-form-field>
+            <button class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeSlot(i)">
+              <mat-icon class="icon">remove</mat-icon>
+            </button>
+            <button class="addremovebtn" *ngIf="i+1 == slots().controls.length" mat-icon-button type="button" (click)="addSlot()">
+              <mat-icon class="icon">add</mat-icon>
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Loading.....' : 'Submit'}}</button>
+      </div>
+    </form>
+  </div>
+</div>

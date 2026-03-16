@@ -1,0 +1,73 @@
+<main class="overflow-auto" style="max-height: 700px;padding: 30px;">
+  <h4 class="d-flex justify-content-center" style="font-size: 20px;">Tier Configuration</h4>
+  <mat-form-field appearance="outline" >
+    <mat-label>Select Tire</mat-label>
+    <mat-select [(ngModel)]="tierAccessForm.tierid">
+      <mat-option *ngFor="let option of tierList" [value]="option.id">{{option.tier}}</mat-option>
+    </mat-select>
+  </mat-form-field><br>
+  <mat-radio-group [(ngModel)]="tierAccessForm.tieraccessby" aria-label="Select an option">
+    <mat-radio-button value="biglevel">By Big Level</mat-radio-button>&nbsp;&nbsp;&nbsp;&nbsp;
+    <mat-radio-button value="product">By Product</mat-radio-button>
+  </mat-radio-group><br>
+  <div *ngIf="tierAccessForm.tieraccessby === 'biglevel'">
+    <li *ngFor="let list of tierAccessForm.biglevel;let j = index">
+      <mat-form-field appearance="outline"  style="width:400px">
+        <mat-label>Select Big Level</mat-label>
+        <mat-select [(ngModel)]="list.atcmodel">
+          <mat-option *ngFor="let option of atcModelList" [value]="option">{{option}}</mat-option>
+        </mat-select>
+      </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+      <mat-form-field appearance="outline"  style="width:400px">
+        <mat-label>Select Big Level</mat-label>
+        <mat-select [(ngModel)]="list.biglevelid" multiple>
+          <mat-option *ngFor="let option of levelList" [value]="option.docid">{{option.level}}</mat-option>
+        </mat-select>
+      </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+      <button mat-icon-button type="button" (click)="onaddbiglevel()"><mat-icon>add</mat-icon></button>&nbsp;&nbsp;
+      <button mat-icon-button type="button" (click)="onremovebiglevel(j)"><mat-icon>cancel</mat-icon></button>
+    </li>
+    
+  </div>
+  <div *ngIf="tierAccessForm.tieraccessby === 'product'">
+    <mat-form-field appearance="outline">
+      <mat-label>Add Active Journey</mat-label>
+      <mat-select (selectionChange)="addactivejourney($event.value)">
+        <mat-option *ngFor="let option of journeyList" [value]="option.id">{{option.journey}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+  <mat-divider class="mb-4"></mat-divider>
+  <div *ngIf="tierAccessForm.tieraccessby === 'product'">
+    <span *ngFor="let journey of tierAccessForm.productaccess | keyvalue;">
+      <span class="d-flex flex-row justify-content-start">
+        <li>
+          {{mapJourney[journey.key]}}&nbsp;&nbsp;&nbsp;&nbsp;
+          <button mat-stroked-button  color="accent" (click)="removeactivejourney(journey.key)">
+            Remove
+          </button>
+        </li>
+      </span>
+      <br>
+      <span *ngFor="let product of journey.value;let i = index" class="d-flex flex-row justify-content-start">
+        <mat-form-field appearance="outline">
+          <mat-label>Select Product</mat-label>
+          <mat-select [(ngModel)]="product.productid">
+            <mat-option *ngFor="let option of productList" [value]="option.id">{{option.product}}</mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+        <mat-form-field appearance="outline">
+          <mat-label>Completed Count</mat-label>
+          <input matInput type="number" [(ngModel)]="product.count">
+        </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
+        <button mat-mini-fab  color="primary" (click)="addproduct(journey.key)"><mat-icon>add</mat-icon></button>&nbsp;&nbsp;
+        <button mat-mini-fab  color="accent" (click)="removeproduct(journey.key,i)"><mat-icon>remove</mat-icon></button>
+      </span>
+      (Or)&nbsp;&nbsp;&nbsp;&nbsp;<mat-divider class="mb-4"></mat-divider>
+    </span>
+  </div>
+  <div class="d-flex flex-row justify-content-center">
+    <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="onFormValidation()">Submit</button>&nbsp;&nbsp;&nbsp;&nbsp;
+    <button mat-stroked-button type="button" (click)="closedialog()">Cancel</button>&nbsp;&nbsp;&nbsp;&nbsp;
+  </div>
+</main>

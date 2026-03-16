@@ -1,0 +1,41 @@
+.title{
+    color: rgb(0, 50, 70);
+    margin-bottom: 15px;
+    text-align: center;
+    margin-bottom: 7px;
+  }
+  
+  .countrycode{
+    background-color: transparent;
+    min-width: 95px;
+    max-width: 95px;
+    margin-right: 5px;
+  }
+  
+  .numberinputfields{
+    background-color: transparent;
+    min-width: 300px;
+    max-width: 400px;
+  }
+  
+  .inputfields{
+    min-width: 400px;
+    max-width: 500px;
+    background-color: transparent;
+  }
+  
+  .actionbox{
+    text-align: center;
+    margin-top: 10px;
+  }
+  
+  .closebtn{
+    color: red;
+    border: 1px solid red;
+    margin-right: 15px;
+  }
+  
+  .submitbtn{
+    background-color: green;
+    color: white;
+  }

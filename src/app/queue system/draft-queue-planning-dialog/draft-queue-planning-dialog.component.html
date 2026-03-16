@@ -1,0 +1,46 @@
+<h2 mat-dialog-title>
+  <mat-icon>drafts</mat-icon>
+  Select Draft
+</h2>
+
+<mat-dialog-content>
+  <p class="dialog-description">
+    Found {{data.drafts.length}} draft(s) for queue: <strong>{{data.queuename}}</strong>
+  </p>
+
+  <mat-selection-list [(ngModel)]="selectedDraft" [multiple]="false">
+    <mat-list-option *ngFor="let draft of data.drafts; let i = index" [value]="draft">
+      <div class="draft-item">
+        <div class="draft-header">
+          <mat-icon class="draft-icon">description</mat-icon>
+          <div class="draft-info">
+            <div class="draft-title">Draft {{i + 1}}</div>
+            <div class="draft-meta">
+              <span class="meta-item">
+                <mat-icon class="small-icon">update</mat-icon>
+                Updated: {{formatDateTime(draft.updatedAt)}}
+              </span>
+              <span class="meta-item">
+                <mat-icon class="small-icon">schedule</mat-icon>
+                Created: {{formatDateTime(draft.createdAt)}}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button mat-icon-button type="button" color="warn" (click)="deleteDraft(draft, i)"><mat-icon>delete</mat-icon></button>
+    </mat-list-option>
+  </mat-selection-list>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">
+    <mat-icon>close</mat-icon>
+    Skip & Close Draft
+  </button>
+  <button mat-raised-button color="primary" [disabled]="!selectedDraft || selectedDraft.length === 0"
+    (click)="onLoadDraft()">
+    <mat-icon>file_open</mat-icon>
+    Load Selected Draft
+  </button>
+</mat-dialog-actions>

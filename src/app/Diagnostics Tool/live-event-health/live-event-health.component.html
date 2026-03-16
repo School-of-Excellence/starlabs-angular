@@ -1,0 +1,184 @@
+<div class="event-dropdown">
+  <h2>Live Events Dashboard</h2>
+  <mat-form-field appearance="outline" style="width:300px">
+    <mat-label>Select or Search Event</mat-label>
+    <input
+      matInput
+      [formControl]="eventControl"
+      [matAutocomplete]="auto"
+      placeholder="Type to search..." />
+    <mat-autocomplete
+      #auto="matAutocomplete"
+      [displayWith]="displayEvent"
+      (optionSelected)="selectEvent($event.option.value)">
+      <mat-option *ngFor="let e of filteredEvents" [value]="e">
+        {{ e.name }}
+      </mat-option>
+    </mat-autocomplete>
+  </mat-form-field>
+</div>
+
+<div *ngIf="selectedEvent">
+<!-- ================= KPI SECTION ================= -->
+<div class="kpi-bar">
+
+  <!-- TOTAL -->
+  <div class="kpi-card" (click)="onTotalKpiClick()">
+    <div class="kpi-label">Total</div>
+    <div class="kpi-value">{{ kpiTotal }}</div>
+  </div>
+
+  <!-- VALID -->
+  <div class="kpi-card success" (click)="onValidKpiClick(true)">
+    <div class="kpi-label">Valid</div>
+    <div class="kpi-value">{{ kpiValid }}</div>
+  </div>
+
+  <!-- INVALID -->
+  <div class="kpi-card danger" (click)="onValidKpiClick(false)">
+    <div class="kpi-label">Invalid</div>
+    <div class="kpi-value">{{ kpiInvalid }}</div>
+  </div>
+
+  <!-- EVENT STATUS KPIs -->
+  <div
+    class="kpi-card neutral"
+    *ngFor="let k of eventStatusKpis"
+    (click)="onEventStatusKpiClick(k.status)">
+    <div class="kpi-label">{{ k.status }}</div>
+    <div class="kpi-value">{{ k.count }}</div>
+  </div>
+
+  <!-- PRODUCT STATUS KPIs -->
+  <div
+    class="kpi-card neutral"
+    *ngFor="let k of productStatusKpis"
+    (click)="onProductStatusKpiClick(k.status)">
+    <div class="kpi-label">{{ k.status }}</div>
+    <div class="kpi-value">{{ k.count }}</div>
+  </div>
+
+</div>
+
+<!-- ================= TABLE ================= -->
+
+<button mat-raised-button
+        color="warn"
+        (click)="cancelSelected()"
+        [disabled]="!selectedRows.length">
+  Cancel Selected ({{ selectedRows.length }})
+</button>
+
+<table
+  mat-table
+  [dataSource]="tableData"
+  *ngIf="tableData.length"
+  class="mat-elevation-z1">
+
+  <ng-container matColumnDef="select">
+  <th mat-header-cell *matHeaderCellDef>
+    <input type="checkbox"
+           (change)="toggleSelectAll($event)" />
+  </th>
+
+  <td mat-cell *matCellDef="let row">
+    <input type="checkbox"
+           [checked]="isSelected(row)"
+           (change)="toggleRow(row, $event)" />
+  </td>
+</ng-container>
+
+  <!-- NAME -->
+  <ng-container matColumnDef="name">
+    <th mat-header-cell *matHeaderCellDef>Name</th>
+    <td mat-cell *matCellDef="let r">{{ r.name }}</td>
+  </ng-container>
+
+  <!-- EVENT -->
+  <ng-container matColumnDef="event">
+    <th mat-header-cell *matHeaderCellDef>Event</th>
+    <td mat-cell *matCellDef="let r">{{ r.event }}</td>
+  </ng-container>
+
+  <!-- PRODUCT -->
+  <ng-container matColumnDef="product">
+    <th mat-header-cell *matHeaderCellDef>Product</th>
+    <td mat-cell *matCellDef="let r">{{ r.product }}</td>
+  </ng-container>
+
+  <!-- EVENT STATUS + FILTER -->
+  <ng-container matColumnDef="eventRequestStatus">
+    <th mat-header-cell *matHeaderCellDef>
+      <div class="header-filter">
+        <span>Event Status</span>
+      </div>
+    </th>
+    <td mat-cell *matCellDef="let r">{{ r.eventRequestStatus }}</td>
+  </ng-container>
+
+  <!-- PRODUCT STATUS + FILTER -->
+  <ng-container matColumnDef="participantProductStatus">
+    <th mat-header-cell *matHeaderCellDef>
+      <div class="header-filter">
+        <span>Product Status</span>
+      </div>
+    </th>
+    <td mat-cell *matCellDef="let r">{{ r.participantProductStatus }}</td>
+  </ng-container>
+
+  <!-- MODE + FILTER -->
+  <ng-container matColumnDef="mode">
+    <th mat-header-cell *matHeaderCellDef>
+      <div class="header-filter">
+        <span>Mode</span>
+        <!-- <mat-select multiple [formControl]="modeFilter">
+          <mat-option *ngFor="let m of modeOptions" [value]="m">
+            {{ m }}
+          </mat-option>
+        </mat-select> -->
+      </div>
+    </th>
+    <td mat-cell *matCellDef="let r">{{ r.mode }}</td>
+  </ng-container>
+
+  <!-- CREATED -->
+  <ng-container matColumnDef="createdDate">
+    <th mat-header-cell *matHeaderCellDef>Created</th>
+    <td mat-cell *matCellDef="let r">
+      {{ r.createdDate | date:'short' }}
+    </td>
+  </ng-container>
+
+  <!-- VALIDATION + FILTER -->
+  <ng-container matColumnDef="validation">
+    <th mat-header-cell *matHeaderCellDef>
+      <div class="header-filter">
+        <span>Validation</span>
+      </div>
+    </th>
+    <td mat-cell *matCellDef="let r">
+      <span
+        [style.color]="r.isValid ? 'green' : 'red'">
+        {{ r.isValid ? 'Valid' : 'Invalid' }}
+      </span>
+    </td>
+  </ng-container>
+
+  <!-- ROWS -->
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr
+    mat-row
+    *matRowDef="let row; columns: displayedColumns"
+    [class.invalid-row]="!row.isValid">
+  </tr>
+</table>
+
+<!-- ================= PAGINATOR ================= -->
+<mat-paginator [length]="kpiTotal" [pageSize]="pageSize" [pageSizeOptions]="[5,10,20]" (page)="onPageChange($event)">
+</mat-paginator>
+
+<!-- ================= EMPTY STATE ================= -->
+<p *ngIf="selectedEvent && !tableData.length" class="empty-state">
+  No participants found.
+</p>
+</div>

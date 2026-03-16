@@ -1,0 +1,40 @@
+<div>
+    <div>
+        <mat-form-field appearance="outline">
+            <mat-label>Space Name</mat-label>
+            <input matInput type="text" [(ngModel)]="inputValue">
+        </mat-form-field>
+
+        &nbsp;&nbsp;
+
+        <mat-form-field appearance="outline">
+            <mat-label>Alias Space Name</mat-label>
+            <input matInput type="text" [(ngModel)]="inputShortValue" maxlength="3">
+        </mat-form-field>
+
+        &nbsp;&nbsp;
+
+        <button mat-raised-button color="primary" (click)="isEdit ? updateField() : createField(inputValue,inputShortValue)" [disabled]="adding">{{isEdit ? 'Update' : 'Create'}}</button>&nbsp;&nbsp;
+        <!-- <button mat-icon-button type="button" style="background-color: rgb(182, 186, 183); color: black;" *ngIf="isEdit" (click)="goToCreate()">
+            <mat-icon>refresh</mat-icon>
+        </button> -->
+    </div>
+
+    <hr>
+
+    <div>
+        <h4>Spaces</h4>
+        <div style="margin-top: 10px;">
+            <mat-chip-grid>
+                <mat-chip *ngFor="let field of spaceMap | keyvalue" (click)="editField(field.value, field.key)">
+                {{ field.value!['spacename'] }} - {{ field.value!['shortname'] }}
+                    <mat-icon matChipRemove 
+                        (click)="editField(field.value, field.key)" 
+                        [style.color]="'black'">
+                        edit
+                    </mat-icon>
+                </mat-chip>
+            </mat-chip-grid>
+        </div>
+    </div>
+</div>

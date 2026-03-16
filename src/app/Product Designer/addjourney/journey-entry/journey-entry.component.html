@@ -1,0 +1,103 @@
+<div *ngIf="!delete">
+  <h2 class="formrow" mat-dialog-title>{{dialogtitle}}</h2>
+  <div [formGroup]="addJourneyForm" mat-dialog-content>
+    <div>
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Journey</mat-label>
+        <input type="text" matInput placeholder="Enter a Journey" formControlName="journey"
+          (ngModelChange)="onvaluechange($event)">
+        <mat-error *ngIf="addJourneyForm.invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+      <br>
+      <!-- type -->
+      <!-- <mat-form-field class="example-chip-list" style="margin-top: 20px;"> -->
+      <mat-radio-group aria-label="Select an option" formControlName="type">
+        <mat-radio-button value="DFU">DFU</mat-radio-button>
+        <mat-radio-button value="NDFU">NDFU</mat-radio-button>
+        <mat-radio-button value="Eco system">Eco system</mat-radio-button>
+      </mat-radio-group>
+      <!-- </mat-form-field> -->
+      <br>
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>Original Purchase Value</mat-label>
+        <input type="number" matInput placeholder="Enter a original purchase value" formControlName="originalfee">
+        <mat-error *ngIf="addJourneyForm.invalid">{{getErrorMessage()}}</mat-error>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="textField" appearance="outline">
+        <mat-label>ATC Model</mat-label>
+        <mat-select formControlName="atcmodel">
+          <mat-option *ngFor="let list of atcModelList" [value]="list.atcmodel">{{list.atcmodel}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="example-chip-list" appearance="outline">
+        <mat-label>Extras</mat-label>
+        <mat-chip-grid #chip aria-label=" selection">
+          <mat-chip *ngFor="let item of addJourneyForm.get('extras').value" (removed)="removeExtras(item)">
+            {{item}}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+          <input placeholder="Add extras..." [matChipInputFor]="chip"
+            [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="addOnBlur"
+            (matChipInputTokenEnd)="addExtras($event)">
+        </mat-chip-grid>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="example-chip-list" appearance="outline">
+        <mat-label>Journey Upgrades</mat-label>
+        <mat-chip-grid #chipList aria-label=" selection">
+          <mat-chip *ngFor="let item of addJourneyForm.get('journeyupgrades').value" (removed)="removeUpgrades(item)">
+            {{item}}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+          <input placeholder="Add Journey Upgrades..." [matChipInputFor]="chipList"
+            [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="addOnBlur"
+            (matChipInputTokenEnd)="addUpgrades($event)">
+        </mat-chip-grid>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="example-chip-list" appearance="outline">
+        <mat-label>Add On Products</mat-label>
+        <mat-chip-grid #chiplist aria-label=" selection">
+          <mat-chip *ngFor="let item of addJourneyForm.get('addonproducts').value" (removed)="removeAddons(item)">
+            {{item}}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+          <input placeholder="Add Add on products..." [matChipInputFor]="chiplist"
+            [matChipInputSeparatorKeyCodes]="separatorKeysCodes" [matChipInputAddOnBlur]="addOnBlur"
+            (matChipInputTokenEnd)="addAddons($event)">
+        </mat-chip-grid>
+      </mat-form-field>
+    </div>
+    <p *ngIf="crossmatch" style="color: red;text-align: center;margin-top: 0;">{{this.croosmatcherrormessage}}</p>
+    <!-- {{addProductForm.value | json}}
+{{addProductForm.invalid}} -->
+    <div class="link mt-4">
+      <label>Product Playlist :</label>&nbsp;&nbsp;
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Select Content</mat-label>
+        <mat-select formControlName="playlist" [compareWith]="compareRef" [multiple]="true">
+          <mat-option *ngFor="let option of videos" [value]="option.docref">{{ option.title }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="formrow">
+      <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+      <button [disabled]="addJourneyForm.invalid" mat-raised-button color="primary"
+        (click)="onformsubmit(addJourneyForm.value)">{{submitbutton}}</button>
+    </div>
+  </div>
+</div>
+<div *ngIf="delete">
+  <div mat-dialog-title>
+    <h2>Delete Journey</h2>
+  </div>
+  <div mat-dialog content>
+    <h3>Are you sure you want to delete?</h3>
+  </div>
+  <div mat-dialog-action>
+    <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
+  </div>
+</div>

@@ -1,0 +1,661 @@
+<!-- <div class="ml-4">
+  <div class="header">
+    <mat-form-field appearance="fill" style="width:25%">
+      <mat-label>Filter</mat-label>
+      <input matInput (keyup)="applyFilter($event)" placeholder="" #input>
+    </mat-form-field>
+    <button mat-raised-button (click)="exportPlaylistExcel()">Export</button>
+  </div>
+
+  <div class="mat-elevation-z8">
+    <table mat-table [dataSource]="dataSource" matSort>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+        <td mat-cell *matCellDef="let row"> {{row.name}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+        <td mat-cell *matCellDef="let row"> {{row.type}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="list">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Playlist</th>
+        <td style="width:20%" mat-cell *matCellDef="let row">
+          <li *ngFor="let list of row.list">
+            {{mapPlaylist[list.id]}}
+          </li>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="date">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Created Date </th>
+        <td mat-cell *matCellDef="let row"> {{row.date != undefined ? (row.date.toDate() | date : 'mediumDate' ): null}}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="personalised">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Personalised </th>
+        <td mat-cell *matCellDef="let row"> {{row.personalised}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="recommendedbyname">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Recomended Person </th>
+        <td mat-cell *matCellDef="let row"> {{row.recommendedbyname}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="title">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Title </th>
+        <td mat-cell *matCellDef="let row">
+          {{row.title}}
+          <button *ngIf="row['type'] == 'generalcontent'" class="text-secondary ml-2" mat-icon-button
+            (click)="copyToClipboard(row)">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="description">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Description </th>
+        <td style="width:5%" mat-cell *matCellDef="let row"> {{row.description}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
+        <td mat-cell *matCellDef="let row" style="padding: 0; white-space: nowrap;">
+          <span *ngIf="row.delete != true"><button style="color:red" class="small-table-text" mat-stroked-button
+              type="button" (click)="onDeletePlaylist(row,true)">Disable</button></span>
+          <span *ngIf="row.delete == true"><button style="color:green" class="small-table-text" mat-stroked-button
+              type="button" (click)="onDeletePlaylist(row,false)">Enable</button></span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="delete_all">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete All </th>
+        <td mat-cell *matCellDef="let row" style="padding: 0; white-space: nowrap;">
+          <span *ngIf="row.delete != true"><button style="color:red" class="small-table-text" mat-stroked-button
+              type="button" (click)="onDeleteAllPlaylist(row,true)">Disable All</button></span>
+          <span *ngIf="row.delete == true"><button style="color:green" class="small-table-text" mat-stroked-button
+              type="button" (click)="onDeleteAllPlaylist(row,false)">Enable All</button></span>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+      <tr class="mat-row" *matNoDataRow>
+        <td class="mat-cell" colspan="9">No data matching the filter "{{input.value}}"</td>
+      </tr>
+    </table>
+
+    <mat-paginator [pageSizeOptions]="[25,50,100,200,500]" aria-label="Select page of users"></mat-paginator>
+  </div>
+</div> -->
+<div class="rp-dashboard">
+  <div class="rp-header">
+    <div>
+      <h1 class="rp-title">Recommended Playlists</h1>
+      <p class="rp-sub">Manage recommended mix playlists for participants</p>
+    </div>
+    <button class="rp-sort-dir-btn" matTooltip="Refresh data" (click)="loadData()">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </div>
+  <div class="rp-date-range-row">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rp-date-field">
+      <mat-label>Start Date</mat-label>
+      <input matInput [matDatepicker]="startPicker" [(ngModel)]="dateRangeStart">
+      <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+      <mat-datepicker #startPicker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rp-date-field">
+      <mat-label>End Date</mat-label>
+      <input matInput [matDatepicker]="endPicker" [(ngModel)]="dateRangeEnd">
+      <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endPicker></mat-datepicker>
+    </mat-form-field>
+
+    <button class="rp-btn-filter" (click)="onDateFilter()" [disabled]="!dateRangeStart || !dateRangeEnd || isLoading">
+      <mat-icon>filter_list</mat-icon>
+      <span>Filter</span>
+    </button>
+
+    <mat-progress-bar *ngIf="isLoading" mode="indeterminate" style="position:absolute;bottom:0;left:0;right:0;"></mat-progress-bar>
+  </div>
+
+<mat-tab-group>
+  <mat-tab label="Group">
+    <div style="padding: 15px;">
+      <div class="rp-filters-row">
+        <div class="rp-search-box">
+          <mat-icon class="rp-search-icon">search</mat-icon>
+          <input type="text" class="rp-search-input" placeholder="Search groups..." (keyup)="applyGroupFilter($event)" autocomplete="off" />
+        </div>
+
+        <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Sort By</mat-label>
+          <mat-select [(value)]="groupSortField" (selectionChange)="onGroupSortChange($event.value)">
+            <mat-option value="">None</mat-option>
+            <mat-option value="title">Title</mat-option>
+            <mat-option value="date">Date</mat-option>
+            <mat-option value="expiredate">Expire Date</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button class="rp-sort-dir-btn" (click)="onGroupSortChange(groupSortField)" [disabled]="!groupSortField"
+          [matTooltip]="groupSortDirection === 'asc' ? 'Ascending' : 'Descending'">
+          <mat-icon>{{ groupSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+        </button>
+
+        <mat-form-field class="rp-filter-select rp-filter-select-wide" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Filter by Profiles</mat-label>
+          <mat-select multiple [(value)]="selectedProfileIds" (selectionChange)="onProfileFilterChange()">
+            <div style="padding:8px 12px;">
+              <input class="rp-search-input" style="width:100%;border:1.5px solid var(--bdr);border-radius:var(--r);height:36px;padding:0 10px;" 
+                placeholder="Search profiles..." [(ngModel)]="profileSearchText" autocomplete="off" (click)="$event.stopPropagation()" />
+            </div>
+            <mat-option *ngFor="let p of filteredProfileList" [value]="p.id">{{ p.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button *ngIf="hasGroupFilters" class="rp-sort-dir-btn" matTooltip="Clear all filters" (click)="clearGroupFilters()">
+        <mat-icon>close</mat-icon>
+      </button>
+      </div>
+
+    <div class="rp-table-outer">
+      <div class="rp-table-card">
+        <table mat-table [dataSource]="groupDataSource" matSort #groupSort="matSort">
+          <ng-container matColumnDef="title">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header style="min-width:160px;">Title</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="rp-cell-name">{{ row.title }}</span>
+            </td>
+          </ng-container>
+
+          <!-- <ng-container matColumnDef="content">
+            <th mat-header-cell *matHeaderCellDef style="min-width:220px;">Content</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="rp-playlist-items">
+                <ng-container *ngIf="row.eiflix?.length">
+                  <span class="rp-content-heading">EiFlix ({{row.eiflix?.length}})</span>
+                  <span class="rp-playlist-item" *ngFor="let name of row.eiflix">{{ mapPlaylist[name.id] }}</span>
+                </ng-container>
+                <ng-container *ngIf="row.generalcontent?.length">
+                  <span class="rp-content-heading">General Content ({{row.generalcontent?.length}})</span>
+                  <span class="rp-playlist-item" *ngFor="let name of row.generalcontent">{{ mapPlaylist[name.id] }}</span>
+                </ng-container>
+                <ng-container *ngIf="row.solarvoice?.length">
+                  <span class="rp-content-heading">Solar Voice ({{row.solarvoice?.length}})</span>
+                  <span class="rp-playlist-item" *ngFor="let name of row.solarvoice">{{ mapPlaylist[name.id] }}</span>
+                </ng-container>
+              </div>
+            </td>
+          </ng-container> -->
+          <ng-container matColumnDef="content">
+            <th mat-header-cell *matHeaderCellDef style="min-width:280px;">Content</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="rp-playlist-items">
+                <ng-container *ngIf="row.eiflix?.length">
+                  <span class="rp-content-heading">EiFlix ({{row.eiflix?.length}})</span>
+                  <div class="rp-content-item-block" *ngFor="let name of row.eiflix; let j = index">
+                    <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
+                    <div class="rp-stats-chips">
+                      <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'eiflix', j, 'all')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.total }}</span>
+                      <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'eiflix', j, 'completed')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.completed }}</span>
+                      <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'eiflix', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.notCompleted }}</span>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-container *ngIf="row.generalcontent?.length">
+                  <span class="rp-content-heading">General Content ({{row.generalcontent?.length}})</span>
+                  <div class="rp-content-item-block" *ngFor="let name of row.generalcontent; let j = index">
+                    <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
+                    <div class="rp-stats-chips">
+                      <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'generalcontent', j, 'all')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.total }}</span>
+                      <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'generalcontent', j, 'completed')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.completed }}</span>
+                      <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'generalcontent', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.notCompleted }}</span>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-container *ngIf="row.solarvoice?.length">
+                  <span class="rp-content-heading">Solar Voice ({{row.solarvoice?.length}})</span>
+                  <div class="rp-content-item-block" *ngFor="let name of row.solarvoice; let j = index">
+                    <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
+                    <div class="rp-stats-chips">
+                      <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'solarvoice', j, 'all')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.total }}</span>
+                      <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'solarvoice', j, 'completed')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.completed }}</span>
+                      <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.notCompleted }}</span>
+                    </div>
+                  </div>
+                </ng-container>
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-date">Date</th>
+            <td mat-cell *matCellDef="let row" class="rp-col-date">
+              <span class="rp-cell-date">{{ formatDate(row.date) }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="expire">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-date">Expire</th>
+            <td mat-cell *matCellDef="let row" class="rp-col-date">
+              <span class="rp-cell-date">{{ formatDate(row.expiredate) }}</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="deeplink">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Deeplink</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="rp-title-cell">
+                <button class="rp-icon-btn" (click)="copyToClipboardgroup(row)" title="Copy link">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+          <!-- <ng-container matColumnDef="recommendedby">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Recomended By</th>
+            <td mat-cell *matCellDef="let row">
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <span class="rp-chip">{{ mapProfile[row.createdby] || row.createdby }}</span>
+              </div>
+            </td>
+          </ng-container> -->
+          <ng-container matColumnDef="profiles">
+            <th mat-header-cell *matHeaderCellDef style="min-width:200px;max-width:320px;">Profiles</th>
+            <td mat-cell *matCellDef="let row; let i = index" style="max-width:320px;">
+              <div class="rp-profiles-wrap">
+                <span class="rp-chip" *ngFor="let id of (expandedProfiles.has(i) ? row.profileid : row.profileid?.slice(0, 5))">
+                  {{ mapProfile[id] || id }}
+                </span>
+                <button *ngIf="row.profileid?.length > 5" class="rp-show-more-btn" (click)="toggleProfiles(i)">
+                  {{ expandedProfiles.has(i) ? 'Show less' : '+' + (row.profileid.length - 5) + ' more' }}
+                </button>
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef class="rp-col-act">Action</th>
+            <td mat-cell *matCellDef="let row" class="rp-col-act">
+              <!-- <button class="rp-icon-btn" (click)="onEditGroup(row)" matTooltip="Edit">
+                <i class="fa-regular fa-pen-to-square"></i>
+              </button> -->
+              <button class="rp-icon-btn" (click)="onEditGroup(row)" matTooltip="Edit" [disabled]="row.delete === true">
+                <i class="fa-regular fa-pen-to-square"></i>
+              </button>
+              <!-- <button class="rp-icon-btn"
+                      (click)="onToggleGroupDelete(row)"
+                      [matTooltip]="row.delete ? 'Enable Group' : 'Disable Group'">
+
+                <i *ngIf="row.delete !== true" class="fa-regular fa-circle-xmark text-danger"></i>
+                <i *ngIf="row.delete === true" class="fa-solid fa-circle-check text-success"></i>
+
+              </button> -->
+              <mat-slide-toggle
+                [checked]="row.delete !== true"
+                (change)="onToggleGroupDelete(row, $event)"
+                [matTooltip]="row.delete ? 'Enable Group' : 'Disable Group'">
+              </mat-slide-toggle>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="groupDisplayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: groupDisplayedColumns;"></tr>
+        </table>
+      </div>
+
+      <mat-paginator #groupPaginator class="rp-paginator" [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons>
+      </mat-paginator>
+    </div>
+  </div>
+</mat-tab>
+  <mat-tab label="Individual">
+    <div style="padding: 15px;">
+  <div class="rp-filters-row">
+    <div class="rp-search-box">
+      <mat-icon class="rp-search-icon">search</mat-icon>
+      <input type="text" class="rp-search-input" placeholder="Search playlists..." (keyup)="applyFilter($event)" #input autocomplete="off" />
+    </div>
+    <button class="rp-btn-export" (click)="exportPlaylistExcel()">
+      <mat-icon>download</mat-icon>
+      <span>Export</span>
+    </button>
+  </div>
+
+  <div class="rp-table-outer">
+    <div class="rp-table-card">
+      <table mat-table [dataSource]="dataSource" matSort>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+        <td mat-cell *matCellDef="let row">
+          <span class="rp-cell-name">
+            <i *ngIf="row.status === 'completed'" 
+              class="fa-regular fa-circle-check text-success">
+            </i>
+          </span>
+        </td>
+      </ng-container>
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="rp-cell-name">{{ row.name }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="rp-chip">{{ row.type }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="list">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-list">Playlist</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-list">
+            <div class="rp-playlist-items">
+              <span class="rp-playlist-item" *ngFor="let list of row.list">{{ mapPlaylist[list.id] }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-date">Created</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-date">
+            <span class="rp-cell-date">{{ row.date != undefined ? (row.date.toDate() | date : 'mediumDate') : null }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="expire">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-date">Expire</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-date">
+            <span class="rp-cell-date">{{ row.expiredate != undefined ? (row.expiredate.toDate() | date : 'mediumDate') : null }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="personalised">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-pers">Personalised</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-pers">
+            <span class="rp-chip" [class.rp-chip-yes]="row.personalised === true" [class.rp-chip-no]="row.personalised !== true">{{ row.personalised }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="recommendedbyname">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-rec">Recommended By</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-rec">
+            <span class="rp-cell-text">{{ row.recommendedbyname }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="rp-title-cell">
+              <span class="rp-cell-name">{{ row.title }}</span>
+              <button *ngIf="row['type'] == 'generalcontent'" class="rp-icon-btn" (click)="copyToClipboard(row)" title="Copy link">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-desc">Description</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-desc">
+            <span class="rp-cell-desc">{{ row.description }}</span>
+          </td>
+        </ng-container>
+
+        <!-- <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef class="rp-col-act">Status</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-act">
+            <button *ngIf="row.delete != true" class="rp-btn-disable" (click)="onDeletePlaylist(row, true)">Disable</button>
+            <button *ngIf="row.delete == true" class="rp-btn-enable" (click)="onDeletePlaylist(row, false)">Enable</button>
+          </td>
+        </ng-container> -->
+        <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef class="rp-col-act">Status</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-act">
+            <mat-slide-toggle
+              [checked]="!row.delete"
+              (change)="onToggleDeletePlaylist(row, $event)"
+              [matTooltip]="row.delete ? 'Enable' : 'Disable'">
+            </mat-slide-toggle>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="delete_all">
+          <th mat-header-cell *matHeaderCellDef class="rp-col-act">Batch</th>
+          <td mat-cell *matCellDef="let row" class="rp-col-act">
+            <button *ngIf="row.delete != true" class="rp-btn-disable" (click)="onDeleteAllPlaylist(row, true)">Disable All</button>
+            <button *ngIf="row.delete == true" class="rp-btn-enable" (click)="onDeleteAllPlaylist(row, false)">Enable All</button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="rp-data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" colspan="10">
+            <div class="rp-empty">
+              <mat-icon>playlist_remove</mat-icon>
+              <p>No data matching the filter "{{ input.value }}"</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[25, 50, 100, 200, 500]" showFirstLastButtons class="rp-paginator"></mat-paginator>
+  </div>
+  </div>
+  </mat-tab>
+<mat-tab label="Personalised">
+  <div style="padding: 15px;">
+  <div class="rp-stats-section">
+    <button class="rp-stats-toggle" (click)="personalisedStatsExpanded = !personalisedStatsExpanded">
+      <mat-icon>{{ personalisedStatsExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+      <span>Statistics</span>
+      <span class="rp-stats-summary">
+        {{ personalisedStats.total }} Total &middot;
+        <span style="color: var(--green);">{{ personalisedStats.active }} Active</span> &middot;
+        <span style="color: var(--red);">{{ personalisedStats.disabled }} Disabled</span>
+      </span>
+    </button>
+    <div class="rp-stats-body" *ngIf="personalisedStatsExpanded">
+      <div class="rp-stats-list">
+        <div class="rp-stats-list-item" *ngFor="let r of personalisedStats.byRecommender">
+          <span class="rp-stats-list-name">{{ r.name }}</span>
+          <span class="rp-stats-list-count">{{ r.count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- <div class="rp-stats-row">
+      <div class="rp-stat-card">
+        <div class="rp-stat-value">{{ personalisedStats.total }}</div>
+        <div class="rp-stat-label">Total Personalised</div>
+      </div>
+      <div class="rp-stat-card rp-stat-active">
+        <div class="rp-stat-value">{{ personalisedStats.active }}</div>
+        <div class="rp-stat-label">Active</div>
+      </div>
+      <div class="rp-stat-card rp-stat-disabled">
+        <div class="rp-stat-value">{{ personalisedStats.disabled }}</div>
+        <div class="rp-stat-label">Disabled</div>
+      </div>
+      <div class="rp-stat-card" *ngFor="let r of personalisedStats.byRecommender">
+        <div class="rp-stat-value">{{ r.count }}</div>
+        <div class="rp-stat-label">{{ r.name }}</div>
+      </div>
+    </div> -->
+
+    <!-- Filters -->
+    <div class="rp-filters-row">
+      <div class="rp-search-box">
+        <mat-icon class="rp-search-icon">search</mat-icon>
+        <input type="text" class="rp-search-input" placeholder="Search personalised..."
+          (keyup)="applyPersonalisedFilter($event)" autocomplete="off" />
+      </div>
+
+      <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Recommended By</mat-label>
+        <mat-select [(value)]="selectedRecommenderId" (selectionChange)="applyPersonalisedFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option *ngFor="let r of recommenderList" [value]="r.id">{{ r.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Status</mat-label>
+        <mat-select [(value)]="personalisedStatusFilter" (selectionChange)="applyPersonalisedFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="active">Active</mat-option>
+          <mat-option value="disabled">Disabled</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Content Type</mat-label>
+        <mat-select [(value)]="personalisedContentFilter" (selectionChange)="applyPersonalisedFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="eiflix">EiFlix</mat-option>
+          <mat-option value="generalcontent">General Content</mat-option>
+          <mat-option value="solarvoice">Solar Voice</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button *ngIf="hasPersonalisedFilters" class="rp-sort-dir-btn" matTooltip="Clear all filters"
+        (click)="clearPersonalisedFilters()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="rp-table-outer">
+      <div class="rp-table-card">
+        <table mat-table [dataSource]="personalisedDataSource" matSort #personalisedSort="matSort">
+
+          <ng-container matColumnDef="recommendedbyname">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header style="min-width:150px;">Recommended By</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="rp-cell-name">{{ row.recommendedbyname }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="title">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header style="min-width:160px;">Title</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="rp-cell-name">{{ row.title }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="profiles">
+            <th mat-header-cell *matHeaderCellDef style="min-width:200px;max-width:320px;">Recommended To</th>
+            <td mat-cell *matCellDef="let row; let i = index" style="max-width:320px;">
+              <div class="rp-profiles-wrap">
+                <span class="rp-chip"
+                  *ngFor="let id of (expandedPersonalisedProfiles.has(i) ? row.profileid : row.profileid?.slice(0, 5))">
+                  {{ mapProfile[id] || id }}
+                </span>
+                <button *ngIf="row.profileid?.length > 5" class="rp-show-more-btn"
+                  (click)="togglePersonalisedProfiles(i)">
+                  {{ expandedPersonalisedProfiles.has(i) ? 'Show less' : '+' + (row.profileid.length - 5) + ' more' }}
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="content">
+            <th mat-header-cell *matHeaderCellDef style="min-width:280px;">Content</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="rp-playlist-items">
+                <ng-container *ngIf="row.eiflix?.length">
+                  <span class="rp-content-heading">EiFlix ({{ row.eiflix.length }})</span>
+                  <span class="rp-playlist-item" *ngFor="let item of row.eiflix">{{ mapPlaylist[item.id] || item.id }}</span>
+                </ng-container>
+                <ng-container *ngIf="row.generalcontent?.length">
+                  <span class="rp-content-heading">General Content ({{ row.generalcontent.length }})</span>
+                  <span class="rp-playlist-item" *ngFor="let item of row.generalcontent">{{ mapPlaylist[item.id] || item.id }}</span>
+                </ng-container>
+                <ng-container *ngIf="row.solarvoice?.length">
+                  <span class="rp-content-heading">Solar Voice ({{ row.solarvoice.length }})</span>
+                  <span class="rp-playlist-item" *ngFor="let item of row.solarvoice">{{ mapPlaylist[item.id] || item.id }}</span>
+                </ng-container>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-date">Date</th>
+            <td mat-cell *matCellDef="let row" class="rp-col-date">
+              <span class="rp-cell-date">{{ formatDate(row.date) }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="expire">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="rp-col-date">Expire</th>
+            <td mat-cell *matCellDef="let row" class="rp-col-date">
+              <span class="rp-cell-date">{{ formatDate(row.expiredate) }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef class="rp-col-act">Status</th>
+            <td mat-cell *matCellDef="let row" class="rp-col-act">
+              <mat-slide-toggle [checked]="row.delete !== true"
+                (change)="onTogglePersonalisedDelete(row, $event)"
+                [matTooltip]="row.delete ? 'Enable' : 'Disable'">
+              </mat-slide-toggle>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="personalisedDisplayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: personalisedDisplayedColumns;"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" colspan="7">
+              <div class="rp-empty">
+                <mat-icon>person_off</mat-icon>
+                <p>No personalised recommendations found</p>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <mat-paginator #personalisedPaginator class="rp-paginator" [pageSizeOptions]="[10, 25, 50]"
+        showFirstLastButtons>
+      </mat-paginator>
+    </div>
+  </div>
+</mat-tab>
+</mat-tab-group>
+<div class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+<div class="rp-side-panel" [class.rp-side-panel-open]="sidePanelOpen">
+  <div class="rp-side-panel-header">
+    <h3 class="rp-side-panel-title">{{ sidePanelTitle }}</h3>
+    <button mat-icon-button class="close-button" (click)="sendWatti()">
+      <i class="fa-brands fa-whatsapp"></i>
+    </button>
+    <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
+      <mat-icon>notifications_active</mat-icon>
+    </button>
+    <button mat-icon-button class="close-button" (click)="closeSidePanel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  <div class="rp-side-panel-count">{{ sidePanelProfiles.length }} profiles</div>
+  <div class="rp-side-panel-body">
+    <div class="rp-side-panel-item" *ngFor="let p of sidePanelProfiles">
+      <span class="rp-cell-text">{{ p.name }}</span>
+      <span *ngIf="p.percentage !== undefined" class="rp-chip">
+        {{ p.percentage }}%
+      </span>
+      <span class="rp-chip" [class.rp-chip-yes]="p.completed" [class.rp-chip-no]="!p.completed">
+        {{ p.completed ? 'Completed' : 'Pending' }}
+      </span>
+    </div>
+    <div *ngIf="sidePanelProfiles.length === 0" class="rp-empty" style="padding:32px 0;">
+      <mat-icon>person_off</mat-icon>
+      <p>No profiles found</p>
+    </div>
+  </div>
+</div>
+</div>

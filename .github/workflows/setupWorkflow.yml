@@ -1,0 +1,39 @@
+name: Setup Firebase Environments
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-firebase:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create environment files
+        env:
+          FIREBASE_TEST_CONFIG: ${{ secrets.FIREBASE_TEST_CONFIG }}
+          FIREBASE_PROD_CONFIG: ${{ secrets.FIREBASE_PROD_CONFIG }}
+          WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
+          WATSON_PROD_CONFIG: ${{ secrets.WATSON_PROD_CONFIG }}
+        run: |
+          mkdir -p src/environments
+          
+          # Create environment.development.ts
+          cat > src/environments/environment.development.ts << EOF
+          export const environment = {
+            production: false,
+            firebase: $FIREBASE_TEST_CONFIG,
+            watson: $WATSON_TEST_CONFIG
+          };
+          EOF
+          
+          # Create environment.ts
+          cat > src/environments/environment.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_PROD_CONFIG,
+            watson: $WATSON_PROD_CONFIG
+          };
+          EOF

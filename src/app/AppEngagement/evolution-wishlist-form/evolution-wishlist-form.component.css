@@ -1,0 +1,439 @@
+/* Font Imports */
+/* @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap'); */
+
+/* Global Styling */
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9edf2 100%);
+  color: #333;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+
+/* Toolbar/Header Styling */
+.toolbar {
+  display: flex;
+  align-items: center;
+  padding: 16px 40px;
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.logo-container {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 50px;
+  width: auto;
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.logo:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.headerClass {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  margin: 0 auto;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Content Container */
+.content {
+  width: 85%;
+  max-width: 1200px;
+  margin: 60px auto;
+  padding: 0 20px;
+}
+
+/* Form Container */
+.form-container {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.form-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+}
+
+/* Introduction Text */
+.form-container p {
+  font-family: 'Poppins', sans-serif;
+  font-style: italic;
+  font-weight: 400;
+  text-align: center;
+  line-height: 1.8;
+  color: #555;
+  margin-bottom: 25px;
+  max-width: 85%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Question Container */
+.question-container {
+  margin-bottom: 38px;
+  padding: 30px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  transition: all 0.4s ease;
+  border-left: 4px solid #1a1a2e;
+}
+
+.question-container:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  background: #f1f3f5;
+}
+
+.question-label {
+  display: block;
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  color: #1a1a2e;
+  margin-bottom: 20px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Video Container */
+.video-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.responsive-video {
+  width: 100%;
+  height: auto;
+  max-height: 450px;
+  object-fit: cover;
+  display: block;
+}
+
+/* Audio Container */
+.audio-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto 20px;
+  padding: 25px;
+  background: #f1f3f5;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.responsive-audio {
+  width: 100%;
+  margin: 10px 0;
+  border-radius: 8px;
+  background: white;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.audio-response, .video-response {
+  margin-top: 25px;
+}
+
+/* Radio Button Styling */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+::ng-deep .mat-radio-button {
+  padding: 14px 18px;
+  background: white;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+::ng-deep .mat-radio-button:hover {
+  background: #f5f7fa;
+  border-color: rgba(26, 26, 46, 0.2);
+}
+
+::ng-deep .mat-radio-checked {
+  background: #e6eef8;
+  border-left: 3px solid #1a1a2e;
+}
+
+/* Checkbox Styling */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+::ng-deep .mat-checkbox {
+  padding: 14px 18px;
+  background: white;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+::ng-deep .mat-checkbox:hover {
+  background: #f5f7fa;
+  border-color: rgba(26, 26, 46, 0.2);
+}
+
+::ng-deep .mat-checkbox-checked {
+  background: #e6eef8;
+  border-left: 3px solid #1a1a2e;
+}
+
+/* Form Fields */
+.full-width {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+::ng-deep .mat-form-field-appearance-outline .mat-form-field-outline {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+::ng-deep .mat-form-field-appearance-outline .mat-form-field-outline-thick {
+  color: rgba(26, 26, 46, 0.5);
+}
+
+::ng-deep .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick {
+  color: #1a1a2e;
+}
+
+::ng-deep .mat-form-field-label {
+  color: #555;
+}
+
+::ng-deep .mat-input-element {
+  color: #333;
+}
+
+::ng-deep .mat-form-field-subscript-wrapper {
+  font-size: 12px;
+}
+
+/* Button Styling */
+.button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.button-container button {
+  padding: 10px 36px;
+  font-size: 16px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+  font-weight: 500;
+  letter-spacing: 1px;
+  transition: all 0.4s ease;
+  box-shadow: 0 4px 15px rgba(26, 26, 46, 0.3);
+  text-transform: uppercase;
+}
+
+.button-container button:not([disabled]) {
+  cursor: pointer;
+}
+
+.button-container button:not([disabled]):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(26, 26, 46, 0.4);
+  background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+}
+
+.button-container button:not([disabled]):active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(26, 26, 46, 0.4);
+}
+
+.button-container button[disabled] {
+  background: #ccc;
+  color: #777;
+  box-shadow: none;
+}
+
+.button-container button mat-icon {
+  margin-right: 8px;
+}
+
+/* Success and Error Messages */
+.success-message, .error-message {
+  text-align: center;
+  padding: 50px;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.success-message::before, .error-message::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+}
+
+.success-message::before {
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.error-message::before {
+  background: linear-gradient(90deg, #d32f2f 0%, #b71c1c 100%);
+}
+
+.success-message h4 {
+  color: #1a1a2e;
+  line-height: 1.8;
+  font-size: 16px;
+  font-weight: 400;
+  margin-top: 20px;
+}
+
+.success-message a {
+  color: #1a1a2e;
+  text-decoration: none;
+  font-weight: 600;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.success-message a::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  bottom: -2px;
+  left: 0;
+  background: #1a1a2e;
+  transform: scaleX(0);
+  transform-origin: bottom right;
+  transition: transform 0.3s ease;
+}
+
+.success-message a:hover {
+  color: #16213e;
+}
+
+.success-message a:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* Loading Template */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 30px;
+}
+
+.loading-container h2 {
+  font-family: 'Playfair Display', serif;
+  color: #1a1a2e;
+  font-weight: 500;
+}
+
+::ng-deep .mat-progress-spinner circle {
+  stroke: #1a1a2e;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .content {
+    width: 95%;
+    padding: 0 10px;
+    margin: 40px auto;
+  }
+
+  .form-container {
+    padding: 30px 20px;
+  }
+
+  .question-container {
+    padding: 20px;
+  }
+
+  .headerClass {
+    font-size: 22px;
+  }
+  
+  .form-container p {
+    max-width: 95%;
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar {
+    padding: 12px 15px;
+  }
+
+  .headerClass {
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+
+  .logo {
+    height: 38px;
+  }
+  
+  .question-label {
+    font-size: 16px;
+  }
+  
+  .button-container button {
+    padding: 8px 24px;
+    font-size: 14px;
+  }
+  
+  .success-message, .error-message {
+    padding: 30px 20px;
+  }
+}

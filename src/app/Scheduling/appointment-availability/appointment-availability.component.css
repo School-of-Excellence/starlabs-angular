@@ -1,0 +1,103 @@
+.mainscreen{
+  width: 100%;
+  padding: 15px;
+}
+
+.heading{
+  font-size: x-large;
+  font-weight: bold;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 15px;
+  color: rgb(0, 50, 67);
+  margin-bottom: 20px;
+}
+
+.actionbox{
+  margin-top: 10px;
+  width: 100%;
+  display: inline-flex;
+  justify-content: space-between;
+  align-content: center;
+}
+
+.actionitem{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.clearbtn{
+  color: grey;
+}
+
+.slotbtn{
+  color: green;
+  border: 1px solid green;
+  margin-left: 10px;
+}
+
+.slotbtn:hover{
+  color: white;
+  background-color: green;
+}
+
+.menubtn{
+  color: gray;
+}
+
+.menubtn:hover{
+  background-color: rgba(145, 145, 145, 0.227);
+}
+
+/* Mat Table */
+table{
+  width: 100%;
+}
+
+.emptytext{
+  text-align: center;
+  color: grey;
+}
+
+th, td{
+  padding-right: 10px !important;
+}
+
+th {
+  background-color: #eeeeee !important;
+  color: #37474f !important;
+  font-weight: 700 !important;
+}
+
+.mat-column-name{
+  width: 20% !important;
+}
+
+.mat-column-appointment{
+  width: 50% !important;
+}
+
+tr.tablerow:not(.expanded):hover{
+  background: whitesmoke;
+}
+
+tr.tablerow:not(.expanded):active{
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.tablerow td{
+  border-bottom-width: 0;
+}
+
+
+.expandrow{
+  height: 0;
+}
+
+.expandedbox{
+  overflow: hidden;
+  display: flex;
+}

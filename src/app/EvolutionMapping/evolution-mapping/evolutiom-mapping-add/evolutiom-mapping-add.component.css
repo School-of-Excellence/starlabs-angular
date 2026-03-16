@@ -1,0 +1,14 @@
+.flex-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  
+  .flex-item {
+    flex: 1;
+  }
+  
+  .full-width {
+    width: 100%;
+    margin-top: 16px;
+  }

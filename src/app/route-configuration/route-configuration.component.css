@@ -1,0 +1,343 @@
+/* Main Card Styles */
+.route-config-card {
+  margin: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.route-config-card .mat-card-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  margin: -16px -16px 20px -16px;
+  padding: 20px 24px;
+  border-radius: 8px 8px 0 0;
+}
+
+.route-config-card .mat-card-title {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.filter-field {
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 20px;
+}
+
+.filter-field .mat-form-field-wrapper {
+  padding-bottom: 0;
+}
+
+.table-container {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.route-table {
+  width: 100%;
+  background: white;
+}
+
+.header-row {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.header-row th {
+  font-weight: 600;
+  color: #495057;
+  font-size: 14px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+/* Column Header Specific Styles */
+.expand-header {
+  width: 60px;
+  text-align: center;
+}
+
+.order-header {
+  width: 80px;
+  text-align: center;
+}
+
+.label-header {
+  width: 200px;
+}
+
+.route-header {
+  width: 200px;
+}
+
+.icon-header {
+  width: 150px;
+}
+
+.docid-header {
+  width: 200px;
+}
+
+/* Row Styles */
+.data-row {
+  border-bottom: 1px solid #e9ecef;
+  transition: background-color 0.2s ease;
+}
+
+.data-row:hover {
+  background-color: #f8f9fa;
+}
+
+.parent-row {
+  background-color: #ffffff;
+  font-weight: 500;
+}
+
+.parent-row:hover {
+  background-color: #f1f3f4;
+}
+
+.child-row {
+  background-color: #f8f9fa;
+  /* border-left: 4px solid #667eea; */
+}
+
+.child-row:hover {
+  background-color: #e9ecef;
+}
+
+.expanded-parent {
+  background-color: #f1f3f4;
+  /* border-bottom: 2px solid #667eea; */
+}
+
+/* Cell Styles */
+.mat-cell {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+/* Expand Button Styles */
+.expand-cell {
+  text-align: center;
+  width: 60px;
+}
+
+
+.child-indicator {
+  color: #667eea;
+  font-family: monospace;
+  font-weight: bold;
+  margin-left: 8px;
+  font-size: 16px;
+}
+
+/* Order Cell */
+.order-cell {
+  text-align: center;
+  width: 80px;
+}
+
+.order-value {
+  display: inline-block;
+  background: #667eea;
+  color: white;
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 24px;
+  text-align: center;
+}
+
+.child-row .order-value {
+  background: #95a5a6;
+}
+
+/* Label Cell */
+.label-cell {
+  width: 200px;
+}
+
+.label-text {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.child-label {
+  color: #5a6c7d;
+  font-weight: 400;
+  font-style: italic;
+  margin-left: 16px;
+}
+
+/* Route Cell */
+.route-cell {
+  width: 200px;
+}
+.user-role {
+  background: #f1f3f4;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 500;
+  color: #000000;
+  display: inline-block;
+  margin: 5px 5px 5px 5px;
+}
+
+.route-code {
+  background: #f1f3f4;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 500;
+  color: #000000;
+  display: inline-block;
+  margin: 5px 5px 5px 5px;
+
+}
+
+.child-row .route-code {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* Icon Cell */
+.icon-cell {
+  width: 150px;
+}
+
+.icon-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.route-icon {
+  color: #667eea;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.child-row .route-icon {
+  color: #95a5a6;
+}
+
+.icon-name {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: monospace;
+}
+
+/* Document ID Cell */
+.docid-cell {
+  width: 200px;
+}
+
+.docid-text {
+  font-family: monospace;
+  font-size: 11px;
+  color: #6b7280;
+  background: #f9fafb;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #e5e7eb;
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.child-row .docid-text {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* No Data Styles */
+.no-data-row {
+  height: 120px;
+}
+
+.no-data-cell {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.no-data-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+}
+
+.no-data-icon {
+  font-size: 48px;
+  color: #d1d5db;
+}
+
+/* Paginator Styles */
+.table-paginator {
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .route-config-card {
+    margin: 10px;
+  }
+  
+  .route-table {
+    font-size: 12px;
+  }
+  
+  .mat-cell {
+    padding: 8px 12px;
+  }
+  
+  .expand-button {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .filter-field {
+    max-width: 100%;
+  }
+}
+
+/* Smooth Transitions */
+.data-row,
+.expand-button,
+.order-value {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Custom Scrollbar */
+.table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: #f1f3f4;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 3px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: #5a67d8;
+}
+

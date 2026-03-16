@@ -1,0 +1,254 @@
+<div class="dialog-wrap" *ngIf="add">
+  <div class="dialog-header">
+    <div class="dialog-icon add-icon"><mat-icon>library_music</mat-icon></div>
+    <div>
+      <h2 class="dialog-title">Add New Audio</h2>
+      <p class="dialog-sub">Upload audio with details and tags</p>
+    </div>
+    <button class="dialog-close" (click)="onNoClick()"><mat-icon>close</mat-icon></button>
+  </div>
+
+  <mat-dialog-content class="dialog-body">
+    <div class="upload-section">
+      <label class="label">Audio File</label>
+      <div class="upload-zone" (click)="audioInput.click()" [class.has-file]="audioUrl">
+        <input #audioInput type="file" (change)="previewAudio($event)" accept="audio/*" hidden />
+        <div class="upload-zone-content" *ngIf="!audioUrl">
+          <mat-icon class="upload-icon">cloud_upload</mat-icon>
+          <span class="upload-text">Click to upload audio</span>
+          <span class="upload-hint">MP3, WAV, OGG supported</span>
+        </div>
+        <div class="upload-preview-audio" *ngIf="audioUrl">
+          <mat-icon class="preview-icon">audiotrack</mat-icon>
+          <span class="preview-name">Audio uploaded</span>
+          <mat-icon class="preview-change">swap_horiz</mat-icon>
+        </div>
+      </div>
+      <audio *ngIf="audioUrl" [src]="audioUrl" controls class="audio-player"></audio>
+    </div>
+    <div class="upload-section">
+      <label class="label">Cover Image <span class="optional">(optional)</span></label>
+      <div class="upload-zone img-zone" (click)="imageInput.click()" [class.has-file]="imageUrl">
+        <input #imageInput type="file" (change)="previewImage($event)" accept="image/*" hidden />
+        <div class="upload-zone-content" *ngIf="!imageUrl">
+          <mat-icon class="upload-icon">image</mat-icon>
+          <span class="upload-text">Upload image</span>
+        </div>
+        <img *ngIf="imageUrl" [src]="imageUrl" class="img-preview" />
+      </div>
+    </div>
+    <form #myForm="ngForm" class="form-fields">
+      <div class="field-group">
+        <label class="label">Name <span class="required">*</span></label>
+        <div class="input-box" [class.error]="!nameCtrl.valid && nameCtrl.touched">
+          <mat-icon class="ib-icon">title</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter audio name"
+            [(ngModel)]="fileName" name="name" required minlength="4"
+            #nameCtrl="ngModel" (keyup)="onselect()" />
+        </div>
+        <span class="field-error" *ngIf="!nameCtrl.valid && nameCtrl.touched">Name is required (min 4 characters)</span>
+        <span class="field-error" *ngIf="crossmatch">{{crossmatcherrormessage}}</span>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Description <span class="required">*</span></label>
+        <div class="input-box" [class.error]="!descCtrl.valid && descCtrl.touched">
+          <mat-icon class="ib-icon">description</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter description"
+            [(ngModel)]="description" name="description" required minlength="6"
+            #descCtrl="ngModel" />
+        </div>
+        <span class="field-error" *ngIf="!descCtrl.valid && descCtrl.touched">Description is required (min 6 characters)</span>
+      </div>
+
+      <div class="field-group">
+        <label class="label">HLS URL <span class="optional">(optional)</span></label>
+        <div class="input-box">
+          <mat-icon class="ib-icon">link</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter HLS URL"
+            [(ngModel)]="hlsurl" name="hlsurl" minlength="6" #hlsCtrl="ngModel" />
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="label">Tags</label>
+        <div class="selected-tags" *ngIf="tags.length">
+          <span class="chip" *ngFor="let tag of tags; let i = index">
+            {{ mapTaxonomy[tag] }}
+            <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+          </span>
+        </div>
+        <div class="input-box">
+          <mat-icon class="ib-icon">search</mat-icon>
+          <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+        </div>
+        <div class="available-tags" *ngIf="filteredTaxonomyList.length">
+          <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+            <mat-icon>add_circle_outline</mat-icon>
+            {{ tag['name'] }}
+          </span>
+        </div>
+      </div>
+    </form>
+  </mat-dialog-content>
+
+    <div class="lm-file-item" *ngIf="isUploading" style="margin: 0 24px;">
+      <mat-icon class="lm-file-icon">cloud_upload</mat-icon>
+      <div class="lm-file-info">
+        <span class="lm-file-name">Uploading audio...</span>
+        <div class="lm-progress-bar">
+          <div class="lm-progress-fill" [style.width.%]="uploadProgress"></div>
+        </div>
+      </div>
+      <span class="lm-file-percent">{{ uploadProgress }}%</span>
+    </div>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" (click)="onNoClick()" [disabled]="isUploading">Cancel</button>
+    <button class="btn-primary" [disabled]="myForm.invalid || crossmatch || file == null || isUploading" (click)="startUpload()">
+      <mat-icon>cloud_upload</mat-icon> {{ isUploading ? 'Uploading...' : 'Upload Audio' }}
+    </button>
+  </mat-dialog-actions>
+</div>
+<div class="dialog-wrap" *ngIf="edit">
+  <div class="dialog-header">
+    <div class="dialog-icon edit-icon"><mat-icon>edit</mat-icon></div>
+    <div>
+      <h2 class="dialog-title">Edit Audio</h2>
+      <p class="dialog-sub">Update audio details and tags</p>
+    </div>
+    <button class="dialog-close" (click)="onNoClick()"><mat-icon>close</mat-icon></button>
+  </div>
+
+  <mat-dialog-content class="dialog-body">
+    <div class="upload-section">
+      <label class="label">Replace Audio <span class="optional">(optional)</span></label>
+      <div class="upload-zone" (click)="audioInputEdit.click()" [class.has-file]="audioUrl">
+        <input #audioInputEdit type="file" (change)="previewAudio($event)" accept="audio/*" hidden />
+        <div class="upload-zone-content" *ngIf="!audioUrl">
+          <mat-icon class="upload-icon">cloud_upload</mat-icon>
+          <span class="upload-text">Click to replace audio</span>
+          <span class="upload-hint">MP3, WAV, OGG supported</span>
+        </div>
+        <div class="upload-preview-audio" *ngIf="audioUrl">
+          <mat-icon class="preview-icon">audiotrack</mat-icon>
+          <span class="preview-name">Audio uploaded</span>
+          <mat-icon class="preview-change">swap_horiz</mat-icon>
+        </div>
+      </div>
+      <audio *ngIf="audioUrl" [src]="audioUrl" controls class="audio-player"></audio>
+    </div>
+
+    <div class="upload-section">
+      <label class="label">Cover Image <span class="optional">(optional)</span></label>
+      <div class="upload-zone img-zone" (click)="imageInputEdit.click()" [class.has-file]="imageUrl">
+        <input #imageInputEdit type="file" (change)="previewImage($event)" accept="image/*" hidden />
+        <div class="upload-zone-content" *ngIf="!imageUrl">
+          <mat-icon class="upload-icon">image</mat-icon>
+          <span class="upload-text">Upload image</span>
+        </div>
+        <img *ngIf="imageUrl" [src]="imageUrl" class="img-preview" />
+      </div>
+    </div>
+
+    <form #form="ngForm" class="form-fields">
+      <div class="field-group">
+        <label class="label">Name <span class="required">*</span></label>
+        <div class="input-box" [class.error]="!nameEditCtrl.valid && nameEditCtrl.touched">
+          <mat-icon class="ib-icon">title</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter audio name"
+            [(ngModel)]="fileName" name="name" required minlength="4"
+            #nameEditCtrl="ngModel" (keyup)="onselectchange()" />
+        </div>
+        <span class="field-error" *ngIf="!nameEditCtrl.valid && nameEditCtrl.touched">Name is required (min 4 characters)</span>
+        <span class="field-error" *ngIf="crossmatch">{{crossmatcherrormessage}}</span>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Description <span class="required">*</span></label>
+        <div class="input-box" [class.error]="!descEditCtrl.valid && descEditCtrl.touched">
+          <mat-icon class="ib-icon">description</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter description"
+            [(ngModel)]="description" name="description" required minlength="6"
+            #descEditCtrl="ngModel" />
+        </div>
+        <span class="field-error" *ngIf="!descEditCtrl.valid && descEditCtrl.touched">Description is required (min 6 characters)</span>
+      </div>
+
+      <div class="field-group">
+        <label class="label">HLS URL <span class="optional">(optional)</span></label>
+        <div class="input-box">
+          <mat-icon class="ib-icon">link</mat-icon>
+          <input type="text" class="ib-input" placeholder="Enter HLS URL"
+            [(ngModel)]="hlsurl" name="hlsurl" minlength="6" #hlsEditCtrl="ngModel" />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="label">Tags</label>
+        <div class="selected-tags" *ngIf="tags.length">
+          <span class="chip" *ngFor="let tag of tags; let i = index">
+            {{ mapTaxonomy[tag] }}
+            <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+          </span>
+        </div>
+        <div class="input-box">
+          <mat-icon class="ib-icon">search</mat-icon>
+          <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+        </div>
+        <div class="available-tags" *ngIf="filteredTaxonomyList.length">
+          <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+            <mat-icon>add_circle_outline</mat-icon>
+            {{ tag['name'] }}
+          </span>
+        </div>
+      </div>
+    </form>
+  </mat-dialog-content>
+  <div class="lm-file-item" *ngIf="isUploading" style="margin: 0 24px;">
+      <mat-icon class="lm-file-icon">cloud_upload</mat-icon>
+      <div class="lm-file-info">
+        <span class="lm-file-name">Saving changes...</span>
+        <div class="lm-progress-bar">
+          <div class="lm-progress-fill" [style.width.%]="uploadProgress"></div>
+        </div>
+      </div>
+      <span class="lm-file-percent">{{ uploadProgress }}%</span>
+    </div>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" (click)="onNoClick()" [disabled]="isUploading">Cancel</button>
+    <button class="btn-primary" [disabled]="isUploading" (click)="onedit(data.id, fileName, description, file, image, hlsurl)">
+      <mat-icon>save</mat-icon> {{ isUploading ? 'Saving...' : 'Update Audio' }}
+    </button>
+  </mat-dialog-actions>
+  <!-- <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" (click)="onNoClick()">Cancel</button>
+    <button class="btn-primary" (click)="onedit(data.id, fileName, description, file, image, hlsurl)">
+      <mat-icon>save</mat-icon> Update Audio
+    </button>
+  </mat-dialog-actions> -->
+</div>
+<div class="dialog-wrap delete-wrap" *ngIf="delete">
+  <div class="dialog-header">
+    <div class="dialog-icon delete-icon"><mat-icon>delete_outline</mat-icon></div>
+    <div>
+      <h2 class="dialog-title">Delete Audio</h2>
+      <p class="dialog-sub">This action cannot be undone</p>
+    </div>
+    <button class="dialog-close" (click)="onNoClick()"><mat-icon>close</mat-icon></button>
+  </div>
+
+  <mat-dialog-content class="dialog-body delete-body">
+    <div class="delete-message">
+      <mat-icon class="delete-warn-icon">warning_amber</mat-icon>
+      <p>Are you sure you want to permanently delete this audio file? This will remove the audio, its cover image, and all associated data.</p>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="dialog-footer">
+    <button class="btn-cancel" (click)="onNoClick()">Cancel</button>
+    <button class="btn-danger" cdkFocusInitial (click)="ondelete(data.id, data.url, data.imageurl)">
+      <mat-icon>delete_forever</mat-icon> Delete Permanently
+    </button>
+  </mat-dialog-actions>
+</div>

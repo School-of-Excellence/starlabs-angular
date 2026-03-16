@@ -1,0 +1,16 @@
+<main class="m-4">
+  <h4 class="d-flex flex-row justify-content-center">Select Participant</h4>
+  <mat-selection-list #participant>
+    <mat-list-option checkboxPosition="before" *ngFor="let item of data" [value]="item">
+      Task Status : <div class="d-flex flex-row" class="w-100">
+        <span *ngFor="let task of item['tasks']">
+          <span *ngIf="![null,undefined].includes(item['taskproperty'][task]['status'])">{{task}} - {{item['taskproperty'][task]['status']}},&nbsp;&nbsp;&nbsp;</span>
+        </span>
+      </div>
+    </mat-list-option>
+  </mat-selection-list>
+  <div class="d-flex flex-row justify-content-center mt-4">
+    <button mat-stroked-button type="button" color="accent" (click)="dialogRef.close([])">cancel</button>&nbsp;&nbsp;&nbsp;&nbsp;
+    <button mat-stroked-button type="button" color="primary" (click)="dialogRef.close(participant.selectedOptions.selected)">Submit</button>&nbsp;&nbsp;&nbsp;&nbsp;
+  </div>
+</main>

@@ -1,0 +1,57 @@
+<form [formGroup]="notesForm" class="notes-form d-flex flex-column justify-content-center align-items-center" (ngSubmit)="submit()">
+    <!-- <div formArrayName="name" class="notes-container w-100"> -->
+      <!-- <div *ngFor="let noteGroup of notesArray.controls; let i = index" [formGroup]="noteGroup" class="note-item"> -->
+        
+        <div>
+          <h4>Custom Metric Creation</h4>
+        </div>
+        <!-- Textarea Input -->
+        <mat-form-field appearance="outline" class="note-input w-50">
+          <mat-label>Type...</mat-label>
+          <!-- <textarea matInput formControlName="stagename" class="textarea"></textarea> -->
+          <input type="text" matInput formControlName="stagename">
+          <!-- <mat-error *ngIf="noteGroup.get('stagename')?.touched && noteGroup.get('note')?.invalid"> -->
+            <!-- Name is required -->
+          <!-- </mat-error> -->
+          <mat-error *ngIf="notesForm.get('stagename').touched && notesForm.get('stagename').invalid">
+            Name is required
+          </mat-error>
+        </mat-form-field>
+  
+        <!-- Multi-Select Dropdown -->
+        <mat-form-field appearance="outline" class="w-75">
+          <mat-label>Select stages from selected queues</mat-label>
+          <mat-select [compareWith]="compareFnc" formControlName="stage" multiple>
+            <mat-option *ngFor="let item of stages" [value]="item">
+              {{item.stagename}}-{{item.status === 'instudio' ? 'activity' : item.status}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{mapQueue[item.queueid] ? mapQueue[item.queueid] : null}}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>&nbsp;&nbsp;
+  
+        <!-- Fixing Add Button Condition -->
+        <!-- <button mat-mini-fab color="primary" 
+          *ngIf="i === notesArray.length - 1 && notesArray.at(i)?.get('stagename')?.value?.trim()" 
+          (click)="addNote()">
+          <mat-icon>add</mat-icon>
+        </button> -->
+  
+        <!-- Remove Button -->
+        <!-- <button mat-mini-fab color="warn" *ngIf="notesArray.length > 1" (click)="removeNote(i)">
+          <mat-icon>remove</mat-icon>
+        </button> -->
+  
+      <!-- </div> -->
+    <!-- </div> -->
+  
+    <!-- Submit Button -->
+    <div class="d-flex flex-row justify-content-center">
+      <div class="button-container">
+        <button mat-raised-button color="accent" type="button" class="button-css" (click)="onClose()">Cancel</button>
+      </div>&nbsp;
+      <div class="button-container">
+        <button mat-raised-button color="accent" type="submit" class="button-css">Submit</button>
+      </div>
+    </div>
+    
+</form>
+  

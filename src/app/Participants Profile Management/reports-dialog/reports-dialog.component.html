@@ -1,0 +1,146 @@
+<div class="dialog-header">
+    <button mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
+      <mat-icon>close</mat-icon>
+    </button>
+</div>
+  
+<div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+</div>
+
+<div *ngIf="!loading">
+    <h2 style="color: rgb(248, 44, 44);font-weight: bold;">{{mapProfile[profileid]}}'s Reports</h2>
+    <div class="tabs">
+        <button 
+            *ngFor="let report of data.element.reports; let i = index" 
+            class="tab-button" 
+            [class.active]="selectedTab === i" 
+            (click)="selectTab(i, report)">
+          {{ reportDisplayNames[report] || report  }}
+        </button>
+    </div>
+
+    <div class="tab-content">
+        <div *ngIf="selectedTabName === 'askah'">
+            <div style="justify-content: space-between; display: flex; align-items: center;">
+                <h3 class="heading">Ask A&H</h3>
+                <h5 *ngIf="askAH?.created">{{ askAH['created']?.toDate() | date:'medium' }}</h5>
+            </div>
+            <table class="report-table">
+                <tr>
+                    <th>Ask A&H</th>
+                    <!-- <th>Installation Ask</th> -->
+                </tr>
+                <tr>
+                    <td>{{ askAH?.askah }}</td>
+                    <!-- <td>{{ askAH?.installationaskah }}</td> -->
+                </tr>
+            </table> <br>
+            <table class="report-table">
+                <tr>
+                    <!-- <th>Ask A&H</th> -->
+                    <th>Installation Ask</th>
+                </tr>
+                <tr>
+                    <!-- <td>{{ askAH?.askah }}</td> -->
+                    <td>{{ askAH?.installationaskah }}</td>
+                </tr>
+            </table>
+        </div>
+        <div *ngIf="selectedTabName === 'loveletter'">
+            <div style="justify-content: space-between; display: flex; align-items: center;">
+                <h3 class="heading">Love Letter</h3>
+                <h5 *ngIf="loveLetter?.created">{{ loveLetter['created']?.toDate() | date:'medium' }}</h5>
+            </div>
+            <p>{{ loveLetter?.loveletter }}</p>
+        </div>
+        <div *ngIf="selectedTabName === 'evolutionprogress'">
+            <div style="justify-content: space-between; display: flex; align-items: center;">
+                <h3 class="heading">Evolution Progress</h3>
+                <!-- <h5 *ngIf="loveLetter?.created">{{ loveLetter['created']?.toDate() | date:'medium' }}</h5> -->
+            </div>
+            <div class="mat-elevation-z8">
+                <table mat-table [dataSource]="dataSource" matSort>
+                    <ng-container matColumnDef="sno">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header> S.No </th>
+                        <td mat-cell *matCellDef="let row; let i = index">
+                            {{ i + 1 }}
+                        </td>                    
+                    </ng-container>
+                  <ng-container matColumnDef="created">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
+                    <td mat-cell *matCellDef="let row"> {{row.created.toDate() | date: 'MMM d, yyyy'}} </td>
+                  </ng-container>
+              
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Adjustment </th>
+                    <td mat-cell *matCellDef="let row"> {{ developerAccess ? row.name : 'Not Allowed' }} </td>
+                  </ng-container>
+              
+                  <ng-container matColumnDef="Progress">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Progress </th>
+                    <td mat-cell *matCellDef="let row"> {{row.Progress}} </td>
+                  </ng-container>
+                  
+                  <ng-container matColumnDef="Hour">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Hour </th>
+                    <td mat-cell *matCellDef="let row"> {{ row.Hour}} </td>
+                  </ng-container>
+
+                  <ng-container matColumnDef="Type">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Type </th>
+                    <td mat-cell *matCellDef="let row"> {{ row.Type}} </td>
+                  </ng-container>
+                  
+                  <ng-container matColumnDef="SavedYears">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> SavedYears </th>
+                    <td mat-cell *matCellDef="let row"> {{ row.SavedYears | number: '1.2-2' }} </td>
+                  </ng-container>
+              
+                  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+                </table>
+                <mat-paginator [pageSizeOptions]="[25, 50, 100, 500]" aria-label="Select page of users"></mat-paginator>
+              </div>
+            <!-- <table>
+                <thead>
+                  <tr>
+                    <th>S.No</th>
+                    <th>Date</th>
+                    <th>Adjustment</th>
+                    <th>Progress</th>
+                    <th>Type</th>
+                    <th>Hour</th>
+                    <th>Saved Years</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let evolv of evolutionData; let i = index">
+                    <td>{{ i + 1 }}</td> 
+                    <td>{{ evolv.created.toDate() | date: 'MMM d, yyyy' }}</td>
+                    <td>{{ evolv.name}}</td>
+                    <td>{{ evolv.totalhoursaved.sliderValue }}</td>
+                    <td>{{ evolv.totalhoursaved.type }}</td>
+                    <td>{{ evolv.totalhoursaved.hourValue }}</td>
+                    <td>{{ evolv.savedyears }}</td>
+                  </tr>
+                </tbody>
+              </table> -->
+        </div>
+        <div *ngIf="selectedTabName === 'crossover'">
+            <div style="justify-content: space-between; display: flex; align-items: center;">
+                <h3 class="heading">AEL Crossover Metric</h3>
+                <h5 *ngIf="crossOver?.created">{{ crossOver['created']?.toDate() | date:'medium' }}</h5>
+            </div>
+            <div class="metric-container">
+                <div class="metric-card" *ngFor="let metric of crossOver?.metric | keyvalue">
+                    <h3>{{ metric.key }}</h3>
+                    <p><strong>Start Point:</strong> {{ metric.value['startpoint'] }}</p>
+                    <p><strong>Endpoint:</strong> {{ metric.value['endpoint'] }}</p>
+                    <p><strong>Jumped From:</strong> {{ metric.value['jumpedfrom'] || 'N/A' }}</p>
+                    <p><strong>Metric Value:</strong> {{ metric.value['metric ']|| 0 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

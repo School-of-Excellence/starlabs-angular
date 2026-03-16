@@ -1,0 +1,165 @@
+<header class="header color-teal">
+  <h1 class="title">Notification</h1>
+  <button mat-icon-button mat-dialog-close class="close-button">
+    <mat-icon style="color:white">close</mat-icon>
+  </button>
+</header>
+
+<div class="mainscreen">
+
+  <div class="row justify-content-center">
+    <button mat-raised-button (click)="view = 'select'" [ngStyle]="view == 'select' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Template Message</button>
+      &nbsp;&nbsp;&nbsp;
+    <button mat-raised-button (click)="view = 'create'" [ngStyle]="view == 'create' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Type & Send</button>
+  </div>
+
+  <div *ngIf="view == 'create'">
+    <!-- <div class="eventbox">
+      <label class="events">Available Events:</label>
+      <br>
+      <mat-checkbox class="checkbox" [(ngModel)]="allusers" (change)="selectAll($event.checked)">Select All</mat-checkbox>
+      <mat-checkbox class="checkbox" *ngFor="let event of eventLists; let i = index" [(ngModel)]="event.checked" (change)="onEventSelect(i, $event.checked)" [disabled]="allusers">{{event.eventname}}</mat-checkbox>
+    </div>
+    <div class="profilebox">
+      <mat-form-field appearance="fill">
+        <mat-label>Select Profile</mat-label>
+        <mat-select [(ngModel)]="selectedProfiles" multiple>
+          <mat-option *ngFor="let profile of profileList" [value]="profile">{{mapProfiles[profile]}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div *ngIf="returnNameList().length != 0" class="selectednames">
+        <label><b>Sending To....</b> {{returnNameList()}}</label>
+      </div>
+    </div> -->
+
+    <form [formGroup]="templateForm">
+      <div class="d-flex flex-column">
+        <div class="d-flex flex-wrap flex-row justify-content-start">
+          <!-- <mat-form-field appearance="outline" class="col-md-3">  
+              <mat-label>Template Name</mat-label>
+              <input matInput placeholder="Enter Template Name" formControlName="templateName" [readonly]="viewmode === 'edit'" required>
+              <mat-error *ngIf="templateForm.get('templateName').hasError('required')">
+                  Template Name Is Required
+              </mat-error>
+              <mat-error *ngIf="templateForm.get('templateName').hasError('duplicateName')">
+                  This template name already exists
+              </mat-error>                             
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="col-md-3">  
+              <mat-label>Template Alias</mat-label>
+              <input matInput placeholder="Enter Template Alias" formControlName="templateAlias" [readonly]="viewmode === 'edit'" required>
+              <mat-error *ngIf="!templateForm.controls['templateAlias'].valid">Template Alias Is Required</mat-error>
+              <mat-hint>Only a-z,'-','_','.' is allowed</mat-hint>
+          </mat-form-field> -->
+          
+          <div class="d-flex flex-row" class="col-md-3">
+              <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Select Category</mat-label>
+                  <mat-select formControlName="templateCategory" required>
+                      <mat-option>
+                          <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let option of onSearchCategory()" [value]="option">{{option}}</mat-option>
+                      <mat-option *ngIf="onSearchCategory().length == 0 && searchCategory != '' " (click)="addCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
+                  </mat-select>
+                  <mat-error *ngIf="!templateForm.controls['templateCategory'].valid">Template Category Is Required</mat-error>
+              </mat-form-field>
+              <button  *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addCategory()"><mat-icon>add</mat-icon></button>
+          </div>
+
+          <div class="d-flex flex-row" class="col-md-3">
+              <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Select Sub-Category</mat-label>
+                  <mat-select formControlName="templateSubCategory" required>
+                      <mat-option>
+                          <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let option of onSearchSubCategory()" [value]="option">{{option}}</mat-option>
+                      <mat-option *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" (click)="addSubCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
+                  </mat-select>
+                  <mat-error *ngIf="!templateForm.controls['templateSubCategory'].valid">Template Sub Category Is Required</mat-error>
+              </mat-form-field>
+              <button *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addSubCategory()"><mat-icon>add</mat-icon></button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="messagebox">
+      <div class="row">
+        <mat-form-field appearance="outline" class="col-md-6">
+          <mat-label>Title</mat-label>
+          <input matInput [(ngModel)]="title">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="col-md-6">
+          <mat-label>Subtitle</mat-label>
+          <input matInput [(ngModel)]="subtitle">
+        </mat-form-field>
+      </div>
+
+      <textarea class="textbox" rows="10" cols="50" placeholder="You Message....." [(ngModel)]="message"></textarea>
+
+      <div class="row">
+        <mat-form-field appearance="outline" class="col-md-6">
+          <mat-label>Landing Page (Deeplink URL)</mat-label>
+          <input matInput [(ngModel)]="landingPage">
+        </mat-form-field>
+
+        <div>
+          <mat-checkbox class="checkbox" [(ngModel)]="sticky">Mark as Sticky Message</mat-checkbox>
+          <br>
+          <mat-hint>Check for the InApp Message</mat-hint>
+        </div>
+      </div>
+
+      <div *ngIf="!sticky">
+        <label>Image (Less than 1 MB)</label><br>
+        <input type="file" multiple="false" accept=".png,.jpg,.jpeg" (change)="importImages($event)">
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="view == 'select' && templateArray.length == 0">
+    <div class="notemplate"><b >Oops! No Templates Found</b></div>
+    <!-- <div mat-stroked-button class="createTemplateBtn" type="button" (click)="createTemplate()">Need to Create a Template..? ></div> -->
+  </div>
+
+  <div *ngIf="view == 'select' && templateArray.length != 0">
+
+    <mat-form-field appearance="outline" class="col-md-12">
+      <mat-label>Broadcast Name</mat-label>
+      <input matInput type="text" [(ngModel)]="broadcastname">
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="col-md-12"  *ngIf="templateArray.length != 0">
+      <mat-label>Select Template</mat-label>
+      <mat-select (selectionChange)="onTemplateChange($event)">
+          <mat-option *ngFor="let template of templateArray" [value]="template">
+              {{template.templatename}}
+          </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <div style="padding: 15px;" *ngIf="isTemplatePresent()">
+      <div style="padding: 15px;">
+        <div class="notificationcontainer">
+            <div class="row">
+                <img src="./../../../assets/AH White Logo Only.png" width="35px" height="30px"/>
+                <div class="col-md-10">
+                    <p>Breakthroughs</p>
+                    <h5><b>{{[null, undefined, ""].includes(selectedTemplate['title']) ? "Title" : selectedTemplate['title']}}</b></h5>
+                    <h6>{{[null, undefined, ""].includes(selectedTemplate['message']) ? "Message" : selectedTemplate['message']}}</h6>
+                    <img *ngIf="selectedTemplate['notificationimage'] != null" [src]="selectedTemplate['notificationimage']" width="400px" height="300px"/>
+                </div>
+            </div>
+        </div>
+      </div>    
+    </div>
+  </div>
+
+  <div class="d-flex flex-row justify-content-center" *ngIf="!sendValidation()">
+    <button mat-raised-button class="sendButton" type="button" [disabled]="sendValidation()" (click)="sendNotification(templateForm.value)">Send Notification</button>
+  </div>
+</div>

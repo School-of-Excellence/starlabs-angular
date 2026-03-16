@@ -1,0 +1,38 @@
+<div [formGroup]="form">
+  <!-- Display selected chips -->
+  <div class="chip-container" *ngIf="hasSelectedValues()">
+    <mat-chip-set>
+      <mat-chip 
+        *ngFor="let item of getDisplayItems(); let i = index"
+        [removable]="true"
+        (removed)="onRemoveItem(i)"
+      >
+        {{ getDisplayText(item) }}<mat-icon matChipRemove>cancel</mat-icon>
+      </mat-chip>
+    </mat-chip-set>
+  </div>
+
+  <!-- Input field with autocomplete -->
+  <mat-form-field class="w-100" appearance="fill">
+    <mat-label>{{label}}</mat-label>
+    <input 
+      matInput
+      placeholder="Search and select..."
+      [matAutocomplete]="auto"
+      (input)="onTextSearch($event)"
+      (focus)="onInputFocus()"
+      [(ngModel)]="searchText"
+      [ngModelOptions]="{standalone: true}"
+    >
+    
+    <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onAddFromChipList($event)" [displayWith]="displayWith">
+      <mat-option *ngFor="let option of filteredData" [value]="option">
+        {{ getOptionDisplayText(option) }}
+      </mat-option>
+    </mat-autocomplete>
+    
+    <mat-error *ngIf="form.get(controlName)?.hasError('required')">
+      {{label}} is required.
+    </mat-error>
+  </mat-form-field>
+</div>

@@ -1,0 +1,37 @@
+<main class="m-4">
+  <div *ngIf="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+
+<div *ngIf="!loading" class="w-100">
+  <h5 class="title text-center" style="font-size: 16px;">Manage Interim Report</h5>
+  <form [formGroup]="manageReportForm" (ngSubmit)="updateInterimReport()">
+    <mat-form-field appearance="outline">
+      <mat-label>Due Date</mat-label>
+      <input matInput [matDatepicker]="picker" formControlName="duedate">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+    <br>
+    Send Remainder before &nbsp;&nbsp;
+    <mat-form-field appearance="outline">
+      <mat-label>Remainder Days</mat-label>
+      <input matInput type="number" formControlName="remaindertime">
+    </mat-form-field>
+    &nbsp;&nbsp;Days
+    <br>
+    Lock App After &nbsp;&nbsp;
+    <mat-form-field appearance="outline">
+      <mat-label>Lock Days</mat-label>
+      <input matInput type="number" formControlName="locktime">
+    </mat-form-field>
+    &nbsp;&nbsp;Days
+    <br>
+
+    <div class="w-100 text-center">
+      <button mat-stroked-button class="closebtn me-3" type="button" (click)="dialogRef.close()">Close</button>
+      <button mat-stroked-button class="successbtn" type="submit">Send Interim Report</button>
+    </div>
+  </form>
+</div>
+</main>

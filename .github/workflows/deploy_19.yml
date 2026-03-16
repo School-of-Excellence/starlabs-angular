@@ -1,0 +1,90 @@
+name: Deploy to Firebase
+
+on:
+  push:
+    branches:
+      - development
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22.16.0'
+
+      - name: Generate Environment Files
+        env:
+          FIREBASE_TEST_CONFIG: ${{ secrets.FIREBASE_TEST_CONFIG }}
+          FIREBASE_PROD_CONFIG: ${{ secrets.FIREBASE_PROD_CONFIG }}
+          WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
+          WATSON_PROD_CONFIG: ${{ secrets.WATSON_PROD_CONFIG }}
+        run: |
+          mkdir -p src/environments
+          
+          if [ "${{ github.ref }}" == "refs/heads/development" ]; then
+            # Test branch - use TEST config for both files
+            cat > src/environments/environment.development.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_TEST_CONFIG,
+            watson: $WATSON_TEST_CONFIG
+          };
+          EOF
+            
+            cat > src/environments/environment.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_TEST_CONFIG,
+            watson: $WATSON_TEST_CONFIG
+          };
+          EOF
+          else
+            # Production branch - use PROD config for both files
+            cat > src/environments/environment.development.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_PROD_CONFIG,
+            watson: $WATSON_PROD_CONFIG
+          };
+          EOF
+            
+            cat > src/environments/environment.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_PROD_CONFIG,
+            watson: $WATSON_PROD_CONFIG
+          };
+          EOF
+          fi
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@14.4.0
+
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli@19.2.13
+
+      - name: Build Angular App
+        run: ng build --configuration production
+
+      - name: Authenticate with Firebase & Set Project
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/development" ]; then
+            echo '${{ secrets.GOOGLE_SERVICE_TEST }}' > $HOME/firebase-key.json
+            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
+            firebase use --add starlabs-test
+            firebase deploy
+          elif [ "${{ github.ref }}" == "refs/heads/production" ]; then
+            echo '${{ secrets.GOOGLE_SERVICE_PROD }}' > $HOME/firebase-key.json
+            export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
+            firebase use --add fir-sample-aae4a
+            firebase deploy
+          fi

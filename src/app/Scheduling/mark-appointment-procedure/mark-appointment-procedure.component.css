@@ -1,0 +1,44 @@
+.loading{
+  font-style: italic;
+  color: grey;
+}
+
+.mainscreen{
+  padding: 20px;
+  width: 100%;
+}
+
+.heading{
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: rgb(0, 50, 67);
+  margin-bottom: 10px;
+}
+
+.adjustmentbox{
+  margin-top: 15px;
+}
+
+.procedurebox{
+  margin-left: 25px;
+  margin-top: 10px;
+}
+
+.matcheckbox{
+  margin-left: 15px;
+}
+
+.actionbox{
+  text-align: right;
+}
+
+.closebtn{
+  color: red;
+}
+
+.submitbtn{
+  color: white;
+  background-color: green;
+  margin-left: 20px;
+}

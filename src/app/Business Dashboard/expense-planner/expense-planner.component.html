@@ -1,0 +1,454 @@
+<ng-template #loader let-message>
+  <div class="loading-overlay">
+    <div class="loading-container">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">{{ message }}</div>
+    </div>
+  </div>
+</ng-template>
+
+<ng-container *ngIf="isloading">
+  <ng-template *ngTemplateOutlet="loader; context: { $implicit: 'Loading Dashboard' }" >
+  </ng-template>
+</ng-container>
+
+<div class="expense-planning-container">
+  <!-- Header with Tabs -->
+  <div class="header">
+    <div class="header-left">
+      <div class="title-tabs">
+        <button [class.active]="activeTab === 'expense'" class="title-tab" (click)="setActiveTab('expense')" >
+          EXPENSE PLANNER
+        </button>
+        <button class="title-tab" [class.active]="activeTab === 'inflow'" (click)="setActiveTab('inflow')" >
+          INFLOW UPDATES
+        </button>
+      </div>
+    </div>
+    <div class="header-right">
+      <!-- Date Selector - Only for Expense tab -->
+      @if (activeTab === 'expense') {
+      <div class="filter-bar">
+        <div class="filter-tabs">
+          <button class="filter-tab" [class.active]="filterType === 'month'" (click)="setFilterType('month')" >
+            Monthly
+          </button>
+          <button class="filter-tab" [class.active]="filterType === 'range'" (click)="setFilterType('range')" >
+            Date Range
+          </button>
+        </div>
+        <div class="compact-date-picker">
+          <div class="filter-inputs">
+            <!-- Month Filter -->
+            <div *ngIf="filterType === 'month'" class="month-picker">
+              <button class="nav-btn" aria-label="Previous month" (click)="backwardMonth()" >
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <input class="month-input" type="month" [(ngModel)]="monthyear" (change)="updateDate()" />
+              <button class="nav-btn" aria-label="Next month" (click)="forwardMonth()" >
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+
+            <!-- Date Range Picker -->
+            <div *ngIf="filterType === 'range'" class="range-picker">
+              <mat-form-field appearance="outline" class="compact-field">
+                <mat-date-range-input [rangePicker]="picker">
+                  <input matStartDate [(ngModel)]="startDate" placeholder="Start" />
+                  <input matEndDate [(ngModel)]="endDate" placeholder="End" />
+                </mat-date-range-input>
+                <mat-datepicker-toggle matIconSuffix [for]="picker" ></mat-datepicker-toggle>
+                <mat-date-range-picker #picker (closed)="loadData()" ></mat-date-range-picker>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="add-entry-btn" (click)="addEntry()">
+        <mat-icon class="material-icons-round">add</mat-icon>
+        Add Entry
+      </button>
+      }
+
+      <!-- Current Date Display - Only for Inflow tab -->
+      @if (activeTab === 'inflow') {
+      <div class="inflow-month-toggle">
+        <button class="month-toggle-btn" [class.active]="inflowMonth === 'current'" (click)="setInflowMonth('current')" >
+          <mat-icon class="material-icons-round">calendar_today</mat-icon>
+          <span>{{ currentMonthName }}</span>
+        </button>
+        <button class="month-toggle-btn" [class.active]="inflowMonth === 'next'" (click)="setInflowMonth('next')" >
+          <mat-icon class="material-icons-round">event</mat-icon>
+          <span>{{ nextMonthName }}</span>
+        </button>
+      </div>
+    }
+    </div>
+  </div>
+
+  <!-- ==================== EXPENSE PLANNER TAB ==================== -->
+  @if (activeTab === 'expense') {
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-card planned">
+      <div class="summary-card-label">Total Planned</div>
+      <div class="summary-card-value">
+        {{ totalPlanned.toLocaleString("en-IN") }}
+      </div>
+    </div>
+    <div class="summary-card paid">
+      <div class="summary-card-label">Total Paid</div>
+      <div class="summary-card-value">
+        {{ totalPaid.toLocaleString("en-IN") }}
+      </div>
+    </div>
+    <div class="summary-card additional">
+      <div class="summary-card-label">Additional Paid</div>
+      <div class="summary-card-value" [class.negative]="additionalPaid < 0">
+        {{ additionalPaid >= 0 ? "+" : "" }}{{ additionalPaid.toLocaleString("en-IN") }}
+      </div>
+    </div>
+    <div class="summary-card entries">
+      <div class="summary-card-label">Total Entries</div>
+      <div class="summary-card-value">{{ expenses.length }}</div>
+    </div>
+  </div>
+
+  <!-- Expense Table -->
+  <div class="table-container">
+    <div class="table-header-bar">
+      <div class="table-title">Expense Entries</div>
+      <div class="table-actions"></div>
+    </div>
+
+    @if (expenses.length === 0) {
+    <div class="empty-state">
+      <div class="empty-state-icon">
+        <mat-icon class="material-icons-round">receipt_long</mat-icon>
+      </div>
+      <h3>No expenses found</h3>
+      <p>Add your first expense entry to get started</p>
+    </div>
+    } @else {
+    <table class="expense-table">
+      <thead>
+        <tr>
+          <th style="width: 100px">Date</th>
+          <th>Description</th>
+          <th style="width: 150px">Total Planned</th>
+          <th style="width: 160px">Total Paid</th>
+          <th style="width: 140px">Additional Paid</th>
+          <th style="width: 100px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (expense of expenses; track expense.docid) {
+        <tr>
+          <td>
+            <div class="date-cell">
+              <span class="date-day">{{ formatDay(expense.date.toDate()) }}</span>
+              <span class="date-month-year">{{ formatMonthYear(expense.date.toDate()) }}</span>
+            </div>
+          </td>
+          <td>
+            <div class="description-cell">
+              <div class="expense-items">
+                @for (desc of expense.description; track $index; let idx = $index) {
+                <div class="expense-item" [class.paid]="desc.paid">
+                  <input
+                    type="checkbox"
+                    class="expense-checkbox"
+                    [checked]="desc.paid"
+                    (change)="updatePaidStatus(expense.docid, idx)" />
+                  <div class="expense-item-details">
+                    <span class="expense-item-name">{{ desc.name }}</span>
+                    <span class="expense-item-amount">{{ desc.amount.toLocaleString("en-IN") }}</span>
+                  </div>
+                </div>
+              }
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="amount-cell amount-planned"> {{ getTotalPlanned(expense).toLocaleString("en-IN") }} </span>
+          </td>
+          <td>
+            <input
+              type="number"
+              class="editable-input"
+              [value]="expense.totalpaid"
+              (keyup.enter)="updateTotalPaid(expense.docid, $event)"
+              (input)="handleTotalPaidChange(expense.docid, $event)"
+              required
+              min="0"
+              #totalpaid />
+            <p *ngIf="showTootipMsg.includes(expense.docid)" class="total-paid-msg">
+              Press Enter To Update
+            </p>
+            <p *ngIf="!totalpaid.value.toString()" class="total-paid-error-msg">
+              Press Enter Total Paid
+            </p>
+          </td>
+          <td>
+            <span
+              class="amount-cell"
+              [class.amount-additional-positive]=" getAdditionalPaid(expense) >= 0 "
+              [class.amount-additional-negative]=" getAdditionalPaid(expense) < 0 " >
+              {{ getAdditionalPaid(expense) >= 0 ? "+" : "" }}{{ getAdditionalPaid(expense).toLocaleString("en-IN") }}
+            </span>
+          </td>
+          <td>
+            <div class="actions-cell">
+              <button class="action-btn" (click)="editEntry(expense)" title="Edit" >
+                <mat-icon class="material-icons-round">edit</mat-icon>
+              </button>
+              <button class="action-btn delete" (click)="deleteEntry(expense.docid)" title="Delete" >
+                <mat-icon class="material-icons-round">delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </tr>
+      }
+      </tbody>
+    </table>
+    }
+  </div>
+
+  <!-- Expense Modal Dialog -->
+  @if (isDialogOpen) {
+  <div class="modal-overlay" (click)="onOverlayClick($event)">
+    <div class="model">
+      <div class="modal-header">
+        <h2>{{ editingExpense ? "Edit Entry" : "Add New Entry" }}</h2>
+        <button class="modal-close" (click)="closeDialog()">
+          <mat-icon class="material-icons-round">close</mat-icon>
+        </button>
+      </div>
+
+      <form action="" [formGroup]="entryForm">
+        <div class="modal-body">
+          <mat-form-field class="form-group">
+            <mat-label>Date</mat-label>
+            <input
+              name="date"
+              matInput
+              [matDatepicker]="expensePicker"
+              [disabled]="isEditMode"
+              readonly
+              formControlName="date" />
+            <mat-error *ngIf="entryForm.get('date').invalid">
+              Entry for this Date is Already Exist
+            </mat-error>
+            <mat-datepicker-toggle matIconSuffix [for]="expensePicker" ></mat-datepicker-toggle>
+            <mat-datepicker #expensePicker (closed)="dateExist()" ></mat-datepicker>
+          </mat-form-field>
+
+          <div class="expense-items-section" [style]="{ marginTop: entryForm.get('date').invalid ? '10px' : '0px' }"
+            *ngIf="isEditMode || showCompleteForm" >
+            <div class="expense-items-header">
+              <h4>Expense Descriptions</h4>
+              <button class="add-item-btn" (click)="addDescription()">
+                <mat-icon class="material-icons-round">add</mat-icon>
+                Add Item
+              </button>
+            </div>
+
+            <div class="form-expense-items" formArrayName="description">
+              <div
+                class="form-expense-item"
+                *ngFor="let desc of description.controls; let i = index"
+                [formGroupName]="i" >
+                <input type="text" placeholder="Name" formControlName="name" />
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  formControlName="amount"
+                  min="0" />
+                <label class="paid-toggle">
+                  <input type="checkbox" formControlName="paid" />
+                  <span>Paid</span>
+                </label>
+                <button
+                  class="remove-item-btn"
+                  (click)="removeDescription(i)"
+                  [disabled]="entryForm.value.description.length <= 1" >
+                  <span class="material-icons-round">close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDialog()"> Cancel </button>
+        <button class="btn btn-primary" (click)="saveEntry()"> Save Entry </button>
+      </div>
+    </div>
+  </div>
+  } }
+
+  <!-- ==================== INFLOW UPDATES TAB ==================== -->
+  @if (activeTab === 'inflow') {
+  <!-- Summary Section -->
+  <div class="inflow-summary">
+    <!-- Top Row - Projection & Difference -->
+    <div class="summary-row top-row">
+      <div class="summary-block projection-block">
+        <div class="block-header">
+          <mat-icon class="material-icons-round">trending_up</mat-icon>
+          <span>Total Projection</span>
+        </div>
+        <div class="block-content">
+          <div class="stat-item">
+            <span class="stat-label">As of 1st</span>
+            <span class="stat-value">{{ thisMonthDue.toLocaleString("en-IN") }}</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item highlight">
+            <span class="stat-label">Current Ongoing</span>
+            <span class="stat-value">{{ totalProjection.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-block difference-block">
+        <div class="block-header">
+          <span>Total Received</span>
+        </div>
+        <div class="block-content centered">
+          <span class="difference-value">
+            {{ thisMonthReceived.toLocaleString("en-IN") }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Row - Payments Received -->
+    <div class="summary-row payments-row">
+      <div class="payments-header">
+        <mat-icon class="material-icons-round">payments</mat-icon>
+        <span>Payments Received</span>
+      </div>
+      <div class="payments-grid">
+        <div class="payment-item">
+          <div class="payment-icon emi">
+            <mat-icon class="material-icons-round">event_repeat</mat-icon>
+          </div>
+          <div class="payment-details">
+            <span class="payment-label">EMI</span>
+            <span class="payment-value">{{ thisMonthEMIPaid.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+
+        <div class="payment-item">
+          <div class="payment-icon new">
+            <mat-icon class="material-icons-round">add_circle</mat-icon>
+          </div>
+          <div class="payment-details">
+            <span class="payment-label">New Payment</span>
+            <span class="payment-value">{{ thisMonthNewPayment.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+
+        <div class="payment-item">
+          <div class="payment-icon additional">
+            <mat-icon class="material-icons-round">add_task</mat-icon>
+          </div>
+          <div class="payment-details">
+            <span class="payment-label">Additional</span>
+            <span class="payment-value">{{ thisMonthAdditional.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+
+        <div class="payment-item">
+          <div class="payment-icon received">
+            <mat-icon class="material-icons-round">check_circle</mat-icon>
+          </div>
+          <div class="payment-details">
+            <span class="payment-label">Revived</span>
+            <span class="payment-value">{{ thisMonthRevived.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+
+        <div class="payment-item">
+          <div class="payment-icon unscheduled">
+            <mat-icon class="material-icons-round">event_busy</mat-icon>
+          </div>
+          <div class="payment-details">
+            <span class="payment-label">Unscheduled</span>
+            <span class="payment-value">{{ thisMonthUnschedule.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+
+        <div class="payment-item total">
+          <div class="payment-icon total-icon">
+            <mat-icon class="material-icons-round">account_balance_wallet</mat-icon>
+          </div>
+          <div class="payment-details">
+            <span class="payment-label">Total Received</span>
+            <span class="payment-value">{{ totalReceived.toLocaleString("en-IN") }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inflow Table -->
+  <div class="table-container">
+    <div class="table-header-bar">
+      <div class="table-title">Daily Breakdown</div>
+      <div class="table-actions"></div>
+    </div>
+
+    @if (inflowSort.length === 0) {
+    <div class="empty-state">
+      <div class="empty-state-icon">
+        <mat-icon class="material-icons-round">trending_up</mat-icon>
+      </div>
+      <h3>No inflows found</h3>
+      <p>No inflow data available for this month</p>
+    </div>
+    } @else {
+    <table class="expense-table">
+      <thead>
+        <tr>
+          <th style="width: 80px">Day</th>
+          <th>Projection</th>
+          <th>Total Paid</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (inflow of inflowSort; track inflow.key) {
+        <tr
+          [class.today]="inflow.key === currentDay"
+          [class.has-data]=" inflow.value.projection > 0 || inflow.value.paid > 0 " >
+          <td>
+            <div
+              class="day-cell"
+              [class.today]=" inflow.key === currentDay && inflowMonth === 'current' " >
+              <span class="day-number">{{ inflow.key }}</span>
+              @if (inflow.key === currentDay && inflowMonth === 'current') {
+                <span class="today-badge">Today</span>
+              }
+            </div>
+          </td>
+          <td>
+            <span class="amount-cell amount-projection">
+              {{ inflow.value.projection.toLocaleString("en-IN") }}
+            </span>
+          </td>
+          <td>
+            <span class="amount-cell amount-total">
+              {{ inflow.value.paid.toLocaleString("en-IN") }}
+            </span>
+          </td>
+        </tr>
+      }
+      </tbody>
+    </table>
+  }
+  </div>
+}
+</div>
