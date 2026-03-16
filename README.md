@@ -5,7 +5,7 @@
 After cloning or pulling the repo, run:
 
 ```bash
-./fetch-firebase-env.sh
+./setupScript.sh
 ```
 
 This triggers a GitHub workflow that:
