@@ -82,8 +82,8 @@ export class SendmessagesComponent implements OnInit, OnDestroy {
 
     getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
       if (wati.exists()) {
-        this.apitoken = wati.data()['wati'][0]['watitoken'];
-        this.endpoint = wati.data()['wati'][0]['endpoint'];
+        this.apitoken = wati.data()['101723']['watitoken'];
+        this.endpoint = wati.data()['101723']['endpoint'];
       }
     });
 
