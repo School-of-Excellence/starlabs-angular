@@ -400,6 +400,7 @@ export class WatiInputComponent {
           templates.filter(t => t.status?.toLowerCase() === 'approved').forEach(t => {
             t.serverid = serverid;
             t.servername = serverConfig.watiname;
+            t.serverurl = serverConfig.endpoint
             this.watiTemplates.push(t);
           });
         });

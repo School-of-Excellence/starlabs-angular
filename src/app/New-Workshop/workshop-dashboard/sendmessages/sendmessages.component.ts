@@ -78,16 +78,7 @@ export class SendmessagesComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private firestore: Firestore,
     @Inject(MAT_DIALOG_DATA) public data: { type: 'mail' | 'whatsapp', selectedprofiles: any }
-  ) { 
-
-    getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
-      if (wati.exists()) {
-        this.apitoken = wati.data()['101723']['watitoken'];
-        this.endpoint = wati.data()['101723']['endpoint'];
-      }
-    });
-
-  }
+  ) { }
 
   ngOnInit(): void {
     this.mailForm = this.fb.group({
@@ -241,6 +232,13 @@ export class SendmessagesComponent implements OnInit, OnDestroy {
   async loadTemplates(): Promise<void> {
     this.isLoadingTemplates = true;
     this.templatesLoadError = '';
+
+    await getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
+      if (wati.exists()) {
+        this.apitoken = wati.data()['101723']['watitoken'];
+        this.endpoint = wati.data()['101723']['endpoint'];
+      }
+    });
 
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${this.apitoken}`,
