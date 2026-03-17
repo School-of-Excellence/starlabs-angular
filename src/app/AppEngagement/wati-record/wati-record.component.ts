@@ -118,11 +118,6 @@ export class WatiRecordComponent implements OnInit {
 
   constructor(private authguard: AuthguardService){
     
-    getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
-      if (wati.exists()) {
-        this.endpoint = wati.data()['wati'][0]['endpoint'];
-      }
-    });
 
   }
 

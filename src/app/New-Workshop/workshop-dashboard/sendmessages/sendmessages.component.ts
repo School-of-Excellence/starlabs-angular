@@ -78,33 +78,8 @@ export class SendmessagesComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private firestore: Firestore,
     @Inject(MAT_DIALOG_DATA) public data: { type: 'mail' | 'whatsapp', selectedprofiles: any }
-  ) { 
+  ) { }
 
-  }
-
-  // ngOnInit(): void {
-  //   this.mailForm = this.fb.group({
-  //     subject: ['', [Validators.required, Validators.maxLength(200)]],
-  //     message: ['', [Validators.required, Validators.maxLength(2000)]]
-  //   });
-    
-  //   this.whatsappForm = this.fb.group({
-  //     templateName: ['', Validators.required]
-  //   });
-    
-  //   this.selectedTabIndex = this.data?.type === 'whatsapp' ? 1 : 0;
-  //   console.log(this.data.selectedprofiles, 'consoling selected profiles');
-    
-  //   this.templateSearchCtrl.valueChanges
-  //     .pipe(takeUntil(this.onDestroy))
-  //     .subscribe(() => {
-  //       this.filterTemplates();
-  //     });
-    
-  //   this.loadPinnedTemplates();
-  //   this.loadMessageCache();
-  //   this.loadTemplates();
-  // }
   ngOnInit(): void {
     this.mailForm = this.fb.group({
       subject: ['', [Validators.required, Validators.maxLength(200)]],
@@ -271,6 +246,13 @@ export class SendmessagesComponent implements OnInit, OnDestroy {
   async loadTemplates(): Promise<void> {
     this.isLoadingTemplates = true;
     this.templatesLoadError = '';
+
+    await getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
+      if (wati.exists()) {
+        this.apitoken = wati.data()['101723']['watitoken'];
+        this.endpoint = wati.data()['101723']['endpoint'];
+      }
+    });
 
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${this.apitoken}`,

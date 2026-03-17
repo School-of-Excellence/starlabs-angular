@@ -670,7 +670,7 @@ export class AppointmentStudioComponent {
       else{
         console.log("Zoom")
         const url = this.router.serializeUrl(
-          this.router.createUrlTree(['/openappointmentzoom', appointment['docid']])
+          this.router.createUrlTree(['/openmeeting', appointment.meta["bookingid"], 'appointment'])
         );
         window.open(url, "_blank");
       }

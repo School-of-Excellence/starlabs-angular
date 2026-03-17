@@ -374,35 +374,45 @@ export class WatiInputComponent {
     this.updatePreview();
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // TEMPLATE LOADERS
-  // ══════════════════════════════════════════════════════════════════════
-
   async loadTemplatesFromAllServers() {
     this.isLoading = true;
+    let watiData: Record<string, any> = {};
     const watiDoc = await getDoc(doc(this.firestore, 'classify', 'wati'));
+
     if (watiDoc.exists()) {
-      this.serverUrls = watiDoc.data()['wati'];
+      watiData = watiDoc.data();
+      this.serverUrls = Object.keys(watiData);
       this.auth.openSnackBar(`Fetching ${this.serverUrls.length} - Servers Templates`, 'OK', 600);
     } else {
       this.auth.openSnackBar(`No Wati Server Found`, 'OK', 600);
+      this.isLoading = false;
+      return;
     }
-    forkJoin(this.serverUrls.map(s => this.watiService.getTemplates(s))).subscribe({
+
+    forkJoin(this.serverUrls.map((serverid) => this.watiService.getTemplates(serverid, watiData))).subscribe({
       next: (responses: any[][]) => {
         this.watiTemplates = [];
+
         responses.forEach((templates, idx) => {
+          const serverid = this.serverUrls[idx];
+          const serverConfig = watiData[serverid];
+
           templates.filter(t => t.status?.toLowerCase() === 'approved').forEach(t => {
-            t.serverurl = this.serverUrls[idx].endpoint;
-            t.serverid = this.serverUrls[idx].serverid;
-            t.servername = this.serverUrls[idx].watiname;
+            t.serverid = serverid;
+            t.servername = serverConfig.watiname;
+            t.serverurl = serverConfig.endpoint
             this.watiTemplates.push(t);
           });
         });
+
         this.watiTemplates.sort((a, b) => b['lastModified'] - a['lastModified']);
         this.applyFiltersAndLimit();
         this.isLoading = false;
       },
-      error: () => { this.snackBar.open('Error loading templates', 'Close', { duration: 3000 }); this.isLoading = false; }
+      error: () => {
+        this.snackBar.open('Error loading templates', 'Close', { duration: 3000 });
+        this.isLoading = false;
+      }
     });
   }
 
@@ -497,10 +507,6 @@ export class WatiInputComponent {
       p.number?.includes(s)
     );
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // TEMPLATE SELECTION
-  // ══════════════════════════════════════════════════════════════════════
 
   async onTemplateChange(event: any) {
     this.resetQueuedTemplateState();
@@ -634,10 +640,6 @@ export class WatiInputComponent {
     this.queuedRecipients = [];
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // PARAM HELPERS
-  // ══════════════════════════════════════════════════════════════════════
-
   hasExcelParam(): boolean { return this.templateParams.some(p => p.fillType === 'excel'); }
   getExcelMappedParams(): TemplateParam[] { return this.templateParams.filter(p => p.fillType === 'excel'); }
   isColumnMapped(header: string): boolean { return this.templateParams.some(p => p.fillType === 'excel' && p.excelColumn === header); }
@@ -663,10 +665,6 @@ export class WatiInputComponent {
     this.templateParams.forEach(p => counts[p.fillType]++);
     return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]) as ParamFillType;
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // EXCEL — SAMPLE DOWNLOAD
-  // ══════════════════════════════════════════════════════════════════════
 
   downloadSampleExcel() {
     const paramCols = this.templateParams.map(p => p.name);
@@ -708,10 +706,6 @@ export class WatiInputComponent {
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // EXCEL FILE PROCESSING
-  // ══════════════════════════════════════════════════════════════════════
 
   onFileSelected(event: any) {
     const file = event.target.files[0];
@@ -834,10 +828,6 @@ export class WatiInputComponent {
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // TEST MODE
-  // ══════════════════════════════════════════════════════════════════════
-
   addProfileToTest(profile: any) {
     if (!profile.number) { this.snackBar.open('No phone number on this profile', 'Close', { duration: 3000 }); return; }
     if (this.selectedProfiles.find(p => p.id === profile.id)) { this.snackBar.open('Already in test list', 'Close', { duration: 2000 }); return; }
@@ -873,22 +863,6 @@ export class WatiInputComponent {
 
   updateTestNumbers() { this.testNumbers = this.testNumbersList.map(i => i.number).join(', '); }
 
-  async sendTestMessage() {
-    if (!this.testNumbersList.length) { this.snackBar.open('Add test numbers first', 'Close', { duration: 3000 }); return; }
-    if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
-    try {
-      const body = { template_name: this.selectedTemplate['elementName'], broadcast_name: this.bufferDoc.broadcastname, parameters: [{ name: 'name', value: 'Test User' }] };
-      for (const item of this.testNumbersList) {
-        // await this.watiService.sendTemplateMessage(body, item.number, this.bufferDoc.serverid);
-      }
-      this.snackBar.open(`Test sent to ${this.testNumbersList.length} number(s)`, 'Close', { duration: 3000 });
-    } catch (e) { this.snackBar.open('Error sending test message', 'Close', { duration: 3000 }); }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // RECIPIENTS
-  // ══════════════════════════════════════════════════════════════════════
-
   onShowRecipients() { this.showRecipients = !this.showRecipients; }
   getRecipientCount() { return this.bufferDoc.profileid.length; }
 
@@ -917,10 +891,6 @@ export class WatiInputComponent {
       }
     });
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // SEND QUEUED TEMPLATE VIA HTTP CLOUD FUNCTION
-  // ══════════════════════════════════════════════════════════════════════
 
   async sendQueuedTemplate() {
     if (!this.selectedQueuedTemplate) { this.snackBar.open('No queued template selected', 'Close', { duration: 3000 }); return; }

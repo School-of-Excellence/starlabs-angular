@@ -2103,8 +2103,9 @@ export class DynamicStudioComponent {
     }
 
     const url = this.router.serializeUrl(
-      this.router.createUrlTree(['/openmeeting', doc['docid']])
+      this.router.createUrlTree(['/openmeeting', doc['docid'], 'queue'])
     );
+         
     window.open(url, "_blank");
   }
   
