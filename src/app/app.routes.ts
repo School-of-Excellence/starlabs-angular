@@ -173,7 +173,7 @@ export const routes: Routes = [
   {path: 'queuebigplanner', loadComponent: () => import('./queue system/big-planner/big-planner.component').then(m => m.BigPlannerComponent), canActivate: [authGuard]},
   // {path: 'dynamicqueuemanager', loadComponent: () => import('./queue system/dynamic-queue-manager/dynamic-queue-manager.component').then(m => m.DynamicQueueManagerComponent), canActivate: [authGuard]},
   {path: 'dynamicqueuemanager', loadComponent: () => import('./queue system/dynamic-queue-manager-clone/dynamic-queue-manager-clone.component').then(m => m.DynamicQueueManagerCloneComponent), canActivate: [authGuard]},
-  {path: 'openmeeting/:id', loadComponent: () => import('./queue system/zoom-clientview/zoom-clientview.component').then(m => m.ZoomClientviewComponent), canActivate:[authGuard]},
+  {path: 'openmeeting/:id/:collectiontype', loadComponent: () => import('./queue system/zoom-clientview/zoom-clientview.component').then(m => m.ZoomClientviewComponent), canActivate:[authGuard]},
 
   // ATC
   {path: 'prescribeATC', loadComponent: () => import('./ATC/prescribe-atc/prescribe-atc.component').then(m => m.PrescribeATCComponent), canActivate: [authGuard]},
