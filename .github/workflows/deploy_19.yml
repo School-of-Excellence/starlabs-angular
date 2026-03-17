@@ -63,7 +63,7 @@ jobs:
           EOF
           fi
 
-      - name: Update Firebase Hosting Site
+      - name: Update Firebase Site
         run: |
           if [ "${{ github.ref }}" == "refs/heads/development" ]; then
             jq '.hosting.site = "breakthroughs-test"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
