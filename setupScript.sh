@@ -33,4 +33,11 @@ echo "🗑️ Deleting artifact..."
 ARTIFACT_ID=$(gh api "/repos/{owner}/{repo}/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="environment-files") | .id')
 gh api --method DELETE "/repos/{owner}/{repo}/actions/artifacts/$ARTIFACT_ID"
 
-echo "✓ Done"
+echo ""
+echo "📦 Installing dependencies..."
+npm i
+
+echo ""
+echo "🎉 Setup complete!"
+echo ""
+echo "Run your app: ng s"
