@@ -1591,15 +1591,16 @@
               <mat-radio-button value="old">Old</mat-radio-button>
             </mat-radio-group>
           </mat-menu>
-<ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
+          <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
             <button mat-icon-button
                     [matMenuTriggerFor]="journeyFilterMenu"
-                    [color]="(selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0) ? 'accent' : ''">
-              <mat-icon>route</mat-icon>
+                    [color]="(selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0) ? 'accent' : ''">
+              <mat-icon>sort</mat-icon>
             </button>
             <mat-menu #journeyFilterMenu="matMenu" class="filter-scroll-menu">
               <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
 
+                <!-- Journey Filter -->
                 <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
                   Journey Filter
                 </div>
@@ -1613,6 +1614,7 @@
                   </mat-checkbox>
                 </div>
 
+                <!-- Tier Filter -->
                 <ng-container *ngIf="workshopData?.tierbased === true">
                   <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
                     Tier Filter
@@ -1628,11 +1630,47 @@
                   </div>
                 </ng-container>
 
+                <!-- Category Filter -->
+                <ng-container *ngIf="workshopData?.categoriesforthisworkshop?.length > 0">
+                  <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                    Category Filter
+                  </div>
+                  <div style="padding: 4px 0;">
+                    <mat-checkbox
+                      *ngFor="let catId of workshopData?.categoriesforthisworkshop"
+                      [checked]="selectedCategoryFilters.includes(catId)"
+                      (change)="toggleCategoryFilter(catId)"
+                      style="display: block; padding: 6px 16px;">
+                      {{ categoryNamesMap.get(catId) || catId }}
+                    </mat-checkbox>
+                  </div>
+                </ng-container>
+
+                <!-- Enrollment Status Filter -->
+                <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Enrollment Status
+                </div>
+                <div style="padding: 4px 0;">
+                  <mat-checkbox
+                    [checked]="selectedEnrollmentStatusFilters.includes('enrolled')"
+                    (change)="toggleEnrollmentStatusFilter('enrolled')"
+                    style="display: block; padding: 6px 16px;">
+                    Started
+                  </mat-checkbox>
+                  <mat-checkbox
+                    [checked]="selectedEnrollmentStatusFilters.includes('enrollednotstarted')"
+                    (change)="toggleEnrollmentStatusFilter('enrollednotstarted')"
+                    style="display: block; padding: 6px 16px;">
+                    Not Started
+                  </mat-checkbox>
+                </div>
+
               </div>
-              <!-- Single clear all at the bottom -->
+
+              <!-- Clear all at the bottom -->
               <div style="padding: 6px 16px 8px; border-top: 1px solid rgba(128,128,128,0.2);">
                 <button mat-button color="warn" style="font-size: 11px; width: 100%;"
-                        (click)="clearJourneyFilters(); clearTierFilters(); $event.stopPropagation()">
+                        (click)="clearJourneyFilters(); clearTierFilters(); clearCategoryFilters(); clearEnrollmentStatusFilters(); $event.stopPropagation()">
                   <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
                   Clear All Filters
                 </button>
@@ -1640,8 +1678,8 @@
             </mat-menu>
 
             <!-- Selected filter chips shown below the button row -->
-            <div *ngIf="selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0"
-                 style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
+            <div *ngIf="selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0"
+                style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
               <mat-chip
                 *ngFor="let journey of selectedJourneyFilters"
                 [removable]="true"
@@ -1659,8 +1697,94 @@
                 {{ tierMap[tier] }}
                 <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
               </mat-chip>
+              <mat-chip
+                *ngFor="let catId of selectedCategoryFilters"
+                [removable]="true"
+                (removed)="toggleCategoryFilter(catId)"
+                color="primary"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ categoryNamesMap.get(catId) || catId }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let es of selectedEnrollmentStatusFilters"
+                [removable]="true"
+                (removed)="toggleEnrollmentStatusFilter(es)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ es === 'enrolled' ? 'Started' : 'Not Started' }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
             </div>
+          </ng-container>
+          <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'notStarted'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="notStartedFilterMenu"
+                    [color]="(selectedCategoryFilters.length > 0 || selectedNotStartedTypeFilters.length > 0) ? 'accent' : ''">
+              <mat-icon>sort</mat-icon>
+            </button>
+            <mat-menu #notStartedFilterMenu="matMenu" class="filter-scroll-menu">
+              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+                <ng-container *ngIf="workshopData?.categoriesforthisworkshop?.length > 0">
+                  <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                    Category Filter
+                  </div>
+                  <div style="padding: 4px 0;">
+                    <mat-checkbox
+                      *ngFor="let catId of workshopData?.categoriesforthisworkshop"
+                      [checked]="selectedCategoryFilters.includes(catId)"
+                      (change)="toggleCategoryFilter(catId)"
+                      style="display: block; padding: 6px 16px;">
+                      {{ categoryNamesMap.get(catId) || catId }}
+                    </mat-checkbox>
+                  </div>
+                </ng-container>
+                <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Enrollment Status
+                </div>
+                <div style="padding: 4px 0;">
+                  <mat-checkbox
+                    [checked]="selectedNotStartedTypeFilters.includes('enrollednotstarted')"
+                    (change)="toggleNotStartedTypeFilter('enrollednotstarted')"
+                    style="display: block; padding: 6px 16px;">
+                    Category Not Selected
+                  </mat-checkbox>
+                  <mat-checkbox
+                    [checked]="selectedNotStartedTypeFilters.includes('enrolled_zero_progress')"
+                    (change)="toggleNotStartedTypeFilter('enrolled_zero_progress')"
+                    style="display: block; padding: 6px 16px;">
+                    Not Started
+                  </mat-checkbox>
+                </div>
 
+              </div>
+              <div style="padding: 6px 16px 8px; border-top: 1px solid rgba(128,128,128,0.2);">
+                <button mat-button color="warn" style="font-size: 11px; width: 100%;"
+                        (click)="clearCategoryFilters(); clearNotStartedTypeFilters(); $event.stopPropagation()">
+                  <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
+                  Clear All Filters
+                </button>
+              </div>
+            </mat-menu>
+            <div *ngIf="selectedCategoryFilters.length > 0 || selectedNotStartedTypeFilters.length > 0"
+                style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
+              <mat-chip
+                *ngFor="let catId of selectedCategoryFilters"
+                [removable]="true"
+                (removed)="toggleCategoryFilter(catId)"
+                color="primary"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ categoryNamesMap.get(catId) || catId }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let t of selectedNotStartedTypeFilters"
+                [removable]="true"
+                (removed)="toggleNotStartedTypeFilter(t)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ t === 'enrollednotstarted' ? 'Not Started' : 'Not Completed 1.1' }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+            </div>
           </ng-container>
           <!-- <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
             <button mat-icon-button
@@ -1708,7 +1832,7 @@
           </ng-container> -->
           </div>
         </div>
-        <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
+        <!-- <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
             <a
               class="participant-item"
@@ -1729,8 +1853,37 @@
           </div>
             </a>
           </mat-card-content>
+        </mat-card> -->
+        <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
+          <mat-card-content>
+            <a
+              class="participant-item"
+              [href]="'/userprofile/' + participant.profileid"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="text-decoration: none; color: inherit; cursor: pointer;"
+            >
+              <mat-icon class="participant-avatar">person</mat-icon>
+              <div class="participant-details">
+                <span class="participant-name">{{ participant.name }}</span>
+                <img
+                  *ngIf="mapProfile[participant.profileid]?.workshoponly"
+                  src="assets/new.png"
+                  alt="New"
+                  class="new-badge"
+                />
+                <ng-container *ngIf="workshopData?.categorybased === true">
+                  <span style="font-size: 11px; margin-top: 3px; display: block;"
+                        [style.opacity]="0.7">
+                    <ng-container *ngIf="participant.isFacilitator">Facilitator</ng-container>
+                    <ng-container *ngIf="!participant.isFacilitator && participant.isCohort">Above Diagnostics</ng-container>
+                    <ng-container *ngIf="!participant.isFacilitator && !participant.isCohort">{{ participant.categoryName }}</ng-container>
+                  </span>
+                </ng-container>
+              </div>
+            </a>
+          </mat-card-content>
         </mat-card>
-
       </div>
 
     </div>
