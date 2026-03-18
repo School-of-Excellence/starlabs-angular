@@ -39,6 +39,7 @@
     </mat-menu>
     <mat-menu #exports="matMenu">
       <button mat-menu-item (click)="exportExcel()">Excel</button>
+      <button mat-menu-item (click)="exportExcel(true)">Excel Selection</button>
       <button mat-menu-item (click)="exportContentConsumption()">Content Consumption</button>
     </mat-menu>
     <mat-menu #playlist="matMenu">
@@ -457,7 +458,6 @@
             </span>
             
             <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate'):null)}}</span>
-            <span *ngIf="column == 'dateofbirth'">  {{ element[column] != null ? (element[column].toDate() | date:'mediumDate') : '' }}</span>
             <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>

@@ -49,12 +49,12 @@
         
                                     <mat-form-field appearance="outline">
                                         <mat-label>Minimum Count</mat-label>
-                                        <input matInput type="number" formControlName="count" placeholder="Min count">
+                                        <input matInput type="number" formControlName="count" placeholder="Min count" min="0">
                                         <mat-error *ngIf="product.get('count')?.hasError('required')">
                                             Count is required
                                         </mat-error>
                                         <mat-error *ngIf="product.get('count')?.hasError('min')">
-                                            Count must be at least 1
+                                            Count must be greater than or equal to 0
                                         </mat-error>
                                     </mat-form-field>
         
@@ -99,12 +99,12 @@
         
                                     <mat-form-field appearance="outline">
                                         <mat-label>Minimum Count</mat-label>
-                                        <input matInput type="number" formControlName="count" placeholder="Min count">
+                                        <input matInput type="number" formControlName="count" placeholder="Min count" min="0">
                                         <mat-error *ngIf="product.get('count')?.hasError('required')">
                                             Count is required
                                         </mat-error>
                                         <mat-error *ngIf="product.get('count')?.hasError('min')">
-                                            Count must be at least 1
+                                            Count must be greater than or equal to 0
                                         </mat-error>
                                     </mat-form-field>
         
@@ -211,7 +211,11 @@
                         <td mat-cell *matCellDef="let element">
                             <div class="products-list">
                                 <ng-container *ngFor="let item of element.products | keyvalue">
-                                    <div *ngIf="$any(item.value).consumedCount > 0" class="product-item consumed">
+                                    <!-- <div *ngIf="$any(item.value).consumedCount > 0" class="product-item consumed">
+                                        <span class="product-name">{{ mapProductName[$any(item.value).productId] }}</span>
+                                        <span class="product-count">{{ $any(item.value).consumedCount }}</span>
+                                    </div> -->
+                                    <div class="product-item consumed">
                                         <span class="product-name">{{ mapProductName[$any(item.value).productId] }}</span>
                                         <span class="product-count">{{ $any(item.value).consumedCount }}</span>
                                     </div>
@@ -225,7 +229,11 @@
                         <td mat-cell *matCellDef="let element">
                             <div class="products-list">
                                 <ng-container *ngFor="let item of element.products | keyvalue">
-                                    <div *ngIf="$any(item.value).unConsumedCount > 0" class="product-item unconsumed">
+                                    <!-- <div *ngIf="$any(item.value).unConsumedCount > 0" class="product-item unconsumed">
+                                        <span class="product-name">{{ mapProductName[$any(item.value).productId] }}</span>
+                                        <span class="product-count">{{ $any(item.value).unConsumedCount }}</span>
+                                    </div> -->
+                                    <div class="product-item unconsumed">
                                         <span class="product-name">{{ mapProductName[$any(item.value).productId] }}</span>
                                         <span class="product-count">{{ $any(item.value).unConsumedCount }}</span>
                                     </div>

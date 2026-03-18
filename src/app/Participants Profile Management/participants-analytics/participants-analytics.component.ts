@@ -400,7 +400,6 @@ export class ParticipantsAnalyticsComponent {
     // Participant metadata
     metadataSnap.docs.forEach(e => {
       const element = e.data();
-      console.log('DOB:', element['dateofbirth'], '| Keys:', Object.keys(element).filter(k => k.includes('date') || k.includes('birth') || k.includes('dob')));  // DEBUG
       element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
       if(![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
         for (let i = 0; i < element['profiletags'].length; i++) {
@@ -1468,12 +1467,195 @@ export class ParticipantsAnalyticsComponent {
   }
 
   //export 
-  exportExcel() {
+  // exportExcel() {
+  //   // Get filtered data from MatTableDataSource
+  //   const rawData = this.dataSource.filteredData ?? this.dataSource.data;
+
+  //   // Create formatted data for export
+  //   const formattedData = rawData.map(element => {
+  //     const formattedRow: any = {};
+
+  //     // Process each column according to your display logic
+  //     this.displayedColumns.forEach(column => {
+  //       if (column === 'select') {
+  //         // Skip checkbox column
+  //         return;
+  //       }
+
+  //       // Handle date columns
+  //       if (['subscriptionend', 'purchasedate', 'subscriptionstart', 'lastpaymentdate', 'lastsubscriptionstart', 'lastsubscriptionend', 'dateofbirth'].includes(column)) {
+  //         formattedRow[column] = element[column] != null
+  //           ? new Date(element[column].toDate()).toLocaleDateString('en-US', {
+  //             year: 'numeric',
+  //             month: 'short',
+  //             day: 'numeric'
+  //           })
+  //           : null;
+  //       }
+  //       // Handle array columns that use mapfiltervalues
+  //       else if (['consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'purchase', 'profiletags'].includes(column)) {
+  //         if (element[column] && Array.isArray(element[column])) {
+  //           formattedRow[column] = element[column]
+  //             .map(value => this.mapfiltervalues[value] || value)
+  //             .join(', ');
+  //         } else {
+  //           formattedRow[column] = '';
+  //         }
+  //       }
+  //       // Handle mapped single values
+  //       else if (['activejourney', 'lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase'].includes(column)) {
+  //         formattedRow[column] = this.mapfiltervalues[element[column]] || element[column];
+  //       }
+  //       // Handle ATC model with filter logic
+  //       else if (column === 'atcmodel') {
+  //         formattedRow[column] = ![null, undefined].includes(this.filterdata['atcmodel'])
+  //           ? this.filterAtcModel(element[column])
+  //           : element[column];
+  //       }
+  //       // Handle product count (complex display logic)
+  //       else if (column === 'productcount') {
+  //         let productCountDisplay = '';
+  //         if (this.filterdata['productcount'] != null) {
+  //           if (this.filterdata['unconsumedproducts'] != null) {
+  //             const filtered = this.filterproducts(element['unconsumedproducts'], this.filterdata['unconsumedproducts'][0]);
+  //             const count = element['productcount'] ? element['productcount'][this.filterdata['unconsumedproducts'][0]] || 0 : 0;
+  //             productCountDisplay = `${filtered}, ${count}`;
+  //           }
+  //           else if (this.filterdata['consumedproducts'] != null) {
+  //             const filtered = this.filterproducts(element['consumedproducts'], this.filterdata['consumedproducts'][0]);
+  //             const count = element['productcount'] ? element['productcount'][this.filterdata['consumedproducts'][0]] || 0 : 0;
+  //             productCountDisplay = `${filtered}, ${count}`;
+  //           }
+  //           else if (this.filterdata['activeproduct'] != null) {
+  //             const filtered = this.filterproducts(element['activeproduct'], this.filterdata['activeproduct'][0]);
+  //             const count = element['productcount'] ? element['productcount'][this.filterdata['activeproduct'][0]] || 0 : 0;
+  //             productCountDisplay = `${filtered}, ${count}`;
+  //           }
+  //         }
+  //         formattedRow[column] = productCountDisplay;
+  //       }
+  //       // Handle product events
+  //       else if (column === 'productevent') {
+  //         if (this.filterdata['productevent'] != null && this.filterdata['products'] != null) {
+  //           const productEvents = element[column] && element[column][this.filterdata['products']]
+  //             ? element[column][this.filterdata['products']].join(', ')
+  //             : '';
+  //           formattedRow[column] = `${this.filterdata['products']}: ${productEvents}`;
+  //         } else {
+  //           // Handle key-value display
+  //           let eventsList = '';
+  //           if (element[column]) {
+  //             Object.keys(element[column]).forEach(key => {
+  //               const mappedKey = this.mapfiltervalues[key] || key;
+  //               const mappedValue = this.mapfiltervalues[element[column][key]] || element[column][key];
+  //               eventsList += `${mappedKey}: ${mappedValue}; `;
+  //             });
+  //           }
+  //           formattedRow[column] = eventsList.trim();
+  //         }
+  //       }
+  //       // Handle queue events (similar to product events)
+  //       else if (column === 'queueevent') {
+  //         if (this.filterdata['queueevent'] != null && this.filterdata['products'] != null) {
+  //           const queueEvents = element[column] && element[column][this.filterdata['products']]
+  //             ? element[column][this.filterdata['products']].join(', ')
+  //             : '';
+  //           formattedRow[column] = `${this.filterdata['products']}: ${queueEvents}`;
+  //         } else {
+  //           let eventsList = '';
+  //           if (element[column]) {
+  //             Object.keys(element[column]).forEach(key => {
+  //               const mappedKey = this.mapfiltervalues[key] || key;
+  //               const mappedValue = this.mapfiltervalues[element[column][key]] || element[column][key];
+  //               eventsList += `${mappedKey}: ${mappedValue}; `;
+  //             });
+  //           }
+  //           formattedRow[column] = eventsList.trim();
+  //         }
+  //       }
+  //       // Handle content columns (eiflix, solarvoice, generalcontent)
+  //       else if (['eiflix', 'solarvoice', 'generalcontent'].includes(column)) {
+  //         let contentList = '';
+  //         if (element[column]) {
+  //           Object.keys(element[column]).forEach(key => {
+  //             const mappedKey = this.mapPlaylist[key] || key;
+  //             if (element[column][key] && Array.isArray(element[column][key])) {
+  //               const mappedValues = element[column][key]
+  //                 .map(item => this.mapPlaylist[item] || item)
+  //                 .join(', ');
+  //               contentList += `${mappedKey} - ${mappedValues}; `;
+  //             }
+  //           });
+  //         }
+  //         formattedRow[column] = contentList.trim();
+  //       }
+  //       // Handle remarks
+  //       else if (column === 'remarks') {
+  //         if (element[column] && Array.isArray(element[column])) {
+  //           formattedRow[column] = element[column]
+  //             .map(item => `${item.note} - ${this.mapParticipantName[item.givenby] || item.givenby}`)
+  //             .join('; ');
+  //         } else {
+  //           formattedRow[column] = '';
+  //         }
+  //       }
+  //       // Handle name column (remove the link, just show text)
+  //       else if (column === 'name') {
+  //         formattedRow[column] = element[column];
+  //       }
+  //       // Handle KYJ column (remove link, just show value)
+  //       else if (column === 'kyj') {
+  //         formattedRow[column] = element[column];
+  //       }
+  //       // Default case for other columns
+  //       else {
+  //         formattedRow[column] = element[column];
+  //       }
+  //     });
+
+  //     return formattedRow;
+  //   });
+
+  //   // Convert formatted data to worksheet
+  //   const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(formattedData);
+
+  //   // Set date format for date columns in Excel
+  //   const dateColumns = ['subscriptionend', 'purchasedate', 'subscriptionstart', 'lastpaymentdate', 'dateofbirth'];
+  //   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+  //   for (let row = range.s.r + 1; row <= range.e.r; row++) {
+  //     dateColumns.forEach(dateCol => {
+  //       const colIndex = this.displayedColumns.indexOf(dateCol);
+  //       if (colIndex !== -1) {
+  //         const cellAddress = XLSX.utils.encode_cell({ r: row, c: colIndex });
+  //         if (ws[cellAddress] && ws[cellAddress].v instanceof Date) {
+  //           ws[cellAddress].t = 'd'; // Set cell type to date
+  //           ws[cellAddress].z = 'mm/dd/yyyy'; // Set date format
+  //         }
+  //       }
+  //     });
+  //   }
+
+  //   // Create workbook
+  //   const wb: XLSX.WorkBook = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+
+  //   // Export with timestamp in filename
+  //   const timestamp = new Date().toISOString().slice(0, 10);
+  //   // XLSX.writeFile(wb, `participants_${timestamp}.xlsx`);
+  // }
+
+  exportExcel( selected = false ) {
     // Get filtered data from MatTableDataSource
-    const rawData = this.dataSource.filteredData ?? this.dataSource.data;
+    const rawData = selected ? this.dataSource.data : this.dataSource.filteredData ?? this.dataSource.data;
 
     // Create formatted data for export
-    const formattedData = rawData.map(element => {
+    const formattedData = [];
+    for(let element of rawData){
+
+      if(selected && !this.selection.isSelected(element)){
+         continue
+      }
       const formattedRow: any = {};
 
       // Process each column according to your display logic
@@ -1614,8 +1796,8 @@ export class ParticipantsAnalyticsComponent {
         }
       });
 
-      return formattedRow;
-    });
+      formattedData.push(formattedRow);
+    };
 
     // Convert formatted data to worksheet
     const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(formattedData);

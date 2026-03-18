@@ -109,7 +109,7 @@ export class ExportWithFiltersComponent {
   }
 
   async ngOnInit() {
-    const [ productsSnap ] = await Promise.all([
+    const [productsSnap] = await Promise.all([
       getDocs(collection(this.firestore, "products"))
     ]);
 
@@ -225,6 +225,9 @@ export class ExportWithFiltersComponent {
     consumed.forEach(c => productIds.add(c.productId));
     unconsumed.forEach(u => productIds.add(u.productId));
 
+    const consumedProductIds = consumed.map(c => c.productId);
+    const unconsumedProductIds = unconsumed.map(c => c.productId);
+
     if (productIds.size === 0) {
       this.filteredData = [];
       return;
@@ -239,7 +242,7 @@ export class ExportWithFiltersComponent {
 
       querySnapshot.docs.forEach(doc => {
         const data = doc.data();
-        if([null, 'completed'].includes(data['status'])) {
+        if ([null, 'completed'].includes(data['status'])) {
           allDocs.push({
             profileId: data['profileid'] || 'N/A',
             status: data['status'],
@@ -274,10 +277,10 @@ export class ExportWithFiltersComponent {
         };
       }
 
-      if(doc['status'] == 'completed') {
+      if (doc['status'] == 'completed' && consumedProductIds.includes(doc.productId)) {
         participant.products[doc.productId].consumedCount++;
         participant.products[doc.productId].consumedDocuments.push(doc);
-      } else if(doc['status'] == null) {
+      } else if (doc['status'] == null && unconsumedProductIds.includes(doc.productId)) {
         participant.products[doc.productId].unConsumedCount++;
         participant.products[doc.productId].unConsumedDocuments.push(doc);
       }
@@ -295,15 +298,17 @@ export class ExportWithFiltersComponent {
       if (consumed.length > 0) {
         matchesConsumed = consumed.every(filter => {
           const productData = participant.products[filter.productId];
+          // console.log(productData)
           if (!productData) return false;
 
-          if (filter.count === 0) {
-            if(productData.consumedCount > 0) {
-              return true;
-            } else {
-              return false;
-            }
-          } 
+          // if (filter.count === 0) {
+          //   if (productData.consumedCount > 0) {
+          //     return true;
+          //   } else {
+          //     return false;
+          //   }
+          // }
+          // console.log(productData.consumedCount , filter.count)
           return productData.consumedCount == filter.count;
         });
       }
@@ -315,16 +320,19 @@ export class ExportWithFiltersComponent {
           if (!productData) return false;
 
           // Count = 0 means get all with that product
-          if (filter.count === 0) {
-            if(productData.unConsumedCount > 0) {
-              return true;
-            } else {
-              return false;
-            }
-          } 
-
+          // if (filter.count === 0) {
+          //   if (productData.unConsumedCount > 0) {
+          //     return true;
+          //   } else {
+          //     return false;
+          //   }
+          // }
           return productData.unConsumedCount == filter.count;
         });
+      }
+
+      if (matchesUnconsumed) {
+        console.log('participant : ',participant)
       }
 
       if (matchesConsumed && matchesUnconsumed) {
@@ -333,11 +341,11 @@ export class ExportWithFiltersComponent {
       }
     }
 
-    if(consumed.length > 0) {
+    if (consumed.length > 0) {
       this.displayedColumns.push('consumed')
     }
 
-    if(unconsumed.length > 0) {
+    if (unconsumed.length > 0) {
       this.displayedColumns.push('unconsumed')
     }
 
@@ -355,7 +363,7 @@ export class ExportWithFiltersComponent {
   }
 
   filterConsumption() {
-    
+
   }
 
   selectFilter(filterType: string): void {
@@ -413,7 +421,7 @@ export class ExportWithFiltersComponent {
   }
 
   exportData(): void {
-    
+
   }
 
   // Optional: CSV export helper method
@@ -449,67 +457,67 @@ export class ExportWithFiltersComponent {
     return csvRows.join('\n');
   }
 
-  getProducts(products : any = {}){
+  getProducts(products: any = {}) {
     const productsId = Object.keys(products);
     const consumedProductsName = [];
     const unConsumedProductsName = [];
 
-    for(let productId of productsId){
+    for (let productId of productsId) {
       const p = products[productId];
-      if(p.consumedCount > 0){
+      if (p.consumedCount > 0) {
         consumedProductsName.push(this.mapProductName[productId]);
       }
-      if(p.unConsumedCount > 0){
+      if (p.unConsumedCount > 0) {
         unConsumedProductsName.push(this.mapProductName[productId]);
       }
     }
 
-    return [consumedProductsName , unConsumedProductsName];
+    return [consumedProductsName, unConsumedProductsName];
   }
 
   exportToExcel() {
-      const data = this.filteredData;
-      const sheetData: any[][] = [];
-  
-      // Header
+    const data = this.filteredData;
+    const sheetData: any[][] = [];
+
+    // Header
+    sheetData.push([
+      'S.No',
+      'Name',
+      'Email',
+      'Consumed',
+      'Unconsumed'
+    ]);
+
+    data.forEach((item: any, index) => {
+      const [consumed, unconsumed] = this.getProducts(item.products)
       sheetData.push([
-        'S.No',
-        'Name',
-        'Email',
-        'Consumed',
-        'Unconsumed'
+        index + 1,
+        this.mapProfile[item.profileId] || '',
+        this.mapProfileData[item.profileId]?.email || '',
+        consumed.join(','),
+        unconsumed.join(',')
       ]);
-  
-      data.forEach((item: any , index) => {
-        const [consumed , unconsumed] = this.getProducts(item.products) 
-          sheetData.push([
-            index + 1,
-            this.mapProfile[item.profileId] || '',
-            this.mapProfileData[item.profileId]?.email || '',
-            consumed.join(','),
-            unconsumed.join(',')
-          ]);
-      });
-  
-      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-      // // worksheet['!merges'] = merges;
-  
-      // // Optional column widths
-      worksheet['!cols'] = [
-        { wch: 8 },
-        { wch: 18 },
-        { wch: 30 },
-        { wch: 50 },
-        { wch: 50 },
-      ];
-  
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Participant List');
-  
-      XLSX.writeFile(
-        workbook,
-        `participant_list_${new Date().toISOString().split('T')[0]}.xlsx`
-      );
-    }
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    // // worksheet['!merges'] = merges;
+
+    // // Optional column widths
+    worksheet['!cols'] = [
+      { wch: 8 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 50 },
+      { wch: 50 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Participant List');
+
+    XLSX.writeFile(
+      workbook,
+      `participant_list_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
+  }
 
 }
