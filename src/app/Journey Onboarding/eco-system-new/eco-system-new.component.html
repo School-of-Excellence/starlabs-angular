@@ -1,0 +1,370 @@
+<div *ngIf="loading" class="loading">
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</div>
+<div *ngIf="!loading" class="d-flex flex-column" style="background-color:#F2F2F7; padding: 20px;">
+    <div class="content-ch">
+        <div *ngFor="let eventName of eventNames; let i = index" class="card">
+            <div class="card-header d-flex justify-content-between align-items-center" [ngStyle]="{'background-color': lightColors[i % lightColors.length]}">
+                <div class="card-title">{{ eventName }}</div>
+                <div class="card-date">
+                    <span>{{ formatDate(eventProfiles[eventName]?.startDate) }}</span>
+                    <span class="profile-count">{{ eventProfiles[eventName]?.profileData.length }}</span>
+                </div>
+            </div>
+            <div class="activity-content d-flex flex-column">
+                <div class="new-old-container d-flex justify-content-between">
+                    <p>NEW: {{ (eventProfiles[eventName]?.profileData.length)-(eventProfiles[eventName]?.totalOldCount) }}</p>
+                    <p>OLD: {{ eventProfiles[eventName]?.totalOldCount }}</p>
+                </div>
+                <div>
+                    <ul class="list-group scroll-container">
+                        <ng-container *ngIf="eventProfiles[eventName]?.newProfiles.length > 0">
+                            <strong style="text-align: center;border-radius: 10px;background-color: grey;padding: 10px;color: white;">NEW</strong>
+                            <li *ngFor="let profile of eventProfiles[eventName]?.newProfiles" class="list-group-item" (click)="profileNavigation(profile)">
+                                {{ mapProfile[profile] }}
+                            </li>
+                        </ng-container>                
+                        <ng-container *ngFor="let previousDate of eventProfiles[eventName]?.previousStartDates">
+                            <strong style="text-align: center;border-radius: 10px;background-color: grey;padding: 10px;color: white;">{{ previousDate }}</strong>
+                            <li *ngFor="let profile of eventProfiles[eventName]?.oldProfiles[previousDate]" class="list-group-item" (click)="profileNavigation(profile)">
+                                {{ mapProfile[profile] }}
+                            </li>
+                        </ng-container>
+                    </ul>
+                </div>                
+                <div class="previous-dates" *ngIf="eventProfiles[eventName]?.previousStartDateCounts">
+                    <ul>
+                        <li *ngFor="let item of eventProfiles[eventName].previousStartDateCounts | keyvalue">
+                            {{ item.key }} - {{ item.value }}
+                        </li>
+                    </ul>
+                    <!-- <div *ngIf="eventProfiles[eventName]?.previousStartDates?.length > 0">
+                        Before {{ eventProfiles[eventName].previousStartDates[0] }} - 0
+                    </div> -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- <div>
+        <hr>
+        <h4 style="border-radius: 10px;padding: 10px;background-color: #a370f7;text-align: center;color: white;">LEAKS</h4>
+
+    </div> -->
+    <div class="d-flex align-items-center">
+        <mat-form-field appearance="outline">
+            <mat-label>LEAKS</mat-label>
+            <mat-select (selectionChange)="leaksPrint($event.value)">
+                <mat-option *ngFor="let eventName of eventNames" [value]="eventName">
+                    {{ formatDate(eventProfiles[eventName]?.startDate) }}
+                </mat-option>
+            </mat-select>
+        </mat-form-field>
+    </div>
+    <!-- <h4 style="border-radius: 10px;padding: 10px;background-color: #a370f7;text-align: center;color: white;width: 100px;margin-left: 28px;">LEAKS</h4> -->
+    <div style="background-color: transparent;" class="container">
+        <!-- Horizontal Event Data -->
+        <div class="horizontal-event-data">
+          <div *ngFor="let eventName of eventNames" class="event-data-container">
+            <!-- Top Label for each Event -->
+            <div class="top-labels">
+              <div class="top-label-item">
+                <span class="event-start-date">
+                  {{ formatDate(eventProfiles[eventName]?.startDate) }}
+                </span>
+                <span class="event-profile-count">
+                  {{ eventProfiles[eventName]?.profileData.length }}
+                </span>
+              </div>
+            </div>      
+            <div class="event-data">
+              <div class="retained-title">Retained Participants</div>
+              <div class="retained-list">
+                <div *ngFor="let item of eventNames.slice(eventNames.indexOf(eventName) + 1)" class="retained-item" 
+                     (click)="openEcoDialog(leakRetained[eventName]?.retainedprofile[item], 'Retained From ' + eventName + ' To ' + formatDate(eventProfiles[item]?.startDate))">
+                  <span>{{ formatDate(eventProfiles[item]?.startDate) }}</span>
+                  <span>({{ leakRetained[eventName]?.retainedprofile[item]?.length || 0 }})</span>
+                </div>
+              </div>
+            </div>
+            <div class="event-data">
+              <div class="retained-title">Leaked Participants</div>
+              <div class="retained-list">
+                <span (click)="openEcoDialog(leakRetained[eventName]?.leakedprofile, 'Leaks From ' + eventName)" 
+                      class="retained-item retained-leak">
+                  {{ leakRetained[eventName]?.leakedprofile?.length || 0 }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    <div>
+        <hr>
+        <mat-form-field class="ml-3" appearance="outline">
+            <mat-label>Select Date</mat-label>
+            <mat-date-range-input [rangePicker]="picker">
+              <input matStartDate [(ngModel)]="filter.startdate" placeholder="Start date">
+              <input matEndDate [(ngModel)]="filter.enddate" placeholder="End date" (dateChange)="onFilter()">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-date-range-picker #picker></mat-date-range-picker>
+          </mat-form-field>
+          <div>
+            <h5>Accelerated Evolution Level</h5><br><br>
+            <div class="card-container2">
+                <div *ngFor="let monthYear of (filteredMonths?.length ? filteredMonths : sortedMonths)" class="vertical-card">
+                    <div class="card-content1">
+                        <p class="centered-date">{{ monthYear | date: 'MMMM yyyy' }} ({{ processedData[monthYear]?.totalProfiles || 0 }})</p>
+                    <!-- <h5>{{monthYear}}</h5> -->
+                    <p style="padding: 8px;">UP</p>
+                    <ng-container *ngFor="let areaChange of areaChangeLabels let i = index">
+                      <div style="margin-left: -16px;margin-right: -16px;font-weight: 600;"
+                        (click)="openEcoDialog(processedData[monthYear]?.areaChangedUpCounts[areaChange.key], 
+                        monthYear + ' - ' + areaChange.label + ' (' + processedData[monthYear]?.areaChangedUpCounts[areaChange.key]?.length + ')'
+                        ,null,null,
+                        processedData[monthYear]?.areaChangedUpCountsMetric[areaChange.key],
+                        getPreviousMetric(processedData[monthYear]?.areaChangedUpCountsMetric[areaChange.key],monthYear),'MetricSection'
+                        )"
+                        class="space-between"
+                        [ngClass]="{ 'bg-in1': i === 0, 'bg-in2': i === 1,'bg-in3': i === 2, 'bg-in4': i === 3,'bg-in5': i === 4, 'bg-in6': i === 5 }"
+                      >
+                        <p>{{ areaChange.label }}</p>
+                        <p>{{ processedData[monthYear]?.areaChangedUpCounts[areaChange.key]?.length || 0 }}</p>
+                      </div>
+                    </ng-container>
+                    
+                    <p style="padding: 8px;">DOWN</p>
+                    <ng-container *ngFor="let areaChange of areaChangeLabels.slice(1) let i = index" >
+                      <div style="margin-left: -16px;margin-right: -16px;font-weight: 600;"
+                        (click)="openEcoDialog(processedData[monthYear]?.areaChangedDownCounts[areaChange.key],
+                        monthYear + ' - ' +areaChange.label + ' (' + processedData[monthYear]?.areaChangedDownCounts[areaChange.key]?.length + ')',
+                        null,null,processedData[monthYear]?.areaChangedDownCountsMetric[areaChange.key],
+                        getPreviousMetric(processedData[monthYear]?.areaChangedDownCountsMetric[areaChange.key],monthYear),'MetricSection'
+                        )"
+                        class="space-between" [ngClass]="{ 'bg-pink': i % 2 === 0, 'bg-pinkLight': i % 2 !== 0 }"
+                      >
+                        <p>{{ areaChange.label }}</p>
+                        <p>{{ processedData[monthYear]?.areaChangedDownCounts[areaChange.key]?.length || 0 }}</p>
+                      </div>
+                    </ng-container>
+                  </div>
+                           
+                  <div class="card-content2">
+                    <p class="centered-date">{{ monthYear | date: 'MMMM yyyy' }}</p>
+                  
+                    <p style="padding: 8px;">UP</p>
+                    <div *ngFor="let category of ['Business', 'Career', 'Family', 'Health', 'Personal Genius']; let i = index">
+                      <div style="margin-left: -16px;margin-right: -16px;font-weight: 600;"
+                        (click)="openEcoDialog(processedData[monthYear].upCounts[category].profileIds, monthYear + ' - ' + category + ' (' + processedData[monthYear].upCounts[category].count + ')')"
+                        class="space-between"
+                        [ngClass]="{ 'bg-grey': i % 2 === 0, 'bg-white': i % 2 !== 0 }"
+                      >
+                        <p>{{ category }}</p>
+                        <p>{{ processedData[monthYear].upCounts[category].count }}</p>
+                      </div>
+                    </div>
+                  
+                    <p style="padding: 8px;">DOWN</p>
+                    <div *ngFor="let category of ['Business', 'Career', 'Family', 'Health', 'Personal Genius']; let i = index">
+                      <div style="margin-left: -16px;margin-right: -16px;font-weight: 600;"
+                        (click)="openEcoDialog(processedData[monthYear].downCounts[category].profileIds, monthYear + ' - ' +  category + ' (' + processedData[monthYear].downCounts[category].count + ')')"
+                        class="space-between"
+                        [ngClass]="{ 'bg-grey': i % 2 === 0, 'bg-white': i % 2 !== 0 }"
+                      >
+                        <p>{{ category }}</p>
+                        <p>{{ processedData[monthYear].downCounts[category].count }}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+              </div>
+            </div>
+          </div>
+          
+          <hr>
+          <div style="font-size: 24px;font-weight: bold;text-align: center;">
+            <span>{{startDate | date}}</span> to
+            <span>{{endDate | date}}</span>
+          </div>
+          <div class="card-container">
+            <div class="cardupdown">
+                <h3>Upgrades & Adons</h3>
+                <div class="card-content">
+                    <div *ngFor="let month of saleUpgradedCounts | keyvalue: compareMonthYear">
+                        <div class="month-count" (click)="openEcoDialog(month.value.profiles, month.value.key + 'Upgrades & Adons '+ '(' + month.value.value + ')' )">
+                            <h4>{{ month.value.key }}</h4> 
+                            <p>{{ month.value.value }}</p> 
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+            <div class="cardupdown">
+                <h3>Downgrade and Cancel</h3>
+                <div class="card-content">
+                    <div *ngFor="let month of saleDowngradedCounts | keyvalue: compareMonthYear">
+                        <div class="month-count" (click)="openEcoDialog(month.value.profiles,  month.value.key + ' Downgrade and Cancel ' + '(' + month.value.value + ')')">
+                            <h4>{{ month.value.key }}</h4>
+                            <p>{{ month.value.value }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="cardupdown">
+                <h3>Adjustment Completed</h3>
+                <div class="card-content">
+                    <!-- <div *ngFor="let adj of adjustmentCompletedMap | keyvalue : compareByKeyDesc"> -->
+                        <div *ngFor="let adj of adjustmentCompletedMap | keyvalue : compareByKeyDesc">
+                        <div class="month-count" (click)="openEcoDialog(adj.value.profileIds, adj.key + ' Adjustment Completed ' + '(' + adj.value.count + ')')">
+                            <h4>{{ adj.key }}</h4>
+                            <p>{{ adj.value.count }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div>
+            <!-- <h5>ATC</h5> -->
+            <div class="row">
+                <div class="column col-30">
+                    <div class="inner-row" *ngFor="let total of totalATC | keyvalue let i = index">
+                        <!-- <div class="rectangle-card merged-card" (click)="openEcoDialog(total.value,'Total ATC '+total.key)"> -->
+                        <div class="rectangle-card merged-card" (click)="openEcoDialog(total.value,'Total ATC')">
+                            <div>
+                                <h5>TOTAL ATC</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{total.key}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inner-row">
+                        <div class="rectangle-card merged-card">
+                            <div>
+                                <h4>ongoing - <span>{{percentageOngoing }}</span></h4>
+                                <h4>completed - <span>{{percentageCompleted}}</span></h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inner-row">
+                        <div class="rectangle-card merged-card-big">
+                            <ul class="list-group">
+                                <ng-container *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc let i = index" >
+                                    <li class="list-group-item-atc" (click)="openEcoDialog(impact.value,impact.key + ' (' + impact.value.length + ')')">
+                                        <span>{{ impact.key }}</span>
+                                        <span style="font-weight: 700;">
+                                            {{ impact.value.length }}
+                                        </span>
+                                    </li>
+                                </ng-container>
+                            </ul>
+                            <h4>Total : {{totalProductCount}}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="column col-30">
+                    <div class="inner-row">
+                        <!-- <div class="rectangle-card merged-card" (click)="openEcoDialog(totalAdjustmentsCompletedMap['profileIds'],'Total Adjustment ' + totalAdjustmentsCompletedMap['count'],totalAdjustmentsCompletedMap['profileIdWiseCount'])"> -->
+                            <div class="rectangle-card merged-card" (click)="openEcoDialog(totalAdjustmentsCompletedMap['profileIds'],'Total Adjustment',totalAdjustmentsCompletedMap['count'],totalAdjustmentsCompletedMap['profileIdWiseCount'])">
+                            <div>
+                                <h5>Total Adjustment</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{totalAdjustmentsCompletedMap['count']}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inner-row">
+                        <!-- <div class="rectangle-card small-card" (click)="openEcoDialog(totalAdjustmentAwareMap['profileIds'],'Aware ' + totalAdjustmentAwareMap['count'],totalAdjustmentAwareMap['profileIdWiseCount'])"> -->
+                        <div class="rectangle-card small-card" (click)="openEcoDialog(totalAdjustmentAwareMap['profileIds'],'Aware',totalAdjustmentAwareMap['count'],totalAdjustmentAwareMap['profileIdWiseCount'])">
+                            <div>
+                                <h5>Aware</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{totalAdjustmentAwareMap['count']}}
+                            </div>
+                        </div>
+                        <!-- <div class="rectangle-card small-card" (click)="openEcoDialog(totalAdjustmentUnAwareMap['profileIds'],'Un Aware ' + totalAdjustmentUnAwareMap['count'],totalAdjustmentUnAwareMap['profileIdWiseCount'])"> -->
+                            <div class="rectangle-card small-card" (click)="openEcoDialog(totalAdjustmentUnAwareMap['profileIds'],'Un Aware',totalAdjustmentUnAwareMap['count'],totalAdjustmentUnAwareMap['profileIdWiseCount'])">
+                            <div>
+                                <h5>Unaware</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{totalAdjustmentUnAwareMap['count']}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inner-row">
+                        <div class="rectangle-card merged-card-big">
+                            <ul class="list-group">
+                                <ng-container *ngFor="let impact of evolutionprogressMap | keyvalue">
+                                    <li class="list-group-item-atc">
+                                        <span>{{ impact.key }}</span>
+                                        <span style="font-weight: 700;">
+                                            {{ impact.value }}
+                                        </span>
+                                    </li>
+                                </ng-container>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="column col-40">
+                    <div class="inner-row">
+                        <!-- <div class="rectangle-card small-card" (click)="openEcoDialog(evolutionYearWastedMap['profileIds'],'Limitation Years ' + evolutionYearWastedMap['count'],evolutionYearWastedMap['profileIdWiseCount'])"> -->
+                            <div class="rectangle-card small-card" (click)="openEcoDialog(evolutionYearWastedMap['profileIds'],'Limitation Years',evolutionYearWastedMap['count'],evolutionYearWastedMap['profileIdWiseCount'])">
+                            <div>
+                                <h5>Limitation Years</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{evolutionYearWastedMap['count']}}
+                            </div>
+                        </div>
+                        <div class="rectangle-card small-card">
+                            <div>
+                                <h5>B!G Opportunities</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                <!-- {{extendedLifeImpactTotal}} -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inner-row">
+                        <!-- <div class="rectangle-card small-card" (click)="openEcoDialog(evolutionYearSavedMap['profileIds'],'Saved Years ' + evolutionYearSavedMap['count'],evolutionYearSavedMap['profileIdWiseCount'])"> -->
+                            <div class="rectangle-card small-card" (click)="openEcoDialog(evolutionYearSavedMap['profileIds'],'Saved Years',evolutionYearSavedMap['count'],evolutionYearSavedMap['profileIdWiseCount'])">
+                            <div>
+                                <h5>Saved Years</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{evolutionYearSavedMap['count']}}
+                            </div>
+                        </div>
+                        <div class="rectangle-card small-card" (click)="scrollToExtendedLifeImpact()">
+                            <div>
+                                <h5>Extended Life Impacted</h5>
+                            </div>
+                            <div style="font-weight: 700;font-size: 26px;">
+                                {{extendedLifeImpactTotal}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inner-row">
+                        <div class="rectangle-card merged-card-big" id="extended-life-content">
+                            <h5>Extended Life Impacted</h5>
+                            <ul class="list-group">
+                                <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
+                                    <li *ngIf="mapParticipant[impact.key] != null" class="list-group-item-atc" (click)="profileNavigation(impact.key)">
+                                        <span>{{ mapParticipant[impact.key] || "No Name" }}</span>
+                                        <span style="font-weight: 700;">{{ impact.value }}</span>
+                                    </li>
+                                </ng-container>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
