@@ -1400,6 +1400,7 @@ private buildDetailPageData(): any {
     const activityIndex = this.getChallengeArray(curriculumGroup).length;
     const challengeGroup = this.fb.group({
       challengeid: [this.generateId()], 
+      zoomattend: [[]], 
       name: ['',],
       description: ['',],
       type:['',],
@@ -1627,6 +1628,7 @@ private rebuildActivityIds(): void {
     const curriculumGroup = this.fb.group({
       type: [challenge.type || ''],
       challengeid: [challenge['challengeid'] || this.generateId()],
+      zoomattend: [challenge['zoomattend'] || []],
       zoomlink: [challenge.zoomlink || ''],
       completedzoomurl: [challenge.completedzoomurl || ''],
       // status: [challenge.status ?? null],
@@ -1670,6 +1672,7 @@ private rebuildActivityIds(): void {
         this.fb.group({
           name: [c.name || ''],
           challengeid: [c['challengeid'] || this.generateId()],
+          zoomattend: [c['zoomattend']], 
           description: [c.description || ''],
           type:[c.type || ''],
           contentref: [c.contentref ||''],
