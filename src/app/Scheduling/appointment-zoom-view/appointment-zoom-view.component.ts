@@ -52,25 +52,6 @@ export class AppointmentZoomViewComponent {
         console.log("docid",snap.id);
         this.zoomdata = snap.data()
         console.log("zoom data",this.zoomdata);
-        // this.firestore.collection('live assignment', ref=> ref.where('docid', '==', this.zoomdata['docid'])).valueChanges().subscribe(res => {
-        //   for (let i = 0; i < res.length; i++) {
-        //     let element = res[i]
-        //     if (element['cliptimings'] && Array.isArray(element['cliptimings'])) {
-        //       // Extract the clipurl, capturedby, and timestamp from cliptimings array
-        //       element['cliptimings'].forEach(timing => {
-        //         const assignmentData: AssignmentData = {
-        //           clipurl: timing.clipurl,
-        //           capturedby: timing.capturedby,
-        //           timestamp: timing.timestamp,
-        //           // Add other properties if necessary
-        //         };
-        //         this.data.push(assignmentData);
-        //         console.log(this.data);
-                
-        //       });
-        //     }
-        //   }
-        // })
         this.startmeeting();
       })
     })

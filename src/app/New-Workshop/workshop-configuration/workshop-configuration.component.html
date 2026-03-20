@@ -1306,6 +1306,30 @@
                                 </mat-icon>
                             </div>
                         </div>
+                        <h3 class="section-title" >Developer Settings</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="triggerFunction"
+                                    (change)="onToggleChange('triggerFunction', $event)"
+                                    color="primary">
+                                    Update Participant Workshop
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('triggerFunction')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('triggerFunction')?.value ? 
+                                        'Workshop is currently able to Update in participant document also' : 
+                                        'Workshop is not able to Update in participant document' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('triggerFunction')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('triggerFunction')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                        </div>
                         <h3 class="section-title">Workshop For</h3>
                         <div class="form-row">
                             <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
