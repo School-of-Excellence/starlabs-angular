@@ -20,7 +20,7 @@ interface ExcelRow {
   name?: string;
   email?: string;
   profileid?: string;
-  matchPercentage?: number;  // Add this
+  matchPercentage?: number;
   matchColor?: string; 
 }
 
@@ -49,7 +49,6 @@ interface ExcelRow {
 export class ZoomCallComponent implements AfterViewInit {
 displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'email'];
   dataSource = new MatTableDataSource<ExcelRow>([]);
-  
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
   editingRowIndex: number | null = null;
@@ -73,6 +72,7 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {
     console.log("Merged profiles list:", this.data.zoomdata['heading']);
+    console.log(this.data.zoomdata['challengeid'],'console challenge id');
     const mapProfile = data.mapProfile || {};
     const mapProfileOld = data.mapProfileold || {};
 
@@ -80,19 +80,16 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
       ...Object.values(mapProfile),
       ...Object.values(mapProfileOld)
     ];
-
     console.log("Merged profiles list:", data.zoomdata);
   }
 
   ngAfterViewInit() {
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
-    
-    // Custom sorting data accessor
     this.dataSource.sortingDataAccessor = (item: ExcelRow, property: string) => {
       switch (property) {
         case 'serial':
-          return this.dataSource.data.indexOf(item) + 1; // Fixed serial column
+          return this.dataSource.data.indexOf(item) + 1;
         case 'name':
           return (item.name || '').toLowerCase().trim();
         case 'email':
@@ -114,8 +111,6 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
   async onFileChange(event: any) {
     const file = event.target.files[0];
     if (!file) return;
-
-    // Show loading state immediately
     this.isProcessing = true;
     this.loadingNames = [];
     this.currentLoadingIndex = 0;
@@ -126,18 +121,10 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
       const workbook = XLSX.read(binaryString, { type: 'binary' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-
       const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-      
-      // Extract names for loading animation (first 50 for performance)
       this.loadingNames = data.slice(1, 51).map(row => (row[0]?.toString() || '').trim()).filter(name => name);
-      
-      // Start fast-scrolling animation
       this.startLoadingAnimation();
-
-      // Simulate processing delay + actual processing
       await this.simulateProcessing();
-
       const mapProfile = this.data.mapProfile || {};
       const mapProfileOld = this.data.mapProfileold || {};
       const combinedProfiles = { ...mapProfile, ...mapProfileOld };
@@ -161,8 +148,6 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
           matchColor: color
         });
       }
-
-      // Stop loading and show results
       this.stopLoadingAnimation();
       this.dataSource.data = excelData;
 
@@ -178,7 +163,7 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
     private startLoadingAnimation() {
     this.loadingInterval = setInterval(() => {
       this.currentLoadingIndex = (this.currentLoadingIndex + 1) % this.loadingNames.length;
-    }, 100); // Fast scroll every 100ms
+    }, 100);
   }
 
   private stopLoadingAnimation() {
@@ -190,299 +175,141 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
   }
 
   private async simulateProcessing() {
-    // Simulate processing time based on file size (1-3 seconds)
     const delay = Math.min(3000, 1000 + this.loadingNames.length * 20);
     return new Promise(resolve => setTimeout(resolve, delay));
   }
-  // onFileChange(event: any) {
-  //   const file = event.target.files[0];
-  //   if (!file) return;
-
-  //   const reader = new FileReader();
-  //   reader.onload = (e: any) => {
-  //     const binaryString = e.target.result;
-  //     const workbook = XLSX.read(binaryString, { type: 'binary' });
-  //     const sheetName = workbook.SheetNames[0];
-  //     const worksheet = workbook.Sheets[sheetName];
-
-  //     const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-
-  //     const mapProfile = this.data.mapProfile || {};
-  //     const mapProfileOld = this.data.mapProfileold || {};
-
-  //     const combinedProfiles = { ...mapProfile, ...mapProfileOld };
-
-  //     const excelData: ExcelRow[] = [];
-  //     for (let i = 1; i < data.length; i++) {
-  //       const colA = data[i][0]?.toString() || '';
-  //       const colB = data[i][1]?.toString() || '';
-  //       const matched = this.findBestMatch(colA, combinedProfiles);
-        
-  //       const percentage = matched ? matched.score : 0;
-  //       const color = this.getRowColor(percentage);
-        
-  //       excelData.push({
-  //         columnA: colA,
-  //         columnB: colB,
-  //         name: matched?.name || '',
-  //         email: matched?.email || '',
-  //         profileid: matched?.profileid || '',
-  //         matchPercentage: percentage,  // Add this
-  //         matchColor: color             // Add this
-  //       });
-  //     }
-  //     // for (let i = 1; i < data.length; i++) {
-  //     //   const colA = data[i][0]?.toString() || '';
-  //     //   const colB = data[i][1]?.toString() || '';
-  //     //   const matched = this.findBestMatch(colA, combinedProfiles);
-  //     //   excelData.push({
-  //     //     columnA: colA,
-  //     //     columnB: colB,
-  //     //     name: matched?.name || '',
-  //     //     email: matched?.email || '',
-  //     //     profileid: matched?.profileid || ''
-  //     //   });
-  //     // }
-  //     this.dataSource.data = excelData;
-
-  //     // Re-attach paginator & sort after data refresh
-  //     setTimeout(() => {
-  //       this.dataSource.paginator = this.paginator;
-  //       this.dataSource.sort = this.sort;
-  //     });
-  //     // this.dataSource.data = excelData;
-  //   };
-
-  //   reader.readAsArrayBuffer(file);
-  // }
-
-  // Levenshtein distance similarity percentage
-// Enhanced similarity with exact substring priority
-getSimilarity(a: string, b: string): number {
-  if (!a || !b) return 0;
-
-  a = a.toLowerCase().trim();
-  b = b.toLowerCase().trim();
-
-  // PRIORITY 1: Exact match (100%)
-  if (a === b) return 100;
-
-  // PRIORITY 2: Exact substring match (name fully contained in profile)
-  if (b.includes(a)) return 95; // High score for perfect prefix/suffix
-
-  // PRIORITY 3: Partial substring match (significant overlap)
-  if (a.includes(b) || b.includes(a.slice(0, Math.floor(a.length * 0.8)))) {
-    return 85;
-  }
-
-  // PRIORITY 4: Levenshtein distance (original logic)
-  const dp = Array(a.length + 1).fill(null).map(() =>
-    Array(b.length + 1).fill(null)
-  );
-
-  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-    }
-  }
-
-  const distance = dp[a.length][b.length];
-  const maxLen = Math.max(a.length, b.length);
-  return ((maxLen - distance) / maxLen) * 100;
-}
-findBestMatch(name: string, profiles: any): any {
-  if (!name) return null;
-  const cleanedInput = name.replace(/\([^)]*\)/g, '').trim();
-  const input = cleanedInput.toLowerCase().trim();
-  const inputWords = input.split(/\s+/).filter(w => w.length > 0);
-
-  let bestMatch = null;
-  let bestScore = 0;
-
-  Object.values(profiles).forEach((p: any) => {
-    const profileName = (p.name || '').toLowerCase().trim();
-    if (!profileName) return;
-    const profileWords = profileName.split(/\s+/).filter(w => w.length > 0);
-    let score = 0;
-    
-    if (profileName === input || profileName === cleanedInput.toLowerCase()) {
-      score = 100;
-    }
-    else if (this.isAbbreviationMatch(inputWords, profileWords)) {
-      score = 99;
-    }
-    else if (this.isAbbreviationMatch(profileWords, inputWords)) {
-      score = 99;
-    }
-    else if (profileName.includes(input) && input.length >= 5) {
-      score = 95;
-    }
-    else if (input.includes(profileName) && profileName.length >= 5) {
-      score = 95;
-    }
-    else {
-      const matchScore = this.calculateWordMatchScore(inputWords, profileWords);
-      score = matchScore;
-    }
-    const lengthRatio = Math.min(input.length, profileName.length) / Math.max(input.length, profileName.length);
-    if (score < 100 && lengthRatio < 0.4) {
-      score = score * 0.7; 
-    }
-    if (profileName.length <= 5 && input.length > 10 && score < 99) {
-      score = score * 0.5; 
-    }
-    console.log(`"${name}" vs "${p.name}": ${score.toFixed(1)}% (len ratio: ${lengthRatio.toFixed(2)})`);
-    
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = { ...p, score };
-    }
-  });
-  console.log(`✅ Best match for "${name}": "${bestMatch?.name}" (${bestScore.toFixed(1)}%)`);
-  return bestScore >= 55 ? bestMatch : null;
-}
-
-private calculateWordMatchScore(inputWords: string[], profileWords: string[]): number {
-  let matchedCount = 0;
-  let partialMatchCount = 0;
   
-  for (const inputWord of inputWords) {
-    let foundExact = false;
-    let foundPartial = false;
-    
-    for (const profileWord of profileWords) {
-      if (inputWord === profileWord) {
-        foundExact = true;
-        break;
-      } else if (inputWord.length > 2 && profileWord.includes(inputWord)) {
-        foundPartial = true;
-      } else if (profileWord.length > 2 && inputWord.includes(profileWord)) {
-        foundPartial = true;
-      } else if (inputWord.length === 1 && profileWord.startsWith(inputWord)) {
-        foundPartial = true;
+  getSimilarity(a: string, b: string): number {
+    if (!a || !b) return 0;
+    a = a.toLowerCase().trim();
+    b = b.toLowerCase().trim();
+    if (a === b) return 100;
+    if (b.includes(a)) return 95;
+    if (a.includes(b) || b.includes(a.slice(0, Math.floor(a.length * 0.8)))) {
+      return 85;
+    }
+    const dp = Array(a.length + 1).fill(null).map(() =>
+      Array(b.length + 1).fill(null)
+    );
+
+    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost
+        );
       }
     }
-    
-    if (foundExact) matchedCount += 1;
-    else if (foundPartial) partialMatchCount += 0.5;
+
+    const distance = dp[a.length][b.length];
+    const maxLen = Math.max(a.length, b.length);
+    return ((maxLen - distance) / maxLen) * 100;
   }
-  
-  const totalMatch = matchedCount + partialMatchCount;
-  const matchRatio = totalMatch / inputWords.length;
 
-  if (matchRatio >= 0.95) return 98;
-  if (matchRatio >= 0.8) return 90;
-  if (matchRatio >= 0.6) return 80;
-  if (matchRatio >= 0.4) return 70;
+  findBestMatch(name: string, profiles: any): any {
+    if (!name) return null;
+    const cleanedInput = name.replace(/\([^)]*\)/g, '').trim();
+    const input = cleanedInput.toLowerCase().trim();
+    const inputWords = input.split(/\s+/).filter(w => w.length > 0);
 
-  const inputStr = inputWords.join(' ');
-  const profileStr = profileWords.join(' ');
-  return this.getSimilarity(inputStr, profileStr);
-}
+    let bestMatch = null;
+    let bestScore = 0;
 
-private isAbbreviationMatch(shortWords: string[], longWords: string[]): boolean {
-  if (shortWords.length !== longWords.length) return false;
-  if (shortWords.length === 0) return false;
-  return shortWords.every((shortWord, index) => {
-    const longWord = longWords[index];
-    return shortWord === longWord || 
-           (shortWord.length === 1 && longWord.startsWith(shortWord));
-  });
-}
-// FIXED: Prioritize exact substring matches
-// findBestMatch(name: string, profiles: any): any {
-//   let bestMatch = null;
-//   let bestScore = 0;
+    Object.values(profiles).forEach((p: any) => {
+      const profileName = (p.name || '').toLowerCase().trim();
+      if (!profileName) return;
+      const profileWords = profileName.split(/\s+/).filter(w => w.length > 0);
+      let score = 0;
+      
+      if (profileName === input || profileName === cleanedInput.toLowerCase()) {
+        score = 100;
+      }
+      else if (this.isAbbreviationMatch(inputWords, profileWords)) {
+        score = 99;
+      }
+      else if (this.isAbbreviationMatch(profileWords, inputWords)) {
+        score = 99;
+      }
+      else if (profileName.includes(input) && input.length >= 5) {
+        score = 95;
+      }
+      else if (input.includes(profileName) && profileName.length >= 5) {
+        score = 95;
+      }
+      else {
+        const matchScore = this.calculateWordMatchScore(inputWords, profileWords);
+        score = matchScore;
+      }
+      const lengthRatio = Math.min(input.length, profileName.length) / Math.max(input.length, profileName.length);
+      if (score < 100 && lengthRatio < 0.4) {
+        score = score * 0.7; 
+      }
+      if (profileName.length <= 5 && input.length > 10 && score < 99) {
+        score = score * 0.5; 
+      }
+      console.log(`"${name}" vs "${p.name}": ${score.toFixed(1)}% (len ratio: ${lengthRatio.toFixed(2)})`);
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = { ...p, score };
+      }
+    });
+    console.log(`✅ Best match for "${name}": "${bestMatch?.name}" (${bestScore.toFixed(1)}%)`);
+    return bestScore >= 55 ? bestMatch : null;
+  }
 
-//   Object.values(profiles).forEach((p: any) => {
-//     const score = this.getSimilarity(name, p.name || '');
+  private calculateWordMatchScore(inputWords: string[], profileWords: string[]): number {
+    let matchedCount = 0;
+    let partialMatchCount = 0;
     
-//     // Debug log to see matching process
-//     console.log(`"${name}" vs "${p.name}": ${score.toFixed(1)}%`);
+    for (const inputWord of inputWords) {
+      let foundExact = false;
+      let foundPartial = false;
+      
+      for (const profileWord of profileWords) {
+        if (inputWord === profileWord) {
+          foundExact = true;
+          break;
+        } else if (inputWord.length > 2 && profileWord.includes(inputWord)) {
+          foundPartial = true;
+        } else if (profileWord.length > 2 && inputWord.includes(profileWord)) {
+          foundPartial = true;
+        } else if (inputWord.length === 1 && profileWord.startsWith(inputWord)) {
+          foundPartial = true;
+        }
+      }
+      
+      if (foundExact) matchedCount += 1;
+      else if (foundPartial) partialMatchCount += 0.5;
+    }
     
-//     if (score > bestScore) {
-//       bestScore = score;
-//       bestMatch = { ...p, score };
-//     }
-//   });
+    const totalMatch = matchedCount + partialMatchCount;
+    const matchRatio = totalMatch / inputWords.length;
 
-//   console.log(`Best match for "${name}": "${bestMatch?.name}" (${bestScore.toFixed(1)}%)`);
-  
-//   // Accept only if similarity ≥ 55%
-//   return bestScore >= 55 ? bestMatch : null;
-// }
+    if (matchRatio >= 0.95) return 98;
+    if (matchRatio >= 0.8) return 90;
+    if (matchRatio >= 0.6) return 80;
+    if (matchRatio >= 0.4) return 70;
 
-// findBestMatch(name: string, profiles: any): any {
-//   if (!name) return null;
+    const inputStr = inputWords.join(' ');
+    const profileStr = profileWords.join(' ');
+    return this.getSimilarity(inputStr, profileStr);
+  }
 
-//   const input = name.toLowerCase().trim();
-
-//   let exactMatch: any = null;
-//   let substringMatch: any = null;
-//   let bestSubstringLength = 0;
-
-//   let bestFuzzyMatch: any = null;
-//   let bestFuzzyScore = 0;
-
-//   Object.values(profiles).forEach((p: any) => {
-//     const n = (p.name || '').toLowerCase().trim();
-//     if (!n) return;
-
-//     // 1️⃣ Exact full name match
-//     if (n === input) {
-//       exactMatch = { ...p, score: 100 };
-//       return;
-//     }
-
-//     // 2️⃣ Substring match (strong indicator of correct match)
-//     if (n.includes(input) || input.includes(n)) {
-//       const lengthScore = Math.min(n.length, input.length);
-//       if (lengthScore > bestSubstringLength) {
-//         bestSubstringLength = lengthScore;
-//         substringMatch = { ...p, score: 95 };
-//       }
-//     }
-
-//     // 3️⃣ Fuzzy match as fallback
-//     const score = this.getSimilarity(input, n);
-//     if (score > bestFuzzyScore) {
-//       bestFuzzyScore = score;
-//       bestFuzzyMatch = { ...p, score };
-//     }
-//   });
-
-//   // Priority return order
-//   if (exactMatch) return exactMatch;
-//   if (substringMatch) return substringMatch;
-//   if (bestFuzzyScore >= 55) return bestFuzzyMatch;
-
-//   return null;
-// }
-
-  // findBestMatch(name: string, profiles: any): any {
-  //   let bestMatch = null;
-  //   let bestScore = 0;
-
-  //   Object.values(profiles).forEach((p: any) => {
-  //     const score = this.getSimilarity(name, p.name || '');
-
-  //     if (score > bestScore) {
-  //       bestScore = score;
-  //       bestMatch = { ...p, score };
-  //     }
-  //   });
-
-  //   // Accept only if similarity ≥ 55%
-  //   return bestScore >= 55 ? bestMatch : null;
-  // }
+  private isAbbreviationMatch(shortWords: string[], longWords: string[]): boolean {
+    if (shortWords.length !== longWords.length) return false;
+    if (shortWords.length === 0) return false;
+    return shortWords.every((shortWord, index) => {
+      const longWord = longWords[index];
+      return shortWord === longWord || 
+            (shortWord.length === 1 && longWord.startsWith(shortWord));
+    });
+  }
   startEdit(index: number) {
     this.editingRowIndex = index;
     this.searchControl.setValue('');
@@ -505,16 +332,14 @@ private isAbbreviationMatch(shortWords: string[], longWords: string[]): boolean 
     row.name = selected.name || '';
     row.email = selected.email || '';
     row.profileid = selected.profileid || '';
-    
-    // Force table refresh with immutable update
     const data = [...this.dataSource.data];
     this.dataSource.data = data;
     this.stopEdit();
   }
 
   getRowColor(percentage: number): string {
-    if (percentage === 0) return '#F8D7DA'; // Light red for unmatched
-    if (percentage === 100) return '#E8F5E8'; // Perfect green
+    if (percentage === 0) return '#F8D7DA';
+    if (percentage === 100) return '#E8F5E8';
     if (percentage >= 90) return '#E1F5E1';
     if (percentage >= 80) return '#D4EDDA';
     if (percentage >= 70) return '#C3E6CB';
@@ -524,10 +349,6 @@ private isAbbreviationMatch(shortWords: string[], longWords: string[]): boolean 
   get totalRows(): number {
     return this.dataSource.data.length;
   }
-
-  // get matchedCount(): number {
-  //   return this.dataSource.data.filter(row => row.profileid).length;
-  // }
 
   get matchedCount(): number {
     return this.dataSource.data.filter(row => row.matchPercentage && row.matchPercentage >= 55).length;
@@ -567,11 +388,23 @@ private isAbbreviationMatch(shortWords: string[], longWords: string[]): boolean 
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
+    // this.dialogRef.close({
+    //   profileIds: this.dataSource.data
+    //     .filter(row => row.profileid)
+    //     .map(row => row.profileid)
+    // });
+  }
+  onUpdate() {
+    const profileIds = this.dataSource.data
+      .filter(row => row.profileid)
+      .map(row => row.profileid);
+
     this.dialogRef.close({
-      profileIds: this.dataSource.data
-        .filter(row => row.profileid)
-        .map(row => row.profileid)
+      profileIds: profileIds
     });
   }
 
+  onClose() {
+    this.dialogRef.close()
+  }
 }
