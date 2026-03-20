@@ -5,7 +5,7 @@
   </div>
 
   <!-- Empty State -->
-  <div *ngIf="liveAssignmentList.length == 0" class="text-center py-5">
+  <div *ngIf="liveAssignmentList.length == 0 && AppointmentList.length == 0" class="text-center py-5">
     <div class="empty-state">
       <mat-icon class="empty-icon">videocam_off</mat-icon>
       <h5 class="text-muted">Room Empty</h5>

@@ -631,8 +631,7 @@ export class AppointmentStudioComponent {
           var appointmentId = appointment.meta["bookingid"]
           
           var roomDoc = doc(this.firestore, "openviduroom", appointmentId)
-          const hostIds = appointment.meta["hosts"].map(ref => ref.path?.split('/').pop());
-
+          const hostIds = appointment.meta["hosts"].map(ref => ref.id);
   
           await getDoc(roomDoc).then(async doc =>{
             if(!doc.exists()){
@@ -643,8 +642,8 @@ export class AppointmentStudioComponent {
                 sessionid: appointmentId,
                 roomid: appointmentId,
                 hosts: hostIds,
-                participantid: appointment["bookedby"].id,
-                title: `${this.mapProfile[appointment["bookedbyId"]]} - ${this.mapAppointment[appointment["appointment"].id]} (${appointment["hostIds"].map(e => this.mapProfile[e]).join(", ")})`,
+                participantid: appointment.meta["bookedby"].id,
+                title: `${this.mapProfile[appointment.meta["bookedby"].id]} - ${this.mapAppointment[appointment.meta["appointment"].id]} (${hostIds.map(e => this.mapProfile[e]).join(", ")})`,
                 metadata: {
                   appointmentid: appointmentId
                 }
@@ -670,7 +669,7 @@ export class AppointmentStudioComponent {
       else{
         console.log("Zoom")
         const url = this.router.serializeUrl(
-          this.router.createUrlTree(['/openappointmentzoom', appointment['docid']])
+          this.router.createUrlTree(['/openmeeting', appointment.meta["bookingid"], 'appointment'])
         );
         window.open(url, "_blank");
       }

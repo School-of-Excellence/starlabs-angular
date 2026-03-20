@@ -167,7 +167,8 @@ export class ListOpenviduRoomComponent {
     const now = new Date();
     const liveQuery = query(
       appointmentCollection,
-      where("platform", "==", "openvidu"),
+      // where("platform", "==", "openvidu"),
+      where("bookedby", "==", doc(this.firestore, "profile_data", this.loggedinProfileID)),
       where("starttime", ">", now),
       where("cancelled", "==", false),
       where("attended", "==", false),
@@ -189,10 +190,9 @@ export class ListOpenviduRoomComponent {
             bookedbyId,
           };
         })
-        .filter(appointment =>
-          appointment.hostIds.includes(this.loggedinProfileID)
-        );
-        
+        // .filter(appointment =>
+        //   appointment.hostIds.includes(this.loggedinProfileID)
+        // );
         
         console.log("My appointments:", userAppointments);
         this.AppointmentList = userAppointments;

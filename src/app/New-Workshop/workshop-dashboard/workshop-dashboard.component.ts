@@ -82,6 +82,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   
   selectedJourneyFilters: string[] = [];
   selectedTierFilters: string[] = [];
+  selectedCategoryFilters: string[] = [];
+  selectedEnrollmentStatusFilters: string[] = [];
+  selectedNotStartedTypeFilters: string[] = []; 
   metrics = new Map<string, string[]>([
     ['totalEnrolled', []],
     ['totalStarted', []],
@@ -659,7 +662,7 @@ private async handleDialogResult(result: any) {
 
 
 async sendNotificationinBreakthrough(){
-    console.log(this.selectedParticipants,"thisssssssss")
+    console.log(this.filteredParticipants,"thisssssssss")
     const { AhNotificationComponent } = await import(
       '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component'
     );
@@ -667,6 +670,7 @@ async sendNotificationinBreakthrough(){
       maxHeight: "90vh",
       disableClose:true,
       autoFocus: false,
+      data:this.filteredParticipants
     })
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
       console.log(profileID,"profile id worskshop notifiation");
@@ -1269,11 +1273,12 @@ async loadCategoryNames() {
 
   onCategoryClick(category: any) {
     const participantIds = category.profileIds;
-    this.selectedParticipants = participantIds.map((id: string) => ({
-      profileid: id,
-      name: this.mapProfile[id]?.name || 'Unknown',
-      metadata: this.mapProfile[id]
-    }));
+    // this.selectedParticipants = participantIds.map((id: string) => ({
+    //   profileid: id,
+    //   name: this.mapProfile[id]?.name || 'Unknown',
+    //   metadata: this.mapProfile[id]
+    // }));
+  this.selectedParticipants = participantIds.map(id => this.buildParticipantEntry(id));
 
     this.selectedStatusInfo = {
       status: 'categoryEnrolled',
@@ -1565,12 +1570,12 @@ async loadCategoryNames() {
     }  
     else {
       const participantIds = this.metrics.get(metricType);
-      this.selectedParticipants = participantIds.map(id => ({
-        profileid: id,
-        name: this.mapProfile[id]?.name || 'Unknown',
-        metadata: this.mapProfile[id]
-      }));
-      
+      // this.selectedParticipants = participantIds.map(id => ({
+      //   profileid: id,
+      //   name: this.mapProfile[id]?.name || 'Unknown',
+      //   metadata: this.mapProfile[id]
+      // }));
+      this.selectedParticipants = participantIds.map(id => this.buildParticipantEntry(id));
       this.selectedStatusInfo = {
         status: metricType,
         challengeName: 'All Participants',
@@ -1581,7 +1586,10 @@ async loadCategoryNames() {
       this.showParticipantPanel = true;
       this.filterOption = 'all';
       this.selectedJourneyFilters = [];
+      this.selectedEnrollmentStatusFilters = [];
       this.selectedTierFilters = [];
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
     }
   }
@@ -1616,12 +1624,12 @@ async loadCategoryNames() {
   }
 
   showParticipantList(participantIds: string[], statusInfo: any) {
-    this.selectedParticipants = participantIds.map(id => ({
-      profileid: id,
-      name: this.mapProfile[id]['name'] || 'Unknown',
-      metadata : this.mapProfile[id]
-    }));
-
+    // this.selectedParticipants = participantIds.map(id => ({
+    //   profileid: id,
+    //   name: this.mapProfile[id]['name'] || 'Unknown',
+    //   metadata : this.mapProfile[id]
+    // }));
+    this.selectedParticipants = participantIds.map(id => this.buildParticipantEntry(id));
     this.selectedStatusInfo = statusInfo;
     this.showParticipantPanel = true;
     this.filterOption = 'all';
@@ -2639,40 +2647,161 @@ openChallengeFormReview(form: any, participant: any): void {
   console.log('Opening form with data:', formData);
   this.onFormPreview(formData);
 }
-  applyFilterSide() {
-    let base = this.selectedParticipants;
+applyFilterSide() {
+  let base = this.selectedParticipants;
 
-    if (this.filterOption === 'new') {
-      base = base.filter(p => this.mapProfile[p.profileid]?.workshoponly === true);
-    } else if (this.filterOption === 'old') {
-      base = base.filter(p => !this.mapProfile[p.profileid]?.workshoponly);
-    }
-
-    if (
-      this.workshopData?.categorybased === true &&
-      this.selectedStatusInfo?.status === 'totalEnrolled' &&
-      this.selectedJourneyFilters.length > 0
-    ) {
-      base = base.filter(p => {
-        const activeJourney: string = this.mapProfile[p.profileid]?.activejourney || '';
-        return this.selectedJourneyFilters.includes(activeJourney);
-      });
-    }
-
-    if (
-      this.workshopData?.categorybased === true &&
-      this.workshopData?.tierbased === true &&
-      this.selectedStatusInfo?.status === 'totalEnrolled' &&
-      this.selectedTierFilters.length > 0
-    ) {
-      base = base.filter(p => {
-        const profileTiers: string[] = this.mapProfile[p.profileid]?.tier || [];
-        return this.selectedTierFilters.some(t => profileTiers.includes(t));
-      });
-    }
-
-    this.filteredParticipants = base;
+  if (this.filterOption === 'new') {
+    base = base.filter(p => this.mapProfile[p.profileid]?.workshoponly === true);
+  } else if (this.filterOption === 'old') {
+    base = base.filter(p => !this.mapProfile[p.profileid]?.workshoponly);
   }
+
+  // ── totalEnrolled filters ──────────────────────────────────────────
+  if (
+    this.workshopData?.categorybased === true &&
+    this.selectedStatusInfo?.status === 'totalEnrolled' &&
+    this.selectedJourneyFilters.length > 0
+  ) {
+    base = base.filter(p => {
+      const activeJourney: string = this.mapProfile[p.profileid]?.activejourney || '';
+      return this.selectedJourneyFilters.includes(activeJourney);
+    });
+  }
+
+  if (
+    this.workshopData?.categorybased === true &&
+    this.workshopData?.tierbased === true &&
+    this.selectedStatusInfo?.status === 'totalEnrolled' &&
+    this.selectedTierFilters.length > 0
+  ) {
+    base = base.filter(p => {
+      const profileTiers: string[] = this.mapProfile[p.profileid]?.tier || [];
+      return this.selectedTierFilters.some(t => profileTiers.includes(t));
+    });
+  }
+
+  if (
+    this.workshopData?.categorybased === true &&
+    this.selectedStatusInfo?.status === 'totalEnrolled' &&
+    this.selectedCategoryFilters.length > 0
+  ) {
+    base = base.filter(p => {
+      const participantCat = this.participantWorkshopCategoryMap.get(p.profileid);
+      return participantCat ? this.selectedCategoryFilters.includes(participantCat) : false;
+    });
+  }
+
+  if (
+    this.selectedStatusInfo?.status === 'totalEnrolled' &&
+    this.selectedEnrollmentStatusFilters.length > 0
+  ) {
+    base = base.filter(p => {
+      const ep = this.enrolledParticipants.find(e => e.profileid === p.profileid);
+      return ep ? this.selectedEnrollmentStatusFilters.includes(ep.status) : false;
+    });
+  }
+
+  // ── notStarted filters ────────────────────────────────────────────
+  if (
+    this.workshopData?.categorybased === true &&
+    this.selectedStatusInfo?.status === 'notStarted'
+  ) {
+    const startedProfileIds = new Set(this.participantProgressList.map(p => p.profileid));
+
+    // 1. Type filter — narrow down to enrollednotstarted vs enrolled-zero-progress
+    if (this.selectedNotStartedTypeFilters.length > 0) {
+      base = base.filter(p => {
+        const isEnrolledNotStarted = !startedProfileIds.has(p.profileid);
+        const isEnrolledZeroProgress = startedProfileIds.has(p.profileid);
+        if (this.selectedNotStartedTypeFilters.includes('enrollednotstarted') && isEnrolledNotStarted) return true;
+        if (this.selectedNotStartedTypeFilters.includes('enrolled_zero_progress') && isEnrolledZeroProgress) return true;
+        return false;
+      });
+    }
+
+    // 2. Category filter — works for both types using dual-source lookup
+    if (this.selectedCategoryFilters.length > 0) {
+      base = base.filter(p => {
+        // enrolled (has doc) → use participantWorkshopCategoryMap
+        const catFromDoc = this.participantWorkshopCategoryMap.get(p.profileid);
+        if (catFromDoc) return this.selectedCategoryFilters.includes(catFromDoc);
+
+        // enrollednotstarted (no doc) → fall back to workshopcategory on enrolled record
+        const enrolledRecord = this.enrolledParticipants.find(e => e.profileid === p.profileid);
+        const catFromEnrolled = enrolledRecord?.workshopcategory || null;
+        return catFromEnrolled ? this.selectedCategoryFilters.includes(catFromEnrolled) : false;
+      });
+    }
+  }
+
+  this.filteredParticipants = base;
+}
+  // applyFilterSide() {
+  //   let base = this.selectedParticipants;
+
+  //   if (this.filterOption === 'new') {
+  //     base = base.filter(p => this.mapProfile[p.profileid]?.workshoponly === true);
+  //   } else if (this.filterOption === 'old') {
+  //     base = base.filter(p => !this.mapProfile[p.profileid]?.workshoponly);
+  //   }
+
+  //   if (
+  //     this.workshopData?.categorybased === true &&
+  //     this.selectedStatusInfo?.status === 'totalEnrolled' &&
+  //     this.selectedJourneyFilters.length > 0
+  //   ) {
+  //     base = base.filter(p => {
+  //       const activeJourney: string = this.mapProfile[p.profileid]?.activejourney || '';
+  //       return this.selectedJourneyFilters.includes(activeJourney);
+  //     });
+  //   }
+
+  //   if (
+  //     this.workshopData?.categorybased === true &&
+  //     this.workshopData?.tierbased === true &&
+  //     this.selectedStatusInfo?.status === 'totalEnrolled' &&
+  //     this.selectedTierFilters.length > 0
+  //   ) {
+  //     base = base.filter(p => {
+  //       const profileTiers: string[] = this.mapProfile[p.profileid]?.tier || [];
+  //       return this.selectedTierFilters.some(t => profileTiers.includes(t));
+  //     });
+  //   }
+  //   if (
+  //     this.workshopData?.categorybased === true &&
+  //     this.selectedStatusInfo?.status === 'totalEnrolled' &&
+  //     this.selectedCategoryFilters.length > 0
+  //   ) {
+  //     base = base.filter(p => {
+  //       const participantCat = this.participantWorkshopCategoryMap.get(p.profileid);
+  //       return participantCat ? this.selectedCategoryFilters.includes(participantCat) : false;
+  //     });
+  //   }
+  //   if (
+  //     this.workshopData?.categorybased === true &&
+  //     this.selectedStatusInfo?.status === 'notStarted' &&
+  //     this.selectedNotStartedTypeFilters.length > 0
+  //   ) {
+  //     const startedProfileIds = new Set(this.participantProgressList.map(p => p.profileid));
+  //     base = base.filter(p => {
+  //       const isEnrolledNotStarted = !startedProfileIds.has(p.profileid);
+  //       const isEnrolledZeroProgress = startedProfileIds.has(p.profileid);
+  //       if (this.selectedNotStartedTypeFilters.includes('enrollednotstarted') && isEnrolledNotStarted) return true;
+  //       if (this.selectedNotStartedTypeFilters.includes('enrolled_zero_progress') && isEnrolledZeroProgress) return true;
+  //       return false;
+  //     });
+  //   }
+  //   if (
+  //     this.selectedStatusInfo?.status === 'totalEnrolled' &&
+  //     this.selectedEnrollmentStatusFilters.length > 0
+  //   ) {
+  //     base = base.filter(p => {
+  //       const ep = this.enrolledParticipants.find(e => e.profileid === p.profileid);
+  //       return ep ? this.selectedEnrollmentStatusFilters.includes(ep.status) : false;
+  //     });
+  //   }
+  //   this.filteredParticipants = base;
+  // }
   toggleTierFilter(tier: string) {
     const idx = this.selectedTierFilters.indexOf(tier);
     if (idx >= 0) {
@@ -2699,6 +2828,48 @@ openChallengeFormReview(form: any, participant: any): void {
 
   clearJourneyFilters() {
     this.selectedJourneyFilters = [];
+    this.applyFilterSide();
+  }
+  toggleEnrollmentStatusFilter(status: string) {
+    const idx = this.selectedEnrollmentStatusFilters.indexOf(status);
+    if (idx >= 0) {
+      this.selectedEnrollmentStatusFilters.splice(idx, 1);
+    } else {
+      this.selectedEnrollmentStatusFilters.push(status);
+    }
+    this.applyFilterSide();
+  }
+
+  clearEnrollmentStatusFilters() {
+    this.selectedEnrollmentStatusFilters = [];
+    this.applyFilterSide();
+  }
+  toggleNotStartedTypeFilter(type: string) {
+    const idx = this.selectedNotStartedTypeFilters.indexOf(type);
+    if (idx >= 0) {
+      this.selectedNotStartedTypeFilters.splice(idx, 1);
+    } else {
+      this.selectedNotStartedTypeFilters.push(type);
+    }
+    this.applyFilterSide();
+  }
+
+  clearNotStartedTypeFilters() {
+    this.selectedNotStartedTypeFilters = [];
+    this.applyFilterSide();
+  }
+  toggleCategoryFilter(categoryId: string) {
+    const idx = this.selectedCategoryFilters.indexOf(categoryId);
+    if (idx >= 0) {
+      this.selectedCategoryFilters.splice(idx, 1);
+    } else {
+      this.selectedCategoryFilters.push(categoryId);
+    }
+    this.applyFilterSide();
+  }
+
+  clearCategoryFilters() {
+    this.selectedCategoryFilters = [];
     this.applyFilterSide();
   }
   // applyFilterSide() {
@@ -3033,6 +3204,24 @@ calculateAccessBasedProgress(participant: any): { completedChallenges: number; t
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
     }
+  private buildParticipantEntry(id: string): any {
+    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
+    const catFromDoc = this.participantWorkshopCategoryMap.get(id);
+    const catFromEnrolled = this.enrolledParticipants.find(e => e.profileid === id)?.workshopcategory || null;
+    const categoryId = catFromDoc || catFromEnrolled || null;
+
+    return {
+      profileid: id,
+      name: this.mapProfile[id]?.name || 'Unknown',
+      metadata: this.mapProfile[id],
+      isFacilitator: facilitatorProfiles.includes(id),
+      isCohort: this.participantCohortMap.get(id) === true,
+      categoryId: categoryId,
+      categoryName: categoryId ? (this.categoryNamesMap.get(categoryId) || '—') : '—'
+    };
+  }
 }
