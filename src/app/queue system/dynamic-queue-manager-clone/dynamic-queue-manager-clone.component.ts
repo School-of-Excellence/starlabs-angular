@@ -40,7 +40,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AddPendingActionComponent } from '../../AppEngagement/app-action-pending/add-pending-action/add-pending-action.component';
 import { TagParticipantsComponent } from '../../Participants Profile Management/participants-analytics/tag-participants/tag-participants.component';
-
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 
@@ -261,6 +260,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private reminderCheckInterval: any;
   private shownReminderIds: Set<string> = new Set();
   editingReminderTime: string ;
+  sidenavMode: 'comms' | 'filter' = 'comms';
+  preassignedDropdownOpen: boolean = false;
+  stageSlotDropdownOpen: boolean = false;
+  showStageCountDropdown: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -297,8 +300,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   @ViewChild('searchBox') searchBox!: ElementRef;
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
-    // Ctrl + F or Cmd + F (Mac)
-    if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+   
+    if ((event.ctrlKey || event.metaKey) && event.key === 'g') {
       event.preventDefault();
       this.focusSearchBox();
       this.isSearchActive = true;
@@ -329,12 +332,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       }
     }
 
-    // Ctrl+G or Cmd+G - Allow browser default behavior (don't prevent default)
-    // This will open the browser's native "Find" or "Go to line" feature
-    if ((event.ctrlKey || event.metaKey) && event.key === 'g') {
-      // Don't call event.preventDefault() - let the browser handle it
-      return;
-    }
+
   }
 
   @HostListener('document:click', ['$event'])
@@ -350,13 +348,18 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
     
     // Close filter dropdowns when clicking outside
-    if (!target.closest('.filter-dropdown-wrapper')) {
+    if (!target.closest('.filter-sidenav-body')) {
       this.segmentDropdownOpen = false;
       this.tagDropdownOpen = false;
+      this.preassignedDropdownOpen = false;
+      this.stageSlotDropdownOpen = false;
     }
     //dharshan
     if (!target.closest('.time-slot-dropdown-wrapper')) {
     this.showTimeDropdown = false;
+    }
+    if (!target.closest('.stage-count-chips-row')) {
+      this.showStageCountDropdown = false;
     }
   }
   @HostListener('window:scroll')
@@ -3024,8 +3027,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     var endpoint = null;
     await getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
       if (wati.exists()) {
-        apikey = wati.data()['101723']['watitoken'];
-        endpoint = wati.data()['101723']['endpoint'];
+        apikey = wati.data()['wati'][0]['watitoken'];
+        endpoint = wati.data()['wati'][0]['endpoint'];
       }
     });
 
@@ -3761,7 +3764,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
           // mark the status to unattended to unattended in event participation request
           const participation = await getDocs(query(
-            collection(this.firestore, "event participation request"),
+            collection(this.firestore, "event participation request" ),
             where("participantproductid", "==", token['participantproductid'])
           ));
 
@@ -4535,6 +4538,34 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
   }
 
+  toggleSegmentDropdown() {
+    if (this.dfuFilterActive || this.selectedStageSlot) return;
+    this.segmentDropdownOpen = !this.segmentDropdownOpen;
+    if (this.segmentDropdownOpen) this.onSegmentDropdownOpen();
+  }
+
+  toggleTagDropdown() {
+    if (this.dfuFilterActive || this.selectedStageSlot) return;
+    this.tagDropdownOpen = !this.tagDropdownOpen;
+    if (this.tagDropdownOpen) this.onTagDropdownOpen();
+  }
+
+  togglePreassignedDropdown() {
+    if (this.dfuFilterActive || !!this.selectedStageSlot) return;
+    this.preassignedDropdownOpen = !this.preassignedDropdownOpen;
+    this.segmentDropdownOpen = false;
+    this.tagDropdownOpen = false;
+    this.stageSlotDropdownOpen = false;
+  }
+
+  toggleStageSlotDropdown() {
+    if (this.dfuFilterActive) return;
+    this.stageSlotDropdownOpen = !this.stageSlotDropdownOpen;
+    this.segmentDropdownOpen = false;
+    this.tagDropdownOpen = false;
+    this.preassignedDropdownOpen = false;
+  }
+
 
   // Computed properties for reminder counts
   get overdueReminders(): any[] {
@@ -4670,5 +4701,19 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   closeReminderNotification() {
     this.showReminderNotification = false;
     this.dueRemindersToShow = [];
+  }
+
+  getActiveFilterCount(): number {
+    let count = 0;
+    if (this.searchFilter) count++;
+    count += this.selectedSegments.length;
+    count += this.selectedTags.length;
+    if (this.preassignedFilter !== 'all') count++;
+    if (this.selectedStageSlot) count++;
+    if (this.dateRangeStart && this.dateRangeEnd) count++;
+    if (this.selectedTimeSlots?.length > 0) count++;
+    if (this.dfuFilterActive) count++;
+    if (this.reminderTodayFilterActive) count++;
+    return count;
   }
 }
