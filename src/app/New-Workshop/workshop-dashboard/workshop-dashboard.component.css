@@ -1637,3 +1637,18 @@
 .facilitator-progress-metric { border-left: 4px solid #f57c00; }
 .facilitator-progress-metric .metric-icon { color: #f57c00; }
 .facilitator-bar { --mdc-linear-progress-active-indicator-color: #f57c00; }
+
+.zoom-attendees-chip {
+  background-color: #0095ff;
+  color: #ffffff;
+}
+
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    100% {
+      transform: rotate(360deg);
+    }
+  }
