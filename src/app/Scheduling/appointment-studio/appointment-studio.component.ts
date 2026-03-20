@@ -629,6 +629,9 @@ export class AppointmentStudioComponent {
   
         try{
           var appointmentId = appointment.meta["bookingid"]
+          console.log(appointment.meta);
+          console.log(appointment.meta["bookedby"]);
+          
           
           var roomDoc = doc(this.firestore, "openviduroom", appointmentId)
           const hostIds = appointment.meta["hosts"].map(ref => ref.path?.split('/').pop());
@@ -643,8 +646,8 @@ export class AppointmentStudioComponent {
                 sessionid: appointmentId,
                 roomid: appointmentId,
                 hosts: hostIds,
-                participantid: appointment["bookedby"].id,
-                title: `${this.mapProfile[appointment["bookedbyId"]]} - ${this.mapAppointment[appointment["appointment"].id]} (${appointment["hostIds"].map(e => this.mapProfile[e]).join(", ")})`,
+                participantid: appointment.meta["bookedby"].id,
+                title: `${this.mapProfile[appointment.meta["bookedby"].id]} - ${this.mapAppointment[appointment.meta["appointment"].id]} (${hostIds.map(e => this.mapProfile[e]).join(", ")})`,
                 metadata: {
                   appointmentid: appointmentId
                 }
