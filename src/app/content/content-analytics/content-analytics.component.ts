@@ -15,6 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatOptionModule } from '@angular/material/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 
 @Component({
   selector: 'app-content-analytics',
@@ -30,7 +31,8 @@ import { MatSelectModule } from '@angular/material/select';
     MatTableModule,
     MatPaginatorModule,
     MatIconModule,
-    MatSelectModule
+    MatSelectModule,
+    MatTabsModule
   ],  templateUrl: './content-analytics.component.html',
   styleUrl: './content-analytics.component.css'
 })
