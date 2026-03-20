@@ -109,7 +109,8 @@ interface CurriculumItem {
   type: 'zoomcall' | 'challenge' | '';
   zoomlink?: string;
   completedzoomurl?: string;
-  status?: 'completed' | null; 
+  // status?: 'completed' | null; 
+  status?: 'completed'; 
   hidezoom?:boolean;
   startlivecall?:string;
   headicon?: string;
@@ -603,6 +604,8 @@ onTemplateFilterChange(selectedIds: string[]): void {
 }
 async ngOnInit() {
   try {
+    const roles = await this.guard.getRoles();
+    this.loggedinProfile = roles["profile_ref"].id;
     const chatgroupsRef = collection(this.firestore, 'supportchat');
     const q = query(chatgroupsRef, where('type', '==', 'group'));
     const querySnapshot = await getDocs(q);
@@ -813,6 +816,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
+      triggerFunction:[false],
       activeparticipants: [false],
       newusersonly:[false],
       journeybased: [false],
@@ -1210,7 +1214,7 @@ private buildDetailPageData(): any {
     }));
   });
 
-  // Remove selectedTestimonials and add testimonialmap instead
+  
   delete data.selectedTestimonials;
   data.testimonialmap = this.testimonialMap;
 
@@ -1349,8 +1353,9 @@ private buildDetailPageData(): any {
   addCurriculum(): void {
     const curriculumGroup = this.fb.group({
       type: ['', Validators.required],
+      challengeid: [this.generateId()],
       zoomlink: [''],
-      status: [null],
+      status: [undefined],
       hidezoom: [null],
       completedzoomurl:[''],
       headicon:[''],
@@ -1394,6 +1399,8 @@ private buildDetailPageData(): any {
     const challengeIndex = this.challengesArray.controls.indexOf(curriculumGroup);
     const activityIndex = this.getChallengeArray(curriculumGroup).length;
     const challengeGroup = this.fb.group({
+      challengeid: [this.generateId()], 
+      zoomattend: [[]], 
       name: ['',],
       description: ['',],
       type:['',],
@@ -1455,6 +1462,9 @@ private buildDetailPageData(): any {
   //   this.rebuildActivityIds(); 
   //   }
   // }
+  generateId(): string {
+    return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  }
 removeSubChallenge(curriculumGroup, index) {
   const confirmDelete = confirm("Are you sure you want to delete this sub-challenge?");
   if (!confirmDelete) return;
@@ -1617,9 +1627,12 @@ private rebuildActivityIds(): void {
   data.challenges.forEach((challenge: CurriculumItem, challengeIndex: number) => {
     const curriculumGroup = this.fb.group({
       type: [challenge.type || ''],
+      challengeid: [challenge['challengeid'] || this.generateId()],
+      zoomattend: [challenge['zoomattend'] || []],
       zoomlink: [challenge.zoomlink || ''],
       completedzoomurl: [challenge.completedzoomurl || ''],
-      status: [challenge.status ?? null],
+      // status: [challenge.status ?? null],
+      status: [challenge.status || undefined],
       hidezoom: [challenge.hidezoom ?? false],
       startlivecall: [challenge.startlivecall || ''],
       headicon:[challenge.headicon || ''],
@@ -1658,6 +1671,8 @@ private rebuildActivityIds(): void {
       subChallengeArray.push(
         this.fb.group({
           name: [c.name || ''],
+          challengeid: [c['challengeid'] || this.generateId()],
+          zoomattend: [c['zoomattend']], 
           description: [c.description || ''],
           type:[c.type || ''],
           contentref: [c.contentref ||''],
@@ -1732,14 +1747,24 @@ private rebuildActivityIds(): void {
     this.loading = true;
     this.isSaving = true;
     try {
-      const challengesData = this.challengesPageForm.value.challenges;
+      const challengesData = this.challengesPageForm.value.challenges.map((challenge: any) => {
+        const cleaned = { ...challenge };
+        if (!cleaned.status) {
+          delete cleaned.status;
+        }
+        return cleaned;
+      });
+
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, { challenges: challengesData });
+      // const challengesData = this.challengesPageForm.value.challenges;
+      // const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
+      // await updateDoc(ref, { challenges: challengesData });
 
-      if (refresh) {
-        // this.snackBar.open('Challenges configuration saved successfully!', 'Close', { duration: 2000 });
-        // this.refetchWorkshop(); // (example only)
-      }
+      // if (refresh) {
+      //   // this.snackBar.open('Challenges configuration saved successfully!', 'Close', { duration: 2000 });
+      //   // this.refetchWorkshop(); // (example only)
+      // }
 
     } catch (error) {
       console.error('Error saving challenges:', error);
@@ -1819,6 +1844,7 @@ private rebuildActivityIds(): void {
         qanda: data['qanda'] || false,
         breakdown : data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
+        triggerFunction: data['triggerFunction'] || false,
         activeparticipants : data['activeparticipants'] || false,
         newusersonly : data['newusersonly'] || false,
         journeybased: data['journeybased'] || false,
@@ -1859,6 +1885,7 @@ private rebuildActivityIds(): void {
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
+        triggerFunction: this.settingsForm.get('triggerFunction')?.value || false,
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
         newusersonly: this.settingsForm.get('newusersonly')?.value || false,
         journeybased: this.settingsForm.get('journeybased')?.value || false,
@@ -1929,7 +1956,7 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased', event: any): void {
+  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }
