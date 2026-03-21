@@ -443,6 +443,31 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     }
   }
 
+  toggleOpportunity(row: any) {
+    const newValue = !row.opportunity;
+    row.opportunity = newValue;
+
+    const collectionName = this.collectionMap[this.activeTab];
+    const docRef = doc(this.firestore, collectionName, row.id);
+
+    if (newValue) {
+      row.opportunitydetails = { user: this.loggedInProfileId, time: new Date() };
+      updateDoc(docRef, {
+        opportunity: true,
+        opportunitydetails: {
+          user: this.loggedInProfileId,
+          time: serverTimestamp()
+        }
+      });
+    } else {
+      row.opportunitydetails = null;
+      updateDoc(docRef, {
+        opportunity: false,
+        opportunitydetails: null
+      });
+    }
+  }
+
   openNotes(row: any) {
     this.notesRecord = row;
     this.notesRecord.profileName = this.mapProfiles[row.profileid]?.['name'] || '-';
