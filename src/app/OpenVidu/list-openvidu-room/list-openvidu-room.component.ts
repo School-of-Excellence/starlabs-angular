@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { AuthguardService } from '../../authguard.service';
 import { collection, collectionData, doc, Firestore, getDocs, query, where, getDoc, serverTimestamp, setDoc, updateDoc } from '@angular/fire/firestore';
-import { Subject, takeUntil } from 'rxjs';
+import { interval, Subject, Subscription, takeUntil } from 'rxjs';
 import { MatButtonModule } from "@angular/material/button";
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -17,6 +17,8 @@ import { MatDialog } from '@angular/material/dialog';
 })
 export class ListOpenviduRoomComponent {
 
+  Array = Array
+
   loggedinProfileID
   liveAssignmentList = []
   openViduStudio = []
@@ -27,6 +29,9 @@ export class ListOpenviduRoomComponent {
   subscription = new Subject<void>()
   openViduAppointments = [];
   AppointmentList = []
+  // Live Appointment
+  liveAppointmentStatus: any = '';
+  timerSub?: Subscription = null;
   
 
   constructor(
@@ -79,18 +84,19 @@ export class ListOpenviduRoomComponent {
   }
 
   async getProfileMap(profileid:[]){
-    if(profileid.length != 0){
-      await getDocs(query(collection(this.firestore, "profile_data"), where("profileid", "in", profileid))).then(list =>{
+    for (let i = 0; i < profileid.length; i+=30) {
+      const sublist = profileid.slice(i, i+30);
+      getDocs(query(collection(this.firestore, "profile_data"), where("profileid", "in", sublist))).then(list =>{
         list.docs.forEach(document =>{
           this.mapProfile[document.id] = document.data()["name"]
         })
-      })
+      }) 
     }
   }
 
-  joinRoom(assignment){
+  joinRoom_Queue(assignment){
     console.log(assignment)
-    if(this.openViduStudio.includes(assignment["studioid"])){
+    if(this.openViduStudio.includes(assignment["studioid"]) && false){
       console.log("OpenVidu")
       var hostname = window.location.origin
       window.open(`${hostname}/joinroom/${assignment["docid"]}`, '_blank')
@@ -98,7 +104,7 @@ export class ListOpenviduRoomComponent {
     else{
       console.log("Zoom")
       const url = this.router.serializeUrl(
-        this.router.createUrlTree(['/openmeeting', assignment['docid']])
+        this.router.createUrlTree(['/openmeeting', assignment['docid'], 'queue'])
       );
       window.open(url, "_blank");
     }
@@ -106,65 +112,62 @@ export class ListOpenviduRoomComponent {
 
   async joinRoom_Appointment(appointment){
     console.log(appointment)
-    if(this.openViduAppointments.includes(appointment["docid"])){
-      console.log("OpenVidu")
 
+    if(appointment["platform"] == "openvidu"){
       var loading = this.dialog.open(LoadingProgressComponent, {
         data: {msg: "Setting uP!..."},
         disableClose: true
       })
 
-      try{
-        var appointmentId = appointment["docid"]
-        var roomDoc = doc(this.firestore, "openviduroom", appointmentId)
+      // Check Room Creation
+      var roomDoc = doc(this.firestore, "openviduroom", appointment["docid"])
 
-        await getDoc(roomDoc).then(async doc =>{
-          if(!doc.exists()){
-            var roomData = {
-              active: true,
-              createddate: serverTimestamp(),
-              sessiontype: "appointment",
-              sessionid: appointmentId,
-              roomid: appointmentId,
-              hosts: appointment["hostIds"],
-              participantid: appointment["bookedbyId"],
-              title: `${this.mapProfile[appointment["bookedbyId"]]} - ${this.mapAppointmenttype[appointment["appointment"].id]} (${appointment["hostIds"].map(e => this.mapProfile[e]).join(", ")})`,
-              metadata: {
-                appointmentid: appointmentId
-              }
-            }
-            await setDoc(roomDoc, roomData)
-          }
-          else{
-            if(!doc.data()["active"]){
-              await updateDoc(roomDoc, {active: true})
+      await getDoc(roomDoc).then(async doc =>{
+        if(!doc.exists()){
+          var roomData = {
+            active: true,
+            createddate: serverTimestamp(),
+            sessiontype: "appointment",
+            sessionid: appointment["docid"],
+            roomid: appointment["docid"],
+            hosts: appointment["hosts"].map(e => e.id),
+            participantid: appointment["bookedby"].id,
+            title: `${this.mapProfile[appointment["bookedby"].id]} - ${this.mapAppointmenttype[appointment["appointment"].id]} (${appointment["hosts"].map(e => this.mapProfile[e.id]).join(", ")})`,
+            metadata: {
+              appointmentid: appointment["docid"]
             }
           }
-        })
-        loading.close();
-  
-        var hostname = window.location.origin
-        window.open(`${hostname}/joinroom/${appointment["docid"]}`, '_blank')
-      } catch(err){
-        loading.close()
-        console.log(err)
-      }
-      
+          await setDoc(roomDoc, roomData)
+        }
+        else{
+          if(!doc.data()["active"]){
+            await updateDoc(roomDoc, {active: true})
+          }
+        }
+      })
+
+      // TODO: Check Server
+
+      loading.close()
+
+      const url = this.router.serializeUrl(
+        this.router.createUrlTree(['/joinroom', appointment["docid"]])
+      );
+      window.open(url, "_blank");
     }
     else{
       console.log("Zoom")
       const url = this.router.serializeUrl(
-        this.router.createUrlTree(['/openappointmentzoom', appointment['docid']])
+        this.router.createUrlTree(['/openmeeting', appointment.meta["bookingid"], 'appointment'])
       );
       window.open(url, "_blank");
     }
   }
 
-
-
   loadAppointments() {
     const appointmentCollection = collection(this.firestore, "appointments");
     const now = new Date();
+    now.setHours(0, 0, 0, 0)
     const liveQuery = query(
       appointmentCollection,
       // where("platform", "==", "openvidu"),
@@ -174,37 +177,89 @@ export class ListOpenviduRoomComponent {
       where("attended", "==", false),
     );
 
-    collectionData(liveQuery).pipe(takeUntil(this.subscription))
-      .subscribe(data => {
-        const userAppointments = data
-        .map(appointment => {
-          const hosts = appointment["hosts"] || [];
-          const bookedby = appointment["bookedby"];
+    collectionData(liveQuery).pipe(takeUntil(this.subscription)).subscribe(data => {
+      var profileIDtoMap = []
+      var upcomingAppointment = []
+      for (let i = 0; i < data.length; i++) {
+        const appointmentData = data[i];
 
-          const hostIds = hosts.map(ref => ref.path?.split('/').pop());
-          const bookedbyId = bookedby?.path?.split('/').pop();
+        // Skip if Cancelled or Marked Attended
+        if(appointmentData["cancelled"] || appointmentData["attended"]) continue
 
-          return {
-            ...appointment,
-            hostIds,
-            bookedbyId,
-          };
-        })
-        // .filter(appointment =>
-        //   appointment.hostIds.includes(this.loggedinProfileID)
-        // );
-        
-        console.log("My appointments:", userAppointments);
-        this.AppointmentList = userAppointments;
-        this.openViduAppointments = userAppointments.map(e => e["docid"]);
+        var endTime = new Date(appointmentData["endtime"].toDate())
 
-        let profileIds = []
-        for (let i = 0; i < this.AppointmentList.length; i++) {
-          const appointment = this.AppointmentList[i];
-          profileIds = [...appointment['hostIds'], appointment['bookedbyId']] 
-          this.getProfileMap(profileIds.filter(e => !this.mapProfile[e]) as [])
+        if(endTime.getTime() >= new Date().getTime()){
+          appointmentData["appointmentrole"].forEach(role=>{
+            appointmentData["hostRole"][role.path].forEach(host=>{
+              if(!profileIDtoMap.includes(host.id)) profileIDtoMap.push(host.id)
+            })
+          })
+          if(!profileIDtoMap.includes(appointmentData["bookedby"].id)) profileIDtoMap.push(appointmentData["bookedby"].id)
+          upcomingAppointment.push(appointmentData)
         }
-      });
+      }
+      this.getProfileMap(profileIDtoMap.filter(e => !this.mapProfile[e]) as [])
+      console.log("My appointments:", upcomingAppointment);
+      this.AppointmentList = upcomingAppointment;
+
+      this.timerSub = interval(1000).subscribe(() => this.checkLiveAppointment());
+
+      // const userAppointments = data.map(appointment => {
+      //   const hosts = appointment["hosts"] || [];
+      //   const bookedby = appointment["bookedby"];
+
+      //   const hostIds = hosts.map(ref => ref.id);
+      //   const bookedbyId = bookedby?.id;
+
+      //   return {
+      //     ...appointment,
+      //     hostIds,
+      //     bookedbyId,
+      //   };
+      // })
+      
+      // console.log("My appointments:", userAppointments);
+      // this.AppointmentList = userAppointments;
+      // this.openViduAppointments = userAppointments.map(e => e["docid"]);
+
+      // let profileIds = []
+      // for (let i = 0; i < this.AppointmentList.length; i++) {
+      //   const appointment = this.AppointmentList[i];
+      //   profileIds = [...appointment['hostIds'], appointment['bookedbyId']] 
+      //   this.getProfileMap(profileIds.filter(e => !this.mapProfile[e]) as [])
+      // }
+    });
+  }
+
+  checkLiveAppointment(){
+    if(this.AppointmentList.length != 0){
+      const now = new Date();
+      var apptStart = this.AppointmentList[0]["starttime"].toDate()
+      var apptend = this.AppointmentList[0]["endtime"].toDate()
+
+      if (now >= apptStart && now <= apptend) {
+        this.liveAppointmentStatus = 'LIVE';
+      } else if (now < apptStart) {
+        this.liveAppointmentStatus = this.getCountdown(apptStart, now);
+      } else {
+        this.liveAppointmentStatus = 'ENDED';
+        this.timerSub?.unsubscribe(); // stop after end
+        this.timerSub = null
+        this.loadAppointments() // Again check next appointment
+      }
+    }
+    else{
+      this.timerSub?.unsubscribe()
+      this.timerSub = null
+    }
+  }
+
+  private getCountdown(target: Date, now: Date): Array<any> {
+    const diff = target.getTime() - now.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    return [hours, minutes, seconds];
   }
 
 }
