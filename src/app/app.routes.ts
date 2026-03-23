@@ -305,6 +305,8 @@ export const routes: Routes = [
   //Vadivel
   {path: 'appointment-dashboard', loadComponent: () => import('./appointment-dashboard/appointment-dashboard.component').then(m => m.AppointmentDashboardComponent), canActivate: [authGuard]},
 
+  {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
+
 ];
 
 // import { Routes } from '@angular/router';

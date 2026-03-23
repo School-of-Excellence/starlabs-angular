@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, computed, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { collection, collectionData, doc, DocumentData, documentId, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, documentId, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { combineLatest, firstValueFrom, Observable, Subject, Subscription } from 'rxjs';
 import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-bulk-invitation.component';
@@ -264,6 +264,27 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   preassignedDropdownOpen: boolean = false;
   stageSlotDropdownOpen: boolean = false;
   showStageCountDropdown: boolean = false;
+  customerSupportMap: { [profileId: string]: any[] } = {};
+  availableCustomerSupportCategories: string[] = [];
+  selectedCustomerSupportCategories: string[] = [];
+  customerSupportDropdownOpen: boolean = false;
+  eventParticipationDropdownOpen: boolean = false;
+  eventParticipationList: any[] = []; // all events + queues (lazy loaded)
+  eventParticipationListLoaded: boolean = false; // lazy load flag
+  selectedEventParticipation: any = null; // selected event/queue
+  arenaEventFilterList: Array<{ docid: string; name: string }> = [];
+  arenaEventProfileMap: { [arenaeventid: string]: Set<string> } = {};
+  selectedArenaEventId: string | null = null;
+  arenaEventDropdownOpen: boolean = false;
+  arenaEventLoading: boolean = false;
+  eventParticipationSearchTerm: string = '';
+  atcValidatedProfileIds: Set<string> = new Set();
+  atcUnvalidatedProfileIds: Set<string> = new Set();
+  atcAllProfileIds: Set<string> = new Set(); // combined set
+  atcFilterActive: boolean = false; // main toggle
+  atcFilter: 'none' | 'validated' | 'unvalidated' = 'none'; // sub filter
+  atcDataLoaded: boolean = false;
+  atcDropdownOpen: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -353,6 +374,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.tagDropdownOpen = false;
       this.preassignedDropdownOpen = false;
       this.stageSlotDropdownOpen = false;
+      this.customerSupportDropdownOpen = false;
+      this.eventParticipationDropdownOpen = false;
+      this.arenaEventDropdownOpen = false;
+      this.atcDropdownOpen = false;
     }
     //dharshan
     if (!target.closest('.time-slot-dropdown-wrapper')) {
@@ -770,8 +795,20 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.showDateRangePicker = false;
     this.availableTimeSlots = [];
     this.selectedTimeSlots = [];
+    this.selectedCustomerSupportCategories = [];
+    this.customerSupportDropdownOpen = false;
     this.showTimeSlotPicker = false;
     this.showTimeDropdown = false;
+    this.selectedArenaEventId = null;
+    this.selectedEventParticipation = null;
+    this.arenaEventFilterList = [];
+    this.arenaEventProfileMap = {};
+    this.arenaEventDropdownOpen = false;
+    this.eventParticipationDropdownOpen = false;
+    this.eventParticipationSearchTerm = '';
+    this.atcFilterActive = false;
+    this.atcFilter = 'none';
+    this.atcDropdownOpen = false;
     this.clearSearch();
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1506,6 +1543,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       if (this.dfuFilterActive && this.allTokensData.length > 0) {
       this.processTokensIntoStages(this.allTokensData);
     }
+    if (this.selectedQueue && this.allTokensData.length > 0) {
+      this.processCustomerSupportData();
+    }
     });
   }
 
@@ -1545,6 +1585,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.searchFilter = '';
     this.selectedSegments = [];
     this.allTokensData = [];
+    this.selectedArenaEventId = null;
+    this.selectedEventParticipation = null;
+    this.arenaEventFilterList = [];
+    this.arenaEventProfileMap = {};
+    this.arenaEventDropdownOpen = false;
+    this.eventParticipationDropdownOpen = false;
+    this.eventParticipationListLoaded = false; 
+    this.eventParticipationSearchTerm = '';
+    this.atcValidatedProfileIds = new Set();
+    this.atcUnvalidatedProfileIds = new Set();
+    this.atcAllProfileIds = new Set();
+    this.atcFilterActive = false;
+    this.atcFilter = 'none';
+    this.atcDataLoaded = false;
+    this.atcDropdownOpen = false;
 
     let count = 0
     this.currentQueueParticipants = [];
@@ -1609,6 +1664,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.allTokensData = token; 
       this.availableStagesFromSlot = this.extractUniqueStagesFromSlot(token);  
       this.processTokensIntoStages(token);
+      this.processCustomerSupportData();
 
       const newProfileIds: string[] = [];
 
@@ -1637,8 +1693,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     loading.close();
     this.fetchStageCountsForQueue(); 
     this.loadReminders();
-
-
   }
 
   async fetchLogs(token) {
@@ -1929,12 +1983,46 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         token => this.getTokenHighlight(token.profile_id) === 'orange'
       );
     }
-  if (this.reminderTodayFilterActive) {
-    const todayProfileIds = new Set(this.todayReminders.map(r => r.profileid));
-    filteredTokens = filteredTokens.filter(
-      token => todayProfileIds.has(token.profile_id)
-    );
-  }
+    if (this.selectedCustomerSupportCategories.length > 0) {
+      filteredTokens = filteredTokens.filter(token => {
+        const entries = this.customerSupportMap[token.profile_id] || [];
+        return entries.some(entry => 
+          this.selectedCustomerSupportCategories.includes(entry.category)
+        );
+      });
+    }
+    if (this.selectedArenaEventId) {
+      const profileIds = this.arenaEventProfileMap[this.selectedArenaEventId];
+      filteredTokens = filteredTokens.filter(token =>
+        profileIds?.has(token.profile_id)
+      );
+    }
+
+    if (this.atcFilterActive) {
+      if (this.atcFilter === 'validated') {
+        filteredTokens = filteredTokens.filter(token =>
+          this.atcValidatedProfileIds.has(token.profile_id) &&
+          token.tokenstatus !== 'inActive'
+        );
+      } else if (this.atcFilter === 'unvalidated') {
+        filteredTokens = filteredTokens.filter(token =>
+          this.atcUnvalidatedProfileIds.has(token.profile_id) &&
+          token.tokenstatus !== 'inActive'
+        );
+      } else {
+        // Show all ATC participants
+        filteredTokens = filteredTokens.filter(token =>
+          this.atcAllProfileIds.has(token.profile_id) &&
+          token.tokenstatus !== 'inActive'
+        );
+      }
+    }
+    if (this.reminderTodayFilterActive) {
+      const todayProfileIds = new Set(this.todayReminders.map(r => r.profileid));
+      filteredTokens = filteredTokens.filter(
+        token => todayProfileIds.has(token.profile_id)
+      );
+    }
 
     return filteredTokens;
   }
@@ -4714,6 +4802,292 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (this.selectedTimeSlots?.length > 0) count++;
     if (this.dfuFilterActive) count++;
     if (this.reminderTodayFilterActive) count++;
+    if (this.atcFilterActive) count++;
+    count += this.selectedCustomerSupportCategories.length;
+    if (this.selectedArenaEventId) count++;
     return count;
+  }
+
+    processCustomerSupportData() {
+    if (!this.selectedQueue || !this.allTokensData.length) return;
+
+    const queueStart = this.selectedQueue.queuestartdate.toDate();
+    const queueEnd = this.selectedQueue.queueenddate.toDate();
+
+    const categorySet = new Set<string>();
+    this.customerSupportMap = {};
+
+    const queueProfileIds = new Set(this.allTokensData.map(t => t.profile_id));
+
+    queueProfileIds.forEach(profileId => {
+      const metadata = this.participantMetaDataMap[profileId];
+      if (!metadata) return;
+
+      const customerSupport = metadata?.['customersupport'];
+      if (!customerSupport) return;
+
+      const matchedEntries: any[] = [];
+
+      Object.values(customerSupport).forEach((entry: any) => {
+        if (!entry?.reporteddate) return;
+
+        const reportedDate = entry.reporteddate.toDate();
+
+        if (reportedDate >= queueStart && reportedDate <= queueEnd && entry.status === 'Open') {
+          matchedEntries.push(entry);
+          if (entry.category) {
+            categorySet.add(entry.category);
+          }
+        }
+      });
+
+      if (matchedEntries.length > 0) {
+        this.customerSupportMap[profileId] = matchedEntries;
+      }
+    });
+
+    this.availableCustomerSupportCategories = Array.from(categorySet).sort();
+  }
+
+  hasCustomerSupport(profileId: string): boolean {
+    return !!this.customerSupportMap[profileId]?.length;
+  }
+
+  getCustomerSupportEntries(profileId: string): any[] {
+    return this.customerSupportMap[profileId] || [];
+  }
+
+  getCustomerSupportTooltip(profileId: string): string {
+    const entries = this.getCustomerSupportEntries(profileId);
+    return entries.map((e, i) => 
+      `#${i + 1} Ticket ${e.ticketno}\nCategory: ${e.category}\nIssue: ${e.issue}`
+    ).join('\n\n');
+  }
+
+  toggleCustomerSupportCategory(category: string) {
+    const index = this.selectedCustomerSupportCategories.indexOf(category);
+    if (index > -1) {
+      this.selectedCustomerSupportCategories.splice(index, 1);
+    } else {
+      this.selectedCustomerSupportCategories.push(category);
+    }
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  getArenaEventName(docid: string): string {
+    const event = this.arenaEventFilterList.find(e => e.docid === docid);
+    return event?.name || docid;
+  }
+
+  getArenaEventQueueCount(arenaeventid: string): number {
+    const profileIds = this.arenaEventProfileMap[arenaeventid];
+    if (!profileIds) return 0;
+    
+    return this.allTokensData.filter(token => 
+      profileIds.has(token.profile_id) && 
+      token.tokenstatus === 'Active'
+    ).length;
+  }
+
+  async loadEventParticipationList() {
+    if (this.eventParticipationListLoaded) return; // already loaded
+
+    this.arenaEventLoading = true;
+
+    const [eventsSnap, queuesSnap] = await Promise.all([
+      getDocs(query(
+        collection(this.firestore, 'event collection'),
+        orderBy('end_date', 'desc')
+      )),
+      getDocs(query(
+        collection(this.firestore, 'queue generation'),
+        orderBy('queueenddate', 'desc')
+      ))
+    ]);
+
+    const events = eventsSnap.docs
+      .map(d => ({ ...d.data(), docid: d.id, type: 'event' }))
+      .filter(e => !e['delete']);
+
+    const queues = queuesSnap.docs
+      .map(d => ({ ...d.data(), docid: d.id, name: d.data()['queuename'], type: 'queue' }))
+      .filter(e => !e['delete']);
+
+    this.eventParticipationList = [...events, ...queues];
+    this.eventParticipationListLoaded = true;
+    this.arenaEventLoading = false;
+  }
+
+  async onEventParticipationSelect(eventOrQueue: any) {
+    this.selectedEventParticipation = eventOrQueue;
+    this.selectedArenaEventId = null;
+    this.arenaEventFilterList = [];
+    this.arenaEventProfileMap = {};
+    this.arenaEventLoading = true;
+
+    // Get docref based on type
+    const docRef = eventOrQueue.type === 'queue'
+      ? doc(this.firestore, 'queue generation', eventOrQueue.docid)
+      : doc(this.firestore, 'event collection', eventOrQueue.docid);
+
+    // Fetch arena events for this event/queue
+    const arenaEventsSnap = await getDocs(
+      query(
+        collection(this.firestore, 'arena events'),
+        where('eventref', '==', docRef)
+      )
+    );
+
+    if (arenaEventsSnap.empty) {
+      this.arenaEventLoading = false;
+      return;
+    }
+
+    // Build filter list
+    arenaEventsSnap.docs.forEach(d => {
+      const data = d.data();
+      this.arenaEventFilterList.push({
+        docid: d.id,
+        name: data['title']
+          ? `${data['eventname']} - ${data['title']}`
+          : data['eventname'] || this.mapProduct[data['productref']?.id] || d.id
+      });
+    });
+
+    // Fetch participation requests
+    const arenaEventIds = arenaEventsSnap.docs.map(d => d.id);
+    const chunks = this.chunkArray(arenaEventIds, 10);
+
+    const chunkPromises = chunks.map(chunk =>
+      getDocs(query(
+        collection(this.firestore, 'event participation request'),
+        where('arenaeventid', 'in', chunk),
+        where('status', 'in', ['approved', 'requested','attended'])
+      ))
+    );
+
+    const results = await Promise.all(chunkPromises);
+
+    results.forEach(snap => {
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const arenaeventid = data['arenaeventid'];
+        const profileid = data['profileid'];
+
+        if (!this.arenaEventProfileMap[arenaeventid]) {
+          this.arenaEventProfileMap[arenaeventid] = new Set<string>();
+        }
+        this.arenaEventProfileMap[arenaeventid].add(profileid);
+      });
+    });
+
+    this.arenaEventLoading = false;
+  }
+
+  get filteredEventParticipationList(): any[] {
+    if (!this.eventParticipationSearchTerm.trim()) {
+      return this.eventParticipationList;
+    }
+    const term = this.eventParticipationSearchTerm.toLowerCase().trim();
+    return this.eventParticipationList.filter(item => {
+      const name = (item.name || item.eventname || '').toLowerCase();
+      return name.includes(term);
+    });
+  }
+  async fetchATCParticipants() {
+    if (!this.selectedQueue) return;
+
+    this.atcValidatedProfileIds = new Set<string>();
+    this.atcUnvalidatedProfileIds = new Set<string>();
+    this.atcAllProfileIds = new Set<string>();
+
+    const queueStart = this.selectedQueue.queuestartdate;
+    const queueEnd = this.selectedQueue.queueenddate;
+
+    const activeProfileIds = new Set(
+      this.allTokensData
+        .filter(token => token.tokenstatus !== 'inActive')
+        .map(token => token.profile_id)
+    );
+
+    const [atcAlphaSnap, atcValidateSnap] = await Promise.all([
+      getDocs(query(
+        collection(this.firestore, 'atc_alpha'),
+        or(
+          where('queueid', '==', this.selectedQueue.docid),
+          and(
+            where('prescription_date', '>=', queueStart),
+            where('prescription_date', '<=', queueEnd)
+          )
+        )
+      )),
+      getDocs(query(
+        collection(this.firestore, 'atc_to_validate'),
+        or(
+          where('queueid', '==', this.selectedQueue.docid),
+          and(
+            where('prescription_date', '>=', queueStart),
+            where('prescription_date', '<=', queueEnd)
+          )
+        )
+      ))
+    ]);
+
+    atcAlphaSnap.docs.forEach(d => {
+      const profileid = d.data()['profileid'];
+      if (profileid && activeProfileIds.has(profileid)) {
+        this.atcValidatedProfileIds.add(profileid);
+        this.atcAllProfileIds.add(profileid);
+      }
+    });
+
+    atcValidateSnap.docs.forEach(d => {
+      const profileid = d.data()['profileid'];
+      if (profileid && activeProfileIds.has(profileid)) {
+        this.atcAllProfileIds.add(profileid);
+        if (!this.atcValidatedProfileIds.has(profileid)) {
+          this.atcUnvalidatedProfileIds.add(profileid);
+        }
+      }
+    });
+    
+    this.atcDataLoaded = true;
+  }
+  async toggleATCFilter() {
+    if (!this.atcDataLoaded) {
+      await this.fetchATCParticipants();
+    }
+    this.atcFilterActive = !this.atcFilterActive;
+    // Reset sub filter when main toggle turns off
+    if (!this.atcFilterActive) {
+      this.atcFilter = 'none';
+      this.atcDropdownOpen = false;
+    }
+    this.processTokensIntoStages(this.allTokensData);
+  }
+  getTotalATCCount(): number {
+    return this.allTokensData.filter(token =>
+      this.atcAllProfileIds.has(token.profile_id) &&
+      token.tokenstatus === 'Active'
+    ).length;
+  }
+  selectATCFilter(type: 'validated' | 'unvalidated' | 'none') {
+    this.atcFilter = this.atcFilter === type ? 'none' : type;
+    this.atcDropdownOpen = false;
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  getATCValidatedCount(): number {
+    return this.allTokensData.filter(token =>
+      this.atcValidatedProfileIds.has(token.profile_id) &&
+      token.tokenstatus === 'Active'
+    ).length;
+  }
+
+  getATCUnvalidatedCount(): number {
+    return this.allTokensData.filter(token =>
+      this.atcUnvalidatedProfileIds.has(token.profile_id) &&
+      token.tokenstatus === 'Active'
+    ).length;
   }
 }
