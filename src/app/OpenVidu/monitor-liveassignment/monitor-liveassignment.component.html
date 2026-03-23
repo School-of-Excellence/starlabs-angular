@@ -77,4 +77,125 @@
       </div>
     </div>
   </div>
+
+  <div class="infra-status-section" *ngIf="infraStatus">
+  
+    <!-- Error/Success Messages -->
+    <div *ngIf="infraError" class="infra-alert infra-error">
+      {{ infraError }}
+      <button (click)="infraError = null" class="close-btn">✕</button>
+    </div>
+    
+    <div *ngIf="infraSuccess" class="infra-alert infra-success">
+      {{ infraSuccess }}
+      <button (click)="infraSuccess = null" class="close-btn">✕</button>
+    </div>
+
+    <div class="infra-cards">
+      
+      <!-- Master Node Card -->
+      <div class="infra-card">
+        <div class="infra-card-header">
+          <div class="header-content">
+            <h3>Master Node</h3>
+            <span class="status-badge" [ngClass]="getMasterStateClass()">
+              {{ getMasterState() }}
+            </span>
+          </div>
+          <div class="external-warning" *ngIf="infraStatus['master']['changedExternally']">
+            ⚠️ Changed via AWS Console
+          </div>
+        </div>
+
+        <div class="infra-card-body">
+          <div class="info-row">
+            <span class="label">Instance</span>
+            <code class="value">{{ infraStatus['master']['instanceId'] }}</code>
+          </div>
+          <div class="info-row" *ngIf="infraStatus['master']['publicIp']">
+            <span class="label">Public IP</span>
+            <code class="value">{{ infraStatus['master']['publicIp'] }}</code>
+          </div>
+          <div class="info-row" *ngIf="infraStatus['master']['instanceType']">
+            <span class="label">Type</span>
+            <span class="value">{{ infraStatus['master']['instanceType'] }}</span>
+          </div>
+        </div>
+
+        <div class="infra-card-actions">
+          <button 
+            (click)="startMasterNode()" 
+            [disabled]="!canStartMaster()"
+            class="infra-btn btn-start">
+            <span *ngIf="!infraActionInProgress">▶️ Start</span>
+            <span *ngIf="infraActionInProgress">⏳</span>
+          </button>
+          <button 
+            (click)="stopMasterNode()" 
+            [disabled]="!canStopMaster()"
+            class="infra-btn btn-stop">
+            <span *ngIf="!infraActionInProgress">⏹️ Stop</span>
+            <span *ngIf="infraActionInProgress">⏳</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Media Nodes Card -->
+      <div class="infra-card">
+        <div class="infra-card-header">
+          <div class="header-content">
+            <h3>Media Nodes</h3>
+            <span class="status-badge" [ngClass]="getMediaStateClass()">
+              {{ infraStatus['media']['instanceStates']['healthy'] }} / {{ infraStatus['media']['desiredCapacity'] }}
+            </span>
+          </div>
+          <div class="external-warning" *ngIf="infraStatus['media']['changedExternally']">
+            ⚠️ Scaled via AWS Console
+          </div>
+        </div>
+
+        <div class="infra-card-body">
+          <div class="info-row">
+            <span class="label">Desired</span>
+            <span class="value">{{ infraStatus['media']['desiredCapacity'] }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Healthy</span>
+            <span class="value healthy">{{ infraStatus['media']['instanceStates']['healthy'] }}</span>
+          </div>
+          <div class="info-row" *ngIf="infraStatus['media']['instanceStates']['pending'] > 0">
+            <span class="label">Starting</span>
+            <span class="value pending">{{ infraStatus['media']['instanceStates']['pending'] }}</span>
+          </div>
+          <div class="info-row" *ngIf="infraStatus['media']['instanceStates']['terminating'] > 0">
+            <span class="label">Terminating</span>
+            <span class="value terminating">{{ infraStatus['media']['instanceStates']['terminating'] }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Range</span>
+            <span class="value">{{ infraStatus['media']['minSize'] }} - {{ infraStatus['media']['maxSize'] }}</span>
+          </div>
+        </div>
+
+        <div class="infra-card-actions">
+          <button 
+            (click)="scaleMediaUp()" 
+            [disabled]="!canScaleUp()"
+            class="infra-btn btn-scale">
+            <span *ngIf="!infraActionInProgress">➕ Scale Up</span>
+            <span *ngIf="infraActionInProgress">⏳</span>
+          </button>
+          <button 
+            (click)="scaleMediaDown()" 
+            [disabled]="!canScaleDown()"
+            class="infra-btn btn-scale">
+            <span *ngIf="!infraActionInProgress">➖ Scale Down</span>
+            <span *ngIf="infraActionInProgress">⏳</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
