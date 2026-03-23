@@ -33,6 +33,20 @@
           </div>
         </mat-card-content>
         <mat-card-actions align="end">
+        <button 
+          mat-icon-button 
+          (click)="refreshData()" 
+          [disabled]="isRefreshing" 
+          matTooltip="Refresh data"
+          style="background-color: #ff4081; color: white;">
+
+          <mat-icon 
+            [class.spin]="isRefreshing"
+            style="color: white;">
+            refresh
+          </mat-icon>
+
+        </button>&nbsp;&nbsp;
           <button mat-raised-button color="accent" (click)="openNewUserDialog()">
             {{'New Users ' + '( ' +objectKeys(mapProfileNew).length + ' )'}} 
           </button>&nbsp;&nbsp;
@@ -626,6 +640,13 @@
                               (click)="openZoomDialog(workshopData?.challenges?.[i],i)">
                       Zoom Call Action
                     </mat-chip>
+                    <mat-chip class="zoom-attendees-chip clickable"
+                      *ngIf="
+                        workshopData?.challenges?.[i]?.type === 'zoomcall' &&
+                        workshopData?.challenges?.[i]?.zoomattended?.length > 0"
+                      (click)="openZoomAttendees(workshopData?.challenges?.[i], i)">
+                      Zoom Attendees ({{ workshopData?.challenges?.[i]?.zoomattended?.length }})
+                    </mat-chip>
                   </div>
                 </div>
                 <div class="sub-challenges-container">
@@ -705,10 +726,46 @@
         </div>
       </mat-card-header>
 
-          <mat-form-field appearance="outline" style="width: 50%; margin: 10px;">
-          <mat-label>Search</mat-label>
-          <input matInput (keyup)="applyFilter($event)" placeholder="Search participants">
-          </mat-form-field> &nbsp;&nbsp;&nbsp;
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 10px 4px;">
+          <mat-form-field appearance="outline" style="flex: 1 1 220px; min-width: 180px; max-width: 50%;">
+            <mat-label>Search</mat-label>
+            <input matInput (keyup)="applyFilter($event)" placeholder="Search participants">
+          </mat-form-field>
+
+          <ng-container *ngIf="workshopData?.categorybased === true">
+            <mat-form-field appearance="outline" style="flex: 0 0 180px;">
+              <mat-label>Filter by Type</mat-label>
+              <mat-select [(value)]="tableTypeFilter" (selectionChange)="onTableTypeFilterChange()">
+                <mat-option value="all">All Types</mat-option>
+                <mat-option *ngFor="let catId of workshopData?.categoriesforthisworkshop || []" [value]="'cat_' + catId">
+                  {{ categoryNamesMap.get(catId) || catId }}
+                </mat-option>
+                <mat-option value="cohort">Above Diagnostics</mat-option>
+                <mat-option value="facilitator">Facilitator</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" style="flex: 0 0 170px;">
+              <mat-label>Filter by Status</mat-label>
+              <mat-select [(value)]="tableStatusFilter" (selectionChange)="onTableStatusFilterChange()">
+                <mat-option value="all">All Statuses</mat-option>
+                <mat-option value="completed">Completed</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="notstarted">Not Started</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-icon-button
+                    *ngIf="tableTypeFilter !== 'all' || tableStatusFilter !== 'all'"
+                    (click)="clearTableFilters()"
+                    matTooltip="Clear filters"
+                    color="warn"
+                    style="margin-bottom: 4px;">
+              <mat-icon>filter_list_off</mat-icon>
+            </button>
+          </ng-container>
+        </div>
+
         <mat-card-content>
           <div class="table-container">
             <table mat-table [dataSource]="dataSource" matSort class="progress-table">
@@ -959,10 +1016,10 @@
               <div *ngIf="participantWorkshopError" class="error-section">
                 <mat-icon class="error-icon">error</mat-icon>
                 <p>{{ participantWorkshopError }}</p>
-                <button mat-stroked-button (click)="loadParticipantWorkshopData(selectedParticipantData.profileid)">
+                <!-- <button mat-stroked-button (click)="loadParticipantWorkshopData(selectedParticipantData.profileid)">
                   <mat-icon>refresh</mat-icon>
                   Retry
-                </button>
+                </button> -->
               </div>
 
               <div *ngIf="displayChallenges.length > 0 && !loadingParticipantWorkshop" class="workshop-data">

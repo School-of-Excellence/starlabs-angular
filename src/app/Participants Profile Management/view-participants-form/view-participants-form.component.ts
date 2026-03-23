@@ -60,7 +60,7 @@ export class ViewParticipantsFormComponent {
   // ==========================================
   // TABLE — replaced 'view' and 'download' with 'actions'
   // ==========================================
-  displayedColumns = ['select', 'profileid', 'queueref', 'workshopref', 'formname', 'submittedin', 'date', 'notes', 'like', 'flag', 'actions'];
+  displayedColumns = ['select', 'profileid', 'queueref', 'workshopref', 'formname', 'submittedin', 'date', 'notes', 'like', 'flag', 'opportunity', 'actions'];
   dataSource = new MatTableDataSource();
   selection = new SelectionModel<any>(true, []);
 
@@ -809,6 +809,23 @@ export class ViewParticipantsFormComponent {
     } else {
       row.tagdetails = null;
       updateDoc(docRef, { tagged: false, tagdetails: null });
+    }
+  }
+
+  // ==========================================
+  // OPPORTUNITY
+  // ==========================================
+  toggleOpportunity(row: any) {
+    const newValue = !row.opportunity;
+    row.opportunity = newValue;
+    const docRef = doc(this.firestore, 'formsByClient', row.docid);
+
+    if (newValue) {
+      row.opportunitydetails = { user: this.loggedInProfileId, time: new Date() };
+      updateDoc(docRef, { opportunity: true, opportunitydetails: { user: this.loggedInProfileId, time: serverTimestamp() } });
+    } else {
+      row.opportunitydetails = null;
+      updateDoc(docRef, { opportunity: false, opportunitydetails: null });
     }
   }
 

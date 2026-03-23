@@ -77,11 +77,11 @@ export class ViewparticipantTierAccessComponent {
             if(tierElement.length != 0){
               for (let j = 0; j < tierElement.length; j++) {
                 this.testTier[tierElement[j]] = this.testTier[tierElement[j]] || []
-                this.testTier[tierElement[j]].push(element["name"]) // this.mapUserToProfileid[userid]
+                this.testTier[tierElement[j]].push(element["name"])
               }
             }else{
               this.testTier["Tierless Participant"] = this.testTier["Tierless Participant"] || []
-              this.testTier["Tierless Participant"].push(element["name"]) // this.mapUserToProfileid[userid]
+              this.testTier["Tierless Participant"].push(element["name"])
             }
           }
         }
@@ -218,8 +218,6 @@ export class ViewparticipantTierAccessComponent {
         break;
     }
     this.filteredSeriesData = filtered;
-
-    // Filter + sort tier view by tier order
     let filteredTiers = this.tierSeriesData.filter(t =>
       (t.tierName || '').toLowerCase().includes(search) ||
       t.seriesList.some((s: string) => s.toLowerCase().includes(search))

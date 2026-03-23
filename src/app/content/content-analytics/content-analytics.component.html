@@ -160,209 +160,248 @@
       </button>
     </div>
   </div>
-
-  <div class="ca-metrics">
-    <div class="ca-metric-card">
-      <div class="ca-metric-icon" style="background: var(--ca-primary-soft); color: var(--ca-primary);">
-        <mat-icon>calendar_today</mat-icon>
-      </div>
-      <div class="ca-metric-info">
-        <span class="ca-metric-value">{{ querydays ?? 0 }}</span>
-        <span class="ca-metric-label">Days</span>
-      </div>
-    </div>
-    <div class="ca-metric-card">
-      <div class="ca-metric-icon" style="background: #e0f2fe; color: #0284c7;">
-        <mat-icon>people</mat-icon>
-      </div>
-      <div class="ca-metric-info">
-        <span class="ca-metric-value">{{ uniqueuser }}</span>
-        <span class="ca-metric-label">Unique Users</span>
-      </div>
-    </div>
-    <div class="ca-metric-card ca-metric-wide">
-      <div class="ca-metric-icon" style="background: #dcfce7; color: #22c55e;">
-        <mat-icon>timer</mat-icon>
-      </div>
-      <div class="ca-metric-info">
-        <span class="ca-metric-value ca-metric-value-sm">{{ uniqueUserContentConsumptionbyhours }}</span>
-        <span class="ca-metric-label">Total Consumption (Hours)</span>
-      </div>
-    </div>
-    <div class="ca-metric-card ca-metric-wide">
-      <div class="ca-metric-icon" style="background: #fef3c7; color: #d97706;">
-        <mat-icon>schedule</mat-icon>
-      </div>
-      <div class="ca-metric-info">
-        <span class="ca-metric-value ca-metric-value-sm">{{ uniqueUserContentConsumptionbydays }}</span>
-        <span class="ca-metric-label">Total Consumption (Days)</span>
-      </div>
-    </div>
-    <div class="ca-metric-card">
-      <div class="ca-metric-icon" style="background: #fce7f3; color: #db2777;">
-        <i class="fa-solid fa-percent"></i>
-        <!-- <mat-icon>avg_pace</mat-icon> -->
-      </div>
-      <div class="ca-metric-info">
-        <span class="ca-metric-value ca-metric-value-sm">{{ averageTimeSpendPerUser }}</span>
-        <span class="ca-metric-label">Avg per User</span>
-      </div>
-    </div>
+  <div class="ca-loading-wrapper" *ngIf="isLoading">
+    <mat-spinner diameter="48"></mat-spinner>
+    <p class="ca-loading-text">Fetching analytics data…</p>
   </div>
 
-  <div class="ca-filters-card">
-    <div class="ca-filters-header">
-      <mat-icon class="ca-filters-icon">filter_list</mat-icon>
-      <span class="ca-filters-title">Filters</span>
-      <button class="ca-btn-text" (click)="onClearFilterValue()">
-        <mat-icon>clear_all</mat-icon> Clear
-      </button>
-      <button class="ca-btn-export" (click)="exportCSV()">
-        <mat-icon>download</mat-icon> Export
-      </button>
-    </div>
-    <div class="ca-filters-row">
-      <div class="ca-input-box ca-filter-input">
-        <mat-icon class="ca-input-icon">person</mat-icon>
-        <input type="text" class="ca-input" placeholder="Filter by name" [(ngModel)]="filterValue.name" (keyup)="onFilter(filterValue)" autocomplete="off" />
-      </div>
-      <div class="ca-input-box ca-filter-input ca-date-box">
-        <mat-icon class="ca-input-icon">date_range</mat-icon>
-        <mat-date-range-input [rangePicker]="picker1">
-          <input matStartDate [(ngModel)]="filterValue.startdate" placeholder="Start">
-          <input matEndDate [(ngModel)]="filterValue.enddate" placeholder="End" (dateChange)="onFilter(filterValue)">
-        </mat-date-range-input>
-        <mat-datepicker-toggle matSuffix [for]="picker1" class="ca-date-toggle"></mat-datepicker-toggle>
-        <mat-date-range-picker #picker1></mat-date-range-picker>
-      </div>
-      <div class="ca-input-box ca-filter-input ca-select-box">
-        <mat-icon class="ca-input-icon">screen_share</mat-icon>
-        <mat-select [(ngModel)]="filterValue.from" (selectionChange)="onFilter(filterValue)" placeholder="Screen From" class="ca-select">
-          <mat-option *ngFor="let option of fromScreenList" [value]="option">{{ option }}</mat-option>
-        </mat-select>
-      </div>
-      <div class="ca-input-box ca-filter-input ca-filter-wide ca-select-box">
-        <mat-icon class="ca-input-icon">video_library</mat-icon>
-        <mat-select [(ngModel)]="filterValue.videoname" (selectionChange)="onFilter(filterValue)" placeholder="Video Name" multiple class="ca-select">
-          <mat-option *ngFor="let option of videoNameList" [value]="option">{{ option }}</mat-option>
-        </mat-select>
-      </div>
-      <div class="ca-input-box ca-filter-input">
-        <mat-icon class="ca-input-icon">timer</mat-icon>
-        <input type="number" class="ca-input" placeholder="Time spend > (mins)" [(ngModel)]="filterValue.totaltimespend" (keyup)="onFilter(filterValue)" />
-      </div>
-      <div class="ca-input-box ca-filter-input ca-select-box">
-        <mat-icon class="ca-input-icon">devices</mat-icon>
-        <mat-select [(ngModel)]="filterValue.platform_name" (selectionChange)="onFilter(filterValue)" placeholder="Platform" class="ca-select">
-          <mat-option *ngFor="let option of platformNameList" [value]="option">{{ option }}</mat-option>
-        </mat-select>
-      </div>
-    </div>
-  </div>
-
-  <div class="ca-table-outer">
-    <div class="ca-table-card">
-      <table mat-table [dataSource]="contentData" matSort>
-
-        <ng-container matColumnDef="logdate">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Log Date</th>
-          <td mat-cell *matCellDef="let row">
-            <span class="ca-cell-date">{{ row.logdate.toDate() | date:'M/d/yy, h:mm:ss a' }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="profileid">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-          <td mat-cell *matCellDef="let row">
-            <div class="ca-name-cell">
-              <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
-                <span class="ca-cell-name">{{ mapProfile[row.profileid] }}</span>
-              </ng-container>
-              <ng-template #newUserBlock>
-                <span class="ca-cell-name">{{ mapProfileNew[row.profileid] }}</span>
-                <span class="ca-badge-new">New</span>
-              </ng-template>
-              <mat-icon *ngIf="row['live']" class="ca-live-icon">play_circle_filled</mat-icon>
+  <ng-container *ngIf="!isLoading">
+    <mat-tab-group mat-align-tabs="center">
+      <mat-tab label="Analytics Table">
+        <div class="ca-metrics" *ngIf="hasFetched">
+          <div class="ca-metric-card">
+            <div class="ca-metric-icon" style="background: var(--ca-primary-soft); color: var(--ca-primary);">
+              <mat-icon>calendar_today</mat-icon>
             </div>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="from">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-from">From</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-from">
-            <span class="ca-chip">{{ row.from }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="videoname">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Video</th>
-          <td mat-cell *matCellDef="let row">
-            <span class="ca-cell-name">{{ row.videoname }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="platform_name">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-platform">Platform</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-platform">
-            <span class="ca-chip" *ngIf="row.platform_name">{{ row.platform_name }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="totalruntime">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-time">Runtime</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-time">
-            <span class="ca-cell-time">{{ convertDecimal(row.totalruntime) }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="lastwatchedtime">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-time">Last Watched</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-time">
-            <span class="ca-cell-time">{{ row.lastwatchedtime }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="totaltimespend">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-time">Time Spent</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-time">
-            <span class="ca-cell-time">{{ convertDecimal(row.totaltimespend) }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="type">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-type">Type</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-type">
-            <span class="ca-chip">{{ row.type }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="playlist">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-playlist">Playlist</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-playlist">
-            <span class="ca-cell-text">{{ row.playlistid ? row.playlistid == 'downloadsplaylist' ? 'Downloads Playlist' : mapPlaylist[row.playlistid] : null }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-status">Status</th>
-          <td mat-cell *matCellDef="let row" class="ca-col-status">
-            <span class="ca-chip" *ngIf="row.status">{{ row.status }}</span>
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="printLog(row)" class="ca-data-row"></tr>
-
-        <tr class="mat-row" *matNoDataRow>
-          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
-            <div class="ca-empty">
-              <mat-icon>analytics</mat-icon>
-              <p>No analytics data found</p>
+            <div class="ca-metric-info">
+              <span class="ca-metric-value">{{ querydays ?? 0 }}</span>
+              <span class="ca-metric-label">Days</span>
             </div>
-          </td>
-        </tr>
-      </table>
-    </div>
-    <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons class="ca-paginator"></mat-paginator>
-  </div>
+          </div>
+          <div class="ca-metric-card">
+            <div class="ca-metric-icon" style="background: #e0f2fe; color: #0284c7;">
+              <mat-icon>people</mat-icon>
+            </div>
+            <div class="ca-metric-info">
+              <span class="ca-metric-value">{{ uniqueuser ?? '—' }}</span>
+              <span class="ca-metric-label">Unique Users</span>
+            </div>
+          </div>
+          <div class="ca-metric-card ca-metric-wide">
+            <div class="ca-metric-icon" style="background: #dcfce7; color: #22c55e;">
+              <mat-icon>timer</mat-icon>
+            </div>
+            <div class="ca-metric-info">
+              <span class="ca-metric-value ca-metric-value-sm">
+                {{ uniqueUserContentConsumptionbyhours ?? '—' }}
+              </span>
+              <span class="ca-metric-label">Total Consumption (Hours)</span>
+            </div>
+          </div>
+          <div class="ca-metric-card ca-metric-wide">
+            <div class="ca-metric-icon" style="background: #fef3c7; color: #d97706;">
+              <mat-icon>schedule</mat-icon>
+            </div>
+            <div class="ca-metric-info">
+              <span class="ca-metric-value ca-metric-value-sm">
+                {{ uniqueUserContentConsumptionbydays ?? '—' }}
+              </span>
+              <span class="ca-metric-label">Total Consumption (Days)</span>
+            </div>
+          </div>
+          <div class="ca-metric-card">
+            <div class="ca-metric-icon" style="background: #fce7f3; color: #db2777;">
+              <i class="fa-solid fa-percent"></i>
+            </div>
+            <div class="ca-metric-info">
+              <span class="ca-metric-value ca-metric-value-sm">
+                {{ averageTimeSpendPerUser ?? '—' }}
+              </span>
+              <span class="ca-metric-label">Avg per User</span>
+            </div>
+          </div>
+        </div>
+        <div class="ca-filters-card" *ngIf="hasFetched">
+          <div class="ca-filters-header">
+            <mat-icon class="ca-filters-icon">filter_list</mat-icon>
+            <span class="ca-filters-title">Filters</span>
+            <button class="ca-btn-text" (click)="onClearFilterValue()">
+              <mat-icon>clear_all</mat-icon> Clear
+            </button>
+            <button class="ca-btn-export" (click)="exportCSV()">
+              <mat-icon>download</mat-icon> Export
+            </button>
+          </div>
+          <div class="ca-filters-row">
+            <div class="ca-input-box ca-filter-input">
+              <mat-icon class="ca-input-icon">person</mat-icon>
+              <input type="text" class="ca-input" placeholder="Filter by name" [(ngModel)]="filterValue.name"
+                (keyup)="onFilter(filterValue)" autocomplete="off" />
+            </div>
+            <div class="ca-input-box ca-filter-input ca-date-box">
+              <mat-icon class="ca-input-icon">date_range</mat-icon>
+              <mat-date-range-input [rangePicker]="picker1">
+                <input matStartDate [(ngModel)]="filterValue.startdate" placeholder="Start">
+                <input matEndDate [(ngModel)]="filterValue.enddate" placeholder="End"
+                  (dateChange)="onFilter(filterValue)">
+              </mat-date-range-input>
+              <mat-datepicker-toggle matSuffix [for]="picker1" class="ca-date-toggle"></mat-datepicker-toggle>
+              <mat-date-range-picker #picker1></mat-date-range-picker>
+            </div>
+            <div class="ca-input-box ca-filter-input ca-select-box">
+              <mat-icon class="ca-input-icon">screen_share</mat-icon>
+              <mat-select [(ngModel)]="filterValue.from" (selectionChange)="onFilter(filterValue)"
+                placeholder="Screen From" class="ca-select">
+                <mat-option *ngFor="let option of fromScreenList" [value]="option">{{ option }}</mat-option>
+              </mat-select>
+            </div>
+            <div class="ca-input-box ca-filter-input ca-filter-wide ca-select-box">
+              <mat-icon class="ca-input-icon">video_library</mat-icon>
+              <mat-select [(ngModel)]="filterValue.videoname" (selectionChange)="onFilter(filterValue)"
+                placeholder="Video Name" multiple class="ca-select">
+                <mat-option *ngFor="let option of videoNameList" [value]="option">{{ option }}</mat-option>
+              </mat-select>
+            </div>
+            <div class="ca-input-box ca-filter-input">
+              <mat-icon class="ca-input-icon">timer</mat-icon>
+              <input type="number" class="ca-input" placeholder="Time spend > (mins)"
+                [(ngModel)]="filterValue.totaltimespend" (keyup)="onFilter(filterValue)" />
+            </div>
+            <div class="ca-input-box ca-filter-input ca-select-box">
+              <mat-icon class="ca-input-icon">devices</mat-icon>
+              <mat-select [(ngModel)]="filterValue.platform_name" (selectionChange)="onFilter(filterValue)"
+                placeholder="Platform" class="ca-select">
+                <mat-option *ngFor="let option of platformNameList" [value]="option">{{ option }}</mat-option>
+              </mat-select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state: fetched but no data -->
+        <div class="ca-empty-state" *ngIf="hasFetched && contentData.data.length === 0">
+          <mat-icon>analytics</mat-icon>
+          <p>No analytics data found for the selected date range.</p>
+        </div>
+        <ng-container *ngIf="hasFetched && contentData.data.length > 0">
+          <div class="ca-table-outer">
+            <div class="ca-table-card">
+              <table mat-table [dataSource]="contentData" matSort>
+
+                <ng-container matColumnDef="logdate">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Log Date</th>
+                  <td mat-cell *matCellDef="let row">
+                    <span class="ca-cell-date">{{ row.logdate.toDate() | date:'M/d/yy, h:mm:ss a' }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="profileid">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+                  <td mat-cell *matCellDef="let row">
+                    <div class="ca-name-cell">
+                      <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
+                        <span class="ca-cell-name">{{ mapProfile[row.profileid] }}</span>
+                      </ng-container>
+                      <ng-template #newUserBlock>
+                        <span class="ca-cell-name">{{ mapProfileNew[row.profileid] }}</span>
+                        <span class="ca-badge-new">New</span>
+                      </ng-template>
+                      <mat-icon *ngIf="row['live']" class="ca-live-icon">play_circle_filled</mat-icon>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="from">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-from">From</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-from">
+                    <span class="ca-chip">{{ row.from }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="videoname">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Video</th>
+                  <td mat-cell *matCellDef="let row">
+                    <span class="ca-cell-name">{{ row.videoname }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="platform_name">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-platform">Platform</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-platform">
+                    <span class="ca-chip" *ngIf="row.platform_name">{{ row.platform_name }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="totalruntime">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-time">Runtime</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-time">
+                    <span class="ca-cell-time">{{ convertDecimal(row.totalruntime) }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="lastwatchedtime">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-time">Last Watched</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-time">
+                    <span class="ca-cell-time">{{ row.lastwatchedtime }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="totaltimespend">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-time">Time Spent</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-time">
+                    <span class="ca-cell-time">{{ convertDecimal(row.totaltimespend) }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="type">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-type">Type</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-type">
+                    <span class="ca-chip">{{ row.type }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="playlist">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-playlist">Playlist</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-playlist">
+                    <span class="ca-cell-text">
+                      {{ row.playlistid
+                        ? row.playlistid === 'downloadsplaylist'
+                          ? 'Downloads Playlist'
+                          : mapPlaylist[row.playlistid]
+                        : null }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="ca-col-status">Status</th>
+                  <td mat-cell *matCellDef="let row" class="ca-col-status">
+                    <span class="ca-chip" *ngIf="row.status">{{ row.status }}</span>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="printLog(row)"
+                  class="ca-data-row"></tr>
+
+                <tr class="mat-row" *matNoDataRow>
+                  <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+                    <div class="ca-empty">
+                      <mat-icon>analytics</mat-icon>
+                      <p>No results match your filters</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons class="ca-paginator"></mat-paginator>
+          </div>
+        </ng-container>
+
+
+
+      </mat-tab>
+      <mat-tab label="Tier Based">
+      </mat-tab>
+    </mat-tab-group>
+  </ng-container>
 </div>

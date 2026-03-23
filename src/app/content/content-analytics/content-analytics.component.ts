@@ -1,11 +1,18 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, OnDestroy } from '@angular/core';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { async, Subject, Subscription, takeUntil } from 'rxjs';
+import { Subject } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
-import { collection, collectionSnapshots, Firestore, getDocs, onSnapshot, orderBy, query, where } from '@angular/fire/firestore';
-import { log } from 'console';
+import {
+  collection,
+  Firestore,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  where
+} from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,6 +22,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatOptionModule } from '@angular/material/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-content-analytics',
@@ -30,315 +39,398 @@ import { MatSelectModule } from '@angular/material/select';
     MatTableModule,
     MatPaginatorModule,
     MatIconModule,
-    MatSelectModule
-  ],  templateUrl: './content-analytics.component.html',
+    MatSelectModule,
+    MatTabsModule,
+    MatProgressSpinnerModule
+  ],
+  templateUrl: './content-analytics.component.html',
   styleUrl: './content-analytics.component.css'
 })
-export class ContentAnalyticsComponent {
+export class ContentAnalyticsComponent implements OnDestroy {
 
-  contentAnalytics=[];
-  mapProfile = {}
-  //newuser
-  mapProfileNew = {}
+  contentAnalytics: any[] = [];
+  mapProfile: { [key: string]: string } = {};
+  mapProfileNew: { [key: string]: string } = {};
+
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
-  // displayedColumns: string[] = ['profileid','from','lastwatchedtime','logdate','totalruntime','totaltimespend','type','videoname'];
-  displayedColumns: string[] = ['logdate','profileid','from','videoname','platform_name','totalruntime','lastwatchedtime','totaltimespend','type','playlist','status'];
-  contentData = new MatTableDataSource();
+
+  displayedColumns: string[] = [
+    'logdate', 'profileid', 'from', 'videoname',
+    'platform_name', 'totalruntime', 'lastwatchedtime',
+    'totaltimespend', 'type', 'playlist', 'status'
+  ];
+
+  contentData = new MatTableDataSource<any>();
+
   startDate: Date;
   endDate: Date;
-  mapPlaylist ={}
+  mapPlaylist: { [key: string]: string } = {};
 
   filterValue = {
-    name:null,
-    startdate:null,
-    enddate:null,
-    from:null,
-    videoname:[],
-    totaltimespend:null,
-    platform_name:null
-  }
+    name: null,
+    startdate: null,
+    enddate: null,
+    from: null,
+    videoname: [],
+    totaltimespend: null,
+    platform_name: null
+  };
 
-  videoNameList = []
-  fromScreenList = []
-  platformNameList = []
+  videoNameList: string[] = [];
+  fromScreenList: string[] = [];
+  platformNameList: string[] = [];
+
   private subscription = new Subject<void>();
-  uniqueuser = 0
-  uniqueUserContentConsumptionbyhours:any = 0
-  uniqueUserContentConsumptionbydays:any = 0
-  averageTimeSpendPerUser:any = 0
-  querydays:any = null
-  unsubscribeContentAnalytics: any;
+  private unsubscribeContentAnalytics: (() => void) | null = null;
+  uniqueuser: number | null = null;
+  uniqueUserContentConsumptionbyhours: string | null = null;
+  uniqueUserContentConsumptionbydays: string | null = null;
+  averageTimeSpendPerUser: string | null = null;
+  querydays: number | null = null;
+
+  isLoading = false;
+  hasFetched = false;
+
+  seriesDataList: any[] = [];
+  tierData :any[] = [];
+  tiermap: any = {};
+
   constructor(
     public firestore: Firestore,
-    private guard : AuthguardService
-  ){
-    this.startDate = new Date(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate() -7));
-    this.endDate = new Date(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()));
+    private guard: AuthguardService
+  ) {
+    const today = new Date();
+    this.startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+    this.endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
     this.guard.getProfileMap().then(e => {
-      this.mapProfile = e.map
-    })
-    //newuser
+      this.mapProfile = e.map;
+    });
     this.guard.getProfileMapNewUser().then(newuser => {
-      this.mapProfileNew = newuser.map
-    })
-    this.filterData();
-    this.querydays = Math.round((Math.abs(new Date(this.endDate).getTime() - new Date(this.startDate).getTime()))/(1000*60*60*24))
+      this.mapProfileNew = newuser.map;
+    });
+
   }
 
   ngOnInit(): void {
-    this.contentData.filterPredicate = this.customfilter()
+    this.contentData.filterPredicate = this.customfilter();
+    this.filterData();
+    this.seriesData();
   }
+  async seriesData() {
+    await getDocs(collection(this.firestore, 'series')).then((series) => {
+      this.seriesDataList = []
+      for (let i = 0; i < series.docs.length; i++) {
+        const element = series.docs[i];
+        this.seriesDataList.push({
+          id: element.id,
+          ...element.data()
+        });
+      }
+      console.log(this.seriesDataList,'seriesss dataaaa');
+    })
+    .catch((error) => {
+      console.error(error, 'series error');
+    });
+   await this.loadTierData()
+  }
+  async loadTierData() {
+    await getDocs(collection(this.firestore, 'tier')).then((tier) => {
+      this.tiermap = {}
+      this.tierData = []
+      for (let i = 0; i < tier.docs.length; i++) {
+        const element = tier.docs[i];
+        this.tierData.push({
+          id: element.id,
+          ...element.data()
+        });
+        this.tiermap[element.data()['id']] = element.data();
+      }
+      console.log(this.tierData,'dataaaa');
+    })
+    .catch((error) => {
+      console.error(error, 'series error');
+    });
+    this.mapTierToSeries()
+  }
+  mapTierToSeries() {
+    const result: any = {};
 
-  onClearFilterValue(){
-    this.filterValue = {
-      name:null,
-      startdate:null,
-      enddate:null,
-      from:null,
-      videoname:[],
-      totaltimespend:null,
-      platform_name:null
+    this.seriesDataList.forEach(series => {
+      const tiers = series.tier || [];
+
+      tiers.forEach((tierRef: any) => {
+        const tierid = tierRef.id || tierRef;
+
+        if (!result[tierid]) {
+          result[tierid] = [];
+        }
+
+        result[tierid].push(series);
+      });
+    });
+
+    Object.keys(result).forEach(tierid => {
+      const tierName = this.tiermap[tierid]?.tier || tierid;
+
+      console.log(`\n🔹 ${tierName}`);
+
+      result[tierid].forEach((series: any) => {
+        console.log(`   - ${series.seriesName || series.id}`);
+      });
+    });
+  }
+  filterData(): void {
+    if (this.unsubscribeContentAnalytics) {
+      this.unsubscribeContentAnalytics();
+      this.unsubscribeContentAnalytics = null;
     }
-    this.onFilter(this.filterValue)
-  }
+    this.contentAnalytics = [];
+    this.fromScreenList = [];
+    this.videoNameList = [];
+    this.platformNameList = [];
+    this.resetMetrics();
+    this.isLoading = true;
+    this.hasFetched = false;
 
-  ngAfterViewInit(){
-    this.contentData.data = this.contentAnalytics
-    this.contentData.sort = this.sort
-    this.contentData.paginator = this.paginator
-  }
+    this.startDate = new Date(this.startDate.setHours(0, 0, 0, 0));
+    this.endDate = new Date(this.endDate.setHours(23, 59, 59, 999));
 
-  convertDecimal(value:number){
-    const minutes = Math.floor(value / 60); // Get the whole minutes
-    const remainingSeconds = value % 60; // Get the remaining seconds
-    return `${minutes} mins ${remainingSeconds} sec (${value})`
-  }
+    this.querydays = Math.round(
+      Math.abs(this.endDate.getTime() - this.startDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-  convertDaysHoursMins(seconds:number){
-    const days = Math.floor(seconds / (3600 * 24));
-    const remainingSecondsAfterDays = seconds % (3600 * 24);
+    const contentanalyticsRef = collection(this.firestore, 'content analytics');
+    const contentanalyticsQuery = query(
+      contentanalyticsRef,
+      where('logdate', '>', this.startDate),
+      where('logdate', '<', this.endDate),
+      orderBy('logdate', 'desc')
+    );
 
-    const hours = Math.floor(remainingSecondsAfterDays / 3600);
-    const remainingSecondsAfterHours = remainingSecondsAfterDays % 3600;
-
-    const minutes = Math.floor(remainingSecondsAfterHours / 60);
-    const remainingSeconds = remainingSecondsAfterHours % 60;
-
-    return `${days} days ${hours} hours ${minutes} mins ${remainingSeconds} secs`
-  }
-
-  convertHoursMins(seconds:number){
-    const hours = Math.floor(seconds / 3600);
-    const remainingSecondsAfterHours = seconds % 3600;
-
-    const minutes = Math.floor(remainingSecondsAfterHours / 60);
-    const remainingSeconds = remainingSecondsAfterHours % 60;
-
-    return `${hours} hours ${minutes} mins ${remainingSeconds} secs`
-  }
-
-
-  filterData(){
-    // ref =>ref.where('logdate','>', this.startDate).where('logdate','<', this.endDate)
-    // console.log(this.subscription?.closed);
-    // if(this.subscription?.closed === false) this.subscription.unsubscribe()
-    this.contentAnalytics = []
-    this.ngAfterViewInit()
-    this.startDate = new Date(this.startDate.setHours(0,0,0,0))
-    this.endDate = new Date(this.endDate.setHours(23,59,59,999))
-    console.log(this.startDate,this.endDate);
-    const contentanalyticsRef = collection(this.firestore,"content analytics")
-    const contentanalyticsQuery = query(contentanalyticsRef,where('logdate','>', this.startDate),where('logdate','<', this.endDate),orderBy('logdate','desc'))
-    
     this.unsubscribeContentAnalytics = onSnapshot(
       contentanalyticsQuery,
       (snapshot) => {
-        // Process each change exactly like before
-        snapshot.docChanges().forEach(e => {
-          let element = e.doc.data();
-          element["docid"] = e.doc.id;
-          element['live'] = (e.type === 'modified');
-          this.contentAnalytics.push(element);
-        });
-        
-        this.ngAfterViewInit();
-        this.getUniqueUser();
-        
-        for (let i = 0; i < this.contentAnalytics.length; i++) {
-          const element = this.contentAnalytics[i];
-          if(!this.fromScreenList.includes(element['from'])){
+        if (!this.hasFetched) {
+          this.contentAnalytics = snapshot.docs.map(doc => {
+            const data = doc.data();
+            data['docid'] = doc.id;
+            data['live'] = false;
+            return data;
+          });
+          this.hasFetched = true;
+          this.isLoading = false;
+        } else {
+          snapshot.docChanges().forEach(change => {
+            const data = change.doc.data();
+            data['docid'] = change.doc.id;
+            data['live'] = (change.type === 'modified');
+
+            if (change.type === 'added') {
+              this.contentAnalytics.unshift(data);
+            } else if (change.type === 'modified') {
+              const idx = this.contentAnalytics.findIndex(e => e['docid'] === data['docid']);
+              if (idx !== -1) this.contentAnalytics[idx] = data;
+            } else if (change.type === 'removed') {
+              this.contentAnalytics = this.contentAnalytics.filter(e => e['docid'] !== data['docid']);
+            }
+          });
+        }
+        this.contentAnalytics.forEach(element => {
+          if (element['from'] && !this.fromScreenList.includes(element['from'])) {
             this.fromScreenList.push(element['from']);
           }
-          if(!this.videoNameList.includes(element['videoname'])){
+          if (element['videoname'] && !this.videoNameList.includes(element['videoname'])) {
             this.videoNameList.push(element['videoname']);
           }
-          if(element['platform_name'] != undefined){
-            if(!this.platformNameList.includes(element['platform_name'])){
-              this.platformNameList.push(element['platform_name']);
-            }
+          if (element['platform_name'] && !this.platformNameList.includes(element['platform_name'])) {
+            this.platformNameList.push(element['platform_name']);
           }
-        }
-        
-        this.querydays = Math.round((Math.abs(new Date(this.endDate).getTime() - new Date(this.startDate).getTime()))/(1000*60*60*24));
+        });
+        this.contentData.data = [...this.contentAnalytics];
+        this.contentData.sort = this.sort;
+        this.contentData.paginator = this.paginator;
+        this.getUniqueUser();
       },
       (error) => {
-        console.error("Content analytics error:", error);
+        console.error('Content analytics error:', error);
+        this.isLoading = false;
       }
     );
 
-    const solarvoiceplaylistRef = collection(this.firestore,"solar voice playlist")
-    getDocs(solarvoiceplaylistRef).then(playlist=>{
-      for(let i = 0; i<playlist.docs.length;i++){
-        const element = playlist.docs[i].data();
-        this.mapPlaylist[element['id']] = element['name']
-      }
+    const solarvoiceplaylistRef = collection(this.firestore, 'solar voice playlist');
+    getDocs(solarvoiceplaylistRef).then(playlist => {
+      playlist.docs.forEach(doc => {
+        const element = doc.data();
+        this.mapPlaylist[element['id']] = element['name'];
+      });
     });
+  }
+  ngAfterViewInit(): void {
+    this.contentData.data = this.contentAnalytics;
+    this.contentData.sort = this.sort;
+    this.contentData.paginator = this.paginator;
+  }
+
+  onClearFilterValue(): void {
+    this.filterValue = {
+      name: null,
+      startdate: null,
+      enddate: null,
+      from: null,
+      videoname: [],
+      totaltimespend: null,
+      platform_name: null
+    };
+    this.onFilter(this.filterValue);
+  }
+
+  convertDecimal(value: number): string {
+    const minutes = Math.floor(value / 60);
+    const remainingSeconds = value % 60;
+    return `${minutes} mins ${remainingSeconds} sec (${value})`;
+  }
+
+  convertDaysHoursMins(seconds: number): string {
+    const days = Math.floor(seconds / (3600 * 24));
+    const rem1 = seconds % (3600 * 24);
+    const hours = Math.floor(rem1 / 3600);
+    const rem2 = rem1 % 3600;
+    const minutes = Math.floor(rem2 / 60);
+    const remainingSeconds = rem2 % 60;
+    return `${days} days ${hours} hours ${minutes} mins ${remainingSeconds} secs`;
+  }
+
+  convertHoursMins(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const rem = seconds % 3600;
+    const minutes = Math.floor(rem / 60);
+    const remainingSeconds = rem % 60;
+    return `${hours} hours ${minutes} mins ${remainingSeconds} secs`;
+  }
+
+  private resetMetrics(): void {
+    this.uniqueuser = null;
+    this.uniqueUserContentConsumptionbyhours = null;
+    this.uniqueUserContentConsumptionbydays = null;
+    this.averageTimeSpendPerUser = null;
   }
 
   ngOnDestroy(): void {
+    if (this.unsubscribeContentAnalytics) {
+      this.unsubscribeContentAnalytics();
+    }
     this.subscription.next();
     this.subscription.complete();
   }
 
+  getUniqueUser(): void {
+    const uniqueUser: { [key: string]: number } = {};
+    const filtered = this.contentData.filteredData;
 
-  applyNameFilter(event: Event) {
-    const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
-    this.contentData.filter = filterValue;
-  }
-
-  getUniqueUser(){
-    // this.uniqueuser = Array.from(new Map(this.contentAnalytics.map(e => [e.profileid,e])).values()).length;
-    let uniqueUser:{[key:string]:number} = {}
-    for (let i = 0; i < this.contentData.filteredData.length; i++) {
-      const element = this.contentData.filteredData[i];
-      uniqueUser[element['profileid']] = (uniqueUser[element['profileid']] || 0) + element['totaltimespend']
+    for (const element of filtered) {
+      uniqueUser[element['profileid']] = (uniqueUser[element['profileid']] || 0) + element['totaltimespend'];
     }
-    this.uniqueuser = Object.keys(uniqueUser).length
-    let totalconsumption = Object.values(uniqueUser).reduce((c,a) => {
-      return c + a
-    },0)
-    this.uniqueUserContentConsumptionbydays = this.convertDaysHoursMins(totalconsumption)
-    this.uniqueUserContentConsumptionbyhours = this.convertHoursMins(totalconsumption)
-    this.averageTimeSpendPerUser = this.convertHoursMins(Math.round(totalconsumption/this.uniqueuser))
+
+    this.uniqueuser = Object.keys(uniqueUser).length;
+
+    const totalconsumption = Object.values(uniqueUser).reduce((c, a) => c + a, 0);
+    this.uniqueUserContentConsumptionbydays = this.convertDaysHoursMins(totalconsumption);
+    this.uniqueUserContentConsumptionbyhours = this.convertHoursMins(totalconsumption);
+    this.averageTimeSpendPerUser = this.uniqueuser > 0
+      ? this.convertHoursMins(Math.round(totalconsumption / this.uniqueuser))
+      : '0 hours 0 mins 0 secs';
   }
 
-  onFilter(value:any){
-    this.contentData.filter = JSON.stringify(value)
+  onFilter(value: any): void {
+    this.contentData.filter = JSON.stringify(value);
+    this.getUniqueUser();
   }
-  //newuser
-  public customfilter():(data:any,filter:string)=> boolean{
-    let filterFunction = (data:any, filter:any):boolean => {
-      let e = data
-      let value = JSON.parse(filter);
-      return (![null,undefined].includes(value['name']) ? (
-      (this.mapProfile[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) ||
-      (this.mapProfileNew[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0)): true)&& 
-      (value['startdate'] != null && value['enddate'] != null ? (e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0,0,0,0)) && e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23,59,59,59))) : true) &&
-      (![null,undefined].includes(value['from']) ? (e['from'] === value['from']) : true) &&
-      (value['videoname'].length != 0 ? value['videoname'].includes(e['videoname']) : true) &&
-      (![null,undefined].includes(value['totaltimespend']) ? (Math.ceil(e['totaltimespend']/60) > value['totaltimespend']) : true) &&
-      (![null,undefined].includes(value['platform_name']) ? (e['platform_name'] != undefined ? e['platform_name'] === value['platform_name'] : false) : true)
-    }
-    return filterFunction;
-  }
-  // public customfilter():(data:any,filter:string)=> boolean{
-  //   let filterFunction = (data:any, filter:any):boolean => {
-  //     let e = data
-  //     let value = JSON.parse(filter);
-  //     return (![null,undefined].includes(value['name']) ? (this.mapProfile[e['profileid']].toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) : true) && 
-  //           (value['startdate'] != null && value['enddate'] != null ? (e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0,0,0,0)) && e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23,59,59,59))) : true) &&
-  //           (![null,undefined].includes(value['from']) ? (e['from'] === value['from']) : true) &&
-  //           (value['videoname'].length != 0 ? value['videoname'].includes(e['videoname']) : true) &&
-  //           (![null,undefined].includes(value['totaltimespend']) ? (Math.ceil(e['totaltimespend']/60) > value['totaltimespend']) : true) &&
-  //           (![null,undefined].includes(value['platform_name']) ? (e['platform_name'] != undefined ? e['platform_name'] === value['platform_name'] : false) : true)
-  //   }
-  //   return filterFunction;
-  // }
 
-  async exportCSV(){
-    // ['profileid','from','lastwatchedtime','logdate','totalruntime', 'totaltimespend' ,'type', 'videoname'];
-    var data = []
-    let clonedContentData = Object.assign([],this.contentData.filteredData.length != 0 ? this.contentData.filteredData : this.contentData.data)
-    // console.log("clonedContentData",clonedContentData);
-    
-    for (let i = 0; i < clonedContentData.length; i++) {
-      let element = clonedContentData[i]
-      if([null,undefined].includes(element['videoname'])){
-        console.log("videoname",element);
-        
+  public customfilter(): (data: any, filter: string) => boolean {
+    return (data: any, filter: string): boolean => {
+      const e = data;
+      const value = JSON.parse(filter);
+      return (
+        (value['name'] != null
+          ? (this.mapProfile[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) ||
+            (this.mapProfileNew[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0)
+          : true) &&
+        (value['startdate'] != null && value['enddate'] != null
+          ? e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0, 0, 0, 0)) &&
+            e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23, 59, 59, 59))
+          : true) &&
+        (value['from'] != null ? e['from'] === value['from'] : true) &&
+        (value['videoname']?.length > 0 ? value['videoname'].includes(e['videoname']) : true) &&
+        (value['totaltimespend'] != null ? Math.ceil(e['totaltimespend'] / 60) > value['totaltimespend'] : true) &&
+        (value['platform_name'] != null
+          ? e['platform_name'] != null ? e['platform_name'] === value['platform_name'] : false
+          : true)
+      );
+    };
+  }
+
+  async exportCSV(): Promise<void> {
+    const data: any[] = [];
+    const cloned = this.contentData.filteredData.length > 0
+      ? [...this.contentData.filteredData]
+      : [...(this.contentData.data as any[])];
+
+    for (const element of cloned) {
+      if (element['videoname'] == null) {
+        console.log('videoname missing:', element);
       }
+      const istOffset = (5 * 60 + 30) * 60 * 1000;
+      const d = new Date(element['logdate'].toDate().getTime() + istOffset);
       data.push({
-        "logdate":new Date(new Date(element['logdate'].toDate()).getTime() + (5 * 60 * 60 * 1000) + (30 * 60 * 1000)).toISOString().substring(0,10),
-        "logtime":new Date(new Date(element['logdate'].toDate()).getTime() + (5 * 60 * 60 * 1000) + (30 * 60 * 1000)).toISOString().substring(11,19),
-        "name":this.mapProfile[element['profileid']] ?? this.mapProfileNew[element['profileid']],
-        "from":element['from'],
-        "videoname" :![null,undefined].includes(element['videoname']) ? element['videoname'].replace(/,/g," ") : null,
-        "totalruntime(sec)":element['totalruntime'],
-        "lastwatchedtime":element['lastwatchedtime'],
-        // "lastwatchedtime(only mins)":element['lastwatchedtime'].slice(2,4),
-        "totaltimespend(sec)":element['totaltimespend'],
-        // "platform" : element['platform_name'] ?? null
-        "platform": element['platform_name'] ?? "A&H App" 
-        // type:element['type']
-      })
-        // element['name'] = this.mapProfile[element['profileid']]
-        // delete element['profileid']
-        // data.push(element)
+        logdate: d.toISOString().substring(0, 10),
+        logtime: d.toISOString().substring(11, 19),
+        name: this.mapProfile[element['profileid']] ?? this.mapProfileNew[element['profileid']],
+        from: element['from'],
+        videoname: element['videoname'] != null ? element['videoname'].replace(/,/g, ' ') : null,
+        'totalruntime(sec)': element['totalruntime'],
+        lastwatchedtime: element['lastwatchedtime'],
+        'totaltimespend(sec)': element['totaltimespend'],
+        platform: element['platform_name'] ?? 'A&H App'
+      });
     }
-    // console.log(JSON.stringify(data))
-    this.downloadFile(data, new Date().toDateString() + " " + "content analytics")
+    this.downloadFile(data, new Date().toDateString() + ' content analytics');
   }
 
-  downloadFile(data,filename = 'data') {
-    if(data.length != 0){
-      let csvData = this.ConvertToCSV(data,Object.keys(data[0]));
-      // console.log(csvData)
-      let blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
-      let dwldLink = document.createElement("a");
-      let url = URL.createObjectURL(blob);
-      let isSafariBrowser = navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1;
-      if (isSafariBrowser) { 
-        dwldLink.setAttribute("target", "_blank");
-      }
-      dwldLink.setAttribute("href", url);
-      dwldLink.setAttribute("download", filename + ".csv");
-      dwldLink.style.visibility = "hidden";
-      document.body.appendChild(dwldLink);
-      dwldLink.click();
-      document.body.removeChild(dwldLink);
-    }else{
-      console.log("export data empty");
+  downloadFile(data: any[], filename = 'data'): void {
+    if (data.length === 0) {
+      console.log('export data empty');
+      return;
     }
+    const csvData = this.ConvertToCSV(data, Object.keys(data[0]));
+    const blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const isSafari = navigator.userAgent.indexOf('Safari') !== -1 && navigator.userAgent.indexOf('Chrome') === -1;
+    if (isSafari) link.setAttribute('target', '_blank');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename + '.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
-  ConvertToCSV(objArray, headerList) {
-    let array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
-    let str = '';
-    let row = 'Index,';
-
-    for (let index in headerList) {
-      row += headerList[index] + ',';
-    }
-    row = row.slice(0, -1);
-    // console.log(row);
-    
-    str += row + '\r\n';
+  ConvertToCSV(objArray: any[], headerList: string[]): string {
+    const array = typeof objArray !== 'object' ? JSON.parse(objArray) : objArray;
+    let str = 'Index,' + headerList.join(',') + '\r\n';
     for (let i = 0; i < array.length; i++) {
       let line = (i + 1) + '';
-      for (let index in headerList) {
-        let head = headerList[index];
+      for (const head of headerList) {
         line += ',' + array[i][head];
       }
       str += line + '\r\n';
     }
-    // console.log(str);
-    
     return str;
   }
 
-  printLog(log){
-    console.log(log)
+  printLog(log: any): void {
+    console.log(log);
   }
-
 }
