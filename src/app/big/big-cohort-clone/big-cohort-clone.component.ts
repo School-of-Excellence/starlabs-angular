@@ -1508,6 +1508,9 @@ export class BigCohortCloneComponent {
   }
 
   onCreateAssignment(cohorts: any) {
+    console.log(this.cohortsList.map((e)=> e.marathonref || null));
+    console.log(this.cohortsList);
+    console.log(this.selectedMarathon);
     let dialogref = this.dialog.open(PlanActivityComponent, {
       maxWidth: '100vw',
       width: '100vw',
@@ -1516,7 +1519,7 @@ export class BigCohortCloneComponent {
       data: {
         type: 'new',
         doc: cohorts,
-        cohortslist: this.cohortsList.filter(e => this.selectedMarathon === e['marathonref'].id),
+        cohortslist: this.cohortsList.filter(e => this.selectedMarathon === e['marathonref']?.id),
         mapProfile: this.mapProfile,
         participantList: this.participantlist ?? []
       },
@@ -1528,6 +1531,8 @@ export class BigCohortCloneComponent {
   }
 
   onEditAssignment(cohorts: any, assignment: any) {
+    console.log(this.cohortsList.map((e)=> e.marathonref.id || null));
+    console.log(this.selectedMarathon);
     let dialogref = this.dialog.open(PlanActivityComponent, {
       data: {
         type: 'edit',

@@ -30,3 +30,7 @@ mat-card {
   display: flex;
   justify-content: flex-end;
 }
+
+input[type="datetime-local"] {
+  color-scheme: dark; /* if you're on a dark theme */
+}

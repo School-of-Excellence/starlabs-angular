@@ -1,4 +1,4 @@
-<div class="container">
+<!-- <div class="container">
   <mat-card>
     <mat-card-content>
       <h2>Create New Workshop</h2>
@@ -16,15 +16,6 @@
         <input matInput formControlName="title">
         <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
         </mat-form-field>
-        <!-- <mat-form-field appearance="fill" class="full-width">
-        <mat-label>Category</mat-label>
-        <mat-select formControlName="category">
-            <mat-option value="Web Development">Web Development</mat-option>
-            <mat-option value="Mobile Development">Mobile Development</mat-option>
-            <mat-option value="Data Science">Data Science</mat-option>
-        </mat-select>
-        <mat-error *ngIf="form.get('category')?.hasError('required')">Category is required.</mat-error>
-        </mat-form-field> -->
 
         <div class="date-row">
             <mat-form-field appearance="fill" class="half-width">
@@ -60,6 +51,109 @@
             <mat-error *ngIf="form.get('workshopEndDate')?.hasError('required')">Workshop End Date is required.</mat-error>
             <mat-error *ngIf="form.get('workshopEndDate')?.hasError('invalid')">End date must be after start date.</mat-error>
             </mat-form-field>
+        </div>
+
+        <div class="actions">
+          <button mat-raised-button color="primary" (click)="createWorkshop()">Create Workshop</button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div> -->
+
+<div class="container">
+  <mat-card>
+    <mat-card-content>
+      <h2>Create New Workshop</h2>
+      <form [formGroup]="form">
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>What are you creating?</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="workshop">Workshop</mat-option>
+            <mat-option value="eiflix">EiFlix</mat-option>
+          </mat-select>
+          <mat-error *ngIf="form.get('type')?.hasError('required')">Type is required.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Title</mat-label>
+          <input matInput formControlName="title">
+          <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
+        </mat-form-field>
+
+        <!-- Registration Start -->
+        <div class="date-row">
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Registration Start Date</mat-label>
+            <input matInput [matDatepicker]="regStartPicker" formControlName="registrationStartDate">
+            <mat-datepicker-toggle matSuffix [for]="regStartPicker"></mat-datepicker-toggle>
+            <mat-datepicker #regStartPicker></mat-datepicker>
+            <mat-error *ngIf="form.get('registrationStartDate')?.hasError('required')">Required.</mat-error>
+          </mat-form-field>
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Registration Start Time</mat-label>
+            <input matInput [matTimepicker]="regStartTime" formControlName="registrationStartTime">
+            <mat-timepicker-toggle matSuffix [for]="regStartTime"></mat-timepicker-toggle>
+            <mat-timepicker #regStartTime></mat-timepicker>
+            <mat-error *ngIf="form.get('registrationStartTime')?.hasError('required')">Required.</mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Registration End -->
+        <div class="date-row">
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Registration End Date</mat-label>
+            <input matInput [matDatepicker]="regEndPicker" formControlName="registrationEndDate">
+            <mat-datepicker-toggle matSuffix [for]="regEndPicker"></mat-datepicker-toggle>
+            <mat-datepicker #regEndPicker></mat-datepicker>
+            <mat-error *ngIf="form.get('registrationEndDate')?.hasError('required')">Required.</mat-error>
+            <mat-error *ngIf="form.get('registrationEndDate')?.hasError('invalid')">End must be after start.</mat-error>
+          </mat-form-field>
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Registration End Time</mat-label>
+            <input matInput [matTimepicker]="regEndTime" formControlName="registrationEndTime">
+            <mat-timepicker-toggle matSuffix [for]="regEndTime"></mat-timepicker-toggle>
+            <mat-timepicker #regEndTime></mat-timepicker>
+            <mat-error *ngIf="form.get('registrationEndTime')?.hasError('required')">Required.</mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Workshop Start -->
+        <div class="date-row">
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Workshop Start Date</mat-label>
+            <input matInput [matDatepicker]="startPicker" formControlName="workshopStartDate">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+            <mat-error *ngIf="form.get('workshopStartDate')?.hasError('required')">Required.</mat-error>
+            <mat-error *ngIf="form.get('workshopStartDate')?.hasError('invalid')">Must be after registration end.</mat-error>
+          </mat-form-field>
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Workshop Start Time</mat-label>
+            <input matInput [matTimepicker]="workshopStartTime" formControlName="workshopStartTime">
+            <mat-timepicker-toggle matSuffix [for]="workshopStartTime"></mat-timepicker-toggle>
+            <mat-timepicker #workshopStartTime></mat-timepicker>
+            <mat-error *ngIf="form.get('workshopStartTime')?.hasError('required')">Required.</mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Workshop End -->
+        <div class="date-row">
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Workshop End Date</mat-label>
+            <input matInput [matDatepicker]="endPicker" formControlName="workshopEndDate">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+            <mat-error *ngIf="form.get('workshopEndDate')?.hasError('required')">Required.</mat-error>
+            <mat-error *ngIf="form.get('workshopEndDate')?.hasError('invalid')">End must be after start.</mat-error>
+          </mat-form-field>
+          <mat-form-field appearance="fill" class="half-width">
+            <mat-label>Workshop End Time</mat-label>
+            <input matInput [matTimepicker]="workshopEndTime" formControlName="workshopEndTime">
+            <mat-timepicker-toggle matSuffix [for]="workshopEndTime"></mat-timepicker-toggle>
+            <mat-timepicker #workshopEndTime></mat-timepicker>
+            <mat-error *ngIf="form.get('workshopEndTime')?.hasError('required')">Required.</mat-error>
+          </mat-form-field>
         </div>
 
         <div class="actions">

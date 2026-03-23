@@ -14,21 +14,23 @@
             <h5 class="mb-0">{{studio["title"]}}</h5>
             <small class="text-muted">Room ID: {{studio['roomid']}}</small>
           </div>
-          <button 
-            class="btn btn-sm"
-            [class.btn-danger]="listeningRoom == studio['roomid']"
-            [class.btn-outline-primary]="listeningRoom != studio['roomid']"
-            (click)="toggleListening(studio['roomid'])">
-            <i class="bi" [class.bi-volume-up-fill]="listeningRoom == studio['roomid']" [class.bi-volume-mute]="listeningRoom != studio['roomid']"></i>
-            {{listeningRoom == studio['roomid'] ? "Stop" : "Start"}} Listening
-          </button>
-          <button 
-            class="btn btn-sm ms-2"
-            [class.btn-danger]="true"
-            [class.btn-outline-primary]="true"
-            (click)="endCall(studio['roomid'])">
-            End Room
-          </button>
+          <div>
+            <button 
+              class="btn btn-sm"
+              [class.btn-danger]="listeningRoom == studio['roomid']"
+              [class.btn-outline-primary]="listeningRoom != studio['roomid']"
+              (click)="toggleListening(studio['roomid'])">
+              <i class="bi" [class.bi-volume-up-fill]="listeningRoom == studio['roomid']" [class.bi-volume-mute]="listeningRoom != studio['roomid']"></i>
+              {{listeningRoom == studio['roomid'] ? "Stop" : "Start"}} Listening
+            </button>
+            <button 
+              class="btn btn-sm ms-3 text-light border-0"
+              [class.btn-danger]="true"
+              [class.btn-outline-primary]="true"
+              (click)="endCall(studio['roomid'])">
+              End Room
+            </button>
+          </div>
         </div>
 
         <div class="card-body">
