@@ -563,11 +563,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async joinCall() {
-  const allowed = await this.prepareParticipant();
-  if (!allowed) {
-    alert("Please allow Camera & Microphone to join the call.");
-    return;
-  }
+    const allowed = await this.prepareParticipant();
+    if (!allowed) {
+      alert("Please allow Camera & Microphone to join the call.");
+      return;
+    }
 
     this.meetingRoomStatus = "connecting"
 
@@ -695,8 +695,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
- 
-
   private async getTokenWithRetry(): Promise<any> {
     const roomName = this.roomDetail.roomId;
     const participantId = this.loggedinProfileid || `user-${Date.now()}`;
@@ -728,9 +726,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  
-
-  
   // Leave/Disconnect from the Room
   async leaveRoom(confirmLeave: boolean) {
 
@@ -827,14 +822,57 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // Screen Share Control
+  isScreenSharing(): boolean {
+    const screenSharePub = this.getLocalTrackPublication(Track.Source.ScreenShare);
+    return screenSharePub !== undefined && !screenSharePub.isMuted;
+  }
+
+  isAnyoneScreenSharing(): boolean {
+    const remoteTracks = Array.from(this.remoteParticipants().values());
+    return remoteTracks.some(track => track.trackPublication.source === Track.Source.ScreenShare);
+  }
+
+  // Update toggleScreenShare to check this
   async toggleScreenShare() {
-    if (!this.isSharing) {
+    if (!this.isScreenSharing()) {
+      // Check if someone else is already sharing
+      if (this.isAnyoneScreenSharing()) {
+        alert("Someone else is already sharing their screen");
+        return;
+      }
       await this.startScreenShare();
     } else {
       this.stopScreenShare();
     }
-    this.isSharing = !this.isSharing;
+  }
+
+  // Get whoever is sharing screen (local or remote)
+  getActiveScreenShare(): { track: any, isLocal: boolean, participantName: string } | null {
+    // Check local first
+    const localScreenShare = this.getLocalTrackPublication(Track.Source.ScreenShare);
+    if (localScreenShare && !localScreenShare.isMuted) {
+      return {
+        track: localScreenShare.videoTrack,
+        isLocal: true,
+        participantName: this.loggedinProfileRole["name"]
+      };
+    }
+
+    // Check remote participants
+    const remoteTracks = Array.from(this.remoteParticipants().values());
+    const remoteScreenShare = remoteTracks.find(
+      track => track.trackPublication.source === Track.Source.ScreenShare
+    );
+
+    if (remoteScreenShare) {
+      return {
+        track: remoteScreenShare.trackPublication.videoTrack,
+        isLocal: false,
+        participantName: remoteScreenShare.participantName
+      };
+    }
+
+    return null;
   }
 
   async startScreenShare() {
