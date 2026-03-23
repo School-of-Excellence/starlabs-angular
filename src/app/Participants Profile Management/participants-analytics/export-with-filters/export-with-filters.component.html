@@ -1,25 +1,17 @@
 <div class="export-dialog">
     <div class="dialog-header">
         <h4 mat-dialog-title>Export Data</h4>
-        <button mat-icon-button mat-dialog-close>
+        <button mat-icon-button (click)="closeDialog()">
             <mat-icon>close</mat-icon>
         </button>
     </div>
 
     <mat-dialog-content>
-        <!-- Filter Type Buttons -->
-        <div class="filter-buttons">
-            <button mat-stroked-button [class.active]="selectedFilter === 'productconsumption'"
-                (click)="selectFilter('productconsumption')">
-                Product Consumption
-            </button>
-        </div>
-
         <!-- Dynamic Filter Section -->
         <div class="filter-section" *ngIf="selectedFilter">
         
             <!-- Date Range Filter -->
-            <div *ngIf="selectedFilter === 'productconsumption'" class="filter-content">
+            <div class="filter-content">
                 <form [formGroup]="filterForm">
         
                     <!-- Consumed Products Section -->
@@ -46,6 +38,24 @@
                                             Product is required
                                         </mat-error>
                                     </mat-form-field>
+
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Comparison</mat-label>
+                                        <mat-select formControlName="comparison">
+                                            <mat-option value="equalto">
+                                                Equal To
+                                            </mat-option>
+                                            <mat-option value="groreqto">
+                                                Greater Than or Equal to
+                                            </mat-option>
+                                            <mat-option value="lsoreqto">
+                                                Less Than or Equal to
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('comparison')?.hasError('required')">
+                                            Comparison is required
+                                        </mat-error>
+                                    </mat-form-field>
         
                                     <mat-form-field appearance="outline">
                                         <mat-label>Minimum Count</mat-label>
@@ -58,8 +68,11 @@
                                         </mat-error>
                                     </mat-form-field>
         
-                                    <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)"
+                                    <!-- <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)"
                                         [disabled]="consumedProducts.length === 1" type="button">
+                                        <mat-icon>delete</mat-icon>
+                                    </button> -->
+                                    <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button>
                                 </div>
@@ -96,6 +109,24 @@
                                             Product is required
                                         </mat-error>
                                     </mat-form-field>
+
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Comparison</mat-label>
+                                        <mat-select formControlName="comparison">
+                                            <mat-option value="equalto">
+                                                Equal To
+                                            </mat-option>
+                                            <mat-option value="groreqto">
+                                                Greater Than or Equal to
+                                            </mat-option>
+                                            <mat-option value="lsoreqto">
+                                                Less Than or Equal to
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('comparison')?.hasError('required')">
+                                            Comparison is required
+                                        </mat-error>
+                                    </mat-form-field>
         
                                     <mat-form-field appearance="outline">
                                         <mat-label>Minimum Count</mat-label>
@@ -108,8 +139,11 @@
                                         </mat-error>
                                     </mat-form-field>
         
-                                    <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)"
+                                    <!-- <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)"
                                         [disabled]="unconsumedProducts.length === 1" type="button">
+                                        <mat-icon>delete</mat-icon>
+                                    </button> -->
+                                    <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button>
                                 </div>
@@ -132,58 +166,12 @@
                             <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
                             {{ isLoading ? 'Searching...' : 'Apply Filter' }}
                         </button>
+                        <button mat-stroked-button (click)="clearFilters()" type="button">
+                            <mat-icon *ngIf="!isLoading">clear</mat-icon>
+                            Clear Filters
+                        </button>
                     </div>
                 </form>
-            </div>
-
-            <!-- Status Filter -->
-            <div *ngIf="selectedFilter === 'status'" class="filter-content">
-                <mat-form-field appearance="outline">
-                    <mat-label>Select Status</mat-label>
-                    <mat-select [(ngModel)]="filters.status" multiple>
-                        <mat-option value="Active">Active</mat-option>
-                        <mat-option value="Pending">Pending</mat-option>
-                        <mat-option value="Completed">Completed</mat-option>
-                        <mat-option value="Cancelled">Cancelled</mat-option>
-                    </mat-select>
-                </mat-form-field>
-
-                <button mat-flat-button color="primary" (click)="applyFilter()">Apply</button>
-            </div>
-
-            <!-- Category Filter -->
-            <div *ngIf="selectedFilter === 'category'" class="filter-content">
-                <mat-form-field appearance="outline">
-                    <mat-label>Select Category</mat-label>
-                    <mat-select [(ngModel)]="filters.category">
-                        <mat-option value="Electronics">Electronics</mat-option>
-                        <mat-option value="Furniture">Furniture</mat-option>
-                        <mat-option value="Clothing">Clothing</mat-option>
-                        <mat-option value="Books">Books</mat-option>
-                        <mat-option value="Sports">Sports</mat-option>
-                    </mat-select>
-                </mat-form-field>
-
-                <button mat-flat-button color="primary" (click)="applyFilter()">Apply</button>
-            </div>
-
-            <!-- Custom Filter -->
-            <div *ngIf="selectedFilter === 'custom'" class="filter-content">
-                <mat-form-field appearance="outline">
-                    <mat-label>Search Term</mat-label>
-                    <input matInput [(ngModel)]="filters.searchTerm" placeholder="Enter search term">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline">
-                    <mat-label>Search In</mat-label>
-                    <mat-select [(ngModel)]="filters.searchField">
-                        <mat-option value="name">Product Name</mat-option>
-                        <mat-option value="id">Order ID</mat-option>
-                        <mat-option value="category">Category</mat-option>
-                    </mat-select>
-                </mat-form-field>
-
-                <button mat-flat-button color="primary" (click)="applyFilter()">Apply</button>
             </div>
         </div>
 
@@ -254,7 +242,7 @@
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
-        <button mat-button mat-dialog-close>Cancel</button>
+        <button mat-button (click)="closeDialog()">Cancel</button>
         <!-- <button mat-flat-button color="primary" [disabled]="filteredData.length === 0" (click)="exportData()">
             Export ({{ filteredData.length }})
         </button> -->

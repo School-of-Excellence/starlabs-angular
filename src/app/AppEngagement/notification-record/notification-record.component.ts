@@ -217,29 +217,70 @@ export class NotificationRecordComponent {
     console.log(row)
   }
 
+  // updateStatistics(data: any[]) {
+  //   this.totalNotifications = data.length;
+  //   const today = new Date().toDateString();
+  //   this.newlyNotifications = data.filter(item =>
+  //     new Date(item.date.toDate()).toDateString() === today
+  //   );
+  //   // Count successful and failed notifications
+  //   const successfulNotifications = data.filter(item => item.success === true).length;
+  //   const currentsuccessfulRate = this.newlyNotifications.filter(item => item.success === true).length
+  //   this.currentfailedRate = this.newlyNotifications.filter(item => item.success === false).length
+  //   this.failedNotifications = data.filter(item => item.success === false).length;
+  //   // console.log(this.failedNotifications);
+
+
+  //   // Calculate percentages
+  //   this.notificationSentRate = this.totalNotifications > 0
+  //     ? ((successfulNotifications / this.totalNotifications) * 100).toFixed(2)
+  //     : "0";
+
+
+
+  //   this.newlysentnotificationRate = this.newlyNotifications.length > 0
+  //     ? ((currentsuccessfulRate / this.newlyNotifications.length) * 100).toFixed(2)
+  //     : "0.00";
+
+  //   // const successfulNotifications = data.reduce((total, item) => {
+  //   //   return total + (item.profilesuccess?.length || 0);
+  //   // }, 0);
+  //   // const currentsuccessfulRate = this.newlyNotifications.reduce((total, item) => {
+  //   //   return total + (item.profilesuccess?.length || 0);
+  //   // }, 0);
+  //   // this.currentfailedRate = this.newlyNotifications.reduce((total, item) => {
+  //   //   return total + (item.profilefailed?.length || 0);
+  //   // }, 0);
+  //   // this.failedNotifications = data.reduce((total, item) => {
+  //   //   return total + (item.profilesuccess?.length || 0);
+  //   // }, 0);
+  // }
+
   updateStatistics(data: any[]) {
     this.totalNotifications = data.length;
     const today = new Date().toDateString();
     this.newlyNotifications = data.filter(item =>
       new Date(item.date.toDate()).toDateString() === today
     );
+    const totalProfileIds = data.reduce((total , notification)=> total + notification?.profileid?.length || 0 , 0);
+    const totalNewlyNotifications = this.newlyNotifications.reduce((total , notification)=> total + notification?.profileid?.length || 0 , 0);
     // Count successful and failed notifications
-    const successfulNotifications = data.filter(item => item.success === true).length;
-    const currentsuccessfulRate = this.newlyNotifications.filter(item => item.success === true).length
-    this.currentfailedRate = this.newlyNotifications.filter(item => item.success === false).length
-    this.failedNotifications = data.filter(item => item.success === false).length;
+    const successfulNotifications = data.reduce((total , notification)=> total + notification?.profilesuccess?.length || 0 , 0);
+    const currentsuccessfulRate = this.newlyNotifications.reduce((total , notification)=> total + notification?.profilesuccess?.length || 0 , 0);
+    this.currentfailedRate = this.newlyNotifications.reduce((total , notification)=> total + notification?.profilefailed?.length || 0 , 0);
+    this.failedNotifications = data.reduce((total , notification)=> total + notification?.profilefailed?.length || 0 , 0);
     // console.log(this.failedNotifications);
 
 
     // Calculate percentages
-    this.notificationSentRate = this.totalNotifications > 0
-      ? ((successfulNotifications / this.totalNotifications) * 100).toFixed(2)
+    this.notificationSentRate = totalProfileIds > 0
+      ? ((successfulNotifications / totalProfileIds) * 100).toFixed(2)
       : "0";
 
 
 
     this.newlysentnotificationRate = this.newlyNotifications.length > 0
-      ? ((currentsuccessfulRate / this.newlyNotifications.length) * 100).toFixed(2)
+      ? ((currentsuccessfulRate / totalNewlyNotifications) * 100).toFixed(2)
       : "0.00";
 
     // const successfulNotifications = data.reduce((total, item) => {
