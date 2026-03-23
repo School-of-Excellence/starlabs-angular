@@ -112,23 +112,23 @@
     </div>
 
     <!-- VIDEO GRID -->
-    <div class="zoom-video-grid" [attr.data-count]="getVideoParticipantCount()">
+    <!-- <div class="zoom-video-grid" [attr.data-count]="getVideoParticipantCount()">
 
-      <!-- LOCAL VIDEO (now inside grid like Zoom) -->
+      <!-- LOCAL VIDEO (now inside grid like Zoom) -- >
       <div class="zoom-video-tile">
         <app-openvidu-video-element
           [track]="localParticipant()"
           [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
         </app-openvidu-video-element>
 
-        <!-- Name badge -->
+        <!-- Name badge -- >
         <div class="zoom-name-badge">
           {{ loggedinProfileRole["name"] }} (You)
           <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
         </div>
       </div>
 
-      <!-- REMOTE PARTICIPANTS -->
+      <!-- REMOTE PARTICIPANTS -- >
       <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
         <div class="zoom-video-tile" *ngIf="remote.trackPublication.kind === 'video'">
 
@@ -137,7 +137,7 @@
             [participantIdentity]="remote.participantName">
           </app-openvidu-video-element>
 
-          <!-- Name badge -->
+          <!-- Name badge -- >
           <div class="zoom-name-badge">
             {{ remote.participantName }}
             <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
@@ -146,7 +146,97 @@
         </div>
       </ng-container>
 
+    </div> -->
+
+    <!-- VIDEO LAYOUT: Screen Share Main + Participants Sidebar (Zoom-style) -->
+    <div *ngIf="getActiveScreenShare(); else normalGrid" class="screen-share-layout">
+      
+      <!-- MAIN: Screen Share -->
+      <div class="screen-share-main" *ngIf="getActiveScreenShare() as activeScreenShare">
+        <app-openvidu-video-element
+          [ngClass]="activeScreenShare.isLocal ? 'mirrorsharing' : ''"
+          [track]="activeScreenShare.track"
+          [participantIdentity]="activeScreenShare.participantName + ' - Screen'">
+        </app-openvidu-video-element>
+        
+        <div class="zoom-name-badge">
+          {{ activeScreenShare.participantName }} {{activeScreenShare.isLocal ? "(You)" : ""}} - Screen Share
+        </div>
+      </div>
+
+      <!-- SIDEBAR: All Participants -->
+      <div class="participants-sidebar">
+        
+        <!-- LOCAL VIDEO -->
+        <div class="zoom-video-tile-small">
+          <app-openvidu-video-element
+            [track]="localParticipant()"
+            [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
+          </app-openvidu-video-element>
+
+          <div class="zoom-name-badge">
+            {{ loggedinProfileRole["name"] }} (You)
+            <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+          </div>
+        </div>
+
+        <!-- REMOTE PARTICIPANTS (only camera videos, not screen shares) -->
+        <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
+          <div class="zoom-video-tile-small" 
+              *ngIf="remote.trackPublication.kind === 'video' && remote.trackPublication.source !== 'screen_share'">
+
+            <app-openvidu-video-element
+              [track]="remote.trackPublication.videoTrack"
+              [participantIdentity]="remote.participantName">
+            </app-openvidu-video-element>
+
+            <div class="zoom-name-badge">
+              {{ remote.participantName }}
+              <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+              <mat-icon class="material-icons text-primary" *ngIf="activeSpeakers.includes(remote.participantIdentity)">record_voice_over</mat-icon>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
     </div>
+
+    <!-- NORMAL GRID: When no screen share -->
+    <ng-template #normalGrid>
+      <div class="zoom-video-grid" [attr.data-count]="getVideoParticipantCount()">
+
+        <!-- LOCAL VIDEO -->
+        <div class="zoom-video-tile">
+          <app-openvidu-video-element
+            [track]="localParticipant()"
+            [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
+          </app-openvidu-video-element>
+
+          <div class="zoom-name-badge">
+            {{ loggedinProfileRole["name"] }} (You)
+            <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+          </div>
+        </div>
+
+        <!-- REMOTE PARTICIPANTS -->
+        <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
+          <div class="zoom-video-tile" *ngIf="remote.trackPublication.kind === 'video'">
+
+            <app-openvidu-video-element
+              [track]="remote.trackPublication.videoTrack"
+              [participantIdentity]="remote.participantName">
+            </app-openvidu-video-element>
+
+            <div class="zoom-name-badge">
+              {{ remote.participantName }}
+              <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+              <mat-icon class="material-icons text-primary" *ngIf="activeSpeakers.includes(remote.participantIdentity)">record_voice_over</mat-icon>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+    </ng-template>
 
     <!-- AUDIO ONLY -->
     <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
@@ -171,10 +261,14 @@
           <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
         </button>
 
-        <button class="zoom-btn" [class.active]="isSharing" (click)="toggleScreenShare()">
+        <button class="zoom-btn" [class.active]="isScreenSharing()" (click)="toggleScreenShare()">
+          <span class="material-icons">{{isScreenSharing() ? "stop_screen_share" : "screen_share"}}</span>
+          <span class="zoom-btn-label">{{isScreenSharing() ? "Stop Share" : "Share"}}</span>
+        </button>
+        <!-- <button class="zoom-btn" [class.active]="isSharing" (click)="toggleScreenShare()">
           <span class="material-icons">{{isSharing ? "stop_screen_share" : "screen_share"}}</span>
           <span class="zoom-btn-label">{{isSharing ? "Stop Share" : "Share"}}</span>
-        </button>
+        </button> -->
 
         <button class="zoom-btn" [class.fullscreen]="isFullscreen" (click)="toggleFullscreen()">
           <span class="material-icons">fullscreen</span>

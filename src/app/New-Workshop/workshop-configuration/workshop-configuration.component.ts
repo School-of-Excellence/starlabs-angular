@@ -870,10 +870,18 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       primarylyTaught: this.fb.array([]),
       thumbnailImage: [''],
       titleVideo: [''],
-      registrationStartDate: ['',],
-      registrationEndDate: ['',],
-      workshopStartDate: ['',],
-      workshopEndDate: ['',],
+      // registrationStartDate: ['',],
+      // registrationEndDate: ['',],
+      // workshopStartDate: ['',],
+      // workshopEndDate: ['',],
+      registrationStartDate: [''],
+      registrationStartTime: [null],
+      registrationEndDate:   [''],
+      registrationEndTime:   [null],
+      workshopStartDate:     [''],
+      workshopStartTime:     [null],
+      workshopEndDate:       [''],
+      workshopEndTime:       [null],
       learnings: this.fb.array([
         this.fb.control('',),
       ]),
@@ -1043,6 +1051,10 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       registrationEndDate: this.convertTimestamp(data.detailpage.registrationEndDate),
       workshopStartDate: this.convertTimestamp(data.detailpage.workshopStartDate),
       workshopEndDate: this.convertTimestamp(data.detailpage.workshopEndDate),
+      registrationStartTime: this.convertTimestamp(data.detailpage.registrationStartDate),
+      registrationEndTime:   this.convertTimestamp(data.detailpage.registrationEndDate),
+      workshopStartTime:     this.convertTimestamp(data.detailpage.workshopStartDate),
+      workshopEndTime:       this.convertTimestamp(data.detailpage.workshopEndDate),
     });
 
     const primarylyTaughtArray = this.getFormArray('primarylyTaught');
@@ -1199,27 +1211,68 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
 
   //   return data;
   // }
-private buildDetailPageData(): any {
-  const formValue = this.detailPageForm.value;
-  const data = { ...formValue };
-  
-  this.richTextFields.forEach(field => {
-    data[field.key] = this.richTextContents[field.key];
-  });
-  
-  this.iconWithTextSections.forEach(section => {
-    data[section.key] = this.getFormArray(section.key).value.map(item => ({
-      question: item.question,
-      answer: item.answer
-    }));
-  });
 
-  
-  delete data.selectedTestimonials;
-  data.testimonialmap = this.testimonialMap;
+  private mergeDateTime(date: Date, time: Date): Date | null {
+    if (!date) return null;
+    const merged = new Date(date);
+    if (time) {
+      merged.setHours(time.getHours(), time.getMinutes(), 0, 0);
+    }
+    return merged;
+  }
+  // private buildDetailPageData(): any {
+  //   const formValue = this.detailPageForm.value;
+  //   const data = { ...formValue };
+    
+  //   this.richTextFields.forEach(field => {
+  //     data[field.key] = this.richTextContents[field.key];
+  //   });
+    
+  //   this.iconWithTextSections.forEach(section => {
+  //     data[section.key] = this.getFormArray(section.key).value.map(item => ({
+  //       question: item.question,
+  //       answer: item.answer
+  //     }));
+  //   });
 
-  return data;
-}
+    
+  //   delete data.selectedTestimonials;
+  //   data.testimonialmap = this.testimonialMap;
+
+  //   return data;
+  // }
+  private buildDetailPageData(): any {
+    const formValue = this.detailPageForm.value;
+    const data = { ...formValue };
+
+    this.richTextFields.forEach(field => {
+      data[field.key] = this.richTextContents[field.key];
+    });
+
+    this.iconWithTextSections.forEach(section => {
+      data[section.key] = this.getFormArray(section.key).value.map(item => ({
+        question: item.question,
+        answer: item.answer
+      }));
+    });
+
+    delete data.selectedTestimonials;
+    data.testimonialmap = this.testimonialMap;
+    const merge = (date: Date, time: Date) => {
+      const d = this.mergeDateTime(date, time);
+      return d ? Timestamp.fromDate(d) : null;
+    };
+
+    data.registrationStartDate = merge(data.registrationStartDate, data.registrationStartTime);
+    data.registrationEndDate   = merge(data.registrationEndDate,   data.registrationEndTime);
+    data.workshopStartDate     = merge(data.workshopStartDate,     data.workshopStartTime);
+    data.workshopEndDate       = merge(data.workshopEndDate,       data.workshopEndTime);
+    delete data.registrationStartTime;
+    delete data.registrationEndTime;
+    delete data.workshopStartTime;
+    delete data.workshopEndTime;
+    return data;
+  }
   
   uploadThumbnail(): void {
       const fileInput = document.createElement('input');

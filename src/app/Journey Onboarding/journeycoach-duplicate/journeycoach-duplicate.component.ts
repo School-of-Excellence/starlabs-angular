@@ -2690,7 +2690,8 @@ export class JourneycoachDuplicateComponent {
       data: element,
       autoFocus: false,
       disableClose: true,
-      panelClass: 'custom-dialog-container'
+      panelClass: 'custom-dialog-container',
+      maxHeight: "90vh"
     });
   }
 
