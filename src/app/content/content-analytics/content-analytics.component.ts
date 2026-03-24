@@ -156,28 +156,14 @@ export class ContentAnalyticsComponent implements OnDestroy {
   }
   mapTierToSeries() {
     const result: any = {};
-
     this.seriesDataList.forEach(series => {
       const tiers = series.tier || [];
-
       tiers.forEach((tierRef: any) => {
         const tierid = tierRef.id || tierRef;
-
         if (!result[tierid]) {
           result[tierid] = [];
         }
-
         result[tierid].push(series);
-      });
-    });
-
-    Object.keys(result).forEach(tierid => {
-      const tierName = this.tiermap[tierid]?.tier || tierid;
-
-      console.log(`\n🔹 ${tierName}`);
-
-      result[tierid].forEach((series: any) => {
-        console.log(`   - ${series.seriesName || series.id}`);
       });
     });
   }
@@ -221,6 +207,11 @@ export class ContentAnalyticsComponent implements OnDestroy {
           });
           this.hasFetched = true;
           this.isLoading = false;
+          this.contentData.data = [...this.contentAnalytics];
+          this.contentData.sort = this.sort;
+          this.contentData.paginator = this.paginator;
+          this.getUniqueUser();
+          // this.checkSeriesCompletion();
         } else {
           snapshot.docChanges().forEach(change => {
             const data = change.doc.data();
@@ -252,6 +243,8 @@ export class ContentAnalyticsComponent implements OnDestroy {
         this.contentData.sort = this.sort;
         this.contentData.paginator = this.paginator;
         this.getUniqueUser();
+        // this.checkSeriesCompletion()
+        
       },
       (error) => {
         console.error('Content analytics error:', error);
@@ -272,7 +265,122 @@ export class ContentAnalyticsComponent implements OnDestroy {
     this.contentData.sort = this.sort;
     this.contentData.paginator = this.paginator;
   }
+  tierCompletionMap: any = {};
+  checkSeriesCompletion() {
+    if (!this.contentAnalytics?.length || !this.seriesDataList?.length) return;
+    const seriesMap = new Map();
+    this.seriesDataList.forEach(series => {
+      if (!series.sequence) return;
 
+      seriesMap.set(series.id, {
+        ...series,
+        sequenceSet: new Set(series.sequence.map((s: any) => s.id))
+      });
+    });
+    const userSeriesMap = new Map();
+    for (const log of this.contentAnalytics) {
+      if (log.status !== 'complete') continue;
+
+      const { profileid, playlistid, videoid } = log;
+      if (!profileid || !playlistid || !videoid) continue;
+
+      if (!userSeriesMap.has(profileid)) {
+        userSeriesMap.set(profileid, new Map());
+      }
+
+      const playlistMap = userSeriesMap.get(profileid);
+
+      if (!playlistMap.has(playlistid)) {
+        playlistMap.set(playlistid, new Set());
+      }
+
+      playlistMap.get(playlistid).add(videoid);
+    }
+
+    const tierCompletionMap: any = {};
+
+    for (const [profileid, playlists] of userSeriesMap.entries()) {
+      const profileName =
+        this.mapProfile[profileid] ||
+        this.mapProfileNew[profileid] ||
+        profileid;
+      for (const [playlistid, completedVideos] of playlists.entries()) {
+        const series = seriesMap.get(playlistid);
+        if (!series) continue;
+        let isCompleted = true;
+        for (const vid of series.sequenceSet) {
+          if (!completedVideos.has(vid)) {
+            isCompleted = false;
+            break;
+          }
+        }
+        if (!isCompleted) continue;
+        for (const tierRef of (series.tier || [])) {
+          const tierid = tierRef.id || tierRef;
+          const tierName = this.tiermap[tierid]?.tier || tierid;
+          const seriesName = series.seriesName || series.id;
+
+          tierCompletionMap[tierName] ??= {};
+          tierCompletionMap[tierName][seriesName] ??= [];
+
+          tierCompletionMap[tierName][seriesName].push(profileName);
+        }
+      }
+    }
+    this.tierCompletionMap = tierCompletionMap;
+    console.log(this.tierCompletionMap, 'tierCompletionMap');
+  }
+  // checkSeriesCompletion() {
+  //   const completedLogs = this.contentAnalytics.filter(
+  //     e => e.status === 'complete'
+  //   );
+  //   const userSeriesMap: any = {};
+  //   completedLogs.forEach(log => {
+  //     const { profileid, playlistid, videoid } = log;
+
+  //     if (!profileid || !playlistid || !videoid) return;
+
+  //     if (!userSeriesMap[profileid]) {
+  //       userSeriesMap[profileid] = {};
+  //     }
+
+  //     if (!userSeriesMap[profileid][playlistid]) {
+  //       userSeriesMap[profileid][playlistid] = new Set();
+  //     }
+
+  //     userSeriesMap[profileid][playlistid].add(videoid);
+  //   });
+  //   this.tierCompletionMap = {};
+  //   Object.keys(userSeriesMap).forEach(profileid => {
+  //     const playlists = userSeriesMap[profileid];
+  //     Object.keys(playlists).forEach(playlistid => {
+  //       const completedVideos = playlists[playlistid];
+  //       const series = this.seriesDataList.find(s => s.id === playlistid);
+  //       if (!series || !series.sequence) return;
+  //       const sequenceIds = series.sequence.map((seq: any) =>seq.id);
+  //       const isCompleted = sequenceIds.every(id =>completedVideos.has(id));
+  //       if (isCompleted) {
+  //         const profileName =
+  //           this.mapProfile[profileid] ||
+  //           this.mapProfileNew[profileid] ||
+  //           profileid;
+  //         const tiers = series.tier || [];
+  //         tiers.forEach((tierRef: any) => {
+  //           const tierid = tierRef.id || tierRef;
+  //           const tierName = this.tiermap[tierid]?.tier || tierid;
+  //           if (!this.tierCompletionMap[tierName]) {
+  //             this.tierCompletionMap[tierName] = {};
+  //           }
+  //           if (!this.tierCompletionMap[tierName][series.seriesName || series.id]) {
+  //             this.tierCompletionMap[tierName][series.seriesName || series.id] = [];
+  //           }
+  //           this.tierCompletionMap[tierName][series.seriesName || series.id].push(profileName);
+  //         });
+  //       }
+  //     });
+  //   });
+  //   console.log(this.tierCompletionMap,'tierCompletionMaptierCompletionMap');
+  // }
   onClearFilterValue(): void {
     this.filterValue = {
       name: null,

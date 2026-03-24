@@ -400,8 +400,29 @@
 
 
       </mat-tab>
-      <mat-tab label="Tier Based">
-      </mat-tab>
+      <!-- <mat-tab label="Tier Based">
+        <div *ngIf="tierCompletionMap | keyvalue as tiers">
+
+          <div *ngFor="let tier of tiers" style="margin-bottom: 20px;">
+            
+            <h3>🔹Tier: {{ tier.key }}</h3>
+
+            <div *ngFor="let series of tier.value | keyvalue" style="margin-left: 15px;">
+              
+              <h4>📺 {{ series.key }}</h4>
+
+              <ul>
+                <li *ngFor="let user of series.value">
+                  ✅ {{ user }}
+                </li>
+              </ul>
+
+            </div>
+
+          </div>
+
+        </div>
+      </mat-tab> -->
     </mat-tab-group>
   </ng-container>
 </div>

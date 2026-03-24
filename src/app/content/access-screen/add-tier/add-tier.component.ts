@@ -26,7 +26,9 @@ export class AddTierComponent {
   edit = false;
   delete = false;
   tier: string = '';
-  tiereligibilitymessage: string = '';  
+  tiereligibilitymessage: string = '';
+  tierUpgrademessage: string = '';
+  tierdowngrademessage: string = '';
   tabledata: any = []
   crossmatch: any;
   crossmatcherrormessage: any;
@@ -50,6 +52,8 @@ export class AddTierComponent {
 
             this.tier = tierData?.tier || '';
             this.tiereligibilitymessage = tierData?.tiereligibilitymessage || '';
+            this.tierUpgrademessage = tierData?.tierUpgrademessage || '';
+            this.tierdowngrademessage = tierData?.tierdowngrademessage || '';
           });
         }
         if(this.data.delete) {
@@ -75,6 +79,8 @@ export class AddTierComponent {
       id: id,
       tier : this.tier,
       tiereligibilitymessage: this.tiereligibilitymessage || '',
+      tierUpgrademessage: this.tierUpgrademessage || '',
+      tierdowngrademessage: this.tierdowngrademessage || '',
       date : new Date()
     }
     setDoc(tierRef, data)
@@ -91,7 +97,9 @@ export class AddTierComponent {
     const tierRef = doc(collection(this.firestore, 'tier'),id);
     updateDoc(tierRef,{
       tier : this.tier,
-      tiereligibilitymessage: this.tiereligibilitymessage || ''
+      tiereligibilitymessage: this.tiereligibilitymessage || '',
+      tierUpgrademessage: this.tierUpgrademessage || '',
+      tierdowngrademessage: this.tierdowngrademessage || '',
     })
     .then(() => {
       console.log(this.tier)
