@@ -588,6 +588,219 @@
             </div>
           </div>
 
+          <!-- CUSTOMER SUPPORT FILTER ROW -->
+          <div class="fsb-expandable" *ngIf="availableCustomerSupportCategories.length > 0">
+            <div class="fsb-row"
+                [class.fsb-row-active]="selectedCustomerSupportCategories.length > 0"
+                (click)="customerSupportDropdownOpen = !customerSupportDropdownOpen">
+              <mat-icon class="fsb-icon">support_agent</mat-icon>
+              <span class="fsb-label">Customer Support</span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="customerSupportDropdownOpen">
+                expand_more
+              </mat-icon>
+            </div>
+            <div class="fsb-dropdown" *ngIf="customerSupportDropdownOpen">
+              <div class="fsb-dropdown-options">
+                <div class="fsb-option"
+                    *ngFor="let category of availableCustomerSupportCategories"
+                    [class.fsb-option-selected]="selectedCustomerSupportCategories.includes(category)"
+                    (click)="toggleCustomerSupportCategory(category); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{selectedCustomerSupportCategories.includes(category) ? 'check_box' : 'check_box_outline_blank'}}
+                  </mat-icon>
+                  <span>{{category}}</span>
+                </div>
+              </div>
+              <div class="fsb-dropdown-footer" *ngIf="selectedCustomerSupportCategories.length > 0">
+                <button (click)="selectedCustomerSupportCategories=[]; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                  Clear selection
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- EVENT PARTICIPATION FILTER ROW -->
+          <div class="fsb-expandable">
+            <div class="fsb-row"
+                [class.fsb-row-active]="!!selectedArenaEventId"
+                (click)="eventParticipationDropdownOpen = !eventParticipationDropdownOpen; !eventParticipationListLoaded && loadEventParticipationList()">
+              <mat-icon class="fsb-icon">event</mat-icon>
+              <span class="fsb-label">Event Participation</span>
+              <span class="fsb-value-text" *ngIf="!selectedArenaEventId">Select Event</span>
+              <span class="fsb-value-text fsb-value-active" *ngIf="selectedArenaEventId">
+                {{getArenaEventName(selectedArenaEventId)}}
+              </span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="eventParticipationDropdownOpen">
+                expand_more
+              </mat-icon>
+            </div>
+
+            <!-- Dropdown — shows event/queue list -->
+            <div class="fsb-dropdown" *ngIf="eventParticipationDropdownOpen">
+              
+              <!-- Loading state -->
+              <div *ngIf="arenaEventLoading" style="padding:16px; text-align:center; color:#999; font-size:13px;">
+                <mat-icon class="spin" style="font-size:18px; width:18px; height:18px;">sync</mat-icon>
+                Loading...
+              </div>
+
+              <!-- Event/Queue list -->
+              <div class="fsb-dropdown-search" *ngIf="!arenaEventLoading && arenaEventFilterList.length === 0">
+                  <mat-icon>search</mat-icon>
+                  <input type="text"
+                        [(ngModel)]="eventParticipationSearchTerm"
+                        (click)="$event.stopPropagation()"
+                        placeholder="Search events...">
+                  <button *ngIf="eventParticipationSearchTerm" 
+                          (click)="eventParticipationSearchTerm=''; $event.stopPropagation()">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              <div class="fsb-dropdown-options" *ngIf="!arenaEventLoading && arenaEventFilterList.length === 0">
+                <div class="fsb-option"
+                    *ngFor="let item of filteredEventParticipationList"
+                    [class.fsb-option-selected]="selectedEventParticipation?.docid === item.docid"
+                    (click)="onEventParticipationSelect(item); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{selectedEventParticipation?.docid === item.docid ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span style="white-space:normal; word-break:break-word; line-height:1.3;">
+                    {{item.name || item.eventname}} 
+                    <span style="font-size:11px; color:#999;">({{item.type | uppercase}})</span>
+                  </span>
+                </div>
+                <div class="fsb-empty" *ngIf="eventParticipationList.length === 0">
+                  No events found
+                </div>
+              </div>
+
+              <!-- Arena events sub-list — shown after event/queue is selected -->
+              <div *ngIf="!arenaEventLoading && arenaEventFilterList.length > 0">
+                
+                <!-- Back button to reselect event/queue -->
+                <div class="fsb-option" 
+                    style="border-bottom:1px solid #e0e0e0; color:#1976d2;"
+                    (click)="selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check" style="color:#1976d2;">arrow_back</mat-icon>
+                  <span>{{selectedEventParticipation?.name || selectedEventParticipation?.eventname}}</span>
+                </div>
+
+                <!-- All Events option -->
+                <div class="fsb-dropdown-options">
+                  <div class="fsb-option"
+                      [class.fsb-option-selected]="!selectedArenaEventId"
+                      (click)="selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                    <mat-icon class="fsb-option-check">
+                      {{!selectedArenaEventId ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                    </mat-icon>
+                    <span>All Events</span>
+                  </div>
+
+                  <!-- Individual arena events -->
+                  <div class="fsb-option"
+                      *ngFor="let event of arenaEventFilterList"
+                      [class.fsb-option-selected]="selectedArenaEventId === event.docid"
+                      (click)="selectedArenaEventId=event.docid; processTokensIntoStages(allTokensData); arenaEventDropdownOpen=false; $event.stopPropagation()">
+                    <mat-icon class="fsb-option-check">
+                      {{selectedArenaEventId === event.docid ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                    </mat-icon>
+                    <span style="white-space:normal; word-break:break-word; line-height:1.3;">
+                      {{event.name}}
+                    </span>
+                    <span style="font-size:11px; color:#999; margin-left:4px; flex-shrink:0;">
+                      ({{getArenaEventQueueCount(event.docid)}})
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Clear selection -->
+                <div class="fsb-dropdown-footer" *ngIf="selectedArenaEventId">
+                  <button (click)="selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- ATC FILTER ROW -->
+          <div class="fsb-expandable">
+            
+            <!-- Main toggle row -->
+            <div class="fsb-row fsb-toggle-row"
+                [class.fsb-row-active]="atcFilterActive"
+                (click)="toggleATCFilter()">
+              <mat-icon class="fsb-icon">medical_services</mat-icon>
+              <span class="fsb-label">Has ATC</span>
+              <span class="fsb-count" *ngIf="atcDataLoaded && getTotalATCCount() > 0">
+                {{getTotalATCCount()}}
+              </span>
+              <div class="fsb-toggle" [class.fsb-toggle-on]="atcFilterActive">
+                <div class="fsb-toggle-knob"></div>
+              </div>
+            </div>
+
+            <!-- Sub filter dropdown — only shown when main toggle is ON -->
+            <div class="fsb-dropdown" *ngIf="atcFilterActive">
+
+              <!-- Loading state -->
+              <div *ngIf="!atcDataLoaded" 
+                  style="padding:16px; text-align:center; color:#999; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <mat-icon class="spin" style="font-size:18px; width:18px; height:18px;">sync</mat-icon>
+                Loading...
+              </div>
+
+              <!-- Options — shown only after loaded -->
+              <div class="fsb-dropdown-options" *ngIf="atcDataLoaded">
+                
+                <!-- All ATC -->
+                <div class="fsb-option"
+                    [class.fsb-option-selected]="atcFilter === 'none'"
+                    (click)="selectATCFilter('none'); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{atcFilter === 'none' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span>All ATC</span>
+                  <span style="font-size:11px; color:#999; margin-left:4px;">
+                    ({{getTotalATCCount()}})
+                  </span>
+                </div>
+
+                <!-- Validated -->
+                <div class="fsb-option"
+                    [class.fsb-option-selected]="atcFilter === 'validated'"
+                    (click)="selectATCFilter('validated'); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{atcFilter === 'validated' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span>Validated</span>
+                  <span style="font-size:11px; color:#999; margin-left:4px;">
+                    ({{getATCValidatedCount()}})
+                  </span>
+                </div>
+
+                <!-- Unvalidated -->
+                <div class="fsb-option"
+                    [class.fsb-option-selected]="atcFilter === 'unvalidated'"
+                    (click)="selectATCFilter('unvalidated'); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{atcFilter === 'unvalidated' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span>Unvalidated</span>
+                  <span style="font-size:11px; color:#999; margin-left:4px;">
+                    ({{getATCUnvalidatedCount()}})
+                  </span>
+                </div>
+
+              </div>
+
+              <!-- Clear selection footer -->
+              <div class="fsb-dropdown-footer" *ngIf="atcDataLoaded && atcFilter !== 'none'">
+                <button (click)="atcFilter='none'; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                  Clear selection
+                </button>
+              </div>
+
+            </div>
+          </div>
           <!-- DFU ROW -->
           <div class="fsb-row fsb-toggle-row"
               [class.fsb-row-active]="dfuFilterActive"
@@ -640,6 +853,16 @@
             <mat-chip *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
               DFU only<mat-icon matChipRemove>cancel</mat-icon>
             </mat-chip>
+            <mat-chip *ngIf="selectedArenaEventId" 
+                      (removed)="selectedArenaEventId=null; selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; processTokensIntoStages(allTokensData)">
+              Event: {{getArenaEventName(selectedArenaEventId)}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+            <mat-chip *ngIf="atcFilterActive" 
+                      (removed)="atcFilterActive=false; atcFilter='none'; processTokensIntoStages(allTokensData)">
+              ATC: {{atcFilter === 'none' ? 'All' : atcFilter === 'validated' ? 'Validated' : 'Unvalidated'}}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
           </div>
 
         </div>
@@ -668,9 +891,9 @@
           </mat-form-field>
 
           <span *ngIf="selectedQueue != null">
-            <h5 style="font-size: 16px;"><b style="font-weight: bold;color:rgb(0, 101, 135);">Total Participants</b> :
-              {{currentQueueParticipants.length}}
-            </h5>
+          <h5 style="font-size: 16px;"><b style="font-weight: bold;color:rgb(0, 101, 135);">Total Participants</b> :
+            {{totalParticipants}}
+          </h5>
           </span>
         </div>
 
@@ -1100,10 +1323,10 @@
                         <span class="stage-entry">
                           <b>{{ stage.key }}:</b>
                           <span *ngFor="let studioId of stage.value; let isLastStudio = last">
-                            <span
-                              *ngFor="let participant of mapStudio[studioId]['participants']; let isLastParticipant = last">
-                              {{ mapProfileData[participant]['name'] }}<span *ngIf="!isLastParticipant">, </span>
-                            </span>
+                          <span
+                            *ngFor="let participant of (mapStudio[studioId]?.['participants'] || []); let isLastParticipant = last">
+                            {{ mapProfileData[participant]?.['name'] }}<span *ngIf="!isLastParticipant">, </span>
+                          </span>
                             <span *ngIf="!isLastStudio"> | </span>
                           </span>
                         </span>
@@ -1131,6 +1354,17 @@
                         </span>
                       </div>
                     </div>
+
+                    <!-- Customer Support Indicator -->
+                    <span *ngIf="hasCustomerSupport(token.profile_id)"
+                          class="cs-indicator"
+                          [matTooltip]="getCustomerSupportTooltip(token.profile_id)"
+                          matTooltipClass="multiline-tooltip">
+                      <mat-icon style="font-size:16px; width:16px; height:16px; color:#e53935;">
+                        support_agent
+                      </mat-icon>
+                      <span class="cs-count">{{getCustomerSupportEntries(token.profile_id).length}}</span>
+                    </span>
 
                     <div class="icon-row">
                       <!-- Left: P in Square (Unconsumed/Package) -->
@@ -1248,8 +1482,8 @@
                                 <span *ngIf="['queued', 'invited'].includes(list['status'])" class="badge queued">Q</span>
                                 <span *ngIf="list['status'] == 'ready'" class="badge waiting">W</span>
                                 <span *ngIf="list['liveassignmentid']" class="badge activity">A</span>
-                                <span *ngIf="list['movedby']" class="log-meta">
-                                  <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]['name']}}
+                                <span *ngIf="list['movedby'] && mapProfileData[list['movedby']]" class="log-meta">
+                                  <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]?.['name']}}
                                 </span>
                                 <span *ngIf="list['movedthrough']" class="log-via" [ngClass]="list['movedthrough']?.toLowerCase()">
                                   {{list['movedthrough']}}
