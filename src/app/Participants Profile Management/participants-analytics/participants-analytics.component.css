@@ -103,3 +103,50 @@ tr:hover .tag-history-btn { opacity: 1; }
 .tag-diff { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .diff-added { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 .diff-removed { background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 10px; font-size: 11px; text-decoration: line-through; }
+
+/* products chips */
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 12px;
+  background: #f4f4f5;
+  border: 0.5px solid #d4d4d8;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #18181b;
+  line-height: 1;
+  transition: border-color 0.15s;
+}
+
+.chip:hover {
+  border-color: #a1a1aa;
+}
+
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0.5px solid #d4d4d8;
+  background: transparent;
+  color: #71717a;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.chip-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}

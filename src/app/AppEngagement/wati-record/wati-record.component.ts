@@ -274,12 +274,13 @@ export class WatiRecordComponent implements OnInit {
         const endTimestamp = Timestamp.fromDate(endDate);
         
         Query = query(watiArchiveCollection, 
-          where('date', '>=', startTimestamp.toDate().toISOString()),
-          where('date', '<=', endTimestamp.toDate().toISOString())
+          where('date', '>=', startTimestamp),
+          where('date', '<=', endTimestamp),
+          orderBy('date', 'desc')
         );
+      } else {
+        Query = query(watiArchiveCollection, orderBy('date', 'desc'));
       }
-
-      Query = query(watiArchiveCollection, orderBy('date', 'desc'));
 
       const querySnapshot = await getDocs(Query);
       const fetchedRecords: any[] = [];
