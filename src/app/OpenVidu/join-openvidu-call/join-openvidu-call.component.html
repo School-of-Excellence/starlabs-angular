@@ -261,6 +261,11 @@
           <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
         </button>
 
+        <button class="zoom-btn" [class.active]="isVideoBlurred" (click)="toggleVideoBlur()">
+          <span class="material-icons">{{isVideoBlurred ? "blur_off" : "blur_on"}}</span>
+          <span class="zoom-btn-label">{{isVideoBlurred ? "Remove Blur" : "Blur"}}</span>
+        </button>
+
         <button class="zoom-btn" [class.active]="isScreenSharing()" (click)="toggleScreenShare()">
           <span class="material-icons">{{isScreenSharing() ? "stop_screen_share" : "screen_share"}}</span>
           <span class="zoom-btn-label">{{isScreenSharing() ? "Stop Share" : "Share"}}</span>

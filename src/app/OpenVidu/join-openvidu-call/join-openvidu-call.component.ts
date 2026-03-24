@@ -14,7 +14,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-
+import { BackgroundProcessor } from "@livekit/track-processors";
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -68,11 +68,12 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
   
-
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
+
+  isVideoBlurred:boolean = false;
 
   constructor(
     public firestore: Firestore,
@@ -961,6 +962,31 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       document.exitFullscreen();
       this.isFullscreen = false;
     }
+  }
+
+  // Add this method after toggleCamera()
+  async toggleVideoBlur() {
+    this.isVideoBlurred = !this.isVideoBlurred;
+    
+    const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
+
+    if (!cameraPub || !cameraPub.videoTrack) return;
+
+    const videoTrack = cameraPub.videoTrack;
+    
+    if (this.isVideoBlurred) {
+      // Apply blur using CSS filter through processor
+      const blur = BackgroundProcessor({
+        mode: "background-blur",
+        blurRadius: 10
+      });
+      videoTrack.setProcessor(blur)
+    } else {
+      // Remove blur
+      await videoTrack.stopProcessor();
+    }
+
+    console.log(this.isVideoBlurred)
   }
 
   // Take reference snapshot
