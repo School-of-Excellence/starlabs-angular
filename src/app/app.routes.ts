@@ -24,6 +24,8 @@ export const routes: Routes = [
   {path: 'participantpurchase/:pid', loadComponent: () => import('./Participants Profile Management/journey-product-purchase/journey-product-purchase.component').then(m => m.JourneyProductPurchaseComponent), canActivate:[authGuard]},
   {path: 'profilesummary/:profileid', loadComponent: () => import('./Participants Profile Management/profile-summary/profile-summary.component').then(m => m.ProfileSummaryComponent), canActivate: [authGuard]},
   {path: 'userprofile/:id', loadComponent: () => import('./Participants Profile Management/userprofile/userprofile.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
+  //userprofile_old
+  {path: 'userprofile_old', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
   {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
   {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
   {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
@@ -306,8 +308,11 @@ export const routes: Routes = [
   //Vadivel
   {path: 'appointment-dashboard', loadComponent: () => import('./appointment-dashboard/appointment-dashboard.component').then(m => m.AppointmentDashboardComponent), canActivate: [authGuard]},
 
+  //ecosystem
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
 
+  //queue-web
+  {path: 'queue-web', loadComponent: () => import('./queue system/QueueWebVerison1/queue-web-version1.component').then(m => m.QueueWebVersion1Component), canActivate: [authGuard] },
 ];
 
 // import { Routes } from '@angular/router';

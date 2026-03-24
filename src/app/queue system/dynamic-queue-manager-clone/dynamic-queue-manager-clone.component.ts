@@ -1574,6 +1574,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
 
   async onQueueSelect() {
+
+    console.log('Selected Queue ID:', this.selectedQueue?.docid);
+    console.log('Full Selected Queue Object:', this.selectedQueue);
+
     // Reset subscription
     this.liveQueueSubscription.next()
     this.liveQueueSubscription.complete()
@@ -1613,7 +1617,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     // Fetch segments for this queue
     await this.fetchQueueSegments();
 
-
+    
     collectionData(query(collection(this.firestore, "queue studio pairing"), where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue["docid"])))).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(studio => {
       this.queueStudioList = studio.filter(e => e["studioin"] == true && e["checkin"] == true)
       this.mapStudio = studio.reduce(function (r, a) {
