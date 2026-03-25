@@ -44,6 +44,13 @@ jobs:
             watson: $WATSON_TEST_CONFIG
           };
           EOF
+            cat > src/firebase-messaging-sw.js << EOF
+          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-app.js');
+          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-messaging.js');
+
+          firebase.initializeApp($FIREBASE_TEST_CONFIG);
+          firebase.messaging();
+          EOF
           else
             # Production branch - use PROD config for both files
             cat > src/environments/environment.development.ts << EOF
@@ -60,6 +67,13 @@ jobs:
             firebase: $FIREBASE_PROD_CONFIG,
             watson: $WATSON_PROD_CONFIG
           };
+          EOF
+            cat > src/firebase-messaging-sw.js << EOF
+          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-app.js');
+          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-messaging.js');
+
+          firebase.initializeApp($FIREBASE_PROD_CONFIG);
+          firebase.messaging();
           EOF
           fi
 
