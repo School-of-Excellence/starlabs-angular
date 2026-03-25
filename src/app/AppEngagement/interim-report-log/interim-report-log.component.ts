@@ -50,7 +50,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   @ViewChild('logPaginator') logPaginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
 
-  logDisplayedColumns: string[] = ['name', 'reportlist', 'lastupdate', 'status', 'duedate', 'remainderdate', 'lockdate'];
+  logDisplayedColumns: string[] = ['name', 'reportlist', 'lastupdate', 'status', 'duedate', 'remainderdate', 'lockdate' , 'createdon'];
   logDataSource = new MatTableDataSource();
   interimlogSubscription: Subscription;
   mapReport = {
@@ -64,12 +64,19 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   notesRecord: any = null;
   notesText = '';
 
+  totalReports = 0;
+  totalReportsCompleted = 0;
+  totalReportsOngoing = 0;
+  totalReportsNotStarted = 0;
+
   // ==========================================
   // ASK A&H / LOVE LETTER
   // ==========================================
   // Filters
   startDate = new FormControl<Date | null>(null);
   endDate = new FormControl<Date | null>(null);
+  logStartDate = new FormControl<Date | null>(null);
+  logEndDate = new FormControl<Date | null>(null);
   participantFilterCtrl = new FormControl('');
   participantOptions: any[] = [];
   filteredParticipants: any[] = [];
@@ -132,6 +139,15 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     //     this.router.navigateByUrl('/');
     //   }
     });
+    const logStartDate = new Date();
+    const logEndDate = new Date();
+
+    logStartDate.setDate(1);
+    logEndDate.setMonth(logEndDate.getMonth() + 1);
+    logEndDate.setDate(0);
+
+    this.logStartDate.setValue(logStartDate);
+    this.logEndDate.setValue(logEndDate);
   }
 
   ngOnDestroy() {
@@ -171,13 +187,29 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   // INTERIM LOG
   // ==========================================
   fetchInterimLog() {
-    if (this.logLoaded) return;
-    this.logLoaded = true;
-
     const interimCollection = collection(this.firestore, 'interimreport log');
-    const q = query(interimCollection, orderBy('lastupdate', 'desc'));
+    const constraints : any[]= [orderBy('lastupdate', 'desc')];
+  
+    if (this.logStartDate.value && this.logEndDate.value) {
+      const startDate = this.logStartDate.value;
+      startDate.setHours(0,0,0,0)
+      const endDate = new Date(this.logEndDate.value);
+      endDate.setHours(23,59,59,999);
+      console.log(startDate , endDate)
+      constraints.push(where('createdon' , '>=' , Timestamp.fromDate(startDate)));
+      constraints.push(where('createdon' , '<=' , Timestamp.fromDate(endDate)));
+    }
+
+    const q = query(interimCollection, ...constraints);
+    if (this.interimlogSubscription) {
+      this.interimlogSubscription.unsubscribe();
+    }
     this.interimlogSubscription = collectionData(q).subscribe((log) => {
       const logList = [];
+      let totalReportsCompleted = 0;
+      let totalReportsOngoing = 0;
+      let totalReportsNotStarted = 0;
+
       log.forEach((data) => {
         data['name'] = this.mapProfiles[data['profileid']]?.['name'] || '-';
         data['reportlist'] = (data['reports'] ?? []).map((e) => '- ' + this.mapReport[e]).join('\n');
@@ -185,15 +217,32 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         data['duedate'] = data['duedate']?.toDate() ?? null;
         data['lockdate'] = data['lockdate']?.toDate() ?? null;
         data['remainderdate'] = data['remainderdate']?.toDate() ?? null;
+        data['createdon'] = data['createdon']?.toDate() ?? null;
         data['status'] = data['status']?.toString();
         logList.push(data);
+        if(data['status'] === 'completed') totalReportsCompleted++;
+        if ([null, undefined , ''].includes(data['status']) && data['reports']?.length > 0) totalReportsOngoing++;
+        if (!Array.isArray(data['reports']) || data['reports']?.length === 0) totalReportsNotStarted++
+        console.log(data['reports'])
       });
+      
+      this.totalReports = logList.length;
+      this.totalReportsCompleted = totalReportsCompleted;
+      this.totalReportsOngoing = totalReportsOngoing;
+      this.totalReportsNotStarted = totalReportsNotStarted;
+
       this.logDataSource.data = logList;
       setTimeout(() => {
         this.logDataSource.sort = this.sort;
         this.logDataSource.paginator = this.logPaginator;
       });
     });
+  }
+
+  clearInterimReportFilter(){
+    this.logStartDate.reset();
+    this.logEndDate.reset();
+    this.fetchInterimLog()
   }
 
   filterLogData(value: string) {
@@ -439,6 +488,56 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       updateDoc(docRef, {
         tagged: false,
         tagdetails: null
+      });
+    }
+  }
+
+  toggleCritical(row: any) {
+    const newValue = !row.critical;
+    row.critical = newValue;
+
+    const collectionName = this.collectionMap[this.activeTab];
+    const docRef = doc(this.firestore, collectionName, row.id);
+
+    if (newValue) {
+      row.criticaldetails = { user: this.loggedInProfileId, time: new Date() };
+      updateDoc(docRef, {
+        critical: true,
+        criticaldetails: {
+          user: this.loggedInProfileId,
+          time: serverTimestamp()
+        }
+      });
+    } else {
+      row.criticaldetails = null;
+      updateDoc(docRef, {
+        critical: false,
+        criticaldetails: null
+      });
+    }
+  }
+
+  toggleOpportunity(row: any) {
+    const newValue = !row.opportunity;
+    row.opportunity = newValue;
+
+    const collectionName = this.collectionMap[this.activeTab];
+    const docRef = doc(this.firestore, collectionName, row.id);
+
+    if (newValue) {
+      row.opportunitydetails = { user: this.loggedInProfileId, time: new Date() };
+      updateDoc(docRef, {
+        opportunity: true,
+        opportunitydetails: {
+          user: this.loggedInProfileId,
+          time: serverTimestamp()
+        }
+      });
+    } else {
+      row.opportunitydetails = null;
+      updateDoc(docRef, {
+        opportunity: false,
+        opportunitydetails: null
       });
     }
   }

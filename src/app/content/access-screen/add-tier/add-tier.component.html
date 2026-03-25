@@ -24,6 +24,22 @@
                         rows="3">
             </textarea>
             </mat-form-field>
+            <mat-form-field style="width:100%;">
+            <textarea matInput rows="4"
+                        placeholder="Tier Upgrade Message"
+                        [(ngModel)]="tierUpgrademessage"
+                        name="tierUpgrademessage"
+                        rows="3">
+            </textarea>
+            </mat-form-field>
+            <mat-form-field style="width:100%;">
+            <textarea matInput rows="4"
+                        placeholder="Tier Downgrade Message"
+                        [(ngModel)]="tierdowngrademessage"
+                        name="tierdowngrademessage"
+                        rows="3">
+            </textarea>
+            </mat-form-field>
         </form>
             <button  mat-raised-button color="primary" (click)="onSubmit()" [disabled]="myForm.invalid ? true :crossmatch ? true: false">Add</button>&nbsp;&nbsp;
             <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
@@ -52,6 +68,22 @@
                         placeholder="Tier Eligibility Message"
                         [(ngModel)]="tiereligibilitymessage"
                         name="tiereligibilitymessage"
+                        rows="3">
+            </textarea>
+            </mat-form-field>
+            <mat-form-field style="width:100%;">
+            <textarea matInput  rows="4"
+                        placeholder="Tier Upgrade Message"
+                        [(ngModel)]="tierUpgrademessage"
+                        name="tierUpgrademessage"
+                        rows="3">
+            </textarea>
+            </mat-form-field>
+            <mat-form-field style="width:100%;">
+            <textarea matInput  rows="4"
+                        placeholder="Tier Downgrade Message"
+                        [(ngModel)]="tierdowngrademessage"
+                        name="tierdowngrademessage"
                         rows="3">
             </textarea>
             </mat-form-field>

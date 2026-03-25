@@ -10,6 +10,7 @@ import { AuthguardService } from '../../authguard.service';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import html2canvas from 'html2canvas';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 
 type zoomConfig = {
   meetingNumber: string | number;
@@ -48,39 +49,36 @@ export class ZoomClientviewComponent {
   profileid: any;
   profileHost:boolean
   screenshots: any = [];
+  collectiontype : any;
+  documentId : any;
+  private subscription: Subscription;
   constructor(private route: ActivatedRoute,private firestore : Firestore,private ngZone:NgZone,  private storage: Storage,private http: HttpClient, private guard: AuthguardService, private snackBar: MatSnackBar) { 
     this.route.params.subscribe(data => {
       console.log(data);
       console.log("docid",data['id']);
-      getDoc(doc(this.firestore,"live assignment", data['id'])).then(snap => {
+      this.documentId = data['id']
+      this.collectiontype = data['collectiontype']
+      
+      const collectionMap = {
+        'queue': 'live assignment',
+        'appointment': 'appointments'
+      };
+      const collectionName = collectionMap[this.collectiontype];
+      getDoc(doc(this.firestore, collectionName, this.documentId)).then(snap => {
         console.log("docid",snap.id);
         this.zoomdata = snap.data()
         console.log("zoom data",this.zoomdata);
-        // this.firestore.collection('live assignment', ref=> ref.where('docid', '==', this.zoomdata['docid'])).valueChanges().subscribe(res => {
-        //   for (let i = 0; i < res.length; i++) {
-        //     let element = res[i]
-        //     if (element['cliptimings'] && Array.isArray(element['cliptimings'])) {
-        //       // Extract the clipurl, capturedby, and timestamp from cliptimings array
-        //       element['cliptimings'].forEach(timing => {
-        //         const assignmentData: AssignmentData = {
-        //           clipurl: timing.clipurl,
-        //           capturedby: timing.capturedby,
-        //           timestamp: timing.timestamp,
-        //           // Add other properties if necessary
-        //         };
-        //         this.data.push(assignmentData);
-        //         console.log(this.data);
-                
-        //       });
-        //     }
-        //   }
-        // })
         this.startmeeting();
       })
-    })
+
+    })  
+    
   }
 
+ 
+
   ngOnInit(): void {
+   
   }
 
   ngOnDestroy() {
@@ -99,8 +97,10 @@ export class ZoomClientviewComponent {
   async startmeeting() {
     await this.guard.getRoles().then(async roles=>{
       this.profileid = roles.profile_ref.id
-      this.profileHost = this.zoomdata["pairing"].includes(this.profileid)
+      const hosts = this.collectiontype === 'queue' ? this.zoomdata["pairing"] : this.zoomdata["hosts"].map(ref => ref.id); 
+      this.profileHost = hosts.includes(this.profileid)
       console.log(this.profileHost ? "Host" : "Participant")
+      
     })  
 
     var profileData = {}

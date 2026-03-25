@@ -1,0 +1,110 @@
+<div class="dialog-header">
+  <button mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<div *ngIf="loading" class="loading-container">
+  <mat-spinner></mat-spinner>
+</div>
+
+<div *ngIf="!loading" class="content-container">
+  <div class="fixed-top-section">
+    <h4 class="heading">{{ heading + (subHeading ? ' ' + subHeading : '') }}</h4><br>
+    <div *ngIf="sectionMetric === 'MetricSection'" style="display: flex; align-items: center; gap: 15px;">
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(152, 235, 152); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">Sequence Increased</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(237, 159, 159); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">Sequence Decreased</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(249,249,249); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Change in Sequence</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(155, 154, 154); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Previous AEL</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(123, 207, 245); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Change in Sequence, but Metric Value Increased</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span style="width: 15px; height: 15px; background-color: rgb(224, 130, 247); border-radius: 50%; display: inline-block;"></span>
+        <span style="margin-left: 5px;">No Change in Sequence, but Metric Value Decreased</span>
+      </div>
+    </div> <br>
+    <input
+      type="text"
+      placeholder="Search..."
+      [(ngModel)]="searchTerm"
+      (input)="filterItems()"
+      class="search-input"
+    />
+  </div>
+
+  <!-- <div *ngIf="heading !== 'Limitation Years' && heading !== 'Saved Years' && heading !== 'Total Adjustment' && heading !== 'Un Aware' && heading !== 'Aware'" class="item-container">
+    <div class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
+      {{ mapProfile[profile] }}
+    </div>
+  </div> -->
+
+  <div class="scrollable-content">
+    <div *ngIf="heading !== 'Limitation Years' && heading !== 'Saved Years' && heading !== 'Total Adjustment' && heading !== 'Un Aware' && heading !== 'Aware'" class="item-container">
+      <div class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
+        <div class="profile-name">{{ mapProfile[profile] }}</div>
+        <div *ngIf="sectionMetric === 'MetricSection'" class="metrics-container">
+          <div class="previous-metrics">
+            <h5>Previous
+              <span *ngIf="previousMetric && previousMetric[profile]">({{ previousMetric[profile].month }} {{ previousMetric[profile].year }})</span>
+            </h5>
+            <ng-container *ngIf="previousMetric && previousMetric[profile]">
+              <div class="metrics-list">
+                <ng-container *ngFor="let category of ['Business', 'Career', 'Family', 'Health', 'Personal Genius']">
+                  <div *ngIf="previousMetric[profile].data[category]" class="metric-item">
+                    <strong>{{ category }}</strong>:
+                    {{ previousMetric[profile].data[category].startpoint }} to {{ previousMetric[profile].data[category].endpoint }}
+                    <span *ngIf="previousMetric[profile].data[category].metric" class="metric-value"> , Metric: {{ previousMetric[profile].data[category].metric }}</span>
+                    <span *ngIf="previousMetric[profile].data[category].jumpedfrom" class="jumped-from"> , Jumped from: {{ previousMetric[profile].data[category].jumpedfrom }}</span>
+                    <!-- <span *ngIf="previousMetric[profile].data[category].sequence" class="jumped-from"> , sequence: {{ previousMetric[profile].data[category].sequence }}</span> -->
+                  </div>
+                </ng-container>
+              </div>
+            </ng-container>
+          </div>
+          <div class="current-metrics">
+            <h5>Current</h5>
+            <ng-container *ngIf="metricData">
+              <div class="metrics-list">
+                <ng-container *ngFor="let category of ['Business', 'Career', 'Family', 'Health', 'Personal Genius']">
+                  <div *ngIf="metricData[profile][category]" class="metric-item" [ngClass]="{
+                    'sequence-increase': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence > previousMetric[profile].data[category].sequence,
+                    'sequence-decrease': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence < previousMetric[profile].data[category].sequence,
+                    'sequence-same': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence === previousMetric[profile].data[category].sequence,
+                    'metric-increase': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence === previousMetric[profile].data[category].sequence && metricData[profile][category].metric > previousMetric[profile].data[category].metric,
+                    'metric-decrease': previousMetric[profile] && previousMetric[profile].data && previousMetric[profile].data[category] && metricData[profile][category].sequence === previousMetric[profile].data[category].sequence && metricData[profile][category].metric < previousMetric[profile].data[category].metric,
+                    'sequence-no-previous': !previousMetric[profile] || !previousMetric[profile].data || !previousMetric[profile].data[category]
+                  }">
+                    <strong>{{ category }}</strong>:
+                    {{ metricData[profile][category].startpoint }} to {{ metricData[profile][category].endpoint }}
+                    <span *ngIf="metricData[profile][category].metric" class="metric-value"> , Metric: {{ metricData[profile][category].metric }}</span>
+                    <span *ngIf="metricData[profile][category].jumpedfrom" class="jumped-from"> , Jumped from: {{ metricData[profile][category].jumpedfrom }}</span>
+                    <!-- <span *ngIf="metricData[profile][category].sequence" class="jumped-from"> , sequence: {{ metricData[profile][category].sequence }}</span> -->
+                  </div>
+                </ng-container>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="heading === 'Limitation Years' || heading === 'Saved Years' || heading === 'Total Adjustment' || heading === 'Un Aware' || heading === 'Aware'" class="item-container">
+      <div class="item" *ngFor="let profile of limitationYearsData" (click)="profileNavigation(profile.key)">
+        {{ mapProfile[profile.key] }} - {{ profile.value }}
+      </div>
+    </div>
+  </div>
+</div>

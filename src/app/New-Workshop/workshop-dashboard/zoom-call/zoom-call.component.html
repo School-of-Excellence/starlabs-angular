@@ -209,4 +209,11 @@
     
     <mat-paginator [pageSizeOptions]="[50, 200, 500]" showFirstLastButtons></mat-paginator>
   </div>
+  <div class="dialog-actions">
+    <button mat-button (click)="onClose()">Close</button>
+
+    <button mat-raised-button color="primary" [disabled]="dataSource.data.length === 0" (click)="onUpdate()">
+      Update
+    </button>
+  </div>
 </div>

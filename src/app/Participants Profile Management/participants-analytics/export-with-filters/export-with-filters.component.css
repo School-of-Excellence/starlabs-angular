@@ -313,3 +313,10 @@ mat-dialog-actions button {
   font-size: 13px !important;
   font-weight: 400 !important;
 }
+
+/* filter action */
+
+.filter-actions{
+  display: flex;
+  gap : 20px;
+}

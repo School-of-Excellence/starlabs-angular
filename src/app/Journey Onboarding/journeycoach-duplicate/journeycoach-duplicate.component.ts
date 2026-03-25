@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef } from '@angular/core';
-import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit } from '@angular/fire/firestore';
+import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -74,6 +74,55 @@ export interface Dialog {
   dialog: DialogConfig,
   table: TableConfig,
   avg?: number
+}
+
+export interface CategoryMetric {
+  startpoint: number;
+  endpoint: number;
+  sequence: number;
+}
+
+export interface InterimProfile {
+  profileId: string;
+  profileName: string;
+  createdDate: string;
+  changedCount: number | 'all';
+  progressedAreas: string[];
+  regressedAreas: string[];
+  metric: Record<string, CategoryMetric>;
+  previousMetric: Record<string, CategoryMetric> | null;
+  previousCreatedDate: string | null;
+}
+
+export interface MonthSummary {
+  yearMonth: string;
+  monthLabel: string;
+  totalInterims: number;
+  noChangeCount: number;
+  progressedData: {
+    areaBreakdown: Record<string | number, number>;
+    categoryBreakdown: Record<string, number>;
+  };
+  regressedData: {
+    areaBreakdown: Record<string | number, number>;
+    categoryBreakdown: Record<string, number>;
+  };
+  profileGroups: {
+    progressed: InterimProfile[];
+    regressed: InterimProfile[];
+    noChange: InterimProfile[];
+  };
+}
+
+export type DialogType = 'nc' | 'area' | 'category' | 'summary' | 'months' | null;
+
+export interface DialogContext {
+  dialogType: DialogType;
+  dialogTitle: string;
+  dialogSubtitle: string;
+  statusClass: 'up' | 'dn' | 'nc';
+  profileList: InterimProfile[];
+  statusType?: 'up' | 'dn' | 'nc';
 }
 
 @Component({
@@ -420,6 +469,56 @@ export class JourneycoachDuplicateComponent {
   dialogConfig: Dialog | null = null;
 
   modesList: any = [];
+  readonly CATEGORIES = ['Business', 'Career', 'Family', 'Health', 'Personal Genius'];
+  readonly AREA_KEYS: (number | 'all')[] = [1, 2, 3, 4, 'all'];
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  numberOfMonths: number = null;
+  filterStartDate: Date | null = null;
+  filterEndDate: Date | null = null;
+  isFetchingData: boolean = false;
+  dateRangeHint: string = '';
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  monthSummaries: MonthSummary[] = [];
+  activeMonthIndex: number = 0;
+
+  // ── Computed getters ──────────────────────────────────────────────────────
+  get activeMonthSummary(): MonthSummary | null {
+    return this.monthSummaries[this.activeMonthIndex] ?? null;
+  }
+  get activeProgressedCount(): number {
+    return this.activeMonthSummary ? this.getTotalProgressed(this.activeMonthSummary) : 0;
+  }
+  get activeRegressedCount(): number {
+    return this.activeMonthSummary ? this.getTotalRegressed(this.activeMonthSummary) : 0;
+  }
+  get progressedPercentage(): number {
+    return this.activeMonthSummary
+      ? Math.round((this.activeProgressedCount / this.activeMonthSummary.totalInterims) * 100) : 0;
+  }
+  get regressedPercentage(): number {
+    return this.activeMonthSummary
+      ? Math.round((this.activeRegressedCount / this.activeMonthSummary.totalInterims) * 100) : 0;
+  }
+  get noChangePercentage(): number {
+    return this.activeMonthSummary
+      ? Math.round((this.activeMonthSummary.noChangeCount / this.activeMonthSummary.totalInterims) * 100) : 0;
+  }
+  filterMode: 'months' | 'daterange' = 'months';
+  loggedInProfileid: string = "";
+
+  // ── Dialog state ──────────────────────────────────────────────────────────
+  isDialogOpen: boolean = false;
+  dialogContext: DialogContext | null = null;
+  dialogProfileList: InterimProfile[] = [];
+  selectedProfile: InterimProfile | null = null;
+  isAllMonthsDialogOpen: boolean = false;
+  askAHLoveLetterSummary: any = null;
+  journeyCoachTags: any[] = [];
+  isTagProfilesDialogOpen: boolean = false;
+  selectedTagName: string = '';
+  selectedTagProfiles: any[] = [];
 
   constructor(
     public firestore: Firestore,
@@ -430,6 +529,9 @@ export class JourneycoachDuplicateComponent {
     private dialog: MatDialog,
     private router: Router
   ) {
+    this.guard.getRoles().then(roles =>{
+      this.loggedInProfileid = roles["profile_ref"].id
+    })
     this.filterForm = this.fb.group({
       search: ['',],
       purchaseStart: ['',],
@@ -461,6 +563,8 @@ export class JourneycoachDuplicateComponent {
             return nameA.localeCompare(nameB);
           });
       });
+
+      this.fetchJourneyCoachTags();
 
       this.subscriptions['appointments'] = collectionData(query(collection(this.firestore, "appointments"), where("journeycoach", "==", true)), { idField: 'id' }).subscribe((appointments) => {
         let tempArray = [];
@@ -638,7 +742,6 @@ export class JourneycoachDuplicateComponent {
     this.loadCurrentSalesLeads();
     this.loadCustomerSupport();
     this.loadModes();
-    this.getAtcAlpha();
   }
 
   // Function to initialize columns for each column 
@@ -779,8 +882,11 @@ export class JourneycoachDuplicateComponent {
       { key: 'pp_totalpurchasevalue', header: 'Purchase Value', width: '5%', type: 'currency', prefix: '₹' },
       { key: 'pp_totalpaid', header: 'Amount Paid', width: '5%', type: 'currency', prefix: '₹' },
       { key: 'balance', header: 'Balance', width: '5%', type: 'currency', prefix: '₹' },
-      { key: 'journeyplan', header: 'Journey Plan', width: '25%', type: 'text' },
-      { key: 'markcoach', header: 'Mark JC Complete', width: '10%', type: 'text' },
+      { key: 'journeyplan', header: 'Journey Plan', width: '15%', type: 'text' },
+      { key: 'markcoach', header: 'Mark JC Complete', width: '10%', type: 'text' }, 
+      { key: 'profiletags', header: 'Tag', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
+      { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
+      { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'menubutton', header: '+', width: '5%', type: 'text' },
     ];
 
@@ -2690,7 +2796,8 @@ export class JourneycoachDuplicateComponent {
       data: element,
       autoFocus: false,
       disableClose: true,
-      panelClass: 'custom-dialog-container'
+      panelClass: 'custom-dialog-container',
+      maxHeight: "90vh"
     });
   }
 
@@ -3691,10 +3798,12 @@ export class JourneycoachDuplicateComponent {
 
   // Function to get atc alpha data 
   getAtcAlpha() {
-    const currentMonthStart = new Date(this.startDate);
-    currentMonthStart.setHours(0, 0, 0, 0);
+    const startInput = this.filterStartDate ? new Date(this.filterStartDate) : new Date();
+    const endInput = this.filterEndDate ? new Date(this.filterEndDate) : new Date();
 
-    const currentMonthEnd = new Date(this.endDate);
+    const currentMonthStart = new Date(startInput);
+    currentMonthStart.setHours(0, 0, 0, 0);
+    const currentMonthEnd = new Date(endInput);
     currentMonthEnd.setHours(23, 59, 59, 999);
 
     currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
@@ -3999,5 +4108,709 @@ export class JourneycoachDuplicateComponent {
       },
       disableClose: true
     });
+  }
+
+  onMonthsCountChange(): void {
+    if (!this.numberOfMonths || this.numberOfMonths < 1) return;
+    this.filterEndDate = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - this.numberOfMonths);
+    start.setDate(1);
+    this.filterStartDate = start;
+    this.updateDateRangeHint();
+    this.loadInterimData();
+    this.getAtcAlpha();
+  }
+
+  onDateRangeChange(): void {
+    if (!this.filterStartDate || !this.filterEndDate) return;
+    const start = new Date(this.filterStartDate);
+    const end = new Date(this.filterEndDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    const diffMs = end.getTime() - start.getTime();
+    this.numberOfMonths = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.5)));
+    this.updateDateRangeHint();
+    this.loadInterimData();
+    this.getAtcAlpha();
+  }
+
+  stepMonths(delta: number): void {
+    this.numberOfMonths = Math.max(1, Math.min(24, this.numberOfMonths + delta));
+    this.onMonthsCountChange(); // already calls loadInterimData
+  }
+
+  private async loadInterimData(): Promise<void> {
+    if (!this.filterStartDate || !this.filterEndDate) return;
+    this.isFetchingData = true;
+    this.monthSummaries = [];
+    this.activeMonthIndex = 0;
+    try {
+      const startDateObj = new Date(this.filterStartDate);
+      startDateObj.setHours(0, 0, 0, 0);
+      const endDateObj = new Date(this.filterEndDate);
+      endDateObj.setHours(23, 59, 59, 999);
+
+      const [rawResult, askAHLoveLetterData] = await Promise.all([
+        this.fetchAELAndInterimData(startDateObj, endDateObj),
+        this.fetchAskAHAndLoveLetterData(startDateObj, endDateObj)
+      ]);
+
+      this.monthSummaries = rawResult.map(r => this.mapRawResultToMonthSummary(r));
+      this.askAHLoveLetterSummary = askAHLoveLetterData;
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      this.isFetchingData = false;
+    }
+  }
+
+  private async fetchAskAHAndLoveLetterData(startDate: Date, endDate: Date): Promise<any> {
+    const startTimestamp = Timestamp.fromDate(startDate);
+    const endTimestamp = Timestamp.fromDate(endDate);
+
+    const [askAHSnapshot, loveLetterSnapshot] = await Promise.all([
+      getDocs(query(
+        collection(this.firestore, 'ask AH'),
+        where('created', '>=', startTimestamp),
+        where('created', '<=', endTimestamp)
+      )).catch(() => null),
+
+      getDocs(query(
+        collection(this.firestore, 'love letter'),
+        where('created', '>=', startTimestamp),
+        where('created', '<=', endTimestamp)
+      )).catch(() => null),
+    ]);
+
+    const askAHDocs = (askAHSnapshot?.docs ?? []).map(doc => ({
+      id: doc.id,
+      source: 'ask AH',
+      ...doc.data()
+    }));
+
+    const loveLetterDocs = (loveLetterSnapshot?.docs ?? []).map(doc => ({
+      id: doc.id,
+      source: 'love letter',
+      ...doc.data()
+    }));
+
+    const allDocs = [...askAHDocs, ...loveLetterDocs];
+
+    return {
+      total: allDocs.length,
+      tagged: allDocs.filter(d => d['tagged'] === true).length,
+      opportunity: allDocs.filter(d => d['opportunity'] === true).length,
+      liked: allDocs.filter(d => d['liked'] === true).length,
+      critical: allDocs.filter(d => d['critical'] === true).length,
+      askAH: {
+        total: askAHDocs.length,
+        tagged: askAHDocs.filter(d => d['tagged'] === true).length,
+        opportunity: askAHDocs.filter(d => d['opportunity'] === true).length,
+        liked: askAHDocs.filter(d => d['liked'] === true).length,
+        critical: askAHDocs.filter(d => d['critical'] === true).length,
+        docs: askAHDocs
+      },
+      loveLetter: {
+        total: loveLetterDocs.length,
+        tagged: loveLetterDocs.filter(d => d['tagged'] === true).length,
+        opportunity: loveLetterDocs.filter(d => d['opportunity'] === true).length,
+        liked: loveLetterDocs.filter(d => d['liked'] === true).length,
+        critical: loveLetterDocs.filter(d => d['critical'] === true).length,
+        docs: loveLetterDocs
+      }
+    };
+  }
+
+  private updateDateRangeHint(): void {
+    if (this.filterStartDate && this.filterEndDate) {
+      const sf = new Date(this.filterStartDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const ef = new Date(this.filterEndDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      this.dateRangeHint = `${sf} → ${ef}`;
+    }
+  }
+
+  // ── Core fetch function (from your previous implementation) ───────────────
+
+  private async fetchAELAndInterimData(startDate: Date, endDate: Date): Promise<any[]> {
+    const CATEGORIES = this.CATEGORIES;
+
+    const [aelSnapshot, interimSnapshot] = await Promise.all([
+      getDocs(collection(this.firestore, 'accelerated evolution level')),
+      getDocs(query(
+        collection(this.firestore, 'interim crossover'),
+        where('created', '>=', Timestamp.fromDate(startDate)),
+        where('created', '<=', Timestamp.fromDate(endDate))
+      ))
+    ]);
+
+    // Build AEL lookup map keyed by "startpoint_endpoint"
+    const aelLookupMap: Record<string, any> = {};
+    aelSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const startPoint = data['startpoint'];
+      const endPoint = data['endpoint'];
+      if (startPoint != null && endPoint != null) {
+        aelLookupMap[`${startPoint}_${endPoint}`] = { id: doc.id, ...data };
+      }
+    });
+
+    // Group docs by profileId
+    const profileDocsMap: Record<string, any[]> = {};
+
+    interimSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const profileId = data['profileid'];
+      if (!profileId) return;
+
+      const rawMetric = data['metric'] ?? {};
+      const enrichedMetric: Record<string, any> = {};
+
+      CATEGORIES.forEach(category => {
+        const categoryData = rawMetric[category] ?? {};
+        const startPoint = categoryData['startpoint'];
+        const endPoint = categoryData['endpoint'];
+        const matchedAEL = aelLookupMap[`${startPoint}_${endPoint}`];
+        enrichedMetric[category] = {
+          ...categoryData,
+          sequence: matchedAEL?.['sequence'] ?? null
+        };
+      });
+
+      if (!profileDocsMap[profileId]) profileDocsMap[profileId] = [];
+      profileDocsMap[profileId].push({ id: doc.id, ...data, metric: enrichedMetric });
+    });
+
+    // Group by profileId + yearMonth, compare consecutive docs
+    const monthResultMap: Record<string, any> = {};
+
+    Object.entries(profileDocsMap).forEach(([profileId, docs]) => {
+      // Sort desc — newest first
+      docs.sort((a, b) => b['created'].toDate() - a['created'].toDate());
+
+      docs.forEach((doc, index) => {
+        const createdDate: Date = doc['created'].toDate();
+        const year = createdDate.getFullYear();
+        const month = String(createdDate.getMonth() + 1).padStart(2, '0');
+        const yearMonth = `${year}-${month}`;
+
+        if (!monthResultMap[yearMonth]) {
+          monthResultMap[yearMonth] = { yearMonth, interimDocs: [] };
+        }
+
+        // Compare with previous (older) doc — index+1 in desc sorted array
+        const previousDoc = docs[index + 1] ?? null;
+        let comparison: any = null;
+
+        if (previousDoc) {
+          const allSame = CATEGORIES.every(cat => {
+            const curr = doc.metric[cat];
+            const prev = previousDoc.metric[cat];
+            return curr?.startpoint === prev?.startpoint && curr?.endpoint === prev?.endpoint;
+          });
+
+          if (allSame) {
+            comparison = { status: 'no change', progressedAreas: [], regressedAreas: [], changedCount: 0 };
+          } else {
+            const progressedAreas: string[] = [];
+            const regressedAreas: string[] = [];
+
+            CATEGORIES.forEach(cat => {
+              const currSeq = doc.metric[cat]?.sequence ?? null;
+              const prevSeq = previousDoc?.metric[cat]?.sequence ?? null;
+              if (currSeq != null && prevSeq != null) {
+                if (Number(currSeq) > Number(prevSeq)) progressedAreas.push(cat);
+                else if (Number(currSeq) < Number(prevSeq)) regressedAreas.push(cat);
+              }
+            });
+
+            const totalChanged = progressedAreas.length + regressedAreas.length;
+            const changedCount: number | 'all' = totalChanged === 5 ? 'all' : totalChanged;
+
+            // No longer single status — profile can be in BOTH progressed and regressed
+            const isProgressed = progressedAreas.length > 0;
+            const isRegressed = regressedAreas.length > 0;
+            const isNoChange = !isProgressed && !isRegressed;
+
+            comparison = {
+              status: isNoChange ? 'no change' : 'changed',
+              progressedAreas,
+              regressedAreas,
+              changedCount
+            };
+          }
+        }
+
+        monthResultMap[yearMonth].interimDocs.push({
+          ...doc,
+          profileid: profileId,
+          comparison,
+          _previousDoc: previousDoc
+        });
+      });
+    });
+
+    return Object.values(monthResultMap).sort((a, b) =>
+      a.yearMonth.localeCompare(b.yearMonth)
+    );
+  }
+
+  // ── Map raw result → MonthSummary ─────────────────────────────────────────
+
+  private mapRawResultToMonthSummary(rawResult: any): MonthSummary {
+    const progressedProfiles: InterimProfile[] = [];
+    const regressedProfiles: InterimProfile[] = [];
+    const noChangeProfiles: InterimProfile[] = [];
+
+    const progressedAreaBreakdown: Record<string | number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, all: 0 };
+    const regressedAreaBreakdown: Record<string | number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, all: 0 };
+    const progressedCategoryBreakdown: Record<string, number> = {};
+    const regressedCategoryBreakdown: Record<string, number> = {};
+    this.CATEGORIES.forEach(cat => {
+      progressedCategoryBreakdown[cat] = 0;
+      regressedCategoryBreakdown[cat] = 0;
+    });
+
+    for (const doc of (rawResult.interimDocs ?? [])) {
+      const profileId: string = doc.profileid ?? '';
+      const profileEntry = this.mapMetaData[profileId];
+      const profileName: string = profileEntry?.name ?? profileId;
+
+      const createdDate = doc.created?.toDate
+        ? doc.created.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+        : (doc.date ?? '');
+
+      const comparisonStatus = doc.comparison?.status ?? 'no change';
+      const progressedAreas: string[] = doc.comparison?.progressedAreas ?? [];
+      const regressedAreas: string[] = doc.comparison?.regressedAreas ?? [];
+      const rawChangedCount = doc.comparison?.changedCount ?? 0;
+      const changedCount: number | 'all' = rawChangedCount === 'all' ? 'all' : rawChangedCount;
+
+      const previousDoc = doc.comparison ? doc._previousDoc ?? null : null;
+      const previousMetric = previousDoc?.metric ?? null;
+      const previousCreatedDate = previousDoc?.created?.toDate
+        ? previousDoc.created.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+        : null;
+
+      const interimProfile: InterimProfile = {
+        profileId,
+        profileName,
+        createdDate,
+        changedCount,
+        progressedAreas,
+        regressedAreas,
+        metric: doc.metric ?? {},
+        previousMetric,
+        previousCreatedDate
+      };
+
+      if (!doc.comparison || comparisonStatus === 'no change') {
+        noChangeProfiles.push(interimProfile);
+      } else {
+        // Add to progressed if any areas progressed
+        if ((doc.comparison.progressedAreas ?? []).length > 0) {
+          progressedProfiles.push(interimProfile);
+          const progressedCount = doc.comparison.progressedAreas.length === 5
+            ? 'all' : doc.comparison.progressedAreas.length;
+          const areaKey: string | number = progressedCount === 'all' ? 'all' : progressedCount as number;
+          progressedAreaBreakdown[areaKey] = (progressedAreaBreakdown[areaKey] ?? 0) + 1;
+          doc.comparison.progressedAreas.forEach((cat: string) => {
+            if (progressedCategoryBreakdown[cat] !== undefined) progressedCategoryBreakdown[cat]++;
+          });
+        }
+
+        // Add to regressed if any areas regressed — independent of progressed
+        if ((doc.comparison.regressedAreas ?? []).length > 0) {
+          regressedProfiles.push(interimProfile);
+          const regressedCount = doc.comparison.regressedAreas.length === 5
+            ? 'all' : doc.comparison.regressedAreas.length;
+          const areaKey: string | number = regressedCount === 'all' ? 'all' : regressedCount as number;
+          regressedAreaBreakdown[areaKey] = (regressedAreaBreakdown[areaKey] ?? 0) + 1;
+          doc.comparison.regressedAreas.forEach((cat: string) => {
+            if (regressedCategoryBreakdown[cat] !== undefined) regressedCategoryBreakdown[cat]++;
+          });
+        }
+
+        // noChange only if neither progressed nor regressed
+        if ((doc.comparison.progressedAreas ?? []).length === 0 &&
+          (doc.comparison.regressedAreas ?? []).length === 0) {
+          noChangeProfiles.push(interimProfile);
+        }
+      }
+    }
+
+    const [year, month] = rawResult.yearMonth.split('-').map(Number);
+    const monthLabel = new Date(year, month - 1, 1)
+      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    return {
+      yearMonth: rawResult.yearMonth,
+      monthLabel,
+      totalInterims: (rawResult.interimDocs ?? []).length,
+      noChangeCount: noChangeProfiles.length,
+      progressedData: {
+        areaBreakdown: progressedAreaBreakdown,
+        categoryBreakdown: progressedCategoryBreakdown
+      },
+      regressedData: {
+        areaBreakdown: regressedAreaBreakdown,
+        categoryBreakdown: regressedCategoryBreakdown
+      },
+      profileGroups: {
+        progressed: progressedProfiles,
+        regressed: regressedProfiles,
+        noChange: noChangeProfiles
+      }
+    };
+  }
+
+  // ── Tab navigation ────────────────────────────────────────────────────────
+
+  switchActiveMonth(index: number): void {
+    this.activeMonthIndex = index;
+    this.closeDialog();
+  }
+
+  getTabLabel(monthSummary: MonthSummary): string {
+    const parts = monthSummary.monthLabel.split(' ');
+    return `${parts[0].slice(0, 3)} ${parts[1].slice(2)}`;
+  }
+
+  // ── Stat helpers ──────────────────────────────────────────────────────────
+
+  getTotalProgressed(monthSummary: MonthSummary): number {
+    return Object.values(monthSummary.progressedData.areaBreakdown).reduce((sum, val) => sum + val, 0);
+  }
+
+  getTotalRegressed(monthSummary: MonthSummary): number {
+    return Object.values(monthSummary.regressedData.areaBreakdown).reduce((sum, val) => sum + val, 0);
+  }
+
+  getMaxValue(breakdownMap: Record<string | number, number>): number {
+    return Math.max(...Object.values(breakdownMap), 1);
+  }
+
+  getBarWidthPercent(value: number, maxValue: number): number {
+    return Math.round((value / Math.max(maxValue, 1)) * 100);
+  }
+
+  getAreaLabel(areaKey: number | 'all'): string {
+    return areaKey === 'all' ? 'All Areas' : `${areaKey} Area${areaKey > 1 ? 's' : ''}`;
+  }
+
+  getAreaValue(monthSummary: MonthSummary, statusType: 'up' | 'dn', areaKey: number | 'all'): number {
+    const breakdown = statusType === 'up'
+      ? monthSummary.progressedData.areaBreakdown
+      : monthSummary.regressedData.areaBreakdown;
+    return breakdown[areaKey] ?? 0;
+  }
+
+  getCategoryValue(monthSummary: MonthSummary, statusType: 'up' | 'dn', category: string): number {
+    const breakdown = statusType === 'up'
+      ? monthSummary.progressedData.categoryBreakdown
+      : monthSummary.regressedData.categoryBreakdown;
+    return breakdown[category] ?? 0;
+  }
+
+  getInitials(name: string): string {
+    return (name || '?').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase();
+  }
+
+  getCountBadgeClass(changedCount: number | 'all', statusType: 'up' | 'dn' | 'nc'): string {
+    return changedCount === 'all' ? 'all' : statusType;
+  }
+
+  // ── Dialog openers ────────────────────────────────────────────────────────
+
+  openNoChangeDialog(): void {
+    const month = this.activeMonthSummary!;
+    this.openProfileListDialog(
+      'nc',
+      'No Change',
+      `${month.monthLabel} · ${month.noChangeCount} profiles`,
+      'nc',
+      month.profileGroups.noChange
+    );
+  }
+
+  openProgressedDialog(): void {
+    const month = this.activeMonthSummary!;
+    const profiles = month.profileGroups.progressed;
+    this.openProfileListDialog(
+      'summary',
+      'Progressed',
+      `${month.monthLabel} · ${profiles.length} participants`,
+      'up',
+      profiles
+    );
+  }
+
+  openRegressedDialog(): void {
+    const month = this.activeMonthSummary!;
+    const profiles = month.profileGroups.regressed;
+    this.openProfileListDialog(
+      'summary',
+      'Regressed',
+      `${month.monthLabel} · ${profiles.length} participants`,
+      'dn',
+      profiles
+    );
+  }
+
+  openAreaDialog(statusType: 'up' | 'dn', areaKey: number | 'all'): void {
+    const month = this.activeMonthSummary!;
+    const filteredProfiles = statusType === 'up'
+      ? month.profileGroups.progressed.filter(p => p.changedCount == areaKey)
+      : month.profileGroups.regressed.filter(p => p.changedCount == areaKey);
+    const areaLabel = areaKey === 'all' ? 'All areas' : `${areaKey} area${areaKey > 1 ? 's' : ''}`;
+    this.openProfileListDialog(
+      'area',
+      `${statusType === 'up' ? 'Progressed' : 'Regressed'} · ${areaLabel}`,
+      `${month.monthLabel} · ${filteredProfiles.length} participants`,
+      statusType,
+      filteredProfiles
+    );
+  }
+
+  openCategoryDialog(statusType: 'up' | 'dn', category: string): void {
+    const month = this.activeMonthSummary!;
+    const filteredProfiles = statusType === 'up'
+      ? month.profileGroups.progressed.filter(p => p.progressedAreas.includes(category))
+      : month.profileGroups.regressed.filter(p => p.regressedAreas.includes(category));
+    this.openProfileListDialog(
+      'category',
+      category,
+      `${statusType === 'up' ? 'Progressed' : 'Regressed'} · ${month.monthLabel} · ${filteredProfiles.length}`,
+      statusType,
+      filteredProfiles
+    );
+  }
+
+  private openProfileListDialog(
+    dialogType: DialogType,
+    title: string,
+    subtitle: string,
+    statusClass: 'up' | 'dn' | 'nc',
+    profileList: InterimProfile[]
+  ): void {
+    this.dialogContext = { dialogType, dialogTitle: title, dialogSubtitle: subtitle, statusClass, profileList, statusType: statusClass };
+    this.dialogProfileList = profileList;
+    this.selectedProfile = null;
+    this.isDialogOpen = true;
+  }
+
+  openProfileDetail(profile: InterimProfile): void { this.selectedProfile = profile; }
+  backToProfileList(): void { this.selectedProfile = null; }
+
+  closeDialog(): void {
+    this.isDialogOpen = false;
+    this.selectedProfile = null;
+    this.dialogContext = null;
+  }
+
+  onDialogOverlayClick(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('overlay')) this.closeDialog();
+  }
+
+  openAllMonthsDialog(): void { this.isAllMonthsDialogOpen = true; }
+  closeAllMonthsDialog(): void { this.isAllMonthsDialogOpen = false; }
+
+  onAllMonthsOverlayClick(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('overlay')) this.closeAllMonthsDialog();
+  }
+
+  // ── Category detail helpers ────────────────────────────────────────────────
+
+  getCategoryChangeType(profile: InterimProfile, category: string): 'up' | 'dn' | 'nc' {
+    if (profile.progressedAreas.includes(category)) return 'up';
+    if (profile.regressedAreas.includes(category)) return 'dn';
+    return 'nc';
+  }
+
+  getCategoryArrow(changeType: 'up' | 'dn' | 'nc'): string {
+    return changeType === 'up' ? '↑' : changeType === 'dn' ? '↓' : '→';
+  }
+
+  getCategoryStatusLabel(changeType: 'up' | 'dn' | 'nc'): string {
+    return changeType === 'up' ? 'Progressed' : changeType === 'dn' ? 'Regressed' : 'No change';
+  }
+
+  isCategoryChanged(profile: InterimProfile, category: string): boolean {
+    return [...profile.progressedAreas, ...profile.regressedAreas].includes(category);
+  }
+
+  getAllChangedAreas(profile: InterimProfile): string[] {
+    return [...profile.progressedAreas, ...profile.regressedAreas];
+  }
+
+  toggleFilterMode(mode: 'months' | 'daterange'): void {
+    if (this.filterMode === mode) return;
+    this.filterMode = mode;
+    // Reset the other mode's data
+    if (mode === 'months') {
+      this.filterStartDate = null;
+      this.filterEndDate = null;
+      this.numberOfMonths = null;
+      this.onMonthsCountChange();
+    } else {
+      this.filterStartDate = null;
+      this.filterEndDate = null;
+      this.numberOfMonths = null;
+      this.monthSummaries = [];
+      this.updateDateRangeHint();
+    }
+  }
+
+  getOverallTotal(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + m.totalInterims, 0);
+  }
+  getOverallProgressed(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + this.getTotalProgressed(m), 0);
+  }
+  getOverallRegressed(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + this.getTotalRegressed(m), 0);
+  }
+  getOverallNoChange(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + m.noChangeCount, 0);
+  }
+
+  getOverallCategoryProgressed(category: string): number {
+    return this.monthSummaries.reduce((sum, m) =>
+      sum + (m.progressedData.categoryBreakdown[category] || 0), 0);
+  }
+
+  getOverallCategoryRegressed(category: string): number {
+    return this.monthSummaries.reduce((sum, m) =>
+      sum + (m.regressedData.categoryBreakdown[category] || 0), 0);
+  }
+
+  getOverallCategoryMax(type: 'up' | 'dn'): number {
+    return Math.max(...this.CATEGORIES.map(cat =>
+      type === 'up'
+        ? this.getOverallCategoryProgressed(cat)
+        : this.getOverallCategoryRegressed(cat)
+    ), 1);
+  }
+
+  getMonthCategories(monthSummary: MonthSummary): string[] {
+    return Object.keys(monthSummary.progressedData.categoryBreakdown);
+  }
+
+  getJourneyCoachTag(profileId: string): string {
+    const journeyCoachTagIds: string[] = this.journeyCoachTags
+      .filter(t => t['isActive'] === true)
+      .map(t => t.id);
+    const metaData = this.mapMetaData[profileId];
+    const profileTags: string[] = metaData?.['profiletags'] ?? [];
+    return profileTags.find(t => journeyCoachTagIds.includes(t)) ?? '';
+  }
+
+  async updateParticipantTag(profileId: string, selectedTagId: string | null, currentTagId: string | null): Promise<void> {
+    // treat empty string as no selection
+    const resolvedTagId = selectedTagId === '' ? null : selectedTagId;
+
+    const metadataRef = doc(this.firestore, 'participant metadata', profileId);
+    const metadataSnap = await getDoc(metadataRef);
+    if (!metadataSnap.exists()) return;
+
+    const metadataData = metadataSnap.data();
+    const currentProfileTags: string[] = metadataData['profiletags'] ?? [];
+
+    const journeyCoachTagIds: string[] = this.journeyCoachTags.map((t: any) => t.id);
+
+    const nonJourneyCoachTags = currentProfileTags.filter(t => !journeyCoachTagIds.includes(t));
+    const existingJourneyCoachTags = currentProfileTags.filter(t => journeyCoachTagIds.includes(t));
+
+    const logPromises: Promise<void>[] = [];
+
+    // Single removal log with ALL removed tags in one array
+    if (existingJourneyCoachTags.length > 0) {
+      const logId = doc(collection(this.firestore, 'participant tag logs')).id;
+      logPromises.push(setDoc(doc(this.firestore, 'participant tag logs', logId), {
+        logid: logId,
+        profileid: profileId,
+        type: 'removed',
+        tags: existingJourneyCoachTags,
+        updated: new Date(),
+        updatedby: this.loggedInProfileid,
+        source: 'journey coach'
+      }));
+    }
+
+    // Build new tags — if null/empty, just keep non-journey-coach tags
+    const newProfileTags = resolvedTagId
+      ? [...nonJourneyCoachTags, resolvedTagId]
+      : nonJourneyCoachTags;
+
+    const batch = writeBatch(this.firestore);
+    batch.update(metadataRef, { profiletags: newProfileTags });
+    await batch.commit();
+
+    // Addition log only if a real tag was selected
+    if (resolvedTagId) {
+      const logId = doc(collection(this.firestore, 'participant tag logs')).id;
+      logPromises.push(setDoc(doc(this.firestore, 'participant tag logs', logId), {
+        logid: logId,
+        profileid: profileId,
+        type: 'added',
+        tags: [resolvedTagId],
+        updated: new Date(),
+        updatedby: this.loggedInProfileid,
+        source: 'journey coach'
+      }));
+    }
+
+    await Promise.all(logPromises);
+    this.guard.openSnackBar("Tag updated successfully", "OK", 3000);
+  }
+
+  private async fetchJourneyCoachTags(): Promise<void> {
+    try {
+      const tagsSnapshot = await getDocs(query(
+        collection(this.firestore, 'participant tags'),
+        where('tagsfor', 'array-contains', 'journey coach')
+      ));
+      this.journeyCoachTags = (tagsSnapshot?.docs ?? []).map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      }));
+    } catch (error) {
+      console.error('Error fetching journey coach tags:', error);
+    }
+  }
+
+  getProfilesForTag(tagId: string): any[] {
+    return Object.entries(this.mapMetaData)
+      .filter(([profileId, meta]: [string, any]) =>
+        (meta?.['profiletags'] ?? []).includes(tagId)
+      )
+      .map(([profileId, meta]: [string, any]) => ({
+        profileId,
+        name: meta?.['name'] ?? profileId
+      }));
+  }
+
+  get activeJourneyCoachTags(): any[] {
+    return this.journeyCoachTags.filter(tag =>
+      this.getProfilesForTag(tag.id).length > 0 || tag['isActive'] === true
+    );
+  }
+
+  openTagProfilesDialog(tag: any): void {
+    this.selectedTagName = tag['name'] || tag.id;
+    this.selectedTagProfiles = this.getProfilesForTag(tag.id);
+    this.isTagProfilesDialogOpen = true;
+  }
+
+  closeTagProfilesDialog(): void {
+    this.isTagProfilesDialogOpen = false;
+    this.selectedTagProfiles = [];
+    this.selectedTagName = '';
+  }
+
+  onTagProfilesOverlayClick(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('overlay')) {
+      this.closeTagProfilesDialog();
+    }
   }
 }

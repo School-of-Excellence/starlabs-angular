@@ -243,7 +243,9 @@ export class CustomerChatScreenComponent {
         }
       }
     } else if (this.screentab == this.selectedtab) {
-      this.fetchTicket(this.ticket_id);
+      if (this.ticket_id) { 
+        this.fetchTicket(this.ticket_id);
+      }
     }
   }
 
@@ -446,6 +448,10 @@ export class CustomerChatScreenComponent {
   }
 
   fetchTicket(ticketId) {
+    if (!ticketId) {
+      console.warn('fetchTicket: ticketId is empty, skipping');
+      return;
+    }
     this.chatloading = true;
     this.profileloading = true;
     this.currentIssueChat = [];
@@ -978,7 +984,6 @@ export class CustomerChatScreenComponent {
   // }
 
   updateTicketDetails(value) {
-    console.log(value)
     // if (value['status']?.toLowerCase() == 'closed') {
     //   this.dialog.open(CustomerTicketReviewComponent, {
     //     disableClose: true,
@@ -1009,7 +1014,9 @@ export class CustomerChatScreenComponent {
       categoryafter: value['category'],
     }
 
-    const clientissue = doc(this.firestore, 'clientissue', this.currentIssueData['id']);
+    const id = this.currentIssueData['id'];
+    if (!id) { console.error('No ticket id'); return; }
+    const clientissue = doc(this.firestore, 'clientissue', id);
 
     updateDoc(clientissue, {
       assign: this.getAssigned()[0],
@@ -1053,7 +1060,9 @@ export class CustomerChatScreenComponent {
       status: status
     };
 
-    const clientissue = doc(this.firestore, 'clientissue', this.currentIssueData['id']);
+    const id = this.currentIssueData['id'];
+    if (!id) { console.error('No ticket id'); return; }
+    const clientissue = doc(this.firestore, 'clientissue', id);
     updateDoc(clientissue, {
       status: statusData
     }).then(() => {
@@ -1343,6 +1352,7 @@ export class CustomerChatScreenComponent {
   }
 
   updateSupportchatMessage(chatid) {
+    if (!chatid) return;
     const clientissueDoc = doc(this.firestore, 'clientissue', chatid)
     const messagesRef = collection(clientissueDoc, 'messages')
     const messageQuery = query(messagesRef, where('pending', 'array-contains', 'admin'), orderBy("time", 'desc'))

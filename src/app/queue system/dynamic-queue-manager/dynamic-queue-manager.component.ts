@@ -1189,8 +1189,8 @@ export class DynamicQueueManagerComponent {
     var endpoint = null;
     await getDoc(doc(this.firestore, "classify", "wati")).then((wati) => {
       if (wati.exists()) {
-        apikey = wati.data()['wati'][0]['watitoken'];
-        endpoint = wati.data()['wati'][0]['endpoint'];
+        apikey = wati.data()['101723']['watitoken'];
+        endpoint = wati.data()['101723']['endpoint'];
       }
     });
 

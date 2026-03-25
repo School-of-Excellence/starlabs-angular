@@ -344,7 +344,9 @@ export class AhNotificationComponent implements AfterViewInit {
       this.profiles = this.data
         .filter(selected => selected["profileid"] != null)
         .map(selected => selected["profileid"]);
-      console.log("Profiles:", this.profiles);
+      console.log("coneossProfilesconsoleeeee....:", this.profiles);
+    } else {
+      console.log('elsesss',this.data);
     }
     this.loadNotifications();
   }

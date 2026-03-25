@@ -375,33 +375,63 @@
                 <mat-divider></mat-divider>
                 <div class="form-section">
                 <h3 class="section-title">Workshop Dates</h3>
-                
                 <div class="form-row">
-                    <mat-form-field appearance="outline">
+                <!-- Registration Start -->
+                <mat-form-field appearance="outline">
                     <mat-label>Registration Start Date</mat-label>
-                    <input  matInput [matDatepicker]="registrationStartPicker" formControlName="registrationStartDate">
+                    <input matInput [matDatepicker]="registrationStartPicker" formControlName="registrationStartDate">
                     <mat-datepicker-toggle matSuffix [for]="registrationStartPicker"></mat-datepicker-toggle>
                     <mat-datepicker #registrationStartPicker></mat-datepicker>
-                    </mat-form-field>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                    <mat-label>Registration Start Time</mat-label>
+                    <input matInput [matTimepicker]="registrationStartTimePicker" formControlName="registrationStartTime">
+                    <mat-timepicker-toggle matSuffix [for]="registrationStartTimePicker"></mat-timepicker-toggle>
+                    <mat-timepicker #registrationStartTimePicker></mat-timepicker>
+                </mat-form-field>
 
-                    <mat-form-field appearance="outline">
+                <!-- Registration End -->
+                <mat-form-field appearance="outline">
                     <mat-label>Registration End Date</mat-label>
-                    <input  matInput [matDatepicker]="registrationEndPicker" formControlName="registrationEndDate">
+                    <input matInput [matDatepicker]="registrationEndPicker" formControlName="registrationEndDate">
                     <mat-datepicker-toggle matSuffix [for]="registrationEndPicker"></mat-datepicker-toggle>
                     <mat-datepicker #registrationEndPicker></mat-datepicker>
-                    </mat-form-field>
-                    <mat-form-field appearance="outline">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                    <mat-label>Registration End Time</mat-label>
+                    <input matInput [matTimepicker]="registrationEndTimePicker" formControlName="registrationEndTime">
+                    <mat-timepicker-toggle matSuffix [for]="registrationEndTimePicker"></mat-timepicker-toggle>
+                    <mat-timepicker #registrationEndTimePicker></mat-timepicker>
+                </mat-form-field>
+                </div>
+                <div class="form-row">
+                <!-- Workshop Start -->
+                <mat-form-field appearance="outline">
                     <mat-label>Workshop Start Date</mat-label>
-                    <input  matInput [matDatepicker]="workshopStartPicker" formControlName="workshopStartDate">
+                    <input matInput [matDatepicker]="workshopStartPicker" formControlName="workshopStartDate">
                     <mat-datepicker-toggle matSuffix [for]="workshopStartPicker"></mat-datepicker-toggle>
                     <mat-datepicker #workshopStartPicker></mat-datepicker>
-                    </mat-form-field>
-                    <mat-form-field appearance="outline">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                    <mat-label>Workshop Start Time</mat-label>
+                    <input matInput [matTimepicker]="workshopStartTimePicker" formControlName="workshopStartTime">
+                    <mat-timepicker-toggle matSuffix [for]="workshopStartTimePicker"></mat-timepicker-toggle>
+                    <mat-timepicker #workshopStartTimePicker></mat-timepicker>
+                </mat-form-field>
+
+                <!-- Workshop End -->
+                <mat-form-field appearance="outline">
                     <mat-label>Workshop End Date</mat-label>
-                    <input  matInput [matDatepicker]="workshopEndPicker" formControlName="workshopEndDate">
+                    <input matInput [matDatepicker]="workshopEndPicker" formControlName="workshopEndDate">
                     <mat-datepicker-toggle matSuffix [for]="workshopEndPicker"></mat-datepicker-toggle>
                     <mat-datepicker #workshopEndPicker></mat-datepicker>
-                    </mat-form-field>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                    <mat-label>Workshop End Time</mat-label>
+                    <input matInput [matTimepicker]="workshopEndTimePicker" formControlName="workshopEndTime">
+                    <mat-timepicker-toggle matSuffix [for]="workshopEndTimePicker"></mat-timepicker-toggle>
+                    <mat-timepicker #workshopEndTimePicker></mat-timepicker>
+                </mat-form-field>
                 </div>
                 </div>
                 <mat-divider></mat-divider>
@@ -1303,6 +1333,30 @@
                                 </div>
                                 <mat-icon [style.color]="settingsForm.get('enableshare')?.value ? '#4caf50' : '#f44336'">
                                     {{ settingsForm.get('enableshare')?.value ? 'check_circle' : 'cancel' }}
+                                </mat-icon>
+                            </div>
+                        </div>
+                        <h3 class="section-title" >Developer Settings</h3>
+                        <div class="form-row">
+                            <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
+                                <mat-slide-toggle 
+                                    formControlName="triggerFunction"
+                                    (change)="onToggleChange('triggerFunction', $event)"
+                                    color="primary">
+                                    Update Participant Workshop
+                                </mat-slide-toggle>
+                                <div style="flex: 1;">
+                                    <p style="margin: 0; color: #333; font-weight: 500;">
+                                        {{ settingsForm.get('triggerFunction')?.value ? 'Active' : 'Inactive' }}
+                                    </p>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">
+                                        {{ settingsForm.get('triggerFunction')?.value ? 
+                                        'Workshop is currently able to Update in participant document also' : 
+                                        'Workshop is not able to Update in participant document' }}
+                                    </p>
+                                </div>
+                                <mat-icon [style.color]="settingsForm.get('triggerFunction')?.value ? '#4caf50' : '#f44336'">
+                                    {{ settingsForm.get('triggerFunction')?.value ? 'check_circle' : 'cancel' }}
                                 </mat-icon>
                             </div>
                         </div>

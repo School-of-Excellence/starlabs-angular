@@ -23,18 +23,18 @@
         <mat-card-content>
           <div class="form-grid">
             <mat-form-field appearance="outline">
-              <mat-label>WATI Name</mat-label>
-              <input matInput [(ngModel)]="newConfig.watiname" placeholder="Enter WATI name">
-              <mat-icon matSuffix>label</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>WATI Server</mat-label>
-              <input matInput [(ngModel)]="newConfig.watiserver" placeholder="Enter server URL">
+              <mat-label>Server ID</mat-label>
+              <input matInput [(ngModel)]="newConfig.serverid" placeholder="e.g. 102731">
               <mat-icon matSuffix>dns</mat-icon>
             </mat-form-field>
             <mat-form-field appearance="outline">
+              <mat-label>WATI Name</mat-label>
+              <input matInput [(ngModel)]="newConfig.watiname" placeholder="e.g. Event WATI">
+              <mat-icon matSuffix>label</mat-icon>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
               <mat-label>Endpoint</mat-label>
-              <input matInput [(ngModel)]="newConfig.endpoint" placeholder="Enter endpoint">
+              <input matInput [(ngModel)]="newConfig.endpoint" placeholder="Enter endpoint URL">
               <mat-icon matSuffix>link</mat-icon>
             </mat-form-field>
             <mat-form-field appearance="outline">
@@ -54,12 +54,26 @@
 
     <!-- Configs Table -->
     <div class="table-container">
-      <table mat-table [dataSource]="watiConfigs" class="configs-table">
+      <table mat-table [dataSource]="watiList" class="configs-table">
+        <!-- Server ID Column -->
+        <ng-container matColumnDef="serverid">
+          <th mat-header-cell *matHeaderCellDef>Server ID</th>
+          <td mat-cell *matCellDef="let config">
+            @if (editingServerId === config.serverid) {
+              <mat-form-field appearance="outline" class="table-input">
+                <input matInput [(ngModel)]="editForm.serverid">
+              </mat-form-field>
+            } @else {
+              <span class="cell-text server-id">{{ config.serverid }}</span>
+            }
+          </td>
+        </ng-container>
+
         <!-- WATI Name Column -->
         <ng-container matColumnDef="watiname">
           <th mat-header-cell *matHeaderCellDef>WATI Name</th>
-          <td mat-cell *matCellDef="let config; let i = index">
-            @if (editingIndex === i) {
+          <td mat-cell *matCellDef="let config">
+            @if (editingServerId === config.serverid) {
               <mat-form-field appearance="outline" class="table-input">
                 <input matInput [(ngModel)]="editForm.watiname">
               </mat-form-field>
@@ -69,25 +83,11 @@
           </td>
         </ng-container>
 
-        <!-- WATI Server Column -->
-        <ng-container matColumnDef="watiserver">
-          <th mat-header-cell *matHeaderCellDef>WATI Server</th>
-          <td mat-cell *matCellDef="let config; let i = index">
-            @if (editingIndex === i) {
-              <mat-form-field appearance="outline" class="table-input">
-                <input matInput [(ngModel)]="editForm.watiserver">
-              </mat-form-field>
-            } @else {
-              <span class="cell-text" [title]="config.watiserver">{{ truncateText(config.watiserver, 25) }}</span>
-            }
-          </td>
-        </ng-container>
-
         <!-- Endpoint Column -->
         <ng-container matColumnDef="endpoint">
           <th mat-header-cell *matHeaderCellDef>Endpoint</th>
-          <td mat-cell *matCellDef="let config; let i = index">
-            @if (editingIndex === i) {
+          <td mat-cell *matCellDef="let config">
+            @if (editingServerId === config.serverid) {
               <mat-form-field appearance="outline" class="table-input">
                 <input matInput [(ngModel)]="editForm.endpoint">
               </mat-form-field>
@@ -100,16 +100,16 @@
         <!-- Token Column -->
         <ng-container matColumnDef="watitoken">
           <th mat-header-cell *matHeaderCellDef>Token</th>
-          <td mat-cell *matCellDef="let config; let i = index">
-            @if (editingIndex === i) {
+          <td mat-cell *matCellDef="let config">
+            @if (editingServerId === config.serverid) {
               <mat-form-field appearance="outline" class="table-input">
                 <input matInput [(ngModel)]="editForm.watitoken" type="password">
               </mat-form-field>
             } @else {
               <div class="token-cell">
-                <span class="token-text">{{ isTokenVisible(i) ? truncateText(config.watitoken, 20) : maskToken() }}</span>
-                <button mat-icon-button class="visibility-btn" (click)="toggleTokenVisibility(i)" [matTooltip]="isTokenVisible(i) ? 'Hide token' : 'Show token'">
-                  <mat-icon>{{ isTokenVisible(i) ? 'visibility_off' : 'visibility' }}</mat-icon>
+                <span class="token-text">{{ isTokenVisible(config.serverid) ? truncateText(config.watitoken, 20) : maskToken() }}</span>
+                <button mat-icon-button class="visibility-btn" (click)="toggleTokenVisibility(config.serverid)" [matTooltip]="isTokenVisible(config.serverid) ? 'Hide token' : 'Show token'">
+                  <mat-icon>{{ isTokenVisible(config.serverid) ? 'visibility_off' : 'visibility' }}</mat-icon>
                 </button>
               </div>
             }
@@ -119,8 +119,8 @@
         <!-- Actions Column -->
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef>Actions</th>
-          <td mat-cell *matCellDef="let config; let i = index">
-            @if (editingIndex === i) {
+          <td mat-cell *matCellDef="let config">
+            @if (editingServerId === config.serverid) {
               <button mat-icon-button color="primary" (click)="saveEdit()" [disabled]="loading" matTooltip="Save">
                 <mat-icon>check</mat-icon>
               </button>
@@ -128,10 +128,10 @@
                 <mat-icon>close</mat-icon>
               </button>
             } @else {
-              <button mat-icon-button color="primary" (click)="editConfig(config, i)" matTooltip="Edit">
+              <button mat-icon-button color="primary" (click)="editConfig(config)" matTooltip="Edit">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button color="warn" (click)="deleteConfig(i)" matTooltip="Delete">
+              <button mat-icon-button color="warn" (click)="deleteConfig(config)" matTooltip="Delete">
                 <mat-icon>delete</mat-icon>
               </button>
             }
@@ -139,10 +139,10 @@
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.editing-row]="editingIndex === watiConfigs.indexOf(row)"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.editing-row]="editingServerId === row.serverid"></tr>
       </table>
 
-      @if (watiConfigs.length === 0 && !loading) {
+      @if (watiList.length === 0 && !loading) {
         <div class="empty-state">
           <mat-icon>cloud_off</mat-icon>
           <h3>No WATI Configurations</h3>
