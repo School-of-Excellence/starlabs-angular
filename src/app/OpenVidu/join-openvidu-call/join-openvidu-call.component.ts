@@ -14,7 +14,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-
+import { BackgroundProcessor } from "@livekit/track-processors";
+import { InstanceStatusService } from '../../instance-status.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -60,19 +61,23 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   roomDetail: RoomInfo | undefined | null;
   roomSubscription = new Subject<void>();
 
+  // Server Subscription
+  serverSubscription = new Subject<void>();
+
   // UI States
   loading = true;
   isSharing = false;
-  meetingRoomStatus: null | "connecting" | "connected" | "left" | "ended" = null
+  meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended" = "servercheck"
   // Fullscreen Enable
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
   
-
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
+
+  isVideoBlurred:boolean = false;
 
   constructor(
     public firestore: Firestore,
@@ -80,7 +85,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public httpClient: HttpClient,
     public guard: AuthguardService,
     public noiseCancellationService: NoiseCancellationService,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private infraService: InstanceStatusService
   ){}
 
   ngAfterViewInit(): void {
@@ -106,7 +112,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           if(data && data["active"]){
 
             // Prepare Call - Only when screen launched first time
-            if(this.roomDetail.title == "") this.prepareParticipant()
+            if(this.roomDetail.title == "") this.checkServer()
 
             this.roomDetail = {
               roomId: id,
@@ -521,6 +527,32 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   //   ).length;
   //   return 1 + remoteVideoCount;
   // }
+
+  async checkServer(){
+    this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
+      next: (serverData) => {
+        if (serverData) {
+          const masterStatus = serverData["master"]["state"]
+          const mediaNode = serverData["media"]["instanceStates"]["healthy"] || 0
+
+          if(masterStatus == "running" && mediaNode > 0){
+            this.prepareParticipant()
+            this.serverSubscription?.next()
+            this.serverSubscription?.complete()
+          }
+          else if(masterStatus == "running" || masterStatus == "starting"){
+            this.meetingRoomStatus = "serverstarting"
+          }
+          else {
+            this.meetingRoomStatus = "serverfailed"
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Infrastructure status error:', err);
+      }
+    });
+  }
 
   async prepareParticipant() {
     this.isRequesting = true;
@@ -961,6 +993,31 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       document.exitFullscreen();
       this.isFullscreen = false;
     }
+  }
+
+  // Add this method after toggleCamera()
+  async toggleVideoBlur() {
+    this.isVideoBlurred = !this.isVideoBlurred;
+    
+    const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
+
+    if (!cameraPub || !cameraPub.videoTrack) return;
+
+    const videoTrack = cameraPub.videoTrack;
+    
+    if (this.isVideoBlurred) {
+      // Apply blur using CSS filter through processor
+      const blur = BackgroundProcessor({
+        mode: "background-blur",
+        blurRadius: 10
+      });
+      videoTrack.setProcessor(blur)
+    } else {
+      // Remove blur
+      await videoTrack.stopProcessor();
+    }
+
+    console.log(this.isVideoBlurred)
   }
 
   // Take reference snapshot

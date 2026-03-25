@@ -82,14 +82,14 @@
               </div>
 
               <div *ngIf="i == 0">
-                <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 15; else watingmessage">
+                <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 5; else watingmessage">
                   <div>
                     <button class="zoomlaunchbtn" mat-button (click)="joinRoom_Appointment(appointment)">Join Meeting Now</button>
                   </div>
                 </div>
                 <ng-template #watingmessage>
                   <div class="zoomcontent">
-                    The meeting will be enabled 15 minutes before the appointment start time.
+                    The meeting will be enabled 5 minutes before the appointment start time.
                   </div>
                 </ng-template>
               </div>
