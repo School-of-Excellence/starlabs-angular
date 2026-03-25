@@ -50,11 +50,79 @@
     <mat-tab label="Interim Report Log">
       <div class="body mat-elevation-z2">
         <div class="actionbox">
+          <section class="report-section">
+        
+            <!-- Total Reports -->
+            <div class="report report-total">
+              <div class="report__header">
+                <div class="report__icon">
+                  <mat-icon>description</mat-icon>
+                </div>
+                <div class="report__info">
+                  <span class="report__label">Total Reports</span>
+                  <span class="report__value">{{totalReports}}</span>
+                </div>
+              </div>
+            </div>
+        
+            <!-- Completed -->
+            <div class="report report-completed">
+              <div class="report__header">
+                <div class="report__icon">
+                  <mat-icon>check_circle</mat-icon>
+                </div>
+                <div class="report__info">
+                  <span class="report__label">Completed</span>
+                  <span class="report__value">{{totalReportsCompleted}}</span>
+                </div>
+              </div>
+            </div>
+        
+            <!-- Ongoing -->
+            <div class="report report-ongoing">
+              <div class="report__header">
+                <div class="report__icon">
+                  <mat-icon>schedule</mat-icon>
+                </div>
+                <div class="report__info">
+                  <span class="report__label">Ongoing</span>
+                  <span class="report__value">{{totalReportsOngoing}}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Not Started -->
+            <div class="report report-not-started">
+              <div class="report__header">
+                <div class="report__icon">
+                  <mat-icon>radio_button_unchecked</mat-icon>
+                </div>
+                <div class="report__info">
+                  <span class="report__label">Not Started</span>
+                  <span class="report__value">{{totalReportsNotStarted}}</span>
+                </div>
+              </div>
+            </div>
+        
+          </section>
           <div class="actionitem">
             <mat-form-field appearance="outline">
               <mat-label>Filter Table</mat-label>
               <input matInput (keyup)="filterLogData(logInput.value)" #logInput autocomplete="off">
             </mat-form-field>
+            <div class="log-date-range">
+              <mat-form-field appearance="outline">
+                <mat-label>Select Send Date</mat-label>
+                <mat-date-range-input [rangePicker]="rangePickerlog">
+                  <input matStartDate [formControl]="logStartDate" placeholder="Start date">
+                  <input matEndDate [formControl]="logEndDate" placeholder="End date">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matSuffix [for]="rangePickerlog"></mat-datepicker-toggle>
+                <mat-date-range-picker #rangePickerlog ></mat-date-range-picker>
+              </mat-form-field>
+              <button mat-raised-button color="primary" (click)="fetchInterimLog()">Apply</button>
+              <button mat-stroked-button (click)="clearInterimReportFilter()">Clear Date</button>
+            </div>
           </div>
         </div>
         <div class="table-container">
@@ -88,6 +156,11 @@
             <ng-container matColumnDef="remainderdate">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Remainder Date</th>
               <td mat-cell *matCellDef="let row">{{ row["remainderdate"] | date }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="createdon">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Send Date</th>
+              <td mat-cell *matCellDef="let row">{{ row["createdon"]| date:"medium" }}</td>
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="logDisplayedColumns; sticky: true"></tr>
@@ -137,7 +210,7 @@
         </ng-container>
 
         <ng-container matColumnDef="like">
-          <th mat-header-cell *matHeaderCellDef>Like</th>
+          <th mat-header-cell *matHeaderCellDef>Happy</th>
           <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
             <div class="action-cell">
               <button mat-icon-button (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''">
@@ -153,7 +226,7 @@
         </ng-container>
         
         <ng-container matColumnDef="flag">
-          <th mat-header-cell *matHeaderCellDef>Flag</th>
+          <th mat-header-cell *matHeaderCellDef>Needs Attention</th>
           <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
             <div class="action-cell">
               <button mat-icon-button (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''">
@@ -184,6 +257,22 @@
           </td>
         </ng-container>
 
+        <ng-container matColumnDef="critical">
+          <th mat-header-cell *matHeaderCellDef>Critical</th>
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+            <div class="action-cell">
+              <button mat-icon-button (click)="toggleCritical(row)">
+                <span class="sos-icon" [class.sos-active]="row.critical">SOS</span>
+              </button>
+              <div class="action-meta" *ngIf="row.critical && row.criticaldetails">
+                <span class="action-user">{{ mapProfiles[row.criticaldetails.user]?.['name'] || '-' }}</span>
+                <span class="action-time">{{ row.criticaldetails.time?.toDate ? (row.criticaldetails.time.toDate() | date: 'short') :
+                  (row.criticaldetails.time | date: 'short') }}</span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
         <ng-container matColumnDef="notes">
           <th mat-header-cell *matHeaderCellDef>Notes</th>
           <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
@@ -199,8 +288,8 @@
           </td>
         </ng-container>
 
-        <tr mat-header-row *matHeaderRowDef="['select', 'sno', 'name', 'date', 'notes', 'like', 'flag', 'opportunity']; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date', 'notes', 'like', 'flag', 'opportunity']"
+        <tr mat-header-row *matHeaderRowDef="['select', 'sno', 'name', 'date', 'notes', 'like', 'flag', 'opportunity', 'critical']; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date', 'notes', 'like', 'flag', 'opportunity', 'critical']"
           [class.selected-row]="isSelected(row)" (click)="viewRow(row)"></tr>
       </table>
 

@@ -1,6 +1,6 @@
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, ElementRef, inject, ViewChild } from '@angular/core';
-import { Firestore,collection,doc,getDocs,query,collectionData,orderBy,updateDoc,DocumentReference,deleteDoc,getDoc,where, writeBatch,serverTimestamp, setDoc, DocumentSnapshot, onSnapshot, limit, startAfter} from '@angular/fire/firestore';
+import { Firestore, collection, doc, getDocs, query, collectionData, orderBy, updateDoc, DocumentReference, deleteDoc, getDoc, where, writeBatch, serverTimestamp, setDoc, DocumentSnapshot, onSnapshot, limit, startAfter } from '@angular/fire/firestore';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,7 +9,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { firstValueFrom, Subject, takeUntil } from 'rxjs';
 import { CommonModule, DatePipe, TitleCasePipe } from '@angular/common';
-import { ExcludeFilterStringPipe ,MessagePipe} from '../../custompipe.pipe';
+import { ExcludeFilterStringPipe, MessagePipe } from '../../custompipe.pipe';
 import { Router, RouterLink, RouterModule } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -34,7 +34,7 @@ import { EmailInputComponent } from './email-input/email-input.component';
 import { WatiInputComponent } from './wati-input/wati-input.component';
 import { SubscriptionDialogComponent } from './subscription-dialog/subscription-dialog.component';
 import { AhNotificationComponent } from './ah-notification/ah-notification.component';
-import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { BroadcastComponent } from './broadcast/broadcast.component';
 import { DataTransferService } from './data-transfer.service';
 import { SendInterimReportComponent } from './send-interim-report/send-interim-report.component';
@@ -58,32 +58,32 @@ import { AddPendingActionComponent } from '../../AppEngagement/app-action-pendin
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../../New-Workshop/whatsapp-progress-dialog.component';
 
 export class formelement {
-  activejourney:Array<string []> | null;
-  lastcompletedjourney:Array<string []> | null;
-  activeproduct:Array<string []> | null;
-  subscriptionend:Object;
-  consumedproducts : Array<string []> | null;
-  unconsumedproducts :Array<string []> | null;
-  purchase :Array<string []> | null;
-  purchasedate:Object;
-  addons : Array<string []> | null;
-  gifts : Array<string []> | null;
-  bonus : Array<string []> | null;
-  atccount:Number | null
-  customersupport  : String | null;
-  searchlabel:string | null;
-  participantmode:string | null;
+  activejourney: Array<string[]> | null;
+  lastcompletedjourney: Array<string[]> | null;
+  activeproduct: Array<string[]> | null;
+  subscriptionend: Object;
+  consumedproducts: Array<string[]> | null;
+  unconsumedproducts: Array<string[]> | null;
+  purchase: Array<string[]> | null;
+  purchasedate: Object;
+  addons: Array<string[]> | null;
+  gifts: Array<string[]> | null;
+  bonus: Array<string[]> | null;
+  atccount: Number | null
+  customersupport: String | null;
+  searchlabel: string | null;
+  participantmode: string | null;
   registereduser: string | null;
 }
 
-export class dateElement{
-  start:Date;
-  end:Date;
+export class dateElement {
+  start: Date;
+  end: Date;
 }
 
-export class numberElement{
-  start:number;
-  end:number;
+export class numberElement {
+  start: number;
+  end: number;
   toObject(): any {
     return {
       start: this.start,
@@ -92,8 +92,8 @@ export class numberElement{
   }
 }
 
-interface userRoles{
-  profile_ref:DocumentReference
+interface userRoles {
+  profile_ref: DocumentReference
 }
 
 @Component({
@@ -129,7 +129,7 @@ interface userRoles{
   ],
   templateUrl: './participants-analytics.component.html',
   styleUrl: './participants-analytics.component.css',
-  providers : [
+  providers: [
     provideNativeDateAdapter()
   ]
 })
@@ -140,85 +140,95 @@ export class ParticipantsAnalyticsComponent {
 
   //mat table req
   dataSource = new MatTableDataSource()
-  displayedColumns = ['select','name']
+  displayedColumns = ['select', 'name']
 
-  @ViewChild(MatPaginator) paginator:MatPaginator
-  @ViewChild(MatSort) sort:MatSort
-  @ViewChild('Table') table:ElementRef;
+  @ViewChild(MatPaginator) paginator: MatPaginator
+  @ViewChild(MatSort) sort: MatSort
+  @ViewChild('Table') table: ElementRef;
 
-  dashboardEntireData:any[] = []
+  dashboardEntireData: any[] = []
   cloneddashboarddata: any[] = [];
   filtereddashboarddata: any[] = [];
+  filteredDataWithoutProductFilter = new Set();
   //filter 
-  filterdata:any
+  filterdata: any
 
   //db data saving to variable
-  productEventList:any[] = []
+  productEventList: any[] = []
   mapPlaylist = {}
 
-  queueventList:any[] = []
+  productMap = {};
+
+  queueventList: any[] = []
   mapfiltervalues = {}
 
-  emailList:any[] = []
+  emailList: any[] = []
   mapParticipantData = {}
   mapParticipantName = {}
 
-  modesList:any[] = []
+  modesList: any[] = []
   showTagHistory = false;
   selectedTagHistory: any[] = [];
   selectedTagHistoryName = '';
-  atcModelList:any[] = []
+  atcModelList: any[] = []
 
   //search filter
   numberrange = ['age']
-  range = ['subscriptionend','purchasedate','subscriptionstart','lastpaymentdate', 'lastsubscriptionstart', 'lastsubscriptionend', 'dateofbirth']
-  arrayarray = ['purchase','consumedproducts','unconsumedproducts','activeproduct','addons','gifts','bonus','forms','reports','events','queue','tier', 'profiletags']
-  string = ['kyj','customersupport','testimonial','referred','directmailaddress','email','phonenumber']
-  number = ['atccount','totaladjustmentaware','totaladjustmentunaware']
+  range = ['subscriptionend', 'purchasedate', 'subscriptionstart', 'lastpaymentdate', 'lastsubscriptionstart', 'lastsubscriptionend', 'dateofbirth']
+  arrayarray = ['purchase', 'consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags']
+  string = ['kyj', 'customersupport', 'testimonial', 'referred', 'directmailaddress', 'email', 'phonenumber']
+  number = ['atccount', 'totaladjustmentaware', 'totaladjustmentunaware']
   stringarray = ['atcmodel']
-  arraystring = ['participantmode','country','currentcity','registeredcity','contract','paymentplan','emistatus','activejourney','financialstatus', 'customerstatus','lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase','registereduser']
+  arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'activejourney', 'financialstatus', 'customerstatus', 'lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
   stringmaparray = ['productevent', 'queueevent']
   numbermapnumber = ['productcount']
-  columnsDisplayed = [...this.arraystring,...this.numberrange,...this.string,...this.stringarray,...this.number,...this.arrayarray,,...this.range,...this.numbermapnumber,...this.stringmaparray,
-    ...['eiflix','solarvoice','generalcontent', 'remarks']]
+  columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray,
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks']]
   filterText = null
   showSectionType = null
-  savedfilterquery:any = []
-  searchsavedfilters:string | null = null
-  nooftimesloaded:number = 0
-  selectedSavedFilterQueryLabel:string
+  savedfilterquery: any = []
+  searchsavedfilters: string | null = null
+  nooftimesloaded: number = 0
+  selectedSavedFilterQueryLabel: string
 
   // form parameters
-  filterjourneylist:string
-  journeylist:any = []
+  filterjourneylist: string
+  journeylist: any = []
 
-  filterproductlist:string
-  productlist:any[] = []
+  filterproductlist: string
+  productlist: any[] = []
 
-  filterprofiletags:string
+  filterprofiletags: string
 
-  filtertier:string
-  tierlist:any[] = []
+  filtertier: string
+  tierlist: any[] = []
+
+  filterByProducts = {
+    consumed: [],
+    unconsumed: [],
+    participants: {},
+    rawProductsData: [],
+  };
 
   mapOperator = {
-    "is equal to":"===",
-    "greater than":">",
-    "lesser than":"<"
+    "is equal to": "===",
+    "greater than": ">",
+    "lesser than": "<"
   }
 
   //add column to table
-  searchColumn:string = '';
-  selectedColumns:any[] = [];
+  searchColumn: string = '';
+  selectedColumns: any[] = [];
 
   // profile
-  loggedInProfileId:any
-  defaultSearchDocId:string
+  loggedInProfileId: any
+  defaultSearchDocId: string
   mapProfile = {}
-  workshopadmin =[];
+  workshopadmin = [];
 
   fullLoadStarted = false;
   unsubscribeFullSnapshots: (() => void)[] = [];
-  
+
   pendingEmailsList = [];
   pendingWatiList = [];
 
@@ -233,11 +243,11 @@ export class ParticipantsAnalyticsComponent {
   private destroy$ = new Subject<void>()
   private firestore = inject(Firestore)
   private dialog = inject(MatDialog)
-  private datepipe= inject(DatePipe)
+  private datepipe = inject(DatePipe)
   private authguard = inject(AuthguardService)
   private _snackBar = inject(MatSnackBar)
   private storage = inject(Storage)
-  private snackBar=  inject(MatSnackBar)
+  private snackBar = inject(MatSnackBar)
   private router = inject(Router)
   private datatransferservice = inject(DataTransferService)
   unsubscribeInitial: any;
@@ -250,21 +260,21 @@ export class ParticipantsAnalyticsComponent {
   timeLeft = 600;
 
   //loading function
-  get loading(){
-    return this.dialog.open(LoadingProgressComponent,{data:{msg:'Processing Please Wait ...'},disableClose:true});
+  get loading() {
+    return this.dialog.open(LoadingProgressComponent, { data: { msg: 'Processing Please Wait ...' }, disableClose: true });
   }
 
-  constructor(private http : HttpClient , private injector: Injector){
+  constructor(private http: HttpClient, private injector: Injector) {
     // get profileid
-    this.authguard.getRoles().then(async roles=>{
+    this.authguard.getRoles().then(async roles => {
       this.loggedInProfileId = roles['profile_ref'].id
       // if(roles["admin"] || roles['developer']){
-        this.fetchData()
+      this.fetchData()
       // }else{
       //   this.router.navigateByUrl('/')
       // }
     })
-     
+
   }
 
 
@@ -288,38 +298,38 @@ export class ParticipantsAnalyticsComponent {
     }
   }
 
-  fetchQueuedEmails(){
+  fetchQueuedEmails() {
 
-    collectionData(query(collection(this.firestore, 'email archive'),where('status','==','queued'))).subscribe((emaildocs)=>{
-      if(emaildocs.length != 0){
-        this.pendingEmailsList = emaildocs.sort((a,b)=>a['date'] - b['date']);
-      }else{
+    collectionData(query(collection(this.firestore, 'email archive'), where('status', '==', 'queued'))).subscribe((emaildocs) => {
+      if (emaildocs.length != 0) {
+        this.pendingEmailsList = emaildocs.sort((a, b) => a['date'] - b['date']);
+      } else {
         console.log('No Queued Emails Found');
       }
     });
 
   }
 
-  fetchQueuedWati(){
+  fetchQueuedWati() {
 
-    collectionData(query(collection(this.firestore, 'wati archive'),where('status','==','queued'))).subscribe((watidocs)=>{
-      if(watidocs.length != 0){
-        this.pendingWatiList = watidocs.sort((a,b)=>a['queuedAt'] - b['queuedAt']);
-      }else{
+    collectionData(query(collection(this.firestore, 'wati archive'), where('status', '==', 'queued'))).subscribe((watidocs) => {
+      if (watidocs.length != 0) {
+        this.pendingWatiList = watidocs.sort((a, b) => a['queuedAt'] - b['queuedAt']);
+      } else {
         console.log('No Queued Emails Found');
       }
     });
 
   }
 
-  async fetchData(){
+  async fetchData() {
     let loadingref = this.loading
     this.filterdata = new formelement
     this.filterdata.subscriptionend = new dateElement
     this.filterdata.purchasedate = new dateElement
     this.filterdata.age = new numberElement
     this.filterdata.profiletags = [];
-    
+
     // Parallel Firestore collections
     const [
       savedFiltersSnap,
@@ -342,17 +352,17 @@ export class ParticipantsAnalyticsComponent {
       getDocs(collection(this.firestore, "participant tags")),
       getDocs(query(collection(this.firestore, "participant metadata"), orderBy('name')))
     ]);
-  
+
     // Saved filters
     this.savedfilterquery = savedFiltersSnap.docs.map(d => d.data());
-  
+
     // Event collection
     this.productEventList = eventSnap.docs.map(e => ({
       ...e.data(),
       id: e.id,
       ref: e.ref
     }));
-  
+
     // Queue generation
     this.queueventList = queueSnap.docs.map(e => {
       const element = e.data();
@@ -361,29 +371,30 @@ export class ParticipantsAnalyticsComponent {
       this.mapfiltervalues[e.id] = element['queuename'];
       return element;
     });
-  
-  
+
+
     // Tier
     this.tierlist = tierSnap.docs.map(e => {
       const element = e.data();
       this.mapfiltervalues[e.id] = element['tier'];
       return element;
     });
-  
+
     // Journey
     this.journeylist = journeySnap.docs.map(e => {
       const element = e.data();
       this.mapfiltervalues[e.id] = element['journey'];
       return element;
     });
-  
+
     // Modes
     this.modesList = modesSnap.docs.map(e => e.data());
-  
+
     // Products
     const atcModelSet = new Set<string>();
     this.productlist = productsSnap.docs.map(e => {
       const element = e.data();
+      this.productMap[e.id] = element;
       this.mapfiltervalues[e.id] = element['product'];
       const model = element['atcmodel'];
       if (model && !atcModelSet.has(model)) atcModelSet.add(model);
@@ -400,13 +411,12 @@ export class ParticipantsAnalyticsComponent {
     // Participant metadata
     metadataSnap.docs.forEach(e => {
       const element = e.data();
-      console.log('DOB:', element['dateofbirth'], '| Keys:', Object.keys(element).filter(k => k.includes('date') || k.includes('birth') || k.includes('dob')));  // DEBUG
       element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
-      if(![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
+      if (![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
         for (let i = 0; i < element['profiletags'].length; i++) {
           const tag = element['profiletags'][i];
-          
-          if(!this.tagList.includes(tag)) {
+
+          if (!this.tagList.includes(tag)) {
             this.tagList.push(tag);
           }
         }
@@ -415,14 +425,14 @@ export class ParticipantsAnalyticsComponent {
       this.dashboardEntireData.push(element)
     })
     loadingref.close();
-    
+
     this.onDataSearch()
-    
-  
+
+
     // Map Playlist - small collections, still done after the main load
     await this.loadMapPlaylist();
   }
-  
+
   private async loadMapPlaylist() {
     const collectionMap = {
       "series": "seriesName",
@@ -431,19 +441,19 @@ export class ParticipantsAnalyticsComponent {
       "content_urls": "title"
     };
     this.mapPlaylist = {};
-  
+
     const promises = Object.entries(collectionMap).map(async ([coll, key]) => {
       const snap = await getDocs(collection(this.firestore, coll));
       snap.docs.forEach(doc => {
         this.mapPlaylist[doc.id] = doc.data()[key];
       });
     });
-  
+
     await Promise.all(promises);
   }
-  
 
-  ngAfterViewInit(){
+
+  ngAfterViewInit() {
     this.dataSource.data = this.filtereddashboarddata
     this.dataSource.sort = this.dataSource.sort
     this.dataSource.paginator = this.paginator
@@ -453,7 +463,7 @@ export class ParticipantsAnalyticsComponent {
     if (this.unsubscribeInitial) {
       this.unsubscribeInitial(); // Firestore onSnapshot returns a function
     }
-  
+
     if (this.unsubscribeFullSnapshots && this.unsubscribeFullSnapshots.length > 0) {
       for (const unsub of this.unsubscribeFullSnapshots) {
         if (typeof unsub === 'function') {
@@ -462,19 +472,19 @@ export class ParticipantsAnalyticsComponent {
       }
       this.unsubscribeFullSnapshots = []; // Clear the array
     }
-  
+
     if (this.destroy$) {
       this.destroy$.next();
       this.destroy$.complete();
     }
     this.clearTimers();
   }
-  
+
 
   private startInactivityTimer() {
     this.lastActivity = Date.now();
     this.clearTimers();
-    
+
     this.inactivityTimer = setTimeout(() => {
       this.showInactivityAlert();
     }, 10 * 60 * 1000); // 10 minutes
@@ -513,7 +523,7 @@ export class ParticipantsAnalyticsComponent {
         'Click OK to refresh the page for better performance.\n' +
         'Click Cancel to continue without refreshing.'
       );
-      
+
       if (userChoice) {
         this.refreshPage();
       } else {
@@ -526,25 +536,25 @@ export class ParticipantsAnalyticsComponent {
     try {
       const loadingRef = this.loading
       this.dashboardEntireData = [];
-      
+
       // Fetch participant metadata
       const metadataSnap = await getDocs(
         query(collection(this.firestore, "participant metadata"), orderBy('name'))
       );
-      
+
       // Update participant metadata
       for (let i = 0; i < metadataSnap.docs.length; i++) {
         const element = metadataSnap.docs[i].data();
         element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
         this.dashboardEntireData.push(element);
       }
-      
+
       // Refresh the table data with new metadata
       this.onDataSearch();
-      
+
       // Close loading
       loadingRef.close();
-      
+
     } catch (error) {
       console.error('Error refreshing participant metadata:', error);
       this.snackBar.open('Failed to refresh participant data', 'Close', {
@@ -556,7 +566,7 @@ export class ParticipantsAnalyticsComponent {
 
   private bindActivityEvents() {
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
+
     events.forEach(event => {
       document.addEventListener(event, () => {
         this.resetTimer();
@@ -598,7 +608,7 @@ export class ParticipantsAnalyticsComponent {
   }
 
   /** The label for the checkbox on the passed row */
-  checkboxLabel(row?:any): string {
+  checkboxLabel(row?: any): string {
     if (!row) {
       return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
     }
@@ -614,23 +624,23 @@ export class ParticipantsAnalyticsComponent {
   }
 
   //saved filter search
-  savedfiltersearch(){
-    var filtered = ![null,undefined,''].includes(this.searchsavedfilters) ? this.savedfilterquery.filter((e:any)=>e.label?.toLowerCase().trim().includes(this.searchsavedfilters?.toLowerCase().trim())) : this.savedfilterquery;
+  savedfiltersearch() {
+    var filtered = ![null, undefined, ''].includes(this.searchsavedfilters) ? this.savedfilterquery.filter((e: any) => e.label?.toLowerCase().trim().includes(this.searchsavedfilters?.toLowerCase().trim())) : this.savedfilterquery;
     return filtered;
   }
 
-  onfilterjourneylist(){
-    if(this.journeylist != null){
+  onfilterjourneylist() {
+    if (this.journeylist != null) {
       const filterValue = (this.filterjourneylist != null && this.filterjourneylist != '') ? this.filterjourneylist.trim().toLowerCase() : ''
       return this.journeylist.filter(e => e.journey.trim().toLowerCase().indexOf(filterValue) === 0)
     }
   }
 
-  onfilterproducts(){
-    if(this.productlist != null){
+  onfilterproducts() {
+    if (this.productlist != null) {
       const filterValue = (this.filterproductlist != null && this.filterproductlist != '') ? this.filterproductlist.trim().toLowerCase() : ''
       return this.productlist.filter(e => e.product.trim().toLowerCase().indexOf(filterValue) === 0)
-    }else return []
+    } else return []
   }
 
   // Function to filter tags on search
@@ -641,35 +651,35 @@ export class ParticipantsAnalyticsComponent {
     } else return []
   }
 
-  filterproducts(productarray:Array<any>,productvalue:string){
+  filterproducts(productarray: Array<any>, productvalue: string) {
     return productarray.filter(e => e === productvalue).length
   }
 
-  filterAtcModel(atcmodelarray:Array<any>){
-    return atcmodelarray.filter(e => e === this.filterdata['atcmodel']).length 
+  filterAtcModel(atcmodelarray: Array<any>) {
+    return atcmodelarray.filter(e => e === this.filterdata['atcmodel']).length
   }
 
-  onfiltertier(){
-    if(this.tierlist != null){
+  onfiltertier() {
+    if (this.tierlist != null) {
       const filterValue = (this.filtertier != null && this.filtertier != '') ? this.filtertier.trim().toLowerCase() : ''
       return this.tierlist.filter(e => e.tier.toLowerCase().indexOf(filterValue) === 0)
-    }else return []
+    } else return []
   }
 
-  returnFilterText():void{
-    
-    let data = Object.assign({},this.filterdata)
-    
-    for (const key in data){     
-      if(data[key] === null || data[key] === undefined) delete data[key]
-      else if(this.range.includes(key)){
-        if(data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
+  returnFilterText(): void {
+
+    let data = Object.assign({}, this.filterdata)
+
+    for (const key in data) {
+      if (data[key] === null || data[key] === undefined) delete data[key]
+      else if (this.range.includes(key)) {
+        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
       }
-      else if([...this.arraystring,...this.arrayarray].includes(key)){
-        if(data[key].length === 0) delete data[key]
+      else if ([...this.arraystring, ...this.arrayarray].includes(key)) {
+        if (data[key].length === 0) delete data[key]
       }
-      else if(this.numberrange.includes(key)){
-        if(data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
+      else if (this.numberrange.includes(key)) {
+        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
       }
     }
     // console.log(data);
@@ -677,7 +687,7 @@ export class ParticipantsAnalyticsComponent {
     let filterdata = Object.assign({}, data)
     for (const key in filterdata) {
       const element = filterdata[key];
-      
+
       // console.log(key, filterdata[key], typeof element)
       // if(this.arraystring.includes(key) || this.arrayarray.includes(key)){
       //   var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${this.mapfiltervalues[filterdata[key]] ? this.mapfiltervalues[filterdata[key]] : this.mapfiltervalues[filterdata[key]] .join(" (OR) ")}`
@@ -692,7 +702,7 @@ export class ParticipantsAnalyticsComponent {
             .map(value => this.mapfiltervalues[value] || value)
             .join(" (OR) "); // Map and join values
           text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${mappedValues}`;
-        } 
+        }
         // Check if the key belongs to arraystring
         else if (this.arraystring.includes(key) && Array.isArray(filterValues)) {
           const mappedValues = filterValues
@@ -701,77 +711,83 @@ export class ParticipantsAnalyticsComponent {
           text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${mappedValues}`;
           // text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${mappedValue}`;
         }
-      
+
         // Append the constructed text to the filterText
         this.filterText = (this.filterText ?? "") + text;
       }
-      
-      else if(this.string.includes(key) || this.number.includes(key) || this.stringarray.includes(key)){
+
+      else if (this.string.includes(key) || this.number.includes(key) || this.stringarray.includes(key)) {
         var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${this.mapfiltervalues[filterdata[key]] ? this.mapfiltervalues[filterdata[key]] : filterdata[key]}`
         this.filterText = (this.filterText ?? "") + text
       }
-      else if(this.range.includes(key)){
+      else if (this.range.includes(key)) {
         var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" From ${this.datepipe.transform(filterdata[key]["start"], 'MMM d, y')} To ${this.datepipe.transform(filterdata[key]["end"], 'MMM d, y')}`
         this.filterText = (this.filterText ?? "") + text
       }
-      else if(this.numberrange.includes(key)){
+      else if (this.numberrange.includes(key)) {
         var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" From ${filterdata[key]["start"]} To ${filterdata[key]["end"]}`
         this.filterText = (this.filterText ?? "") + text
       }
     }
   }
 
-  loadtabledata(value:any){
-    console.log(value);
-    this.filterdata = new formelement
-    this.filterdata.subscriptionend = new dateElement
-    this.filterdata.purchasedate = new dateElement
-    this.filterdata.age = new numberElement
-    for (const key in value) {
-      this.filterdata[key] = value[key]
+  loadtabledata(value: any) {
+    if (!this.selectedSavedFilterQueryLabel) {
+      this.filterdata = new formelement
+      this.filterdata.subscriptionend = new dateElement
+      this.filterdata.purchasedate = new dateElement
+      this.filterdata.age = new numberElement
+      for (const key in value) {
+        this.filterdata[key] = value[key]
+      }
+      this.selectedSavedFilterQueryLabel = value.label
+      this.onDataSearch();
+      this.returnFilterText();
+    } else {
+      this.selectedSavedFilterQueryLabel = null;
+      this.onformreset();
     }
-    this.selectedSavedFilterQueryLabel = value.label
-    this.onDataSearch()
   }
 
-  updateDefaultSearch(doc:any){
-    if(confirm("are you want to update")){
-      const docRef = doc(this.firestore,'profile_data',this.loggedInProfileId)
-      updateDoc(docRef,{
-        defaultsearchref:doc(this.firestore,'searchquery',doc['docid'])
+  updateDefaultSearch(data: any) {
+    if (confirm("are you want to update")) {
+      const docRef = doc(this.firestore, 'profile_data', this.loggedInProfileId)
+      updateDoc(docRef, {
+        defaultsearchref: doc(this.firestore, 'searchquery', data['docid'])
       }).then(() => {
         console.log("successfully submitted");
         this.onInitiate()
-      }).catch(err => {console.log(err);
+      }).catch(err => {
+        console.log(err);
       })
     }
   }
 
-  ondeletefilterdata(value:any){
+  ondeletefilterdata(value: any) {
     // console.log(value);
-    if(confirm("are you sure want to delete tag")){
-      const docRef = doc(this.firestore,"searchquery",value['docid'])
+    if (confirm("are you sure want to delete tag")) {
+      const docRef = doc(this.firestore, "searchquery", value['docid'])
       deleteDoc(docRef).then(() => {
         console.log("document successfully deleted");
-        if(this.defaultSearchDocId === value['docid']){
-          const profileDocRef = doc(this.firestore,'profile_data',this.loggedInProfileId)
-          updateDoc(profileDocRef,{defaultsearchref:null}).then(() => {
+        if (this.defaultSearchDocId === value['docid']) {
+          const profileDocRef = doc(this.firestore, 'profile_data', this.loggedInProfileId)
+          updateDoc(profileDocRef, { defaultsearchref: null }).then(() => {
             this.onInitiate()
           })
         }
-      }).catch(err => {console.log(err);})
+      }).catch(err => { console.log(err); })
     }
   }
 
-  onInitiate(){
-    const profileDataDocRef = doc(this.firestore,"profile_data",this.loggedInProfileId)
+  onInitiate() {
+    const profileDataDocRef = doc(this.firestore, "profile_data", this.loggedInProfileId)
     getDoc(profileDataDocRef).then(snap => {
-      if(snap?.data()['defaultsearchref'] != null || snap?.data()['defaultsearchref'] != undefined){
+      if (snap?.data()['defaultsearchref'] != null || snap?.data()['defaultsearchref'] != undefined) {
         this.defaultSearchDocId = snap.data()['defaultsearchref'].id
-        getDoc(doc(this.firestore,snap.data()['defaultsearchref'].path)).then(searchsnap => {
+        getDoc(doc(this.firestore, snap.data()['defaultsearchref'].path)).then(searchsnap => {
           this.loadtabledata(searchsnap.data())
         })
-      }else{
+      } else {
         this.onDataSearch()
       }
     })
@@ -779,7 +795,8 @@ export class ParticipantsAnalyticsComponent {
 
   async onDataSearch() {
     let loadingref = this.loading
-    let data = Object.assign({}, this.filterdata)
+    let data = Object.assign({}, this.filterdata);
+
     for (const key in data) {
       if (data[key] === null || data[key] === undefined) delete data[key]
       else if (this.range.includes(key)) {
@@ -793,6 +810,7 @@ export class ParticipantsAnalyticsComponent {
       }
     }
 
+    const filteredDataWithoutProductFilter = new Set();
     this.cloneddashboarddata = this.dashboardEntireData.map(a => ({ ...a }))
     this.filtereddashboarddata = this.cloneddashboarddata.filter(e => {
       let booleanarray = []
@@ -850,6 +868,16 @@ export class ParticipantsAnalyticsComponent {
           }
         }
       }
+
+      if (!booleanarray.includes(false)) {
+        filteredDataWithoutProductFilter.add(e['profileid'])
+      }
+
+      if ((this.filterByProducts.consumed.length > 0 || this.filterByProducts.unconsumed.length > 0)
+        && (!Object.hasOwn(this.filterByProducts.participants, e['profileid']))) {
+        booleanarray.push(false);
+      }
+
       if (!booleanarray.includes(false)) {
         return e
       } else {
@@ -858,36 +886,37 @@ export class ParticipantsAnalyticsComponent {
         // console.log(!booleanarray.includes(false));
       }
     })
+    this.filteredDataWithoutProductFilter = filteredDataWithoutProductFilter;
     this.ngAfterViewInit()
     loadingref.close()
     this.nooftimesloaded = 1
     this.selection.clear()
   }
 
-  searchValidation(){
+  searchValidation() {
     let validation = []
-    if(this.filterdata['productcount'] != null && this.filterdata['productcount'] != undefined){
-      let productarray = Object.keys(this.filterdata).filter(e => ['unconsumedproducts','consumedproducts','activeproduct'].includes(e))
-      for (let i = 0; i < productarray.length; i++){
+    if (this.filterdata['productcount'] != null && this.filterdata['productcount'] != undefined) {
+      let productarray = Object.keys(this.filterdata).filter(e => ['unconsumedproducts', 'consumedproducts', 'activeproduct'].includes(e))
+      for (let i = 0; i < productarray.length; i++) {
         const element = productarray[i];
-          if(this.filterdata[element].length != 0 ) validation.push(true)
-          else{
-            delete this.filterdata[element]
-            validation.push(false)
-          }
+        if (this.filterdata[element].length != 0) validation.push(true)
+        else {
+          delete this.filterdata[element]
+          validation.push(false)
+        }
       }
     }
     return validation.filter(e => e).length > 1
   }
 
 
-  saveSearchedFilter(value){
+  saveSearchedFilter(value) {
     // console.log(this.filterdata);
     let loadingref = this.loading
-    let data = Object.assign({},this.filterdata)
-    for (const key in data){
+    let data = Object.assign({}, this.filterdata)
+    for (const key in data) {
       if (data[key] instanceof numberElement) {
-        data[key] = data[key].toObject(); 
+        data[key] = data[key].toObject();
       }
       if (data[key] instanceof dateElement) {
         data[key] = {
@@ -897,109 +926,116 @@ export class ParticipantsAnalyticsComponent {
           end: data[key].end ? this.datepipe.transform(data[key].end, 'yyyy-MM-dd') : null,
         };
       }
-      if(data[key] === null || data[key] === undefined) delete data[key]
-      else if(this.range.includes(key)){
-        if(data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
+      if (data[key] === null || data[key] === undefined) delete data[key]
+      else if (this.range.includes(key)) {
+        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
       }
-      else if([...this.arraystring,...this.arrayarray].includes(key)){
-        if(data[key].length === 0) delete data[key]
+      else if ([...this.arraystring, ...this.arrayarray].includes(key)) {
+        if (data[key].length === 0) delete data[key]
       }
-      else if(this.numberrange.includes(key)){
-        if(data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
+      else if (this.numberrange.includes(key)) {
+        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
       }
     }
     // console.log(data);
-    if(Object.keys(data).length >= 2){
-      if(confirm("are you sure you want to submit")){
+    if (Object.keys(data).length >= 2) {
+      if (confirm("are you sure you want to submit")) {
         // console.log(data);
-        data['docid'] = data['docid'] ?? doc(this.firestore,"searchquery").id
+        data['docid'] = data['docid'] ?? doc(collection(this.firestore, "searchquery")).id
         data['createdby'] = this.loggedInProfileId
-        setDoc(doc(this.firestore,"searchquery",data['docid']),data,{merge:true}).then(() => {
+        setDoc(doc(this.firestore, "searchquery", data['docid']), data, { merge: true }).then(() => {
           console.log("successfully saved search querysubmitted ");
           loadingref.close()
         })
-      }else{
+      } else {
         loadingref.close()
       }
-    }else{
+    } else {
       loadingref.close()
       alert("Please give label for the filter before you save it & atleast give one filter")
     }
-    
+
   }
 
-  onformreset(){
+  onformreset() {
     this.filterdata = new formelement
     this.filterdata.subscriptionend = new dateElement
     this.filterdata.purchasedate = new dateElement
     this.filterdata.age = new numberElement
-    this.filterText = null
+    this.filterText = null;
+    this.filterByProducts = {
+      consumed: [],
+      unconsumed: [],
+      participants: {},
+      rawProductsData: []
+    };
     this.selection.clear();
+    this.onDataSearch();
   }
 
-  onColumnNameSelect(value){
+  onColumnNameSelect(value) {
     // console.log(value);
-    this.displayedColumns = ['select','name', ...value]
+    this.displayedColumns = ['select', 'name', ...value]
   }
 
-  returnTableColumns(){
+  returnTableColumns() {
     var columns = this.columnsDisplayed
     return columns.filter(e => e.toLowerCase().trim().includes(this.searchColumn.toLowerCase().trim()))
   }
 
   //remarks
 
-  addremarks(profile){
+  addremarks(profile) {
     // console.log(profile);
     let mapprofileremarks = {}
-    var dialogRef = this.dialog.open(AddRemarksComponent, { 
+    var dialogRef = this.dialog.open(AddRemarksComponent, {
       data: {},
       autoFocus: false,
     })
-    
-    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value=>{
-      if(value != null){
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value => {
+      if (value != null) {
         // console.log(value);
         for (let i = 0; i < profile.length; i++) {
           const element = profile[i];
           mapprofileremarks[element['profileid']] = element
         }
         var remarks = {
-          date : new Date(),
-          note : value,
-          givenby : this.loggedInProfileId
+          date: new Date(),
+          note: value,
+          givenby: this.loggedInProfileId
         }
         for (const key in mapprofileremarks) {
           if (Object.prototype.hasOwnProperty.call(mapprofileremarks, key)) {
             const element = mapprofileremarks[key];
             // console.log(element['remarks']);
-            if(element['remarks'] == undefined){
-              element['remarks'] =  [remarks] 
-            }else {
+            if (element['remarks'] == undefined) {
+              element['remarks'] = [remarks]
+            } else {
               element['remarks'].push(remarks)
             }
-            updateDoc(doc(this.firestore,"participant metadata",key),{
-              remarks : element['remarks']
+            updateDoc(doc(this.firestore, "participant metadata", key), {
+              remarks: element['remarks']
             })
           }
         }
       }
-    }) 
+    })
   }
 
   editremarks(profile) {
     // console.log(profile);
     if (profile != undefined) {
       profile.forEach(map => {
-        const dialogRef = this.dialog.open(RemarkDialogComponent, { 
-          data: map['remarks'].map(e => Object.assign({},e)),
+        const dialogRef = this.dialog.open(RemarkDialogComponent, {
+          data: map['remarks'].map(e => Object.assign({}, e)),
           autoFocus: false,
         });
-      
+
         let mapprofileremarks = {};
         dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(newRemarks => {
           newRemarks = newRemarks.filter(element => element.note.trim() !== "")
-        // console.log(newRemarks);
+          // console.log(newRemarks);
           if (newRemarks != null) {
             for (let i = 0; i < profile.length; i++) {
               const element = profile[i];
@@ -1007,7 +1043,7 @@ export class ParticipantsAnalyticsComponent {
             }
             for (const key in mapprofileremarks) {
               if (Object.prototype.hasOwnProperty.call(mapprofileremarks, key)) {
-                updateDoc(doc(this.firestore,"participant metadata",key),{
+                updateDoc(doc(this.firestore, "participant metadata", key), {
                   remarks: newRemarks
                 }).then(() => {
                   console.log("Remarks updated in Firebase");
@@ -1023,30 +1059,30 @@ export class ParticipantsAnalyticsComponent {
   }
 
   // playlist
-  onViewRecommendedPlaylist(){
-    if(this.displayedColumns.some(e => ['eiflix','solarvoice','generalcontent'].includes(e))){
-      this.displayedColumns  = this.displayedColumns.filter(e => !['eiflix','solarvoice','generalcontent'].includes(e))
-    }else{
-      this.displayedColumns  = [...this.displayedColumns ,...['eiflix','generalcontent','solarvoice']]
+  onViewRecommendedPlaylist() {
+    if (this.displayedColumns.some(e => ['eiflix', 'solarvoice', 'generalcontent'].includes(e))) {
+      this.displayedColumns = this.displayedColumns.filter(e => !['eiflix', 'solarvoice', 'generalcontent'].includes(e))
+    } else {
+      this.displayedColumns = [...this.displayedColumns, ...['eiflix', 'generalcontent', 'solarvoice']]
     }
   }
-  
-  createRecommendedPlaylistToSelectedParticipant(){//map recommended playlist to selected participant to buffer collection
+
+  createRecommendedPlaylistToSelectedParticipant() {//map recommended playlist to selected participant to buffer collection
     // console.log(this.selection.selected);
-    let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent,{
-      data : {
-        participantlist : this.selection.selected,
+    let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
+      data: {
+        participantlist: this.selection.selected,
         // personalised : personalised
       },
-      minWidth:"500px",
-      disableClose:true
+      minWidth: "500px",
+      disableClose: true
     })
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
       // console.log(result);
-      if(result != null && result != undefined){
-        let docid = doc(collection(this.firestore,"buffermix archive")).id
+      if (result != null && result != undefined) {
+        let docid = doc(collection(this.firestore, "buffermix archive")).id
         result['docid'] = docid
-        setDoc(doc(this.firestore,"buffermix archive",docid),result).then(() => {
+        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
           console.log("buffer document created");
         }).catch(err => {
           console.log(err);
@@ -1061,35 +1097,35 @@ export class ParticipantsAnalyticsComponent {
     this._snackBar.open(message, action);
   }
 
-  sendEmailToSelectedParicipant(){
-    let dialogRef = this.dialog.open(EmailInputComponent,{
-      data : this.selection.selected,
-      minWidth : "600px",
-      disableClose:true
+  sendEmailToSelectedParicipant() {
+    let dialogRef = this.dialog.open(EmailInputComponent, {
+      data: this.selection.selected,
+      minWidth: "600px",
+      disableClose: true
     });
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
-      if(result != null && result != undefined){
+      if (result != null && result != undefined) {
         console.log(result);
-        
-        const docRef = doc(collection(this.firestore,"email archive"),result['docid']);
-        if(result['status'] == 'queued' || result['status'] == 'send'){
-          await setDoc(docRef,result,{merge:true}).then(() => {
+
+        const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
             this.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK");
           }).catch(err => {
             console.log(err);
             this.openSnackBar("Error Sending Email", "OK");
           });
-        }else if (result['status'] == 'validated'){
-          let url:string;
-          if(environment.firebase.projectId == 'starlabs-test'){
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
             url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
-          }else if (environment.firebase.projectId == 'fir-sample-aae4a'){
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
             url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail"
           }
           console.log("EMAIL :", url);
           let data = result;
           data['archiveid'] = result['docid'];
-          this.http.post(url, JSON.stringify(data),{
+          this.http.post(url, JSON.stringify(data), {
             responseType: 'text',
             headers: new HttpHeaders().set('Content-Type', 'application/json'),
           }).subscribe({
@@ -1107,20 +1143,20 @@ export class ParticipantsAnalyticsComponent {
     })
   }
 
-  updateEmailValidator(){
+  updateEmailValidator() {
     let listofprofileid = this.selection.selected.map(e => e.profileid)
     // console.log(listofprofileid);
-    setDoc(doc(this.firestore,"email validators","validators"),{
-      profilelist:listofprofileid
-    },{merge:true}).then(() => {
-      this.openSnackBar("Updated EMail Validators","close")
+    setDoc(doc(this.firestore, "email validators", "validators"), {
+      profilelist: listofprofileid
+    }, { merge: true }).then(() => {
+      this.openSnackBar("Updated EMail Validators", "close")
     }).catch(err => {
       console.log(err);
     })
-  } 
+  }
 
-  patchEmailValidator(){
-    getDoc(doc(this.firestore,"email validators","validators")).then(async snap => {
+  patchEmailValidator() {
+    getDoc(doc(this.firestore, "email validators", "validators")).then(async snap => {
       this.selection.clear()
       console.log("cleared");
       let filterDatasource = this.dataSource.data.filter(e => snap.data()['profilelist'].includes(e['profileid']))
@@ -1128,28 +1164,28 @@ export class ParticipantsAnalyticsComponent {
     })
   }
 
-  sendWatiMessage(){
-    let dialogRef = this.dialog.open(WatiInputComponent,{
-      data : this.selection.selected,
-      width : "70vw",
-      height : "80vh",
-      disableClose:true
+  sendWatiMessage() {
+    let dialogRef = this.dialog.open(WatiInputComponent, {
+      data: this.selection.selected,
+      width: "70vw",
+      height: "80vh",
+      disableClose: true
     });
 
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
-      if(result != null && result != undefined){
-        if(result == 'success') {
+      if (result != null && result != undefined) {
+        if (result == 'success') {
           this.openSnackBar("Wati Message Sent Successfully", "OK");
-          if(result['status'] == 'sendtoparticipants'){
-            let url:string;
+          if (result['status'] == 'sendtoparticipants') {
+            let url: string;
 
-            if(environment.firebase.projectId == 'starlabs-test'){
+            if (environment.firebase.projectId == 'starlabs-test') {
               url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
-            }else if (environment.firebase.projectId == 'fir-sample-aae4a'){
+            } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
               url = ""
-            } 
+            }
 
-            const docRef = doc(collection(this.firestore , 'wati archive'), result['archiveid']);
+            const docRef = doc(collection(this.firestore, 'wati archive'), result['archiveid']);
             await updateDoc(docRef, {
               templatestatus: "created",
               templatevalidated: true,
@@ -1160,50 +1196,50 @@ export class ParticipantsAnalyticsComponent {
             });
 
             const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
-            console.log("Response : ",response)
+            console.log("Response : ", response)
 
           }
-        } else if(result == 'failed') {
+        } else if (result == 'failed') {
           this.openSnackBar("Sending Wati Message Failed", "OK");
         }
       }
     });
   }
 
-  openWatiConfig(){
-    let dialogRef = this.dialog.open(WatiConfigDialogComponent,{
-      data : this.selection.selected,
-      width : "70vw",
-      height : "80vh",
-      disableClose:true
+  openWatiConfig() {
+    let dialogRef = this.dialog.open(WatiConfigDialogComponent, {
+      data: this.selection.selected,
+      width: "70vw",
+      height: "80vh",
+      disableClose: true
     });
   }
 
-  updatelist(profile){
+  updatelist(profile) {
   }
 
-  managelist(profile){
-    const dialogRef = this.dialog.open(ManageParticipantlistDialogComponent, { 
+  managelist(profile) {
+    const dialogRef = this.dialog.open(ManageParticipantlistDialogComponent, {
       width: '80vw',
       height: '85vh',
-      data:profile,
+      data: profile,
       autoFocus: false,
     });
   }
 
-  addSubscription(profile){
-    const dialogRef = this.dialog.open(SubscriptionDialogComponent, { 
-      width: '80%', 
+  addSubscription(profile) {
+    const dialogRef = this.dialog.open(SubscriptionDialogComponent, {
+      width: '80%',
       height: '80%',
-      data:profile,
+      data: profile,
       autoFocus: false,
     });
-    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value =>{
-      if(value != null){
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value => {
+      if (value != null) {
         console.log(value);
-        value.data.forEach((profile:any) => {
-          const collRef = collection(this.firestore,"participantjourneyproduct")
-          const q = query(collRef,where('profileid', '==', profile.profileid),where('subscriptionend', '==', profile.subscriptionend))
+        value.data.forEach((profile: any) => {
+          const collRef = collection(this.firestore, "participantjourneyproduct")
+          const q = query(collRef, where('profileid', '==', profile.profileid), where('subscriptionend', '==', profile.subscriptionend))
           getDocs(q).then(snap => {
             for (let i = 0; i < snap.docs.length; i++) {
               const element = snap.docs[i].data();
@@ -1214,12 +1250,12 @@ export class ParticipantsAnalyticsComponent {
               element['extendreason'] = value.input.reason
               let currentdate = new Date()
               let journeystatus = (new Date(newsubscriptionend) < currentdate) ? "completed" : "ongoing"
-              let id = doc(this.firestore,'subscription extend log').id;
-              setDoc(doc(this.firestore,"subscription extend log",id),element)
-              updateDoc(doc(this.firestore,"participantjourneyproduct",element['docid']),{
-                subscriptionend : new Date(newsubscriptionend),
-                extendreason : value.input.reason,
-                journeystatus : journeystatus
+              let id = doc(this.firestore, 'subscription extend log').id;
+              setDoc(doc(this.firestore, "subscription extend log", id), element)
+              updateDoc(doc(this.firestore, "participantjourneyproduct", element['docid']), {
+                subscriptionend: new Date(newsubscriptionend),
+                extendreason: value.input.reason,
+                journeystatus: journeystatus
               })
             }
           })
@@ -1229,24 +1265,24 @@ export class ParticipantsAnalyticsComponent {
   }
 
   //send in app messages to selected participant
-  sendNotificationinBreakthrough(){
-    let dialogRef = this.dialog.open(AhNotificationComponent,{
-      data : this.selection.selected,
-      width : "80vw",
+  sendNotificationinBreakthrough() {
+    let dialogRef = this.dialog.open(AhNotificationComponent, {
+      data: this.selection.selected,
+      width: "80vw",
       maxHeight: "90vh",
-      disableClose:true,
+      disableClose: true,
       autoFocus: false,
     })
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
-      console.log(result,'send app notificationssss');
-      if(result != null && result != undefined){
+      console.log(result, 'send app notificationssss');
+      if (result != null && result != undefined) {
         var userID = [];
         var profileID = [];
-        console.log(this.selection.selected,"this.selection.selected");
+        console.log(this.selection.selected, "this.selection.selected");
         // var unsentProfiles = [];
         for (let i = 0; i < this.selection.selected.length; i++) {
           const selected = this.selection.selected[i];
-          if(selected["firebaseuserref"] != null){
+          if (selected["firebaseuserref"] != null) {
             profileID.push(selected["profileid"])
           }
           // var profiledata = this.mapProfile[selected["profileid"]]
@@ -1261,17 +1297,17 @@ export class ParticipantsAnalyticsComponent {
         }
 
         var notificationimage = null
-        if(result["notificationimage"] != null){
+        if (result["notificationimage"] != null) {
           const filepath = "Notification Images/" + new Date().toISOString() + result["notificationimage"].name;
           try {
-            const storageRef = ref(this.storage,filepath)
-            const uploadResult = await uploadBytes(storageRef,result["notificationimage"])
+            const storageRef = ref(this.storage, filepath)
+            const uploadResult = await uploadBytes(storageRef, result["notificationimage"])
             notificationimage = await getDownloadURL(uploadResult.ref)
           } catch (error) {
-            console.log("file upload error",error);
+            console.log("file upload error", error);
           }
         }
-        console.log(profileID,"profileIDprofileIDprofileIDprofileID");
+        console.log(profileID, "profileIDprofileIDprofileIDprofileID");
         this.authguard.saveNotificationRecord({
           title: result["title"],
           message: result["message"],
@@ -1279,11 +1315,11 @@ export class ParticipantsAnalyticsComponent {
           notificationtype: "ahupdate",
           notificationimage: notificationimage,
           sticky: result["sticky"],
-          logged: true, 
+          logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
-        }).then(()=>{
-          console.log( notificationimage)
+        }).then(() => {
+          console.log(notificationimage)
           alert("A&H Update sent to App user " + profileID.length.toString())
         })
       }
@@ -1291,45 +1327,45 @@ export class ParticipantsAnalyticsComponent {
   }
 
   //send Broadcast in support desk
-  sendChatBroadcast(){
-    let dialogRef = this.dialog.open(BroadcastComponent,{
-      data:{},
-      minWidth : "50vw",
-      maxWidth : "70vw",
-      disableClose:true
+  sendChatBroadcast() {
+    let dialogRef = this.dialog.open(BroadcastComponent, {
+      data: {},
+      minWidth: "50vw",
+      maxWidth: "70vw",
+      disableClose: true
     });
 
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
-      if(this.selection.selected.length === 0 && result != null){
+      if (this.selection.selected.length === 0 && result != null) {
         alert("Please Select Participants")
-      }else if(result != null && result != undefined){
+      } else if (result != null && result != undefined) {
 
         var check = confirm("Are you sure want to send out the Broadcast for the selected Participants")
-        if(check){
+        if (check) {
           var broadcast = result;
           var mapProfileUid = {};
           const batch = writeBatch(this.firestore);
 
-          const profileDataCollRef = collection(this.firestore,"profile_data")
-          await getDocs(profileDataCollRef).then((profiledoc)=>{
+          const profileDataCollRef = collection(this.firestore, "profile_data")
+          await getDocs(profileDataCollRef).then((profiledoc) => {
             for (let i = 0; i < profiledoc.docs.length; i++) {
               const element = profiledoc.docs[i];
-              if(element.data()['user_ref'] != null){
+              if (element.data()['user_ref'] != null) {
                 mapProfileUid[element.data()['profileid']] = element.data()['user_ref'].id
               }
             }
           });
 
-          const broadCastAnalyticsId = doc(this.firestore,"broadcast_analytics").id
-          setDoc(doc(this.firestore,"broadcast_analytics",broadCastAnalyticsId),{
-            docid:broadCastAnalyticsId,
+          const broadCastAnalyticsId = doc(this.firestore, "broadcast_analytics").id
+          setDoc(doc(this.firestore, "broadcast_analytics", broadCastAnalyticsId), {
+            docid: broadCastAnalyticsId,
           })
-  
+
           const setbatchArray = []
           setbatchArray.push(batch)
           let setoperationCounter = 0;
           let setbatchIndex = 0;
-  
+
           const setbatchArray2 = []
           setbatchArray2.push(batch)
           let setoperationCounter2 = 0;
@@ -1339,65 +1375,65 @@ export class ParticipantsAnalyticsComponent {
           setbatchArray3.push(batch)
           let setoperationCounter3 = 0;
           let setbatchIndex3 = 0;
-  
+
           for (let j = 0; j < this.selection.selected.length; j++) {
             const element = this.selection.selected[j];
-  
-            var docid = doc(this.firestore,"supportdesk",mapProfileUid[element['profileid']],"messages").id;
-            var deskdocRef = doc(this.firestore,"supportdesk",mapProfileUid[element['profileid']])
-            var deskmsgdocRef = doc(this.firestore,"supportdesk",mapProfileUid[element['profileid']],"messages",docid)
-            var bap_docid = doc(this.firestore,"broadcast_participants").id;
-            var bap_docref = doc(this.firestore,"broadcast_participants",bap_docid);
+
+            var docid = doc(this.firestore, "supportdesk", mapProfileUid[element['profileid']], "messages").id;
+            var deskdocRef = doc(this.firestore, "supportdesk", mapProfileUid[element['profileid']])
+            var deskmsgdocRef = doc(this.firestore, "supportdesk", mapProfileUid[element['profileid']], "messages", docid)
+            var bap_docid = doc(this.firestore, "broadcast_participants").id;
+            var bap_docref = doc(this.firestore, "broadcast_participants", bap_docid);
 
             var supportDesk = {
-              email:element['email'],
-              files:broadcast['files'],
-              last_message:broadcast['body'],
-              last_modification:new Date(),
-              last_pending:['user'],
-              last_read_by:['admin'],
-              last_sender_uid:mapProfileUid[this.loggedInProfileId],
-              uid:mapProfileUid[element['profileid']]
+              email: element['email'],
+              files: broadcast['files'],
+              last_message: broadcast['body'],
+              last_modification: new Date(),
+              last_pending: ['user'],
+              last_read_by: ['admin'],
+              last_sender_uid: mapProfileUid[this.loggedInProfileId],
+              uid: mapProfileUid[element['profileid']]
             }
-  
+
             var supportDeskMessage = {
-              files:broadcast['files'],
-              buttonlink:broadcast['link'] ?? null,
-              buttonname:broadcast['buttonname'] ?? null,
+              files: broadcast['files'],
+              buttonlink: broadcast['link'] ?? null,
+              buttonname: broadcast['buttonname'] ?? null,
               // message:this.pipe.transform(broadcast['body'],this.mapProfile,element['profileid']),
-              message: new MessagePipe().transform(broadcast['body'],this.mapProfile,element['profileid']),
-              messageid:docid,
-              pending:['user'],
-              read_by:['admin'],
-              sender_email:this.mapParticipantData[this.loggedInProfileId]['email'],
-              sender_uid:mapProfileUid[this.loggedInProfileId],
-              time:new Date(),
+              message: new MessagePipe().transform(broadcast['body'], this.mapProfile, element['profileid']),
+              messageid: docid,
+              pending: ['user'],
+              read_by: ['admin'],
+              sender_email: this.mapParticipantData[this.loggedInProfileId]['email'],
+              sender_uid: mapProfileUid[this.loggedInProfileId],
+              time: new Date(),
             }
 
             var broadcast_participants = {
-              docid:bap_docid,
-              profile_id:mapProfileUid[element['profileid']],
-              profile_uid:mapProfileUid[element['profileid']],
-              date:serverTimestamp(),
-              broadcast_templateid:result['docid'],
+              docid: bap_docid,
+              profile_id: mapProfileUid[element['profileid']],
+              profile_uid: mapProfileUid[element['profileid']],
+              date: serverTimestamp(),
+              broadcast_templateid: result['docid'],
               // broadcastid:ba_docid,
-              broadcastname:result['broadcastname'],
+              broadcastname: result['broadcastname'],
             }
-            
-            setbatchArray[setbatchIndex].set(deskdocRef,supportDesk,{merge:true});
-            setbatchArray2[setbatchIndex2].set(deskmsgdocRef,supportDeskMessage,{merge:true});
-            setbatchArray3[setbatchIndex3].set(bap_docref,broadcast_participants,{merge:true});
+
+            setbatchArray[setbatchIndex].set(deskdocRef, supportDesk, { merge: true });
+            setbatchArray2[setbatchIndex2].set(deskmsgdocRef, supportDeskMessage, { merge: true });
+            setbatchArray3[setbatchIndex3].set(bap_docref, broadcast_participants, { merge: true });
 
             setoperationCounter++;
             setoperationCounter2++;
             setoperationCounter3++;
-    
+
             if (setoperationCounter === 499) {
               setbatchArray.push(batch);
               setbatchIndex++;
               setoperationCounter = 0;
             }
-  
+
             if (setoperationCounter2 === 499) {
               setbatchArray2.push(batch);
               setbatchIndex2++;
@@ -1409,25 +1445,25 @@ export class ParticipantsAnalyticsComponent {
               setbatchIndex3++;
               setoperationCounter3 = 0;
             }
-  
+
           }
-  
-          setbatchArray.forEach(async batch => await batch.commit().then(()=>{
+
+          setbatchArray.forEach(async batch => await batch.commit().then(() => {
             console.log("Broadcast sent supportDesk Successfully");
-          }).catch((error)=>{
-            console.log("Error While sending supportDesk Broadcast",error);;
-          }))
-  
-          setbatchArray2.forEach(async batch => await batch.commit().then(()=>{
-            console.log("Broadcast sent supportDesk Message Successfully");
-          }).catch((error)=>{
-            console.log("Error While supportDesk Message Broadcast",error);;
+          }).catch((error) => {
+            console.log("Error While sending supportDesk Broadcast", error);;
           }))
 
-          setbatchArray3.forEach(async batch => await batch.commit().then(()=>{
+          setbatchArray2.forEach(async batch => await batch.commit().then(() => {
+            console.log("Broadcast sent supportDesk Message Successfully");
+          }).catch((error) => {
+            console.log("Error While supportDesk Message Broadcast", error);;
+          }))
+
+          setbatchArray3.forEach(async batch => await batch.commit().then(() => {
             console.log("Broadcast Analytics Participants created Successfully");
-          }).catch((error)=>{
-            console.log("Error While creating Broadcast Analytics Participants",error);;
+          }).catch((error) => {
+            console.log("Error While creating Broadcast Analytics Participants", error);;
           }))
 
         }
@@ -1437,13 +1473,13 @@ export class ParticipantsAnalyticsComponent {
 
   }
 
-  async onParticipantEvolution(selectedDoc:any){
+  async onParticipantEvolution(selectedDoc: any) {
     // let listofprofileid = doc.map((e:any) => e['profileid'])
     let listofdocs = selectedDoc
-    this.datatransferservice.setData(listofdocs,"participant-evolution-summary",'evolutionSharedData')
+    this.datatransferservice.setData(listofdocs, "participant-evolution-summary", 'evolutionSharedData')
   }
 
-  sendInterimReport(profile){
+  sendInterimReport(profile) {
     console.log(profile)
     var profileid = profile.map(e => e["profileid"])
     var dialogRef = this.dialog.open(SendInterimReportComponent, {
@@ -1455,7 +1491,7 @@ export class ParticipantsAnalyticsComponent {
     });
   }
 
-  sendEvolutionWishList(profile){
+  sendEvolutionWishList(profile) {
     console.log(profile)
     var profileid = profile.map(e => e["profileid"])
     var dialogRef = this.dialog.open(EvolutionWishlistLogComponent, {
@@ -1468,12 +1504,195 @@ export class ParticipantsAnalyticsComponent {
   }
 
   //export 
-  exportExcel() {
+  // exportExcel() {
+  //   // Get filtered data from MatTableDataSource
+  //   const rawData = this.dataSource.filteredData ?? this.dataSource.data;
+
+  //   // Create formatted data for export
+  //   const formattedData = rawData.map(element => {
+  //     const formattedRow: any = {};
+
+  //     // Process each column according to your display logic
+  //     this.displayedColumns.forEach(column => {
+  //       if (column === 'select') {
+  //         // Skip checkbox column
+  //         return;
+  //       }
+
+  //       // Handle date columns
+  //       if (['subscriptionend', 'purchasedate', 'subscriptionstart', 'lastpaymentdate', 'lastsubscriptionstart', 'lastsubscriptionend', 'dateofbirth'].includes(column)) {
+  //         formattedRow[column] = element[column] != null
+  //           ? new Date(element[column].toDate()).toLocaleDateString('en-US', {
+  //             year: 'numeric',
+  //             month: 'short',
+  //             day: 'numeric'
+  //           })
+  //           : null;
+  //       }
+  //       // Handle array columns that use mapfiltervalues
+  //       else if (['consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'purchase', 'profiletags'].includes(column)) {
+  //         if (element[column] && Array.isArray(element[column])) {
+  //           formattedRow[column] = element[column]
+  //             .map(value => this.mapfiltervalues[value] || value)
+  //             .join(', ');
+  //         } else {
+  //           formattedRow[column] = '';
+  //         }
+  //       }
+  //       // Handle mapped single values
+  //       else if (['activejourney', 'lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase'].includes(column)) {
+  //         formattedRow[column] = this.mapfiltervalues[element[column]] || element[column];
+  //       }
+  //       // Handle ATC model with filter logic
+  //       else if (column === 'atcmodel') {
+  //         formattedRow[column] = ![null, undefined].includes(this.filterdata['atcmodel'])
+  //           ? this.filterAtcModel(element[column])
+  //           : element[column];
+  //       }
+  //       // Handle product count (complex display logic)
+  //       else if (column === 'productcount') {
+  //         let productCountDisplay = '';
+  //         if (this.filterdata['productcount'] != null) {
+  //           if (this.filterdata['unconsumedproducts'] != null) {
+  //             const filtered = this.filterproducts(element['unconsumedproducts'], this.filterdata['unconsumedproducts'][0]);
+  //             const count = element['productcount'] ? element['productcount'][this.filterdata['unconsumedproducts'][0]] || 0 : 0;
+  //             productCountDisplay = `${filtered}, ${count}`;
+  //           }
+  //           else if (this.filterdata['consumedproducts'] != null) {
+  //             const filtered = this.filterproducts(element['consumedproducts'], this.filterdata['consumedproducts'][0]);
+  //             const count = element['productcount'] ? element['productcount'][this.filterdata['consumedproducts'][0]] || 0 : 0;
+  //             productCountDisplay = `${filtered}, ${count}`;
+  //           }
+  //           else if (this.filterdata['activeproduct'] != null) {
+  //             const filtered = this.filterproducts(element['activeproduct'], this.filterdata['activeproduct'][0]);
+  //             const count = element['productcount'] ? element['productcount'][this.filterdata['activeproduct'][0]] || 0 : 0;
+  //             productCountDisplay = `${filtered}, ${count}`;
+  //           }
+  //         }
+  //         formattedRow[column] = productCountDisplay;
+  //       }
+  //       // Handle product events
+  //       else if (column === 'productevent') {
+  //         if (this.filterdata['productevent'] != null && this.filterdata['products'] != null) {
+  //           const productEvents = element[column] && element[column][this.filterdata['products']]
+  //             ? element[column][this.filterdata['products']].join(', ')
+  //             : '';
+  //           formattedRow[column] = `${this.filterdata['products']}: ${productEvents}`;
+  //         } else {
+  //           // Handle key-value display
+  //           let eventsList = '';
+  //           if (element[column]) {
+  //             Object.keys(element[column]).forEach(key => {
+  //               const mappedKey = this.mapfiltervalues[key] || key;
+  //               const mappedValue = this.mapfiltervalues[element[column][key]] || element[column][key];
+  //               eventsList += `${mappedKey}: ${mappedValue}; `;
+  //             });
+  //           }
+  //           formattedRow[column] = eventsList.trim();
+  //         }
+  //       }
+  //       // Handle queue events (similar to product events)
+  //       else if (column === 'queueevent') {
+  //         if (this.filterdata['queueevent'] != null && this.filterdata['products'] != null) {
+  //           const queueEvents = element[column] && element[column][this.filterdata['products']]
+  //             ? element[column][this.filterdata['products']].join(', ')
+  //             : '';
+  //           formattedRow[column] = `${this.filterdata['products']}: ${queueEvents}`;
+  //         } else {
+  //           let eventsList = '';
+  //           if (element[column]) {
+  //             Object.keys(element[column]).forEach(key => {
+  //               const mappedKey = this.mapfiltervalues[key] || key;
+  //               const mappedValue = this.mapfiltervalues[element[column][key]] || element[column][key];
+  //               eventsList += `${mappedKey}: ${mappedValue}; `;
+  //             });
+  //           }
+  //           formattedRow[column] = eventsList.trim();
+  //         }
+  //       }
+  //       // Handle content columns (eiflix, solarvoice, generalcontent)
+  //       else if (['eiflix', 'solarvoice', 'generalcontent'].includes(column)) {
+  //         let contentList = '';
+  //         if (element[column]) {
+  //           Object.keys(element[column]).forEach(key => {
+  //             const mappedKey = this.mapPlaylist[key] || key;
+  //             if (element[column][key] && Array.isArray(element[column][key])) {
+  //               const mappedValues = element[column][key]
+  //                 .map(item => this.mapPlaylist[item] || item)
+  //                 .join(', ');
+  //               contentList += `${mappedKey} - ${mappedValues}; `;
+  //             }
+  //           });
+  //         }
+  //         formattedRow[column] = contentList.trim();
+  //       }
+  //       // Handle remarks
+  //       else if (column === 'remarks') {
+  //         if (element[column] && Array.isArray(element[column])) {
+  //           formattedRow[column] = element[column]
+  //             .map(item => `${item.note} - ${this.mapParticipantName[item.givenby] || item.givenby}`)
+  //             .join('; ');
+  //         } else {
+  //           formattedRow[column] = '';
+  //         }
+  //       }
+  //       // Handle name column (remove the link, just show text)
+  //       else if (column === 'name') {
+  //         formattedRow[column] = element[column];
+  //       }
+  //       // Handle KYJ column (remove link, just show value)
+  //       else if (column === 'kyj') {
+  //         formattedRow[column] = element[column];
+  //       }
+  //       // Default case for other columns
+  //       else {
+  //         formattedRow[column] = element[column];
+  //       }
+  //     });
+
+  //     return formattedRow;
+  //   });
+
+  //   // Convert formatted data to worksheet
+  //   const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(formattedData);
+
+  //   // Set date format for date columns in Excel
+  //   const dateColumns = ['subscriptionend', 'purchasedate', 'subscriptionstart', 'lastpaymentdate', 'dateofbirth'];
+  //   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+  //   for (let row = range.s.r + 1; row <= range.e.r; row++) {
+  //     dateColumns.forEach(dateCol => {
+  //       const colIndex = this.displayedColumns.indexOf(dateCol);
+  //       if (colIndex !== -1) {
+  //         const cellAddress = XLSX.utils.encode_cell({ r: row, c: colIndex });
+  //         if (ws[cellAddress] && ws[cellAddress].v instanceof Date) {
+  //           ws[cellAddress].t = 'd'; // Set cell type to date
+  //           ws[cellAddress].z = 'mm/dd/yyyy'; // Set date format
+  //         }
+  //       }
+  //     });
+  //   }
+
+  //   // Create workbook
+  //   const wb: XLSX.WorkBook = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+
+  //   // Export with timestamp in filename
+  //   const timestamp = new Date().toISOString().slice(0, 10);
+  //   // XLSX.writeFile(wb, `participants_${timestamp}.xlsx`);
+  // }
+
+  exportExcel(selected = false) {
     // Get filtered data from MatTableDataSource
-    const rawData = this.dataSource.filteredData ?? this.dataSource.data;
+    const rawData = selected ? this.dataSource.data : (this.dataSource.filteredData ?? this.dataSource.data);
 
     // Create formatted data for export
-    const formattedData = rawData.map(element => {
+    const formattedData = [];
+    for (let element of rawData) {
+
+      if (selected && !this.selection.isSelected(element)) {
+        continue
+      }
       const formattedRow: any = {};
 
       // Process each column according to your display logic
@@ -1614,8 +1833,16 @@ export class ParticipantsAnalyticsComponent {
         }
       });
 
-      return formattedRow;
-    });
+      if (this.filterByProducts.consumed.length > 0) {
+        formattedRow['consumed products'] = this.filterByProducts.consumed.map((p) => this.getProductString(p)).join(',');
+      }
+
+      if (this.filterByProducts.unconsumed.length > 0) {
+        formattedRow['unconsumed products'] = this.filterByProducts.unconsumed.map((p) => this.getProductString(p)).join(',');
+      }
+
+      formattedData.push(formattedRow);
+    };
 
     // Convert formatted data to worksheet
     const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(formattedData);
@@ -1646,7 +1873,7 @@ export class ParticipantsAnalyticsComponent {
     XLSX.writeFile(wb, `participants_${timestamp}.xlsx`);
   }
 
-  exportContentConsumption(){
+  exportContentConsumption() {
     console.log(this.dataSource.filteredData);
     let getProfiles = []
     let mapProfiles = {}
@@ -1657,12 +1884,12 @@ export class ParticipantsAnalyticsComponent {
     }
     //query
     let contentdata = []
-    const collRef = collection(this.firestore,"content analytics")
+    const collRef = collection(this.firestore, "content analytics")
     getDocs(collRef).then(snap => {
-      contentdata = snap.docs.map(e =>e.data())
+      contentdata = snap.docs.map(e => e.data())
       let filterdata = []
-      filterdata = contentdata.filter(e  => {
-        if(getProfiles.includes(e['profileid'])){
+      filterdata = contentdata.filter(e => {
+        if (getProfiles.includes(e['profileid'])) {
           e['name'] = mapProfiles[e['profileid']]['name']
           return e
         }
@@ -1670,9 +1897,9 @@ export class ParticipantsAnalyticsComponent {
       let headers = []
       let data = []
       // console.log(filterdata);
-      if(filterdata.length != 0){
+      if (filterdata.length != 0) {
         for (const key in filterdata[0]) {
-          {headers.push(key)}
+          { headers.push(key) }
         }
         for (let i = 0; i < filterdata.length; i++) {
           let element = filterdata[i]
@@ -1732,11 +1959,11 @@ export class ParticipantsAnalyticsComponent {
           .forEach((g: any) => {
             const matched = this.dataSource.data.find((e) => e['email'] === g['email']);
             console.log(matched, 'matchd');
-            
+
             if (matched) {
               this.selection.toggle(matched);
             }
-            else{
+            else {
               console.log("Unmatched", g["email"])
             }
           });
@@ -1746,12 +1973,13 @@ export class ParticipantsAnalyticsComponent {
       }
     };
 
-    reader.readAsArrayBuffer(file); 
+    this.inputFile.nativeElement.value = '';
+    reader.readAsArrayBuffer(file);
   }
 
   // checklists
-  navigateTochecklists(type){
-    if(type === 'higherorderpurchase'){
+  navigateTochecklists(type) {
+    if (type === 'higherorderpurchase') {
       let higherorderpurchaseData = this.dashboardEntireData.filter(e => e['activejourney'] != null && e['activejourney'] != e['higherorderpurchase'])
       console.log(higherorderpurchaseData);
       const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
@@ -1777,7 +2005,7 @@ export class ParticipantsAnalyticsComponent {
       });
     }
   }
-    
+
   // Function to add products to participant Journey 
   bulkAddProducts() {
     this.dialog.open(BulkAddProductsComponent, {
@@ -1798,14 +2026,14 @@ export class ParticipantsAnalyticsComponent {
   }
 
   getTagsAdded(current: any, previous: any): string[] {
-    const curr = current.profiletags || [];   
-    const prev = previous.profiletags || [];  
+    const curr = current.profiletags || [];
+    const prev = previous.profiletags || [];
     return curr.filter((t: string) => !prev.includes(t));
   }
 
   getTagsRemoved(current: any, previous: any): string[] {
     const curr = current.profiletags || [];
-    const prev = previous.profiletags || [];  
+    const prev = previous.profiletags || [];
     return prev.filter((t: string) => !curr.includes(t));
   }
 
@@ -1843,11 +2071,25 @@ export class ParticipantsAnalyticsComponent {
 
   // Function to export with fiiters 
   exportWithFilters() {
+    const participants = this.filteredDataWithoutProductFilter;
+
     this.dialog.open(ExportWithFiltersComponent, {
+      data: {
+        consumed: this.filterByProducts.consumed,
+        unconsumed: this.filterByProducts.unconsumed,
+        participants,
+        productsFilteredData: Object.values(this.filterByProducts.participants),
+        rawProductsData : this.filterByProducts.rawProductsData
+      }
+    }).afterClosed().subscribe((data) => {
+      if (data) {
+        this.filterByProducts = data;
+        this.onDataSearch();
+      }
     })
   }
 
-  addSegments(){
+  addSegments() {
     const dialogRef = this.dialog.open(CreateSegmentsDialogComponent, {
       width: '80vw',
       height: '85vh',
@@ -1897,7 +2139,7 @@ export class ParticipantsAnalyticsComponent {
           name: param.name,
           value: param.value.replace(/\{\{name\}\}/g, name)
         }));
-        
+
         return {
           phonenumber,
           name,
@@ -2058,10 +2300,10 @@ export class ParticipantsAnalyticsComponent {
             // const phonenumber = metadata['phonenumber'];
             const name = metadata['name'];
             let cc = metadata['countryCode'] || metadata['countrycode'] || '';
-              cc = cc.trim();
-              if (cc && !cc.startsWith('+')) {
-                cc = '+' + cc;
-              }
+            cc = cc.trim();
+            if (cc && !cc.startsWith('+')) {
+              cc = '+' + cc;
+            }
             let phone = metadata['phonenumber']?.toString().trim() || '';
             phone = phone.replace(/^\+/, '');
             const phonenumber = cc ? `${cc}${phone}` : phone;
@@ -2071,7 +2313,7 @@ export class ParticipantsAnalyticsComponent {
               value: param.value.replace(/\{\{name\}\}/g, name)
             }));
             console.log(
-              phonenumber,"conslingggg fullnum"
+              phonenumber, "conslingggg fullnum"
             );
             return {
               phonenumber,
@@ -2085,7 +2327,7 @@ export class ParticipantsAnalyticsComponent {
           this.openSnackBar('No valid participants found', 'OK');
           return;
         }
-        const bulkPayload = { 
+        const bulkPayload = {
           type: 'whatsapp',
           templateName,
           participants
@@ -2120,9 +2362,9 @@ export class ParticipantsAnalyticsComponent {
           } else {
             snackBarMessage = `Failed to send messages`;
           }
-          
+
           this.openSnackBar(snackBarMessage, "OK");
-          
+
         } catch (error) {
           console.error('Failed to send bulk messages:', error);
           this.openSnackBar('Failed to send bulk messages', 'OK');
@@ -2134,7 +2376,7 @@ export class ParticipantsAnalyticsComponent {
   }
 
   addBulkActionPending() {
-    const selectedParticipants = this.selection.selected.map((e)=>e['profileid']);
+    const selectedParticipants = this.selection.selected.map((e) => e['profileid']);
     console.log(selectedParticipants)
 
     if (selectedParticipants.length === 0) {
@@ -2155,5 +2397,190 @@ export class ParticipantsAnalyticsComponent {
       }
     });
   }
-  
+
+  getProductString(product: any) {
+    if (!product) return '';
+
+    let comparison = product?.comparison;
+
+    if (comparison == 'equalto') {
+      comparison = 'Equal To';
+    } else if (comparison == 'gtoreqto') {
+      comparison = 'Greater than or Equal To';
+    } else if (comparison == 'lsoreqto') {
+      comparison = 'Less than or Equal To';
+    }
+
+    return `${this.productMap[product?.productId]?.product} ${comparison} ${product?.count}`;
+  }
+
+  unSelectConsumedProduct(productId: string) {
+    const data = Object.assign({}, this.filterByProducts);
+    data.consumed = data.consumed.filter((p) => p.productId !== productId);
+    this.filterProductsFromFilters(data)
+    this.onDataSearch();
+  }
+
+  unSelectUnconsumedProduct(productId: string) {
+    const data = Object.assign({}, this.filterByProducts);
+    data.unconsumed = data.unconsumed.filter((p) => p.productId !== productId);
+    this.filterProductsFromFilters(data)
+    this.onDataSearch();
+  }
+
+  filterProductsFromFilters(data: any) {
+    const consumed = data.consumed;
+    const unconsumed = data.unconsumed;
+    const participants = {};
+    if (data?.rawProductsData) {
+      data?.rawProductsData.forEach((p) => {
+        let matchesConsumed = consumed.length === 0;
+        let matchesUnconsumed = unconsumed.length === 0;
+
+        if (consumed.length > 0) {
+          matchesConsumed = consumed.every(filter => {
+            const productData = p.products[filter.productId];
+
+            if (!productData) return false;
+
+            if (filter.comparison === 'equalto') {
+              return productData.consumedCount == filter.count;
+            } else if (filter.comparison === 'groreqto') {
+              return productData.consumedCount >= filter.count;
+            } else if (filter.comparison === 'lsoreqto') {
+              return productData.consumedCount <= filter.count;
+            }
+            return productData.consumedCount == filter.count;
+          });
+        }
+
+        // Check unconsumed filters (only if unconsumed filters exist)
+        if (unconsumed.length > 0) {
+          matchesUnconsumed = unconsumed.every(filter => {
+            const productData = p.products[filter.productId];
+            if (!productData) return false;
+
+            if (filter.comparison === 'equalto') {
+              return productData.unConsumedCount == filter.count;
+            } else if (filter.comparison === 'groreqto') {
+              return productData.unConsumedCount >= filter.count;
+            } else if (filter.comparison === 'lsoreqto') {
+              return productData.unConsumedCount <= filter.count;
+            }
+
+            return productData.unConsumedCount == filter.count;
+          });
+        }
+
+        if (matchesConsumed && matchesUnconsumed) {
+          participants[p['profileId']] = p;
+        }
+      })
+    }
+    data.participants = participants;
+    this.filterByProducts = data;
+  }
+
+  // rawProductsData
+
+  // private async workshopmessage(result: any) {
+  //   if (result?.action === 'sent') {
+  //     if (result.type === 'mail') {
+  //       alert("Only Whatsapp")
+  //     } else if (result.type === 'whatsapp') {
+  //       console.log(this.selection.selected, 'WhatsApp participants');
+  //       console.log('WhatsApp message:', result);
+
+  //       const { templateName, customParams } = result;
+
+  //       let successfulSends = 0;
+  //       let failedSends = 0;
+
+  //       for (let i = 0; i < this.selection.selected.length; i++) {
+  //         const metadata = this.selection.selected[i];
+  //         if (!metadata) continue;
+
+  //         const phonenumber = metadata['phonenumber'];
+  //         const name = metadata['name'];
+
+  //         if (!phonenumber || !name) continue;
+  //         const processedParams = customParams.map((param: any) => {
+  //           return {
+  //             name: param.name,
+  //             value: param.value.replace(/\{\{name\}\}/g, name)
+  //           };
+  //         });
+
+  //         const payload = { 
+  //           type: 'whatsapp',
+  //           phonenumber, 
+  //           name,
+  //           templateName,
+  //           customParams: processedParams
+  //         };
+
+  //         let url: string = '';
+
+  //         if (environment.firebase.projectId === 'test-environment-841c3') {
+  //           console.log('Test Env 1');
+  //           url = 'https://us-central1-test-environment-841c3.cloudfunctions.net/workshopprogressmessage';
+  //         } else if (environment.firebase.projectId === 'starlabs-test') {
+  //           console.log('Test Env 2');
+  //           url = 'https://us-central1-starlabs-test.cloudfunctions.net/workshopprogressmessage';
+  //         } else if (
+  //           environment.firebase.projectId === 'fir-sample-aae4a'
+  //         ) {
+  //           console.log('Production Env');
+  //           url = 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/workshopprogressmessage';
+  //         }
+
+  //         try {
+  //           const response = await firstValueFrom(
+  //             this.http.post(url, payload, { responseType: 'text' })
+  //           );
+  //           console.log(`sent to ${name} (${phonenumber}):`, response);
+  //           successfulSends++;
+  //         } catch (error) {
+  //           console.error(`Failed to ${phonenumber}:`, error);
+  //           failedSends++; 
+  //         }
+  //       }
+
+  //       const totalParticipants = this.selection.selected.length;
+  //       let snackBarMessage = '';
+
+  //       if (successfulSends === totalParticipants) {
+  //         snackBarMessage = `WhatsApp message successfully sent to all ${totalParticipants} participants!`;
+  //       } else if (successfulSends > 0) {
+  //         snackBarMessage = `Sent to ${successfulSends} participants. Failed to send to ${failedSends}.`;
+  //       } else {
+  //         snackBarMessage = `failed to send...`;
+  //       }
+  //       this.openSnackBar(snackBarMessage, "OK");
+  //     }
+  //   } else if (result?.action === 'closed') {
+  //     console.log('closed');
+  //   }
+  // }
 }
+
+
+// listofcities:any [] = []
+// paymentplanlist:any [] = []
+// countrylist:any [] = []
+// sourcelist:any [] = []
+// contractlist:any [] = []
+// emistatuslist:any [] = []
+
+// classify
+// const classifyCollRef = collection(this.firestore,"classify")
+// getDocs(classifyCollRef).then(snap => {
+//   for (const element of snap.docs) {
+//     if(element.id === "cities") this.listofcities = element.data()['names']
+//     else if(element.id === "paymentplan") this.paymentplanlist = element.data()['names']
+//     else if(element.id === "country") this.countrylist = element.data()['names']
+//     else if(element.id === "originalsource") this.sourcelist = element.data()['names']
+//     else if(element.id === "contract") this.contractlist = element.data()['names']
+//     else if(element.id === "emistatus") this.emistatuslist = element.data()['names']
+//   }
+// })

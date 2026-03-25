@@ -640,7 +640,7 @@ export class AppointmentStudioComponent {
 
       await getDoc(roomDoc).then(async doc =>{
         if(!doc.exists()){
-          var roomData = {
+          await this.guard.createOpenViduRoom({
             active: true,
             createddate: serverTimestamp(),
             sessiontype: "appointment",
@@ -651,9 +651,23 @@ export class AppointmentStudioComponent {
             title: `${this.mapProfile[appointment["bookedby"].id]} - ${this.mapAppointment[appointment["appointment"].id]} (${appointment["hosts"].map(e => this.mapProfile[e.id]).join(", ")})`,
             metadata: {
               appointmentid: appointment["docid"]
-            }
-          }
-          await setDoc(roomDoc, roomData)
+            },
+          })
+
+          // var roomData = {
+          //   active: true,
+          //   createddate: serverTimestamp(),
+          //   sessiontype: "appointment",
+          //   sessionid: appointment["docid"],
+          //   roomid: appointment["docid"],
+          //   hosts: appointment["hosts"].map(e => e.id),
+          //   participantid: appointment["bookedby"].id,
+          //   title: `${this.mapProfile[appointment["bookedby"].id]} - ${this.mapAppointment[appointment["appointment"].id]} (${appointment["hosts"].map(e => this.mapProfile[e.id]).join(", ")})`,
+          //   metadata: {
+          //     appointmentid: appointment["docid"]
+          //   }
+          // }
+          // await setDoc(roomDoc, roomData)
         }
         else{
           if(!doc.data()["active"]){
