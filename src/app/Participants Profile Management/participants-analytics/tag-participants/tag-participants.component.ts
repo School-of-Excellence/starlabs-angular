@@ -68,7 +68,7 @@ export class TagParticipantsComponent {
   selectedTagToRemove = null;
   selectedTagToReplace = null;
   selectedTagReplaceWith = null;
-  tagsForOptions = ['live event', 'queue event', 'video ask'];
+  tagsForOptions = ['live event', 'queue event', 'video ask', 'journey coach'];
   newTagsFor: string[] = [];
 
   loggedInProfileid
@@ -446,8 +446,8 @@ export class TagParticipantsComponent {
           var addLog = {
             logid: addLogId,
             profileid: participant.profileid,
-            type: "removed",
-            tags: [oldTag],
+            type: "added",
+            tags: [newTag],
             updated: new Date(),
             updatedby: this.loggedInProfileid,
             source: "bulk"
