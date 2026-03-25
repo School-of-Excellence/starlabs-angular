@@ -13,6 +13,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { MarkAppointmentStatusComponent } from '../mark-appointment-status/mark-appointment-status.component';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
+import { MatSlideToggleModule } from "@angular/material/slide-toggle";
 
 @Component({
   selector: 'app-appointment-studio',
@@ -20,8 +21,9 @@ import { LoadingProgressComponent } from '../../loading-progress/loading-progres
     MatIconModule,
     MatButtonModule,
     MatCardModule,
-    CommonModule
-  ],
+    CommonModule,
+    MatSlideToggleModule,
+],
   templateUrl: './appointment-studio.component.html',
   styleUrl: './appointment-studio.component.css'
 })
@@ -753,6 +755,13 @@ export class AppointmentStudioComponent {
       window.open(url, "_blank");
     }
     */
+  }
+
+  onPlatformChange(enableOpenVidu, appointmentData){
+    console.log(enableOpenVidu, appointmentData)
+    updateDoc(doc(this.firestore, "appointments", appointmentData["docid"]), {
+      platform: enableOpenVidu ? "openvidu" : "zoom"
+    })
   }
 
 }
