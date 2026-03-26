@@ -16,7 +16,8 @@
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">
       <button mat-menu-item [mat-menu-trigger-for]="playlist">Playlist</button>
-      <button mat-menu-item *ngIf="workshopadmin.includes(loggedInProfileId)" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages (Workshop Only)</button>
+      <!-- <button mat-menu-item *ngIf="workshopadmin.includes(loggedInProfileId)" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages (Workshop Only)</button> -->
+      <button mat-menu-item (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages</button>
       <!-- <button mat-menu-item [mat-menu-trigger-for]="email">Email</button> -->
       <!-- <button mat-menu-item (click)="exportWithFilters()">Export With Filters</button> -->
       <!-- <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Send Wati Messages</button> -->
