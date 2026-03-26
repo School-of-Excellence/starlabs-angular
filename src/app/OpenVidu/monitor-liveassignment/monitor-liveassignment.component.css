@@ -20,8 +20,8 @@
 /* Video tile with aspect ratio */
 .video-tile {
   position: relative;
-  width: 200px;
-  height: 150px;
+  width: 350px;
+  height: 300px;
   border-radius: 8px;
   overflow: hidden;
   background: #000;

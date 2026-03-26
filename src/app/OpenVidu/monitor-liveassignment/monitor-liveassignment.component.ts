@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, signal } from '@angular/core';
-import { lastValueFrom, Subject, takeUntil } from 'rxjs';
+import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { LocalVideoTrack, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent } from 'livekit-client';
 import { collection, collectionData, Firestore, limit, query, where } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
@@ -85,7 +85,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
         }
       })
 
-      this.loadInfrastructureStatus();
+      if(roles["developer"]) this.loadInfrastructureStatus();
     })
   }
 
@@ -195,23 +195,55 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
     } catch (error: any) {
       // Handle connection errors gracefully
+      console.log(error)
       console.log('There was an error connecting to the room:', error?.error?.errorMessage || error?.message || error);
       this.leaveRoom(roomName);
     }
   }
 
   // Get LiveKit Token
-  async getToken(roomName: string) {
-    const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`;
+  async getToken(roomID: string) {
+    // const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`;
 
-    const participantName = this.loggedinProfileRole["name"] + this.ghostID
-    const participantId = this.loggedinProfileid + this.ghostID
+    // const participantName = this.loggedinProfileRole["name"] + this.ghostID
+    // const participantId = this.loggedinProfileid + this.ghostID
 
-    const response = await lastValueFrom(
-      this.http.post<{url: string, token: string }>(url, { roomName, participantName, participantId })
-    );
+    // const response = await lastValueFrom(
+    //   this.http.post<{url: string, token: string }>(url, { roomName, participantName, participantId })
+    // );
 
-    return response;
+    // return response;
+
+    const roomName = roomID;
+    const participantId = (this.loggedinProfileid || `user-${Date.now()}`) + this.ghostID;
+    const participantName = (this.loggedinProfileRole["name"] || 'Guest') + this.ghostID;
+
+    console.log({roomName, participantId, participantName})
+    
+    let retryCount = 0;
+
+    while (retryCount <= 3) {
+      try {
+        return await firstValueFrom(
+          this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
+            roomName,
+            participantName,
+            participantId
+          })
+        );
+      } catch (error: any) {
+        if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
+          retryCount++;
+          if (retryCount > 3) throw new Error('System at capacity');
+          
+          const wait = error.error?.retryAfter || 60;
+          console.log(`Scaling... retry in ${wait}s`);
+          await new Promise(r => setTimeout(r, wait * 1000));
+        } else {
+          throw error;
+        }
+      }
+    }
   }
 
   async endCall(RoomId){

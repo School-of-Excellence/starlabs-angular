@@ -47,3 +47,4 @@ ticket-management/
 # Firebase
 .firebase
 src/environments
+src/firebase-messaging-sw.js

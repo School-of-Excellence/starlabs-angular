@@ -2402,7 +2402,7 @@ export class DynamicStudioComponent {
 
       await getDoc(roomDoc).then(async doc =>{
         if(!doc.exists()){
-          var roomData = {
+          await this.guard.createOpenViduRoom({
             active: true,
             createddate: serverTimestamp(),
             sessiontype: "live assignment",
@@ -2414,8 +2414,22 @@ export class DynamicStudioComponent {
             metadata: {
               queueid: this.ongoingQueue["docid"]
             }
-          }
-          await setDoc(roomDoc, roomData)
+          })
+
+          // var roomData = {
+          //   active: true,
+          //   createddate: serverTimestamp(),
+          //   sessiontype: "live assignment",
+          //   sessionid: liveAssignmentID,
+          //   roomid: liveAssignmentID,
+          //   hosts: this.liveAssignment["pairing"],
+          //   participantid: this.liveAssignment["participantid"],
+          //   title: `${this.mapProfile[this.liveAssignment["token"]?.profile_id]} - ${this.liveAssignment["stagename"]} (${this.liveAssignment["pairing"].map(e => this.mapProfile[e]).join(", ")})`,
+          //   metadata: {
+          //     queueid: this.ongoingQueue["docid"]
+          //   }
+          // }
+          // await setDoc(roomDoc, roomData)
         }
         else{
           if(!doc.data()["active"]){

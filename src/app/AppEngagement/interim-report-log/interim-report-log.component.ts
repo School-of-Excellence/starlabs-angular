@@ -492,6 +492,31 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     }
   }
 
+  toggleCritical(row: any) {
+    const newValue = !row.critical;
+    row.critical = newValue;
+
+    const collectionName = this.collectionMap[this.activeTab];
+    const docRef = doc(this.firestore, collectionName, row.id);
+
+    if (newValue) {
+      row.criticaldetails = { user: this.loggedInProfileId, time: new Date() };
+      updateDoc(docRef, {
+        critical: true,
+        criticaldetails: {
+          user: this.loggedInProfileId,
+          time: serverTimestamp()
+        }
+      });
+    } else {
+      row.criticaldetails = null;
+      updateDoc(docRef, {
+        critical: false,
+        criticaldetails: null
+      });
+    }
+  }
+
   toggleOpportunity(row: any) {
     const newValue = !row.opportunity;
     row.opportunity = newValue;

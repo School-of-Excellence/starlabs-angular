@@ -96,7 +96,7 @@ export class ListOpenviduRoomComponent {
 
   joinRoom_Queue(assignment){
     console.log(assignment)
-    if(this.openViduStudio.includes(assignment["studioid"]) && false){
+    if(this.openViduStudio.includes(assignment["studioid"])){
       console.log("OpenVidu")
       var hostname = window.location.origin
       window.open(`${hostname}/joinroom/${assignment["docid"]}`, '_blank')
@@ -124,7 +124,7 @@ export class ListOpenviduRoomComponent {
 
       await getDoc(roomDoc).then(async doc =>{
         if(!doc.exists()){
-          var roomData = {
+          await this.guard.createOpenViduRoom({
             active: true,
             createddate: serverTimestamp(),
             sessiontype: "appointment",
@@ -135,9 +135,23 @@ export class ListOpenviduRoomComponent {
             title: `${this.mapProfile[appointment["bookedby"].id]} - ${this.mapAppointmenttype[appointment["appointment"].id]} (${appointment["hosts"].map(e => this.mapProfile[e.id]).join(", ")})`,
             metadata: {
               appointmentid: appointment["docid"]
-            }
-          }
-          await setDoc(roomDoc, roomData)
+            },
+          })
+
+          // var roomData = {
+          //   active: true,
+          //   createddate: serverTimestamp(),
+          //   sessiontype: "appointment",
+          //   sessionid: appointment["docid"],
+          //   roomid: appointment["docid"],
+          //   hosts: appointment["hosts"].map(e => e.id),
+          //   participantid: appointment["bookedby"].id,
+          //   title: `${this.mapProfile[appointment["bookedby"].id]} - ${this.mapAppointmenttype[appointment["appointment"].id]} (${appointment["hosts"].map(e => this.mapProfile[e.id]).join(", ")})`,
+          //   metadata: {
+          //     appointmentid: appointment["docid"]
+          //   }
+          // }
+          // await setDoc(roomDoc, roomData)
         }
         else{
           if(!doc.data()["active"]){
