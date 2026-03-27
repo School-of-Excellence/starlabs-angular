@@ -230,7 +230,7 @@ export class JourneycoachDuplicateComponent {
     salesLeads: false,
     metadata: false,
     journeyProduct: false,
-    customerSupport: false,
+    // customerSupport: false,
     modes: false
   };
 
@@ -519,6 +519,34 @@ export class JourneycoachDuplicateComponent {
   isTagProfilesDialogOpen: boolean = false;
   selectedTagName: string = '';
   selectedTagProfiles: any[] = [];
+  evolutionProgressData: {
+    keys: string[];
+    bands: {
+      label: string;
+      range: [number, number];
+      profiles: Record<string, { profileId: string; profileName: string; total: number; pct: number }[]>;
+    }[];
+    totals: Record<string, number>;
+  } | null = null;
+
+  // ── EP dialog state ──────────────────────────────
+  isEpDialogOpen = false;
+  epDialogTitle = '';
+  epDialogSubtitle = '';
+  epDialogBandIdx = 0;
+  epDialogProfiles: { profileId: string; profileName: string; total: number; pct: number }[] = [];
+
+  subscriptionMatrix: {
+    journeys: { id: string; label: string }[];
+    months: { ym: string; label: string }[];
+    cells: Record<string, Record<string, { count: number; docs: any[] }>>;
+    monthTotals: Record<string, number>;
+    journeyTotals: Record<string, number>;
+  } | null = null;
+
+  isSubDialogOpen = false;
+  subDialogTitle = '';
+  subDialogDocs: any[] = [];
 
   constructor(
     public firestore: Firestore,
@@ -529,7 +557,7 @@ export class JourneycoachDuplicateComponent {
     private dialog: MatDialog,
     private router: Router
   ) {
-    this.guard.getRoles().then(roles =>{
+    this.guard.getRoles().then(roles => {
       this.loggedInProfileid = roles["profile_ref"].id
     })
     this.filterForm = this.fb.group({
@@ -601,7 +629,6 @@ export class JourneycoachDuplicateComponent {
       });
 
       this.fetchData();
-      await this.getModes();
 
       this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map);
     } catch (error) {
@@ -732,7 +759,7 @@ export class JourneycoachDuplicateComponent {
       salesLeads: false,
       metadata: false,
       journeyProduct: false,
-      customerSupport: false,
+      // customerSupport: false,
       modes: false
     }
 
@@ -740,8 +767,9 @@ export class JourneycoachDuplicateComponent {
     this.initializeColumns();
     this.loadDialogConfig();
     this.loadCurrentSalesLeads();
-    this.loadCustomerSupport();
+    // this.loadCustomerSupport();
     this.loadModes();
+    this.getModes();
   }
 
   // Function to initialize columns for each column 
@@ -883,7 +911,7 @@ export class JourneycoachDuplicateComponent {
       { key: 'pp_totalpaid', header: 'Amount Paid', width: '5%', type: 'currency', prefix: '₹' },
       { key: 'balance', header: 'Balance', width: '5%', type: 'currency', prefix: '₹' },
       { key: 'journeyplan', header: 'Journey Plan', width: '15%', type: 'text' },
-      { key: 'markcoach', header: 'Mark JC Complete', width: '10%', type: 'text' }, 
+      { key: 'markcoach', header: 'Mark JC Complete', width: '10%', type: 'text' },
       { key: 'profiletags', header: 'Tag', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
@@ -1321,8 +1349,8 @@ export class JourneycoachDuplicateComponent {
         let avgToASVList = [];
         let avgGSVToASVList = [];
 
-        let salesData = salesleads.filter((e)=> !(e['journey'] === 'RXvsMYoK0g4SstvDDURZ' && e['email']?.toLowerCase().includes('soexcellence.com')));
-        
+        let salesData = salesleads.filter((e) => !(e['journey'] === 'RXvsMYoK0g4SstvDDURZ' && e['email']?.toLowerCase().includes('soexcellence.com')));
+
         try {
           for (let i = 0; i < salesData.length; i++) {
             const salesLeadsData = salesData[i];
@@ -2000,45 +2028,34 @@ export class JourneycoachDuplicateComponent {
         }
       })
 
-      // this.subscriptions['journeyproduct3'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("onboarded", "==", true))).subscribe((onboarded) => {
-      //   if (onboarded.length != 0) {
-      //     // last 30days 
-      //     let last30days = new Date();
-      //     last30days.setDate(currentDate.getDate() - 30);
-      //     let tempArray7 = [];
-      //     let tempArray8 = [];
-      //     for (let i = 0; i < onboarded.length; i++) {
-      //       const onboardedData = onboarded[i];
-      //       const profileId = onboardedData['profileid'];
-      //       const activeProduct = this.mapMetaData[profileId]?.['activeproduct'];
-      //       const consumedProduct = this.mapMetaData[profileId]?.['consumedproducts'];
-      //       const journeyStatus = onboardedData['journeystatus'];
+      getDocs(query(
+        collection(this.firestore, "participantjourneyproduct"),
+        where("journeystatus", "in", ['ongoing', "completed"]),
+        where("subscriptionend", ">=", startdate),
+        where("subscriptionend", "<=", enddate)
+      )).then((snapshot) => {
 
-      //       if ((journeyStatus === 'initiated' || journeyStatus === 'ongoing') && (!consumedProduct || consumedProduct.length === 0)) {
-      //         // if (onboardedData['purchasedate']?.toDate() >= new Date('2025-01-01') && ([null, undefined, ""].includes(onboardedData['journeyref']) || onboardedData['journeyref'].id != 'InLXMl7OBAqlDTZcXwK0')) {
-      //           if (this.mapMetaData[onboardedData['profileid']]?.['activeproduct']?.length == 0) {
-      //             if (onboardedData['purchasedate']?.toDate() >= last30days) {
-      //               tempArray7.push(onboardedData);
-      //             } else {
-      //               tempArray8.push(onboardedData);
-      //             }
-      //           }
-      //         // }
-      //       }
-      //       if (i + 1 == onboarded.length) {
-      //         this.originalData['lessthan30daysjourneynotstarted'].data = tempArray7;
-      //         this.originalData['lessthan30daysjourneynotstarted'].count = tempArray7.length;
+        // monthMap: { '2025-03': { 'journeyRefId': { label: string, count: number, docs: any[] } } }
+        const monthMap: Record<string, Record<string, { label: string; count: number; docs: any[] }>> = {};
 
-      //         this.originalData['morethan30daysjourneynotstarted'].data = tempArray8;
-      //         this.originalData['morethan30daysjourneynotstarted'].count = tempArray8.length;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const end = data['subscriptionend']?.toDate ? data['subscriptionend'].toDate() : new Date(data['subscriptionend']);
+          const ym = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+          const journeyId = data['journeyref']?.id ?? data['journeyref'] ?? 'Unknown';
+          const journeyLabel = this.mapjourneyname?.[journeyId] ?? journeyId;
 
-      //         this.originalData['alljourneynotstarted'].data = [...tempArray7, ...tempArray8];
-      //         this.originalData['alljourneynotstarted'].count = [...tempArray7, ...tempArray8].length;
-      //         this.updateTableDataIfOpen(this.tableType);
-      //       }
-      //     }
-      //   }
-      // })
+          if (!monthMap[ym]) monthMap[ym] = {};
+          if (!monthMap[ym][journeyId]) monthMap[ym][journeyId] = { label: journeyLabel, count: 0, docs: [] };
+
+          monthMap[ym][journeyId].count++;
+          monthMap[ym][journeyId].docs.push({ id: doc.id, ...data });
+        });
+
+        // Convert to sorted array for template
+        this.buildSubscriptionMatrix(snapshot)
+      });
+
       this.updateTableDataIfOpen(this.tableType);
       this.loadingStates.journeyProduct = true;
       this.checkAllDataLoaded();
@@ -2049,216 +2066,216 @@ export class JourneycoachDuplicateComponent {
   }
 
   // Function to load customer support tickets 
-  async loadCustomerSupport() {
-    this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
-      if (tickets.length != 0) {
-        const currentMonthStart = new Date(this.startDate);
-        currentMonthStart.setHours(0, 0, 0, 0);
+  // async loadCustomerSupport() {
+  //   this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
+  //     if (tickets.length != 0) {
+  //       const currentMonthStart = new Date(this.startDate);
+  //       currentMonthStart.setHours(0, 0, 0, 0);
 
-        const currentMonthEnd = new Date(this.endDate);
-        currentMonthEnd.setHours(23, 59, 59, 999);
+  //       const currentMonthEnd = new Date(this.endDate);
+  //       currentMonthEnd.setHours(23, 59, 59, 999);
 
-        currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
-        currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
+  //       currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
+  //       currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
 
-        let startdate = Timestamp.fromDate(currentMonthStart).toDate();
-        let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
+  //       let startdate = Timestamp.fromDate(currentMonthStart).toDate();
+  //       let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
 
-        this.originalData['eventtickets'].count = 0
-        this.originalData['eventtickets'].data = []
-        this.originalData['eventticketnew'].count = 0
-        this.originalData['eventticketnew'].data = []
-        this.originalData['eventticketresponded'].count = 0
-        this.originalData['eventticketresponded'].data = []
-        this.originalData['eventticketsclosed'].count = 0
-        this.originalData['eventticketsclosed'].data = []
+  //       this.originalData['eventtickets'].count = 0
+  //       this.originalData['eventtickets'].data = []
+  //       this.originalData['eventticketnew'].count = 0
+  //       this.originalData['eventticketnew'].data = []
+  //       this.originalData['eventticketresponded'].count = 0
+  //       this.originalData['eventticketresponded'].data = []
+  //       this.originalData['eventticketsclosed'].count = 0
+  //       this.originalData['eventticketsclosed'].data = []
 
-        this.originalData['journeytickets'].count = 0
-        this.originalData['journeytickets'].data = []
-        this.originalData['journeyticketnew'].count = 0
-        this.originalData['journeyticketnew'].data = []
-        this.originalData['journeyticketresponded'].count = 0
-        this.originalData['journeyticketresponded'].data = []
-        this.originalData['journeyticketsclosed'].count = 0
-        this.originalData['journeyticketsclosed'].data = []
+  //       this.originalData['journeytickets'].count = 0
+  //       this.originalData['journeytickets'].data = []
+  //       this.originalData['journeyticketnew'].count = 0
+  //       this.originalData['journeyticketnew'].data = []
+  //       this.originalData['journeyticketresponded'].count = 0
+  //       this.originalData['journeyticketresponded'].data = []
+  //       this.originalData['journeyticketsclosed'].count = 0
+  //       this.originalData['journeyticketsclosed'].data = []
 
-        this.originalData['cancellationtickets'].count = 0
-        this.originalData['cancellationtickets'].data = []
-        this.originalData['cancellationticketnew'].count = 0
-        this.originalData['cancellationticketnew'].data = []
-        this.originalData['cancellationticketresponded'].count = 0
-        this.originalData['cancellationticketresponded'].data = []
-        this.originalData['cancellationticketsclosed'].count = 0
-        this.originalData['cancellationticketsclosed'].data = []
+  //       this.originalData['cancellationtickets'].count = 0
+  //       this.originalData['cancellationtickets'].data = []
+  //       this.originalData['cancellationticketnew'].count = 0
+  //       this.originalData['cancellationticketnew'].data = []
+  //       this.originalData['cancellationticketresponded'].count = 0
+  //       this.originalData['cancellationticketresponded'].data = []
+  //       this.originalData['cancellationticketsclosed'].count = 0
+  //       this.originalData['cancellationticketsclosed'].data = []
 
-        this.originalData['financetickets'].count = 0
-        this.originalData['financetickets'].data = []
-        this.originalData['financeticketnew'].count = 0
-        this.originalData['financeticketnew'].data = []
-        this.originalData['financeticketresponded'].count = 0
-        this.originalData['financeticketresponded'].data = []
-        this.originalData['financeticketsclosed'].count = 0
-        this.originalData['financeticketsclosed'].data = []
+  //       this.originalData['financetickets'].count = 0
+  //       this.originalData['financetickets'].data = []
+  //       this.originalData['financeticketnew'].count = 0
+  //       this.originalData['financeticketnew'].data = []
+  //       this.originalData['financeticketresponded'].count = 0
+  //       this.originalData['financeticketresponded'].data = []
+  //       this.originalData['financeticketsclosed'].count = 0
+  //       this.originalData['financeticketsclosed'].data = []
 
-        this.originalData['referraltickets'].count = 0
-        this.originalData['referraltickets'].data = []
-        this.originalData['referralticketnew'].count = 0
-        this.originalData['referralticketnew'].data = []
-        this.originalData['referralticketresponded'].count = 0
-        this.originalData['referralticketresponded'].data = []
-        this.originalData['referralticketsclosed'].count = 0
-        this.originalData['referralticketsclosed'].data = []
+  //       this.originalData['referraltickets'].count = 0
+  //       this.originalData['referraltickets'].data = []
+  //       this.originalData['referralticketnew'].count = 0
+  //       this.originalData['referralticketnew'].data = []
+  //       this.originalData['referralticketresponded'].count = 0
+  //       this.originalData['referralticketresponded'].data = []
+  //       this.originalData['referralticketsclosed'].count = 0
+  //       this.originalData['referralticketsclosed'].data = []
 
-        try {
-          for (let i = 0; i < tickets.length; i++) {
-            const ticketdata = tickets[i];
-            if (ticketdata['status']?.status.toLowerCase() == 'open') {
-              if (ticketdata['category'] == 'Events & Process') {
-                this.originalData['eventtickets'].count++;
-                this.originalData['eventtickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['eventticketnew'].count++;
-                  this.originalData['eventticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['eventticketresponded'].count++;
-                  this.originalData['eventticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Journey Related') {
-                this.originalData['journeytickets'].count++;
-                this.originalData['journeytickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['journeyticketnew'].count++;
-                  this.originalData['journeyticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['journeyticketresponded'].count++;
-                  this.originalData['journeyticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
-                this.originalData['cancellationtickets'].count++;
-                this.originalData['cancellationtickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['cancellationticketnew'].count++;
-                  this.originalData['cancellationticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['cancellationticketresponded'].count++;
-                  this.originalData['cancellationticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Finance & Accounts') {
-                this.originalData['financetickets'].count++;
-                this.originalData['financetickets'].data.push(ticketdata);
+  //       try {
+  //         for (let i = 0; i < tickets.length; i++) {
+  //           const ticketdata = tickets[i];
+  //           if (ticketdata['status']?.status.toLowerCase() == 'open') {
+  //             if (ticketdata['category'] == 'Events & Process') {
+  //               this.originalData['eventtickets'].count++;
+  //               this.originalData['eventtickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['eventticketnew'].count++;
+  //                 this.originalData['eventticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['eventticketresponded'].count++;
+  //                 this.originalData['eventticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Journey Related') {
+  //               this.originalData['journeytickets'].count++;
+  //               this.originalData['journeytickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['journeyticketnew'].count++;
+  //                 this.originalData['journeyticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['journeyticketresponded'].count++;
+  //                 this.originalData['journeyticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
+  //               this.originalData['cancellationtickets'].count++;
+  //               this.originalData['cancellationtickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['cancellationticketnew'].count++;
+  //                 this.originalData['cancellationticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['cancellationticketresponded'].count++;
+  //                 this.originalData['cancellationticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Finance & Accounts') {
+  //               this.originalData['financetickets'].count++;
+  //               this.originalData['financetickets'].data.push(ticketdata);
 
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['financeticketnew'].count++;
-                  this.originalData['financeticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['financeticketresponded'].count++;
-                  this.originalData['financeticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Referrals & Upgrades') {
-                this.originalData['referraltickets'].count++;
-                this.originalData['referraltickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['referralticketnew'].count++;
-                  this.originalData['referralticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['referralticketresponded'].count++;
-                  this.originalData['referralticketresponded'].data.push(ticketdata);
-                }
-              }
-            } else if (ticketdata['status']?.status.toLowerCase() == 'closed' && (ticketdata['status']?.date?.toDate() >= startdate && ticketdata['status']?.date?.toDate() <= enddate)) {
-              if (ticketdata['category'] == 'Events & Process') {
-                this.originalData['eventticketsclosed'].count++;
-                this.originalData['eventticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Journey Related') {
-                this.originalData['journeyticketsclosed'].count++;
-                this.originalData['journeyticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
-                this.originalData['cancellationticketsclosed'].count++;
-                this.originalData['cancellationticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Finance & Accounts') {
-                this.originalData['financeticketsclosed'].count++;
-                this.originalData['financeticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Referrals & Upgrades') {
-                this.originalData['referralticketsclosed'].count++;
-                this.originalData['referralticketsclosed'].data.push(ticketdata);
-              }
-            }
-            // Event tickets closed
-            const eventClosed = this.originalData['eventticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['eventticketsclosed'].avg = eventClosed / this.originalData['eventticketsclosed'].data.length;
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['financeticketnew'].count++;
+  //                 this.originalData['financeticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['financeticketresponded'].count++;
+  //                 this.originalData['financeticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Referrals & Upgrades') {
+  //               this.originalData['referraltickets'].count++;
+  //               this.originalData['referraltickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['referralticketnew'].count++;
+  //                 this.originalData['referralticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['referralticketresponded'].count++;
+  //                 this.originalData['referralticketresponded'].data.push(ticketdata);
+  //               }
+  //             }
+  //           } else if (ticketdata['status']?.status.toLowerCase() == 'closed' && (ticketdata['status']?.date?.toDate() >= startdate && ticketdata['status']?.date?.toDate() <= enddate)) {
+  //             if (ticketdata['category'] == 'Events & Process') {
+  //               this.originalData['eventticketsclosed'].count++;
+  //               this.originalData['eventticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Journey Related') {
+  //               this.originalData['journeyticketsclosed'].count++;
+  //               this.originalData['journeyticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
+  //               this.originalData['cancellationticketsclosed'].count++;
+  //               this.originalData['cancellationticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Finance & Accounts') {
+  //               this.originalData['financeticketsclosed'].count++;
+  //               this.originalData['financeticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Referrals & Upgrades') {
+  //               this.originalData['referralticketsclosed'].count++;
+  //               this.originalData['referralticketsclosed'].data.push(ticketdata);
+  //             }
+  //           }
+  //           // Event tickets closed
+  //           const eventClosed = this.originalData['eventticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['eventticketsclosed'].avg = eventClosed / this.originalData['eventticketsclosed'].data.length;
 
-            // Journey tickets closed
-            const journeyClosed = this.originalData['journeyticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['journeyticketsclosed'].avg = journeyClosed / this.originalData['journeyticketsclosed'].data.length;
+  //           // Journey tickets closed
+  //           const journeyClosed = this.originalData['journeyticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['journeyticketsclosed'].avg = journeyClosed / this.originalData['journeyticketsclosed'].data.length;
 
-            // Cancellation tickets closed
-            const cancellationClosed = this.originalData['cancellationticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['cancellationticketsclosed'].avg = cancellationClosed / this.originalData['cancellationticketsclosed'].data.length;
+  //           // Cancellation tickets closed
+  //           const cancellationClosed = this.originalData['cancellationticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['cancellationticketsclosed'].avg = cancellationClosed / this.originalData['cancellationticketsclosed'].data.length;
 
-            //Finance tickets closed
-            const bigClosed = this.originalData['financeticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['financeticketsclosed'].avg = bigClosed / this.originalData['financeticketsclosed'].data.length;
+  //           //Finance tickets closed
+  //           const bigClosed = this.originalData['financeticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['financeticketsclosed'].avg = bigClosed / this.originalData['financeticketsclosed'].data.length;
 
-            // Referral tickets closed
-            const referralClosed = this.originalData['referralticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['referralticketsclosed'].avg = referralClosed / this.originalData['referralticketsclosed'].data.length;
+  //           // Referral tickets closed
+  //           const referralClosed = this.originalData['referralticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['referralticketsclosed'].avg = referralClosed / this.originalData['referralticketsclosed'].data.length;
 
-            if (i + 1 == tickets.length) {
-              this.loadingStates.customerSupport = true;
-              this.checkAllDataLoaded();
-            }
-          }
-        } catch (error) {
-          this.loadingStates.customerSupport = true;
-          this.checkAllDataLoaded();
-        }
-      } else {
-        this.loadingStates.customerSupport = true;
-        this.checkAllDataLoaded();
-      }
-    })
+  //           if (i + 1 == tickets.length) {
+  //             this.loadingStates.customerSupport = true;
+  //             this.checkAllDataLoaded();
+  //           }
+  //         }
+  //       } catch (error) {
+  //         this.loadingStates.customerSupport = true;
+  //         this.checkAllDataLoaded();
+  //       }
+  //     } else {
+  //       this.loadingStates.customerSupport = true;
+  //       this.checkAllDataLoaded();
+  //     }
+  //   })
 
-  }
+  // }
 
   // Function to load modes from participant products 
   async loadModes() {
@@ -2594,10 +2611,10 @@ export class JourneycoachDuplicateComponent {
             cancelled: false,
           }).then(() => {
             console.log("Onboard Marked Successfully");
-            this.guard.openSnackBar("Onboard Marked Successfully", "OK",600);
+            this.guard.openSnackBar("Onboard Marked Successfully", "OK", 600);
           }).catch((error) => {
             console.error("Oops! Error while marking Onboard", error);
-            this.guard.openSnackBar("Oops! Error while marking Onboard", "OK",600);
+            this.guard.openSnackBar("Oops! Error while marking Onboard", "OK", 600);
           });
         }
 
@@ -2608,9 +2625,9 @@ export class JourneycoachDuplicateComponent {
             journeystatus: 'Upgraded'
           }).then(() => {
             console.log("Previous Journey Status Updated");
-            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK",600);
+            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
           }).catch((error) => {
-            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK",600);
+            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
             console.log("Oops Error While Updating Previous Journey Status")
           });
         }
@@ -2618,7 +2635,7 @@ export class JourneycoachDuplicateComponent {
         dialogRef.close();
 
       } else {
-        this.guard.openSnackBar("No Action Taken", "OK",600)
+        this.guard.openSnackBar("No Action Taken", "OK", 600)
       }
     })
   }
@@ -2812,10 +2829,10 @@ export class JourneycoachDuplicateComponent {
             cancelled: false,
           }).then(() => {
             console.log("Journey Coach Marked Successfully");
-            this.guard.openSnackBar("Journey Coach Marked Successfully", "OK",600);
+            this.guard.openSnackBar("Journey Coach Marked Successfully", "OK", 600);
           }).catch((error) => {
             console.error("Oops! Error while marking Journey Coach", error);
-            this.guard.openSnackBar("Oops! Error while marking Journey Coach", "OK",600);
+            this.guard.openSnackBar("Oops! Error while marking Journey Coach", "OK", 600);
           });
         }
       } else {
@@ -3767,9 +3784,9 @@ export class JourneycoachDuplicateComponent {
           generalnotes: element['generalnotes']
         }).then(() => {
           console.log("Notes Updated Successfully");
-          this.guard.openSnackBar("Notes Updated Successfully", "OK",600);
+          this.guard.openSnackBar("Notes Updated Successfully", "OK", 600);
         }).catch((error) => {
-          this.guard.openSnackBar("Oops! Error While Updating Notes", "OK",600);
+          this.guard.openSnackBar("Oops! Error While Updating Notes", "OK", 600);
           console.error("Oops! Error While Updating Notes");
         });
       }
@@ -3850,6 +3867,7 @@ export class JourneycoachDuplicateComponent {
         let tempPercentageCompleted = [];
         let tempPercentageOngoing = 0;
         let tempTotalProductCount = 0;
+        let tempEvolutionProgressProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]> = {};
 
         let tempTotalAdjustmentUnAwareMap = {
           count: 0,
@@ -4015,6 +4033,17 @@ export class JourneycoachDuplicateComponent {
           if (atcData['evolutionprogress'] != null) {
             Object.entries(atcData['evolutionprogress']).forEach(([key, value]) => {
               tempEvolutionprogressMap[key] = (tempEvolutionprogressMap[key] || 0) + (value as number);
+
+              const profileId = atcData['profileid'] ?? atcData['id'];
+              const docTotal = Object.values(atcData['evolutionprogress'] as Record<string, number>)
+                .reduce((a, b) => a + b, 0);
+
+              if (!tempEvolutionProgressProfileMap[key]) tempEvolutionProgressProfileMap[key] = [];
+              tempEvolutionProgressProfileMap[key].push({
+                profileId,
+                sum: Number(value),
+                docTotal
+              });
             });
           }
         });
@@ -4037,8 +4066,42 @@ export class JourneycoachDuplicateComponent {
         this.evolutionYearWastedMap = tempEvolutionYearWastedMap;
         this.evolutionYearSavedMap = tempEvolutionYearSavedMap;
         this.totalAdjustmentsCompletedMap = tempTotalAdjustmentsCompletedMap;
+        this.evolutionprogressMap = tempEvolutionprogressMap;
+        this.processEvolutionProgressFromMap(tempEvolutionProgressProfileMap);
       });
     }
+  }
+
+  // Function to calculate evolution process percentage 
+  processEvolutionProgressFromMap(keyProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]>): void {
+    const keys = Object.keys(keyProfileMap);
+
+    const bands = [
+      { label: '< 25%', range: [0, 25] as [number, number], profiles: {} as Record<string, any[]> },
+      { label: '25 – 50%', range: [25, 50] as [number, number], profiles: {} as Record<string, any[]> },
+      { label: '50 – 75%', range: [50, 75] as [number, number], profiles: {} as Record<string, any[]> },
+      { label: '75 – 100%', range: [75, 101] as [number, number], profiles: {} as Record<string, any[]> },
+    ];
+
+    const totals: Record<string, number> = {};
+
+    keys.forEach(key => {
+      const allEntries = keyProfileMap[key];
+      totals[key] = allEntries.reduce((a, b) => a + b.sum, 0);
+
+      allEntries.forEach(({ profileId, sum, docTotal }) => {
+        const pct = docTotal > 0 ? Math.round((sum / docTotal) * 100) : 0;
+        const profileName = this.mapprofile[profileId] ?? profileId;
+        const profile = { profileId, profileName, total: sum, pct };
+        const band = bands.find(b => pct >= b.range[0] && pct < b.range[1]);
+        if (band) {
+          if (!band.profiles[key]) band.profiles[key] = [];
+          band.profiles[key].push(profile);
+        }
+      });
+    });
+
+    this.evolutionProgressData = { keys, bands, totals };
   }
 
   openDialog(key: string) {
@@ -4812,5 +4875,112 @@ export class JourneycoachDuplicateComponent {
     if ((event.target as HTMLElement).classList.contains('overlay')) {
       this.closeTagProfilesDialog();
     }
+  }
+
+  getEpBandCount(key: string, bandIdx: number): number {
+    return this.evolutionProgressData?.bands[bandIdx]?.profiles[key]?.length ?? 0;
+  }
+
+  getEpBandProfiles(key: string, bandIdx: number): { profileId: string; profileName: string; total: number; pct: number }[] {
+    return this.evolutionProgressData?.bands[bandIdx]?.profiles[key] ?? [];
+  }
+
+  openEpDialog(key: string, bandLabel: string, bandIdx: number): void {
+    const profiles = this.getEpBandProfiles(key, bandIdx);
+    if (!profiles.length) return;
+    this.epDialogTitle = `${key} · ${bandLabel}`;
+    this.epDialogSubtitle = `${profiles.length} profiles in this band`;
+    this.epDialogBandIdx = bandIdx;
+    this.epDialogProfiles = profiles;
+    this.isEpDialogOpen = true;
+  }
+
+  closeEpDialog(): void {
+    this.isEpDialogOpen = false;
+    this.epDialogProfiles = [];
+  }
+
+  onEpOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeEpDialog();
+  }
+
+  // Build matrix after fetch
+  buildSubscriptionMatrix(snapshot: any): void {
+    const cells: Record<string, Record<string, { count: number; docs: any[] }>> = {};
+    const monthSet = new Set<string>();
+    const journeyMap: Record<string, string> = {};
+
+    snapshot.forEach((doc: any) => {
+      const data = doc.data();
+      const end = data['subscriptionend']?.toDate
+        ? data['subscriptionend'].toDate()
+        : new Date(data['subscriptionend']);
+      const ym = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+      const journeyId = data['journeyref']?.id ?? data['journeyref'] ?? 'Unknown';
+      const journeyLabel = this.mapjourneyname?.[journeyId] ?? journeyId;
+
+      monthSet.add(ym);
+      journeyMap[journeyId] = journeyLabel;
+
+      if (!cells[journeyId]) cells[journeyId] = {};
+      if (!cells[journeyId][ym]) cells[journeyId][ym] = { count: 0, docs: [] };
+      cells[journeyId][ym].count++;
+      cells[journeyId][ym].docs.push({ id: doc.id, ...data });
+    });
+
+    const months = [...monthSet].sort().map(ym => {
+      const [y, m] = ym.split('-').map(Number);
+      return {
+        ym,
+        label: new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      };
+    });
+
+    const journeys = Object.entries(journeyMap)
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Totals
+    const monthTotals: Record<string, number> = {};
+    const journeyTotals: Record<string, number> = {};
+    months.forEach(m => {
+      monthTotals[m.ym] = journeys.reduce((s, j) => s + (cells[j.id]?.[m.ym]?.count ?? 0), 0);
+    });
+    journeys.forEach(j => {
+      journeyTotals[j.id] = months.reduce((s, m) => s + (cells[j.id]?.[m.ym]?.count ?? 0), 0);
+    });
+
+    this.subscriptionMatrix = { journeys, months, cells, monthTotals, journeyTotals };
+  }
+
+  // Dialog
+  openSubDialog(docs: any[], title: string): void {
+    this.subDialogTitle = title;
+    this.subDialogDocs = docs;
+    this.isSubDialogOpen = true;
+  }
+  closeSubDialog(): void { this.isSubDialogOpen = false; this.subDialogDocs = []; }
+  onSubDialogOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeSubDialog();
+  }
+  getCellData(journeyId: string, ym: string) {
+    return this.subscriptionMatrix?.cells[journeyId]?.[ym] ?? null;
+  }
+  getSubEndDate(doc: any): string {
+    const d = doc['subscriptionend']?.toDate ? doc['subscriptionend'].toDate() : new Date(doc['subscriptionend']);
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  getSubJourneyName(doc: any): string {
+    const id = doc['journeyref']?.id ?? doc['journeyref'] ?? '';
+    return this.mapjourneyname?.[id] ?? id;
+  }
+  getSubStatusClass(status: string): string {
+    if (status === 'completed') return 'status-completed';
+    if (status === 'ongoing') return 'status-ongoing';
+    return '';
+  }
+  getGrandTotal(): number {
+    if (!this.subscriptionMatrix) return 0;
+    return Object.values(this.subscriptionMatrix.monthTotals).reduce((a, b) => a + b, 0);
   }
 }
