@@ -580,8 +580,8 @@ export class ContentAnalyticsComponent {
   }
 
   convertDecimal(value:number){
-    const minutes = Math.floor(value / 60); // Get the whole minutes
-    const remainingSeconds = value % 60; // Get the remaining seconds
+    const minutes = Math.floor(value / 60);
+    const remainingSeconds = value % 60;
     return `${minutes} mins ${remainingSeconds} sec (${value})`
   }
 
@@ -997,12 +997,11 @@ export class ContentAnalyticsComponent {
   downloadFile(data,filename = 'data') {
     if(data.length != 0){
       let csvData = this.ConvertToCSV(data,Object.keys(data[0]));
-      // console.log(csvData)
       let blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
       let dwldLink = document.createElement("a");
       let url = URL.createObjectURL(blob);
       let isSafariBrowser = navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1;
-      if (isSafariBrowser) {  //if Safari open in new window to save file with random filename.
+      if (isSafariBrowser) { 
         dwldLink.setAttribute("target", "_blank");
       }
       dwldLink.setAttribute("href", url);
@@ -1025,7 +1024,6 @@ export class ContentAnalyticsComponent {
       row += headerList[index] + ',';
     }
     row = row.slice(0, -1);
-    // console.log(row);
     
     str += row + '\r\n';
     for (let i = 0; i < array.length; i++) {
@@ -1036,7 +1034,6 @@ export class ContentAnalyticsComponent {
       }
       str += line + '\r\n';
     }
-    // console.log(str);
     
     return str;
   }

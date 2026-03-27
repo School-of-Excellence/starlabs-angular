@@ -1,6 +1,4 @@
 <div class="page-root">
-
-  <!-- ── Query Bar (visible on ALL tabs) ── -->
   <div class="query-bar">
     <div class="control-group">
       <span class="control-section-label">Query by date</span>
@@ -22,14 +20,8 @@
       Export
     </button>
   </div>
-
-  <!-- ── Tabs ── -->
   <mat-tab-group mat-align-tabs="start">
-
-    <!-- Analytics Table -->
     <mat-tab label="Analytics Table">
-
-      <!-- ── Filter Panel (Analytics tab only) ── -->
       <div class="control-panel">
         <div class="control-row control-row-filters">
           <span class="control-section-label">Filter by</span>
@@ -81,8 +73,6 @@
         </button>
         </div>
       </div>
-
-      <!-- ── Summary Strip ── -->
       <div class="summary-strip">
         <div class="summary-card">
           <div class="summary-card-label">Period</div>
@@ -179,8 +169,6 @@
       </div>
       <mat-paginator [pageSizeOptions]="[25,50,100]" aria-label=""></mat-paginator>
     </mat-tab>
-
-    <!-- Tier Based -->
     <mat-tab label="Tier Based">
       <div class="tier-header">
         <div class="tier-header-left">
@@ -203,8 +191,6 @@
         <div class="tier-spinner"></div>
         <span class="tier-loading-text">Fetching tier data...</span>
       </div>
-
-      <!-- Series view -->
       <div *ngIf="!tierLoading && viewMode === 'series'" class="tier-grid">
         <ng-container *ngFor="let tier of tierCompletionMap | keyvalue">
           <ng-container *ngIf="!tierSearchQuery || tiermap[$any(tier.key)]?.tier?.toLowerCase()?.includes(tierSearchQuery.toLowerCase())">
@@ -236,7 +222,6 @@
                   <span class="tier-stat-label">NOT STARTED</span>
                 </div>
               </div>
-              <!-- Toggle always at top, defaults to 'series' in series view -->
               <div class="card-view-toggle">
                 <button class="card-tab-btn"
                   [class.active-card-tab]="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'series'"
@@ -245,7 +230,6 @@
                   [class.active-card-tab]="cardViewMode[$any(tier.key)] === 'participant'"
                   (click)="cardViewMode[$any(tier.key)] = 'participant'">Participants</button>
               </div>
-              <!-- Series list (default) -->
               <div class="series-list" *ngIf="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'series'">
                 <div class="series-row" *ngFor="let s of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
                   <div class="series-icon">
@@ -271,7 +255,6 @@
                   </div>
                 </div>
               </div>
-              <!-- Participant list (when toggled inside card) -->
               <div class="series-list" *ngIf="cardViewMode[$any(tier.key)] === 'participant'">
                 <div class="series-row" *ngFor="let user of tierParticipantSummary[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
                   <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
@@ -288,8 +271,6 @@
           </ng-container>
         </ng-container>
       </div>
-
-      <!-- Participant view -->
       <div *ngIf="!tierLoading && viewMode === 'participant'" class="tier-grid">
         <ng-container *ngFor="let tier of tierParticipantSummary | keyvalue">
           <ng-container *ngIf="!tierSearchQuery || tiermap[$any(tier.key)]?.tier?.toLowerCase()?.includes(tierSearchQuery.toLowerCase())">
@@ -321,7 +302,6 @@
                   <span class="tier-stat-label">NOT STARTED</span>
                 </div>
               </div>
-              <!-- Toggle always at top, defaults to 'participant' in participant view -->
               <div class="card-view-toggle">
                 <button class="card-tab-btn"
                   [class.active-card-tab]="cardViewMode[$any(tier.key)] === 'series'"
@@ -330,7 +310,6 @@
                   [class.active-card-tab]="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'participant'"
                   (click)="cardViewMode[$any(tier.key)] = 'participant'">Participants</button>
               </div>
-              <!-- Participant list (default) -->
               <div class="series-list" *ngIf="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'participant'">
                 <div class="series-row" *ngFor="let user of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
                   <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
@@ -343,7 +322,6 @@
                   </span>
                 </div>
               </div>
-              <!-- Series list (when toggled inside card) -->
               <div class="series-list" *ngIf="cardViewMode[$any(tier.key)] === 'series'">
                 <div class="series-row" *ngFor="let s of tierCompletionMap[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
                   <div class="series-icon">
@@ -365,17 +343,12 @@
         </ng-container>
       </div>
     </mat-tab>
-
-    <!-- Journey Based -->
     <mat-tab label="Journey Based">
       <div *ngIf="tierLoading" class="tier-loading-wrap">
         <div class="tier-spinner"></div>
         <span class="tier-loading-text">Fetching journey data...</span>
       </div>
-
       <div class="journey-layout" *ngIf="journeyWiseData && !tierLoading">
-
-        <!-- Sidebar -->
         <div class="journey-sidebar">
           <div class="journey-sidebar-title">All Journeys</div>
           <div class="journey-sidebar-item"
@@ -407,7 +380,6 @@
           </div>
         </div>
 
-        <!-- Right panel -->
         <div class="journey-panel" *ngIf="selectedJourneyId && journeyWiseData[selectedJourneyId]">
           <ng-container *ngIf="journeyWiseData[selectedJourneyId] as jd">
             <div class="journey-panel-header">
@@ -516,11 +488,7 @@
 
   </mat-tab-group>
 </div>
-
-<!-- Drawer overlay -->
 <div class="tier-drawer-overlay" *ngIf="drawerOpen" (click)="closeDrawer()"></div>
-
-<!-- Drawer -->
 <div class="tier-drawer" [class.drawer-open]="drawerOpen">
   <div class="drawer-header">
     <div class="drawer-header-left">

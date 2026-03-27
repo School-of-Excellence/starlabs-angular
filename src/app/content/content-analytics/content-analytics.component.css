@@ -1,10 +1,4 @@
-/* =========================================================
-   CONTENT ANALYTICS — Light Premium Theme
-   Inspired by Stripe / Linear / Notion aesthetics
-   ========================================================= */
-
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
 :host {
   font-family: 'Poppins', system-ui, sans-serif;
   --c-bg:        #f8f7f4;
@@ -28,14 +22,11 @@
   --radius-lg:   14px;
 }
 
-/* ── Page wrapper ── */
 .page-root {
   padding: 24px 28px;
   background: var(--c-bg);
   min-height: 100vh;
 }
-
-/* ── Control panel (filter section inside Analytics tab) ── */
 .control-panel {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -74,11 +65,8 @@
   padding-right: 4px;
 }
 
-/* Field sizing */
 .ctrl-field { min-width: 160px; }
 .ctrl-field-lg { min-width: 240px; }
-
-/* Fetch button */
 .btn-fetch {
   border-color: var(--c-accent) !important;
   color: var(--c-accent) !important;
@@ -91,8 +79,6 @@
 }
 
 .btn-fetch:hover { background: var(--c-accent-bg) !important; }
-
-/* Export button */
 .btn-export {
   border-color: var(--c-border-md) !important;
   color: var(--c-text-2) !important;
@@ -107,8 +93,6 @@
 }
 
 .btn-export:hover { background: var(--c-bg) !important; color: var(--c-text) !important; }
-
-/* Clear button */
 .btn-clear {
   border-color: var(--c-border) !important;
   color: var(--c-text-3) !important;
@@ -122,7 +106,6 @@
 
 .btn-clear:hover { color: var(--c-red) !important; border-color: var(--c-red) !important; background: var(--c-red-bg) !important; }
 
-/* ── Summary cards ── */
 .summary-strip {
   display: flex;
   gap: 12px;
@@ -162,16 +145,12 @@
   color: var(--c-text-2);
   margin-top: 2px;
 }
-
-/* ── Global Poppins override — excludes Material Icons ── */
 *:not(.material-icons):not(mat-icon):not([class*="mat-icon"]) {
   font-family: 'Poppins', system-ui, sans-serif !important;
 }
 mat-icon, .material-icons, [class*="mat-icon"] {
   font-family: 'Material Icons' !important;
 }
-
-/* ── Query bar (above tabs, all tabs) ── */
 .query-bar {
   display: flex;
   align-items: center;
@@ -186,7 +165,6 @@ mat-icon, .material-icons, [class*="mat-icon"] {
   flex-wrap: wrap;
 }
 
-/* ── Inline SVG icon for play ── */
 .icon-play {
   vertical-align: middle;
   display: inline-block;
@@ -194,7 +172,6 @@ mat-icon, .material-icons, [class*="mat-icon"] {
   top: -1px;
 }
 
-/* ── Export button icon (unicode codepoint fallback) ── */
 .btn-icon {
   font-family: 'Material Icons' !important;
   font-size: 16px;
@@ -203,12 +180,10 @@ mat-icon, .material-icons, [class*="mat-icon"] {
   margin-right: 4px;
 }
 
-/* ── Material form field overrides ── */
 .mat-mdc-form-field {
   --mdc-outlined-text-field-container-shape: 8px;
 }
 
-/* ── Buttons (non-named) ── */
 button[mat-stroked-button] {
   border-radius: 8px !important;
   font-size: 13px !important;
@@ -219,7 +194,6 @@ button[mat-stroked-button] {
   transition: background 0.15s, box-shadow 0.15s !important;
 }
 
-/* ── Material table ── */
 .mat-elevation-z8 {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -261,7 +235,6 @@ button[mat-stroked-button] {
   font-size: 12.5px !important;
 }
 
-/* new-user tag */
 .new-user-tag {
   color: var(--c-red);
   font-size: 11px;
@@ -269,8 +242,6 @@ button[mat-stroked-button] {
 }
 
 .forrestGreen { color: var(--c-green); }
-
-/* ── Tabs ── */
 .mat-mdc-tab-group {
   --mdc-tab-indicator-active-indicator-color: var(--c-accent);
   --mat-tab-header-active-label-text-color: var(--c-text);
@@ -289,11 +260,6 @@ button[mat-stroked-button] {
   font-weight: 600 !important;
   letter-spacing: 0.01em !important;
 }
-
-/* =========================================================
-   TIER BASED TAB
-   ========================================================= */
-
 .tier-header {
   display: flex;
   align-items: flex-start;
@@ -324,7 +290,6 @@ button[mat-stroked-button] {
   flex-wrap: wrap;
 }
 
-/* Toggle group */
 .tier-toggle-group {
   display: flex;
   background: #f0ece6;
@@ -351,7 +316,6 @@ button[mat-stroked-button] {
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
-/* Search */
 .tier-search-wrap {
   display: flex;
   align-items: center;
@@ -383,8 +347,6 @@ button[mat-stroked-button] {
 }
 
 .tier-search-input::placeholder { color: var(--c-text-3); }
-
-/* Loading */
 .tier-loading-wrap {
   display: flex;
   flex-direction: column;
@@ -411,7 +373,6 @@ button[mat-stroked-button] {
   letter-spacing: 0.03em;
 }
 
-/* Card grid */
 .tier-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
@@ -419,7 +380,6 @@ button[mat-stroked-button] {
   padding: 4px 0 24px 0;
 }
 
-/* Tier card */
 .tier-card {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -441,7 +401,6 @@ button[mat-stroked-button] {
   letter-spacing: 0.01em;
 }
 
-/* Summary stats */
 .tier-summary-row {
   display: flex;
   gap: 16px;
@@ -485,7 +444,6 @@ button[mat-stroked-button] {
 .arrow.up   { color: var(--c-green); }
 .arrow.down { color: var(--c-red); }
 
-/* Card inner toggle */
 .card-view-toggle { display: flex; gap: 6px; }
 
 .card-tab-btn {
@@ -511,7 +469,6 @@ button[mat-stroked-button] {
   color: #ffffff;
 }
 
-/* Series list */
 .series-list {
   display: flex;
   flex-direction: column;
@@ -560,7 +517,6 @@ button[mat-stroked-button] {
 .series-fraction.yellow { color: var(--c-amber); }
 .series-fraction.red    { color: var(--c-red); }
 
-/* Progress bar */
 .series-bar-wrap {
   display: flex;
   flex-direction: column;
@@ -583,7 +539,6 @@ button[mat-stroked-button] {
 
 .series-pct { font-size: 9.5px; color: var(--c-text-3); }
 
-/* Avatars */
 .participant-avatar,
 .journey-avatar,
 .drawer-avatar {
@@ -602,10 +557,6 @@ button[mat-stroked-button] {
 
 .journey-avatar { width: 30px; height: 30px; border-radius: 9px; }
 .drawer-avatar  { width: 32px; height: 32px; border-radius: 8px; font-size: 11px; }
-
-/* =========================================================
-   RIGHT SIDE DRAWER
-   ========================================================= */
 
 .tier-drawer-overlay {
   position: fixed;
@@ -752,10 +703,6 @@ button[mat-stroked-button] {
   color: var(--c-text-3);
 }
 
-/* =========================================================
-   JOURNEY BASED TAB
-   ========================================================= */
-
 .journey-layout {
   display: flex;
   height: calc(100vh - 200px);
@@ -765,7 +712,6 @@ button[mat-stroked-button] {
   padding: 16px 2px;
 }
 
-/* Sidebar */
 .journey-sidebar {
   width: 260px;
   min-width: 200px;
@@ -859,7 +805,6 @@ button[mat-stroked-button] {
 
 .jsstat-divider { font-size: 14px; color: var(--c-border-md); padding-bottom: 10px; }
 
-/* Right panel */
 .journey-panel {
   flex: 1;
   background: var(--c-surface);
@@ -974,8 +919,6 @@ button[mat-stroked-button] {
   font-weight: 700;
   color: var(--c-text-2);
 }
-
-/* Table */
 .journey-table-header {
   display: grid;
   grid-template-columns: 1fr 110px 160px 110px 120px;
@@ -1029,16 +972,12 @@ button[mat-stroked-button] {
   align-items: flex-end;
   gap: 3px;
 }
-
-/* Status colors */
 .stat-green  { color: var(--c-green); }
 .stat-yellow { color: var(--c-amber); }
 .stat-gray   { color: var(--c-text-3); }
 .seen-green  { color: var(--c-green); }
 .seen-yellow { color: var(--c-amber); }
 .seen-red    { color: var(--c-red); }
-
-/* Completion */
 .journey-completion-val { font-size: 13px; font-weight: 700; }
 .comp-100 { color: var(--c-green); }
 .comp-mid { color: var(--c-amber); }
@@ -1064,9 +1003,6 @@ button[mat-stroked-button] {
   color: var(--c-text-3);
 }
 
-/* =========================================================
-   DIALOG OVERRIDE
-   ========================================================= */
 .uad-dialog-panel .mat-mdc-dialog-container,
 .uad-dialog-panel .mdc-dialog__surface {
   padding: 0 !important;
