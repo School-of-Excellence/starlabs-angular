@@ -512,6 +512,7 @@ export class FormtemplateComponent {
 
   private async submitFormData(nextstage: string | null) {
     // Submit form to formsByClient collection
+    console.log("submitformdata", this.submittedClientForm['docid']);
     const formDocRef = doc(this.firestore, 'formsByClient', this.submittedClientForm['docid']);
     await setDoc(formDocRef, this.submittedClientForm);
 
