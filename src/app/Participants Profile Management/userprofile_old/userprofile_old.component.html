@@ -1,0 +1,626 @@
+<div class="titlebar">
+    <div class="titlebar-content">
+        <img src="./../../assets/AH White Logo Only.png" style="width: 40px; height: 30px;">
+        <h5 style="font-weight: bold;">BREAKTHROUGHS</h5>
+    </div>
+</div>
+
+<div class="content">
+    <div class="row">
+
+        <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+        <div class="col-md-2">
+            <div class="profile-container">
+
+                <div class="profile-header">
+                    <div class="avatar-container" *ngIf="![null, undefined].includes(user.profile)">
+                        <img [src]="user.profile" alt="Profile" class="avatar">
+                    </div>
+                    <h2 class="greeting">Hello {{user.name}}</h2>
+                    <p class="email">{{user.email}}</p>
+                </div>
+
+                <div class="menu-grid">
+                    <a *ngFor="let item of menuItems" [ngClass]="selectedScreen == item.label ? 'menu-item selected' : 'menu-item unselected'" (click)="selectedScreen = item.label">
+                        <mat-icon>{{item.icon}}</mat-icon>
+                        <span>{{item.label}}</span>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ── Main content ─────────────────────────────────────────────────── -->
+        <div class="col-md-10">
+            <mat-tab-group mat-align-tabs="center" animationDuration="0ms">
+                <mat-tab *ngFor="let tab of tabs">
+                    <ng-template mat-tab-label>
+                        <mat-icon>{{tab.icon}}</mat-icon>
+                        &nbsp;
+                        <span>{{tab.label}}</span>
+                    </ng-template>
+
+                    <div class="mattab-content">
+
+                        <!-- ── Ongoing Event Tab ─────────────────────────────── -->
+                        <div *ngIf="tab.label == 'Ongoing Event'">
+                            <div style="text-align: center; justify-content: center;" *ngIf="loadingQueue">
+                                <img src="./../../assets/AH White Logo Only.png" style="width: 100px; height: 100px;">
+                                <br>
+                                Fetching Data....
+                            </div>
+
+                            <div *ngIf="!loadingQueue">
+                                <h5 style="color: #ff4081;text-align: center;"><b>{{profileJourneyProduct['queueData']['queuename']}}</b></h5>
+                                <h6 style="color: black;text-align: center;"><b>{{mapproduct[profileJourneyProduct['participantproductdata']['productref'].id]}}</b></h6>
+
+                                <!-- Timeline -->
+                                <div class="timeline-container">
+                                    <div class="timeline-wrapper">
+                                        <div class="timeline-line"></div>
+                                        <div class="timeline-steps">
+                                            <div *ngFor="let stage of profileJourneyProduct['queueData']['stages']; let i = index" class="timeline-step">
+                                                <div class="step-marker" [ngClass]="{'current': i === currentQueueStageIndex,'completed': i < currentQueueStageIndex ,'pending': i > currentQueueStageIndex}">
+                                                    <mat-icon *ngIf="i < currentQueueStageIndex" style="color: white;">check</mat-icon>
+                                                </div>
+                                                <div class="step-label" [ngClass]="{'current-label': i === currentQueueStageIndex, 'completed-label': i < currentQueueStageIndex}">{{ stage }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row queuecontainer">
+
+                                    <!-- Stage info -->
+                                    <div class="col-md-8">
+                                        <div *ngIf="profileJourneyProduct['currentstage'] != 'In Evolution Mapping Activity'">
+                                            <p *ngIf="![null, undefined, ''].includes(profileJourneyProduct['queuetoken']['queueposition'])" class="current-label">Queue Position : {{profileJourneyProduct['queuetoken']['queueposition']}}</p>
+                                            <p *ngIf="[null, undefined, ''].includes(profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation'])" class="stageexplanation">{{'Please wait until your turn is requested and go through each step to finish the queue'}}</p>
+                                            <p *ngIf="![null, undefined, ''].includes(profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation'])" class="stageexplanation">{{profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation']}}</p>
+                                        </div>
+
+                                        <div *ngIf="profileJourneyProduct['currentstage'] == 'In Evolution Mapping Activity'">
+                                            <div *ngIf="liveEvolutionMapping.length != 0 && liveEvolutionMapping[0].live; else noData">
+                                                <div style="text-align: center; max-width: 800px; margin: 20px auto;">
+                                                    <h1>What is Evolution Mapping?</h1>
+                                                    <p>
+                                                        You'll witness the fine changes that has happened in your post uP! by watching your pre and post-videos. You'll
+                                                        be mapping your evolution progress. This becomes an education for your unconscious in a way that it
+                                                        generalises the impact of breakthroughs in your life across other aspects.
+                                                    </p>
+                                                </div>
+                                                <div style="display: flex; flex-wrap: wrap; justify-content: center; margin-top: 30px; gap: 20px;">
+                                                    <div *ngFor="let video of liveEvolutionMapping[0].videolist; let i = index" style="width: calc(48% - 20px); margin-bottom: 20px; display: flex; flex-direction: column; align-items: center;">
+                                                        <app-video-player [videoUrl]="video"></app-video-player>
+                                                        <p style="text-align: center; margin-top: 10px;">{{ i + 1 }}. {{ i === 0 ? 'POST VIDEO' : 'PRE VIDEO' }} ({{mapVideoTitle[video]}})</p>
+                                                        <p style="text-align: center; margin-top: 5px;">{{mapRecordedDate[video].toDate() | date}}</p>
+                                                    </div>
+                                                </div>
+                                                <button class="actionButton" (click)="actionButton(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])">{{buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['buttonlabel']}}</button>
+                                            </div>
+                                            <ng-template #noData>
+                                                <p style="text-align: center;">No data available.</p>
+                                            </ng-template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Stage chat -->
+                                    <div class="col-md-4">
+                                        <p><b>STAGE CHAT</b></p>
+                                        <div class="stagecontainer">
+                                            <div class="header">
+                                                <div>
+                                                    <p style="margin-bottom: 0;">{{profileJourneyProduct['currentstage']}}</p>
+                                                </div>
+                                            </div>
+                                            <div class="chatcontainer">
+                                                <span *ngIf="chatList[profileJourneyProduct['currentstage']]?.length == 0">
+                                                    <h5 class="nomessage"><b>No Messages</b></h5>
+                                                </span>
+                                                <span class="columnReverse" *ngIf="chatList[profileJourneyProduct['currentstage']]?.length != 0">
+                                                    <div *ngFor="let message of chatList[profileJourneyProduct['currentstage']]; let idx = index">
+                                                        <div class="flexCenter">
+                                                            <div *ngIf="idx == (chatList[profileJourneyProduct['currentstage']].length)-1" class="date">{{message['date']?.toDate() | date:'fullDate'}}</div>
+                                                            <div *ngIf="idx != (chatList[profileJourneyProduct['currentstage']].length)-1 && (chatList[profileJourneyProduct['currentstage']][idx+1]['date']?.toDate() | date) != (chatList[profileJourneyProduct['currentstage']][idx]['date']?.toDate() | date)" class="date">
+                                                                {{message['date']?.toDate() | date:'fullDate'}}
+                                                            </div>
+                                                        </div>
+                                                        <div #itemElement [ngClass]="message.senderprofileid == user.profileid ? 'mychat' : 'otherchat'">
+                                                            <div style="display: flex;flex-direction: row;justify-content: space-between;">
+                                                                <div>
+                                                                    <h6 style="margin-left: 5px;"><b>{{mapProfile[message.senderprofileid]['name']}}</b></h6>
+                                                                    <div>
+                                                                        <p id="messages" [innerHTML]="message['message'] | linebreaks | link"></p>
+                                                                    </div>
+                                                                    <p style="float: left;">{{message.date.toDate() | date : 'shortTime'}}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </span>
+                                            </div>
+                                            <form>
+                                                <div class="bottom">
+                                                    <div class="message" style="width: 80%;">
+                                                        <textarea matInput placeholder="Type your message"
+                                                            cdkTextareaAutosize
+                                                            #autosize="cdkTextareaAutosize"
+                                                            cdkAutosizeMinRows="1"
+                                                            cdkAutosizeMaxRows="3"
+                                                            [(ngModel)]="stageMessage">
+                                                        </textarea>
+                                                    </div>
+                                                    <div class="buttons">
+                                                        &nbsp;
+                                                        <button mat-mini-fab class="btn" (click)="sendMessage(stageMessage)"><mat-icon>send</mat-icon></button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Journey Tab ───────────────────────────────────── -->
+                        <div *ngIf="tab.label == 'Journey'">
+                            <div style="width: 100%">
+                                <div *ngFor="let journey of participantjourney; let i = index">
+                                    <div class="card">
+                                        <div class="row align-items-center">
+                                            <h5 class="col-md-4">{{ i + 1 }}. {{mapjourney[journey['journeyref']?.id] || 'Addon'}}</h5>
+                                            <div class="col-md-7">
+                                                <span class="badge ongoing col-md-4">{{(journey.journeystatus || 'addon product').toUpperCase()}}</span>
+                                                &nbsp;&nbsp;
+                                                <span class="badge journey-dates col-md-4">{{ journey.subscriptionstart?.toDate() | date: 'mediumDate'}} - {{journey.subscriptionend?.toDate() | date: 'mediumDate' }}</span>
+                                            </div>
+                                            <button mat-icon-button (click)="toggleProductSection(journey)" class="col-md-1">
+                                                <mat-icon *ngIf="!journey.showProductSection">keyboard_arrow_down</mat-icon>
+                                                <mat-icon *ngIf="journey.showProductSection">keyboard_arrow_up</mat-icon>
+                                            </button>
+                                        </div>
+
+                                        <mat-divider></mat-divider>
+
+                                        <div *ngIf="journey.showProductSection">
+                                            <!-- Products -->
+                                            <div class="section-header">
+                                                <h6 style="font-weight: bold;">Products</h6>
+                                            </div>
+                                            <table class="product-table">
+                                                <ng-container *ngFor="let product of journey['participantproducts']; let i = index">
+                                                    <div *ngIf="mapPackage[participantproductlist[product['participantproductid']]['packageref'].id] !== 'Bonus'">
+                                                        <tr>
+                                                            <td style="width: 10%;">{{ i + 1 }}.</td>
+                                                            <td style="width: 80%;">{{ mapproduct[product['productref']?.id] }}</td>
+                                                            <td style="width: 15%;">
+                                                                <span class="badge status" [ngClass]="{
+                                                                'completed': participantproductlist[product['participantproductid']]?.status === 'cancelled',
+                                                                'ongoing': participantproductlist[product['participantproductid']]?.status !== 'cancelled'
+                                                                }">{{ participantproductlist[product['participantproductid']]?.status || 'Not Started' }}</span>
+                                                            </td>
+                                                            <td style="width: 15%;">
+                                                                <span class="badge journey-dates">
+                                                                {{  (participantproductlist[product['participantproductid']]?.statusdate?.ongoing?.toDate() | date: 'mediumDate') || 'N/A'}}
+                                                                -
+                                                                {{ (participantproductlist[product['participantproductid']]?.statusdate?.completed?.toDate() | date: 'mediumDate') || 'N/A'}}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    </div>
+                                                </ng-container>
+                                            </table>
+
+                                            <!-- Bonus -->
+                                            <div class="section-header">
+                                                <h6 style="font-weight: bold;">Bonus</h6>
+                                            </div>
+                                            <table class="product-table">
+                                                <ng-container *ngFor="let product of journey['participantproducts']; let i = index">
+                                                    <div *ngIf="mapPackage[participantproductlist[product['participantproductid']]['packageref'].id] === 'Bonus'">
+                                                        <tr>
+                                                            <td style="width: 10%;">{{ i + 1 }}.</td>
+                                                            <td style="width: 80%;">{{ mapproduct[product['productref']?.id] }}</td>
+                                                            <td style="width: 15%;">
+                                                                <span class="badge status" [ngClass]="{
+                                                                'completed': participantproductlist[product['participantproductid']]?.status === 'cancelled',
+                                                                'ongoing':  participantproductlist[product['participantproductid']]?.status !== 'cancelled'
+                                                                }">{{ participantproductlist[product['participantproductid']]?.status || 'Not Started' }} {{participantproductlist[product['participantproductid']]?.status | json}}</span>
+                                                            </td>
+                                                            <td style="width: 15%;">
+                                                                <span class="badge journey-dates">
+                                                                {{  (participantproductlist[product['participantproductid']]?.statusdate?.ongoing?.toDate() | date: 'mediumDate') || 'N/A'}}
+                                                                -
+                                                                {{ (participantproductlist[product['participantproductid']]?.statusdate?.completed?.toDate() | date: 'mediumDate') || 'N/A'}}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    </div>
+                                                </ng-container>
+                                            </table>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Events Attended Tab ───────────────────────────── -->
+                        <div *ngIf="tab.label == 'Event Attended'">
+                            <div *ngIf="participantevents.length != 0; else noData">
+                                <div class="card">
+                                    <table class="product-table">
+                                        <ng-container *ngFor="let event of participantevents; let i = index">
+                                            <tr>
+                                                <td>{{ i + 1 }}.</td>
+                                                <td>{{ mapevents[event['event_ref'].id]['name'] }}</td>
+                                                <td>
+                                                    <span class="badge status" [ngClass]="{
+                                                    'completed': mapevents[event['event_ref'].id]['venue'] !== 'online',
+                                                    'ongoing': mapevents[event['event_ref'].id]['venue'] === 'online'
+                                                    }">{{ mapevents[event['event_ref']?.id]['venue'] }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge journey-dates">
+                                                    {{  (mapevents[event['event_ref'].id]['start_date']?.toDate() | date: 'mediumDate') || 'N/A'}}
+                                                    -
+                                                    {{  (mapevents[event['event_ref'].id]['end_date']?.toDate() | date: 'mediumDate') || 'N/A'}}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </ng-container>
+                                    </table>
+                                </div>
+                            </div>
+                            <ng-template #noData>
+                                <p style="text-align: center;">No data available.</p>
+                            </ng-template>
+                        </div>
+
+                        <!-- ── Support Ticket Tab ────────────────────────────── -->
+                        <div *ngIf="tab.label == 'Support Ticket'">
+                            <div class="row">
+                                <div class="col-md-4 scrollable-container">
+                                    <mat-card *ngFor="let ticket of customerticket; let i = index" class="custom-card" appearance="outlined" (click)="fetchTicketMessages(ticket)">
+                                        <mat-card-header>
+                                            <mat-card-title style="font-size: 18px; font-weight: 600;">{{ ticket.issueno }} - {{ ticket.reporteddate.toDate() | date:'mediumDate' }}</mat-card-title>
+                                            <mat-card-subtitle style="font-size: 18px; font-weight: 600;">Reported by - <span style="font-weight: bold;color: black;">{{ mapProfile[ticket.reportedBy] }}</span></mat-card-subtitle>
+                                        </mat-card-header>
+                                        <mat-card-content style="font-size: 20px;">
+                                            <p>{{ticket.issue.substring(0,30)}}</p>
+                                        </mat-card-content>
+                                        <mat-card-actions>
+                                            <div *ngIf="ticket.status.status != null" class="status-box" [ngClass]="{'closed': ticket.status.status === 'Closed', 'open': ticket.status.status !== 'Closed'}">
+                                                {{ ticket.status.status }}
+                                            </div>
+                                            <div *ngIf="ticket.status.date != null" class="status-box" [ngClass]="{'closed': ticket.status.status === 'Closed', 'open': ticket.status.status !== 'Closed'}">
+                                                {{ ticket.status.date.toDate() | date:'mediumDate' }}
+                                            </div>
+                                            <div *ngIf="mapProfile[ticket.status.editedBy] != null" class="status-box edited-by">
+                                                {{ mapProfile[ticket.status.editedBy] }}
+                                            </div>
+                                        </mat-card-actions>
+                                    </mat-card>
+                                </div>
+
+                                <div class="col-md-8">
+                                    <div class="chat-screen" *ngIf="![null, undefined].includes(currentIssueData) && currentIssueChat.length != 0">
+                                        <div *ngIf="currentIssueChat.length == 0" class="center">
+                                            <p>Chat History is Empty</p>
+                                        </div>
+                                        <p *ngIf="currentIssueChat.length != 0" [ngClass]="currentIssueData['status']?.status?.toLowerCase() == 'open' ? 'ticketopen' : 'ticketclose'">
+                                            Ticket No - {{ currentIssueData['issueno'] }}
+                                        </p>
+
+                                        <div class="chat-container">
+                                            <div *ngFor="let chat of currentIssueChat; let idx = index">
+                                                <div *ngIf="(idx+1) === unreadcount" class="flexCenter">
+                                                    <div class="unread">{{unreadcount}} Unread</div>
+                                                </div>
+                                                <div class="flexCenter">
+                                                    <div *ngIf="idx == (currentIssueChat.length)-1" class="date">{{chat['time']?.toDate() | date:'fullDate'}}</div>
+                                                    <div *ngIf="idx != (currentIssueChat.length)-1 && (currentIssueChat[idx+1]['time']?.toDate() | date) != (currentIssueChat[idx]['time']?.toDate() | date)" class="date">
+                                                        {{chat['time']?.toDate() | date:'fullDate'}}
+                                                    </div>
+                                                </div>
+
+                                                <div [ngClass]="chat.sender_profileid == user.profileid ? 'mychat' : 'otherchat'">
+                                                    <div style="display: flex; flex-direction: column;">
+                                                        <div style="display: flex; flex-direction: row; justify-content: space-between; width: 95%">
+                                                            <div style="padding-top: 5px;">
+                                                                <p *ngIf="![null,undefined,''].includes(chat.sender_uid)" style="font-size: 15px;">
+                                                                    <b *ngIf="user.profileid != chat['sender_profileid']">
+                                                                        {{[null,undefined].includes(mapUserId[chat.sender_uid]) ? '...' : chat.type == 'automated' ? 'Automated' : mapUserId[chat.sender_uid]['name']}}
+                                                                    </b>
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div style="display: flex; flex-direction: row; width: 80%; margin-top: -15px;">
+                                                            <div>
+                                                                <span *ngIf="chat['message'] == '' && chat['files'].length == 0" style="color: grey;">Loading File...</span>
+                                                                <span *ngIf="chat['files'] != null && chat['files'].length != 0"
+                                                                    style="display:inline-flex;flex-direction: column;justify-content: center;min-width: 30%;max-width: 65%;">
+                                                                    <span *ngFor="let image of chat['files']">
+                                                                        <span style="margin-left: 5px;margin-top: 5px;">
+                                                                            <span *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
+                                                                                <br>
+                                                                                <img style="margin-bottom: 5px; width: 22vw;" [src]="image['fileurl']" alt="">
+                                                                            </span>
+                                                                            <span #myvideo *ngIf="image['mediatype']?.includes('video')" (click)="downloadFiles(image['fileurl'])">
+                                                                                <video style="margin-bottom: 5px; width: 22vw;" height="350" controls id="myvideo">
+                                                                                    <source [src]="image['fileurl']">
+                                                                                </video>
+                                                                            </span>
+                                                                            <span *ngIf="image['mediatype']?.includes('audio')">
+                                                                                <audio style="width: 22vw; height: 50px" controls>
+                                                                                    <source [src]="image['fileurl']">
+                                                                                </audio>
+                                                                            </span>
+                                                                            <span style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px;text-align: center; border-radius: 10px; width: 12vw;">
+                                                                                <span>
+                                                                                    <img *ngIf="image['filetype']?.includes('.sheet')" src="assets/Images/xls.png" width="25" height="25">
+                                                                                    <img *ngIf="image['filetype']?.includes('pdf')" src="assets/Images/pdf-file.png" width="25" height="25">
+                                                                                    <img *ngIf="image['filetype']?.includes('.document')" src="assets/Images/doc.png" width="25" height="25">
+                                                                                </span>
+                                                                                <span class="lastmessage" style="width: 12vw; font-size: 14px;">
+                                                                                    {{image['filename']}}
+                                                                                    <button mat-icon-button (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
+                                                                                </span>
+                                                                            </span>
+                                                                        </span>
+                                                                    </span>
+                                                                </span>
+                                                                <p id="messages" [innerHTML]="chat['message'] | linebreaks | link"></p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div style="display: flex; flex-direction: row; justify-content: space-between; width: 95%; font-size: 12px; margin-top: -15px; padding: 0;">
+                                                            <div><p></p></div>
+                                                            <div style="display: flex; flex-direction: row;">
+                                                                <p style="margin-right: 5px; color:#ff7a55; font-weight: bold;" *ngIf="![null,undefined, ''].includes(chat.time)">{{chat.time.toDate() | date : 'shortTime'}}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+
+                                        <!-- <span *ngIf="ticketFiles.length != 0">
+                                            <div *ngFor="let file of ticketFiles.length;let index = index">
+                                              <div style="display: flex;flex-direction: row;justify-content: space-between;padding: 10px; margin: 5px; text-align: center;background-color: rgb(189, 189, 189);border-radius: 10px; color: black;">
+                                                    <span class="lastmessage">
+                                                        <p>{{file.filename}}</p>
+                                                    </span>
+                                                    <button mat-icon-button (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
+                                              </div>
+                                            </div>
+                                        </span> -->
+
+                                        <div *ngIf="currentIssueChat.length != 0 && currentIssueData['status']['status']?.toLowerCase() == 'open'" class="chatbottom">
+                                            <div class="message">
+                                                <textarea matInput placeholder="Type your message" [(ngModel)]="ticketMessage" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6"></textarea>
+                                            </div>
+                                            <div class="buttons">
+                                                <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
+                                                <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+                                                    &nbsp;&nbsp;
+                                                    <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+                                                    &nbsp;&nbsp;
+                                                    <button mat-icon-button (click)="chooseType('video')" class="attach"><mat-icon>videocam</mat-icon></button>
+                                                    <br>
+                                                    &nbsp;&nbsp;
+                                                    <button mat-icon-button (click)="chooseType('audio')" class="attach"><mat-icon>music_note</mat-icon></button>
+                                                    &nbsp;&nbsp;
+                                                    <button mat-icon-button (click)="chooseType('files')" class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
+                                                </mat-menu>
+                                                <input style="display: none;" #fileInput type="file" [accept]="this['filetype']" (click)="onClick($event)" (change)="selectFiles($event)" multiple>
+                                                &nbsp;
+                                                <button mat-mini-fab (click)="sendChatMessage(ticketMessage,currentIssueData)"><mat-icon>send</mat-icon></button>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Forms Tab ─────────────────────────────────────── -->
+                        <div *ngIf="tab.label == 'Forms'">
+                            <div style="width:65vw">
+                                <div *ngIf="participantforms.length != 0; else noData">
+                                    <table class="product-table">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Form Name</th>
+                                                <th>Workshop</th>
+                                                <th>Queue</th>
+                                                <th>Submitted In</th>
+                                                <th>Date</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <ng-container *ngFor="let form of participantforms; let i = index">
+                                                <tr>
+                                                    <td>{{ i + 1 }}.</td>
+                                                    <td>{{ form['formname'] }}</td>
+                                                    <td><span>{{ mapWorkshop[form['workshopref']?.id] }}</span></td>
+                                                    <td><span>{{ mapQueue[form['queueref']?.id] }}</span></td>
+                                                    <td><span>{{form.submittedin}}</span></td>
+                                                    <td>
+                                                        <span class="badge journey-dates">{{  (form['date']?.toDate() | date: 'mediumDate') || 'N/A'}}</span>
+                                                    </td>
+                                                    <td>
+                                                        <button mat-raised-button class="badge journey-dates" (click)="this['onFormPreview'](form)">view</button>
+                                                    </td>
+                                                </tr>
+                                            </ng-container>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <ng-template #noData>
+                                    <p style="text-align: center;">No data available.</p>
+                                </ng-template>
+                            </div>
+                        </div>
+
+                        <!-- ── Interim Reports Tab ───────────────────────────── -->
+                        <div *ngIf="tab.label == 'Interim Report'">
+                            <div *ngIf="participantreports.length != 0; else noData">
+                                <table class="product-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Reports Done</th>
+                                            <th>Status</th>
+                                            <th>Last Update</th>
+                                            <th>Due Date</th>
+                                            <th>Lock Date</th>
+                                            <th>Remainder Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <ng-container *ngFor="let report of participantreports; let i = index">
+                                            <tr style="cursor: pointer;" (click)="this['reportView'](report)">
+                                                <td>{{ i + 1 }}.</td>
+                                                <td>{{ report['reportlist'] }}</td>
+                                                <td><span>{{report.status}}</span></td>
+                                                <td><span>{{ report['lastupdate']?.toDate() | date: 'mediumDate' }}</span></td>
+                                                <td><span>{{ report['duedate']?.toDate() | date: 'mediumDate' }}</span></td>
+                                                <td><span>{{ report['lockdate']?.toDate() | date: 'mediumDate' }}</span></td>
+                                                <td><span>{{  report['remainderdate']?.toDate() | date: 'mediumDate'}}</span></td>
+                                            </tr>
+                                        </ng-container>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <ng-template #noData>
+                                <p style="text-align: center;">No data available.</p>
+                            </ng-template>
+                        </div>
+
+                        <!-- ── Breakthroughs Tab ─────────────────────────────── -->
+                        <div *ngIf="tab.label == 'Breakthroughs'">
+                            <div *ngIf="breakthroughs.length != 0; else noData">
+                                <ul class="product-list">
+                                    <li class="product-item" *ngFor="let post of breakthroughs; let i=index">
+                                        <div class="card">
+                                            <span style="font-weight: bold;margin-bottom: 5px;">{{i+1}}. {{ mappostcategory[post['postcategory'].id] }}</span>
+                                            <span style="font-weight: bold;margin-bottom: 5px;">Post Message: </span>
+                                            <p>{{ post.postmessage }}</p>
+                                            <span style="font-weight: bold;margin-bottom: 5px;">parallel Trajectory: </span>
+                                            <p>{{ post.paralleltrajectory }}</p>
+                                            <span style="font-weight: bold;margin-bottom: 5px;">Post Message: </span>
+                                            <p>{{ post.postmessage }}</p>
+                                            <span style="font-weight: bold;margin-bottom: 5px;">Post Visibility: </span>
+                                            <span>{{ post.private ? 'Private' : 'Public' }}</span>
+                                            <span style="font-weight: bold;margin-bottom: 5px;">Posted on: </span>
+                                            <span>{{ post.created?.toDate() | date: 'mediumDate' }}</span>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <ng-template #noData>
+                                <p style="text-align: center;">No data available.</p>
+                            </ng-template>
+                        </div>
+
+                        <!-- ── AEL Tab ────────────────────────────────────────── -->
+                        <div *ngIf="tab.label == 'AEL'">
+                            <div class="mat-elevation-z8" style="height: 100%; overflow-y: auto;width: 65vw;">
+                                <table mat-table [dataSource]="dataSource" matSort>
+
+                                    <ng-container matColumnDef="edit">
+                                        <th mat-header-cell *matHeaderCellDef class="edit-column"> Edit </th>
+                                        <td mat-cell *matCellDef="let row" class="edit-column">
+                                            <button [disabled]="this['loggedInProfileId'] !== 'tGE64OoJuurjayW3tJKa' && this['loggedInProfileId'] !== 'l0ApFnXuM5Ac8tpqJQnk'" mat-icon-button (click)="this['editRow'](row)">
+                                                <mat-icon>edit</mat-icon>
+                                            </button>
+                                        </td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="sno">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header class="sno-column"> S.No </th>
+                                        <td mat-cell *matCellDef="let row; let i = index" class="sno-column">{{ i + 1 }}</td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="created">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header class="date-column"> Date </th>
+                                        <td mat-cell *matCellDef="let row" class="date-column">
+                                            {{row.created.toDate() | date: 'MMM d, yyyy'}}
+                                        </td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="business">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header> Business </th>
+                                        <td mat-cell *matCellDef="let row">
+                                            <ul>
+                                                <li *ngFor="let item of row.business | keyvalue">
+                                                    <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="career">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header> Career </th>
+                                        <td mat-cell *matCellDef="let row">
+                                            <ul>
+                                                <li *ngFor="let item of row.career | keyvalue">
+                                                    <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="family">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header> Family </th>
+                                        <td mat-cell *matCellDef="let row">
+                                            <ul>
+                                                <li *ngFor="let item of row.family | keyvalue">
+                                                    <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="health">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header> Health </th>
+                                        <td mat-cell *matCellDef="let row">
+                                            <ul>
+                                                <li *ngFor="let item of row.health | keyvalue">
+                                                    <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </ng-container>
+
+                                    <ng-container matColumnDef="personalGenius">
+                                        <th mat-header-cell *matHeaderCellDef mat-sort-header> Personal Genius </th>
+                                        <td mat-cell *matCellDef="let row">
+                                            <ul>
+                                                <li *ngFor="let item of row.personalGenius | keyvalue">
+                                                    <span style="font-weight: bold;">{{ item.key }}: </span> {{ item.value }}
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </ng-container>
+
+                                    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                                    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+                                </table>
+                                <mat-paginator [pageSizeOptions]="[25, 50, 100, 500]" aria-label="Select page of users"></mat-paginator>
+                            </div>
+                        </div>
+
+                    </div>
+                </mat-tab>
+            </mat-tab-group>
+        </div>
+
+    </div>
+</div>

@@ -11,8 +11,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Firestore, collection, collectionData, doc, docData, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { Firestore, doc, docData, setDoc } from '@angular/fire/firestore';
 import { Subscription } from 'rxjs';
+
+interface WatiConfig {
+  watiname: string;
+  serverid: string;
+  endpoint: string;
+  watitoken: string;
+}
 
 @Component({
   selector: 'app-wati-config-dialog',
@@ -39,23 +46,25 @@ export class WatiConfigDialogComponent implements OnInit, OnDestroy {
   private dialogRef = inject(MatDialogRef<WatiConfigDialogComponent>);
   private snackBar = inject(MatSnackBar);
 
-  watiSubscribe:Subscription;
-  // Data
-  watiConfigs = [];
+  watiSubscribe: Subscription;
+
+  // Data — map keyed by serverid
+  watiMap: { [serverid: string]: WatiConfig } = {};
+  watiList: WatiConfig[] = [];
 
   // Edit mode
-  editingIndex: number = -1;
-  editForm = { watiname: '', watiserver: '', endpoint: '', watitoken: '' };
+  editingServerId: string | null = null;
+  editForm: WatiConfig = { watiname: '', serverid: '', endpoint: '', watitoken: '' };
 
   // Add mode
   showAddForm = false;
-  newConfig = { watiname: '', watiserver: '', endpoint: '', watitoken: '' };
+  newConfig: WatiConfig = { watiname: '', serverid: '', endpoint: '', watitoken: '' };
 
   // Table columns
-  displayedColumns: string[] = ['watiname', 'watiserver', 'endpoint', 'watitoken', 'actions'];
+  displayedColumns: string[] = ['serverid', 'watiname', 'endpoint', 'watitoken', 'actions'];
 
   // Token visibility tracking
-  visibleTokens: Set<number> = new Set();
+  visibleTokens: Set<string> = new Set();
 
   // Loading state
   loading = false;
@@ -65,56 +74,62 @@ export class WatiConfigDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.watiSubscribe.unsubscribe()
+    this.watiSubscribe?.unsubscribe();
   }
 
-  async loadWatiData(): Promise<void> {
+  loadWatiData(): void {
     this.loading = true;
     try {
       const docRef = doc(this.firestore, 'classify', 'wati');
-      this.watiSubscribe = docData(docRef).subscribe((watidata)=>{
+      this.watiSubscribe = docData(docRef).subscribe((watidata) => {
         if (watidata) {
-          const data = watidata;
-          this.watiConfigs = data?.['wati'] || [];
+          const { ...map } = watidata;
+          this.watiMap = map as { [serverid: string]: WatiConfig };
+          this.rebuildList();
         } else {
-          this.watiConfigs = [];
+          this.watiMap = {};
+          this.watiList = [];
         }
+        this.loading = false;
       });
-
     } catch (error) {
       console.error('Error loading WATI data:', error);
       this.showSnackBar('Error loading data');
-    } finally {
       this.loading = false;
     }
   }
 
-  // Add operations
+  private rebuildList(): void {
+    this.watiList = Object.keys(this.watiMap).map(key => this.watiMap[key]);
+  }
+
+  // --- Add ---
   toggleAddForm(): void {
     this.showAddForm = !this.showAddForm;
-    this.newConfig = { watiname: '', watiserver: '', endpoint: '', watitoken: '' };
+    this.newConfig = { watiname: '', serverid: '', endpoint: '', watitoken: '' };
     if (this.showAddForm) {
       this.cancelEdit();
     }
   }
 
   async addConfig(): Promise<void> {
-    if (!this.newConfig.watiname || !this.newConfig.watiserver || !this.newConfig.endpoint || !this.newConfig.watitoken) {
+    if (!this.newConfig.watiname || !this.newConfig.serverid || !this.newConfig.endpoint || !this.newConfig.watitoken) {
       this.showSnackBar('Please fill all fields');
       return;
     }
 
-    if (this.watiConfigs.some(c => c.watiname === this.newConfig.watiname)) {
-      this.showSnackBar('WATI name already exists');
+    if (this.watiMap[this.newConfig.serverid]) {
+      this.showSnackBar('Server ID already exists');
       return;
     }
 
     this.loading = true;
     try {
-      this.watiConfigs.push({ ...this.newConfig });
+      this.watiMap[this.newConfig.serverid] = { ...this.newConfig };
       await this.saveToFirestore();
+      this.rebuildList();
       this.showAddForm = false;
-      this.newConfig = { watiname: '', watiserver: '', endpoint: '', watitoken: '' };
+      this.newConfig = { watiname: '', serverid: '', endpoint: '', watitoken: '' };
       this.showSnackBar('WATI config added successfully');
     } catch (error) {
       console.error('Error adding config:', error);
@@ -124,34 +139,37 @@ export class WatiConfigDialogComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Edit operations
-  editConfig(config, index: number): void {
-    this.editingIndex = index;
+  // --- Edit ---
+  editConfig(config: WatiConfig): void {
+    this.editingServerId = config.serverid;
     this.editForm = { ...config };
     this.showAddForm = false;
   }
 
   cancelEdit(): void {
-    this.editingIndex = -1;
-    this.editForm = { watiname: '', watiserver: '', endpoint: '', watitoken: '' };
+    this.editingServerId = null;
+    this.editForm = { watiname: '', serverid: '', endpoint: '', watitoken: '' };
   }
 
   async saveEdit(): Promise<void> {
-    if (!this.editForm.watiname || !this.editForm.watiserver || !this.editForm.endpoint || !this.editForm.watitoken) {
+    if (!this.editForm.watiname || !this.editForm.serverid || !this.editForm.endpoint || !this.editForm.watitoken) {
       this.showSnackBar('Please fill all fields');
       return;
     }
 
-    const duplicate = this.watiConfigs.some((c, i) => c.watiname === this.editForm.watiname && i !== this.editingIndex);
-    if (duplicate) {
-      this.showSnackBar('WATI name already exists');
+    if (this.editForm.serverid !== this.editingServerId && this.watiMap[this.editForm.serverid]) {
+      this.showSnackBar('Server ID already exists');
       return;
     }
 
     this.loading = true;
     try {
-      this.watiConfigs[this.editingIndex] = { ...this.editForm };
+      if (this.editForm.serverid !== this.editingServerId) {
+        delete this.watiMap[this.editingServerId];
+      }
+      this.watiMap[this.editForm.serverid] = { ...this.editForm };
       await this.saveToFirestore();
+      this.rebuildList();
       this.cancelEdit();
       this.showSnackBar('WATI config updated successfully');
     } catch (error) {
@@ -162,17 +180,17 @@ export class WatiConfigDialogComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Delete operation
-  async deleteConfig(index: number): Promise<void> {
-    const config = this.watiConfigs[index];
+  // --- Delete ---
+  async deleteConfig(config: WatiConfig): Promise<void> {
     if (!confirm(`Are you sure you want to delete "${config.watiname}"?`)) {
       return;
     }
 
     this.loading = true;
     try {
-      this.watiConfigs.splice(index, 1);
+      delete this.watiMap[config.serverid];
       await this.saveToFirestore();
+      this.rebuildList();
       this.showSnackBar('WATI config deleted successfully');
     } catch (error) {
       console.error('Error deleting config:', error);
@@ -182,27 +200,28 @@ export class WatiConfigDialogComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Firestore save
+  // --- Firestore ---
   private async saveToFirestore(): Promise<void> {
     const docRef = doc(this.firestore, 'classify', 'wati');
     try {
-      await updateDoc(docRef, { wati: this.watiConfigs });
+      await setDoc(docRef, this.watiMap);
     } catch (error) {
-      await setDoc(docRef, { wati: this.watiConfigs });
+      console.error('Firestore save error:', error);
+      throw error;
     }
   }
 
-  // Token visibility
-  toggleTokenVisibility(index: number): void {
-    if (this.visibleTokens.has(index)) {
-      this.visibleTokens.delete(index);
+  // --- Token visibility ---
+  toggleTokenVisibility(serverid: string): void {
+    if (this.visibleTokens.has(serverid)) {
+      this.visibleTokens.delete(serverid);
     } else {
-      this.visibleTokens.add(index);
+      this.visibleTokens.add(serverid);
     }
   }
 
-  isTokenVisible(index: number): boolean {
-    return this.visibleTokens.has(index);
+  isTokenVisible(serverid: string): boolean {
+    return this.visibleTokens.has(serverid);
   }
 
   maskToken(): string {

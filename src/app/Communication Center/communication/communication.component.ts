@@ -12,7 +12,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ViewTemplateDialogComponent } from '../view-template-dialog/view-template-dialog.component';
 import { NavigationEnd, Router } from '@angular/router';
 import { MyOperatorService } from '../myoperator-service';
-import { WatiService } from '../wati-service';
+// import { WatiService } from '../wati-service';
 import { filter, map } from 'rxjs/operators';
 import { combineLatest } from 'rxjs';
 import { animate, state, style, transition, trigger } from '@angular/animations';
@@ -308,7 +308,7 @@ export class CommunicationComponent implements OnInit, AfterViewInit {
   myOperatorForm: FormGroup;
 
   constructor(
-    private watiService: WatiService,
+    // private watiService: WatiService,
     private authguard: AuthguardService,
     public firestore: Firestore,
     private sanitizer: DomSanitizer,
@@ -1601,14 +1601,14 @@ export class CommunicationComponent implements OnInit, AfterViewInit {
           }
         }
 
-        this.watiService.sendTemplateMessage(waticontent.body, waticontent.phonenumber).subscribe((response) => {
-          console.log('Template Message Sent successfully:', response);
-          if (participants.length == i) {
-            alert("Template Message Sent Fully")
-          }
-        }, (error) => {
-          console.error('Error creating template:', error);
-        });
+        // this.watiService.sendTemplateMessage(waticontent.body, waticontent.phonenumber).subscribe((response) => {
+        //   console.log('Template Message Sent successfully:', response);
+        //   if (participants.length == i) {
+        //     alert("Template Message Sent Fully")
+        //   }
+        // }, (error) => {
+        //   console.error('Error creating template:', error);
+        // });
       }
     }
   }

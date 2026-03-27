@@ -210,8 +210,8 @@ export class OpenviduRecordingComponent {
       if(RoomTitle.trim().length > 0){
         const collectionName = "openviduroom"
         const roomId = this.guard.generateId(this.firestore, collectionName)
-        const roomDoc = doc(this.firestore, collectionName, roomId)
-        var roomData = {
+
+        await this.guard.createOpenViduRoom({
           active: true,
           createddate: serverTimestamp(),
           sessiontype: "private",
@@ -220,9 +220,21 @@ export class OpenviduRecordingComponent {
           hosts: [this.loggedInProfileid],
           participantid: null,
           title: RoomTitle,
-          metadata: {}
-        }
-        await setDoc(roomDoc, roomData)
+          metadata: {},
+        })
+
+        // var roomData = {
+        //   active: true,
+        //   createddate: serverTimestamp(),
+        //   sessiontype: "private",
+        //   sessionid: roomId,
+        //   roomid: roomId,
+        //   hosts: [this.loggedInProfileid],
+        //   participantid: null,
+        //   title: RoomTitle,
+        //   metadata: {}
+        // }
+        // await setDoc(roomDoc, roomData)
       }
       else{
         alert("Need Room Title")

@@ -123,6 +123,12 @@ mat-dialog-content {
   color: #333;
 }
 
+.server-id {
+  font-family: monospace;
+  font-weight: 600;
+  color: #1976d2;
+}
+
 /* Token Cell */
 .token-cell {
   display: flex;

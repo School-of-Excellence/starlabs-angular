@@ -1,126 +1,206 @@
-<div style="padding: 20px;">
-  <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 16px;">
-      <button type="button" style="color: rgb(220, 78, 101);" mat-stroked-button (click)="openEiflixBannerDialog()">
-        <mat-icon style="color:rgb(220, 78, 101);">movie</mat-icon> EiFlix Banner
+<div class="workshops-page">
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">Workshops</h1>
+      <p class="page-subtitle">Configure, monitor and manage all workshop sessions</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button class="action-btn secondary-btn" (click)="openEiflixBannerDialog()">
+        <mat-icon>movie_filter</mat-icon>
+        <span>EiFlix Banner</span>
       </button>
-      <button type="button" style="color: blue;" mat-stroked-button (click)="routeToProducts()">
-        <mat-icon style="color:blue;">add_shopping_cart</mat-icon> Product Page
+      <button mat-stroked-button class="action-btn secondary-btn" (click)="routeToProducts()">
+        <mat-icon>storefront</mat-icon>
+        <span>Products</span>
       </button>
-      <button type="button" style="color: green;" mat-stroked-button (click)="route('create',null)">
-        <mat-icon style="color:green;">edit_note</mat-icon> Add New Workshop
+      <button mat-flat-button class="action-btn primary-btn" (click)="route('create')">
+        <mat-icon>add</mat-icon>
+        <span>New Workshop</span>
       </button>
     </div>
-      <!-- <button type="button" style="float:right;color: green;" mat-stroked-button (click)="route('create',null)">
-        <mat-icon style="color:green;">edit_note</mat-icon> Add New Workshop 
-    </button> <br><br> -->
-    <table mat-table [dataSource]="workshops$ | async" class="mat-elevation-z8 full-width-table">
-    <ng-container matColumnDef="title">
-        <th mat-header-cell *matHeaderCellDef> Title </th>
-        <td mat-cell *matCellDef="let element"> {{ element.detailpage?.title }} </td>
-    </ng-container>
-    <ng-container matColumnDef="type">
-        <th mat-header-cell *matHeaderCellDef> Type </th>
-        <!-- <td mat-cell *matCellDef="let element"> {{ element.detailpage?.type }} </td> -->
-        <td mat-cell *matCellDef="let element"> {{ element.categorybased ? 'CP Workshop' : 'Workshop' }} </td>
-    </ng-container>
-    <ng-container matColumnDef="created">
-        <th mat-header-cell *matHeaderCellDef> Created </th>
-        <td mat-cell *matCellDef="let element"> 
-        {{ element.created?.toDate() | date:'mediumDate' }} 
-        </td>
-    </ng-container>
-    <ng-container matColumnDef="startDate">
-        <th mat-header-cell *matHeaderCellDef> Start Date </th>
-        <td mat-cell *matCellDef="let element"> 
-        {{ element.detailpage?.workshopStartDate?.toDate() | date:'mediumDate' }} 
-        </td>
-    </ng-container>
-    <ng-container matColumnDef="endDate">
-        <th mat-header-cell *matHeaderCellDef> End Date </th>
-        <td mat-cell *matCellDef="let element"> 
-        {{ element.detailpage?.workshopEndDate?.toDate() | date:'mediumDate' }} 
-        </td>
-    </ng-container>
-    <ng-container matColumnDef="status">
-  <th mat-header-cell *matHeaderCellDef> Status </th>
-  <td mat-cell *matCellDef="let element">
-    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <mat-slide-toggle
-          [checked]="element.active || false"
-          (change)="onWorkshopStatusChange(element, $event)"
-          color="primary">
-        </mat-slide-toggle>
-        <span [style.color]="element.active ? '#4caf50' : '#f44336'"
-              style="font-size: 12px; font-weight: 500;">
-          {{ element.active ? 'Active' : 'Inactive' }}
-        </span>
-        <mat-icon [style.color]="element.active ? '#4caf50' : '#f44336'" style="font-size: 16px;">
-          {{ element.active ? 'check_circle' : 'cancel' }}
-        </mat-icon>
+  </div>
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label class="filter-label">Status</label>
+      <div class="filter-chips">
+        <button class="chip" [class.chip-active]="statusFilter === 'all'"
+          (click)="statusFilter = 'all'; applyFilters()">All</button>
+        <button class="chip chip-active-color" [class.chip-active]="statusFilter === 'active'"
+          (click)="statusFilter = 'active'; applyFilters()">
+          <span class="chip-dot dot-green"></span>Active
+        </button>
+        <button class="chip chip-inactive-color" [class.chip-active]="statusFilter === 'inactive'"
+          (click)="statusFilter = 'inactive'; applyFilters()">
+          <span class="chip-dot dot-red"></span>Inactive
+        </button>
+        <button class="chip chip-completed-color" [class.chip-active]="statusFilter === 'completed'"
+          (click)="statusFilter = 'completed'; applyFilters()">
+          <span class="chip-dot dot-blue"></span>Completed
+        </button>
       </div>
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <mat-slide-toggle
-          [checked]="element.workshopcompleted || false"
-          (change)="onWorkshopCompletedChange(element, $event)"
-          color="accent">
-        </mat-slide-toggle>
-        <span [style.color]="element.workshopcompleted ? '#2196f3' : '#9e9e9e'"
-              style="font-size: 12px; font-weight: 500;">
-          {{ element.workshopcompleted ? 'Completed' : 'Not Completed' }}
-        </span>
-        <mat-icon [style.color]="element.workshopcompleted ? '#2196f3' : '#9e9e9e'" style="font-size: 16px;">
-          {{ element.workshopcompleted ? 'check_circle' : 'hourglass_empty' }}
-        </mat-icon>
-      </div>
-
     </div>
-  </td>
-</ng-container>
 
-    <!-- <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef> Status </th>
-        <td mat-cell *matCellDef="let element">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <mat-slide-toggle 
-                    [checked]="element.active || false"
-                    (change)="onWorkshopStatusChange(element, $event)"
-                    color="primary">
+    <div class="filter-divider"></div>
+
+    <div class="filter-group">
+      <label class="filter-label">Sort By</label>
+      <div class="filter-chips">
+        <button class="chip" [class.chip-active]="sortField === 'created'" (click)="setSortField('created')">
+          Created
+          <mat-icon class="sort-icon" *ngIf="sortField === 'created'">
+            {{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+          </mat-icon>
+        </button>
+        <button class="chip" [class.chip-active]="sortField === 'startDate'" (click)="setSortField('startDate')">
+          Start Date
+          <mat-icon class="sort-icon" *ngIf="sortField === 'startDate'">
+            {{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+          </mat-icon>
+        </button>
+        <button class="chip" [class.chip-active]="sortField === 'endDate'" (click)="setSortField('endDate')">
+          End Date
+          <mat-icon class="sort-icon" *ngIf="sortField === 'endDate'">
+            {{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+          </mat-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-container" *ngIf="workshops$ | async as workshops; else loading">
+    <ng-container *ngIf="applyAllFilters(workshops) as filtered">
+      <div class="result-count-bar">
+        <span class="count-badge">{{ filtered.length }}</span>
+        <span class="count-label">{{ filtered.length === 1 ? 'workshop' : 'workshops' }}</span>
+      </div>
+
+      <div class="table-wrapper" *ngIf="filtered.length > 0; else empty">
+        <table mat-table [dataSource]="filtered" class="workshops-table">
+
+          <ng-container matColumnDef="active">
+            <th mat-header-cell *matHeaderCellDef class="col-center col-active">Active</th>
+            <td mat-cell *matCellDef="let workshop" class="col-center col-active">
+              <mat-slide-toggle
+                [checked]="workshop.active"
+                (change)="onWorkshopStatusChange(workshop, $event)"
+                color="primary">
+              </mat-slide-toggle>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="title">
+            <th mat-header-cell *matHeaderCellDef>Workshop</th>
+            <td mat-cell *matCellDef="let workshop">
+              <div class="workshop-title-cell">
+                <div class="workshop-name">{{ workshop?.detailpage?.title || '—' }}</div>
+                <!-- <div class="workshop-id">{{ workshop?.id }}</div> -->
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let workshop">
+              <span class="type-badge" [class.type-cp]="workshop?.categorybased">
+                {{ workshop?.categorybased ? 'CP Workshop' : 'Workshop' }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="created">
+            <th mat-header-cell *matHeaderCellDef>Created</th>
+            <td mat-cell *matCellDef="let workshop">
+              <div class="date-cell">
+                <mat-icon class="date-icon">calendar_today</mat-icon>
+                <span>{{ workshop?.created?.toDate() | date:'dd MMM yyyy' }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="startDate">
+            <th mat-header-cell *matHeaderCellDef>Start Date</th>
+            <td mat-cell *matCellDef="let workshop">
+              <div class="date-cell">
+                <mat-icon class="date-icon">play_circle_outline</mat-icon>
+                <span>{{ workshop?.detailpage?.workshopStartDate?.toDate() | date:'dd MMM yyyy' }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="endDate">
+            <th mat-header-cell *matHeaderCellDef>End Date</th>
+            <td mat-cell *matCellDef="let workshop">
+              <div class="date-cell">
+                <mat-icon class="date-icon">stop_circle</mat-icon>
+                <span>{{ workshop?.detailpage?.workshopEndDate?.toDate() | date:'dd MMM yyyy' }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef class="col-center">Completed</th>
+            <td mat-cell *matCellDef="let workshop" class="col-center">
+              <div class="status-cell">
+                <mat-slide-toggle
+                  [checked]="workshop.workshopcompleted"
+                  (change)="onWorkshopCompletedChange(workshop, $event)"
+                  color="accent">
                 </mat-slide-toggle>
-                <span [style.color]="element.active ? '#4caf50' : '#f44336'" 
-                      style="font-size: 12px; font-weight: 500;">
-                    {{ element.active ? 'Active' : 'Inactive' }}
+                <span class="completed-label" [class.done]="workshop.workshopcompleted">
+                  <!-- {{ workshop.workshopcompleted ? 'Done' : 'Pending' }} -->
+                    {{ workshop.workshopcompleted ? 'Done' : (workshop.active ? 'Ongoing' : 'Not Started') }}
                 </span>
-                <mat-icon [style.color]="element.active ? '#4caf50' : '#f44336'" 
-                          style="font-size: 16px;">
-                    {{ element.active ? 'check_circle' : 'cancel' }}
-                </mat-icon>
-            </div>
-        </td>
-    </ng-container> -->
-    <ng-container matColumnDef="edit">
-    <th mat-header-cell *matHeaderCellDef> Actions </th>
-    <td mat-cell *matCellDef="let element">
-        <button mat-icon-button [matMenuTriggerFor]="menu">
-        <mat-icon>view_list</mat-icon>
-        </button>
-        <mat-menu #menu="matMenu">
-        <button mat-menu-item (click)="route('edit', element)">
-            <mat-icon>edit</mat-icon>
-            <span>Edit</span>
-        </button>
-        <button mat-menu-item (click)="dashboardNavigation(element)">
-            <mat-icon>bar_chart</mat-icon>
-            <span>Dashboard</span>
-        </button>
-        <button disabled="false" mat-menu-item (click)="duplicateWorkshop(element)">
-            <mat-icon>content_copy</mat-icon>
-            <span>Duplicate Workshop</span>
-        </button>
-        </mat-menu>
-    </td>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="edit">
+            <th mat-header-cell *matHeaderCellDef class="col-center col-actions">Actions</th>
+            <td mat-cell *matCellDef="let workshop" class="col-center col-actions">
+              <div class="action-cell">
+                <button mat-icon-button class="icon-btn dashboard-btn"
+                  matTooltip="Open Dashboard" (click)="dashboardNavigation(workshop)">
+                  <mat-icon>dashboard</mat-icon>
+                </button>
+                <button mat-icon-button class="icon-btn edit-btn"
+                  matTooltip="Edit Workshop" (click)="route('edit', workshop)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button class="icon-btn duplicate-btn"
+                  matTooltip="Duplicate" (click)="duplicateWorkshop(workshop)">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns" class="table-header-row"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"
+            [class.row-active]="row.active"
+            [class.row-completed]="row.workshopcompleted">
+          </tr>
+        </table>
+      </div>
+
+      <ng-template #empty>
+        <div class="empty-state">
+          <mat-icon class="empty-icon">event_busy</mat-icon>
+          <h3>No workshops found</h3>
+          <p>Try adjusting your filters or create a new workshop.</p>
+          <button mat-flat-button class="primary-btn" (click)="route('create')">
+            <mat-icon>add</mat-icon> Create Workshop
+          </button>
+        </div>
+      </ng-template>
+
     </ng-container>
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-    </table>
+  </div>
+
+  <ng-template #loading>
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading workshops…</p>
+    </div>
+  </ng-template>
+
 </div>

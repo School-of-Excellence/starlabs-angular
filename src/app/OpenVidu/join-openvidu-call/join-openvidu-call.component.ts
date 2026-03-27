@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, } from 'livekit-client';
@@ -14,7 +14,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-
+import { BackgroundProcessor } from "@livekit/track-processors";
+import { InstanceStatusService } from '../../instance-status.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -60,19 +61,23 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   roomDetail: RoomInfo | undefined | null;
   roomSubscription = new Subject<void>();
 
+  // Server Subscription
+  serverSubscription = new Subject<void>();
+
   // UI States
   loading = true;
   isSharing = false;
-  meetingRoomStatus: null | "connecting" | "connected" | "left" | "ended" = null
+  meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended" = "servercheck"
   // Fullscreen Enable
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
   
-
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
+
+  isVideoBlurred:boolean = false;
 
   constructor(
     public firestore: Firestore,
@@ -80,7 +85,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public httpClient: HttpClient,
     public guard: AuthguardService,
     public noiseCancellationService: NoiseCancellationService,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private infraService: InstanceStatusService
   ){}
 
   ngAfterViewInit(): void {
@@ -106,7 +112,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           if(data && data["active"]){
 
             // Prepare Call - Only when screen launched first time
-            if(this.roomDetail.title == "") this.prepareParticipant()
+            if(this.roomDetail.title == "") this.checkServer()
 
             this.roomDetail = {
               roomId: id,
@@ -522,6 +528,32 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   //   return 1 + remoteVideoCount;
   // }
 
+  async checkServer(){
+    this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
+      next: (serverData) => {
+        if (serverData) {
+          const masterStatus = serverData["master"]["state"]
+          const mediaNode = serverData["media"]["instanceStates"]["healthy"] || 0
+
+          if(masterStatus == "running" && mediaNode > 0){
+            this.prepareParticipant()
+            this.serverSubscription?.next()
+            this.serverSubscription?.complete()
+          }
+          else if(masterStatus == "running" || masterStatus == "starting"){
+            this.meetingRoomStatus = "serverstarting"
+          }
+          else {
+            this.meetingRoomStatus = "serverfailed"
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Infrastructure status error:', err);
+      }
+    });
+  }
+
   async prepareParticipant() {
     this.isRequesting = true;
     this.meetingRoomStatus = null
@@ -608,11 +640,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.ConnectionQualityChanged, 
       (quality: ConnectionQuality, participant: Participant) => {
-      console.log("Network quality changed:", participant.identity, quality);
-      this.remoteParticipantsQuality.update((value) =>{
-        value.set(participant.identity, quality)
-        return value
-      })
+        console.log("Network quality changed:", participant.identity, quality);
+        this.remoteParticipantsQuality.update((value) =>{
+          value.set(participant.identity, quality)
+          return value
+        })
     });
 
     // Track Muted Participants
@@ -646,26 +678,26 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     try {
       // Request a new token
-      const response = await this.getTokenWithRetry();
-      console.log('Token received:', response);
+    const response = await this.getTokenWithRetry();
+    console.log('Token received:', response);
 
 
       // Connect to the LiveKit room
       // await ensures we wait until initial signaling is done
-      await room.connect(response.url, response.token);
+    await room.connect(response.url, response.token);
       this.meetingRoomStatus = "connected"
-      console.log('Room connected:', this.loggedinProfileid);
+    console.log('Room connected:', this.loggedinProfileid);
 
       // Enable camera 
-      await room.localParticipant.setCameraEnabled(true);
+    await room.localParticipant.setCameraEnabled(true);
       
-      const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
-      this.localParticipant.set(videoTrack);
+    const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
+    this.localParticipant.set(videoTrack);
 
-      await room.localParticipant.setMicrophoneEnabled(true, {
-        noiseSuppression: true,
-        echoCancellation: true
-      });
+    await room.localParticipant.setMicrophoneEnabled(true, {
+      noiseSuppression: true,
+      echoCancellation: true
+    });
 
       // Enable camera and microphone for publishing - Default
       /*
@@ -694,8 +726,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       this.leaveRoom(false);
     }
   }
-
- 
 
   private async getTokenWithRetry(): Promise<any> {
     const roomName = this.roomDetail.roomId;
@@ -728,9 +758,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  
-
-  
   // Leave/Disconnect from the Room
   async leaveRoom(confirmLeave: boolean) {
 
@@ -827,14 +854,57 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // Screen Share Control
+  isScreenSharing(): boolean {
+    const screenSharePub = this.getLocalTrackPublication(Track.Source.ScreenShare);
+    return screenSharePub !== undefined && !screenSharePub.isMuted;
+  }
+
+  isAnyoneScreenSharing(): boolean {
+    const remoteTracks = Array.from(this.remoteParticipants().values());
+    return remoteTracks.some(track => track.trackPublication.source === Track.Source.ScreenShare);
+  }
+
+  // Update toggleScreenShare to check this
   async toggleScreenShare() {
-    if (!this.isSharing) {
+    if (!this.isScreenSharing()) {
+      // Check if someone else is already sharing
+      if (this.isAnyoneScreenSharing()) {
+        alert("Someone else is already sharing their screen");
+        return;
+      }
       await this.startScreenShare();
     } else {
       this.stopScreenShare();
     }
-    this.isSharing = !this.isSharing;
+  }
+
+  // Get whoever is sharing screen (local or remote)
+  getActiveScreenShare(): { track: any, isLocal: boolean, participantName: string } | null {
+    // Check local first
+    const localScreenShare = this.getLocalTrackPublication(Track.Source.ScreenShare);
+    if (localScreenShare && !localScreenShare.isMuted) {
+      return {
+        track: localScreenShare.videoTrack,
+        isLocal: true,
+        participantName: this.loggedinProfileRole["name"]
+      };
+    }
+
+    // Check remote participants
+    const remoteTracks = Array.from(this.remoteParticipants().values());
+    const remoteScreenShare = remoteTracks.find(
+      track => track.trackPublication.source === Track.Source.ScreenShare
+    );
+
+    if (remoteScreenShare) {
+      return {
+        track: remoteScreenShare.trackPublication.videoTrack,
+        isLocal: false,
+        participantName: remoteScreenShare.participantName
+      };
+    }
+
+    return null;
   }
 
   async startScreenShare() {
@@ -923,6 +993,31 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       document.exitFullscreen();
       this.isFullscreen = false;
     }
+  }
+
+  // Add this method after toggleCamera()
+  async toggleVideoBlur() {
+    this.isVideoBlurred = !this.isVideoBlurred;
+    
+    const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
+
+    if (!cameraPub || !cameraPub.videoTrack) return;
+
+    const videoTrack = cameraPub.videoTrack;
+    
+    if (this.isVideoBlurred) {
+      // Apply blur using CSS filter through processor
+      const blur = BackgroundProcessor({
+        mode: "background-blur",
+        blurRadius: 10
+      });
+      videoTrack.setProcessor(blur)
+    } else {
+      // Remove blur
+      await videoTrack.stopProcessor();
+    }
+
+    console.log(this.isVideoBlurred)
   }
 
   // Take reference snapshot

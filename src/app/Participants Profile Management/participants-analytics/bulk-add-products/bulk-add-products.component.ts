@@ -284,7 +284,7 @@ export class BulkAddProductsComponent {
         const pjpSnapshot = await getDocs(query(
           collection(this.firestore, "participantjourneyproduct"),
           where("profileid", "in", batch),
-          where("journeystatus", "in", ['initiated', 'ongoing'])
+          where("journeystatus", "in", ['initiated', 'ongoing', 'completed'])
         ));
 
         const profileCounts = new Map();
