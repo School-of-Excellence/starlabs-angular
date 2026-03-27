@@ -513,8 +513,72 @@
     </div>
   </div>
 
+  <!-- Template -->
+  <div class="card sub-matrix-card" *ngIf="subscriptionMatrix">
+    <div class="ahl-card-hd">
+      <span class="ahl-card-title">Subscription ending</span>
+      <div style="display:flex; gap:8px; margin-left:auto; align-items:center;">
+        <span style="font-size:11px; color:var(--text3);">
+          {{ subscriptionMatrix.months.length }} months
+        </span>
+        <span style="font-size:11px; color:var(--text3);">·</span>
+        <span style="font-size:11px; color:var(--text3);">
+          {{ subscriptionMatrix.journeys.length }} journeys
+        </span>
+        <span class="sub-mat-total" style="padding:2px 10px; border-radius:20px;
+          background:var(--dn-bg); color:var(--dn-dark);
+          border:1px solid var(--dn-mid); font-size:12px;">
+          {{ getGrandTotal() }} total
+        </span>
+      </div>
+    </div>
+  
+    <div class="sub-matrix-wrap">
+      <table class="sub-matrix-table">
+        <thead>
+          <tr>
+            <th class="sub-mat-th sub-mat-journey-col">Journey</th>
+            <th class="sub-mat-th" *ngFor="let m of subscriptionMatrix.months">
+              {{ m.label }}
+            </th>
+            <th class="sub-mat-th sub-mat-total-col">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sub-mat-row" *ngFor="let j of subscriptionMatrix.journeys">
+            <td class="sub-mat-td sub-mat-journey-col">{{ j.label }}</td>
+            <td class="sub-mat-td" *ngFor="let m of subscriptionMatrix.months">
+              <ng-container *ngIf="getCellData(j.id, m.ym) as cell; else empty">
+                <span class="sub-mat-pill" (click)="openSubDialog(cell.docs, j.label + ' · ' + m.label)">
+                  {{ cell.count }}
+                </span>
+              </ng-container>
+              <ng-template #empty><span class="sub-mat-zero">—</span></ng-template>
+            </td>
+            <td class="sub-mat-td sub-mat-total-col">
+              <span class="sub-mat-total">{{ subscriptionMatrix.journeyTotals[j.id] }}</span>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="sub-mat-footer-row">
+            <td class="sub-mat-td sub-mat-journey-col sub-mat-footer-lbl">Total</td>
+            <td class="sub-mat-td" *ngFor="let m of subscriptionMatrix.months">
+              <span class="sub-mat-total">{{ subscriptionMatrix.monthTotals[m.ym] }}</span>
+            </td>
+            <td class="sub-mat-td sub-mat-total-col">
+              <span class="sub-mat-grand-total">
+                {{ getGrandTotal() }}
+              </span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
   <!-- Customer Support Container -->
-  <div class="customer-support-container-new">
+  <!-- <div class="customer-support-container-new">
     <div class="support-header">
       <h2 class="support-title">Customer Support</h2>
       <button class="dashboard-link" (click)="navigateToCustomerSupport()">
@@ -523,7 +587,6 @@
     </div>
 
     <div class="support-cards-new">
-      <!-- Event & Process -->
       <div class="support-card-new">
         <div class="card-header">Event & Process</div>
 
@@ -554,7 +617,6 @@
         </div>
       </div>
 
-      <!-- Journey Related -->
       <div class="support-card-new">
         <div class="card-header">Journey Related</div>
 
@@ -585,7 +647,6 @@
         </div>
       </div>
 
-      <!-- Cancellation -->
       <div class="support-card-new">
         <div class="card-header">Cancellation</div>
 
@@ -616,7 +677,6 @@
         </div>
       </div>
 
-      <!-- BIG Support -->
       <div class="support-card-new">
         <div class="card-header">Finance</div>
 
@@ -647,7 +707,6 @@
         </div>
       </div>
 
-      <!-- Referrals -->
       <div class="support-card-new">
         <div class="card-header">Referrals</div>
 
@@ -678,7 +737,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <!-- Modes Container -->
   <div class="modes-container-new">
@@ -914,30 +973,29 @@
       <div class="eco-row-bottom">
         <div class="eco-card">
           <div class="eco-card-header">
-            <div class="eco-card-icon orange">
+            <div class="eco-card-icon teal">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
               </svg>
             </div>
-            <span class="eco-card-title">Adjustment Details</span>
+            <span class="eco-card-title">Tags breakdown</span>
+            <span class="eco-card-count">{{ activeJourneyCoachTags.length }}</span>
           </div>
-          <div class="eco-card-body">
-            <ul class="eco-list">
-              <li class="eco-list-item" *ngFor="let impact of evolutionprogressMap | keyvalue">
-                <span class="eco-list-text">{{impact.key}}</span>
-                <div class="eco-list-arrow">
-                  <span class="eco-list-badge teal">{{impact.value}}</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
-                </div>
-              </li>
-            </ul>
-            <div class="eco-empty" *ngIf="(evolutionprogressMap | keyvalue)?.length === 0">
-              <span>No adjustment details</span>
+          <div class="eco-card-body" style="padding:0;">
+            <div *ngFor="let tag of activeJourneyCoachTags" class="eco-list-item" (click)="openTagProfilesDialog(tag)">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="ahl-tag-dot"></span>
+                <span class="eco-list-text">{{ tag['name'] || tag.id }}</span>
+              </div>
+              <div class="eco-list-arrow">
+                <span class="eco-list-badge teal">{{ getProfilesForTag(tag.id).length }}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
             </div>
+            <div class="eco-empty" *ngIf="activeJourneyCoachTags.length === 0">No active tags</div>
           </div>
         </div>
       </div>
@@ -1187,7 +1245,79 @@
     <!-- COLUMN 2 — Ask AH + Tags stacked -->
     <div class="interim-col2">
 
-      <!-- ROW 1 — Ask AH & Love letter -->
+      <!-- ROW 1: Adjustment Details (35%) + Evolution Progress (rest) -->
+      <div class="interim-col2-row1">
+      
+        <!-- Adjustment Details -->
+        <div class="adj-mini-card card">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Adjustment details</span>
+          </div>
+          <div class="adj-mini-body">
+            <div class="adj-mini-row" *ngFor="let item of evolutionprogressMap | keyvalue">
+              <span class="adj-mini-lbl">{{ item.key }}</span>
+              <span class="adj-mini-val">{{ item.value }}</span>
+            </div>
+            <div class="empty-state" *ngIf="(evolutionprogressMap | keyvalue)?.length === 0">
+              No details
+            </div>
+          </div>
+        </div>
+      
+        <!-- Evolution Progress Table -->
+        <div class="ep-card card" *ngIf="evolutionProgressData">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Evolution progress</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:auto;">
+              {{ evolutionProgressData.keys.length }} keys
+            </span>
+          </div>
+          <div class="ep-table-wrap">
+            <table class="ep-table">
+              <thead>
+                <tr>
+                  <th class="ep-th ep-th-key">Key</th>
+                  <th class="ep-th ep-th-b0">&lt; 25%</th>
+                  <th class="ep-th ep-th-b1">25–50%</th>
+                  <th class="ep-th ep-th-b2">50–75%</th>
+                  <th class="ep-th ep-th-b3">75–100%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="ep-tr" *ngFor="let key of evolutionProgressData.keys">
+                  <td class="ep-td ep-td-key">
+                    <div class="ep-key-wrap">
+                      <span class="ep-key-dot"></span>{{ key }}
+                    </div>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b0" *ngIf="getEpBandCount(key,0)>0; else d0"
+                      (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span>
+                    <ng-template #d0><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b1" *ngIf="getEpBandCount(key,1)>0; else d1"
+                      (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span>
+                    <ng-template #d1><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b2" *ngIf="getEpBandCount(key,2)>0; else d2"
+                      (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span>
+                    <ng-template #d2><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b3" *ngIf="getEpBandCount(key,3)>0; else d3"
+                      (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span>
+                    <ng-template #d3><span class="ep-zero">—</span></ng-template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2 — Ask AH & Love letter -->
       <div class="ahl-widget" *ngIf="!isFetchingData && askAHLoveLetterSummary">
         <div class="card">
           <div class="ahl-card-hd">
@@ -1296,30 +1426,6 @@
           </table>
         </div>
       </div>
-
-      <!-- ROW 2 — Tags breakdown -->
-      <div class="ahl-widget" *ngIf="journeyCoachTags.length > 0">
-        <div class="card">
-          <div class="ahl-tags-section">
-            <div class="ahl-tags-title">Tags breakdown</div>
-            <div class="ahl-tag-rows">
-              <div class="ahl-tag-row" *ngFor="let tag of activeJourneyCoachTags">
-                <div class="ahl-tag-row-hd" (click)="openTagProfilesDialog(tag)">
-                  <div class="ahl-tag-name-wrap">
-                    <span class="ahl-tag-dot"></span>
-                    <span class="ahl-tag-name">{{ tag['name'] || tag.id }}</span>
-                  </div>
-                  <div class="ahl-tag-row-right">
-                    <span class="ahl-tag-count">{{ getProfilesForTag(tag.id).length }}</span>
-                    <span class="ahl-tag-chevron">›</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
@@ -1425,6 +1531,85 @@
           </div>
         </div>
       </ng-template>
+    </div>
+  </div>
+
+  <!-- ══ SUBSCRIPTION END DIALOG ══ -->
+  <div class="overlay" [class.open]="isSubDialogOpen" (click)="onSubDialogOverlayClick($event)">
+    <div class="dialog sub-dialog">
+      <div class="dlg-hd">
+        <div class="dlg-hd-left">
+          <div class="dlg-av dn">↓</div>
+          <div>
+            <div class="dlg-title">{{ subDialogTitle }}</div>
+            <div class="dlg-sub">{{ subDialogDocs.length }} participants</div>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeSubDialog()">✕</button>
+      </div>
+      <div class="sub-dlg-table-hd">
+        <span class="sub-dlg-col name">Name</span>
+        <span class="sub-dlg-col journey">Journey</span>
+        <span class="sub-dlg-col status">Status</span>
+        <span class="sub-dlg-col enddate">Sub End</span>
+      </div>
+      <div class="dlg-body">
+        <div *ngIf="subDialogDocs.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">No participants
+        </div>
+        <div class="sub-dlg-row" *ngFor="let doc of subDialogDocs" (click)="navigatetoprofile(doc['profileid'])">
+          <div class="sub-dlg-col name">
+            <div class="par-av dn" style="flex-shrink:0;">
+              {{ getInitials(mapprofile[doc['profileid']] || doc['profileid']) }}
+            </div>
+            <div style="min-width:0;">
+              <div class="par-name">{{ mapprofile[doc['profileid']] || doc['profileid'] }}</div>
+              <div class="par-id">{{ doc['profileid'] }}</div>
+            </div>
+          </div>
+          <div class="sub-dlg-col journey">
+            <span class="sub-journey-pill">{{ getSubJourneyName(doc) }}</span>
+          </div>
+          <div class="sub-dlg-col status">
+            <span class="sub-status-pill" [ngClass]="getSubStatusClass(doc['journeystatus'])">
+              {{ doc['journeystatus'] }}
+            </span>
+          </div>
+          <div class="sub-dlg-col enddate">
+            <span class="sub-end-badge">{{ getSubEndDate(doc) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ EVOLUTION PROGRESS DIALOG ══ -->
+  <div class="overlay" [class.open]="isEpDialogOpen" (click)="onEpOverlayClick($event)">
+    <div class="dialog">
+      <div class="dlg-hd">
+        <div class="dlg-hd-left">
+          <div class="dlg-av" [ngClass]="'ep-av-'+epDialogBandIdx">{{ epDialogTitle.slice(0,2).toUpperCase() }}</div>
+          <div>
+            <div class="dlg-title">{{ epDialogTitle }}</div>
+            <div class="dlg-sub">{{ epDialogSubtitle }}</div>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeEpDialog()">✕</button>
+      </div>
+      <div class="dlg-body">
+        <div class="sec-lbl" style="margin-bottom:10px;">Profiles in this band</div>
+        <div *ngIf="epDialogProfiles.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles
+        </div>
+        <div class="participant-row" *ngFor="let p of epDialogProfiles">
+          <div class="par-av" [ngClass]="'ep-av-'+epDialogBandIdx">{{ getInitials(p.profileName) }}</div>
+          <div>
+            <div class="par-name">{{ p.profileName }}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px;">Total: {{ p.total }}</div>
+          </div>
+          <div class="par-right">
+            <span class="ep-pct-pill" [ngClass]="'ep-b'+epDialogBandIdx">{{ p.pct }}%</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2214,16 +2399,6 @@
     </div>
 
     <mat-dialog-content>
-      <!-- Search -->
-      <!-- <div class="search-bar">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"></circle>
-          <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
-        </svg>
-
-        <input type="text" placeholder="Search..." class="search-input">
-      </div> -->
-
       <!-- Table -->
       <div class="table-wrapper">
         <table class="data-table">
