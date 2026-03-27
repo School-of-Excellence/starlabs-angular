@@ -1,147 +1,564 @@
-<div>
-    <div style="margin: 20px;">
-        <!-- <h5 class="title">Content Analytics ({{querydays}}&nbsp;days)</h5> -->
-        <!-- (dateChange)="filterData()" -->
-        <mat-label>Query Data by date range : </mat-label>
-        <mat-form-field appearance="outline" style="padding-left: 10px;">
-            <mat-label>Enter a date range</mat-label>
-            <mat-date-range-input [rangePicker]="picker">
-                <input matStartDate [(ngModel)]="startDate" placeholder="Start date">
-                <input matEndDate [(ngModel)]="endDate" placeholder="End date">
-            </mat-date-range-input>
-            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-            <mat-date-range-picker #picker></mat-date-range-picker>
-        </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-        <button mat-stroked-button color="primary" type="button" (click)="filterData()">Fetch Data</button>
-        <!-- <div *ngIf="contentAnalytics.length != 0"> -->
-        <div class="d-flex flex-row justify-content-between">
-            <div class="d-flex flex-row flex-wrap">
-                <mat-label>Filter By : &nbsp;&nbsp;</mat-label>
-                <mat-form-field appearance="outline">
-                    <mat-label>Name</mat-label>
-                    <input matInput [(ngModel)]="filterValue.name" (keyup)="onFilter(filterValue)" placeholder="name">
-                </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-                <mat-form-field appearance="outline" style="padding-left: 10px;">
-                    <mat-label>Date range</mat-label>
-                    <mat-date-range-input [rangePicker]="picker1">
-                        <input matStartDate [(ngModel)]="filterValue.startdate" placeholder="Start date">
-                        <input matEndDate [(ngModel)]="filterValue.enddate" placeholder="End date"
-                            (dateChange)="onFilter(filterValue)">
-                    </mat-date-range-input>
-                    <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
-                    <mat-date-range-picker #picker1></mat-date-range-picker>
-                </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-                <mat-form-field appearance="outline" style="padding-left: 10px;">
-                    <mat-label>Screen From </mat-label>
-                    <mat-select [(ngModel)]="filterValue.from" (selectionChange)="onFilter(filterValue)">
-                        <mat-option *ngFor="let option of fromScreenList" [value]="option">{{option}}</mat-option>
-                    </mat-select>
-                </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-                <mat-form-field appearance="outline" style="padding-left: 10px;width:300px">
-                    <mat-label>Video Name</mat-label>
-                    <mat-select [(ngModel)]="filterValue.videoname" (selectionChange)="onFilter(filterValue)" multiple>
-                        <mat-option *ngFor="let option of videoNameList" [value]="option">{{option}}</mat-option>
-                    </mat-select>
-                </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-                <mat-form-field appearance="outline" style="padding-left: 10px;width:300px">
-                    <mat-label>Total time spend (>) given value (mins)</mat-label>
-                    <input type="number" matInput [(ngModel)]="filterValue.totaltimespend"
-                        (keyup)="onFilter(filterValue)">
-                </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-                <mat-form-field appearance="outline" style="padding-left: 10px;width:300px">
-                    <mat-label>Platform</mat-label>
-                    <mat-select [(ngModel)]="filterValue.platform_name" (selectionChange)="onFilter(filterValue)">
-                        <mat-option *ngFor="let option of platformNameList" [value]="option">{{option}}</mat-option>
-                    </mat-select>
-                </mat-form-field>&nbsp;&nbsp;&nbsp;&nbsp;
-                <button style="height: 40px;margin-top: 15px;" mat-stroked-button type="button"
-                    (click)="onClearFilterValue()">Clear</button>
-            </div>
-            <div>
-                <button mat-stroked-button type="button" (click)="exportCSV()">Export</button>
-            </div>
-        </div>
+<div class="page-root">
 
-        <!-- user date -->
-        <div class="d-flex flex-column">
-            <h4>{{querydays ?? 0}}&nbsp;days</h4>
-            <span>Unique User : <b>{{uniqueuser}}</b></span>
-            <span>
-                Total Content Consumption by unique user: 
-                &nbsp;&nbsp;<b>{{uniqueUserContentConsumptionbyhours}}</b>
-                &nbsp;&nbsp;'is equivalent to'
-                &nbsp;&nbsp;<b>{{uniqueUserContentConsumptionbydays}}</b>
-            </span>
-            <span>Average time spend per user : <b>{{averageTimeSpendPerUser}}</b></span>
-        </div>
-
-        <br>
-        <br>
-        <!-- <mat-form-field appearance="outline">
-                <mat-label>Filter by Name</mat-label>
-                <input matInput (input)="applyNameFilter($event)" placeholder="name">
-            </mat-form-field> -->
-        <div class="mat-elevation-z8">
-            <table mat-table [dataSource]="contentData" matSort>
-                <ng-container matColumnDef="profileid">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-                    <td mat-cell *matCellDef="let row">
-                    <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
-                        {{ mapProfile[row.profileid] }}
-                    </ng-container>
-                    <ng-template #newUserBlock>
-                        {{ mapProfileNew[row.profileid] }}
-                        <span style="color: red;">(New User)</span>
-                    </ng-template>
-                    &nbsp;&nbsp;
-                    <mat-icon *ngIf="row['live']" class="forrestGreen">play_circle_filled</mat-icon>
-                    </td>
-                </ng-container>
-                <ng-container matColumnDef="from">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header>From</th>
-                    <td mat-cell *matCellDef="let row">{{row.from}}</td>
-                </ng-container>
-                <ng-container matColumnDef="lastwatchedtime">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header>Lastwatched Time </th>
-                    <td mat-cell *matCellDef="let row">{{row.lastwatchedtime}}</td>
-                </ng-container>
-                <ng-container matColumnDef="logdate">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Logdate </th>
-                    <td mat-cell *matCellDef="let row">{{row.logdate.toDate() | date : 'M/d/yy, h:mm:ss a'}}</td>
-                </ng-container>
-                <ng-container matColumnDef="totalruntime">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Total Runtime </th>
-                    <td mat-cell *matCellDef="let row">{{convertDecimal(row.totalruntime)}}</td>
-                </ng-container>
-                <ng-container matColumnDef="totaltimespend">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Total Timespend </th>
-                    <td mat-cell *matCellDef="let row">{{convertDecimal(row.totaltimespend)}}</td>
-                </ng-container>
-                <ng-container matColumnDef="type">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Type </th>
-                    <td mat-cell *matCellDef="let row">{{row.type}}</td>
-                </ng-container>
-                <ng-container matColumnDef="videoname">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Videoname </th>
-                    <td mat-cell *matCellDef="let row">{{row.videoname}}</td>
-                </ng-container>
-                <ng-container matColumnDef="platform_name">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Platform </th>
-                    <td mat-cell *matCellDef="let row">{{row.platform_name ? row.platform_name : null }}</td>
-                </ng-container>
-                <ng-container matColumnDef="playlist">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Playlist </th>
-                    <td mat-cell *matCellDef="let row">{{row.playlistid ? row.playlistid == 'downloadsplaylist' ? 'Downloads Playlist' :  mapPlaylist[row.playlistid] : null }}</td>
-                </ng-container>
-                <ng-container matColumnDef="status">
-                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
-                    <td mat-cell *matCellDef="let row">{{row.status ? row.status : null }}</td>
-                </ng-container>
-                <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-                <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="printLog(row)"></tr>
-            </table>
-        </div>
-        <!-- </div> -->
-        <mat-paginator [pageSizeOptions]="[25,50,100]" aria-label=""></mat-paginator>
+  <!-- ── Query Bar (visible on ALL tabs) ── -->
+  <div class="query-bar">
+    <div class="control-group">
+      <span class="control-section-label">Query by date</span>
+      <mat-form-field appearance="outline" class="ctrl-field">
+        <mat-label>Date range</mat-label>
+        <mat-date-range-input [rangePicker]="picker">
+          <input matStartDate [(ngModel)]="startDate" placeholder="Start date">
+          <input matEndDate [(ngModel)]="endDate" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker #picker></mat-date-range-picker>
+      </mat-form-field>
+      <button mat-stroked-button color="primary" type="button" (click)="filterData()" class="btn-fetch">
+        <span class="btn-icon"><mat-icon>find_in_page</mat-icon></span>Fetch Data
+    </button>
     </div>
+    <button mat-stroked-button type="button" (click)="exportCSV()" class="btn-export">
+      <span class="btn-icon"><mat-icon>cloud_download</mat-icon></span>
+      Export
+    </button>
+  </div>
+
+  <!-- ── Tabs ── -->
+  <mat-tab-group mat-align-tabs="start">
+
+    <!-- Analytics Table -->
+    <mat-tab label="Analytics Table">
+
+      <!-- ── Filter Panel (Analytics tab only) ── -->
+      <div class="control-panel">
+        <div class="control-row control-row-filters">
+          <span class="control-section-label">Filter by</span>
+
+          <mat-form-field appearance="outline" class="ctrl-field">
+            <mat-label>Name</mat-label>
+            <input matInput [(ngModel)]="filterValue.name" (keyup)="onFilter(filterValue)" placeholder="name">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="ctrl-field">
+            <mat-label>Date range</mat-label>
+            <mat-date-range-input [rangePicker]="picker1">
+              <input matStartDate [(ngModel)]="filterValue.startdate" placeholder="Start date">
+              <input matEndDate [(ngModel)]="filterValue.enddate" placeholder="End date"
+                  (dateChange)="onFilter(filterValue)">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+            <mat-date-range-picker #picker1></mat-date-range-picker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="ctrl-field">
+            <mat-label>Screen From</mat-label>
+            <mat-select [(ngModel)]="filterValue.from" (selectionChange)="onFilter(filterValue)">
+              <mat-option *ngFor="let option of fromScreenList" [value]="option">{{option}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="ctrl-field ctrl-field-lg">
+            <mat-label>Video Name</mat-label>
+            <mat-select [(ngModel)]="filterValue.videoname" (selectionChange)="onFilter(filterValue)" multiple>
+              <mat-option *ngFor="let option of videoNameList" [value]="option">{{option}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="ctrl-field ctrl-field-lg">
+            <mat-label>Total time spent (mins ›)</mat-label>
+            <input type="number" matInput [(ngModel)]="filterValue.totaltimespend" (keyup)="onFilter(filterValue)">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="ctrl-field">
+            <mat-label>Platform</mat-label>
+            <mat-select [(ngModel)]="filterValue.platform_name" (selectionChange)="onFilter(filterValue)">
+              <mat-option *ngFor="let option of platformNameList" [value]="option">{{option}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button type="button" (click)="onClearFilterValue()" class="btn-clear">
+            <span class="btn-icon"><mat-icon>clear</mat-icon></span>Clear
+        </button>
+        </div>
+      </div>
+
+      <!-- ── Summary Strip ── -->
+      <div class="summary-strip">
+        <div class="summary-card">
+          <div class="summary-card-label">Period</div>
+          <div class="summary-card-value">{{querydays ?? 0}} days</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-label">Unique Users</div>
+          <div class="summary-card-value">{{uniqueuser}}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-label">Total Content Consumption</div>
+          <div class="summary-card-value">{{uniqueUserContentConsumptionbyhours}}</div>
+          <div class="summary-card-sub">≈ {{uniqueUserContentConsumptionbydays}}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-label">Avg. Time / User</div>
+          <div class="summary-card-value">{{averageTimeSpendPerUser}}</div>
+        </div>
+      </div>
+
+      <div class="mat-elevation-z8" style="margin-top:16px">
+        <table mat-table [dataSource]="contentData" matSort>
+
+          <ng-container matColumnDef="profileid">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+            <td mat-cell *matCellDef="let row">
+              <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
+                {{ mapProfile[row.profileid] }}
+              </ng-container>
+              <ng-template #newUserBlock>
+                {{ mapProfileNew[row.profileid] }}
+                <span class="new-user-tag">(New User)</span>
+              </ng-template>
+              &nbsp;
+              <svg *ngIf="row['live']" class="icon-play forrestGreen" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+              </svg>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="from">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>From</th>
+            <td mat-cell *matCellDef="let row">{{row.from}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="lastwatchedtime">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Last Watched</th>
+            <td mat-cell *matCellDef="let row">{{row.lastwatchedtime}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="logdate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Log Date</th>
+            <td mat-cell *matCellDef="let row">{{row.logdate.toDate() | date : 'M/d/yy, h:mm:ss a'}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="totalruntime">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Total Runtime</th>
+            <td mat-cell *matCellDef="let row">{{convertDecimal(row.totalruntime)}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="totaltimespend">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Time Spent</th>
+            <td mat-cell *matCellDef="let row">{{convertDecimal(row.totaltimespend)}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+            <td mat-cell *matCellDef="let row">{{row.type}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="videoname">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Video Name</th>
+            <td mat-cell *matCellDef="let row">{{row.videoname}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="platform_name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Platform</th>
+            <td mat-cell *matCellDef="let row">{{row.platform_name ? row.platform_name : null}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="playlist">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Playlist</th>
+            <td mat-cell *matCellDef="let row">{{row.playlistid ? row.playlistid == 'downloadsplaylist' ? 'Downloads Playlist' : mapPlaylist[row.playlistid] : null}}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+            <td mat-cell *matCellDef="let row">{{row.status ? row.status : null}}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="printLog(row)"></tr>
+        </table>
+      </div>
+      <mat-paginator [pageSizeOptions]="[25,50,100]" aria-label=""></mat-paginator>
+    </mat-tab>
+
+    <!-- Tier Based -->
+    <mat-tab label="Tier Based">
+      <div class="tier-header">
+        <div class="tier-header-left">
+          <span class="tier-title">Tier Based Content Measuring</span>
+          <span class="tier-subtitle">Toggle between Series (videos) and Participants view</span>
+        </div>
+        <div class="tier-header-right">
+          <div class="tier-toggle-group">
+            <button class="tier-toggle-btn" [class.active]="viewMode === 'series'" (click)="viewMode = 'series'">Series</button>
+            <button class="tier-toggle-btn" [class.active]="viewMode === 'participant'" (click)="viewMode = 'participant'">Participants</button>
+          </div>
+          <div class="tier-search-wrap">
+            <mat-icon class="tier-search-icon">search</mat-icon>
+            <input class="tier-search-input" placeholder="Search tiers..." [(ngModel)]="tierSearchQuery">
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="tierLoading" class="tier-loading-wrap">
+        <div class="tier-spinner"></div>
+        <span class="tier-loading-text">Fetching tier data...</span>
+      </div>
+
+      <!-- Series view -->
+      <div *ngIf="!tierLoading && viewMode === 'series'" class="tier-grid">
+        <ng-container *ngFor="let tier of tierCompletionMap | keyvalue">
+          <ng-container *ngIf="!tierSearchQuery || tiermap[$any(tier.key)]?.tier?.toLowerCase()?.includes(tierSearchQuery.toLowerCase())">
+            <div class="tier-card">
+              <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
+              <div class="tier-summary-row">
+                <div class="tier-stat">
+                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'done', 'series')">
+                    {{ tierStats[$any(tier.key)]?.series?.completed }}/{{ tierStats[$any(tier.key)]?.series?.total }}
+                  </span>
+                  <span class="tier-stat-label">DONE</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'completed', 'series')">
+                    {{ tierStats[$any(tier.key)]?.series?.completed }}
+                  </span>
+                  <span class="tier-stat-label">COMPLETED</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'ontrack', 'series')">
+                    {{ tierStats[$any(tier.key)]?.series?.onTrack }}
+                  </span>
+                  <span class="tier-stat-label">ON TRACK</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'notstarted', 'series')">
+                    {{ tierStats[$any(tier.key)]?.series?.notStarted }}
+                  </span>
+                  <span class="tier-stat-label">NOT STARTED</span>
+                </div>
+              </div>
+              <!-- Toggle always at top, defaults to 'series' in series view -->
+              <div class="card-view-toggle">
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'series'"
+                  (click)="cardViewMode[$any(tier.key)] = 'series'">Series</button>
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="cardViewMode[$any(tier.key)] === 'participant'"
+                  (click)="cardViewMode[$any(tier.key)] = 'participant'">Participants</button>
+              </div>
+              <!-- Series list (default) -->
+              <div class="series-list" *ngIf="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'series'">
+                <div class="series-row" *ngFor="let s of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
+                  <div class="series-icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                    </svg>
+                  </div>
+                  <span class="series-name">{{ s.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="getCompletedCount(s.value) === getTotalCount(s.value)"
+                    [class.yellow]="getCompletedCount(s.value) > 0 && getCompletedCount(s.value) < getTotalCount(s.value)"
+                    [class.red]="getCompletedCount(s.value) === 0">
+                    {{ getCompletedCount(s.value) }}/{{ getTotalCount(s.value) }}
+                  </span>
+                  <div class="series-bar-wrap">
+                    <div class="series-bar"
+                      [class.bar-green]="getCompletedCount(s.value) === getTotalCount(s.value)"
+                      [class.bar-yellow]="getCompletedCount(s.value) > 0 && getCompletedCount(s.value) < getTotalCount(s.value)"
+                      [class.bar-red]="getCompletedCount(s.value) === 0"
+                      [style.width.%]="getTotalCount(s.value) > 0 ? (getCompletedCount(s.value) / getTotalCount(s.value) * 100) : 0">
+                    </div>
+                    <span class="series-pct">{{ getTotalCount(s.value) > 0 ? ((getCompletedCount(s.value) / getTotalCount(s.value) * 100) | number:'1.0-0') : 0 }}%</span>
+                  </div>
+                </div>
+              </div>
+              <!-- Participant list (when toggled inside card) -->
+              <div class="series-list" *ngIf="cardViewMode[$any(tier.key)] === 'participant'">
+                <div class="series-row" *ngFor="let user of tierParticipantSummary[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
+                  <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
+                  <span class="series-name">{{ user.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="user.value['completed'] === user.value['total']"
+                    [class.yellow]="user.value['completed'] > 0 && user.value['completed'] < user.value['total']"
+                    [class.red]="user.value['completed'] === 0">
+                    {{ user.value['completed'] }}/{{ user.value['total'] }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+
+      <!-- Participant view -->
+      <div *ngIf="!tierLoading && viewMode === 'participant'" class="tier-grid">
+        <ng-container *ngFor="let tier of tierParticipantSummary | keyvalue">
+          <ng-container *ngIf="!tierSearchQuery || tiermap[$any(tier.key)]?.tier?.toLowerCase()?.includes(tierSearchQuery.toLowerCase())">
+            <div class="tier-card">
+              <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
+              <div class="tier-summary-row">
+                <div class="tier-stat">
+                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'done', 'participant')">
+                    {{ tierStats[$any(tier.key)]?.participant?.completed }}/{{ tierStats[$any(tier.key)]?.participant?.total }}
+                  </span>
+                  <span class="tier-stat-label">DONE</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'completed', 'participant')">
+                    {{ tierStats[$any(tier.key)]?.participant?.completed }}
+                  </span>
+                  <span class="tier-stat-label">COMPLETED</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'ontrack', 'participant')">
+                    {{ tierStats[$any(tier.key)]?.participant?.onTrack }}
+                  </span>
+                  <span class="tier-stat-label">ON TRACK</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'notstarted', 'participant')">
+                    {{ tierStats[$any(tier.key)]?.participant?.notStarted }}
+                  </span>
+                  <span class="tier-stat-label">NOT STARTED</span>
+                </div>
+              </div>
+              <!-- Toggle always at top, defaults to 'participant' in participant view -->
+              <div class="card-view-toggle">
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="cardViewMode[$any(tier.key)] === 'series'"
+                  (click)="cardViewMode[$any(tier.key)] = 'series'">Series</button>
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'participant'"
+                  (click)="cardViewMode[$any(tier.key)] = 'participant'">Participants</button>
+              </div>
+              <!-- Participant list (default) -->
+              <div class="series-list" *ngIf="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'participant'">
+                <div class="series-row" *ngFor="let user of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
+                  <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
+                  <span class="series-name">{{ user.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="user.value['completed'] === user.value['total']"
+                    [class.yellow]="user.value['completed'] > 0 && user.value['completed'] < user.value['total']"
+                    [class.red]="user.value['completed'] === 0">
+                    {{ user.value['completed'] }}/{{ user.value['total'] }}
+                  </span>
+                </div>
+              </div>
+              <!-- Series list (when toggled inside card) -->
+              <div class="series-list" *ngIf="cardViewMode[$any(tier.key)] === 'series'">
+                <div class="series-row" *ngFor="let s of tierCompletionMap[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
+                  <div class="series-icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                    </svg>
+                  </div>
+                  <span class="series-name">{{ s.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="getCompletedCount(s.value) === getTotalCount(s.value)"
+                    [class.yellow]="getCompletedCount(s.value) > 0 && getCompletedCount(s.value) < getTotalCount(s.value)"
+                    [class.red]="getCompletedCount(s.value) === 0">
+                    {{ getCompletedCount(s.value) }}/{{ getTotalCount(s.value) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+    </mat-tab>
+
+    <!-- Journey Based -->
+    <mat-tab label="Journey Based">
+      <div *ngIf="tierLoading" class="tier-loading-wrap">
+        <div class="tier-spinner"></div>
+        <span class="tier-loading-text">Fetching journey data...</span>
+      </div>
+
+      <div class="journey-layout" *ngIf="journeyWiseData && !tierLoading">
+
+        <!-- Sidebar -->
+        <div class="journey-sidebar">
+          <div class="journey-sidebar-title">All Journeys</div>
+          <div class="journey-sidebar-item"
+              *ngFor="let j of journeyWiseData | keyvalue"
+              [class.journey-sidebar-active]="selectedJourneyId === $any(j.key)"
+              (click)="selectJourney($any(j.key))">
+            <div style="display:flex;align-items:center">
+              <div class="journey-sidebar-dot"
+                  [class.dot-green]="j.value['notYet'] === 0"
+                  [class.dot-yellow]="j.value['notYet'] > 0 && j.value['watching'] > 0"
+                  [class.dot-red]="j.value['watching'] === 0"></div>
+              <span class="journey-sidebar-name">{{ j.value['journeyName'] }}</span>
+            </div>
+            <div class="journey-sidebar-stats">
+              <div class="jsstat">
+                <span class="jsstat-val green">{{ j.value['total'] }}</span>
+                <span class="jsstat-label">TOTAL</span>
+              </div>
+              <div class="jsstat">
+                <span class="jsstat-val green">{{ j.value['watching'] }}</span>
+                <span class="jsstat-label">WATCHING</span>
+              </div>
+              <span class="jsstat-divider">/</span>
+              <div class="jsstat">
+                <span class="jsstat-val red">{{ j.value['notYet'] }}</span>
+                <span class="jsstat-label">NOT YET</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right panel -->
+        <div class="journey-panel" *ngIf="selectedJourneyId && journeyWiseData[selectedJourneyId]">
+          <ng-container *ngIf="journeyWiseData[selectedJourneyId] as jd">
+            <div class="journey-panel-header">
+              <span class="journey-panel-title">{{ jd['journeyName'] }}</span>
+              <span class="journey-panel-count">{{ jd['total'] }} participants</span>
+            </div>
+
+            <div class="journey-panel-toolbar">
+              <div class="journey-search-wrap">
+                <mat-icon class="journey-search-icon">search</mat-icon>
+                <input class="journey-search-input" placeholder="Search participants..."
+                      [(ngModel)]="journeySearchQuery">
+              </div>
+              <div class="journey-filter-chips">
+                <button class="jchip" [class.jchip-active]="journeyFilter === 'all'" (click)="journeyFilter = 'all'">
+                  All <span class="jchip-count">{{ jd['total'] }}</span>
+                </button>
+                <button class="jchip jchip-watching" [class.jchip-active]="journeyFilter === 'watching'" (click)="journeyFilter = 'watching'">
+                  Watching <span class="jchip-count">{{ jd['watching'] }}</span>
+                </button>
+                <button class="jchip jchip-notyet" [class.jchip-active]="journeyFilter === 'notyet'" (click)="journeyFilter = 'notyet'">
+                  Not Watching <span class="jchip-count">{{ jd['notYet'] }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="journey-table-header">
+              <span class="jth-participant">Participant</span>
+              <span class="jth-stat">Watch Hrs</span>
+              <span class="jth-stat">Completion</span>
+              <span class="jth-stat">Avg/Day</span>
+              <span class="jth-stat">Last Seen</span>
+            </div>
+
+            <div class="journey-table-body">
+              <ng-container *ngFor="let profile of jd['profile']">
+                <div class="journey-row"
+                    (click)="openUserAnalyticsDialog(profile)"
+                    *ngIf="journeyProfileVisible(profile)">
+
+                  <div class="journey-row-participant">
+                    <div class="journey-avatar" [style.background]="getAvatarColor(profile.name)">
+                      {{ getInitials(profile.name) }}
+                    </div>
+                    <span class="journey-row-name">{{ profile.name }}</span>
+                  </div>
+
+                  <span class="journey-row-stat"
+                        [class.stat-green]="getWatchHrs(profile.logs) > 10"
+                        [class.stat-yellow]="getWatchHrs(profile.logs) > 0 && getWatchHrs(profile.logs) <= 10"
+                        [class.stat-gray]="getWatchHrs(profile.logs) === 0">
+                    {{ getWatchHrs(profile.logs) > 0 ? (getWatchHrs(profile.logs) | number:'1.1-1') + 'h' : '—' }}
+                  </span>
+
+                  <div class="journey-row-stat">
+                    <span class="journey-completion-val"
+                          [class.comp-100]="getCompletion(profile.logs) >= 100"
+                          [class.comp-mid]="getCompletion(profile.logs) >= 50 && getCompletion(profile.logs) < 100"
+                          [class.comp-low]="getCompletion(profile.logs) < 50 && getCompletion(profile.logs) > 0"
+                          [class.stat-gray]="getCompletion(profile.logs) === 0">
+                      {{ getCompletion(profile.logs) > 0 ? (getCompletion(profile.logs) | number:'1.1-1') + '%' : '—' }}
+                    </span>
+                    <div class="journey-comp-bar-wrap" *ngIf="getCompletion(profile.logs) > 0">
+                      <div class="journey-comp-bar"
+                          [class.cbar-100]="getCompletion(profile.logs) >= 100"
+                          [class.cbar-mid]="getCompletion(profile.logs) >= 50 && getCompletion(profile.logs) < 100"
+                          [class.cbar-low]="getCompletion(profile.logs) < 50"
+                          [style.width.%]="getCompletion(profile.logs) > 100 ? 100 : getCompletion(profile.logs)">
+                      </div>
+                    </div>
+                  </div>
+
+                  <span class="journey-row-stat"
+                        [class.stat-green]="getAvgPerDay(profile.logs) > 1"
+                        [class.stat-yellow]="getAvgPerDay(profile.logs) > 0 && getAvgPerDay(profile.logs) <= 1"
+                        [class.stat-gray]="getAvgPerDay(profile.logs) === 0">
+                    {{ getAvgPerDay(profile.logs) > 0 ? (getAvgPerDay(profile.logs) | number:'1.1-1') + 'h' : '—' }}
+                  </span>
+
+                  <span class="journey-row-stat" [class.stat-gray]="!profile.watching">
+                    <span *ngIf="profile.watching"
+                          [class.seen-green]="getLastSeenDays(profile.logs) <= 2"
+                          [class.seen-yellow]="getLastSeenDays(profile.logs) > 2 && getLastSeenDays(profile.logs) <= 7"
+                          [class.seen-red]="getLastSeenDays(profile.logs) > 7">
+                      • {{ getLastSeenDays(profile.logs) }}d ago
+                    </span>
+                    <span *ngIf="!profile.watching" class="stat-gray">—</span>
+                  </span>
+                </div>
+              </ng-container>
+
+              <div class="journey-empty" *ngIf="getVisibleCount(jd['profile']) === 0">
+                No participants found
+              </div>
+            </div>
+          </ng-container>
+        </div>
+
+        <div class="journey-panel journey-empty-panel" *ngIf="!selectedJourneyId">
+          <mat-icon style="font-size:40px;color:#c8b99a;">route</mat-icon>
+          <span>Select a journey to view participants</span>
+        </div>
+
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>
+
+<!-- Drawer overlay -->
+<div class="tier-drawer-overlay" *ngIf="drawerOpen" (click)="closeDrawer()"></div>
+
+<!-- Drawer -->
+<div class="tier-drawer" [class.drawer-open]="drawerOpen">
+  <div class="drawer-header">
+    <div class="drawer-header-left">
+      <span class="drawer-tier-label">{{ drawerTierName }}</span>
+      <span class="drawer-context-label">{{ drawerContextLabel }}</span>
+    </div>
+    <button class="drawer-close-btn" (click)="closeDrawer()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="drawer-filter-row">
+    <button class="drawer-chip" [class.chip-active]="drawerFilter === 'all'"       (click)="drawerFilter = 'all'">All</button>
+    <button class="drawer-chip" [class.chip-active]="drawerFilter === 'completed'" (click)="drawerFilter = 'completed'">Completed</button>
+    <button class="drawer-chip" [class.chip-active]="drawerFilter === 'pending'"   (click)="drawerFilter = 'pending'">Not Completed</button>
+  </div>
+
+  <div class="drawer-count">
+    {{ getFilteredDrawerItems().length }} participant{{ getFilteredDrawerItems().length !== 1 ? 's' : '' }}
+  </div>
+
+  <div class="drawer-list">
+    <div class="drawer-item" *ngFor="let item of getFilteredDrawerItems()">
+      <div class="drawer-avatar" [style.background]="getAvatarColor(item.name)">
+        {{ getInitials(item.name) }}
+      </div>
+      <div class="drawer-item-info">
+        <span class="drawer-item-name">{{ item.name }}</span>
+        <span class="drawer-item-sub" *ngIf="item.seriesLabel">{{ item.seriesLabel }}</span>
+      </div>
+      <span class="drawer-status-badge"
+        [class.badge-completed]="item.status === 'completed'"
+        [class.badge-pending]="item.status !== 'completed'">
+        {{ item.status === 'completed' ? 'Completed' : 'Pending' }}
+      </span>
+    </div>
+    <div *ngIf="getFilteredDrawerItems().length === 0" class="drawer-empty">
+      No participants found
+    </div>
+  </div>
 </div>
