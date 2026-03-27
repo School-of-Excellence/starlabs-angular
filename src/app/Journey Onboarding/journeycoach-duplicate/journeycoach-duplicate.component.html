@@ -67,7 +67,8 @@
         <mat-icon class="heart-icon">favorite</mat-icon>
         <span class="love-factor-label">Love Factor</span>
         <span class="equals">=</span>
-        <span class="cura-label"> <b>{{totalCURASales}}</b> - ({{this.originalData['continuitySales'].count}} + {{this.originalData['upgradeSales'].count}} +
+        <span class="cura-label"> <b>{{totalCURASales}}</b> - ({{this.originalData['continuitySales'].count}} +
+          {{this.originalData['upgradeSales'].count}} +
           {{this.originalData['referralSales'].count}} + {{this.originalData['addonSales'].count}})</span>
         <span class="divider">/</span>
         <span class="mts-label">{{totalMTSSales}}</span>
@@ -190,12 +191,13 @@
               <span class="split-value green">{{assuredSalesSplit['new']}}</span>
             </div>
             <!-- <div class="vertical-separator-line"></div> -->
-            <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredUpgradeSales')" style="cursor: pointer;">
+            <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredUpgradeSales')"
+              style="cursor: pointer;">
               <span class="split-label">Upgrades</span>
               <span class="split-value green">{{assuredSalesSplit['upgrades']}}</span>
             </div>
             <!-- <div class="vertical-separator-line"></div> -->
-            <div class="split-item"(click)="onAssuredSplitClick($event, 'assuredAddonSales')" style="cursor: pointer;">
+            <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredAddonSales')" style="cursor: pointer;">
               <span class="split-label">Add-On</span>
               <span class="split-value green">{{assuredSalesSplit['addons']}}</span>
             </div>
@@ -511,8 +513,72 @@
     </div>
   </div>
 
+  <!-- Template -->
+  <div class="card sub-matrix-card" *ngIf="subscriptionMatrix">
+    <div class="ahl-card-hd">
+      <span class="ahl-card-title">Subscription ending</span>
+      <div style="display:flex; gap:8px; margin-left:auto; align-items:center;">
+        <span style="font-size:11px; color:var(--text3);">
+          {{ subscriptionMatrix.months.length }} months
+        </span>
+        <span style="font-size:11px; color:var(--text3);">·</span>
+        <span style="font-size:11px; color:var(--text3);">
+          {{ subscriptionMatrix.journeys.length }} journeys
+        </span>
+        <span class="sub-mat-total" style="padding:2px 10px; border-radius:20px;
+          background:var(--dn-bg); color:var(--dn-dark);
+          border:1px solid var(--dn-mid); font-size:12px;">
+          {{ getGrandTotal() }} total
+        </span>
+      </div>
+    </div>
+  
+    <div class="sub-matrix-wrap">
+      <table class="sub-matrix-table">
+        <thead>
+          <tr>
+            <th class="sub-mat-th sub-mat-journey-col">Journey</th>
+            <th class="sub-mat-th" *ngFor="let m of subscriptionMatrix.months">
+              {{ m.label }}
+            </th>
+            <th class="sub-mat-th sub-mat-total-col">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sub-mat-row" *ngFor="let j of subscriptionMatrix.journeys">
+            <td class="sub-mat-td sub-mat-journey-col">{{ j.label }}</td>
+            <td class="sub-mat-td" *ngFor="let m of subscriptionMatrix.months">
+              <ng-container *ngIf="getCellData(j.id, m.ym) as cell; else empty">
+                <span class="sub-mat-pill" (click)="openSubDialog(cell.docs, j.label + ' · ' + m.label)">
+                  {{ cell.count }}
+                </span>
+              </ng-container>
+              <ng-template #empty><span class="sub-mat-zero">—</span></ng-template>
+            </td>
+            <td class="sub-mat-td sub-mat-total-col">
+              <span class="sub-mat-total">{{ subscriptionMatrix.journeyTotals[j.id] }}</span>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="sub-mat-footer-row">
+            <td class="sub-mat-td sub-mat-journey-col sub-mat-footer-lbl">Total</td>
+            <td class="sub-mat-td" *ngFor="let m of subscriptionMatrix.months">
+              <span class="sub-mat-total">{{ subscriptionMatrix.monthTotals[m.ym] }}</span>
+            </td>
+            <td class="sub-mat-td sub-mat-total-col">
+              <span class="sub-mat-grand-total">
+                {{ getGrandTotal() }}
+              </span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
   <!-- Customer Support Container -->
-  <div class="customer-support-container-new">
+  <!-- <div class="customer-support-container-new">
     <div class="support-header">
       <h2 class="support-title">Customer Support</h2>
       <button class="dashboard-link" (click)="navigateToCustomerSupport()">
@@ -521,7 +587,6 @@
     </div>
 
     <div class="support-cards-new">
-      <!-- Event & Process -->
       <div class="support-card-new">
         <div class="card-header">Event & Process</div>
 
@@ -552,7 +617,6 @@
         </div>
       </div>
 
-      <!-- Journey Related -->
       <div class="support-card-new">
         <div class="card-header">Journey Related</div>
 
@@ -583,7 +647,6 @@
         </div>
       </div>
 
-      <!-- Cancellation -->
       <div class="support-card-new">
         <div class="card-header">Cancellation</div>
 
@@ -614,7 +677,6 @@
         </div>
       </div>
 
-      <!-- BIG Support -->
       <div class="support-card-new">
         <div class="card-header">Finance</div>
 
@@ -645,7 +707,6 @@
         </div>
       </div>
 
-      <!-- Referrals -->
       <div class="support-card-new">
         <div class="card-header">Referrals</div>
 
@@ -676,7 +737,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <!-- Modes Container -->
   <div class="modes-container-new">
@@ -687,100 +748,169 @@
       </button>
     </div>
 
-<div class="modes-list">
-  <!-- First Column -->
-  <div class="modes-column">
-    <div class="mode-item" *ngFor="let mode of modesList.slice(0, Math.ceil(modesList.length / 2))" (click)="openDialog(mode)">
-      <span class="mode-name">{{mode}}</span>
-      <div class="mode-badge">
-        <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
-        <span class="mode-arrow">›</span>
+    <div class="modes-list">
+      <!-- First Column -->
+      <div class="modes-column">
+        <div class="mode-item" *ngFor="let mode of modesList.slice(0, Math.ceil(modesList.length / 2))"
+          (click)="openDialog(mode)">
+          <span class="mode-name">{{mode}}</span>
+          <div class="mode-badge">
+            <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
+            <span class="mode-arrow">›</span>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Second Column -->
-  <div class="modes-column">
-    <div class="mode-item" *ngFor="let mode of modesList.slice(Math.ceil(modesList.length / 2))" (click)="openDialog(mode)">
-      <span class="mode-name">{{mode}}</span>
-      <div class="mode-badge">
-        <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
-        <span class="mode-arrow">›</span>
+      <!-- Second Column -->
+      <div class="modes-column">
+        <div class="mode-item" *ngFor="let mode of modesList.slice(Math.ceil(modesList.length / 2))"
+          (click)="openDialog(mode)">
+          <span class="mode-name">{{mode}}</span>
+          <div class="mode-badge">
+            <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
+            <span class="mode-arrow">›</span>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
   </div>
 </div>
 
 <!-- ATC DATA -->
 <div *ngIf="!showTable">
-  <!-- Header -->
+
+  <!-- Header with controls -->
   <div class="eco-header">
     <div class="eco-header-left">
       <h1 class="eco-title">ATC Analytics</h1>
+      <div class="page-sub">{{ dateRangeHint || 'Select range' }}</div>
     </div>
-    <button class="crossover-btn" (click)="openCrossoverMetricsDialog()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="9" cy="9" r="5"/>
-        <circle cx="15" cy="15" r="5"/>
-      </svg>
-      Crossover Metrics
-    </button>
+    <div class="controls">
+      <div class="ctrl-group toggle-group">
+        <div class="toggle-btn" [class.active]="filterMode === 'months'" (click)="toggleFilterMode('months')">Months</div>
+        <div class="toggle-btn" [class.active]="filterMode === 'daterange'" (click)="toggleFilterMode('daterange')">Date range</div>
+      </div>
+      <div class="ctrl-group" *ngIf="filterMode === 'months'">
+        <span class="ctrl-label">Months</span>
+        <div class="ctrl-sep"></div>
+        <div class="months-input-wrap">
+          <input class="months-input" type="number" [(ngModel)]="numberOfMonths" min="1" max="24" placeholder="—" (change)="onMonthsCountChange()">
+          <div class="months-spin">
+            <button class="spin-btn" (click)="stepMonths(1)">▲</button>
+            <button class="spin-btn" (click)="stepMonths(-1)">▼</button>
+          </div>
+        </div>
+      </div>
+      <mat-form-field appearance="outline" class="date-range-field" *ngIf="filterMode === 'daterange'">
+        <mat-label>Date range</mat-label>
+        <mat-date-range-input [rangePicker]="rangePicker">
+          <input matStartDate [(ngModel)]="filterStartDate" name="filterStartDate" placeholder="Start date" (dateChange)="onDateRangeChange()">
+          <input matEndDate [(ngModel)]="filterEndDate" name="filterEndDate" placeholder="End date" (dateChange)="onDateRangeChange()">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matIconSuffix [for]="rangePicker"></mat-datepicker-toggle>
+        <mat-date-range-picker #rangePicker></mat-date-range-picker>
+      </mat-form-field>
+      <button class="crossover-btn" (click)="openCrossoverMetricsDialog()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="9" cy="9" r="5" /><circle cx="15" cy="15" r="5" />
+        </svg>
+        Crossover Metrics
+      </button>
+    </div>
   </div>
 
   <!-- Main Grid -->
   <div class="eco-grid">
     <!-- Column 1: ATC & Products -->
     <div class="eco-column">
-      <!-- Row 1: ATC Status -->
       <div class="eco-row-top">
-        <div class="eco-card" *ngFor="let total of totalATC | keyvalue; let i = index">
-          <div class="eco-card-header">
-            <div class="eco-card-icon blue">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 12l2 2 4-4"/>
-                <circle cx="12" cy="12" r="10"/>
-              </svg>
+        <ng-container *ngIf="(totalATC | keyvalue)?.length > 0; else atcEmpty">
+          <div class="eco-card" *ngFor="let total of totalATC | keyvalue; let i = index">
+            <div class="eco-card-header">
+              <div class="eco-card-icon blue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 12l2 2 4-4" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+              </div>
+              <span class="eco-card-title">ATC Status</span>
             </div>
-            <span class="eco-card-title">ATC Status</span>
-          </div>
-          <div class="eco-card-body">
-            <div class="atc-grid">
-              <div class="atc-item">
-                <div class="atc-value validated" (click)="openEcoDialog(total.value,'Total ATC')">{{total.key}}</div>
-                <div class="atc-label">Validated Total ATC</div>
-                <div class="atc-tag success" (click)="openEcoDialog(percentageCompleted,'Completed ATC')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                  {{percentageCompleted.length}} Completed
+            <div class="eco-card-body">
+              <div class="atc-grid">
+                <div class="atc-item">
+                  <div class="atc-value validated" (click)="openEcoDialog(total.value,'Total ATC')">{{total.key}}</div>
+                  <div class="atc-label">Validated Total ATC</div>
+                  <div class="atc-tag success" (click)="openEcoDialog(percentageCompleted,'Completed ATC')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {{percentageCompleted.length}} Completed
+                  </div>
+                </div>
+                <div class="atc-item" (click)="openEcoDialog(unvalidatedATC,'Unvalidated ATC')">
+                  <div class="atc-value pending">{{unvalidatedATC.length}}</div>
+                  <div class="atc-label">Unvalidated ATC</div>
+                  <div class="atc-tag warning">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 6v6l4 2" />
+                    </svg>
+                    Awaiting Review
+                  </div>
                 </div>
               </div>
-              <div class="atc-item" (click)="openEcoDialog(unvalidatedATC,'Unvalidated ATC')">
-                <div class="atc-value pending">{{unvalidatedATC.length}}</div>
-                <div class="atc-label">Unvalidated ATC</div>
-                <div class="atc-tag warning">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 6v6l4 2"/>
-                  </svg>
-                  Awaiting Review
+            </div>
+          </div>
+        </ng-container>
+    
+        <!-- atcEmpty must be INSIDE eco-row-top, sibling to ng-container -->
+        <ng-template #atcEmpty>
+          <div class="eco-card">
+            <div class="eco-card-header">
+              <div class="eco-card-icon blue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 12l2 2 4-4" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+              </div>
+              <span class="eco-card-title">ATC Status</span>
+            </div>
+            <div class="eco-card-body">
+              <div class="atc-grid">
+                <div class="atc-item">
+                  <div class="atc-value validated">0</div>
+                  <div class="atc-label">Validated Total ATC</div>
+                  <div class="atc-tag success">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    0 Completed
+                  </div>
+                </div>
+                <div class="atc-item">
+                  <div class="atc-value pending">{{ unvalidatedATC.length }}</div>
+                  <div class="atc-label">Unvalidated ATC</div>
+                  <div class="atc-tag warning">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 6v6l4 2" />
+                    </svg>
+                    Awaiting Review
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </ng-template>
       </div>
-
-      <!-- Row 2: Products List -->
+    
       <div class="eco-row-bottom">
         <div class="eco-card">
           <div class="eco-card-header">
             <div class="eco-card-icon purple">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
-                <line x1="7" y1="7" x2="7.01" y2="7"/>
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
               </svg>
             </div>
             <span class="eco-card-title">Products</span>
@@ -788,9 +918,8 @@
           </div>
           <div class="eco-card-body">
             <ul class="eco-list">
-              <li class="eco-list-item" 
-                  *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc"
-                  (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
+              <li class="eco-list-item" *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc"
+                (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
                 <span class="eco-list-text">{{impact.key}}</span>
                 <span class="eco-list-badge blue">{{impact.value.length}}</span>
               </li>
@@ -805,32 +934,32 @@
 
     <!-- Column 2: Adjustments -->
     <div class="eco-column">
-      <!-- Row 1: Total Adjustments -->
       <div class="eco-row-top">
         <div class="eco-card">
           <div class="eco-card-header">
             <div class="eco-card-icon teal">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 20V10"/>
-                <path d="M18 20V4"/>
-                <path d="M6 20v-4"/>
+                <path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" />
               </svg>
             </div>
             <span class="eco-card-title">Total Adjustments</span>
           </div>
           <div class="eco-card-body">
-            <div class="adjustment-hero" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment', totalAdjustmentsCompletedMap['count'])">
+            <div class="adjustment-hero"
+              (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment', totalAdjustmentsCompletedMap['count'])">
               <span class="adjustment-number">{{totalAdjustmentsCompletedMap['count']}}</span>
             </div>
             <div class="adjustment-split">
-              <div class="adjustment-item" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware', totalAdjustmentAwareMap['count'])">
+              <div class="adjustment-item"
+                (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware', totalAdjustmentAwareMap['count'])">
                 <div class="adjustment-bar blue"></div>
                 <div class="adjustment-info">
                   <span class="adjustment-value">{{totalAdjustmentAwareMap['count']}}</span>
                   <span class="adjustment-label">Aware</span>
                 </div>
               </div>
-              <div class="adjustment-item" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware', totalAdjustmentUnAwareMap['count'])">
+              <div class="adjustment-item"
+                (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware', totalAdjustmentUnAwareMap['count'])">
                 <div class="adjustment-bar green"></div>
                 <div class="adjustment-info">
                   <span class="adjustment-value">{{totalAdjustmentUnAwareMap['count']}}</span>
@@ -841,36 +970,32 @@
           </div>
         </div>
       </div>
-
-      <!-- Row 2: Adjustment Details -->
       <div class="eco-row-bottom">
         <div class="eco-card">
           <div class="eco-card-header">
-            <div class="eco-card-icon orange">
+            <div class="eco-card-icon teal">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
               </svg>
             </div>
-            <span class="eco-card-title">Adjustment Details</span>
+            <span class="eco-card-title">Tags breakdown</span>
+            <span class="eco-card-count">{{ activeJourneyCoachTags.length }}</span>
           </div>
-          <div class="eco-card-body">
-            <ul class="eco-list">
-              <li class="eco-list-item" *ngFor="let impact of evolutionprogressMap | keyvalue">
-                <span class="eco-list-text">{{impact.key}}</span>
-                <div class="eco-list-arrow">
-                  <span class="eco-list-badge teal">{{impact.value}}</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 18l6-6-6-6"/>
-                  </svg>
-                </div>
-              </li>
-            </ul>
-            <div class="eco-empty" *ngIf="(evolutionprogressMap | keyvalue)?.length === 0">
-              <span>No adjustment details</span>
+          <div class="eco-card-body" style="padding:0;">
+            <div *ngFor="let tag of activeJourneyCoachTags" class="eco-list-item" (click)="openTagProfilesDialog(tag)">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="ahl-tag-dot"></span>
+                <span class="eco-list-text">{{ tag['name'] || tag.id }}</span>
+              </div>
+              <div class="eco-list-arrow">
+                <span class="eco-list-badge teal">{{ getProfilesForTag(tag.id).length }}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
             </div>
+            <div class="eco-empty" *ngIf="activeJourneyCoachTags.length === 0">No active tags</div>
           </div>
         </div>
       </div>
@@ -878,14 +1003,13 @@
 
     <!-- Column 3: Metrics & Impact -->
     <div class="eco-column">
-      <!-- Row 1: Metric Cards Only -->
       <div class="eco-row-top">
         <div class="eco-metrics-grid">
-          <div class="eco-metric-card red" (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
+          <div class="eco-metric-card red"
+            (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
             <div class="eco-metric-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 6v6l4 2"/>
+                <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
               </svg>
             </div>
             <div class="eco-metric-content">
@@ -893,11 +1017,11 @@
               <span class="eco-metric-label">Limitation Years</span>
             </div>
           </div>
-
-          <div class="eco-metric-card green" (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
+          <div class="eco-metric-card green"
+            (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
             <div class="eco-metric-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
             <div class="eco-metric-content">
@@ -905,11 +1029,10 @@
               <span class="eco-metric-label">Saved Years</span>
             </div>
           </div>
-
           <div class="eco-metric-card amber">
             <div class="eco-metric-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </div>
             <div class="eco-metric-content">
@@ -919,14 +1042,12 @@
           </div>
         </div>
       </div>
-
-      <!-- Row 2: Extended Life Impact (Single Card with Header + List) -->
       <div class="eco-row-bottom">
         <div class="eco-card">
           <div class="eco-card-header">
             <div class="eco-card-icon pink">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
               </svg>
             </div>
             <span class="eco-card-title">Extended Life Impact</span>
@@ -938,14 +1059,12 @@
           <div class="eco-card-body">
             <ul class="eco-list">
               <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
-                <li class="eco-list-item" 
-                    *ngIf="mapprofile[impact.key] != null"
-                    (click)="profileNavigation(impact.key)">
+                <li class="eco-list-item" *ngIf="mapprofile[impact.key] != null" (click)="profileNavigation(impact.key)">
                   <span class="eco-list-text">{{mapprofile[impact.key] || "No Name"}}</span>
                   <div class="eco-list-arrow">
                     <span class="eco-list-badge pink">{{impact.value}}</span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M9 18l6-6-6-6"/>
+                      <path d="M9 18l6-6-6-6" />
                     </svg>
                   </div>
                 </li>
@@ -959,149 +1078,671 @@
       </div>
     </div>
   </div>
-</div>
-<!-- <div *ngIf="!showTable">
-  <div class="dashboard-container">
-    <div class="dashboard-section">
-      <div class="inner-row" *ngFor="let total of totalATC | keyvalue let i = index">
-        <div class="rectangle-card main-card" (click)="openEcoDialog(total.value,'Total ATC')">
-          <div class="card-header1">
-            <h5>ATC Status</h5>
-          </div>
-          <div class="main-value-row">
-            <div class="card-value">{{total.key}}</div>
-            <div class="card-icon"></div>
-            <div class="card-label">Validated Total ATC</div>
-          </div>
-          <div class="main-value-row">
-            <div class="card-value">{{unvalidatedATC.length}}</div>
-            <div class="card-icon"></div>
-            <div class="card-label">Unvalidated ATC</div>
-          </div>
-          <div class="sub-metrics">
-            <div class="sub-item">Completed: <span class="completed-count">{{percentageCompleted}}</span></div>
-          </div>
-        </div>
+
+  <!-- Interim section title -->
+  <div class="page-hd" style="margin-top: 28px; margin-left: 15px">
+    <div class="eco-header-left">
+      <h1 class="eco-title">Ecosystem Health</h1>
+      <div class="page-sub">{{ dateRangeHint || 'Evolution tracking · select range' }}</div>
+    </div>
+  </div>
+
+  <!-- INTERIM ROW -->
+  <div class="interim-row">
+
+    <!-- COLUMN 1 — Interim widget -->
+    <div class="widget">
+      <!-- Loading -->
+      <div class="card" *ngIf="isFetchingData">
+        <div class="empty-state">Loading...</div>
       </div>
 
-      <div class="inner-row">
-        <div class="rectangle-card list-card">
-          <div class="list-header">Products List</div>
-          <h4>Total : {{totalProductCount}}</h4>
-          <ul class="list-group">
-            <ng-container *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc let i = index">
-              <li class="list-group-item-atc"
-                (click)="openEcoDialog(impact.value,impact.key + ' (' + impact.value.length + ')')">
-                <span>{{ impact.key }}</span>
-                <span class="item-count">{{ impact.value.length }}</span>
-              </li>
-            </ng-container>
-          </ul>
+      <!-- Empty -->
+      <div class="card" *ngIf="!isFetchingData && monthSummaries.length === 0">
+        <div class="empty-state">Change date range to load data</div>
+      </div>
+
+      <div class="card" *ngIf="!isFetchingData && monthSummaries.length > 0 && activeMonthSummary">
+
+        <!-- TOTAL BANNER -->
+        <div class="total-banner">
+          <div class="total-top-row">
+            <span class="total-title">{{ activeMonthSummary.monthLabel }}</span>
+            <button class="eye-btn" (click)="openAllMonthsDialog()" title="View all months">
+              <svg class="eye-svg" viewBox="0 0 24 24" fill="none">
+                <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z"
+                  stroke="#9299B0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="3" stroke="#9299B0" stroke-width="1.8"/>
+              </svg>
+            </button>
+          </div>
+          <div class="total-stats">
+            <div class="ts">
+              <div class="ts-num total">{{ activeMonthSummary.totalInterims }}</div>
+              <div class="ts-lbl">Total</div>
+            </div>
+            <div class="ts">
+              <div class="ts-num up" (click)="openProgressedDialog()">{{ activeProgressedCount }}</div>
+              <div class="ts-lbl">Progressed</div>
+              <div class="ts-bar up" [style.width.%]="progressedPercentage"></div>
+            </div>
+            <div class="ts">
+              <div class="ts-num dn" (click)="openRegressedDialog()">{{ activeRegressedCount }}</div>
+              <div class="ts-lbl">Regressed</div>
+              <div class="ts-bar dn" [style.width.%]="regressedPercentage"></div>
+            </div>
+            <div class="ts">
+              <div class="ts-num nc" (click)="openNoChangeDialog()">{{ activeMonthSummary.noChangeCount }}</div>
+              <div class="ts-lbl">No change</div>
+              <div class="ts-bar nc" [style.width.%]="noChangePercentage"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MONTH TABS -->
+        <div class="month-tabs">
+          <div *ngFor="let monthSummary of monthSummaries; let i = index"
+            class="mtab" [class.active]="i === activeMonthIndex"
+            (click)="switchActiveMonth(i)">
+            {{ getTabLabel(monthSummary) }}
+          </div>
+        </div>
+
+        <!-- NO CHANGE BANNER -->
+        <div class="nc-banner" (click)="openNoChangeDialog()">
+          <div class="nc-left">
+            <div class="nc-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="#7C5CFC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+            </div>
+            <div>
+              <div class="nc-label">No Change · {{ activeMonthSummary.monthLabel }}</div>
+              <div class="nc-pct">{{ noChangePercentage }}% of {{ activeMonthSummary.totalInterims }} · tap to view</div>
+            </div>
+          </div>
+          <div class="nc-num">{{ activeMonthSummary.noChangeCount }}</div>
+        </div>
+
+        <!-- TWO COLUMNS -->
+        <div class="cols">
+
+          <!-- PROGRESSED COL -->
+          <div class="col">
+            <div class="col-head">
+              <div class="col-head-title up">
+                <span class="ch-dot up"></span>Progressed · {{ activeProgressedCount }}
+              </div>
+            </div>
+            <div class="area-head">Areas changed</div>
+            <div *ngFor="let areaKey of AREA_KEYS" class="arow hu" (click)="openAreaDialog('up', areaKey)">
+              <span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span>
+              <div class="arow-right">
+                <div class="arow-bar">
+                  <div class="arow-bar-fill up" [style.width.%]="getBarWidthPercent(
+                    getAreaValue(activeMonthSummary, 'up', areaKey),
+                    getMaxValue(activeMonthSummary.progressedData.areaBreakdown))">
+                  </div>
+                </div>
+                <span class="arow-num">{{ getAreaValue(activeMonthSummary, 'up', areaKey) }}</span>
+              </div>
+            </div>
+            <div class="cat-head">By category</div>
+            <div *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('up', category)">
+              <span class="crow-lbl">{{ category }}</span>
+              <div class="crow-right">
+                <div class="crow-bar">
+                  <div class="crow-fill up" [style.width.%]="getBarWidthPercent(
+                    getCategoryValue(activeMonthSummary, 'up', category),
+                    getMaxValue(activeMonthSummary.progressedData.categoryBreakdown))">
+                  </div>
+                </div>
+                <span class="crow-num up">{{ getCategoryValue(activeMonthSummary, 'up', category) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- REGRESSED COL -->
+          <div class="col">
+            <div class="col-head">
+              <div class="col-head-title dn">
+                <span class="ch-dot dn"></span>Regressed · {{ activeRegressedCount }}
+              </div>
+            </div>
+            <div class="area-head">Areas changed</div>
+            <div *ngFor="let areaKey of AREA_KEYS" class="arow hd" (click)="openAreaDialog('dn', areaKey)">
+              <span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span>
+              <div class="arow-right">
+                <div class="arow-bar">
+                  <div class="arow-bar-fill dn" [style.width.%]="getBarWidthPercent(
+                    getAreaValue(activeMonthSummary, 'dn', areaKey),
+                    getMaxValue(activeMonthSummary.regressedData.areaBreakdown))">
+                  </div>
+                </div>
+                <span class="arow-num">{{ getAreaValue(activeMonthSummary, 'dn', areaKey) }}</span>
+              </div>
+            </div>
+            <div class="cat-head">By category</div>
+            <div *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('dn', category)">
+              <span class="crow-lbl">{{ category }}</span>
+              <div class="crow-right">
+                <div class="crow-bar">
+                  <div class="crow-fill dn" [style.width.%]="getBarWidthPercent(
+                    getCategoryValue(activeMonthSummary, 'dn', category),
+                    getMaxValue(activeMonthSummary.regressedData.categoryBreakdown))">
+                  </div>
+                </div>
+                <span class="crow-num dn">{{ getCategoryValue(activeMonthSummary, 'dn', category) }}</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
 
-    <div class="dashboard-section">
-      <div class="inner-row">
-        <div class="rectangle-card main-card"
-          (click)="openEcoDialog(totalAdjustmentsCompletedMap['profileIds'],'Total Adjustment',totalAdjustmentsCompletedMap['count'],totalAdjustmentsCompletedMap['profileIdWiseCount'])">
-          <div class="card-header1">
-            <div class="card-icon"></div>
-            <h5>Total Adjustments</h5>
+    <!-- COLUMN 2 — Ask AH + Tags stacked -->
+    <div class="interim-col2">
+
+      <!-- ROW 1: Adjustment Details (35%) + Evolution Progress (rest) -->
+      <div class="interim-col2-row1">
+      
+        <!-- Adjustment Details -->
+        <div class="adj-mini-card card">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Adjustment details</span>
           </div>
-          <div class="card-value">{{totalAdjustmentsCompletedMap['count']}}</div>
-          <div class="sub-metrics-grid">
-            <div class="sub-item-large">
-              <div class="sub-number">{{totalAdjustmentAwareMap['count']}}</div>
-              <div class="sub-label">
-                <div class="sub-icon blue-icon"></div>
-                <span>Aware Adjustments</span>
-              </div>
+          <div class="adj-mini-body">
+            <div class="adj-mini-row" *ngFor="let item of evolutionprogressMap | keyvalue">
+              <span class="adj-mini-lbl">{{ item.key }}</span>
+              <span class="adj-mini-val">{{ item.value }}</span>
             </div>
-            <div class="sub-item-large">
-              <div class="sub-number">{{totalAdjustmentUnAwareMap['count']}}</div>
-              <div class="sub-label">
-                <div class="sub-icon green-icon"></div>
-                <span>Unaware Adjustments</span>
-              </div>
+            <div class="empty-state" *ngIf="(evolutionprogressMap | keyvalue)?.length === 0">
+              No details
             </div>
+          </div>
+        </div>
+      
+        <!-- Evolution Progress Table -->
+        <div class="ep-card card" *ngIf="evolutionProgressData">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Evolution progress</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:auto;">
+              {{ evolutionProgressData.keys.length }} keys
+            </span>
+          </div>
+          <div class="ep-table-wrap">
+            <table class="ep-table">
+              <thead>
+                <tr>
+                  <th class="ep-th ep-th-key">Key</th>
+                  <th class="ep-th ep-th-b0">&lt; 25%</th>
+                  <th class="ep-th ep-th-b1">25–50%</th>
+                  <th class="ep-th ep-th-b2">50–75%</th>
+                  <th class="ep-th ep-th-b3">75–100%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="ep-tr" *ngFor="let key of evolutionProgressData.keys">
+                  <td class="ep-td ep-td-key">
+                    <div class="ep-key-wrap">
+                      <span class="ep-key-dot"></span>{{ key }}
+                    </div>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b0" *ngIf="getEpBandCount(key,0)>0; else d0"
+                      (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span>
+                    <ng-template #d0><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b1" *ngIf="getEpBandCount(key,1)>0; else d1"
+                      (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span>
+                    <ng-template #d1><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b2" *ngIf="getEpBandCount(key,2)>0; else d2"
+                      (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span>
+                    <ng-template #d2><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b3" *ngIf="getEpBandCount(key,3)>0; else d3"
+                      (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span>
+                    <ng-template #d3><span class="ep-zero">—</span></ng-template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <div class="inner-row">
-        <div class="rectangle-card list-card">
-          <div class="list-header">Adjustment Details</div>
-          <ul class="list-group">
-            <ng-container *ngFor="let impact of evolutionprogressMap | keyvalue">
-              <li class="list-group-item-atc">
-                <span>{{ impact.key }}</span>
-                <div class="mode-badge">
-                  <span class="mode-count">{{ impact.value }}</span>
-                  <span class="mode-arrow">›</span>
-                </div>
-              </li>
-            </ng-container>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="dashboard-section metrics-section">
-      <div class="metrics-row">
-        <div class="rectangle-card metric-card"
-          (click)="openEcoDialog(evolutionYearWastedMap['profileIds'],'Limitation Years',evolutionYearWastedMap['count'],evolutionYearWastedMap['profileIdWiseCount'])">
-          <div class="card-header1">
-            <div class="card-icon"></div>
-            <h5>Limitation Years</h5>
-          </div>
-          <div class="card-value">{{evolutionYearWastedMap['count']}}</div>
-        </div>
-
-        <div class="rectangle-card metric-card"
-          (click)="openEcoDialog(evolutionYearSavedMap['profileIds'],'Saved Years',evolutionYearSavedMap['count'],evolutionYearSavedMap['profileIdWiseCount'])">
-          <div class="card-header1">
-            <div class="card-icon"></div>
-            <h5>Saved years</h5>
-          </div>
-          <div class="card-value">{{evolutionYearSavedMap['count']}}</div>
-        </div>
-
-        <div class="rectangle-card metric-card">
-          <div class="card-header1">
-            <div class="card-icon"></div>
-            <h5>Big Opportunities</h5>
-          </div>
-          <div class="card-value"></div>
-        </div>
-      </div>
-
-      <div class="inner-row">
-        <div class="rectangle-card list-card" id="extended-life-content">
-          <div class="list-header-row">
-            <div class="list-header">Extended Life Impacted List</div>
-            <div class="total-impact-badge">
-              <span class="badge-label">Total Impact</span>
-              <span class="badge-count">{{extendedLifeImpactTotal}}</span>
+      <!-- ROW 2 — Ask AH & Love letter -->
+      <div class="ahl-widget" *ngIf="!isFetchingData && askAHLoveLetterSummary">
+        <div class="card">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Ask AH &amp; Love letter</span>
+            <div class="ahl-hd-pills">
+              <span class="ahl-hd-pill purple">
+                <span class="ahl-src-dot" style="background:#7F77DD;"></span>
+                Ask AH · {{ askAHLoveLetterSummary.askAH.total }}
+              </span>
+              <span class="ahl-hd-pill pink">
+                <span class="ahl-src-dot" style="background:#D4537E;"></span>
+                Love letter · {{ askAHLoveLetterSummary.loveLetter.total }}
+              </span>
             </div>
           </div>
-          <ul class="list-group">
-            <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
-              <li *ngIf="mapprofile[impact.key] != null" class="list-group-item-atc"
-                (click)="profileNavigation(impact.key)">
-                <span>{{ mapprofile[impact.key] || "No Name" }}</span>
-                <div class="mode-badge">
-                  <span class="mode-count">{{ impact.value }}</span>
-                  <span class="mode-arrow">›</span>
-                </div>
-              </li>
-            </ng-container>
-          </ul>
+          <table class="ahl-table">
+            <thead>
+              <tr>
+                <th class="ahl-th ahl-th-flag">Flag</th>
+                <th class="ahl-th ahl-col-divider">
+                  <div class="ahl-src-header">
+                    <span class="ahl-src-dot" style="background:#7F77DD;"></span>Ask AH
+                  </div>
+                </th>
+                <th class="ahl-th ahl-col-divider">
+                  <div class="ahl-src-header">
+                    <span class="ahl-src-dot" style="background:#D4537E;"></span>Love letter
+                  </div>
+                </th>
+                <th class="ahl-th ahl-total-col">Combined</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- HAPPY -->
+              <tr class="ahl-row">
+                <td class="ahl-td">
+                  <div class="ahl-row-lbl">
+                    <div class="ahl-row-icon" style="background:#EAF3DE;">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1.5C4.41 1.5 1.5 4.41 1.5 8S4.41 14.5 8 14.5 14.5 11.59 14.5 8 11.59 1.5 8 1.5zm-2 4.5a1 1 0 112 0 1 1 0 01-2 0zm4 0a1 1 0 112 0 1 1 0 01-2 0zm2.5 3.5c-.5 1.5-2 2.5-4.5 2.5s-4-1-4.5-2.5h9z" fill="#27500A"/>
+                      </svg>
+                    </div>
+                    <span class="ahl-row-name">Happy</span>
+                  </div>
+                </td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-happy">{{ askAHLoveLetterSummary.askAH.liked }}</span></td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-happy">{{ askAHLoveLetterSummary.loveLetter.liked }}</span></td>
+                <td class="ahl-td ahl-total-col"><span class="ahl-pill ahl-happy">{{ askAHLoveLetterSummary.liked }}</span></td>
+              </tr>
+              <!-- NEEDS ATTENTION -->
+              <tr class="ahl-row">
+                <td class="ahl-td">
+                  <div class="ahl-row-lbl">
+                    <div class="ahl-row-icon" style="background:#FAEEDA;">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1L1 14h14L8 1zm0 3.5l4.5 8.5H3.5L8 4.5zM7.5 7h1v3h-1V7zm0 4h1v1h-1v-1z" fill="#633806"/>
+                      </svg>
+                    </div>
+                    <span class="ahl-row-name">Needs attention</span>
+                  </div>
+                </td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-attn">{{ askAHLoveLetterSummary.askAH.tagged }}</span></td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-attn">{{ askAHLoveLetterSummary.loveLetter.tagged }}</span></td>
+                <td class="ahl-td ahl-total-col"><span class="ahl-pill ahl-attn">{{ askAHLoveLetterSummary.tagged }}</span></td>
+              </tr>
+              <!-- OPPORTUNITY -->
+              <tr class="ahl-row">
+                <td class="ahl-td">
+                  <div class="ahl-row-lbl">
+                    <div class="ahl-row-icon" style="background:#E6F1FB;">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-5h1.5v5zm0-6.5h-1.5V3.5h1.5V5z" fill="#0C447C"/>
+                      </svg>
+                    </div>
+                    <span class="ahl-row-name">Opportunity</span>
+                  </div>
+                </td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-opp">{{ askAHLoveLetterSummary.askAH.opportunity }}</span></td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-opp">{{ askAHLoveLetterSummary.loveLetter.opportunity }}</span></td>
+                <td class="ahl-td ahl-total-col"><span class="ahl-pill ahl-opp">{{ askAHLoveLetterSummary.opportunity }}</span></td>
+              </tr>
+              <!-- CRITICAL -->
+              <tr class="ahl-row">
+                <td class="ahl-td">
+                  <div class="ahl-row-lbl">
+                    <div class="ahl-row-icon" style="background:#FCEBEB;">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.75 4h1.5v5H7.25V5zm0 6h1.5v1.5H7.25V11z" fill="#791F1F"/>
+                      </svg>
+                    </div>
+                    <span class="ahl-row-name">Critical</span>
+                  </div>
+                </td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-critical">{{ askAHLoveLetterSummary.askAH.critical }}</span></td>
+                <td class="ahl-td ahl-col-divider"><span class="ahl-pill ahl-critical">{{ askAHLoveLetterSummary.loveLetter.critical }}</span></td>
+                <td class="ahl-td ahl-total-col"><span class="ahl-pill ahl-critical">{{ askAHLoveLetterSummary.critical }}</span></td>
+              </tr>
+              <!-- TOTAL ROW -->
+              <tr class="ahl-total-row">
+                <td class="ahl-td"><span class="ahl-total-lbl">Total flagged</span></td>
+                <td class="ahl-td ahl-col-divider">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</td>
+                <td class="ahl-td ahl-col-divider">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</td>
+                <td class="ahl-td ahl-total-col">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   </div>
-</div> -->
+
+  <!-- ══════════════════ DIALOG OVERLAY ══════════════════ -->
+  <div class="overlay" [class.open]="isDialogOpen" (click)="onDialogOverlayClick($event)">
+    <div class="dialog" *ngIf="dialogContext">
+      <ng-container *ngIf="selectedProfile; else listView">
+        <div class="dlg-hd">
+          <div class="dlg-hd-left">
+            <div class="dlg-av" [ngClass]="dialogContext.statusClass">
+              {{ getInitials(selectedProfile.profileName || selectedProfile.profileId) }}
+            </div>
+            <div>
+              <div class="dlg-title">{{ selectedProfile.profileName || selectedProfile.profileId }}</div>
+              <div class="dlg-sub">
+                {{ selectedProfile.createdDate }} ·
+                {{ dialogContext.statusType === 'up' ? 'Progressed' : dialogContext.statusType === 'dn' ? 'Regressed' : 'No change' }}
+              </div>
+            </div>
+          </div>
+          <button class="close-btn" (click)="closeDialog()">✕</button>
+        </div>
+        <div class="dlg-body">
+          <div class="back-btn" (click)="backToProfileList()">‹ Back to list</div>
+          <div class="changed-tags" *ngIf="getAllChangedAreas(selectedProfile).length">
+            <span *ngFor="let area of selectedProfile.progressedAreas" class="changed-tag up">{{ area }}</span>
+            <span *ngFor="let area of selectedProfile.regressedAreas" class="changed-tag dn">{{ area }}</span>
+          </div>
+          <div class="sec-lbl">Category breakdown · start → end</div>
+          <div *ngFor="let category of CATEGORIES" class="cat-card"
+            [style.border-color]="isCategoryChanged(selectedProfile, category)
+              ? (getCategoryChangeType(selectedProfile, category) === 'up' ? 'var(--up-mid)' : 'var(--dn-mid)')
+              : 'var(--border)'">
+            <div class="cat-card-hd"
+              [style.background]="isCategoryChanged(selectedProfile, category)
+                ? (getCategoryChangeType(selectedProfile, category) === 'up' ? 'var(--up-bg)' : 'var(--dn-bg)')
+                : 'var(--bg)'">
+              <span class="cat-card-name">{{ category }}</span>
+              <span class="status-pill" [ngClass]="getCategoryChangeType(selectedProfile, category)">
+                {{ getCategoryStatusLabel(getCategoryChangeType(selectedProfile, category)) }}
+              </span>
+            </div>
+            <div class="cat-card-body">
+              <ng-container *ngIf="selectedProfile.previousMetric && selectedProfile.previousCreatedDate">
+                <div class="prev-interim-row">
+                  <span class="prev-interim-lbl">Prev · {{ selectedProfile.previousCreatedDate }}</span>
+                  <div class="prev-pt-track">
+                    <span class="pt-box start">{{ selectedProfile.previousMetric[category]?.startpoint }}</span>
+                    <span class="prev-arr">→</span>
+                    <span class="pt-box start">{{ selectedProfile.previousMetric[category]?.endpoint }}</span>
+                  </div>
+                  <span class="seq-chip">L{{ selectedProfile.previousMetric[category]?.sequence }}</span>
+                </div>
+              </ng-container>
+              <div class="curr-interim-row">
+                <span class="prev-interim-lbl">Current · {{ selectedProfile.createdDate }}</span>
+                <div class="prev-pt-track">
+                  <span class="pt-box start">{{ selectedProfile.metric[category]?.startpoint }}</span>
+                  <span class="pt-arr" [ngClass]="getCategoryChangeType(selectedProfile, category)">
+                    {{ getCategoryArrow(getCategoryChangeType(selectedProfile, category)) }}
+                  </span>
+                  <span class="pt-box" [ngClass]="'end-' + getCategoryChangeType(selectedProfile, category)">
+                    {{ selectedProfile.metric[category]?.endpoint }}
+                  </span>
+                </div>
+                <span class="seq-chip">L{{ selectedProfile.metric[category]?.sequence }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+      <ng-template #listView>
+        <div class="dlg-hd">
+          <div class="dlg-hd-left">
+            <div class="dlg-av" [ngClass]="dialogContext.statusClass">
+              {{ dialogContext.statusClass === 'up' ? '↑' : dialogContext.statusClass === 'dn' ? '↓' : '—' }}
+            </div>
+            <div>
+              <div class="dlg-title">{{ dialogContext.dialogTitle }}</div>
+              <div class="dlg-sub">{{ dialogContext.dialogSubtitle }}</div>
+            </div>
+          </div>
+          <button class="close-btn" (click)="closeDialog()">✕</button>
+        </div>
+        <div class="dlg-body">
+          <div class="sec-lbl" style="margin-bottom:8px;">Click name to view their interim</div>
+          <div *ngIf="dialogProfileList.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div>
+          <div *ngFor="let profile of dialogProfileList" class="participant-row" (click)="openProfileDetail(profile)">
+            <div class="par-av" [ngClass]="dialogContext.statusClass">
+              {{ getInitials(profile.profileName || profile.profileId) }}
+            </div>
+            <div>
+              <div class="par-name">{{ profile.profileName || profile.profileId }}</div>
+            </div>
+            <div class="par-right">
+              <span class="par-date">{{ profile.createdDate }}</span>
+              <span *ngIf="profile.changedCount" class="par-cnt"
+                [ngClass]="getCountBadgeClass(profile.changedCount, dialogContext.statusType || 'up')">
+                {{ profile.changedCount === 'all' ? 'ALL' : profile.changedCount }}
+              </span>
+              <span class="par-arrow">›</span>
+            </div>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- ══ SUBSCRIPTION END DIALOG ══ -->
+  <div class="overlay" [class.open]="isSubDialogOpen" (click)="onSubDialogOverlayClick($event)">
+    <div class="dialog sub-dialog">
+      <div class="dlg-hd">
+        <div class="dlg-hd-left">
+          <div class="dlg-av dn">↓</div>
+          <div>
+            <div class="dlg-title">{{ subDialogTitle }}</div>
+            <div class="dlg-sub">{{ subDialogDocs.length }} participants</div>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeSubDialog()">✕</button>
+      </div>
+      <div class="sub-dlg-table-hd">
+        <span class="sub-dlg-col name">Name</span>
+        <span class="sub-dlg-col journey">Journey</span>
+        <span class="sub-dlg-col status">Status</span>
+        <span class="sub-dlg-col enddate">Sub End</span>
+      </div>
+      <div class="dlg-body">
+        <div *ngIf="subDialogDocs.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">No participants
+        </div>
+        <div class="sub-dlg-row" *ngFor="let doc of subDialogDocs" (click)="navigatetoprofile(doc['profileid'])">
+          <div class="sub-dlg-col name">
+            <div class="par-av dn" style="flex-shrink:0;">
+              {{ getInitials(mapprofile[doc['profileid']] || doc['profileid']) }}
+            </div>
+            <div style="min-width:0;">
+              <div class="par-name">{{ mapprofile[doc['profileid']] || doc['profileid'] }}</div>
+              <div class="par-id">{{ doc['profileid'] }}</div>
+            </div>
+          </div>
+          <div class="sub-dlg-col journey">
+            <span class="sub-journey-pill">{{ getSubJourneyName(doc) }}</span>
+          </div>
+          <div class="sub-dlg-col status">
+            <span class="sub-status-pill" [ngClass]="getSubStatusClass(doc['journeystatus'])">
+              {{ doc['journeystatus'] }}
+            </span>
+          </div>
+          <div class="sub-dlg-col enddate">
+            <span class="sub-end-badge">{{ getSubEndDate(doc) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ EVOLUTION PROGRESS DIALOG ══ -->
+  <div class="overlay" [class.open]="isEpDialogOpen" (click)="onEpOverlayClick($event)">
+    <div class="dialog">
+      <div class="dlg-hd">
+        <div class="dlg-hd-left">
+          <div class="dlg-av" [ngClass]="'ep-av-'+epDialogBandIdx">{{ epDialogTitle.slice(0,2).toUpperCase() }}</div>
+          <div>
+            <div class="dlg-title">{{ epDialogTitle }}</div>
+            <div class="dlg-sub">{{ epDialogSubtitle }}</div>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeEpDialog()">✕</button>
+      </div>
+      <div class="dlg-body">
+        <div class="sec-lbl" style="margin-bottom:10px;">Profiles in this band</div>
+        <div *ngIf="epDialogProfiles.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles
+        </div>
+        <div class="participant-row" *ngFor="let p of epDialogProfiles">
+          <div class="par-av" [ngClass]="'ep-av-'+epDialogBandIdx">{{ getInitials(p.profileName) }}</div>
+          <div>
+            <div class="par-name">{{ p.profileName }}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px;">Total: {{ p.total }}</div>
+          </div>
+          <div class="par-right">
+            <span class="ep-pct-pill" [ngClass]="'ep-b'+epDialogBandIdx">{{ p.pct }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAG PROFILES DIALOG ══════════════════ -->
+  <div class="overlay" [class.open]="isTagProfilesDialogOpen" (click)="onTagProfilesOverlayClick($event)">
+    <div class="dialog">
+      <div class="dlg-hd">
+        <div class="dlg-hd-left">
+          <div class="dlg-av nc">{{ selectedTagName.slice(0,2).toUpperCase() }}</div>
+          <div>
+            <div class="dlg-title">{{ selectedTagName }}</div>
+            <div class="dlg-sub">{{ selectedTagProfiles.length }} profiles tagged</div>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeTagProfilesDialog()">✕</button>
+      </div>
+      <div class="dlg-body">
+        <div *ngIf="selectedTagProfiles.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles tagged</div>
+        <div class="participant-row" *ngFor="let p of selectedTagProfiles">
+          <div class="par-av nc">{{ p.name.slice(0,2).toUpperCase() }}</div>
+          <div><div class="par-name">{{ p.name }}</div></div>
+          <div class="par-arrow">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ ALL MONTHS OVERLAY ══════════════════ -->
+  <div class="overlay" [class.open]="isAllMonthsDialogOpen" (click)="onAllMonthsOverlayClick($event)">
+    <div class="dialog months-dialog">
+      <div class="dlg-hd">
+        <div>
+          <div class="dlg-title">All months overview</div>
+          <div class="dlg-sub">{{ dateRangeHint }}</div>
+        </div>
+        <button class="close-btn" (click)="closeAllMonthsDialog()">✕</button>
+      </div>
+      <div class="months-totals-row">
+        <div class="months-total-cell">
+          <div class="months-total-num">{{ getOverallTotal() }}</div>
+          <div class="months-total-lbl">Total interims</div>
+        </div>
+        <div class="months-total-cell up">
+          <div class="months-total-num up">{{ getOverallProgressed() }}</div>
+          <div class="months-total-lbl">Progressed</div>
+        </div>
+        <div class="months-total-cell dn">
+          <div class="months-total-num dn">{{ getOverallRegressed() }}</div>
+          <div class="months-total-lbl">Regressed</div>
+        </div>
+        <div class="months-total-cell nc">
+          <div class="months-total-num nc">{{ getOverallNoChange() }}</div>
+          <div class="months-total-lbl">No change</div>
+        </div>
+      </div>
+      <div class="months-overall-cats">
+        <div class="moc-section-lbl" style="padding: 10px 20px 6px;">Overall by category</div>
+        <div class="months-overall-cat-grid">
+          <div class="moc-overall-cat-row" *ngFor="let category of CATEGORIES">
+            <span class="moc-overall-cat-lbl">{{ category }}</span>
+            <div class="moc-overall-cat-bars">
+              <div class="moc-overall-bar-wrap">
+                <div class="moc-cat-bar up" [style.width.%]="getBarWidthPercent(getOverallCategoryProgressed(category), getOverallCategoryMax('up'))"></div>
+              </div>
+              <span class="moc-overall-val up">{{ getOverallCategoryProgressed(category) }}</span>
+              <div class="moc-overall-bar-wrap">
+                <div class="moc-cat-bar dn" [style.width.%]="getBarWidthPercent(getOverallCategoryRegressed(category), getOverallCategoryMax('dn'))"></div>
+              </div>
+              <span class="moc-overall-val dn">{{ getOverallCategoryRegressed(category) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="months-cards-body">
+        <div class="month-overview-card" *ngFor="let monthSummary of monthSummaries">
+          <div class="moc-head">
+            <div class="moc-month">{{ monthSummary.monthLabel }}</div>
+            <div class="moc-total-badge">{{ monthSummary.totalInterims }}</div>
+          </div>
+          <div class="moc-stats">
+            <div class="moc-stat">
+              <div class="moc-stat-num up">{{ getTotalProgressed(monthSummary) }}</div>
+              <div class="moc-stat-lbl">Up</div>
+            </div>
+            <div class="moc-stat">
+              <div class="moc-stat-num dn">{{ getTotalRegressed(monthSummary) }}</div>
+              <div class="moc-stat-lbl">Down</div>
+            </div>
+            <div class="moc-stat">
+              <div class="moc-stat-num nc">{{ monthSummary.noChangeCount }}</div>
+              <div class="moc-stat-lbl">No change</div>
+            </div>
+          </div>
+          <div class="moc-bars">
+            <div class="moc-bar-track"><div class="moc-bar-fill up" [style.width.%]="getBarWidthPercent(getTotalProgressed(monthSummary), monthSummary.totalInterims)"></div></div>
+            <div class="moc-bar-track"><div class="moc-bar-fill dn" [style.width.%]="getBarWidthPercent(getTotalRegressed(monthSummary), monthSummary.totalInterims)"></div></div>
+            <div class="moc-bar-track"><div class="moc-bar-fill nc" [style.width.%]="getBarWidthPercent(monthSummary.noChangeCount, monthSummary.totalInterims)"></div></div>
+          </div>
+          <div class="moc-divider"></div>
+          <div class="moc-section-lbl">Areas changed</div>
+          <div class="moc-areas">
+            <div class="moc-area-row" *ngFor="let areaKey of AREA_KEYS">
+              <span class="moc-area-lbl">{{ getAreaLabel(areaKey) }}</span>
+              <div class="moc-area-vals">
+                <span class="moc-val up">{{ monthSummary.progressedData.areaBreakdown[areaKey] || 0 }}</span>
+                <span class="moc-val-sep">/</span>
+                <span class="moc-val dn">{{ monthSummary.regressedData.areaBreakdown[areaKey] || 0 }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="moc-divider"></div>
+          <div class="moc-section-lbl">By category</div>
+          <div class="moc-cats">
+            <div class="moc-cat-row" *ngFor="let category of getMonthCategories(monthSummary)">
+              <span class="moc-cat-lbl">{{ category }}</span>
+              <div class="moc-cat-bars">
+                <div class="moc-cat-bar-wrap">
+                  <div class="moc-cat-bar up" [style.width.%]="getBarWidthPercent(monthSummary.progressedData.categoryBreakdown[category] || 0, getMaxValue(monthSummary.progressedData.categoryBreakdown))"></div>
+                </div>
+                <span class="moc-cat-num up">{{ monthSummary.progressedData.categoryBreakdown[category] || 0 }}</span>
+                <div class="moc-cat-bar-wrap">
+                  <div class="moc-cat-bar dn" [style.width.%]="getBarWidthPercent(monthSummary.regressedData.categoryBreakdown[category] || 0, getMaxValue(monthSummary.regressedData.categoryBreakdown))"></div>
+                </div>
+                <span class="moc-cat-num dn">{{ monthSummary.regressedData.categoryBreakdown[category] || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 <!-- Table Section with Filter -->
 <div class="table-section" *ngIf="showTable">
@@ -1187,11 +1828,12 @@
             <mat-label>Sale Type</mat-label>
             <mat-select placeholder="Filter Sale Type" formControlName="saleType"
               (selectionChange)="filterTableData(filterForm.value)">
-              <mat-option *ngFor="let saleType of saleTypeList" [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
+              <mat-option *ngFor="let saleType of saleTypeList"
+                [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
-        
+
         <div *ngIf="currentTableConfig?.filters?.includes('customerStatus')">
           <mat-form-field appearance="outline">
             <mat-label>Customer Status</mat-label>
@@ -1282,17 +1924,19 @@
           <tr *ngFor="let row of updatePaginatedData let i = index" [ngClass]="highlightRow(row)"
             [class.even-row]="i % 2 === 0">
             <td>{{ (currentPage - 1) * itemsPerPage + i + 1 }}.</td>
-            <td *ngFor="let column of currentTableConfig?.columns" [class.highlight-cell]="shouldHighlightCell(column.key)">
-        
+            <td *ngFor="let column of currentTableConfig?.columns"
+              [class.highlight-cell]="shouldHighlightCell(column.key)">
+
               <span [class.badge-cell]="isBadgeColumn(column.key)"
-                *ngIf="column.header !== 'Name' && !['schedule', 'schedulefor', 'action', 'notes', 'journeyplan', 'addnotes', 'generalnotes', 'waitingperiod', 'delayeddays', 'menubutton', 'salenotes', 'subscriptionend'].includes(column.key)">
+                *ngIf="column.header !== 'Name' && !['schedule', 'schedulefor', 'action', 'notes', 'journeyplan', 'addnotes', 'generalnotes', 'waitingperiod', 'delayeddays', 'profiletags', 'menubutton', 'salenotes', 'subscriptionend'].includes(column.key)">
                 {{ formatCellValue(row, column) }}
               </span>
 
-              <span *ngIf="column.header === 'Name'" class="clickable-name" (click)="navigatetoprofile(row['profileid'])">
+              <span *ngIf="column.header === 'Name'" class="clickable-name"
+                (click)="navigatetoprofile(row['profileid'])">
                 {{ formatCellValue(row, column) }}
               </span>
-        
+
               <span *ngIf="column.key === 'schedule'">
                 <span [ngStyle]="{ 'padding': '5px', 'background-color': row['onboardingscheduled'] ? 
                                           (row['onboardingscheduled'].toDate() > currentDate ? 'green' : 'red') : 
@@ -1323,6 +1967,17 @@
                 </span>
               </span>
 
+              <span *ngIf="column.key === 'profiletags'">
+                <mat-select class="tag-select" [value]="getJourneyCoachTag(row.profileid)"
+                  (selectionChange)="updateParticipantTag(row.profileid, $event.value, getJourneyCoachTag(row.profileid))"
+                  placeholder="No tag">
+                  <mat-option [value]="null">No tag</mat-option>
+                  <mat-option *ngFor="let tag of journeyCoachTags" [value]="tag.id">
+                    {{ tag['name'] || tag.id }}
+                  </mat-option>
+                </mat-select>
+              </span>
+
               <span *ngIf="column.key === 'addnotes'">
                 <div (click)="addNotes(row)">
                   <mat-icon class="edit-icon">edit_note</mat-icon>
@@ -1349,13 +2004,15 @@
               <span *ngIf="column.key === 'waitingperiod'">
                 {{ formatCellValue(row, column) }} days
               </span>
-              
+
               <span *ngIf="column.key === 'delayeddays'">
                 {{ formatCellValue(row, column) }} days
               </span>
 
               <span *ngIf="column.key === 'subscriptionend'">
-                {{ (![null, undefined, ""].includes(row['subscriptionend']) ? row['subscriptionend'] : [null, undefined, ""].includes(row['lastsubscriptionend']) ? null : row['lastsubscriptionend'])?.toDate() | date:'medium'}}
+                {{ (![null, undefined, ""].includes(row['subscriptionend']) ? row['subscriptionend'] : [null, undefined,
+                ""].includes(row['lastsubscriptionend']) ? null : row['lastsubscriptionend'])?.toDate() |
+                date:'medium'}}
               </span>
 
               <span *ngIf="column.key === 'generalnotes'" #notesContainer
@@ -1409,20 +2066,24 @@
               </span>
 
               <span *ngIf="column.key === 'journeyplan'" [ngClass]="getColumnClass(row.tentativestart)">
-                <button mat-stroked-button
-                  class="ml-2" style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
+                <button mat-stroked-button class="ml-2"
+                  style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
                   (click)="navigatejourneyplan(row)">Journey Plan</button>
                 &nbsp;
                 <button mat-stroked-button class="ml-2" *ngIf="tableType == 'overallParticipants'"
                   style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
-                  (click)="openSchedule(row, 'coach')">{{[null, undefined].includes(mapCoachAppointments[row['profileid']]) ?
-                  'Schedule' : (mapCoachAppointments[row['profileid']][0]?.['starttime']?.toDate() | date : 'mediumDate')}}</button>
+                  (click)="openSchedule(row, 'coach')">{{[null,
+                  undefined].includes(mapCoachAppointments[row['profileid']]) ?
+                  'Schedule' : (mapCoachAppointments[row['profileid']][0]?.['starttime']?.toDate() | date :
+                  'mediumDate')}}</button>
               </span>
 
               <span *ngIf="column.key === 'markcoach'">
-                <button mat-stroked-button class="ml-2" *ngIf="![null, undefined].includes(mapCoachAppointments[row['profileid']])"
+                <button mat-stroked-button class="ml-2"
+                  *ngIf="![null, undefined].includes(mapCoachAppointments[row['profileid']])"
                   style="border: 2px solid rgb(232, 92, 92); border-radius: 5px;color: rgb(232, 92, 92);"
-                  (click)="markJCcomplete(row, mapCoachAppointments[row['profileid']][0])">{{[null, undefined].includes(mapCoachAppointments[row['profileid']]) ?
+                  (click)="markJCcomplete(row, mapCoachAppointments[row['profileid']][0])">{{[null,
+                  undefined].includes(mapCoachAppointments[row['profileid']]) ?
                   '' : 'Mark Complete'}}</button>
               </span>
 
@@ -1564,7 +2225,8 @@
       <!-- Schedule Details Section -->
       <div class="calendar-right">
         <div class="schedule-list">
-          <div *ngFor="let schedule of selectedDateSchedules" [ngClass]="schedule.cancelled ? 'schedule-item-cancelled' : schedule.attended ? 'schedule-item-completed' : 'schedule-item-active'">
+          <div *ngFor="let schedule of selectedDateSchedules"
+            [ngClass]="schedule.cancelled ? 'schedule-item-cancelled' : schedule.attended ? 'schedule-item-completed' : 'schedule-item-active'">
             <div class="schedule-info">
               <div class="participant-name">
                 <strong>Participant name:</strong> {{ mapprofile[schedule.bookedby.id] }}
@@ -1608,19 +2270,19 @@
             <div *ngIf="originalData['continuitySales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['continuitySales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1634,19 +2296,19 @@
             <div *ngIf="originalData['upgradeSales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['upgradeSales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1660,19 +2322,19 @@
             <div *ngIf="originalData['referralSales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['referralSales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1686,19 +2348,19 @@
             <div *ngIf="originalData['addonSales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['addonSales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1726,7 +2388,8 @@
     <div class="modal-header">
       <div class="header-content">
         <h2 mat-dialog-title>{{ dialogConfig.title }}</h2>
-        <span *ngIf="dialogConfig.avg"> : ( {{ dialogConfig.table.data.length > 0 ? dialogConfig.avg.toFixed(2) ?? 0 : 'N/A' }} )</span>
+        <span *ngIf="dialogConfig.avg"> : ( {{ dialogConfig.table.data.length > 0 ? dialogConfig.avg.toFixed(2) ?? 0 :
+          'N/A' }} )</span>
         <span class="header-subtitle">{{ dialogConfig.table.data.length }} records</span>
       </div>
 
@@ -1736,16 +2399,6 @@
     </div>
 
     <mat-dialog-content>
-      <!-- Search -->
-      <!-- <div class="search-bar">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"></circle>
-          <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
-        </svg>
-
-        <input type="text" placeholder="Search..." class="search-input">
-      </div> -->
-
       <!-- Table -->
       <div class="table-wrapper">
         <table class="data-table">
@@ -1766,27 +2419,17 @@
               </td>
             </tr>
             <tr *ngIf="dialogConfig?.table.data.length === 0">
-            <td
-              [attr.colspan]="(dialogConfig?.table?.columns?.length || 0) + 1"
-              class="no-data"
-            >
-              <div class="no-data-message">
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                  <path d="M2 17l10 5 10-5"></path>
-                  <path d="M2 12l10 5 10-5"></path>
-                </svg>
-                <p>No data available</p>
-              </div>
-            </td>
-          </tr>
+              <td [attr.colspan]="(dialogConfig?.table?.columns?.length || 0) + 1" class="no-data">
+                <div class="no-data-message">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                  <p>No data available</p>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1799,4 +2442,3 @@
     </mat-dialog-actions>
   </div>
 </ng-template>
-

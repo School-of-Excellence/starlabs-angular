@@ -594,6 +594,24 @@ table {
   align-items: center;
 }
 
+.sos-icon {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border2);
+  color: var(--text3);
+  background: transparent;
+  transition: all .15s;
+  line-height: 1;
+}
+.sos-active {
+  background: #FEF0EE;
+  border-color: #FAC5BF;
+  color: #8C1C13;
+}
+
 /* action buttons interim log */
 .action-btn-group {
   display: flex;
