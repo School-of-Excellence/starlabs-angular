@@ -333,7 +333,7 @@ export class DeliveryDashboardCloneComponent {
 
   selectedFlowProduct = "";
 
-  mapProductGroupId: any = {
+  mapProductGroupId: any = { //I have this already, temporarily hardcoded
     "WiSH": "EhvINcWVG1Qw0AZrVdC6",
     "A&H Light": "",
     "EI Solution": "UyFb4hg57FKEHtvnVf4v",
@@ -934,6 +934,7 @@ export class DeliveryDashboardCloneComponent {
         })
     );
   }
+
   async FilterReportData(product: string, productId: string) {
     // Filter Report 
     const participantSnap = await runInInjectionContext(this.injector, () =>
