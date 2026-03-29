@@ -393,20 +393,6 @@
             </button>
           </div>
 
-          <!-- SEARCH ROW -->
-          <div class="fsb-row" [class.fsb-row-active]="searchFilter">
-            <mat-icon class="fsb-icon">search</mat-icon>
-            <input class="fsb-input" [(ngModel)]="searchFilter"
-                  (ngModelChange)="onSearchChange()"
-                  [disabled]="dfuFilterActive || !!selectedStageSlot"
-                  placeholder="Search participants...">
-            <span class="fsb-match" *ngIf="searchFilter && searchMatches.length > 0">{{searchMatches.length}}</span>
-            <span class="fsb-no-match" *ngIf="searchFilter && searchMatches.length === 0">0</span>
-            <button class="fsb-clear-row" *ngIf="searchFilter" (click)="clearSearch()">
-              <mat-icon>close</mat-icon>
-            </button>
-          </div>
-
           <!-- SEGMENT ROW -->
           <div class="fsb-expandable" *ngIf="availableSegments.length > 0">
             <div class="fsb-row" [class.fsb-row-active]="selectedSegments.length > 0"
@@ -827,44 +813,6 @@
               <div class="fsb-toggle-knob"></div>
             </div>
           </div>
-
-          <!-- ACTIVE CHIPS -->
-          <div class="fsb-active-chips" *ngIf="getActiveFilterCount() > 0">
-            <mat-chip *ngIf="searchFilter" (removed)="clearSearch()">
-              <mat-icon matChipAvatar>search</mat-icon>"{{searchFilter}}"
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngFor="let segId of selectedSegments"
-                      (removed)="removeSegment(segId); onSegmentFilterChange()">
-              {{(availableSegments | segmentName:segId) || segId}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)">
-              {{getTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngIf="preassignedFilter !== 'all'"
-                      (removed)="preassignedFilter='all'; onPreassignedFilterChange()">
-              {{preassignedFilter === 'preassigned' ? 'Pre-assigned only' : 'Not pre-assigned'}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngIf="selectedStageSlot" (removed)="clearStageSlotFilter()">
-              Stage: {{selectedStageSlot}}<mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
-              DFU only<mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngIf="selectedArenaEventId" 
-                      (removed)="selectedArenaEventId=null; selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; processTokensIntoStages(allTokensData)">
-              Event: {{getArenaEventName(selectedArenaEventId)}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip *ngIf="atcFilterActive" 
-                      (removed)="atcFilterActive=false; atcFilter='none'; processTokensIntoStages(allTokensData)">
-              ATC: {{atcFilter === 'none' ? 'All' : atcFilter === 'validated' ? 'Validated' : 'Unvalidated'}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-          </div>
-
         </div>
 
         <div class="filter-sidenav-empty" *ngIf="selectedQueue == null">
@@ -1055,6 +1003,77 @@
           </div>
         </div>
       </div>
+
+<!-- Search Bar + Active Chips Row -->
+<div *ngIf="selectedQueue != null" style="margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+  
+  <!-- Search Input -->
+  <div class="fsb-row" [class.fsb-row-active]="searchFilter"
+       style="background:#f5f5f5; border-radius:8px; padding:6px 12px; display:flex; align-items:center; gap:8px; max-width:400px;">
+    <mat-icon style="color:#888; font-size:20px;">search</mat-icon>
+    <input #searchBox
+           style="border:none; background:transparent; outline:none; flex:1; font-size:14px; color:#333;"
+           [(ngModel)]="searchFilter"
+           (ngModelChange)="onSearchChange()"
+           placeholder="Search participants..."
+           [disabled]="dfuFilterActive || !!selectedStageSlot">
+    <span style="font-size:12px; color:#1976d2; font-weight:500;"
+          *ngIf="searchFilter && searchMatches.length > 0">
+      {{getMatchPositionText()}}
+    </span>
+    <span style="font-size:12px; color:#e53935;"
+          *ngIf="searchFilter && searchMatches.length === 0">0</span>
+    <button *ngIf="searchFilter"
+            style="border:none; background:none; cursor:pointer; padding:0; display:flex; align-items:center;"
+            (click)="clearSearch()">
+      <mat-icon style="font-size:18px; color:#888;">close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Active Filter Chips -->
+  <mat-chip-set *ngIf="getActiveFilterCount() > 0" style="display:flex; flex-wrap:wrap; gap:4px;">
+    <mat-chip *ngIf="searchFilter" (removed)="clearSearch()">
+      <mat-icon matChipAvatar>search</mat-icon>"{{searchFilter}}"
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngFor="let segId of selectedSegments"
+              (removed)="removeSegment(segId); onSegmentFilterChange()">
+      {{(availableSegments | segmentName:segId) || segId}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)">
+      {{getTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="preassignedFilter !== 'all'"
+              (removed)="preassignedFilter='all'; onPreassignedFilterChange()">
+      {{preassignedFilter === 'preassigned' ? 'Pre-assigned only' : 'Not pre-assigned'}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="selectedStageSlot" (removed)="clearStageSlotFilter()">
+      Stage: {{selectedStageSlot}}<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
+      DFU only<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="selectedArenaEventId"
+              (removed)="selectedArenaEventId=null; selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; processTokensIntoStages(allTokensData)">
+      Event: {{getArenaEventName(selectedArenaEventId)}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="atcFilterActive"
+              (removed)="atcFilterActive=false; atcFilter='none'; processTokensIntoStages(allTokensData)">
+      ATC: {{atcFilter === 'none' ? 'All' : atcFilter === 'validated' ? 'Validated' : 'Unvalidated'}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="selectedCustomerSupportCategories.length > 0"
+              (removed)="selectedCustomerSupportCategories=[]; processTokensIntoStages(allTokensData)">
+      CS: {{selectedCustomerSupportCategories.length}} categor{{selectedCustomerSupportCategories.length > 1 ? 'ies' : 'y'}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+  </mat-chip-set>
+
+</div>
+
       <!-- Reminder Banner -->
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px;">
         
@@ -1360,10 +1379,19 @@
                           class="cs-indicator"
                           [matTooltip]="getCustomerSupportTooltip(token.profile_id)"
                           matTooltipClass="multiline-tooltip">
-                      <mat-icon style="font-size:16px; width:16px; height:16px; color:#e53935;">
+                      <mat-icon style="font-size:16px; width:16px; height:16px; color:#e53935; vertical-align:middle;">
                         support_agent
                       </mat-icon>
-                      <span class="cs-count">{{getCustomerSupportEntries(token.profile_id).length}}</span>
+                      <span class="cs-count" style="vertical-align:middle;">
+                        {{getCustomerSupportEntries(token.profile_id).length}}
+                      </span>
+                    </span>
+
+                    <span *ngIf="isATCDateRangeOnly(token.profile_id)"
+                          style="font-size:10px; background:#fff3e0; color:#e65100; border:1px solid #e65100; 
+                                border-radius:10px; padding:1px 6px; margin-left:4px;"
+                          matTooltip="ATC validated via date range — no queueid assigned">
+                      ATC*
                     </span>
 
                     <div class="icon-row">
@@ -1414,6 +1442,14 @@
                         </span>
                       </div>
                     </div>
+
+                    <!-- Notification Timeline Icon -->
+                    <span style="display:inline-flex; align-items:center; margin-left:4px;"
+                          (click)="openNotificationTimeline(token); $event.stopPropagation()"
+                          matTooltip="View Notification Timeline"
+                          style="cursor:pointer;">
+                      <mat-icon style="font-size:18px; width:18px; height:18px; color:#1976d2;">notifications</mat-icon>
+                    </span>
 
                     <div class="notes-tags-indicators" *ngIf="hasNotesOrTags(token)">
                       <div *ngIf="token.notes || (token.notesList && token.notesList.length > 0)" class="notes-indicator"
@@ -1796,6 +1832,95 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Timeline Dialog -->
+<div class="reminder-modal-overlay" *ngIf="showTimelineDialog" (click)="closeTimelineDialog()">
+  <div class="reminder-modal" (click)="$event.stopPropagation()"
+       style="max-width:500px; width:90vw; max-height:80vh; overflow-y:auto;">
+    
+    <!-- Header -->
+    <div class="reminder-header">
+      <div class="reminder-title">
+        <mat-icon>notifications</mat-icon>
+        <h3>
+          Notification Timeline — 
+          {{mapProfileData[selectedTimelineToken?.profile_id]?.['name']}}
+          (#{{selectedTimelineToken?.tokennumber}})
+        </h3>
+      </div>
+      <button mat-icon-button (click)="closeTimelineDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="notificationTimelineLoading"
+         style="padding:32px; text-align:center; color:#999; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <mat-icon class="spin">sync</mat-icon>
+      Loading timeline...
+    </div>
+
+    <!-- Timeline -->
+    <div *ngIf="!notificationTimelineLoading" style="padding:24px 16px;">
+
+      <!-- Empty state -->
+      <div *ngIf="(notificationTimelineMap[selectedTimelineToken?.profile_id] || []).length === 0"
+          style="text-align:center; color:#999; padding:32px;">
+        <mat-icon style="font-size:40px; width:40px; height:40px;">notifications_off</mat-icon>
+        <p>No notifications sent to this participant</p>
+      </div>
+
+      <!-- Horizontal Timeline -->
+      <div *ngIf="(notificationTimelineMap[selectedTimelineToken?.profile_id] || []).length > 0"
+          style="display:flex; align-items:flex-start; overflow-x:auto; padding-bottom:16px; gap:0;">
+
+        <div *ngFor="let item of notificationTimelineMap[selectedTimelineToken?.profile_id]; let last = last"
+            style="display:flex; flex-direction:column; align-items:center; min-width:80px; max-width:80px; position:relative;">
+
+          <!-- Horizontal line before circle (not for first) -->
+          <div style="display:flex; align-items:center; width:100%; position:relative; justify-content:center;">
+            
+            <!-- Left line -->
+            <div style="flex:1; height:2px; background:#e0e0e0;"></div>
+
+            <!-- Circle -->
+            <div [matTooltip]="item.message"
+                matTooltipClass="multiline-tooltip"
+                style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
+                        display:flex; align-items:center; justify-content:center;
+                        cursor:pointer; border:2px solid; z-index:1;"
+                [style.background]="item.status === 'success' ? '#e8f5e9' : '#ffebee'"
+                [style.border-color]="item.status === 'success' ? '#4caf50' : '#f44336'">
+              <mat-icon style="font-size:16px; width:16px; height:16px; line-height:16px;"
+                        [style.color]="item.status === 'success' ? '#4caf50' : '#f44336'">
+                {{item.status === 'success' ? 'check' : 'close'}}
+              </mat-icon>
+            </div>
+
+            <!-- Right line (hidden for last) -->
+            <div style="flex:1; height:2px;"
+                [style.background]="last ? 'transparent' : '#e0e0e0'"></div>
+          </div>
+
+          <!-- Date below circle -->
+          <div style="font-size:10px; color:#999; margin-top:6px; text-align:center; line-height:1.3; word-break:break-word;">
+            {{item.logdate?.toDate() | date:'MMM d'}}
+          </div>
+          <div style="font-size:10px; color:#bbb; text-align:center;">
+            {{item.logdate?.toDate() | date:'h:mm a'}}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Total count -->
+      <div style="margin-top:8px; font-size:12px; color:#999; text-align:right;">
+        {{(notificationTimelineMap[selectedTimelineToken?.profile_id] || []).length}} notification(s)
+      </div>
+
     </div>
   </div>
 </div>

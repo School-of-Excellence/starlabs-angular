@@ -5101,3 +5101,20 @@ button[matMenuTriggerFor] {
   font-weight: 700;
   color: #e53935;
 }
+.cs-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fdecea;
+  border: 1px solid #e53935;
+  border-radius: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.cs-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e53935;
+}
