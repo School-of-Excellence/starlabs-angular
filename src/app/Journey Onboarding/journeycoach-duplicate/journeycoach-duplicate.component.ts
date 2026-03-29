@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef } from '@angular/core';
-import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit } from '@angular/fire/firestore';
+import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -74,6 +74,55 @@ export interface Dialog {
   dialog: DialogConfig,
   table: TableConfig,
   avg?: number
+}
+
+export interface CategoryMetric {
+  startpoint: number;
+  endpoint: number;
+  sequence: number;
+}
+
+export interface InterimProfile {
+  profileId: string;
+  profileName: string;
+  createdDate: string;
+  changedCount: number | 'all';
+  progressedAreas: string[];
+  regressedAreas: string[];
+  metric: Record<string, CategoryMetric>;
+  previousMetric: Record<string, CategoryMetric> | null;
+  previousCreatedDate: string | null;
+}
+
+export interface MonthSummary {
+  yearMonth: string;
+  monthLabel: string;
+  totalInterims: number;
+  noChangeCount: number;
+  progressedData: {
+    areaBreakdown: Record<string | number, number>;
+    categoryBreakdown: Record<string, number>;
+  };
+  regressedData: {
+    areaBreakdown: Record<string | number, number>;
+    categoryBreakdown: Record<string, number>;
+  };
+  profileGroups: {
+    progressed: InterimProfile[];
+    regressed: InterimProfile[];
+    noChange: InterimProfile[];
+  };
+}
+
+export type DialogType = 'nc' | 'area' | 'category' | 'summary' | 'months' | null;
+
+export interface DialogContext {
+  dialogType: DialogType;
+  dialogTitle: string;
+  dialogSubtitle: string;
+  statusClass: 'up' | 'dn' | 'nc';
+  profileList: InterimProfile[];
+  statusType?: 'up' | 'dn' | 'nc';
 }
 
 @Component({
@@ -181,7 +230,7 @@ export class JourneycoachDuplicateComponent {
     salesLeads: false,
     metadata: false,
     journeyProduct: false,
-    customerSupport: false,
+    // customerSupport: false,
     modes: false
   };
 
@@ -319,6 +368,8 @@ export class JourneycoachDuplicateComponent {
     'Preparation Mode': { count: 0, data: [] },
     'Exploration Mode': { count: 0, data: [] },
 
+    activeJourneyData: {},
+
     minimumpaymentdue: { count: 0, data: [] },
     disappear: { count: 0, data: [] },
     minimal: { count: 0, data: [] },
@@ -420,6 +471,105 @@ export class JourneycoachDuplicateComponent {
   dialogConfig: Dialog | null = null;
 
   modesList: any = [];
+  readonly CATEGORIES = ['Business', 'Career', 'Family', 'Health', 'Personal Genius'];
+  readonly AREA_KEYS: (number | 'all')[] = [1, 2, 3, 4, 'all'];
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  numberOfMonths: number = null;
+  filterStartDate: Date | null = null;
+  filterEndDate: Date | null = null;
+  isFetchingData: boolean = false;
+  dateRangeHint: string = '';
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  monthSummaries: MonthSummary[] = [];
+  activeMonthIndex: number = 0;
+
+  // ── Computed getters ──────────────────────────────────────────────────────
+  get activeMonthSummary(): MonthSummary | null {
+    return this.monthSummaries[this.activeMonthIndex] ?? null;
+  }
+  get activeProgressedCount(): number {
+    return this.activeMonthSummary ? this.getTotalProgressed(this.activeMonthSummary) : 0;
+  }
+  get activeRegressedCount(): number {
+    return this.activeMonthSummary ? this.getTotalRegressed(this.activeMonthSummary) : 0;
+  }
+  get progressedPercentage(): number {
+    return this.activeMonthSummary
+      ? Math.round((this.activeProgressedCount / this.activeMonthSummary.totalInterims) * 100) : 0;
+  }
+  get regressedPercentage(): number {
+    return this.activeMonthSummary
+      ? Math.round((this.activeRegressedCount / this.activeMonthSummary.totalInterims) * 100) : 0;
+  }
+  get noChangePercentage(): number {
+    return this.activeMonthSummary
+      ? Math.round((this.activeMonthSummary.noChangeCount / this.activeMonthSummary.totalInterims) * 100) : 0;
+  }
+  filterMode: 'months' | 'daterange' = 'months';
+  loggedInProfileid: string = "";
+
+  // ── Dialog state ──────────────────────────────────────────────────────────
+  isDialogOpen: boolean = false;
+  dialogContext: DialogContext | null = null;
+  dialogProfileList: InterimProfile[] = [];
+  selectedProfile: InterimProfile | null = null;
+  isAllMonthsDialogOpen: boolean = false;
+  askAHLoveLetterSummary: any = null;
+  journeyCoachTags: any[] = [];
+  isTagProfilesDialogOpen: boolean = false;
+  selectedTagName: string = '';
+  selectedTagProfiles: any[] = [];
+  evolutionProgressData: {
+    keys: string[];
+    bands: {
+      label: string;
+      range: [number, number];
+      profiles: Record<string, { profileId: string; profileName: string; total: number; pct: number }[]>;
+    }[];
+    totals: Record<string, number>;
+  } | null = null;
+
+  // ── EP dialog state ──────────────────────────────
+  isEpDialogOpen = false;
+  epDialogTitle = '';
+  epDialogSubtitle = '';
+  epDialogBandIdx = 0;
+  epDialogProfiles: { profileId: string; profileName: string; total: number; pct: number }[] = [];
+
+  subscriptionMatrix: {
+    journeys: { id: string; label: string }[];
+    months: { ym: string; label: string }[];
+    cells: Record<string, Record<string, { count: number; docs: any[] }>>;
+    monthTotals: Record<string, number>;
+    journeyTotals: Record<string, number>;
+  } | null = null;
+
+  isSubDialogOpen = false;
+  subDialogTitle = '';
+  subDialogDocs: any[] = [];
+
+  tempActiveJourney: Record<string, { status: string; profiles: any[] }> = {};
+  tempNullStatusProfiles: any[] = [];
+
+  // Toggle state
+  activeJourneyFilter: string | null = null; // journey name filter
+  activeStatusFilter: 'active' | 'non active' | 'discontinued' | 'null' | 'all' = 'all';
+  journeyStatusMatrix: {
+    journeyName: string;
+    statuses: Record<string, { status: string; profiles: any[] }>;
+    total: number;
+  }[] = [];
+
+  nullStatusProfiles: any[] = [];
+
+  // Dialog
+  isJourneyStatusDialogOpen = false;
+  journeyStatusDialogTitle = '';
+  journeyStatusDialogProfiles: any[] = [];
+  activeStatusTab: string = 'all';
+  expandedEpProfile: string | null = null;
 
   constructor(
     public firestore: Firestore,
@@ -430,6 +580,9 @@ export class JourneycoachDuplicateComponent {
     private dialog: MatDialog,
     private router: Router
   ) {
+    this.guard.getRoles().then(roles => {
+      this.loggedInProfileid = roles["profile_ref"].id
+    })
     this.filterForm = this.fb.group({
       search: ['',],
       purchaseStart: ['',],
@@ -461,6 +614,8 @@ export class JourneycoachDuplicateComponent {
             return nameA.localeCompare(nameB);
           });
       });
+
+      this.fetchJourneyCoachTags();
 
       this.subscriptions['appointments'] = collectionData(query(collection(this.firestore, "appointments"), where("journeycoach", "==", true)), { idField: 'id' }).subscribe((appointments) => {
         let tempArray = [];
@@ -497,7 +652,6 @@ export class JourneycoachDuplicateComponent {
       });
 
       this.fetchData();
-      await this.getModes();
 
       this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map);
     } catch (error) {
@@ -628,7 +782,7 @@ export class JourneycoachDuplicateComponent {
       salesLeads: false,
       metadata: false,
       journeyProduct: false,
-      customerSupport: false,
+      // customerSupport: false,
       modes: false
     }
 
@@ -636,9 +790,9 @@ export class JourneycoachDuplicateComponent {
     this.initializeColumns();
     this.loadDialogConfig();
     this.loadCurrentSalesLeads();
-    this.loadCustomerSupport();
+    // this.loadCustomerSupport();
     this.loadModes();
-    this.getAtcAlpha();
+    this.getModes();
   }
 
   // Function to initialize columns for each column 
@@ -779,8 +933,11 @@ export class JourneycoachDuplicateComponent {
       { key: 'pp_totalpurchasevalue', header: 'Purchase Value', width: '5%', type: 'currency', prefix: '₹' },
       { key: 'pp_totalpaid', header: 'Amount Paid', width: '5%', type: 'currency', prefix: '₹' },
       { key: 'balance', header: 'Balance', width: '5%', type: 'currency', prefix: '₹' },
-      { key: 'journeyplan', header: 'Journey Plan', width: '25%', type: 'text' },
+      { key: 'journeyplan', header: 'Journey Plan', width: '15%', type: 'text' },
       { key: 'markcoach', header: 'Mark JC Complete', width: '10%', type: 'text' },
+      { key: 'profiletags', header: 'Tag', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
+      { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
+      { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'menubutton', header: '+', width: '5%', type: 'text' },
     ];
 
@@ -1215,8 +1372,8 @@ export class JourneycoachDuplicateComponent {
         let avgToASVList = [];
         let avgGSVToASVList = [];
 
-        let salesData = salesleads.filter((e)=> !(e['journey'] === 'RXvsMYoK0g4SstvDDURZ' && e['email']?.toLowerCase().includes('soexcellence.com')));
-        
+        let salesData = salesleads.filter((e) => !(e['journey'] === 'RXvsMYoK0g4SstvDDURZ' && e['email']?.toLowerCase().includes('soexcellence.com')));
+
         try {
           for (let i = 0; i < salesData.length; i++) {
             const salesLeadsData = salesData[i];
@@ -1497,6 +1654,15 @@ export class JourneycoachDuplicateComponent {
       let dfuMap = [];
       let discontinuedArray = [];
 
+      const mapCustomerStatusVariable: Record<string, string> = {
+        "active": 'activejourney',
+        "non active": 'lastcompletedjourney',
+        'discontinued': 'lastsubscribedjourney'
+      };
+
+      let tempActiveJourney: Record<string, Record<string, { status: string; profiles: any[] }>> = {};
+      let tempNullStatusProfiles: any[] = [];
+
       // Journey Engagement declarations 
       let journeyMap = {
         1: [],
@@ -1515,6 +1681,8 @@ export class JourneycoachDuplicateComponent {
 
             const purchaseValue = metaData['pp_totalpurchasevalue'] || 0;
             const amountPaid = metaData['pp_totalpaid'] || 0;
+            const customerStatus = metaData['customerstatus'] || null;
+
             metaData['balance'] = purchaseValue - amountPaid;
 
             if (![null, undefined, ""].includes(metaData['profileid'])) {
@@ -1608,6 +1776,22 @@ export class JourneycoachDuplicateComponent {
               }
             }
 
+            if (['active', 'non active', 'discontinued'].includes(customerStatus)) {
+              const journeyField = mapCustomerStatusVariable[customerStatus];
+              if (journeyField) {
+                const journeyName = this.mapjourneyname[metaData[journeyField]]?.toLowerCase();
+                if (journeyName) {
+                  if (!tempActiveJourney[journeyName]) tempActiveJourney[journeyName] = {};
+                  if (!tempActiveJourney[journeyName][customerStatus]) {
+                    tempActiveJourney[journeyName][customerStatus] = { status: customerStatus, profiles: [] };
+                  }
+                  tempActiveJourney[journeyName][customerStatus].profiles.push(metaData);
+                }
+              }
+            } else if (customerStatus === null || customerStatus === undefined || customerStatus === '') {
+              tempNullStatusProfiles.push(metaData);
+            }
+
             if (metaData['activejourney']) {
               metaData['journey'] = metaData['activejourney'];
               const journeyId = metaData['activejourney'];
@@ -1689,6 +1873,14 @@ export class JourneycoachDuplicateComponent {
               this.originalData['allParticipants'].count = allParticipantsList.length;
 
               this.modeMap = tempModeMap;
+
+              this.journeyStatusMatrix = Object.entries(tempActiveJourney).map(([journeyName, statusMap]) => ({
+                journeyName,
+                statuses: statusMap,
+                total: Object.values(statusMap).reduce((a, b) => a + b.profiles.length, 0)
+              })).sort((a, b) => b.total - a.total);
+
+              this.nullStatusProfiles = tempNullStatusProfiles;
 
               this.updateTableDataIfOpen(this.tableType);
               this.loadingStates.metadata = true;
@@ -1894,45 +2086,34 @@ export class JourneycoachDuplicateComponent {
         }
       })
 
-      // this.subscriptions['journeyproduct3'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("onboarded", "==", true))).subscribe((onboarded) => {
-      //   if (onboarded.length != 0) {
-      //     // last 30days 
-      //     let last30days = new Date();
-      //     last30days.setDate(currentDate.getDate() - 30);
-      //     let tempArray7 = [];
-      //     let tempArray8 = [];
-      //     for (let i = 0; i < onboarded.length; i++) {
-      //       const onboardedData = onboarded[i];
-      //       const profileId = onboardedData['profileid'];
-      //       const activeProduct = this.mapMetaData[profileId]?.['activeproduct'];
-      //       const consumedProduct = this.mapMetaData[profileId]?.['consumedproducts'];
-      //       const journeyStatus = onboardedData['journeystatus'];
+      getDocs(query(
+        collection(this.firestore, "participantjourneyproduct"),
+        where("journeystatus", "in", ['ongoing', "completed"]),
+        where("subscriptionend", ">=", startdate),
+        where("subscriptionend", "<=", enddate)
+      )).then((snapshot) => {
 
-      //       if ((journeyStatus === 'initiated' || journeyStatus === 'ongoing') && (!consumedProduct || consumedProduct.length === 0)) {
-      //         // if (onboardedData['purchasedate']?.toDate() >= new Date('2025-01-01') && ([null, undefined, ""].includes(onboardedData['journeyref']) || onboardedData['journeyref'].id != 'InLXMl7OBAqlDTZcXwK0')) {
-      //           if (this.mapMetaData[onboardedData['profileid']]?.['activeproduct']?.length == 0) {
-      //             if (onboardedData['purchasedate']?.toDate() >= last30days) {
-      //               tempArray7.push(onboardedData);
-      //             } else {
-      //               tempArray8.push(onboardedData);
-      //             }
-      //           }
-      //         // }
-      //       }
-      //       if (i + 1 == onboarded.length) {
-      //         this.originalData['lessthan30daysjourneynotstarted'].data = tempArray7;
-      //         this.originalData['lessthan30daysjourneynotstarted'].count = tempArray7.length;
+        // monthMap: { '2025-03': { 'journeyRefId': { label: string, count: number, docs: any[] } } }
+        const monthMap: Record<string, Record<string, { label: string; count: number; docs: any[] }>> = {};
 
-      //         this.originalData['morethan30daysjourneynotstarted'].data = tempArray8;
-      //         this.originalData['morethan30daysjourneynotstarted'].count = tempArray8.length;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const end = data['subscriptionend']?.toDate ? data['subscriptionend'].toDate() : new Date(data['subscriptionend']);
+          const ym = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+          const journeyId = data['journeyref']?.id ?? data['journeyref'] ?? 'Unknown';
+          const journeyLabel = this.mapjourneyname?.[journeyId] ?? journeyId;
 
-      //         this.originalData['alljourneynotstarted'].data = [...tempArray7, ...tempArray8];
-      //         this.originalData['alljourneynotstarted'].count = [...tempArray7, ...tempArray8].length;
-      //         this.updateTableDataIfOpen(this.tableType);
-      //       }
-      //     }
-      //   }
-      // })
+          if (!monthMap[ym]) monthMap[ym] = {};
+          if (!monthMap[ym][journeyId]) monthMap[ym][journeyId] = { label: journeyLabel, count: 0, docs: [] };
+
+          monthMap[ym][journeyId].count++;
+          monthMap[ym][journeyId].docs.push({ id: doc.id, ...data });
+        });
+
+        // Convert to sorted array for template
+        this.buildSubscriptionMatrix(snapshot)
+      });
+
       this.updateTableDataIfOpen(this.tableType);
       this.loadingStates.journeyProduct = true;
       this.checkAllDataLoaded();
@@ -1943,216 +2124,216 @@ export class JourneycoachDuplicateComponent {
   }
 
   // Function to load customer support tickets 
-  async loadCustomerSupport() {
-    this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
-      if (tickets.length != 0) {
-        const currentMonthStart = new Date(this.startDate);
-        currentMonthStart.setHours(0, 0, 0, 0);
+  // async loadCustomerSupport() {
+  //   this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
+  //     if (tickets.length != 0) {
+  //       const currentMonthStart = new Date(this.startDate);
+  //       currentMonthStart.setHours(0, 0, 0, 0);
 
-        const currentMonthEnd = new Date(this.endDate);
-        currentMonthEnd.setHours(23, 59, 59, 999);
+  //       const currentMonthEnd = new Date(this.endDate);
+  //       currentMonthEnd.setHours(23, 59, 59, 999);
 
-        currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
-        currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
+  //       currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
+  //       currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
 
-        let startdate = Timestamp.fromDate(currentMonthStart).toDate();
-        let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
+  //       let startdate = Timestamp.fromDate(currentMonthStart).toDate();
+  //       let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
 
-        this.originalData['eventtickets'].count = 0
-        this.originalData['eventtickets'].data = []
-        this.originalData['eventticketnew'].count = 0
-        this.originalData['eventticketnew'].data = []
-        this.originalData['eventticketresponded'].count = 0
-        this.originalData['eventticketresponded'].data = []
-        this.originalData['eventticketsclosed'].count = 0
-        this.originalData['eventticketsclosed'].data = []
+  //       this.originalData['eventtickets'].count = 0
+  //       this.originalData['eventtickets'].data = []
+  //       this.originalData['eventticketnew'].count = 0
+  //       this.originalData['eventticketnew'].data = []
+  //       this.originalData['eventticketresponded'].count = 0
+  //       this.originalData['eventticketresponded'].data = []
+  //       this.originalData['eventticketsclosed'].count = 0
+  //       this.originalData['eventticketsclosed'].data = []
 
-        this.originalData['journeytickets'].count = 0
-        this.originalData['journeytickets'].data = []
-        this.originalData['journeyticketnew'].count = 0
-        this.originalData['journeyticketnew'].data = []
-        this.originalData['journeyticketresponded'].count = 0
-        this.originalData['journeyticketresponded'].data = []
-        this.originalData['journeyticketsclosed'].count = 0
-        this.originalData['journeyticketsclosed'].data = []
+  //       this.originalData['journeytickets'].count = 0
+  //       this.originalData['journeytickets'].data = []
+  //       this.originalData['journeyticketnew'].count = 0
+  //       this.originalData['journeyticketnew'].data = []
+  //       this.originalData['journeyticketresponded'].count = 0
+  //       this.originalData['journeyticketresponded'].data = []
+  //       this.originalData['journeyticketsclosed'].count = 0
+  //       this.originalData['journeyticketsclosed'].data = []
 
-        this.originalData['cancellationtickets'].count = 0
-        this.originalData['cancellationtickets'].data = []
-        this.originalData['cancellationticketnew'].count = 0
-        this.originalData['cancellationticketnew'].data = []
-        this.originalData['cancellationticketresponded'].count = 0
-        this.originalData['cancellationticketresponded'].data = []
-        this.originalData['cancellationticketsclosed'].count = 0
-        this.originalData['cancellationticketsclosed'].data = []
+  //       this.originalData['cancellationtickets'].count = 0
+  //       this.originalData['cancellationtickets'].data = []
+  //       this.originalData['cancellationticketnew'].count = 0
+  //       this.originalData['cancellationticketnew'].data = []
+  //       this.originalData['cancellationticketresponded'].count = 0
+  //       this.originalData['cancellationticketresponded'].data = []
+  //       this.originalData['cancellationticketsclosed'].count = 0
+  //       this.originalData['cancellationticketsclosed'].data = []
 
-        this.originalData['financetickets'].count = 0
-        this.originalData['financetickets'].data = []
-        this.originalData['financeticketnew'].count = 0
-        this.originalData['financeticketnew'].data = []
-        this.originalData['financeticketresponded'].count = 0
-        this.originalData['financeticketresponded'].data = []
-        this.originalData['financeticketsclosed'].count = 0
-        this.originalData['financeticketsclosed'].data = []
+  //       this.originalData['financetickets'].count = 0
+  //       this.originalData['financetickets'].data = []
+  //       this.originalData['financeticketnew'].count = 0
+  //       this.originalData['financeticketnew'].data = []
+  //       this.originalData['financeticketresponded'].count = 0
+  //       this.originalData['financeticketresponded'].data = []
+  //       this.originalData['financeticketsclosed'].count = 0
+  //       this.originalData['financeticketsclosed'].data = []
 
-        this.originalData['referraltickets'].count = 0
-        this.originalData['referraltickets'].data = []
-        this.originalData['referralticketnew'].count = 0
-        this.originalData['referralticketnew'].data = []
-        this.originalData['referralticketresponded'].count = 0
-        this.originalData['referralticketresponded'].data = []
-        this.originalData['referralticketsclosed'].count = 0
-        this.originalData['referralticketsclosed'].data = []
+  //       this.originalData['referraltickets'].count = 0
+  //       this.originalData['referraltickets'].data = []
+  //       this.originalData['referralticketnew'].count = 0
+  //       this.originalData['referralticketnew'].data = []
+  //       this.originalData['referralticketresponded'].count = 0
+  //       this.originalData['referralticketresponded'].data = []
+  //       this.originalData['referralticketsclosed'].count = 0
+  //       this.originalData['referralticketsclosed'].data = []
 
-        try {
-          for (let i = 0; i < tickets.length; i++) {
-            const ticketdata = tickets[i];
-            if (ticketdata['status']?.status.toLowerCase() == 'open') {
-              if (ticketdata['category'] == 'Events & Process') {
-                this.originalData['eventtickets'].count++;
-                this.originalData['eventtickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['eventticketnew'].count++;
-                  this.originalData['eventticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['eventticketresponded'].count++;
-                  this.originalData['eventticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Journey Related') {
-                this.originalData['journeytickets'].count++;
-                this.originalData['journeytickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['journeyticketnew'].count++;
-                  this.originalData['journeyticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['journeyticketresponded'].count++;
-                  this.originalData['journeyticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
-                this.originalData['cancellationtickets'].count++;
-                this.originalData['cancellationtickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['cancellationticketnew'].count++;
-                  this.originalData['cancellationticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['cancellationticketresponded'].count++;
-                  this.originalData['cancellationticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Finance & Accounts') {
-                this.originalData['financetickets'].count++;
-                this.originalData['financetickets'].data.push(ticketdata);
+  //       try {
+  //         for (let i = 0; i < tickets.length; i++) {
+  //           const ticketdata = tickets[i];
+  //           if (ticketdata['status']?.status.toLowerCase() == 'open') {
+  //             if (ticketdata['category'] == 'Events & Process') {
+  //               this.originalData['eventtickets'].count++;
+  //               this.originalData['eventtickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['eventticketnew'].count++;
+  //                 this.originalData['eventticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['eventticketresponded'].count++;
+  //                 this.originalData['eventticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Journey Related') {
+  //               this.originalData['journeytickets'].count++;
+  //               this.originalData['journeytickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['journeyticketnew'].count++;
+  //                 this.originalData['journeyticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['journeyticketresponded'].count++;
+  //                 this.originalData['journeyticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
+  //               this.originalData['cancellationtickets'].count++;
+  //               this.originalData['cancellationtickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['cancellationticketnew'].count++;
+  //                 this.originalData['cancellationticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['cancellationticketresponded'].count++;
+  //                 this.originalData['cancellationticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Finance & Accounts') {
+  //               this.originalData['financetickets'].count++;
+  //               this.originalData['financetickets'].data.push(ticketdata);
 
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['financeticketnew'].count++;
-                  this.originalData['financeticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['financeticketresponded'].count++;
-                  this.originalData['financeticketresponded'].data.push(ticketdata);
-                }
-              } else if (ticketdata['category'] == 'Referrals & Upgrades') {
-                this.originalData['referraltickets'].count++;
-                this.originalData['referraltickets'].data.push(ticketdata);
-                if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
-                  this.originalData['referralticketnew'].count++;
-                  this.originalData['referralticketnew'].data.push(ticketdata);
-                }
-                if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
-                  this.originalData['referralticketresponded'].count++;
-                  this.originalData['referralticketresponded'].data.push(ticketdata);
-                }
-              }
-            } else if (ticketdata['status']?.status.toLowerCase() == 'closed' && (ticketdata['status']?.date?.toDate() >= startdate && ticketdata['status']?.date?.toDate() <= enddate)) {
-              if (ticketdata['category'] == 'Events & Process') {
-                this.originalData['eventticketsclosed'].count++;
-                this.originalData['eventticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Journey Related') {
-                this.originalData['journeyticketsclosed'].count++;
-                this.originalData['journeyticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
-                this.originalData['cancellationticketsclosed'].count++;
-                this.originalData['cancellationticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Finance & Accounts') {
-                this.originalData['financeticketsclosed'].count++;
-                this.originalData['financeticketsclosed'].data.push(ticketdata);
-              } else if (ticketdata['category'] == 'Referrals & Upgrades') {
-                this.originalData['referralticketsclosed'].count++;
-                this.originalData['referralticketsclosed'].data.push(ticketdata);
-              }
-            }
-            // Event tickets closed
-            const eventClosed = this.originalData['eventticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['eventticketsclosed'].avg = eventClosed / this.originalData['eventticketsclosed'].data.length;
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['financeticketnew'].count++;
+  //                 this.originalData['financeticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['financeticketresponded'].count++;
+  //                 this.originalData['financeticketresponded'].data.push(ticketdata);
+  //               }
+  //             } else if (ticketdata['category'] == 'Referrals & Upgrades') {
+  //               this.originalData['referraltickets'].count++;
+  //               this.originalData['referraltickets'].data.push(ticketdata);
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'new') {
+  //                 this.originalData['referralticketnew'].count++;
+  //                 this.originalData['referralticketnew'].data.push(ticketdata);
+  //               }
+  //               if (ticketdata['chatstatus']?.toLowerCase() == 'decision making') {
+  //                 this.originalData['referralticketresponded'].count++;
+  //                 this.originalData['referralticketresponded'].data.push(ticketdata);
+  //               }
+  //             }
+  //           } else if (ticketdata['status']?.status.toLowerCase() == 'closed' && (ticketdata['status']?.date?.toDate() >= startdate && ticketdata['status']?.date?.toDate() <= enddate)) {
+  //             if (ticketdata['category'] == 'Events & Process') {
+  //               this.originalData['eventticketsclosed'].count++;
+  //               this.originalData['eventticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Journey Related') {
+  //               this.originalData['journeyticketsclosed'].count++;
+  //               this.originalData['journeyticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Downgrade, Cancellation & Exceptions') {
+  //               this.originalData['cancellationticketsclosed'].count++;
+  //               this.originalData['cancellationticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Finance & Accounts') {
+  //               this.originalData['financeticketsclosed'].count++;
+  //               this.originalData['financeticketsclosed'].data.push(ticketdata);
+  //             } else if (ticketdata['category'] == 'Referrals & Upgrades') {
+  //               this.originalData['referralticketsclosed'].count++;
+  //               this.originalData['referralticketsclosed'].data.push(ticketdata);
+  //             }
+  //           }
+  //           // Event tickets closed
+  //           const eventClosed = this.originalData['eventticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['eventticketsclosed'].avg = eventClosed / this.originalData['eventticketsclosed'].data.length;
 
-            // Journey tickets closed
-            const journeyClosed = this.originalData['journeyticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['journeyticketsclosed'].avg = journeyClosed / this.originalData['journeyticketsclosed'].data.length;
+  //           // Journey tickets closed
+  //           const journeyClosed = this.originalData['journeyticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['journeyticketsclosed'].avg = journeyClosed / this.originalData['journeyticketsclosed'].data.length;
 
-            // Cancellation tickets closed
-            const cancellationClosed = this.originalData['cancellationticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['cancellationticketsclosed'].avg = cancellationClosed / this.originalData['cancellationticketsclosed'].data.length;
+  //           // Cancellation tickets closed
+  //           const cancellationClosed = this.originalData['cancellationticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['cancellationticketsclosed'].avg = cancellationClosed / this.originalData['cancellationticketsclosed'].data.length;
 
-            //Finance tickets closed
-            const bigClosed = this.originalData['financeticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['financeticketsclosed'].avg = bigClosed / this.originalData['financeticketsclosed'].data.length;
+  //           //Finance tickets closed
+  //           const bigClosed = this.originalData['financeticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['financeticketsclosed'].avg = bigClosed / this.originalData['financeticketsclosed'].data.length;
 
-            // Referral tickets closed
-            const referralClosed = this.originalData['referralticketsclosed'].data.reduce((sum, element) => {
-              return sum + Number(
-                this.calculateDaysClosed(
-                  element['reporteddate']?.toDate(),
-                  element['status']?.date?.toDate()
-                )
-              );
-            }, 0);
-            this.originalData['referralticketsclosed'].avg = referralClosed / this.originalData['referralticketsclosed'].data.length;
+  //           // Referral tickets closed
+  //           const referralClosed = this.originalData['referralticketsclosed'].data.reduce((sum, element) => {
+  //             return sum + Number(
+  //               this.calculateDaysClosed(
+  //                 element['reporteddate']?.toDate(),
+  //                 element['status']?.date?.toDate()
+  //               )
+  //             );
+  //           }, 0);
+  //           this.originalData['referralticketsclosed'].avg = referralClosed / this.originalData['referralticketsclosed'].data.length;
 
-            if (i + 1 == tickets.length) {
-              this.loadingStates.customerSupport = true;
-              this.checkAllDataLoaded();
-            }
-          }
-        } catch (error) {
-          this.loadingStates.customerSupport = true;
-          this.checkAllDataLoaded();
-        }
-      } else {
-        this.loadingStates.customerSupport = true;
-        this.checkAllDataLoaded();
-      }
-    })
+  //           if (i + 1 == tickets.length) {
+  //             this.loadingStates.customerSupport = true;
+  //             this.checkAllDataLoaded();
+  //           }
+  //         }
+  //       } catch (error) {
+  //         this.loadingStates.customerSupport = true;
+  //         this.checkAllDataLoaded();
+  //       }
+  //     } else {
+  //       this.loadingStates.customerSupport = true;
+  //       this.checkAllDataLoaded();
+  //     }
+  //   })
 
-  }
+  // }
 
   // Function to load modes from participant products 
   async loadModes() {
@@ -2488,10 +2669,10 @@ export class JourneycoachDuplicateComponent {
             cancelled: false,
           }).then(() => {
             console.log("Onboard Marked Successfully");
-            this.guard.openSnackBar("Onboard Marked Successfully", "OK",600);
+            this.guard.openSnackBar("Onboard Marked Successfully", "OK", 600);
           }).catch((error) => {
             console.error("Oops! Error while marking Onboard", error);
-            this.guard.openSnackBar("Oops! Error while marking Onboard", "OK",600);
+            this.guard.openSnackBar("Oops! Error while marking Onboard", "OK", 600);
           });
         }
 
@@ -2502,9 +2683,9 @@ export class JourneycoachDuplicateComponent {
             journeystatus: 'Upgraded'
           }).then(() => {
             console.log("Previous Journey Status Updated");
-            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK",600);
+            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
           }).catch((error) => {
-            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK",600);
+            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
             console.log("Oops Error While Updating Previous Journey Status")
           });
         }
@@ -2512,7 +2693,7 @@ export class JourneycoachDuplicateComponent {
         dialogRef.close();
 
       } else {
-        this.guard.openSnackBar("No Action Taken", "OK",600)
+        this.guard.openSnackBar("No Action Taken", "OK", 600)
       }
     })
   }
@@ -2706,10 +2887,10 @@ export class JourneycoachDuplicateComponent {
             cancelled: false,
           }).then(() => {
             console.log("Journey Coach Marked Successfully");
-            this.guard.openSnackBar("Journey Coach Marked Successfully", "OK",600);
+            this.guard.openSnackBar("Journey Coach Marked Successfully", "OK", 600);
           }).catch((error) => {
             console.error("Oops! Error while marking Journey Coach", error);
-            this.guard.openSnackBar("Oops! Error while marking Journey Coach", "OK",600);
+            this.guard.openSnackBar("Oops! Error while marking Journey Coach", "OK", 600);
           });
         }
       } else {
@@ -3661,9 +3842,9 @@ export class JourneycoachDuplicateComponent {
           generalnotes: element['generalnotes']
         }).then(() => {
           console.log("Notes Updated Successfully");
-          this.guard.openSnackBar("Notes Updated Successfully", "OK",600);
+          this.guard.openSnackBar("Notes Updated Successfully", "OK", 600);
         }).catch((error) => {
-          this.guard.openSnackBar("Oops! Error While Updating Notes", "OK",600);
+          this.guard.openSnackBar("Oops! Error While Updating Notes", "OK", 600);
           console.error("Oops! Error While Updating Notes");
         });
       }
@@ -3692,10 +3873,12 @@ export class JourneycoachDuplicateComponent {
 
   // Function to get atc alpha data 
   getAtcAlpha() {
-    const currentMonthStart = new Date(this.startDate);
-    currentMonthStart.setHours(0, 0, 0, 0);
+    const startInput = this.filterStartDate ? new Date(this.filterStartDate) : new Date();
+    const endInput = this.filterEndDate ? new Date(this.filterEndDate) : new Date();
 
-    const currentMonthEnd = new Date(this.endDate);
+    const currentMonthStart = new Date(startInput);
+    currentMonthStart.setHours(0, 0, 0, 0);
+    const currentMonthEnd = new Date(endInput);
     currentMonthEnd.setHours(23, 59, 59, 999);
 
     currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
@@ -3742,6 +3925,7 @@ export class JourneycoachDuplicateComponent {
         let tempPercentageCompleted = [];
         let tempPercentageOngoing = 0;
         let tempTotalProductCount = 0;
+        let tempEvolutionProgressProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]> = {};
 
         let tempTotalAdjustmentUnAwareMap = {
           count: 0,
@@ -3907,6 +4091,17 @@ export class JourneycoachDuplicateComponent {
           if (atcData['evolutionprogress'] != null) {
             Object.entries(atcData['evolutionprogress']).forEach(([key, value]) => {
               tempEvolutionprogressMap[key] = (tempEvolutionprogressMap[key] || 0) + (value as number);
+
+              const profileId = atcData['profileid'] ?? atcData['id'];
+              const docTotal = Object.values(atcData['evolutionprogress'] as Record<string, number>)
+                .reduce((a, b) => a + b, 0);
+
+              if (!tempEvolutionProgressProfileMap[key]) tempEvolutionProgressProfileMap[key] = [];
+              tempEvolutionProgressProfileMap[key].push({
+                profileId,
+                sum: Number(value),
+                docTotal
+              });
             });
           }
         });
@@ -3929,8 +4124,42 @@ export class JourneycoachDuplicateComponent {
         this.evolutionYearWastedMap = tempEvolutionYearWastedMap;
         this.evolutionYearSavedMap = tempEvolutionYearSavedMap;
         this.totalAdjustmentsCompletedMap = tempTotalAdjustmentsCompletedMap;
+        this.evolutionprogressMap = tempEvolutionprogressMap;
+        this.processEvolutionProgressFromMap(tempEvolutionProgressProfileMap);
       });
     }
+  }
+
+  // Function to calculate evolution process percentage 
+  processEvolutionProgressFromMap(keyProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]>): void {
+    const keys = Object.keys(keyProfileMap);
+
+    const bands = [
+      { label: '< 25%', range: [0, 25] as [number, number], profiles: {} as Record<string, any[]> },
+      { label: '25 – 50%', range: [25, 50] as [number, number], profiles: {} as Record<string, any[]> },
+      { label: '50 – 75%', range: [50, 75] as [number, number], profiles: {} as Record<string, any[]> },
+      { label: '75 – 100%', range: [75, 101] as [number, number], profiles: {} as Record<string, any[]> },
+    ];
+
+    const totals: Record<string, number> = {};
+
+    keys.forEach(key => {
+      const allEntries = keyProfileMap[key];
+      totals[key] = allEntries.reduce((a, b) => a + b.sum, 0);
+
+      allEntries.forEach(({ profileId, sum, docTotal }) => {
+        const pct = docTotal > 0 ? Math.round((sum / docTotal) * 100) : 0;
+        const profileName = this.mapprofile[profileId] ?? profileId;
+        const profile = { profileId, profileName, total: sum, pct };
+        const band = bands.find(b => pct >= b.range[0] && pct < b.range[1]);
+        if (band) {
+          if (!band.profiles[key]) band.profiles[key] = [];
+          band.profiles[key].push(profile);
+        }
+      });
+    });
+
+    this.evolutionProgressData = { keys, bands, totals };
   }
 
   openDialog(key: string) {
@@ -4000,5 +4229,872 @@ export class JourneycoachDuplicateComponent {
       },
       disableClose: true
     });
+  }
+
+  onMonthsCountChange(): void {
+    if (!this.numberOfMonths || this.numberOfMonths < 1) return;
+    this.filterEndDate = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - this.numberOfMonths);
+    start.setDate(1);
+    this.filterStartDate = start;
+    this.updateDateRangeHint();
+    this.loadInterimData();
+    this.getAtcAlpha();
+  }
+
+  onDateRangeChange(): void {
+    if (!this.filterStartDate || !this.filterEndDate) return;
+    const start = new Date(this.filterStartDate);
+    const end = new Date(this.filterEndDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    const diffMs = end.getTime() - start.getTime();
+    this.numberOfMonths = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.5)));
+    this.updateDateRangeHint();
+    this.loadInterimData();
+    this.getAtcAlpha();
+  }
+
+  stepMonths(delta: number): void {
+    this.numberOfMonths = Math.max(1, Math.min(24, this.numberOfMonths + delta));
+    this.onMonthsCountChange(); // already calls loadInterimData
+  }
+
+  private async loadInterimData(): Promise<void> {
+    if (!this.filterStartDate || !this.filterEndDate) return;
+    this.isFetchingData = true;
+    this.monthSummaries = [];
+    this.activeMonthIndex = 0;
+    try {
+      const startDateObj = new Date(this.filterStartDate);
+      startDateObj.setHours(0, 0, 0, 0);
+      const endDateObj = new Date(this.filterEndDate);
+      endDateObj.setHours(23, 59, 59, 999);
+
+      const [rawResult, askAHLoveLetterData] = await Promise.all([
+        this.fetchAELAndInterimData(startDateObj, endDateObj),
+        this.fetchAskAHAndLoveLetterData(startDateObj, endDateObj)
+      ]);
+
+      this.monthSummaries = rawResult.map(r => this.mapRawResultToMonthSummary(r));
+      this.askAHLoveLetterSummary = askAHLoveLetterData;
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      this.isFetchingData = false;
+    }
+  }
+
+  private async fetchAskAHAndLoveLetterData(startDate: Date, endDate: Date): Promise<any> {
+    const startTimestamp = Timestamp.fromDate(startDate);
+    const endTimestamp = Timestamp.fromDate(endDate);
+
+    const [askAHSnapshot, loveLetterSnapshot] = await Promise.all([
+      getDocs(query(
+        collection(this.firestore, 'ask AH'),
+        where('created', '>=', startTimestamp),
+        where('created', '<=', endTimestamp)
+      )).catch(() => null),
+
+      getDocs(query(
+        collection(this.firestore, 'love letter'),
+        where('created', '>=', startTimestamp),
+        where('created', '<=', endTimestamp)
+      )).catch(() => null),
+    ]);
+
+    const askAHDocs = (askAHSnapshot?.docs ?? []).map(doc => ({
+      id: doc.id,
+      source: 'ask AH',
+      ...doc.data()
+    }));
+
+    const loveLetterDocs = (loveLetterSnapshot?.docs ?? []).map(doc => ({
+      id: doc.id,
+      source: 'love letter',
+      ...doc.data()
+    }));
+
+    const allDocs = [...askAHDocs, ...loveLetterDocs];
+
+    return {
+      total: allDocs.length,
+      tagged: allDocs.filter(d => d['tagged'] === true).length,
+      opportunity: allDocs.filter(d => d['opportunity'] === true).length,
+      liked: allDocs.filter(d => d['liked'] === true).length,
+      critical: allDocs.filter(d => d['critical'] === true).length,
+      askAH: {
+        total: askAHDocs.length,
+        tagged: askAHDocs.filter(d => d['tagged'] === true).length,
+        opportunity: askAHDocs.filter(d => d['opportunity'] === true).length,
+        liked: askAHDocs.filter(d => d['liked'] === true).length,
+        critical: askAHDocs.filter(d => d['critical'] === true).length,
+        docs: askAHDocs
+      },
+      loveLetter: {
+        total: loveLetterDocs.length,
+        tagged: loveLetterDocs.filter(d => d['tagged'] === true).length,
+        opportunity: loveLetterDocs.filter(d => d['opportunity'] === true).length,
+        liked: loveLetterDocs.filter(d => d['liked'] === true).length,
+        critical: loveLetterDocs.filter(d => d['critical'] === true).length,
+        docs: loveLetterDocs
+      }
+    };
+  }
+
+  private updateDateRangeHint(): void {
+    if (this.filterStartDate && this.filterEndDate) {
+      const sf = new Date(this.filterStartDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const ef = new Date(this.filterEndDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      this.dateRangeHint = `${sf} → ${ef}`;
+    }
+  }
+
+  // ── Core fetch function (from your previous implementation) ───────────────
+
+  private async fetchAELAndInterimData(startDate: Date, endDate: Date): Promise<any[]> {
+    const CATEGORIES = this.CATEGORIES;
+
+    const [aelSnapshot, interimSnapshot] = await Promise.all([
+      getDocs(collection(this.firestore, 'accelerated evolution level')),
+      getDocs(query(
+        collection(this.firestore, 'interim crossover'),
+        where('created', '>=', Timestamp.fromDate(startDate)),
+        where('created', '<=', Timestamp.fromDate(endDate))
+      ))
+    ]);
+
+    // Build AEL lookup map keyed by "startpoint_endpoint"
+    const aelLookupMap: Record<string, any> = {};
+    aelSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const startPoint = data['startpoint'];
+      const endPoint = data['endpoint'];
+      if (startPoint != null && endPoint != null) {
+        aelLookupMap[`${startPoint}_${endPoint}`] = { id: doc.id, ...data };
+      }
+    });
+
+    // Group docs by profileId
+    const profileDocsMap: Record<string, any[]> = {};
+
+    interimSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const profileId = data['profileid'];
+      if (!profileId) return;
+
+      const rawMetric = data['metric'] ?? {};
+      const enrichedMetric: Record<string, any> = {};
+
+      CATEGORIES.forEach(category => {
+        const categoryData = rawMetric[category] ?? {};
+        const startPoint = categoryData['startpoint'];
+        const endPoint = categoryData['endpoint'];
+        const matchedAEL = aelLookupMap[`${startPoint}_${endPoint}`];
+        enrichedMetric[category] = {
+          ...categoryData,
+          sequence: matchedAEL?.['sequence'] ?? null
+        };
+      });
+
+      if (!profileDocsMap[profileId]) profileDocsMap[profileId] = [];
+      profileDocsMap[profileId].push({ id: doc.id, ...data, metric: enrichedMetric });
+    });
+
+    // Group by profileId + yearMonth, compare consecutive docs
+    const monthResultMap: Record<string, any> = {};
+
+    Object.entries(profileDocsMap).forEach(([profileId, docs]) => {
+      // Sort desc — newest first
+      docs.sort((a, b) => b['created'].toDate() - a['created'].toDate());
+
+      docs.forEach((doc, index) => {
+        const createdDate: Date = doc['created'].toDate();
+        const year = createdDate.getFullYear();
+        const month = String(createdDate.getMonth() + 1).padStart(2, '0');
+        const yearMonth = `${year}-${month}`;
+
+        if (!monthResultMap[yearMonth]) {
+          monthResultMap[yearMonth] = { yearMonth, interimDocs: [] };
+        }
+
+        // Compare with previous (older) doc — index+1 in desc sorted array
+        const previousDoc = docs[index + 1] ?? null;
+        let comparison: any = null;
+
+        if (previousDoc) {
+          const allSame = CATEGORIES.every(cat => {
+            const curr = doc.metric[cat];
+            const prev = previousDoc.metric[cat];
+            return curr?.startpoint === prev?.startpoint && curr?.endpoint === prev?.endpoint;
+          });
+
+          if (allSame) {
+            comparison = { status: 'no change', progressedAreas: [], regressedAreas: [], changedCount: 0 };
+          } else {
+            const progressedAreas: string[] = [];
+            const regressedAreas: string[] = [];
+
+            CATEGORIES.forEach(cat => {
+              const currSeq = doc.metric[cat]?.sequence ?? null;
+              const prevSeq = previousDoc?.metric[cat]?.sequence ?? null;
+              if (currSeq != null && prevSeq != null) {
+                if (Number(currSeq) > Number(prevSeq)) progressedAreas.push(cat);
+                else if (Number(currSeq) < Number(prevSeq)) regressedAreas.push(cat);
+              }
+            });
+
+            const totalChanged = progressedAreas.length + regressedAreas.length;
+            const changedCount: number | 'all' = totalChanged === 5 ? 'all' : totalChanged;
+
+            // No longer single status — profile can be in BOTH progressed and regressed
+            const isProgressed = progressedAreas.length > 0;
+            const isRegressed = regressedAreas.length > 0;
+            const isNoChange = !isProgressed && !isRegressed;
+
+            comparison = {
+              status: isNoChange ? 'no change' : 'changed',
+              progressedAreas,
+              regressedAreas,
+              changedCount
+            };
+          }
+        }
+
+        monthResultMap[yearMonth].interimDocs.push({
+          ...doc,
+          profileid: profileId,
+          comparison,
+          _previousDoc: previousDoc
+        });
+      });
+    });
+
+    return Object.values(monthResultMap).sort((a, b) =>
+      a.yearMonth.localeCompare(b.yearMonth)
+    );
+  }
+
+  // ── Map raw result → MonthSummary ─────────────────────────────────────────
+
+  private mapRawResultToMonthSummary(rawResult: any): MonthSummary {
+    const progressedProfiles: InterimProfile[] = [];
+    const regressedProfiles: InterimProfile[] = [];
+    const noChangeProfiles: InterimProfile[] = [];
+
+    const progressedAreaBreakdown: Record<string | number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, all: 0 };
+    const regressedAreaBreakdown: Record<string | number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, all: 0 };
+    const progressedCategoryBreakdown: Record<string, number> = {};
+    const regressedCategoryBreakdown: Record<string, number> = {};
+    this.CATEGORIES.forEach(cat => {
+      progressedCategoryBreakdown[cat] = 0;
+      regressedCategoryBreakdown[cat] = 0;
+    });
+
+    for (const doc of (rawResult.interimDocs ?? [])) {
+      const profileId: string = doc.profileid ?? '';
+      const profileEntry = this.mapMetaData[profileId];
+      const profileName: string = profileEntry?.name ?? profileId;
+
+      const createdDate = doc.created?.toDate
+        ? doc.created.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+        : (doc.date ?? '');
+
+      const comparisonStatus = doc.comparison?.status ?? 'no change';
+      const progressedAreas: string[] = doc.comparison?.progressedAreas ?? [];
+      const regressedAreas: string[] = doc.comparison?.regressedAreas ?? [];
+      const rawChangedCount = doc.comparison?.changedCount ?? 0;
+      const changedCount: number | 'all' = rawChangedCount === 'all' ? 'all' : rawChangedCount;
+
+      const previousDoc = doc.comparison ? doc._previousDoc ?? null : null;
+      const previousMetric = previousDoc?.metric ?? null;
+      const previousCreatedDate = previousDoc?.created?.toDate
+        ? previousDoc.created.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+        : null;
+
+      const interimProfile: InterimProfile = {
+        profileId,
+        profileName,
+        createdDate,
+        changedCount,
+        progressedAreas,
+        regressedAreas,
+        metric: doc.metric ?? {},
+        previousMetric,
+        previousCreatedDate
+      };
+
+      if (!doc.comparison || comparisonStatus === 'no change') {
+        noChangeProfiles.push(interimProfile);
+      } else {
+        // Add to progressed if any areas progressed
+        if ((doc.comparison.progressedAreas ?? []).length > 0) {
+          progressedProfiles.push(interimProfile);
+          const progressedCount = doc.comparison.progressedAreas.length === 5
+            ? 'all' : doc.comparison.progressedAreas.length;
+          const areaKey: string | number = progressedCount === 'all' ? 'all' : progressedCount as number;
+          progressedAreaBreakdown[areaKey] = (progressedAreaBreakdown[areaKey] ?? 0) + 1;
+          doc.comparison.progressedAreas.forEach((cat: string) => {
+            if (progressedCategoryBreakdown[cat] !== undefined) progressedCategoryBreakdown[cat]++;
+          });
+        }
+
+        // Add to regressed if any areas regressed — independent of progressed
+        if ((doc.comparison.regressedAreas ?? []).length > 0) {
+          regressedProfiles.push(interimProfile);
+          const regressedCount = doc.comparison.regressedAreas.length === 5
+            ? 'all' : doc.comparison.regressedAreas.length;
+          const areaKey: string | number = regressedCount === 'all' ? 'all' : regressedCount as number;
+          regressedAreaBreakdown[areaKey] = (regressedAreaBreakdown[areaKey] ?? 0) + 1;
+          doc.comparison.regressedAreas.forEach((cat: string) => {
+            if (regressedCategoryBreakdown[cat] !== undefined) regressedCategoryBreakdown[cat]++;
+          });
+        }
+
+        // noChange only if neither progressed nor regressed
+        if ((doc.comparison.progressedAreas ?? []).length === 0 &&
+          (doc.comparison.regressedAreas ?? []).length === 0) {
+          noChangeProfiles.push(interimProfile);
+        }
+      }
+    }
+
+    const [year, month] = rawResult.yearMonth.split('-').map(Number);
+    const monthLabel = new Date(year, month - 1, 1)
+      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    return {
+      yearMonth: rawResult.yearMonth,
+      monthLabel,
+      totalInterims: (rawResult.interimDocs ?? []).length,
+      noChangeCount: noChangeProfiles.length,
+      progressedData: {
+        areaBreakdown: progressedAreaBreakdown,
+        categoryBreakdown: progressedCategoryBreakdown
+      },
+      regressedData: {
+        areaBreakdown: regressedAreaBreakdown,
+        categoryBreakdown: regressedCategoryBreakdown
+      },
+      profileGroups: {
+        progressed: progressedProfiles,
+        regressed: regressedProfiles,
+        noChange: noChangeProfiles
+      }
+    };
+  }
+
+  // ── Tab navigation ────────────────────────────────────────────────────────
+
+  switchActiveMonth(index: number): void {
+    this.activeMonthIndex = index;
+    this.closeDialog();
+  }
+
+  getTabLabel(monthSummary: MonthSummary): string {
+    const parts = monthSummary.monthLabel.split(' ');
+    return `${parts[0].slice(0, 3)} ${parts[1].slice(2)}`;
+  }
+
+  // ── Stat helpers ──────────────────────────────────────────────────────────
+
+  getTotalProgressed(monthSummary: MonthSummary): number {
+    return Object.values(monthSummary.progressedData.areaBreakdown).reduce((sum, val) => sum + val, 0);
+  }
+
+  getTotalRegressed(monthSummary: MonthSummary): number {
+    return Object.values(monthSummary.regressedData.areaBreakdown).reduce((sum, val) => sum + val, 0);
+  }
+
+  getMaxValue(breakdownMap: Record<string | number, number>): number {
+    return Math.max(...Object.values(breakdownMap), 1);
+  }
+
+  getBarWidthPercent(value: number, maxValue: number): number {
+    return Math.round((value / Math.max(maxValue, 1)) * 100);
+  }
+
+  getAreaLabel(areaKey: number | 'all'): string {
+    return areaKey === 'all' ? 'All Areas' : `${areaKey} Area${areaKey > 1 ? 's' : ''}`;
+  }
+
+  getAreaValue(monthSummary: MonthSummary, statusType: 'up' | 'dn', areaKey: number | 'all'): number {
+    const breakdown = statusType === 'up'
+      ? monthSummary.progressedData.areaBreakdown
+      : monthSummary.regressedData.areaBreakdown;
+    return breakdown[areaKey] ?? 0;
+  }
+
+  getCategoryValue(monthSummary: MonthSummary, statusType: 'up' | 'dn', category: string): number {
+    const breakdown = statusType === 'up'
+      ? monthSummary.progressedData.categoryBreakdown
+      : monthSummary.regressedData.categoryBreakdown;
+    return breakdown[category] ?? 0;
+  }
+
+  getInitials(name: string): string {
+    return (name || '?').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase();
+  }
+
+  getCountBadgeClass(changedCount: number | 'all', statusType: 'up' | 'dn' | 'nc'): string {
+    return changedCount === 'all' ? 'all' : statusType;
+  }
+
+  // ── Dialog openers ────────────────────────────────────────────────────────
+
+  openNoChangeDialog(): void {
+    const month = this.activeMonthSummary!;
+    this.openProfileListDialog(
+      'nc',
+      'No Change',
+      `${month.monthLabel} · ${month.noChangeCount} profiles`,
+      'nc',
+      month.profileGroups.noChange
+    );
+  }
+
+  openProgressedDialog(): void {
+    const month = this.activeMonthSummary!;
+    const profiles = month.profileGroups.progressed;
+    this.openProfileListDialog(
+      'summary',
+      'Progressed',
+      `${month.monthLabel} · ${profiles.length} participants`,
+      'up',
+      profiles
+    );
+  }
+
+  openRegressedDialog(): void {
+    const month = this.activeMonthSummary!;
+    const profiles = month.profileGroups.regressed;
+    this.openProfileListDialog(
+      'summary',
+      'Regressed',
+      `${month.monthLabel} · ${profiles.length} participants`,
+      'dn',
+      profiles
+    );
+  }
+
+  openAreaDialog(statusType: 'up' | 'dn', areaKey: number | 'all'): void {
+    const month = this.activeMonthSummary!;
+    const filteredProfiles = statusType === 'up'
+      ? month.profileGroups.progressed.filter(p => p.changedCount == areaKey)
+      : month.profileGroups.regressed.filter(p => p.changedCount == areaKey);
+    const areaLabel = areaKey === 'all' ? 'All areas' : `${areaKey} area${areaKey > 1 ? 's' : ''}`;
+    this.openProfileListDialog(
+      'area',
+      `${statusType === 'up' ? 'Progressed' : 'Regressed'} · ${areaLabel}`,
+      `${month.monthLabel} · ${filteredProfiles.length} participants`,
+      statusType,
+      filteredProfiles
+    );
+  }
+
+  openCategoryDialog(statusType: 'up' | 'dn', category: string): void {
+    const month = this.activeMonthSummary!;
+    const filteredProfiles = statusType === 'up'
+      ? month.profileGroups.progressed.filter(p => p.progressedAreas.includes(category))
+      : month.profileGroups.regressed.filter(p => p.regressedAreas.includes(category));
+    this.openProfileListDialog(
+      'category',
+      category,
+      `${statusType === 'up' ? 'Progressed' : 'Regressed'} · ${month.monthLabel} · ${filteredProfiles.length}`,
+      statusType,
+      filteredProfiles
+    );
+  }
+
+  private openProfileListDialog(
+    dialogType: DialogType,
+    title: string,
+    subtitle: string,
+    statusClass: 'up' | 'dn' | 'nc',
+    profileList: InterimProfile[]
+  ): void {
+    this.dialogContext = { dialogType, dialogTitle: title, dialogSubtitle: subtitle, statusClass, profileList, statusType: statusClass };
+    this.dialogProfileList = profileList;
+    this.selectedProfile = null;
+    this.isDialogOpen = true;
+  }
+
+  openProfileDetail(profile: InterimProfile): void { this.selectedProfile = profile; }
+  backToProfileList(): void { this.selectedProfile = null; }
+
+  closeDialog(): void {
+    this.isDialogOpen = false;
+    this.selectedProfile = null;
+    this.dialogContext = null;
+  }
+
+  onDialogOverlayClick(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('overlay')) this.closeDialog();
+  }
+
+  openAllMonthsDialog(): void { this.isAllMonthsDialogOpen = true; }
+  closeAllMonthsDialog(): void { this.isAllMonthsDialogOpen = false; }
+
+  onAllMonthsOverlayClick(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('overlay')) this.closeAllMonthsDialog();
+  }
+
+  // ── Category detail helpers ────────────────────────────────────────────────
+
+  getCategoryChangeType(profile: InterimProfile, category: string): 'up' | 'dn' | 'nc' {
+    if (profile.progressedAreas.includes(category)) return 'up';
+    if (profile.regressedAreas.includes(category)) return 'dn';
+    return 'nc';
+  }
+
+  getCategoryArrow(changeType: 'up' | 'dn' | 'nc'): string {
+    return changeType === 'up' ? '↑' : changeType === 'dn' ? '↓' : '→';
+  }
+
+  getCategoryStatusLabel(changeType: 'up' | 'dn' | 'nc'): string {
+    return changeType === 'up' ? 'Progressed' : changeType === 'dn' ? 'Regressed' : 'No change';
+  }
+
+  isCategoryChanged(profile: InterimProfile, category: string): boolean {
+    return [...profile.progressedAreas, ...profile.regressedAreas].includes(category);
+  }
+
+  getAllChangedAreas(profile: InterimProfile): string[] {
+    return [...profile.progressedAreas, ...profile.regressedAreas];
+  }
+
+  toggleFilterMode(mode: 'months' | 'daterange'): void {
+    if (this.filterMode === mode) return;
+    this.filterMode = mode;
+    // Reset the other mode's data
+    if (mode === 'months') {
+      this.filterStartDate = null;
+      this.filterEndDate = null;
+      this.numberOfMonths = null;
+      this.onMonthsCountChange();
+    } else {
+      this.filterStartDate = null;
+      this.filterEndDate = null;
+      this.numberOfMonths = null;
+      this.monthSummaries = [];
+      this.updateDateRangeHint();
+    }
+  }
+
+  getOverallTotal(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + m.totalInterims, 0);
+  }
+  getOverallProgressed(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + this.getTotalProgressed(m), 0);
+  }
+  getOverallRegressed(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + this.getTotalRegressed(m), 0);
+  }
+  getOverallNoChange(): number {
+    return this.monthSummaries.reduce((sum, m) => sum + m.noChangeCount, 0);
+  }
+
+  getOverallCategoryProgressed(category: string): number {
+    return this.monthSummaries.reduce((sum, m) =>
+      sum + (m.progressedData.categoryBreakdown[category] || 0), 0);
+  }
+
+  getOverallCategoryRegressed(category: string): number {
+    return this.monthSummaries.reduce((sum, m) =>
+      sum + (m.regressedData.categoryBreakdown[category] || 0), 0);
+  }
+
+  getOverallCategoryMax(type: 'up' | 'dn'): number {
+    return Math.max(...this.CATEGORIES.map(cat =>
+      type === 'up'
+        ? this.getOverallCategoryProgressed(cat)
+        : this.getOverallCategoryRegressed(cat)
+    ), 1);
+  }
+
+  getMonthCategories(monthSummary: MonthSummary): string[] {
+    return Object.keys(monthSummary.progressedData.categoryBreakdown);
+  }
+
+  getJourneyCoachTag(profileId: string): string {
+    const journeyCoachTagIds: string[] = this.journeyCoachTags
+      .filter(t => t['isActive'] === true)
+      .map(t => t.id);
+    const metaData = this.mapMetaData[profileId];
+    const profileTags: string[] = metaData?.['profiletags'] ?? [];
+    return profileTags.find(t => journeyCoachTagIds.includes(t)) ?? '';
+  }
+
+  async updateParticipantTag(profileId: string, selectedTagId: string | null, currentTagId: string | null): Promise<void> {
+    // treat empty string as no selection
+    const resolvedTagId = selectedTagId === '' ? null : selectedTagId;
+
+    const metadataRef = doc(this.firestore, 'participant metadata', profileId);
+    const metadataSnap = await getDoc(metadataRef);
+    if (!metadataSnap.exists()) return;
+
+    const metadataData = metadataSnap.data();
+    const currentProfileTags: string[] = metadataData['profiletags'] ?? [];
+
+    const journeyCoachTagIds: string[] = this.journeyCoachTags.map((t: any) => t.id);
+
+    const nonJourneyCoachTags = currentProfileTags.filter(t => !journeyCoachTagIds.includes(t));
+    const existingJourneyCoachTags = currentProfileTags.filter(t => journeyCoachTagIds.includes(t));
+
+    const logPromises: Promise<void>[] = [];
+
+    // Single removal log with ALL removed tags in one array
+    if (existingJourneyCoachTags.length > 0) {
+      const logId = doc(collection(this.firestore, 'participant tag logs')).id;
+      logPromises.push(setDoc(doc(this.firestore, 'participant tag logs', logId), {
+        logid: logId,
+        profileid: profileId,
+        type: 'removed',
+        tags: existingJourneyCoachTags,
+        updated: new Date(),
+        updatedby: this.loggedInProfileid,
+        source: 'journey coach'
+      }));
+    }
+
+    // Build new tags — if null/empty, just keep non-journey-coach tags
+    const newProfileTags = resolvedTagId
+      ? [...nonJourneyCoachTags, resolvedTagId]
+      : nonJourneyCoachTags;
+
+    const batch = writeBatch(this.firestore);
+    batch.update(metadataRef, { profiletags: newProfileTags });
+    await batch.commit();
+
+    // Addition log only if a real tag was selected
+    if (resolvedTagId) {
+      const logId = doc(collection(this.firestore, 'participant tag logs')).id;
+      logPromises.push(setDoc(doc(this.firestore, 'participant tag logs', logId), {
+        logid: logId,
+        profileid: profileId,
+        type: 'added',
+        tags: [resolvedTagId],
+        updated: new Date(),
+        updatedby: this.loggedInProfileid,
+        source: 'journey coach'
+      }));
+    }
+
+    await Promise.all(logPromises);
+    this.guard.openSnackBar("Tag updated successfully", "OK", 3000);
+  }
+
+  private async fetchJourneyCoachTags(): Promise<void> {
+    try {
+      const tagsSnapshot = await getDocs(query(
+        collection(this.firestore, 'participant tags'),
+        where('tagsfor', 'array-contains', 'journey coach')
+      ));
+      this.journeyCoachTags = (tagsSnapshot?.docs ?? []).map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      }));
+    } catch (error) {
+      console.error('Error fetching journey coach tags:', error);
+    }
+  }
+
+  getProfilesForTag(tagId: string): any[] {
+    return Object.entries(this.mapMetaData)
+      .filter(([profileId, meta]: [string, any]) =>
+        (meta?.['profiletags'] ?? []).includes(tagId)
+      )
+      .map(([profileId, meta]: [string, any]) => ({
+        profileId,
+        name: meta?.['name'] ?? profileId
+      }));
+  }
+
+  get activeJourneyCoachTags(): any[] {
+    return this.journeyCoachTags.filter(tag =>
+      this.getProfilesForTag(tag.id).length > 0 || tag['isActive'] === true
+    );
+  }
+
+  openTagProfilesDialog(tag: any): void {
+    this.selectedTagName = tag['name'] || tag.id;
+    this.selectedTagProfiles = this.getProfilesForTag(tag.id);
+    this.isTagProfilesDialogOpen = true;
+  }
+
+  closeTagProfilesDialog(): void {
+    this.isTagProfilesDialogOpen = false;
+    this.selectedTagProfiles = [];
+    this.selectedTagName = '';
+  }
+
+  onTagProfilesOverlayClick(event: MouseEvent): void {
+    if ((event.target as HTMLElement).classList.contains('overlay')) {
+      this.closeTagProfilesDialog();
+    }
+  }
+
+  getEpBandCount(key: string, bandIdx: number): number {
+    return this.evolutionProgressData?.bands[bandIdx]?.profiles[key]?.length ?? 0;
+  }
+
+  getEpBandProfiles(key: string, bandIdx: number): { profileId: string; profileName: string; total: number; pct: number }[] {
+    return this.evolutionProgressData?.bands[bandIdx]?.profiles[key] ?? [];
+  }
+
+  openEpDialog(key: string, bandLabel: string, bandIdx: number): void {
+    const profiles = this.getEpBandProfiles(key, bandIdx);
+    if (!profiles.length) return;
+    this.epDialogTitle = `${key} · ${bandLabel}`;
+    this.epDialogSubtitle = `${profiles.length} profiles in this band`;
+    this.epDialogBandIdx = bandIdx;
+    this.epDialogProfiles = profiles;
+    this.isEpDialogOpen = true;
+  }
+
+  closeEpDialog(): void {
+    this.isEpDialogOpen = false;
+    this.epDialogProfiles = [];
+  }
+
+  onEpOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeEpDialog();
+  }
+
+  // Build matrix after fetch
+  buildSubscriptionMatrix(snapshot: any): void {
+    const cells: Record<string, Record<string, { count: number; docs: any[] }>> = {};
+    const monthSet = new Set<string>();
+    const journeyMap: Record<string, string> = {};
+
+    snapshot.forEach((doc: any) => {
+      const data = doc.data();
+      const end = data['subscriptionend']?.toDate
+        ? data['subscriptionend'].toDate()
+        : new Date(data['subscriptionend']);
+      const ym = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+      const journeyId = data['journeyref']?.id ?? data['journeyref'] ?? 'Unknown';
+      const journeyLabel = this.mapjourneyname?.[journeyId] ?? journeyId;
+
+      monthSet.add(ym);
+      journeyMap[journeyId] = journeyLabel;
+
+      if (!cells[journeyId]) cells[journeyId] = {};
+      if (!cells[journeyId][ym]) cells[journeyId][ym] = { count: 0, docs: [] };
+      cells[journeyId][ym].count++;
+      cells[journeyId][ym].docs.push({ id: doc.id, ...data });
+    });
+
+    const months = [...monthSet].sort().map(ym => {
+      const [y, m] = ym.split('-').map(Number);
+      return {
+        ym,
+        label: new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      };
+    });
+
+    const journeys = Object.entries(journeyMap)
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Totals
+    const monthTotals: Record<string, number> = {};
+    const journeyTotals: Record<string, number> = {};
+    months.forEach(m => {
+      monthTotals[m.ym] = journeys.reduce((s, j) => s + (cells[j.id]?.[m.ym]?.count ?? 0), 0);
+    });
+    journeys.forEach(j => {
+      journeyTotals[j.id] = months.reduce((s, m) => s + (cells[j.id]?.[m.ym]?.count ?? 0), 0);
+    });
+
+    this.subscriptionMatrix = { journeys, months, cells, monthTotals, journeyTotals };
+  }
+
+  // Dialog
+  openSubDialog(docs: any[], title: string): void {
+    this.subDialogTitle = title;
+    this.subDialogDocs = docs;
+    this.isSubDialogOpen = true;
+  }
+  closeSubDialog(): void { this.isSubDialogOpen = false; this.subDialogDocs = []; }
+  onSubDialogOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeSubDialog();
+  }
+  getCellData(journeyId: string, ym: string) {
+    return this.subscriptionMatrix?.cells[journeyId]?.[ym] ?? null;
+  }
+  getSubEndDate(doc: any): string {
+    const d = doc['subscriptionend']?.toDate ? doc['subscriptionend'].toDate() : new Date(doc['subscriptionend']);
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  getSubJourneyName(doc: any): string {
+    const id = doc['journeyref']?.id ?? doc['journeyref'] ?? '';
+    return this.mapjourneyname?.[id] ?? id;
+  }
+  getSubStatusClass(status: string): string {
+    if (status === 'completed') return 'status-completed';
+    if (status === 'ongoing') return 'status-ongoing';
+    return '';
+  }
+  getGrandTotal(): number {
+    if (!this.subscriptionMatrix) return 0;
+    return Object.values(this.subscriptionMatrix.monthTotals).reduce((a, b) => a + b, 0);
+  }
+
+  openJourneyStatusDialog(profiles: any[], title: string): void {
+    this.journeyStatusDialogProfiles = profiles;
+    this.journeyStatusDialogTitle = title;
+    this.isJourneyStatusDialogOpen = true;
+  }
+
+  closeJourneyStatusDialog(): void {
+    this.isJourneyStatusDialogOpen = false;
+    this.journeyStatusDialogProfiles = [];
+  }
+
+  onJourneyStatusOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeJourneyStatusDialog();
+  }
+
+  getStatusClass(status: string): string {
+    if (status === 'active') return 'js-active';
+    if (status === 'non active') return 'js-nonactive';
+    if (status === 'discontinued') return 'js-discontinued';
+    return 'js-null';
+  }
+
+  getAllProfilesForJourney(journey: any): any[] {
+    return Object.values(journey.statuses).flatMap((s: any) => s.profiles);
+  }
+
+  getTotalForStatus(status: string): number {
+    return this.journeyStatusMatrix.reduce((a, j) =>
+      a + (j.statuses[status]?.profiles.length ?? 0), 0);
+  }
+
+  getJourneyStatusGrandTotal(): number {
+    const matrixTotal = this.journeyStatusMatrix.reduce((a, j) => a + j.total, 0);
+    return matrixTotal + this.nullStatusProfiles.length;
+  }
+
+  toggleEpProfileExpand(profileId: string): void {
+    this.expandedEpProfile = this.expandedEpProfile === profileId ? null : profileId;
+  }
+
+  getProfileAllKeyData(profileId: string): { key: string; count: number; pct: number; bandIdx: number }[] {
+    if (!this.evolutionProgressData) return [];
+    const result: { key: string; count: number; pct: number; bandIdx: number }[] = [];
+
+    this.evolutionProgressData.keys.forEach(key => {
+      this.evolutionProgressData!.bands.forEach((band, bandIdx) => {
+        const entry = band.profiles[key]?.find(p => p.profileId === profileId);
+        if (entry) {
+          result.push({ key, count: entry.total, pct: entry.pct, bandIdx });
+        }
+      });
+    });
+
+    return result.sort((a, b) => b.pct - a.pct);
   }
 }

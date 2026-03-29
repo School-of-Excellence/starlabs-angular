@@ -665,6 +665,36 @@
   }
 }
 
+.platformtoggle{
+  /* When checked (active) - Green */
+  --mdc-switch-selected-track-color: #20bb27 !important;
+  --mdc-switch-selected-handle-color: #409c43 !important;
+  --mdc-switch-selected-hover-track-color: #20bb27 !important;
+  --mdc-switch-selected-focus-track-color: #20bb27 !important;
+  --mdc-switch-selected-pressed-track-color: #20bb27 !important;
+  --mdc-switch-selected-focus-handle-color: #409c43 !important;
+  --mdc-switch-selected-hover-handle-color: #409c43 !important;
+  --mdc-switch-selected-pressed-handle-color: #409c43 !important;
+  
+  /* When unchecked (inactive) - Blue */
+  --mdc-switch-unselected-track-color: #2774c2 !important;
+  --mdc-switch-unselected-handle-color: #137fd8 !important;
+  --mdc-switch-unselected-hover-track-color: #2774c2 !important;
+  --mdc-switch-unselected-focus-track-color: #2774c2 !important;
+  --mdc-switch-unselected-pressed-track-color: #2774c2;
+  --mdc-switch-unselected-focus-handle-color: #137fd8 !important;
+  --mdc-switch-unselected-hover-handle-color: #137fd8 !important;
+  --mdc-switch-unselected-pressed-handle-color: #137fd8 !important;
+}
+
+.zoomenable{
+  color: #137fd8;
+}
+
+.openviduenable{
+  color: #409c43;
+}
+
 /*
 .current-appointments {
   margin-bottom: 2rem;

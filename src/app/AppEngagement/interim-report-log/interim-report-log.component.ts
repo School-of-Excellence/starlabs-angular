@@ -1,10 +1,10 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { arrayUnion, collection, collectionData, doc, Firestore, getDocs, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, updateDoc, where } from '@angular/fire/firestore';
+import { arrayUnion, collection, collectionData, doc, Firestore, getDocs, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, updateDoc, where, setDoc } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -18,6 +18,15 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { SelectionModel } from '@angular/cdk/collections';
+import { MatDialog } from '@angular/material/dialog';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
+import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { environment } from '../../../environments/environment.development';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 
 @Component({
   selector: 'app-interim-report-log',
@@ -50,8 +59,11 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   @ViewChild('logPaginator') logPaginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
 
-  logDisplayedColumns: string[] = ['name', 'reportlist', 'lastupdate', 'status', 'duedate', 'remainderdate', 'lockdate' , 'createdon'];
+  selection = new SelectionModel<any>(true, []);
+  private destroy$ = new Subject<void>()
+  logDisplayedColumns: string[] = ['select', 'name', 'reportlist', 'lastupdate', 'status', 'duedate', 'remainderdate', 'lockdate', 'createdon'];
   logDataSource = new MatTableDataSource();
+  logData = [];
   interimlogSubscription: Subscription;
   mapReport = {
     'crossover': 'AEL Crossover Metric',
@@ -98,11 +110,13 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   records: any[] = [];
   loading = false;
   mapProfiles: any = {};
+  mapParticipantMetaData: { [key: string]: any } = {};
   selectedRecords: any[] = [];
 
   // Overlay
   showOverlay = false;
   overlayMode: 'individual' | 'merged' = 'merged';
+  selectedFilterType : 'total' | 'completed' | 'ongoing' | 'notstarted' = 'total';
   overlayTitle = '';
   overlayRecords: any[] = [];
   overlayLoading = false;
@@ -115,30 +129,17 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     { primary: 'loveletter', primaryLabel: 'Love Letter' },
   ];
 
-  private destroy$ = new Subscription();
+  // private destroy$ = new Subscription();
 
   constructor(
     private firestore: Firestore,
     private guard: AuthguardService,
-    private router: Router
-  ) {}
-
-  ngOnInit() {
-    this.guard.getRoles().then(async (roles) => {
-    //   const superrole = roles['admin'] || roles['ah'] || roles['developer'];
-    //   if (superrole) {
-        this.loggedInProfileId = roles['profile_ref'].id ?? null
-        this.fetchParticipants();
-        this.fetchAskAH();
-
-        this.participantFilterCtrl.valueChanges.subscribe((search) => {
-          this.filterParticipants(search || '');
-        });
-    //   } else {
-    //     alert('No Access');
-    //     this.router.navigateByUrl('/');
-    //   }
-    });
+    private router: Router,
+    private dialog: MatDialog,
+    private storage: Storage,
+    private _snackBar: MatSnackBar,
+    private http: HttpClient
+  ) {
     const logStartDate = new Date();
     const logEndDate = new Date();
 
@@ -150,9 +151,30 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     this.logEndDate.setValue(logEndDate);
   }
 
+  ngOnInit() {
+    this.guard.getRoles().then(async (roles) => {
+      //   const superrole = roles['admin'] || roles['ah'] || roles['developer'];
+      //   if (superrole) {
+      this.loggedInProfileId = roles['profile_ref'].id ?? null
+      this.fetchParticipants();
+      this.fetchAskAH();
+
+      this.participantFilterCtrl.valueChanges.subscribe((search) => {
+        this.filterParticipants(search || '');
+      });
+      //   } else {
+      //     alert('No Access');
+      //     this.router.navigateByUrl('/');
+      //   }
+    });
+  }
+
   ngOnDestroy() {
     this.interimlogSubscription?.unsubscribe();
-    this.destroy$.unsubscribe();
+    if (this.destroy$) {
+      this.destroy$.next();
+      this.destroy$.complete();
+    }
   }
 
   // ==========================================
@@ -168,6 +190,13 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       this.mapProfiles = {};
       snap.docs.forEach((doc) => {
         this.mapProfiles[doc.id] = doc.data();
+      });
+    });
+
+    getDocs(collection(this.firestore, 'participant metadata')).then((snap) => {
+      this.mapParticipantMetaData = {};
+      snap.docs.forEach((doc) => {
+        this.mapParticipantMetaData[doc.id] = doc.data();
       });
     });
   }
@@ -188,16 +217,16 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   // ==========================================
   fetchInterimLog() {
     const interimCollection = collection(this.firestore, 'interimreport log');
-    const constraints : any[]= [orderBy('lastupdate', 'desc')];
-  
+    const constraints: any[] = [orderBy('lastupdate', 'desc')];
+
     if (this.logStartDate.value && this.logEndDate.value) {
       const startDate = this.logStartDate.value;
-      startDate.setHours(0,0,0,0)
+      startDate.setHours(0, 0, 0, 0)
       const endDate = new Date(this.logEndDate.value);
-      endDate.setHours(23,59,59,999);
-      console.log(startDate , endDate)
-      constraints.push(where('createdon' , '>=' , Timestamp.fromDate(startDate)));
-      constraints.push(where('createdon' , '<=' , Timestamp.fromDate(endDate)));
+      endDate.setHours(23, 59, 59, 999);
+      console.log(startDate, endDate)
+      constraints.push(where('createdon', '>=', Timestamp.fromDate(startDate)));
+      constraints.push(where('createdon', '<=', Timestamp.fromDate(endDate)));
     }
 
     const q = query(interimCollection, ...constraints);
@@ -220,18 +249,19 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         data['createdon'] = data['createdon']?.toDate() ?? null;
         data['status'] = data['status']?.toString();
         logList.push(data);
-        if(data['status'] === 'completed') totalReportsCompleted++;
-        if ([null, undefined , ''].includes(data['status']) && data['reports']?.length > 0) totalReportsOngoing++;
+        if (data['status'] === 'completed') totalReportsCompleted++;
+        if ([null, undefined, ''].includes(data['status']) && data['reports']?.length > 0) totalReportsOngoing++;
         if (!Array.isArray(data['reports']) || data['reports']?.length === 0) totalReportsNotStarted++
         console.log(data['reports'])
       });
-      
+
       this.totalReports = logList.length;
       this.totalReportsCompleted = totalReportsCompleted;
       this.totalReportsOngoing = totalReportsOngoing;
       this.totalReportsNotStarted = totalReportsNotStarted;
 
-      this.logDataSource.data = logList;
+      this.logDataSource.data = logList.filter((data)=>this.matchLogDataFilter(data));
+      this.logData = logList;
       setTimeout(() => {
         this.logDataSource.sort = this.sort;
         this.logDataSource.paginator = this.logPaginator;
@@ -239,14 +269,40 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     });
   }
 
-  clearInterimReportFilter(){
-    this.logStartDate.reset();
-    this.logEndDate.reset();
+  clearInterimReportFilter() {
+    const logStartDate = new Date();
+    const logEndDate = new Date();
+
+    logStartDate.setDate(1);
+    logEndDate.setMonth(logEndDate.getMonth() + 1);
+    logEndDate.setDate(0);
+
+    this.logStartDate.setValue(logStartDate);
+    this.logEndDate.setValue(logEndDate);
     this.fetchInterimLog()
   }
 
-  filterLogData(value: string) {
+  filterLogData(value: string) { 
     this.logDataSource.filter = value;
+  }
+
+  filterLogDataWithBoxClick(type : 'total' | 'completed' | 'ongoing' | 'notstarted'){
+    if (this.selectedFilterType === type) {
+      this.selectedFilterType = 'total';
+    } else {
+      this.selectedFilterType = type;
+    }
+    this.logDataSource.data = this.logData.filter((data)=>this.matchLogDataFilter(data));
+  }
+
+  matchLogDataFilter(data : any){
+    const type = this.selectedFilterType;
+    if ((type === 'completed' && data['status'] !== 'completed') ||
+    (type === 'ongoing' && !([null, undefined, ''].includes(data['status']) && data['reports']?.length > 0)) || 
+    (type === 'notstarted' && !(!Array.isArray(data['reports']) || data['reports']?.length === 0))) {
+      return false
+    }
+    return true;
   }
 
   // ==========================================
@@ -356,6 +412,12 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     return this.records.length > 0 && this.selectedRecords.length === this.records.length;
   }
 
+  /** Whether the number of selected elements matches the total number of rows. */
+  isAllSelectedLogs() {
+    const numSelected = this.selection.selected.length;
+    const numRows = this.logDataSource.data.length;
+    return numSelected === numRows;
+  }
   toggleRow(row: any, checked: boolean) {
     if (checked) {
       this.selectedRecords.push(row);
@@ -492,6 +554,31 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     }
   }
 
+  toggleCritical(row: any) {
+    const newValue = !row.critical;
+    row.critical = newValue;
+
+    const collectionName = this.collectionMap[this.activeTab];
+    const docRef = doc(this.firestore, collectionName, row.id);
+
+    if (newValue) {
+      row.criticaldetails = { user: this.loggedInProfileId, time: new Date() };
+      updateDoc(docRef, {
+        critical: true,
+        criticaldetails: {
+          user: this.loggedInProfileId,
+          time: serverTimestamp()
+        }
+      });
+    } else {
+      row.criticaldetails = null;
+      updateDoc(docRef, {
+        critical: false,
+        criticaldetails: null
+      });
+    }
+  }
+
   toggleOpportunity(row: any) {
     const newValue = !row.opportunity;
     row.opportunity = newValue;
@@ -563,4 +650,168 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     if (!this.notesRecord?.notes) return [];
     return [...this.notesRecord.notes].reverse();
   }
+
+  /** Selects all rows if they are not all selected; otherwise clear selection. */
+  toggleAllRows() {
+    if (this.isAllSelectedLogs()) {
+      this.selection.clear();
+      return;
+    }
+    this.selection.select(...this.logDataSource.data);
+  }
+
+  /** The label for the checkbox on the passed row */
+  checkboxLabel(row?: any): string {
+    if (!row) {
+      return `${this.isAllSelectedLogs() ? 'deselect' : 'select'} all`;
+    }
+    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${row.position + 1}`;
+  }
+
+  sendNotificationinBreakthrough() {
+    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+    console.log(selectedProfiles)
+    let dialogRef = this.dialog.open(AhNotificationComponent, {
+      data: selectedProfiles,
+      width: "80vw",
+      maxHeight: "90vh",
+      disableClose: true,
+      autoFocus: false,
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        var userID = [];
+        var profileID = [];
+        console.log(selectedProfiles, "this.selection.selected");
+        // var unsentProfiles = [];
+        for (let i = 0; i < selectedProfiles.length; i++) {
+          const selected = selectedProfiles[i];
+          if (selected["firebaseuserref"] != null) {
+            profileID.push(selected["profileid"])
+          }
+        }
+
+        var notificationimage = null
+        if (result["notificationimage"] != null) {
+          const filepath = "Notification Images/" + new Date().toISOString() + result["notificationimage"].name;
+          try {
+            const storageRef = ref(this.storage, filepath)
+            const uploadResult = await uploadBytes(storageRef, result["notificationimage"])
+            notificationimage = await getDownloadURL(uploadResult.ref)
+          } catch (error) {
+            console.log("file upload error", error);
+          }
+        }
+        console.log(profileID, "profileIDprofileIDprofileIDprofileID");
+        this.guard.saveNotificationRecord({
+          title: result["title"],
+          message: result["message"],
+          subtitle: result["subtitle"] ?? null,
+          notificationtype: "ahupdate",
+          notificationimage: notificationimage,
+          sticky: result["sticky"],
+          logged: true,
+          landingpage: result["landingpage"],
+          profileid: profileID,
+        }).then(() => {
+          console.log(notificationimage)
+          alert("A&H Update sent to App user " + profileID.length.toString())
+        })
+      }
+    })
+  }
+  sendEmailToSelectedParicipant() {
+    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+    let dialogRef = this.dialog.open(EmailInputComponent, {
+      data: selectedProfiles,
+      minWidth: "600px",
+      disableClose: true
+    });
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        console.log(result);
+
+        const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
+            this.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK");
+          }).catch(err => {
+            console.log(err);
+            this.openSnackBar("Error Sending Email", "OK");
+          });
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
+            url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+            url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail"
+          }
+          console.log("EMAIL :", url);
+          let data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data), {
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log(err);
+              console.log("Error: " + err);
+            }
+          });
+        }
+
+      }
+    })
+  }
+  openSnackBar(message: string, action: string) {
+    this._snackBar.open(message, action);
+  }
+
+  sendWatiMessage() {
+    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+
+    let dialogRef = this.dialog.open(WatiInputComponent, {
+      data: selectedProfiles,
+      width: "70vw",
+      height: "80vh",
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        if (result == 'success') {
+          this.openSnackBar("Wati Message Sent Successfully", "OK");
+          if (result['status'] == 'sendtoparticipants') {
+            let url: string;
+
+            if (environment.firebase.projectId == 'starlabs-test') {
+              url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
+            } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+              url = ""
+            }
+
+            const docRef = doc(collection(this.firestore, 'wati archive'), result['archiveid']);
+            await updateDoc(docRef, {
+              templatestatus: "created",
+              templatevalidated: true,
+            }).then(() => {
+              console.log("Wati Archive Document Created");
+            }).catch((error) => {
+              console.log("Error Creating Wati Archive");
+            });
+
+            const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
+            console.log("Response : ", response)
+
+          }
+        } else if (result == 'failed') {
+          this.openSnackBar("Sending Wati Message Failed", "OK");
+        }
+      }
+    });
+  }
+
 }
