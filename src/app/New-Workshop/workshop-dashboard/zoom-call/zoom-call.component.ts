@@ -47,7 +47,7 @@ interface ExcelRow {
   styleUrl: './zoom-call.component.css'
 })
 export class ZoomCallComponent implements AfterViewInit {
-displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'email'];
+displayedColumns: string[] = ['delete', 'serial', 'columnA', 'name', 'matchPercentage', 'email'];
   dataSource = new MatTableDataSource<ExcelRow>([]);
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -406,5 +406,10 @@ displayedColumns: string[] = ['serial', 'columnA', 'name', 'matchPercentage', 'e
 
   onClose() {
     this.dialogRef.close()
+  }
+  deleteRow(index:number){
+    const data = [...this.dataSource.data];
+    data.splice(index,1)
+    this.dataSource.data = data;
   }
 }
