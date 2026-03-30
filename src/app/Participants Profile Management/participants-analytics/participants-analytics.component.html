@@ -16,9 +16,10 @@
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">
       <button mat-menu-item [mat-menu-trigger-for]="playlist">Playlist</button>
-      <button mat-menu-item *ngIf="workshopadmin.includes(loggedInProfileId)" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages (Workshop Only)</button>
+      <!-- <button mat-menu-item *ngIf="workshopadmin.includes(loggedInProfileId)" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages (Workshop Only)</button> -->
+      <button mat-menu-item (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages</button>
       <!-- <button mat-menu-item [mat-menu-trigger-for]="email">Email</button> -->
-      <button mat-menu-item (click)="exportWithFilters()">Export With Filters</button>
+      <!-- <button mat-menu-item (click)="exportWithFilters()">Export With Filters</button> -->
       <!-- <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Send Wati Messages</button> -->
       <button mat-menu-item (click)="openWatiConfig()">Wati Configuration</button>
       <button mat-menu-item (click)="addremarks(selection.selected)" [disabled]="selection.selected.length === 0">Add Remarks</button>
@@ -38,7 +39,8 @@
 
     </mat-menu>
     <mat-menu #exports="matMenu">
-      <button mat-menu-item (click)="exportExcel()">Excel</button>
+      <button mat-menu-item (click)="exportExcel(false)">Export Table</button>
+      <button mat-menu-item  *ngIf="selection.hasValue()" (click)="exportExcel(true)">Export Selection Table </button>
       <button mat-menu-item (click)="exportContentConsumption()">Content Consumption</button>
     </mat-menu>
     <mat-menu #playlist="matMenu">
@@ -82,7 +84,7 @@
             <mat-chip-option
               *ngFor="let option of savedfiltersearch();let i = index;"
               [selected]="selectedSavedFilterQueryLabel === option['label']"
-              (click)="loadtabledata(savedfilterquery[i]);returnFilterText();"
+              (click)="loadtabledata(savedfilterquery[i]);"
             >
               <div class="chip-content">
                 <span class="label">{{option.label}}</span>
@@ -359,6 +361,41 @@
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
         </form>
+        <div style="display:flex;flex-direction : column ; gap : 15px">
+          <div *ngIf="filterByProducts?.consumed.length > 0">
+            <h2>Consumed Products</h2>
+            <!-- <div>
+              <div *ngFor="let product of (filterByProducts.consumed || [])">{{getProductString(product)}}</div>
+            </div> -->
+            <div class="chips-wrap">
+              <div class="chip" *ngFor="let product of (filterByProducts.consumed || []); let i = index">
+                <span>{{ getProductString(product) }}</span>
+                <button class="chip-btn" (click)="unSelectConsumedProduct(product?.productId)" [attr.aria-label]="'Remove ' + getProductString(product)">
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M1 1L7 7M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="filterByProducts.unconsumed.length > 0">
+            <h2>Unconsumed Products</h2>
+            <!-- <div>
+              <div *ngFor="let product of (filterByProducts.unconsumed || [])">{{getProductString(product)}}</div>
+            </div> -->
+            <div class="chips-wrap">
+              <div class="chip" *ngFor="let product of (filterByProducts.unconsumed || []); let i = index">
+                <span>{{ getProductString(product) }}</span>
+                <button class="chip-btn" (click)="unSelectUnconsumedProduct(product?.productId)" [attr.aria-label]="'Remove ' + getProductString(product)">
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M1 1L7 7M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <button mat-stroked-button type="button" (click)="exportWithFilters()">Product Filter</button>&nbsp;&nbsp;
+        </div>
         <div class="d-flex justify-content-center" style="margin-bottom:10px;">
           <button mat-stroked-button type="button" (click)="onDataSearch();" [disabled]="searchValidation()">Search</button>&nbsp;&nbsp;
           <button mat-stroked-button type="button" (click)="saveSearchedFilter(filterdata);">Save Search</button>&nbsp;&nbsp;
@@ -457,7 +494,6 @@
             </span>
             
             <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate'):null)}}</span>
-            <span *ngIf="column == 'dateofbirth'">  {{ element[column] != null ? (element[column].toDate() | date:'mediumDate') : '' }}</span>
             <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>

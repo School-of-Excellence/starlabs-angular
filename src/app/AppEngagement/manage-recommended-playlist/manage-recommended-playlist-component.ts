@@ -541,7 +541,7 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
   sidePanelTitle = '';
   sidePanelProfiles: {
     name: string;
-    profileId: string;
+    profileid: string;
     completed: boolean;
     playlistDoc: any;
     percentage?: number;
@@ -585,7 +585,7 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
       }
       return {
         name: this.mapProfile[doc['profileid']] || doc['profileid'],
-        profileId: doc['profileid'],
+        profileid: doc['profileid'],
         completed: completedIds.includes(itemId),
         playlistDoc: doc,
         percentage,
@@ -812,12 +812,13 @@ async sendNotificationinBreakthrough(){
       maxHeight: "90vh",
       disableClose:true,
       autoFocus: false,
+      data:this.sidePanelProfiles
     })
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
       console.log(profileID,"profile id worskshop notifiation");
       if(result != null && result != undefined){
         var userID = [];
-        var profileID = this.sidePanelProfiles.map(p => p.profileId);
+        var profileID = this.sidePanelProfiles.map(p => p.profileid);
         console.log(profileID,"profile id worskshop notifiation");
         var notificationimage = null
         if(result["notificationimage"] != null){

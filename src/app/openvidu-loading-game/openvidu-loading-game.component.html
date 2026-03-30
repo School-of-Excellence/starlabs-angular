@@ -1,0 +1,24 @@
+<div class="game-container">
+    <h3>Preparing your meeting room...</h3>
+    <p class="status-text">{{ statusMessage }}</p>
+    
+    <div class="mini-game">
+        <h4>Click the targets!</h4>
+        <div class="score">Score: {{ score }}</div>
+        <div class="game-board" (click)="onBoardClick($event)">
+            <div 
+            *ngFor="let target of targets" 
+            class="target"
+            [style.left.px]="target.x"
+            [style.top.px]="target.y"
+            (click)="hitTarget(target.id); $event.stopPropagation()"
+            >
+            🎯
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="progress"></div>
+    </div>
+</div>

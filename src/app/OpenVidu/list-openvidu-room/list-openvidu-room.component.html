@@ -5,7 +5,7 @@
   </div>
 
   <!-- Empty State -->
-  <div *ngIf="liveAssignmentList.length == 0" class="text-center py-5">
+  <div *ngIf="liveAssignmentList.length == 0 && AppointmentList.length == 0" class="text-center py-5">
     <div class="empty-state">
       <mat-icon class="empty-icon">videocam_off</mat-icon>
       <h5 class="text-muted">Room Empty</h5>
@@ -15,29 +15,31 @@
 
   <!-- Assignment Cards -->
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-5 col-md-6 col-sm-12 mb-3" *ngFor="let assignment of liveAssignmentList">
-        <div class="card assignment-card">
-          <div class="card-body p-3">
-            <!-- Invitation Text -->
-            <p class="mb-3">
-              You are invited to the call for <span class="stage-name">'{{assignment["stagename"]}}'</span> Stage
-            </p>
-            
-            <!-- Specialist Info -->
-            <div class="mb-3">
-              <span><b>Specialist:</b> 
+    <div class="justify-content-center">
+      <div class="mb-3" *ngFor="let assignment of liveAssignmentList">
+        <div class="liveappointment">
+          <div class="livestatus">
+            Live
+          </div>
+          <div>
+            <div class="appointmenttitle">
+              <span> You are invited to the call for <strong>'{{assignment["stagename"]}}'</strong> Stage</span>
+            </div>
+
+            <div class="appointmentdetails">
+              <p>
+                <strong>Specialist:</strong> 
                 <span *ngFor="let name of assignment['pairing']; let isLast = last">
                   {{mapProfile[name]}}<span *ngIf="!isLast">, </span>
                 </span>
-              </span>
+              </p>
             </div>
-            
-            <!-- Join Button -->
-            <button mat-stroked-button class="btn btn-primary w-100 py-2" (click)="joinRoom(assignment)">
-              <mat-icon class="button-icon">videocam</mat-icon>
-              Join Call
-            </button>
+
+            <div class="zoomcontent">
+              <div>
+                <button class="zoomlaunchbtn" mat-button (click)="joinRoom_Queue(assignment)">Join Meeting Now</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -46,29 +48,52 @@
 
   <!-- Appointment Cards -->
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-5 col-md-6 col-sm-12 mb-3" *ngFor="let appointment of AppointmentList">
-        <div class="card assignment-card">
-          <div class="card-body p-3">
-            <!-- Invitation Text -->
-            <p class="mb-3">
-              You are invited to the call for <span class="stage-name">'{{mapAppointmenttype[appointment["appointment"].id]}}'</span> 
-            </p>
-            
-            <!-- Specialist Info -->
-            <div class="mb-3">
-              <span><b>Specialist:</b> 
-                <span *ngFor="let name of appointment['hostIds']; let isLast = last">
-                  {{mapProfile[name]}}<span *ngIf="!isLast">, </span>
-                </span>
-              </span>
+    <div class="justify-content-center">
+      <div class="mb-3" *ngFor="let appointment of AppointmentList; let i = index">
+        <div>
+          <div class="liveappointment">
+            <div class="upcomingstatus" *ngIf="i != 0">
+              Upcoming
             </div>
-            
-            <!-- Join Button -->
-            <button mat-stroked-button class="btn btn-primary w-100 py-2" (click)="joinRoom_Appointment(appointment)">
-              <mat-icon class="button-icon">videocam</mat-icon>
-              Join Call
-            </button>
+            <div class="livestatus" *ngIf="i == 0 && liveAppointmentStatus == 'LIVE'">
+              LIVE
+            </div>
+            <div class="countdownstatus" *ngIf="i == 0 && liveAppointmentStatus != 'LIVE' && liveAppointmentStatus != 'ENDED' && Array.isArray(liveAppointmentStatus)">
+              Starts in:
+              <span>{{ liveAppointmentStatus[0] }}H</span>
+              <span>{{ liveAppointmentStatus[1] }}M</span>
+              <span>{{ liveAppointmentStatus[2] }}S</span>
+            </div>
+
+            <div>
+              <div class="appointmenttitle">
+                <span>Scheduled for <strong>"{{mapAppointmenttype[appointment["appointment"].id]}}"</strong> Appointment</span>
+              </div>
+              <div class="appointmenttime">
+                {{appointment["starttime"].toDate() | date:'MMM d, y, h:mm a'}} - {{(appointment["starttime"].toDate() | date:'shortDate') == (appointment["endtime"].toDate() | date:'shortDate') ? (appointment["endtime"].toDate() | date:'h:mm a') : (appointment["endtime"].toDate() | date:'MMM d, y, h:mm a')}}
+              </div>
+              <div class="appointmentdetails">
+                <p>
+                  <strong>Specialist:</strong> 
+                  <label *ngFor="let host of appointment['hosts']; let isLast = last">
+                    {{mapProfile[host.id]}}<span *ngIf="!isLast">, </span>
+                  </label>
+                </p>
+              </div>
+
+              <div *ngIf="i == 0">
+                <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 5; else watingmessage">
+                  <div>
+                    <button class="zoomlaunchbtn" mat-button (click)="joinRoom_Appointment(appointment)">Join Meeting Now</button>
+                  </div>
+                </div>
+                <ng-template #watingmessage>
+                  <div class="zoomcontent">
+                    The meeting will be enabled 5 minutes before the appointment start time.
+                  </div>
+                </ng-template>
+              </div>
+            </div>
           </div>
         </div>
       </div>

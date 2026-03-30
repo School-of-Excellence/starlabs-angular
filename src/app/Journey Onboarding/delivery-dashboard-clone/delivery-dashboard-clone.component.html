@@ -499,33 +499,11 @@
 
   <!-- ========== JOURNEY FLOW ========== -->
   <div class="flow-section">
-    <div class="flow-header">
-
-      <!-- Search Participant toggle -->
-
-      <!-- <div style="display:flex; align-items:center; gap:8px;">
-        <span>Flow Stats</span>
-
-        <mat-slide-toggle (change)="toggleTableView()" [checked]="showTable">
-        </mat-slide-toggle>
-
-        <span>Table View</span>
-      </div> -->
-
-      <!-- Flow Stats Cards -->
-
-      <div class="flow-stats">
-
-      </div>
-    </div>
-
-
     <div class="header">
       <div class="title">Product Journey Flow Analysis</div>
       <div class="header-right">
-
         <!-- Toggle Button -->
-        <div class="toggle-group">
+        <!-- <div class="toggle-group">
           <button class="toggle-btn active">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
               stroke-linecap="round" stroke-linejoin="round">
@@ -546,257 +524,171 @@
             </svg>
             Table
           </button>
+        </div> -->
+
+        <!-- Search Container -->
+        <div class="search-container">
+          <div class="search-field">
+            <mat-icon matSuffix>search</mat-icon>
+            <input matInput type="text" placeholder="Search participant..." (input)="searchParticipant($event)"
+              [(ngModel)]="searchText" />
+          </div>
         </div>
+
+        <button class="clear-tab" [class.active]="!selectedProductLabel" (click)="clearStats()">
+          Clear Stats
+        </button>
 
         <!-- Product Selector -->
         <div class="filter-tabs">
-          <button class="tab active">WISH</button>
-          <button class="tab">A&H Light</button>
-          <button class="tab">EI Solution</button>
-          <button class="tab">EI Starter Pack</button>
-          <button class="tab">Critical Support</button>
+          <button *ngFor="let p of products" class="tab" [class.active]="selectedProductLabel === p"
+            (click)="selectProduct(p)" [disabled]="p!== 'EI Starter Pack'">
+            {{ p }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Overview -->
-    <!-- Total -->
-    <div class="stats-row">
-      <div class="stat-card" style="--accent-color:#7c3aed;">
-        <div class="stat-lbl">Total</div>
-        <div class="stat-val" style="color:#7c3aed">0</div>
-      </div>
-
-      <!-- Completed -->
-      <div class="stat-card" style="--accent-color:#22c55e;">
-        <div class="stat-lbl">Completed</div>
-        <div class="stat-val" style="color:#15803d">0</div>
-      </div>
-
-      <!-- In Progress -->
-      <div class="stat-card" style="--accent-color:#3b82f6;">
-        <div class="stat-lbl">In Progress</div>
-        <div class="stat-val" style="color:#1d4ed8">0</div>
-      </div>
-
-      <!-- Pending -->
-      <div class="stat-card" style="--accent-color:#eab308;">
-        <div class="stat-lbl">Pending</div>
-        <div class="stat-val" style="color:#a16207">0</div>
-      </div>
-
-      <!-- Overdue -->
-      <div class="stat-card" style="--accent-color:#ef4444;">
-        <div class="stat-lbl">Overdue</div>
-        <div class="stat-val" style="color:#b91c1c">0</div>
-      </div>
-
-      <!-- In Review -->
-      <div class="stat-card" style="--accent-color:#8b5cf6;">
-        <div class="stat-lbl">In Review</div>
-        <div class="stat-val" style="color:#6d28d9">0</div>
-      </div>
-    </div>
-
-    <!-- Participant Search Bar -->
-    <!-- <div class="search-container">
-      <mat-form-field appearance="outline" class="search-field">
-        <input matInput type="text" placeholder="Search participant..." (input)="searchStatsParticipant($event)"
-          [(ngModel)]="searchText" />
-
-        <mat-icon matSuffix>search</mat-icon>
-      </mat-form-field>
-    </div> -->
-
+    <!-- Flow Stats Cards -->
     <!-- Total Eligible -->
     <div class="d-flex board">
-      <!-- Total Eligible -->
-      <div class="column col-0">
-        <div class="col-header" style="background-color: #3b82f6; color: #fff">
+      <div class="column" *ngFor="let col of columns; let i = index">
+        <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
           <div class="col-header-left">
-            <span class="col-title">Total Eligible</span>
+            <span class="col-title">{{ col }}</span>
           </div>
-          <span class="col-badge">0</span>
+          <span class="col-badge">
+            {{ filteredCardsMap[i]?.length || 0 }}
+          </span>
         </div>
-        <div class="col-body" id="body-0">
 
-          <!-- Card Body -->
-          <div class="card" style="animation-delay:50ms;">
-            <div class="card-top">
-              <div class="card-info">
-                <div class="card-name">Priya S</div>
-                <div class="card-product">WISH Onboarding</div>
+        <div class="col-body">
+          <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
+            <div class="card" *ngFor="let c of filteredCardsMap[i]" [class.card-expanded]="c._expanded">
+              <!-- Collapsed Header (always visible) -->
+              <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
+                <div class="card-info">
+                  <div class="card-name">{{ mapMetaData[c.profileid]?.name }}</div>
+                  <div class="card-product">
+                    {{ c?.productid ? mapProductName?.[c?.productid] :
+                    mapProductName?.[c?.productref?.id] }}
+                  </div>
+                </div>
+              </div>
+              <!-- Status -->
+              <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0">
+                {{ c.status || 'NOT INITIATED' }}
+              </span>
+              <!-- Tentative Date -->
+              <span *ngIf="(c?.status === null || c?.status === 'initiated') && c?.tentativestart" class="card-date">
+                Tentative Start:
+                {{ c?.tentativestart?.toDate() | date:'dd MMM yyyy' }}
+              </span>
+              <div *ngIf="c?.status === 'completed' || c?.status === 'ongoing' || c?.status === 'submitted'"
+                class="detail-row" (click)="toggleExpand(c, i)">
+                <span>
+                  <span class="detail-label">
+                    {{
+                    c?.status === 'completed'
+                    ? 'Completed: '
+                    : c?.status === 'submitted'
+                    ? 'Form Submitted: '
+                    : c?.status === 'ongoing' && c?.appointmentType === `${mapProductName[c.productref.id]} Welcome
+                    Call`
+                    ? 'Welcome Call: '
+                    : c?.status === 'ongoing' && c?.appointmentType === `${mapProductName[c.productref.id]} Diagnostics`
+                    ? 'D&I: '
+                    : c?.status === 'ongoing' && c?.appointmentType === `${mapProductName[c.productref.id]}
+                    Implementation`
+                    ? 'D&I: '
+                    : ''
+                    }}
+                  </span>
+                  <span class="detail-val">
+                    {{
+                    c?.status === 'submitted'
+                    ? (c?.starttime?.toDate() | date:'dd MMM yyyy')
+
+                    : c?.statusdate?.completed
+                    ? (c.statusdate.completed.toDate() | date:'dd MMM yyyy')
+
+                    : (
+                    c?.status === 'ongoing' &&
+                    c?.starttime &&
+                    [
+                    mapProductName[c.productref.id] + ' Welcome Call',
+                    mapProductName[c.productref.id] + ' Diagnostics',
+                    mapProductName[c.productref.id] + ' Implementation'
+                    ].includes(c?.appointmentType)
+                    )
+                    ? (c.starttime.toDate() | date:'dd MMM yyyy')
+
+                    : '—'
+                    }}
+                  </span>
+                </span>
+                <span *ngIf="(c?.status === 'ongoing' || c?.status === 'completed')" class="chevron"
+                  [class.open]="c._expanded">
+                </span>
+              </div>
+              <!-- Expandable Section -->
+              <div class="expand-section" *ngIf="filteredCardsMap[i]?.length > 0" [class.expanded]="c._expanded"
+                [class.collapsed]="!c._expanded">
+                <hr class="divider">
+                <ng-container>
+                  <div class="d-flex justify-content-between align-items-center mb-2" *ngFor="let stage of stages">
+                    <ng-container *ngIf="getAppointmentByStage(stage, c?.allappointments) as appointment">
+                      <div>
+                        <div class="detail-stage-label text-muted">
+                          {{ stage }}
+                        </div>
+                        <div class="stage-date text-muted">
+                          {{
+                          stage === "Post Session Check-in"
+                          ? (c?.date?.toDate() | date:'dd MMM yyyy, hh:mm a')
+                          : (appointment?.attended && appointment?.endtime
+                          ? (appointment?.endtime?.toDate() | date:'dd MMM yyyy, hh:mm a')
+                          : (appointment?.starttime?.toDate() | date:'dd MMM yyyy, hh:mm a'))
+                          }}
+                        </div>
+                      </div>
+                      <div class="status-badge" [ngClass]="getStatusClass(appointment)">
+                        {{
+                        stage === "Post Session Check-in"
+                        ? 'Completed'
+                        : (appointment?.cancelled
+                        ? 'Cancelled'
+                        : appointment?.attended
+                        ? 'Completed'
+                        : appointment?.starttime && !appointment?.endtime
+                        ? 'Scheduled'
+                        : 'Scheduled')
+                        }}
+                      </div>
+                    </ng-container>
+                    <ng-container *ngIf="!getAppointmentByStage(stage, c?.allappointments)">
+                      <div>
+                        <div class="detail-stage-label text-muted">
+                          {{ stage }}
+                        </div>
+                      </div>
+                      <div class="status-badge status-notscheduled">
+                        Not Scheduled
+                      </div>
+                    </ng-container>
+                  </div>
+                </ng-container>
               </div>
             </div>
-            <span class="card-status s-pending">Pending</span>
-            <div class="card-footer">
-              <span class="card-date">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="#94a3b8"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg> Mar 11</span>
+          </ng-container>
+          <ng-template #noData>
+            <div class="no-data-card">
+              No Data Yet
             </div>
-          </div>
+          </ng-template>
         </div>
-      </div>
-
-      <!-- Past Month -->
-      <div class="column" style="background-color: #8b5cf6;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Past Month</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-1">
-
-          <!-- Card Body -->
-          <div class="card" style="animation-delay:50ms;">
-            <div class="card-top">
-              <div class="card-info">
-                <div class="card-name">Abishek M</div>
-                <div class="card-product">WISH Onboarding</div>
-              </div>
-            </div>
-            <span class="card-status s-inprogress">In Progress</span>
-            <div class="card-footer">
-              <span class="card-date">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="#94a3b8"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg> Mar 11</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- This Month -->
-      <div class="column" style="background-color: #ec4899;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">This Month</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-2">
-          <!-- Card Body -->
-          <div class="card" style="animation-delay:0ms;">
-            <div class="card-top">
-              <div class="card-info">
-                <div class="card-name">Harish R</div>
-                <div class="card-product">EI Implementation</div>
-              </div>
-            </div>
-            <span class="card-status s-completed">Completed</span>
-            <div class="card-footer">
-              <span class="card-date">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="#94a3b8"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg> Mar 10</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Next Month -->
-      <div class="column" style="background-color: #f97316;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Next Month</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-3">
-
-          <!-- Card Body -->
-          <div class="card" style="animation-delay:100ms;">
-            <div class="card-top">
-              <div class="card-info">
-                <div class="card-name">Rahul M</div>
-                <div class="card-product">A&H Light Setup</div>
-              </div>
-            </div>
-            <span class="card-status s-pending">Pending</span>
-            <div class="card-footer">
-              <span class="card-date">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="#94a3b8"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg> Mar 12</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Onboarded -->
-      <div class="column" style="background-color: #10b981;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Onboarded</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-4"></div>
-      </div>
-
-      <!-- Pre-Process -->
-      <div class="column col" style="background-color: #eab308;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Pre-Process</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-5"></div>
-      </div>
-
-      <!-- Upcoming D&I Appointments -->
-      <div class="column" style="background-color: #06b6d4;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Upcoming D&I Appointments</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-6"></div>
-      </div>
-
-      <!-- Report -->
-      <div class="column" style="background-color:  #ef4444;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Report</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-7"></div>
-      </div>
-
-      <!-- Celebration Call Completed -->
-      <div class="column" style="background-color: #6366f1;">
-        <div class="col-header">
-          <div class="col-header-left">
-            <span class="col-title">Celebration Call Completed</span>
-          </div>
-          <span class="col-badge">0</span>
-        </div>
-        <div class="col-body" id="body-8"></div>
       </div>
     </div>
-
 
     <!-- Flow Table -->
     <div class="flow-table-container" *ngIf="showTable">
@@ -859,8 +751,8 @@
             <mat-label>Journey</mat-label>
             <mat-select placeholder="Select Journey" formControlName="journey" (selectionChange)="filterTableData()"
               multiple>
-              <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{ journey
-                }}</mat-option>
+              <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{
+                journey}}</mat-option>
             </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline" class="pm-filter-field"
@@ -986,7 +878,7 @@
               </div>
             </span>
             <span *ngIf="header.key === 'financialdata'" class="pm-status-pill"
-              [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-pending': participant[header.key] === 'Pending'}">{{
+              [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-Not Scheduled': participant[header.key] === 'Not Scheduled'}">{{
               participant[header.key] === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED' }}</span>
             <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata'] ===
               'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up' }}</span>

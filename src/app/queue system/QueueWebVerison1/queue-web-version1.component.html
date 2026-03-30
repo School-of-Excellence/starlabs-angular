@@ -1,0 +1,103 @@
+<div class="qwv-root">
+    <div class="qwv-loading" *ngIf="loadingQueue">
+        <div class="qwv-loading-inner">
+        <div class="qwv-spinner"></div>
+        <p class="qwv-loading-text">Fetching your queue data…</p>
+        </div>
+    </div>
+
+    <div class="qwv-content" *ngIf="!loadingQueue">
+        <div class="qwv-header">
+            <div class="qwv-header-inner">
+                <span class="qwv-queue-name">
+                {{ profileJourneyProduct['queueData']['queuename'] }}
+                </span>
+                <span class="qwv-divider-dot">·</span>
+                <span class="qwv-product-name">
+                {{ mapproduct[profileJourneyProduct['participantproductdata']['productref'].id] }}
+                </span>
+            </div>
+        </div>
+
+        <div>
+            <div class="qwv-timeline-steps">
+                <div *ngFor="let stage of profileJourneyProduct['queueData']['stages']; let i = index" class="qwv-step" >
+                <!-- connector line fill -->
+                <div class="qwv-step-line" [class.qwv-step-line--done]="i < currentQueueStageIndex"></div>
+                <!-- marker -->
+                <div class="qwv-step-marker" [class.qwv-step-marker--done]="i < currentQueueStageIndex"  [class.qwv-step-marker--current]="i === currentQueueStageIndex"  [class.qwv-step-marker--pending]="i > currentQueueStageIndex" >
+                    <svg *ngIf="i < currentQueueStageIndex" class="qwv-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <div *ngIf="i === currentQueueStageIndex" class="qwv-pulse-ring"></div>
+                </div>
+                <!-- label -->
+                <div class="qwv-step-label" [class.qwv-step-label--done]="i < currentQueueStageIndex" [class.qwv-step-label--current]="i === currentQueueStageIndex">
+                    {{ stage }}
+                </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qwv-body">
+            <div class="qwv-stage-panel">
+                <!-- Normal stage (not Evolution Mapping) -->
+                <ng-container *ngIf="profileJourneyProduct['currentstage'] != 'In Evolution Mapping Activity'">
+                    <div class="qwv-stage-info">
+                        <div class="qwv-stage-name-tag">
+                        {{ profileJourneyProduct['currentstage'] }}
+                        </div>
+                        <div class="qwv-queue-position" *ngIf="![null, undefined, ''].includes(profileJourneyProduct['queuetoken']['queueposition'])" >
+                        <span class="qwv-position-label">Queue Position</span>
+                        <span class="qwv-position-number">
+                            {{ profileJourneyProduct['queuetoken']['queueposition'] }}
+                        </span>
+                        </div>
+
+                        <p class="qwv-explanation" *ngIf="[null, undefined, ''].includes(profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation'])">
+                        Please wait until your turn is requested and go through each step to finish the queue
+                        </p>
+                        <p class="qwv-explanation" *ngIf="![null, undefined, ''].includes(profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation'])" >
+                        {{ profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation'] }}
+                        </p>
+                        <button class="qwv-action-btn" *ngIf="buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['type'] !== 'default'" (click)="actionButton(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])">
+                        {{ buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['buttonlabel'] }}
+                        <span class="qwv-btn-arrow">→</span>
+                        </button>
+                    </div>
+                </ng-container>
+
+                <!-- Evolution Mapping Activity -->
+                <ng-container *ngIf="profileJourneyProduct['currentstage'] == 'In Evolution Mapping Activity'">
+                    <div *ngIf="liveEvolutionMapping.length != 0 && liveEvolutionMapping[0].live; else noEvoData">
+                        <div class="qwv-evo-header">
+                        <h2 class="qwv-evo-title">What is Evolution Mapping?</h2>
+                        <p class="qwv-evo-desc">
+                            You'll witness the fine changes that has happened in your post uP! by watching your
+                            pre and post-videos. You'll be mapping your evolution progress. This becomes an
+                            education for your unconscious in a way that it generalises the impact of
+                            breakthroughs in your life across other aspects.
+                        </p>
+                        </div>
+                        <div class="qwv-evo-videos">
+                        <div *ngFor="let video of liveEvolutionMapping[0].videolist; let i = index"  class="qwv-evo-video-item" >
+                            <app-video-player [videoUrl]="video"></app-video-player>
+                            <p class="qwv-evo-video-label">
+                            {{ i + 1 }}. {{ i === 0 ? 'POST VIDEO' : 'PRE VIDEO' }} ({{ mapVideoTitle[video] }})
+                            </p>
+                            <p class="qwv-evo-video-date">{{ mapRecordedDate[video].toDate() | date }}</p>
+                        </div>
+                        </div>
+                        <button class="qwv-action-btn" (click)="actionButton(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])" >
+                        {{ buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['buttonlabel'] }}
+                        <span class="qwv-btn-arrow">→</span>
+                        </button>
+                    </div>
+                    <ng-template #noEvoData>
+                        <div class="qwv-no-data">No evolution mapping data available.</div>
+                    </ng-template>
+                </ng-container>
+            </div>
+        </div>
+    </div>
+</div>

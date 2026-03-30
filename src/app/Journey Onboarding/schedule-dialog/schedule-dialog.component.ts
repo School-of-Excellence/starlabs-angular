@@ -44,7 +44,7 @@ export class ScheduleDialogComponent {
   selectedDate;
   mindate
 
-  selectedPlatform: 'zoom' | 'openvidu' | null = null;
+  selectedPlatform: 'zoom' | 'openvidu' | null = 'openvidu';
   platformError: boolean = false;
 
 

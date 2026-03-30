@@ -46,6 +46,7 @@
   background: white;
   border-radius: 16px;
   padding: 30px;
+  padding-bottom: 0;
   margin-bottom: 40px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
   border: 2px solid #e9ecef;
@@ -129,7 +130,7 @@
 /* Appointment Details Card */
 .appointmentdetails {
   background: #f8f9fa;
-  padding: 20px;
+  padding: 10px 20px 2px 20px;
   border-radius: 10px;
   border-left: 4px solid #28a745;
   margin-bottom: 25px;
@@ -161,14 +162,10 @@
   margin-top: 25px;
 }
 
-.actionbox .zoomcontent {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 8px;
+.zoomcontent {
   margin-bottom: 15px;
   font-size: 1rem;
   color: #666;
-  border-left: 3px solid #007bff;
 }
 
 /* Retry Link */
@@ -212,7 +209,7 @@
 }
 
 /* Next Appointments */
-.nextappointment {
+/* .nextappointment {
   background: white;
   border-radius: 12px;
   padding: 20px;
@@ -228,9 +225,9 @@
   opacity: 1;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
-}
+} */
 
-.nextappointment .upcomingstatus {
+.liveappointment .upcomingstatus {
   position: absolute;
   top: -8px;
   left: 20px;
@@ -244,7 +241,7 @@
   letter-spacing: 0.5px;
 }
 
-.nextappointment .appointmenttitle {
+/* .nextappointment .appointmenttitle {
   font-size: 1.2rem;
   margin: 10px 0 8px 0;
   color: #495057;
@@ -264,7 +261,7 @@
 .nextappointment .appointmentdetails p {
   font-size: 1rem;
   margin-bottom: 6px;
-}
+} */
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -300,10 +297,6 @@
     padding: 2px 6px;
     min-width: 30px;
     font-size: 0.8rem;
-  }
-  
-  .appointmentdetails {
-    padding: 15px;
   }
   
   .nextappointment {
@@ -670,6 +663,36 @@
   .assignment-card {
     margin-bottom: 20px;
   }
+}
+
+.platformtoggle{
+  /* When checked (active) - Green */
+  --mdc-switch-selected-track-color: #20bb27 !important;
+  --mdc-switch-selected-handle-color: #409c43 !important;
+  --mdc-switch-selected-hover-track-color: #20bb27 !important;
+  --mdc-switch-selected-focus-track-color: #20bb27 !important;
+  --mdc-switch-selected-pressed-track-color: #20bb27 !important;
+  --mdc-switch-selected-focus-handle-color: #409c43 !important;
+  --mdc-switch-selected-hover-handle-color: #409c43 !important;
+  --mdc-switch-selected-pressed-handle-color: #409c43 !important;
+  
+  /* When unchecked (inactive) - Blue */
+  --mdc-switch-unselected-track-color: #2774c2 !important;
+  --mdc-switch-unselected-handle-color: #137fd8 !important;
+  --mdc-switch-unselected-hover-track-color: #2774c2 !important;
+  --mdc-switch-unselected-focus-track-color: #2774c2 !important;
+  --mdc-switch-unselected-pressed-track-color: #2774c2;
+  --mdc-switch-unselected-focus-handle-color: #137fd8 !important;
+  --mdc-switch-unselected-hover-handle-color: #137fd8 !important;
+  --mdc-switch-unselected-pressed-handle-color: #137fd8 !important;
+}
+
+.zoomenable{
+  color: #137fd8;
+}
+
+.openviduenable{
+  color: #409c43;
 }
 
 /*

@@ -403,13 +403,14 @@ export class ParticipantDeliverySequenceComponent {
   }
 
   onAppointmentSelection() {
-    console.log(this.selectedAppointments)
+    console.log("selected appointments",this.selectedAppointments)
     var ref = []
     for (let i = 0; i < this.selectedAppointments.length; i++) {
       const element = this.selectedAppointments[i];
       ref.push(doc(this.firestore, "appointments", element))
     }
     this.mapDeliveryDoc[this.participantProducts[this.selectedProductIndex].delivery[this.selectDeliveryIndex].sequenceref.path]["fileref"] = ref
+    console.log("map delivery doc", this.mapDeliveryDoc);
     // this.mapDeliveryDoc[this.participantProducts[this.selectedProductIndex].delivery[this.selectDeliveryIndex].sequenceref.path]["type"] = "appointment"
   }
 

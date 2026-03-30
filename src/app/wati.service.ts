@@ -10,24 +10,23 @@ import { Subject, takeUntil, forkJoin, debounceTime, distinctUntilChanged } from
   providedIn: 'root'
 })
 export class WatiService {
-  private fetchTemplateapiUrl:string;
-  private apiToken:string;
-  private sendTemplateMsgUrl:string;
-  private sendBroadcastTemplateMsgUrl:string;
+  private fetchTemplateapiUrl: string;
+  private apiToken: string;
+  private sendTemplateMsgUrl: string;
+  private sendBroadcastTemplateMsgUrl: string;
   constructor(private http: HttpClient,
     private firestore: Firestore
-  ) {}
+  ) { }
 
-
-  async serverURL(server){
-    this.fetchTemplateapiUrl = `https://live-mt-server.wati.io/${server.watiserver}/api/v1/getMessageTemplates`;
-    this.sendTemplateMsgUrl = `https://live-server-${server.watiserver}.wati.io/api/v1/sendTemplateMessage?whatsappNumber=`;
-    this.sendBroadcastTemplateMsgUrl = `https://live-server-${server.watiserver}.wati.io/api/v1/sendTemplateMessages/`;
-    this.apiToken = server.watitoken
+  async serverURL(serverid,serverData) {
+    this.fetchTemplateapiUrl = `https://live-mt-server.wati.io/${serverid}/api/v1/getMessageTemplates`;
+    this.sendTemplateMsgUrl = `https://live-server-${serverid}.wati.io/api/v1/sendTemplateMessage?whatsappNumber=`;
+    this.sendBroadcastTemplateMsgUrl = `https://live-server-${serverid}.wati.io/api/v1/sendTemplateMessages/`;
+    this.apiToken = serverData[serverid]['watitoken']
   }
 
-  getTemplates(server: any): Observable<any[]> {
-    return from(this.serverURL(server)).pipe(
+  getTemplates(serverid: string,serverData:Object): Observable<any[]> {
+    return from(this.serverURL(serverid,serverData)).pipe(
       switchMap(() => {
 
         const headers = new HttpHeaders({
@@ -70,15 +69,10 @@ export class WatiService {
     );
   }
 
-  sendBroadcastMessage(phoneNumbers: string[], message: string, serverid:string): Observable<any> {
+  sendBroadcastMessage(phoneNumbers: string[], message: string, serverid: string,serverData:Object): Observable<any> {
     console.log('Send Broadcast Message Triggered');
-    
-    this.serverURL(serverid);
 
-    // console.log(body,phonenumber,serverid);
-    console.log(this.apiToken);
-    console.log(this.sendTemplateMsgUrl);
-    console.log(this.sendBroadcastTemplateMsgUrl);
+    this.serverURL(serverid,serverData);
 
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${this.apiToken}`,
@@ -92,6 +86,42 @@ export class WatiService {
     };
     return this.http.post<any>(this.sendBroadcastTemplateMsgUrl, body, { headers });
   }
+
+  // sendTemplateMessage(body, phonenumber) {
+
+  //   const headers = new HttpHeaders({
+  //     'Authorization': `Bearer ${this.apiToken}`,
+  //     'Content-Type': 'application/json'
+  //   });
+
+  //   const apiUrl = this.apiUrl + phonenumber;
+
+  //   return this.http.post(apiUrl, body, { headers });
+  // }
+
+  // // Fetch templates
+  // getTemplates(): Observable<any> {
+  //   const headers = new HttpHeaders({
+  //   'Authorization': `Bearer ${this.apiToken}`,
+  //   'Content-Type': 'application/json'
+  //   });
+  //   return this.http.get(this.apiUrl, { headers });
+  // }
+
+
+  // sendBroadcastMessage(phoneNumbers: string[], message: string): Observable<any> {
+  //   const headers = new HttpHeaders({
+  //     'Authorization': `Bearer ${this.apiToken}`,
+  //     'Content-Type': 'application/json'
+  //   });
+  //   const body = {
+  //     "messages": phoneNumbers.map(number => ({
+  //       to: number,
+  //       message: message
+  //     }))
+  //   };
+  //   return this.http.post<any>(this.apiUrl, body, { headers });
+  // }
 
 }
 
