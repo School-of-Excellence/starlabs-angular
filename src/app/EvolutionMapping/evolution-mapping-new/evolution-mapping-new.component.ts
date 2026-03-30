@@ -43,8 +43,7 @@ import * as XLSX from 'xlsx';
   styleUrl: './evolution-mapping-new.component.css',
 })
 export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
-
-
+  
   // Participant table
   participantOptions: any[] = [];
   filteredParticipants: any[] = [];
