@@ -2677,18 +2677,18 @@ export class JourneycoachDuplicateComponent {
         }
 
         // Updating Journey Status as Upgraded for previous Journey
-        if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
-          const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
-          await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
-            journeystatus: 'Upgraded'
-          }).then(() => {
-            console.log("Previous Journey Status Updated");
-            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
-          }).catch((error) => {
-            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
-            console.log("Oops Error While Updating Previous Journey Status")
-          });
-        }
+        // if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
+        //   const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
+        //   await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
+        //     journeystatus: 'Upgraded'
+        //   }).then(() => {
+        //     console.log("Previous Journey Status Updated");
+        //     this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
+        //   }).catch((error) => {
+        //     this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
+        //     console.log("Oops Error While Updating Previous Journey Status")
+        //   });
+        // }
 
         dialogRef.close();
 
