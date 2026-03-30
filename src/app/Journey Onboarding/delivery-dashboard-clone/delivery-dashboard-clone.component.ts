@@ -778,14 +778,12 @@ export class DeliveryDashboardCloneComponent {
   async filterProductData(product: string, productId: string) {
     if (product === "EI Solution") product = "EI";
 
-    // Filter Total Eligible (where status="null or initiated", tentativestart="null" 
-    // and if status="ongoing" in the appoinments attended="false")
+    // Filter Total Eligible
     this.totalEligible = Object.values(
       this.getCardGroupedFiltered(productId) ?? {}
     ).flat().filter(p => !p.tentativestart);
 
-    // Filter This Month, Past Month, This Month (where status="null or initiated", tentativestart exists based on the date 
-    // and if status="ongoing" in the appoinments attended="false")
+    // Filter This Month, Past Month, This Month 
     this.thisMonth = Object.values(
       this.getCardGroupedThisMonth(productId) ?? {}
     ).flat();
