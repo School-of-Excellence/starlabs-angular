@@ -264,10 +264,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   preassignedDropdownOpen: boolean = false;
   stageSlotDropdownOpen: boolean = false;
   showStageCountDropdown: boolean = false;
+  customerSupportDropdownOpen: boolean = false;
+  customerSupportSubscription: Subscription;
   customerSupportMap: { [profileId: string]: any[] } = {};
   availableCustomerSupportCategories: string[] = [];
   selectedCustomerSupportCategories: string[] = [];
-  customerSupportDropdownOpen: boolean = false;
   eventParticipationDropdownOpen: boolean = false;
   eventParticipationList: any[] = []; // all events + queues (lazy loaded)
   eventParticipationListLoaded: boolean = false; // lazy load flag
@@ -285,6 +286,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   atcFilter: 'none' | 'validated' | 'unvalidated' = 'none'; // sub filter
   atcDataLoaded: boolean = false;
   atcDropdownOpen: boolean = false;
+  atcDateRangeOnlyProfileIds: Set<string> = new Set();
+  notificationTimelineMap: { [profileId: string]: any[] } = {};
+  notificationTimelineLoading: boolean = false;
+  selectedTimelineToken: any = null;
+  showTimelineDialog: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -1543,9 +1549,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       if (this.dfuFilterActive && this.allTokensData.length > 0) {
       this.processTokensIntoStages(this.allTokensData);
     }
-    if (this.selectedQueue && this.allTokensData.length > 0) {
-      this.processCustomerSupportData();
-    }
+
     });
   }
 
@@ -1575,9 +1579,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   async onQueueSelect() {
 
-    console.log('Selected Queue ID:', this.selectedQueue?.docid);
-    console.log('Full Selected Queue Object:', this.selectedQueue);
-
     // Reset subscription
     this.liveQueueSubscription.next()
     this.liveQueueSubscription.complete()
@@ -1604,6 +1605,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.atcFilter = 'none';
     this.atcDataLoaded = false;
     this.atcDropdownOpen = false;
+    this.customerSupportMap = {};
+    this.availableCustomerSupportCategories = [];
+    this.selectedCustomerSupportCategories = [];
+    this.atcDateRangeOnlyProfileIds = new Set();
 
     let count = 0
     this.currentQueueParticipants = [];
@@ -1668,7 +1673,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.allTokensData = token; 
       this.availableStagesFromSlot = this.extractUniqueStagesFromSlot(token);  
       this.processTokensIntoStages(token);
-      this.processCustomerSupportData();
+      
 
       const newProfileIds: string[] = [];
 
@@ -1697,6 +1702,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     loading.close();
     this.fetchStageCountsForQueue(); 
     this.loadReminders();
+    this.loadCustomerSupportData();
   }
 
   async fetchLogs(token) {
@@ -2242,19 +2248,19 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         if (typeof slotData === 'object' && !Array.isArray(slotData)) {
           Object.entries(slotData).forEach(([key, slot]: [string, any]) => {
             if (index < 3) {
-              console.log(`  Slot key: ${key}, value:`, slot);
+              console.log(` Slot key: ${key}, value:`, slot);
             }
             
             if (slot && typeof slot === 'object') {
               const stageName = slot.stagename || slot.stageName || slot.stage;
               if (stageName) {
                 if (index < 3) {
-                  console.log('  ✓ Found stagename:', stageName);
+                  console.log('Found stagename:', stageName);
                 }
                 stageSet.add(stageName);
               } else {
                 if (index < 3) {
-                  console.log('  ✗ No stagename found in slot:', Object.keys(slot));
+                  console.log(' No stagename found in slot:', Object.keys(slot));
                 }
               }
             }
@@ -4812,45 +4818,56 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     return count;
   }
 
-    processCustomerSupportData() {
-    if (!this.selectedQueue || !this.allTokensData.length) return;
+  loadCustomerSupportData() {
+    if (!this.selectedQueue) return;
 
-    const queueStart = this.selectedQueue.queuestartdate.toDate();
-    const queueEnd = this.selectedQueue.queueenddate.toDate();
-
-    const categorySet = new Set<string>();
+    const queueStart = this.selectedQueue.queuestartdate;
+    const queueEnd = this.selectedQueue.queueenddate;
     this.customerSupportMap = {};
+    this.availableCustomerSupportCategories = [];
+    this.selectedCustomerSupportCategories = [];
 
-    const queueProfileIds = new Set(this.allTokensData.map(t => t.profile_id));
+    collectionData( query(  collection(this.firestore, 'clientissue'), where('reporteddate', '>=', queueStart), where('reporteddate', '<=', queueEnd)),).pipe( takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription) ).subscribe(docs => {
+      const categorySet = new Set<string>();
+      const newMap: { [profileId: string]: any[] } = {};
 
-    queueProfileIds.forEach(profileId => {
-      const metadata = this.participantMetaDataMap[profileId];
-      if (!metadata) return;
+      // Filter Open status in JS (avoids composite index issue)
+      const openDocs = docs.filter(d => d['status']?.['status'] === 'Open');
 
-      const customerSupport = metadata?.['customersupport'];
-      if (!customerSupport) return;
+      openDocs.forEach(doc => {
+        const profileId = doc['clientid']; // link clientid → profileid
+        if (!profileId) return;
 
-      const matchedEntries: any[] = [];
+        // Only care about participants in current queue
+        const isInQueue = this.allTokensData.some(
+          t => t.profile_id === profileId && t.tokenstatus !== 'inActive'
+        );
+        if (!isInQueue) return;
 
-      Object.values(customerSupport).forEach((entry: any) => {
-        if (!entry?.reporteddate) return;
+        if (!newMap[profileId]) {
+          newMap[profileId] = [];
+        }
 
-        const reportedDate = entry.reporteddate.toDate();
+        newMap[profileId].push({
+          issueno: doc['issueno'],
+          category: doc['category'],
+          issue: doc['issue'],
+          reporteddate: doc['reporteddate'],
+          status: doc['status']?.['status'],
+        });
 
-        if (reportedDate >= queueStart && reportedDate <= queueEnd && entry.status === 'Open') {
-          matchedEntries.push(entry);
-          if (entry.category) {
-            categorySet.add(entry.category);
-          }
+        if (doc['category']) {
+          categorySet.add(doc['category']);
         }
       });
 
-      if (matchedEntries.length > 0) {
-        this.customerSupportMap[profileId] = matchedEntries;
+      this.customerSupportMap = newMap;
+      this.availableCustomerSupportCategories = Array.from(categorySet).sort();
+
+      if (this.selectedCustomerSupportCategories.length > 0) {
+        this.processTokensIntoStages(this.allTokensData);
       }
     });
-
-    this.availableCustomerSupportCategories = Array.from(categorySet).sort();
   }
 
   hasCustomerSupport(profileId: string): boolean {
@@ -4863,8 +4880,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   getCustomerSupportTooltip(profileId: string): string {
     const entries = this.getCustomerSupportEntries(profileId);
-    return entries.map((e, i) => 
-      `#${i + 1} Ticket ${e.ticketno}\nCategory: ${e.category}\nIssue: ${e.issue}`
+    return entries.map((e, i) =>
+      `#${i + 1} Issue No: ${e.issueno}\nCategory: ${e.category}\nIssue: ${e.issue}`
     ).join('\n\n');
   }
 
@@ -5039,16 +5056,31 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     atcAlphaSnap.docs.forEach(d => {
       const profileid = d.data()['profileid'];
+      const queueid = d.data()['queueid'];
+      
       if (profileid && activeProfileIds.has(profileid)) {
         this.atcValidatedProfileIds.add(profileid);
         this.atcAllProfileIds.add(profileid);
+        
+        // track if they came in without queueid
+        if (!queueid || queueid !== this.selectedQueue.docid) {
+          this.atcDateRangeOnlyProfileIds.add(profileid);
+        }
       }
     });
 
     atcValidateSnap.docs.forEach(d => {
       const profileid = d.data()['profileid'];
+      const queueid = d.data()['queueid'];
+      
       if (profileid && activeProfileIds.has(profileid)) {
         this.atcAllProfileIds.add(profileid);
+        
+        // track if they came in without queueid
+        if (!queueid || queueid !== this.selectedQueue.docid) {
+          this.atcDateRangeOnlyProfileIds.add(profileid);
+        }
+        
         if (!this.atcValidatedProfileIds.has(profileid)) {
           this.atcUnvalidatedProfileIds.add(profileid);
         }
@@ -5094,4 +5126,62 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       token.tokenstatus === 'Active'
     ).length;
   }
+  isATCDateRangeOnly(profileId: string): boolean {
+    return this.atcDateRangeOnlyProfileIds.has(profileId);
+  }
+  async openNotificationTimeline(token: any) {
+  this.selectedTimelineToken = token;
+  this.showTimelineDialog = true;
+  this.notificationTimelineLoading = true;
+
+  // Fetch notificationrecord where metadata.queueref == selectedQueue
+  const snap = await getDocs(query(
+    collection(this.firestore, 'notificationrecord'),
+    where('metadata.queueref', '==', doc(this.firestore, 'queue generation', this.selectedQueue.docid))
+  ));
+
+  const timeline: any[] = [];
+
+  snap.docs.forEach(d => {
+    const data = d.data();
+    const profileids: string[] = data['profileid'] || [];
+    const profileId = token.profile_id;
+
+    // Check if this notification was sent to this participant
+    if (!profileids.includes(profileId)) return;
+
+    const profilesuccess: string[] = data['profilesuccess'] || [];
+    const profilefailure: string[] = data['profilefailed'] || [];
+
+    let status: 'success' | 'failure' | 'pending' = 'pending';
+    if (profilesuccess.includes(profileId)) {
+      status = 'success';
+    } else if (profilefailure.includes(profileId)) {
+      status = 'failure';
+    }
+
+    timeline.push({
+      message: data['message'] || '',
+      logdate: data['metadata']?.['logdate'],
+      status: status,
+      title: data['title'] || '',
+      notificationtype: data['notificationtype'] || ''
+    });
+  });
+
+  // Sort by date ascending 
+  timeline.sort((a, b) => {
+    const dateA = a.logdate?.toDate?.() || new Date(0);
+    const dateB = b.logdate?.toDate?.() || new Date(0);
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  this.notificationTimelineMap[token.profile_id] = timeline;
+  this.notificationTimelineLoading = false;
+}
+
+closeTimelineDialog() {
+  this.showTimelineDialog = false;
+  this.selectedTimelineToken = null;
+}
 }

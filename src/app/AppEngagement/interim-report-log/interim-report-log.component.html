@@ -53,7 +53,7 @@
           <section class="report-section">
         
             <!-- Total Reports -->
-            <div class="report report-total">
+            <div class="report report-total" (click)="filterLogDataWithBoxClick('total')" [class.active]="selectedFilterType === 'total'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>description</mat-icon>
@@ -66,7 +66,7 @@
             </div>
         
             <!-- Completed -->
-            <div class="report report-completed">
+            <div class="report report-completed" (click)="filterLogDataWithBoxClick('completed')" [class.active]="selectedFilterType === 'completed'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>check_circle</mat-icon>
@@ -79,7 +79,7 @@
             </div>
         
             <!-- Ongoing -->
-            <div class="report report-ongoing">
+            <div class="report report-ongoing" (click)="filterLogDataWithBoxClick('ongoing')" [class.active]="selectedFilterType === 'ongoing'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>schedule</mat-icon>
@@ -92,7 +92,7 @@
             </div>
 
             <!-- Not Started -->
-            <div class="report report-not-started">
+            <div class="report report-not-started" (click)="filterLogDataWithBoxClick('notstarted')" [class.active]="selectedFilterType === 'notstarted'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>radio_button_unchecked</mat-icon>
@@ -123,10 +123,40 @@
               <button mat-raised-button color="primary" (click)="fetchInterimLog()">Apply</button>
               <button mat-stroked-button (click)="clearInterimReportFilter()">Clear Date</button>
             </div>
+            <div *ngIf="selection.hasValue()" class="action-btn-group">
+            <button class="action-btn action-btn--notification" mat-stroked-button (click)="sendNotificationinBreakthrough()">
+              <mat-icon>notifications</mat-icon>
+              <span>Notification</span>
+            </button>
+            
+            <button class="action-btn action-btn--whatsapp" mat-stroked-button (click)="sendWatiMessage()">
+              <mat-icon>chat</mat-icon>
+              <span>WhatsApp</span>
+            </button>
+            
+            <button class="action-btn action-btn--email" mat-stroked-button (click)="sendEmailToSelectedParicipant()">
+              <mat-icon>mail</mat-icon>
+              <span>Email</span>
+            </button>
+            </div>
           </div>
         </div>
         <div class="table-container">
           <table mat-table [dataSource]="logDataSource" matSort>
+
+            <ng-container matColumnDef="select">
+              <th mat-header-cell *matHeaderCellDef>
+                <mat-checkbox (change)="$event ? toggleAllRows() : null" [checked]="selection.hasValue() && isAllSelectedLogs()"
+                  [indeterminate]="selection.hasValue() && !isAllSelectedLogs()" [aria-label]="checkboxLabel()">
+                </mat-checkbox>
+              </th>
+              <td mat-cell *matCellDef="let row">
+                <mat-checkbox (click)="$event.stopPropagation()" (change)="$event ? selection.toggle(row) : null"
+                  [checked]="selection.isSelected(row)" [aria-label]="checkboxLabel(row)">
+                </mat-checkbox>
+              </td>
+            </ng-container>
+
             <ng-container matColumnDef="name">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Profile Name</th>
               <td mat-cell *matCellDef="let row">{{ row["name"] }}</td>
