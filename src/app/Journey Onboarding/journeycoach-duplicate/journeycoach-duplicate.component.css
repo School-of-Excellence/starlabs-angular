@@ -10134,3 +10134,112 @@ mat-dialog-actions {
   border-top: 1px solid var(--border);
   box-shadow: none;
 }
+
+/* Filter chips */
+.js-filter-chips {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.js-chip {
+  font-size: 12px; font-weight: 700; padding: 5px 14px;
+  border-radius: 20px; cursor: pointer;
+  border: 1px solid var(--border2); color: var(--text3);
+  background: var(--surface); transition: all .15s;
+}
+.js-chip:hover { border-color: var(--text3); color: var(--text); }
+.js-chip.active { border-color: transparent; color: #fff; }
+.js-chip.js-active.active   { background: var(--up); }
+.js-chip.js-nonactive.active { background: #F59E0B; }
+.js-chip.js-discontinued.active { background: var(--text3); }
+.js-chip.js-null.active     { background: var(--nc); }
+.js-chip.active:not(.js-active):not(.js-nonactive):not(.js-discontinued):not(.js-null) {
+  background: var(--text);
+}
+
+/* Matrix */
+.js-matrix-wrap { margin-top: 8px; }
+.js-matrix-scroll { overflow-x: auto; overflow-y: auto; max-height: 320px; }
+.js-matrix-table { width: 100%; border-collapse: collapse; }
+
+.js-th {
+  padding: 9px 16px; font-size: 11px; font-weight: 700;
+  color: var(--text3); text-transform: uppercase; letter-spacing: .06em;
+  background: var(--bg); border-bottom: 2px solid var(--border);
+  text-align: center; white-space: nowrap;
+  position: sticky; top: 0; z-index: 2;
+}
+.js-journey-col { text-align: left; min-width: 150px; position: sticky; left: 0; z-index: 3; background: var(--bg); }
+.js-total-col   { border-left: 2px solid var(--border2); background: var(--bg); }
+
+.js-row { border-bottom: 1px solid var(--border); transition: background .12s; }
+.js-row:hover { background: var(--bg); }
+.js-row:hover .js-journey-col { background: var(--bg); }
+
+.js-td { padding: 9px 16px; text-align: center; vertical-align: middle; }
+.js-row .js-journey-col {
+  text-align: left; font-size: 13px; font-weight: 600;
+  color: var(--text); position: sticky; left: 0;
+  background: var(--surface); border-right: 1px solid var(--border);
+}
+.js-row .js-total-col { border-left: 2px solid var(--border2); }
+
+/* Pills */
+.js-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; padding: 3px 12px;
+  border-radius: 20px; cursor: pointer; min-width: 36px;
+  transition: opacity .13s;
+}
+.js-pill:hover { opacity: .75; }
+.js-pill.js-active       { background: var(--up-bg); color: var(--up-dark); border: 1px solid var(--up-mid); }
+.js-pill.js-nonactive    { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+.js-pill.js-discontinued { background: var(--bg); color: var(--text3); border: 1px solid var(--border2); }
+.js-pill.js-total        { background: var(--nc-bg); color: var(--nc-dark); border: 1px solid var(--nc-mid); }
+.js-zero { font-size: 13px; color: var(--text3); }
+
+/* Badge in dialog */
+.js-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border-radius: 20px; white-space: nowrap;
+}
+.js-badge.js-active       { background: var(--up-bg); color: var(--up-dark); border: 1px solid var(--up-mid); }
+.js-badge.js-nonactive    { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+.js-badge.js-discontinued { background: var(--bg); color: var(--text3); border: 1px solid var(--border2); }
+.js-badge.js-null         { background: var(--nc-bg); color: var(--nc-dark); border: 1px solid var(--nc-mid); }
+
+/* Null card */
+.js-null-card { margin-bottom: 12px; }
+.js-view-btn {
+  font-size: 12px; font-weight: 600; padding: 4px 12px;
+  border-radius: 8px; border: 1px solid var(--border2);
+  background: var(--surface); color: var(--text2);
+  cursor: pointer; margin-left: 8px; transition: all .13s;
+}
+.js-view-btn:hover { background: var(--bg); color: var(--text); }
+.js-null-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.js-matrix-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.ep-row-expanded {
+  border-radius: 10px 10px 0 0 !important;
+  border-bottom-color: transparent !important;
+  background: var(--bg) !important;
+}
+
+.ep-key-expand-row:last-child {
+  border-bottom: none !important;
+}

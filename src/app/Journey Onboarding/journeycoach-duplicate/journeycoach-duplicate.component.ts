@@ -368,6 +368,8 @@ export class JourneycoachDuplicateComponent {
     'Preparation Mode': { count: 0, data: [] },
     'Exploration Mode': { count: 0, data: [] },
 
+    activeJourneyData: {},
+
     minimumpaymentdue: { count: 0, data: [] },
     disappear: { count: 0, data: [] },
     minimal: { count: 0, data: [] },
@@ -547,6 +549,27 @@ export class JourneycoachDuplicateComponent {
   isSubDialogOpen = false;
   subDialogTitle = '';
   subDialogDocs: any[] = [];
+
+  tempActiveJourney: Record<string, { status: string; profiles: any[] }> = {};
+  tempNullStatusProfiles: any[] = [];
+
+  // Toggle state
+  activeJourneyFilter: string | null = null; // journey name filter
+  activeStatusFilter: 'active' | 'non active' | 'discontinued' | 'null' | 'all' = 'all';
+  journeyStatusMatrix: {
+    journeyName: string;
+    statuses: Record<string, { status: string; profiles: any[] }>;
+    total: number;
+  }[] = [];
+
+  nullStatusProfiles: any[] = [];
+
+  // Dialog
+  isJourneyStatusDialogOpen = false;
+  journeyStatusDialogTitle = '';
+  journeyStatusDialogProfiles: any[] = [];
+  activeStatusTab: string = 'all';
+  expandedEpProfile: string | null = null;
 
   constructor(
     public firestore: Firestore,
@@ -1631,6 +1654,15 @@ export class JourneycoachDuplicateComponent {
       let dfuMap = [];
       let discontinuedArray = [];
 
+      const mapCustomerStatusVariable: Record<string, string> = {
+        "active": 'activejourney',
+        "non active": 'lastcompletedjourney',
+        'discontinued': 'lastsubscribedjourney'
+      };
+
+      let tempActiveJourney: Record<string, Record<string, { status: string; profiles: any[] }>> = {};
+      let tempNullStatusProfiles: any[] = [];
+
       // Journey Engagement declarations 
       let journeyMap = {
         1: [],
@@ -1649,6 +1681,8 @@ export class JourneycoachDuplicateComponent {
 
             const purchaseValue = metaData['pp_totalpurchasevalue'] || 0;
             const amountPaid = metaData['pp_totalpaid'] || 0;
+            const customerStatus = metaData['customerstatus'] || null;
+
             metaData['balance'] = purchaseValue - amountPaid;
 
             if (![null, undefined, ""].includes(metaData['profileid'])) {
@@ -1742,6 +1776,22 @@ export class JourneycoachDuplicateComponent {
               }
             }
 
+            if (['active', 'non active', 'discontinued'].includes(customerStatus)) {
+              const journeyField = mapCustomerStatusVariable[customerStatus];
+              if (journeyField) {
+                const journeyName = this.mapjourneyname[metaData[journeyField]]?.toLowerCase();
+                if (journeyName) {
+                  if (!tempActiveJourney[journeyName]) tempActiveJourney[journeyName] = {};
+                  if (!tempActiveJourney[journeyName][customerStatus]) {
+                    tempActiveJourney[journeyName][customerStatus] = { status: customerStatus, profiles: [] };
+                  }
+                  tempActiveJourney[journeyName][customerStatus].profiles.push(metaData);
+                }
+              }
+            } else if (customerStatus === null || customerStatus === undefined || customerStatus === '') {
+              tempNullStatusProfiles.push(metaData);
+            }
+
             if (metaData['activejourney']) {
               metaData['journey'] = metaData['activejourney'];
               const journeyId = metaData['activejourney'];
@@ -1823,6 +1873,14 @@ export class JourneycoachDuplicateComponent {
               this.originalData['allParticipants'].count = allParticipantsList.length;
 
               this.modeMap = tempModeMap;
+
+              this.journeyStatusMatrix = Object.entries(tempActiveJourney).map(([journeyName, statusMap]) => ({
+                journeyName,
+                statuses: statusMap,
+                total: Object.values(statusMap).reduce((a, b) => a + b.profiles.length, 0)
+              })).sort((a, b) => b.total - a.total);
+
+              this.nullStatusProfiles = tempNullStatusProfiles;
 
               this.updateTableDataIfOpen(this.tableType);
               this.loadingStates.metadata = true;
@@ -2619,18 +2677,18 @@ export class JourneycoachDuplicateComponent {
         }
 
         // Updating Journey Status as Upgraded for previous Journey
-        if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
-          const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
-          await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
-            journeystatus: 'Upgraded'
-          }).then(() => {
-            console.log("Previous Journey Status Updated");
-            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
-          }).catch((error) => {
-            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
-            console.log("Oops Error While Updating Previous Journey Status")
-          });
-        }
+        // if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
+        //   const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
+        //   await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
+        //     journeystatus: 'Upgraded'
+        //   }).then(() => {
+        //     console.log("Previous Journey Status Updated");
+        //     this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
+        //   }).catch((error) => {
+        //     this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
+        //     console.log("Oops Error While Updating Previous Journey Status")
+        //   });
+        // }
 
         dialogRef.close();
 
@@ -4982,5 +5040,61 @@ export class JourneycoachDuplicateComponent {
   getGrandTotal(): number {
     if (!this.subscriptionMatrix) return 0;
     return Object.values(this.subscriptionMatrix.monthTotals).reduce((a, b) => a + b, 0);
+  }
+
+  openJourneyStatusDialog(profiles: any[], title: string): void {
+    this.journeyStatusDialogProfiles = profiles;
+    this.journeyStatusDialogTitle = title;
+    this.isJourneyStatusDialogOpen = true;
+  }
+
+  closeJourneyStatusDialog(): void {
+    this.isJourneyStatusDialogOpen = false;
+    this.journeyStatusDialogProfiles = [];
+  }
+
+  onJourneyStatusOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeJourneyStatusDialog();
+  }
+
+  getStatusClass(status: string): string {
+    if (status === 'active') return 'js-active';
+    if (status === 'non active') return 'js-nonactive';
+    if (status === 'discontinued') return 'js-discontinued';
+    return 'js-null';
+  }
+
+  getAllProfilesForJourney(journey: any): any[] {
+    return Object.values(journey.statuses).flatMap((s: any) => s.profiles);
+  }
+
+  getTotalForStatus(status: string): number {
+    return this.journeyStatusMatrix.reduce((a, j) =>
+      a + (j.statuses[status]?.profiles.length ?? 0), 0);
+  }
+
+  getJourneyStatusGrandTotal(): number {
+    const matrixTotal = this.journeyStatusMatrix.reduce((a, j) => a + j.total, 0);
+    return matrixTotal + this.nullStatusProfiles.length;
+  }
+
+  toggleEpProfileExpand(profileId: string): void {
+    this.expandedEpProfile = this.expandedEpProfile === profileId ? null : profileId;
+  }
+
+  getProfileAllKeyData(profileId: string): { key: string; count: number; pct: number; bandIdx: number }[] {
+    if (!this.evolutionProgressData) return [];
+    const result: { key: string; count: number; pct: number; bandIdx: number }[] = [];
+
+    this.evolutionProgressData.keys.forEach(key => {
+      this.evolutionProgressData!.bands.forEach((band, bandIdx) => {
+        const entry = band.profiles[key]?.find(p => p.profileId === profileId);
+        if (entry) {
+          result.push({ key, count: entry.total, pct: entry.pct, bandIdx });
+        }
+      });
+    });
+
+    return result.sort((a, b) => b.pct - a.pct);
   }
 }
