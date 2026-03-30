@@ -467,6 +467,25 @@ export class ContentAnalyticsComponent {
       }
     }
 
+    // Seed ALL series that belong to each tier (including those with 0 completions in this date range)
+    this.seriesDataList.forEach(series => {
+      const seriesName = series.seriesName || series.id;
+      const tiers = series.tier || [];
+      tiers.forEach((tierRef: any) => {
+        const tierid = tierRef.id || tierRef;
+        const eligibleUsers = tierEligibleUsersMap[tierid] || [];
+        if (eligibleUsers.length === 0) return;
+        tierCompletionMap[tierid] ??= {};
+        tierCompletionMap[tierid][seriesName] ??= {};
+        for (const user of eligibleUsers) {
+          if (!tierCompletionMap[tierid][seriesName][user]) {
+            tierCompletionMap[tierid][seriesName][user] = 'pending';
+          }
+        }
+      });
+    });
+
+    // Fill any remaining gaps: eligible users missing from already-existing series entries
     for (const tierId in tierCompletionMap) {
       const seriesMapObj = tierCompletionMap[tierId];
       const eligibleUsers = tierEligibleUsersMap[tierId] || [];
@@ -1034,7 +1053,6 @@ export class ContentAnalyticsComponent {
       }
       str += line + '\r\n';
     }
-    
     return str;
   }
 
@@ -1043,4 +1061,3 @@ export class ContentAnalyticsComponent {
   }
 
 }
-
