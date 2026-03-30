@@ -145,7 +145,7 @@ export class DeliveryDashboardCloneComponent {
 
   //Array declarations
   journeyList = [];
-  productList: string[] = [];
+  productList: any[] = [];
   coachesList = [];
 
   searchText: string = '';
@@ -333,13 +333,7 @@ export class DeliveryDashboardCloneComponent {
 
   selectedFlowProduct = "";
 
-  mapProductGroupId: any = { //I have this already, temporarily hardcoded
-    "WiSH": "EhvINcWVG1Qw0AZrVdC6",
-    "A&H Light": "",
-    "EI Solution": "UyFb4hg57FKEHtvnVf4v",
-    "EI Starter Pack": "VAMiMqVDf1f7NPQ5W7RZ",
-    "Critical Support": ""
-  };
+  mapProductGroupId: any = [];
   products: string[] = [
     "WiSH",
     "A&H Light",
@@ -505,6 +499,18 @@ export class DeliveryDashboardCloneComponent {
       // Load metadata + dependent data
       await this.loadParticipantMetadata();
 
+      // Filter only required Products from the Productlist
+      this.mapProductGroupId = this.rawProductData
+        .filter(item =>
+          this.products
+            .map(p => p.toLowerCase().trim())
+            .includes(item?.product?.toLowerCase().trim())
+        )
+        .reduce((acc, item) => {
+          acc[item.product] = item.id;
+          return acc;
+        }, {} as Record<string, string>);
+
       // Process users (depends on mapprofile from metadata)
       this.coachesList = usersSnap.docs
         .map((e) => e.data())
@@ -513,16 +519,6 @@ export class DeliveryDashboardCloneComponent {
           const nameB = (this.mapprofile[b['profile_ref']?.id] || '').toLowerCase();
           return nameA.localeCompare(nameB);
         });
-
-      //   const requiredIds = Object.values(this.mapProductName).filter(id => id);
-
-      // this.mapProductGroupId = Object.entries(this.mapProductName)
-      //   .filter(([id]) => requiredIds.includes(id))
-      //   .reduce((acc, [id, name]) => {
-      //     acc[id] = name;
-      //     return acc;
-      //   }, {});
-
 
       // this.initSpecialistDateRange();
       // this.specialistRange.valueChanges.subscribe((val) => {
@@ -782,14 +778,12 @@ export class DeliveryDashboardCloneComponent {
   async filterProductData(product: string, productId: string) {
     if (product === "EI Solution") product = "EI";
 
-    // Filter Total Eligible (where status="null or initiated", tentativestart="null" 
-    // and if status="ongoing" in the appoinments attended="false")
+    // Filter Total Eligible
     this.totalEligible = Object.values(
       this.getCardGroupedFiltered(productId) ?? {}
     ).flat().filter(p => !p.tentativestart);
 
-    // Filter This Month, Past Month, This Month (where status="null or initiated", tentativestart exists based on the date 
-    // and if status="ongoing" in the appoinments attended="false")
+    // Filter This Month, Past Month, This Month 
     this.thisMonth = Object.values(
       this.getCardGroupedThisMonth(productId) ?? {}
     ).flat();
