@@ -83,6 +83,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     eventId?: string;
     videoType?: string;
     docId?: string;
+    extraVideos?: { videoUrl: string; videoTitle: string; docId: string; videoType: string }[];
   }[] = [];
   dragCardIndex: number | null = null;
   dragOverIndex: number | null = null;
@@ -109,6 +110,8 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   // SUBSCRIPTIONS
   private participantSearchSub: Subscription | null = null;
+  private eventFilterSearchSub: Subscription | null = null;  
+  private videoFilterSearchSub: Subscription | null = null;  
 
   showEditVideoOverlay = false;
   editVideoIndex: number | null = null;
@@ -139,7 +142,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   bulkErrorMessages: string[] = [];
   bulkImportProcessed = false;
   journeyOptions: { id: string; name: string }[] = [];
-  selectedJourneyFilter: string = '';
+  selectedJourneyFilters: string[] = [];
+  journeyFilterCtrl = new FormControl('');
+  filteredJourneys: { id: string; name: string }[] = [];
 
   summaryStats = {
     totalParticipants: 0,
@@ -151,8 +156,24 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   showVideoOverlay = false;
   overlayVideoUrl = '';
   overlayVideoTitle = '';
-  activeWatchIndex: number | null = null;
+  activeWatchIndex: string | null = null;
+  journeyTypeFilter: 'all' | 'active' | 'last' = 'all';
+  showEventFilterDropdown = false;
+  selectedEventFilters: string[] = [];
+  eventFilterOptions: { id: string; name: string }[] = [];
+  eventFilterDropdownTop = 0;
+  eventFilterDropdownLeft = 0;
+  copiedEventId: string | null = null;
+  showVideoFilterDropdown = false;
+  selectedVideoFilters: string[] = [];
+  videoFilterDropdownTop = 0;
+  videoFilterDropdownLeft = 0;
+  eventFilterSearchCtrl = new FormControl('');
+  filteredEventFilterOptions: { id: string; name: string }[] = [];
+  videoFilterSearchCtrl = new FormControl('');
+  filteredVideoFilterOptions: { id: string; name: string }[] = [];
 
+  
   constructor(
     private firestore: Firestore,
     private guard: AuthguardService,
@@ -167,6 +188,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.guard.getRoles().then(async (roles) => {
       this.loggedInProfileId = roles['profile_ref'].id ?? null;
       await this.fetchParticipants();
+      this.fetchEventFilterOptions();
       this.fetchRecords();
     });
 
@@ -182,6 +204,8 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.participantSearchSub?.unsubscribe();
     this.addVideoSearchSub?.unsubscribe();
+    this.eventFilterSearchSub?.unsubscribe();  
+    this.videoFilterSearchSub?.unsubscribe();  
   }
 
   // Fetch participants for filter dropdown
@@ -216,24 +240,47 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           this.mapJourneys[d.id] = d.data()['journey'] || 'No Journey';
         }
       });
+
+      // Build journeyOptions from mapJourneys
       this.journeyOptions = Object.entries(this.mapJourneys).map(([id, name]) => ({
         id,
         name: name as string,
       })).sort((a, b) => a.name.localeCompare(b.name));
+
+      this.filteredJourneys = [...this.journeyOptions];
+
+      this.journeyFilterCtrl.valueChanges.pipe(
+        debounceTime(200),
+        distinctUntilChanged()
+      ).subscribe((search) => {
+        const lower = (search || '').toLowerCase();
+        this.filteredJourneys = this.journeyOptions.filter(j =>
+          j.name.toLowerCase().includes(lower)
+        );
+      });
     }
     this.fetchSummaryStats();
   }
 
   getJourneyFilteredIds(): string[] {
-    if (!this.selectedJourneyFilter) return [];
+    if (!this.selectedJourneyFilters.length) return [];
     return Object.entries(this.mapProfiles)
       .filter(([, profile]: [string, any]) =>
-        profile['activejourney'] === this.selectedJourneyFilter ||
-        profile['lastcompletedjourney'] === this.selectedJourneyFilter
+        this.selectedJourneyFilters.includes(profile['activejourney']) ||
+        this.selectedJourneyFilters.includes(profile['lastcompletedjourney'])
       )
       .map(([id]) => id);
   }
 
+  onParticipantFilterChange() {
+  this.resetPagination();
+  this.fetchRecords();
+}
+
+onJourneyFilterChange() {
+  this.resetPagination();
+  this.fetchRecords();
+}
   // Fetch event counts
   async fetchEventCounts(records: any[]) {
     const profileIds = records.map((r) => r['profileid']).filter(Boolean);
@@ -399,23 +446,112 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     );
   }
 
-  onDropdownClose(isOpen: boolean) {
-    if (!isOpen) this.applyFilters();
-  }
+
 
   applyFilters() {
     this.resetPagination();
     this.fetchRecords();
   }
 
-  clearFilters() {
-    this.selectedParticipants = [];
-    this.selectedJourneyFilter = '';
+  toggleJourneyTypeFilter() {
+    if (this.journeyTypeFilter === 'all') {
+      this.journeyTypeFilter = 'active';
+    } else if (this.journeyTypeFilter === 'active') {
+      this.journeyTypeFilter = 'last';
+    } else {
+      this.journeyTypeFilter = 'all';
+    }
+  }
+
+  onEventFilterChange(eventId: string, event: any) {
+    if (event.target.checked) {
+      this.selectedEventFilters = [...this.selectedEventFilters, eventId];
+    } else {
+      this.selectedEventFilters = this.selectedEventFilters.filter(id => id !== eventId);
+    }
     this.resetPagination();
     this.fetchRecords();
   }
 
-  onJourneyFilterChange() {
+  copyToClipboard(text: string, eventId: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      this.copiedEventId = eventId;
+      setTimeout(() => {
+        this.copiedEventId = null;
+      }, 2000);
+    });
+  }
+
+  getJourneyTypeFilterLabel(): string {
+    if (this.journeyTypeFilter === 'active') return 'Active';
+    if (this.journeyTypeFilter === 'last') return 'Last';
+    return '';
+  }
+
+  openEventFilterDropdown(event: MouseEvent) {
+    const rect = (event.target as HTMLElement).closest('button')!.getBoundingClientRect();
+    this.eventFilterDropdownTop = rect.bottom + 8;
+    this.eventFilterDropdownLeft = rect.left;
+    this.showEventFilterDropdown = !this.showEventFilterDropdown;
+    event.stopPropagation();
+  }
+
+  openVideoFilterDropdown(event: MouseEvent) {
+    const rect = (event.target as HTMLElement).closest('button')!.getBoundingClientRect();
+    this.videoFilterDropdownTop = rect.bottom + 8;
+    this.videoFilterDropdownLeft = rect.left;
+    this.showVideoFilterDropdown = !this.showVideoFilterDropdown;
+    this.showEventFilterDropdown = false;
+    event.stopPropagation();
+  }
+
+  async getVideoFilteredIds(): Promise<string[]> {
+    if (!this.selectedVideoFilters.length) return [];
+
+    const chunks = this.chunkArray(this.selectedVideoFilters, 30);
+    const snaps = await Promise.all(
+      chunks.map((chunk) =>
+        getDocs(query(
+          collection(this.firestore, 'participant videos'),
+          where('delete', '==', false),
+          where('eventref', 'in', chunk.map(id => doc(this.firestore, 'event collection', id)))
+        ))
+      )
+    );
+
+    const profileIds = new Set<string>();
+    snaps.forEach((snap) => {
+      snap.docs.forEach((d) => {
+        const profileid = d.data()['profileid'];
+        if (profileid) profileIds.add(profileid);
+      });
+    });
+
+    return Object.entries(this.mapProfiles)
+      .filter(([, profile]: [string, any]) => profileIds.has(profile['profileid']))
+      .map(([id]) => id);
+  }
+
+  onVideoFilterChange(eventId: string, event: any) {
+    if (event.target.checked) {
+      this.selectedVideoFilters = [...this.selectedVideoFilters, eventId];
+    } else {
+      this.selectedVideoFilters = this.selectedVideoFilters.filter(id => id !== eventId);
+    }
+    this.resetPagination();
+    this.fetchRecords();
+  }
+
+  
+  clearFilters() {
+    this.selectedParticipants = [];
+    this.selectedJourneyFilters = [];
+    this.selectedEventFilters = [];
+    this.selectedVideoFilters = [];
+    this.eventFilterSearchCtrl.setValue('');   
+    this.videoFilterSearchCtrl.setValue('');   
+    this.showEventFilterDropdown = false;
+    this.showVideoFilterDropdown = false;
     this.resetPagination();
     this.fetchRecords();
   }
@@ -446,27 +582,74 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     return query(ref, ...constraints);
   }
 
-  fetchRecords(startAfterDoc?: any) {
+  async getEventFilteredIds(): Promise<string[]> {
+    if (!this.selectedEventFilters.length) return [];
+
+    const chunks = this.chunkArray(this.selectedEventFilters, 30);
+    const snaps = await Promise.all(
+      chunks.map((chunk) =>
+        getDocs(query(
+          collection(this.firestore, 'event participation request'),
+          where('status', '==', 'attended'),
+          where('eventref', 'in', chunk.map(id => doc(this.firestore, 'event collection', id)))
+        ))
+      )
+    );
+
+    const profileIds = new Set<string>();
+    snaps.forEach((snap) => {
+      snap.docs.forEach((d) => {
+        const profileid = d.data()['profileid'];
+        if (profileid) profileIds.add(profileid);
+      });
+    });
+
+    // Convert profileids to metadata ids
+    return Object.entries(this.mapProfiles)
+      .filter(([, profile]: [string, any]) => profileIds.has(profile['profileid']))
+      .map(([id]) => id);
+  }
+
+  async fetchRecords(startAfterDoc?: any) {
     this.loading = true;
-    
+
     let selectedIds = this.selectedParticipants.map((p) => p.id);
-    
+
     // Apply journey filter
-    if (this.selectedJourneyFilter) {
+    if (this.selectedJourneyFilters.length) {
       const journeyIds = this.getJourneyFilteredIds();
-      if (selectedIds.length > 0) {
-        selectedIds = selectedIds.filter(id => journeyIds.includes(id));
-      } else {
-        selectedIds = journeyIds;
-      }
+      selectedIds = selectedIds.length > 0
+        ? selectedIds.filter(id => journeyIds.includes(id))
+        : journeyIds;
     }
 
-    if (selectedIds.length === 0 && !this.selectedJourneyFilter) {
+    // Apply event filter
+    if (this.selectedEventFilters.length) {
+      const eventIds = await this.getEventFilteredIds();
+      selectedIds = selectedIds.length > 0
+        ? selectedIds.filter(id => eventIds.includes(id))
+        : eventIds;
+    }
+
+    // Apply video filter
+    if (this.selectedVideoFilters.length) {
+      const videoIds = await this.getVideoFilteredIds();
+      selectedIds = selectedIds.length > 0
+        ? selectedIds.filter(id => videoIds.includes(id))
+        : videoIds;
+    }
+
+    const noFilters = !this.selectedParticipants.length &&
+                    !this.selectedJourneyFilters.length &&
+                    !this.selectedEventFilters.length &&
+                    !this.selectedVideoFilters.length;
+
+    if (noFilters) {
       this.executeSingleQuery(this.buildBaseQuery(undefined, startAfterDoc));
       return;
     }
 
-    if (selectedIds.length === 0 && this.selectedJourneyFilter) {
+    if (selectedIds.length === 0) {
       this.ngZone.run(() => {
         this.records = [];
         this.totalRecords = 0;
@@ -495,15 +678,10 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         this.lastDoc = paginated[paginated.length - 1] || null;
         this.pageCache.set(this.currentPage, paginated as any);
         this.totalRecords = allDocs.length;
-      this.ngZone.run(() => {
-        this.loading = false;
-        this.initialLoading = false;
-      });
-      })
-      .catch((err) => {
-        console.error('Error fetching chunked records:', err);
-        this.loading = false;
-        this.initialLoading = false;
+        this.ngZone.run(() => {
+          this.loading = false;
+          this.initialLoading = false;
+        });
       });
   }
 
@@ -609,13 +787,16 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     ]);
 
     // Build video map: eventref path -> video
-    const videoByEventRef: { [path: string]: any } = {};
+    const videoByEventRef: { [path: string]: any[] } = {};
     const standaloneVideos: any[] = [];
 
     videoSnap.docs.forEach((d) => {
       const data = { ...d.data(), docId: d.id };
       if (data['eventref']?.path) {
-        videoByEventRef[data['eventref'].path] = data;
+        if (!videoByEventRef[data['eventref'].path]) {
+          videoByEventRef[data['eventref'].path] = [];
+        }
+        videoByEventRef[data['eventref'].path].push(data);
       } else {
         standaloneVideos.push(data);
       }
@@ -644,18 +825,25 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             }
           } catch (e) {}
 
-          const matchedVideo = videoByEventRef[eventref.path];
+          const matchedVideos = videoByEventRef[eventref.path] || [];
+          const matchedVideo = matchedVideos[0] || null;
 
           return {
             type: 'event' as const,
             eventName,
             date,
-            hasVideo: !!matchedVideo,
+            hasVideo: matchedVideos.length > 0,
             videoUrl: matchedVideo ? matchedVideo['videourl'] : null,
             videoTitle: matchedVideo?.['title'] || null,
             eventId: eventref.path,
             docId: matchedVideo?.['docId'] || null,
             videoType: matchedVideo?.['type'] || null,
+            extraVideos: matchedVideos.slice(1).map((v: any) => ({
+              videoUrl: v['videourl'],
+              videoTitle: v['title'] || 'Untitled',
+              docId: v['docId'],
+              videoType: v['type'] || null,
+            })),
           };
         })
     );
@@ -682,7 +870,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     const matchedEventPaths = new Set(eventItems.map(e => (e as any).eventId));
     const unmatchedEventVideos = Object.entries(videoByEventRef)
       .filter(([path]) => !matchedEventPaths.has(path))
-      .map(([, v]) => {
+      .flatMap(([, videos]) => videos.map((v: any) => {
         let date: Date | null = null;
         if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
         else if (v['recordeddate']) date = new Date(v['recordeddate']);
@@ -695,9 +883,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           videoTitle: v['title'],
           videoType: v['type'],
           docId: v['docId'] || null,
-
+          extraVideos: [],
         };
-      });
+      }));
 
     // Merge and sort by date desc
     const allItems = [...eventItems, ...videoItems, ...unmatchedEventVideos];
@@ -929,6 +1117,38 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       id: d.id,
       name: d.data()['name'] || 'Unnamed Event',
     }));
+  }
+
+  async fetchEventFilterOptions() {
+    if (this.eventFilterOptions.length > 0) return;
+    const snap = await getDocs(
+      query(collection(this.firestore, 'event collection'), orderBy('name', 'asc'))
+    );
+    this.eventFilterOptions = snap.docs.map((d) => ({
+      id: d.id,
+      name: d.data()['name'] || 'Unnamed Event',
+    }));
+
+    this.filteredEventFilterOptions = [...this.eventFilterOptions];
+    this.filteredVideoFilterOptions = [...this.eventFilterOptions];
+
+    this.eventFilterSearchSub = this.eventFilterSearchCtrl.valueChanges.pipe(
+      debounceTime(200), distinctUntilChanged()
+    ).subscribe((search) => {
+      const lower = (search || '').toLowerCase();
+      this.filteredEventFilterOptions = this.eventFilterOptions.filter(e =>
+        e.name.toLowerCase().includes(lower)
+      );
+    });
+
+    this.videoFilterSearchSub = this.videoFilterSearchCtrl.valueChanges.pipe(
+      debounceTime(200), distinctUntilChanged()
+    ).subscribe((search) => {
+      const lower = (search || '').toLowerCase();
+      this.filteredVideoFilterOptions = this.eventFilterOptions.filter(e =>
+        e.name.toLowerCase().includes(lower)
+      );
+    });
   }
 
   addVideoEntry() {
