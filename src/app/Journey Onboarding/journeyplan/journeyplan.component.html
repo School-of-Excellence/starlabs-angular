@@ -1,172 +1,377 @@
 <div *ngIf="loading" class="loading">
-    <mat-progress-spinner class="spinner" [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
-  	<span class="loading-text">Fetching Data...</span>
+  <mat-progress-spinner [diameter]="50" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+  <span class="loading-text">Fetching Data...</span>
 </div>
 
 <div *ngIf="!loading" class="mainscreen">
-  <h4 class="heading mb-3">Journey Support - {{clientdata['name']}}</h4>
 
-  <h3>Paid Amount - {{totalpaid}}</h3>
-    <div class="content-container" style="display: flex; justify-content: space-between; gap: 20px;">
-        <div class="product-dashboard">
-			<div class="table-container">
-			  <table class="product-table">
-				<thead>
-				  <tr>
-					<th></th> <!-- Extra column for drag handle -->
-					<th>Product</th>
-					<th>Package</th>
-					<th>Minimum Payment</th>
-					<th>Remaining Amount</th>
-					<th>Start Date</th>
-				  </tr>
-				</thead>
-				<tbody cdkDropList (cdkDropListDropped)="drop($event)">
-				  <tr *ngFor="let row of productData.data" 
-					[class.disabled-row]="row.docid != null"
-					cdkDrag
-					class="draggable-row">
-					<!-- Drag Handle -->
-					<td class="drag-handle" cdkDragHandle>
-					  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" 
-						   [class.disabled]="row.docid != null">
-						<path d="M8 6h8M8 12h8M8 18h8"></path>
-					  </svg>
-					</td>
-					<!-- Product -->
-					<td>
-					  <div class="select-wrapper select-wrapper-width1">
-						<select [(ngModel)]="row.productref" [disabled]="row.docid != null">
-						  <option class="font" *ngFor="let product of productList" [value]="product.docid">
-							{{product.product}}
-						  </option>
-						</select>
-						<div class="select-arrow"></div>
-					  </div>
-					</td>
-					<!-- Package -->
-					<td>
-					  <div class="select-wrapper select-wrapper-width2">
-						<select [(ngModel)]="row.packageref" [disabled]="!profileRoles['developer']">
-						  <option class="font" *ngFor="let pkg of packageList" [value]="pkg.docid">
-							{{pkg.package}}
-						  </option>
-						</select>
-						<div class="select-arrow"></div>
-					  </div>
-					</td>
-					<!-- Minimum Payment -->
-					<td>
-					  <div class="input-wrapper">
-						<span class="currency-symbol">₹</span>
-						<input type="number" [(ngModel)]="row.minimumpayment" placeholder="0.00" class="amount-input">
-					  </div>
-					</td>
-					<!-- Remaining Amount -->
-					<td>
-					  <div class="input-wrapper">
-						<span class="currency-symbol">₹</span>
-						<input type="number" [(ngModel)]="row.remainingamount" placeholder="0.00" class="amount-input">
-					  </div>
-					</td>
-					<!-- Start Date -->
-					<td>
-					  <div class="date-wrapper">
-						<input *ngIf="![null,undefined,''].includes(row.tentativestart)" type="date" [(ngModel)]="row.tentativestart" [ngModel]="row.tentativestart | date:'yyyy-MM-dd'" class="date-input">
-					  	<!-- <input *ngIf="[null,undefined,''].includes(row.tentativestart)" type="date" [(ngModel)]="row.tentativestart" [ngModel]="[null,undefined,''].includes(row.tentativestart) ? null : row.tentativestart" class="date-input" > -->
-						  <input *ngIf="[null,undefined,''].includes(row.tentativestart)" type="date" [(ngModel)]="row.tentativestart" [ngModelOptions]="{updateOn: 'blur'}" class="date-input">
-					  </div>
-					</td>
-				  </tr>
-				</tbody>
-			  </table>
-			</div>
-		  
-			<div class="actions">
-			  <button class="submit-button" (click)="updateProducts()">
-				<span class="button-content">
-				  <svg class="save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-					<polyline points="17 21 17 13 7 13 7 21"></polyline>
-					<polyline points="7 3 7 8 15 8"></polyline>
-				  </svg>
-				  Save Changes
-				</span>
-			  </button>
-			</div>
-		  </div>
+  <!-- SCREEN TITLE -->
+  <div class="screen-title-block">
+    <h2 class="screen-title">Journey Support</h2>
+    <p class="screen-client">{{ clientdata['name'] }}</p>
+    <div class="active-chips-row">
+      <ng-container *ngIf="(clientdata['activeproduct'] || []).length > 0; else noActive">
+        <span class="active-label">Active Products:</span>
+        <span class="active-chip" *ngFor="let product of clientdata['activeproduct']">
+          <mat-icon class="active-chip-icon">verified</mat-icon>
+          {{ (mapProduct[product] || {})['product'] }}
+        </span>
+      </ng-container>
+      <ng-template #noActive>
+        <span class="no-active-chip">No Active Product</span>
+      </ng-template>
+    </div>
+  </div>
 
-		<div class="emi-dashboard">
-			<div class="header">
-			  <div class="header-content">
-				<h2 class="title">EMI Payment Schedule</h2>
-				<h2 class="subtitle">Monthly payment breakdown with cumulative totals</h2>
-			  </div>
-			</div>
-		  
-			<div class="content" *ngIf="watsonScheduleList.length !== 0; else noSchedules">
-			  <!-- Total Summary Cards -->
-			  <div class="summary-cards">
-				<div class="summary-card">
-				  <div class="card-label">Total Months</div>
-				  <div class="card-value">{{watsonScheduleList.length}}</div>
-				</div>
-				<div class="summary-card">
-				  <div class="card-label">Monthly EMI</div>
-				  <div class="card-value">{{watsonScheduleList[0]?.amount | currency:'INR':'symbol':'1.0-0'}}</div>
-				</div>
-				<div class="summary-card highlight">
-				  <div class="card-label">Total Amount</div>
-				  <div class="card-value">{{cumulativeTotals[cumulativeTotals.length - 1] | currency:'INR':'symbol':'1.0-0'}}</div>
-				</div>
-			  </div>
-		  
-			  <!-- Schedule Table -->
-			  <div class="schedule-container">
-				<div class="schedule-header">
-				  <div class="header-cell">Payment Month</div>
-				  <div class="header-cell">EMI Amount</div>
-				  <div class="header-cell">Running Total</div>
-				</div>
-		  
-				<div class="schedule-body">
-				  <div class="schedule-row" *ngFor="let schedule of watsonScheduleList; let i = index">
-					<div class="schedule-cell month">
-					  <div class="month-indicator">
-						<div class="month-number">{{i + 1}}</div>
-						<div class="month-progress" [style.height.%]="((i + 1) / watsonScheduleList.length) * 100"></div>
-					  </div>
-					  <div class="month-details">
-						<span class="month-name">{{ schedule.date.toDate() | date: 'MMMM' }}</span>
-						<span class="month-year">{{ schedule.date.toDate() | date: 'yyyy' }}</span>
-					  </div>
+  <!-- SECTION 1: Unconsumed Products + EMI side by side -->
+  <div class="section-card">
+    <div class="section-label-bar">
+      <mat-icon class="section-bar-icon">inventory_2</mat-icon>
+      <span>Unconsumed Products Tentative Plan</span>
+    </div>
+    <div class="two-panel-row">
+
+      <!-- Left: Product Table -->
+      <div class="product-panel">
+        <div class="table-scroll">
+          <table class="product-table">
+            <thead>
+              <tr>
+                <th class="th-drag"></th>
+                <th>Product</th>
+                <th>Package</th>
+                <th>Min. Payment</th>
+                <th>Remaining</th>
+                <th>Tentative Start</th>
+              </tr>
+            </thead>
+            <tbody cdkDropList (cdkDropListDropped)="drop($event)">
+              <tr *ngIf="productData.data.length == 0">
+                <td class="text-center p-2" colspan="6">No pending products</td>
+              </tr>
+              <tr *ngFor="let row of productData.data"
+                [class.row-locked]="row.docid != null"
+                cdkDrag class="draggable-row">
+                <td class="td-drag" cdkDragHandle>
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"
+                    [class.drag-disabled]="row.docid != null">
+                    <path d="M8 6h8M8 12h8M8 18h8"/>
+                  </svg>
+                </td>
+                <td>
+                  <div class="field-select-wrap">
+                    <select [(ngModel)]="row.productref" [disabled]="row.docid != null">
+                      <option *ngFor="let p of productList" [value]="p.docid">{{ p.product }}</option>
+                    </select>
+                    <div class="field-caret"></div>
+                  </div>
+                </td>
+                <td>
+                  <div class="field-select-wrap">
+                    <select [(ngModel)]="row.packageref" [disabled]="!profileRoles['developer']">
+                      <option *ngFor="let pkg of packageList" [value]="pkg.docid">{{ pkg.package }}</option>
+                    </select>
+                    <div class="field-caret"></div>
+                  </div>
+                </td>
+                <td>
+                  <div class="field-amount-wrap">
+                    <span class="rupee-sym">₹</span>
+                    <input type="number" [(ngModel)]="row.minimumpayment" placeholder="0">
+                  </div>
+                </td>
+                <td>
+                  <div class="field-amount-wrap">
+                    <span class="rupee-sym">₹</span>
+                    <input type="number" [(ngModel)]="row.remainingamount" placeholder="0">
+                  </div>
+                </td>
+                <td>
+                  <input *ngIf="![null,undefined,''].includes(row.tentativestart)"
+                    type="date" class="field-date"
+                    [(ngModel)]="row.tentativestart"
+                    [ngModel]="row.tentativestart | date:'yyyy-MM-dd'">
+                  <input *ngIf="[null,undefined,''].includes(row.tentativestart)"
+                    type="date" class="field-date"
+                    [(ngModel)]="row.tentativestart"
+                    [ngModelOptions]="{updateOn:'blur'}">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="panel-vdivider"></div>
+
+      <!-- Right: EMI Panel -->
+      <div class="emi-panel">
+        <ng-container *ngIf="watsonScheduleList.length > 0; else noSchedules">
+					<div class="emi-heading">
+						EMI Payment Schedule
 					</div>
-					
-					<div class="schedule-cell amount">
-					  <span class="amount-value">{{ schedule.amount | currency:'INR':'symbol':'1.0-0' }}</span>
-					  <span class="gst-badge">-GST</span>
-					</div>
-					
-					<div class="schedule-cell total">
-					  <span class="total-value">{{ cumulativeTotals[i] | currency:'INR':'symbol':'1.0-0' }}</span>
-					  <span class="percentage">
-						{{((cumulativeTotals[i] / cumulativeTotals[cumulativeTotals.length - 1]) * 100).toFixed(0)}}%
-					  </span>
-					</div>
-				  </div>
-				</div>
-			  </div>
-			</div>
-		  
-			<ng-template #noSchedules>
-			  <div class="empty-state">
-				<mat-icon class="empty-icon">account_balance_wallet</mat-icon>
-				<h3>No EMI Plans Available</h3>
-				<p>There are currently no EMI payment schedules to display.</p>
-			  </div>
-			</ng-template>
-		</div>
-	</div>
+          <div class="emi-stats-row">
+            <div class="emi-stat">
+              <span class="emi-stat-label">Total Months</span>
+              <span class="emi-stat-val">{{ watsonScheduleList.length }}</span>
+            </div>
+            <div class="emi-stat">
+              <span class="emi-stat-label">Monthly EMI</span>
+              <span class="emi-stat-val">{{ watsonScheduleList[0]?.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+            </div>
+            <div class="emi-stat emi-stat-highlight">
+              <span class="emi-stat-label">Total Amount</span>
+              <span class="emi-stat-val">{{ cumulativeTotals[cumulativeTotals.length - 1] | currency:'INR':'symbol':'1.0-0' }}</span>
+            </div>
+          </div>
+          <div class="emi-list-header">
+            <span>Month</span>
+            <span>EMI</span>
+            <span>Cumulative</span>
+          </div>
+          <div class="emi-list-body">
+            <div class="emi-list-row" *ngFor="let schedule of watsonScheduleList; let i = index">
+              <div class="emi-month-cell">
+                <span class="emi-idx">{{ i + 1 }}</span>
+                <div class="emi-month-detail">
+                  <span class="emi-month-name">{{ schedule.date.toDate() | date:'MMM' }}</span>
+                  <span class="emi-month-year">{{ schedule.date.toDate() | date:'yyyy' }}</span>
+                </div>
+              </div>
+              <div class="emi-amount-cell">
+                <span>{{ schedule.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="gst-badge">-GST</span>
+              </div>
+              <div class="emi-total-cell">
+                <span>{{ cumulativeTotals[i] | currency:'INR':'symbol':'1.0-0' }}</span>
+                <span class="emi-pct">{{ ((cumulativeTotals[i] / cumulativeTotals[cumulativeTotals.length - 1]) * 100).toFixed(0) }}%</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noSchedules>
+          <div class="emi-empty">
+            <mat-icon>account_balance_wallet</mat-icon>
+            <p>No EMI schedule found</p>
+          </div>
+        </ng-template>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 2: Content Monthly Plan -->
+  <div class="section-card">
+    <div class="section-label-bar">
+      <mat-icon class="section-bar-icon">calendar_month</mat-icon>
+      <span>Plan Monthly Content</span>
+    </div>
+
+    <div class="timeline-container">
+      <div class="timeline-line"></div>
+
+      <div *ngFor="let month of monthlyPlanData; let i = index" class="timeline-item">
+        <div class="timeline-dot"><span class="dot-number">{{ i + 1 }}</span></div>
+
+        <mat-card class="month-card">
+
+          <!-- Month Header -->
+          <div class="month-header" (click)="toggleMonth(i)">
+            <div class="month-header-left">
+              <span class="month-title">{{ month.display }}</span>
+              <ng-container *ngFor="let row of productData.data">
+                <span class="month-prod-chip" *ngIf="row.tentativestart && isProductInMonth(row.tentativestart, month.month, month.year)">
+                  <mat-icon class="month-prod-icon">shopping_bag</mat-icon>
+                  {{ (mapProduct[row.productref] || {})['product'] }}
+                </span>
+              </ng-container>
+            </div>
+            <mat-icon class="chevron" [class.open]="month.expanded">expand_more</mat-icon>
+          </div>
+
+          <!-- Month Body -->
+          <ng-container *ngIf="month.expanded">
+
+            <!-- Product strip -->
+            <div class="prod-strip" *ngIf="hasProductInMonth(month.month, month.year)">
+              <mat-icon class="prod-strip-icon">shopping_bag</mat-icon>
+              <span class="prod-strip-label">Starting this month:</span>
+              <ng-container *ngFor="let row of productData.data">
+                <span class="prod-strip-chip"
+                  *ngIf="row.tentativestart && isProductInMonth(row.tentativestart, month.month, month.year)">
+                  {{ (mapProduct[row.productref] || {})['product'] }}
+                  <span class="prod-strip-date">{{ row.tentativestart | date:'d MMM' }}</span>
+                </span>
+              </ng-container>
+            </div>
+
+            <!-- Cat Grid -->
+            <div class="cat-grid">
+
+              <!-- Solar Voice -->
+              <div class="cat-col">
+                <div class="cat-col-header">
+                  <mat-icon class="cat-icon">record_voice_over</mat-icon>
+                  <span class="cat-title">Solar Voice</span>
+                  <button mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'solarvoice'); $event.stopPropagation()">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+                <div class="empty-cat" *ngIf="month.data.solarvoice.length === 0">No Plan — click + to add</div>
+                <div class="playlist-slot" *ngFor="let row of month.data.solarvoice; let ri = index">
+                  <div class="slot-top-row">
+                    <mat-form-field appearance="outline" class="slot-multiselect">
+                      <mat-label>Playlists</mat-label>
+                      <mat-select multiple [(ngModel)]="row.playlist">
+                        <mat-option *ngFor="let p of solarVoicePlaylist" [value]="p.id">{{ p.name }}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'solarvoice', ri)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <div class="slot-bottom-row">
+                    <mat-form-field appearance="outline" class="slot-day">
+                      <mat-label>Day</mat-label>
+                      <mat-select [(ngModel)]="row.preferredday">
+                        <mat-option value="all">All Days</mat-option>
+                        <mat-option value="weekday">Weekdays</mat-option>
+                        <mat-option value="weekend">Weekends</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="slot-time" *ngIf="!row.allTime">
+                      <mat-label>Time (24h)</mat-label>
+                      <input matInput type="time" [(ngModel)]="row.preferredtime">
+                    </mat-form-field>
+                    <mat-checkbox class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
+                      All Day
+                    </mat-checkbox>
+                  </div>
+                </div>
+              </div>
+
+              <!-- EiFlix -->
+              <div class="cat-col">
+                <div class="cat-col-header">
+                  <mat-icon class="cat-icon">movie</mat-icon>
+                  <span class="cat-title">EiFlix</span>
+                  <button mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'eiflix'); $event.stopPropagation()">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+                <div class="empty-cat" *ngIf="month.data.eiflix.length === 0">No Plan — click + to add</div>
+                <div class="playlist-slot" *ngFor="let row of month.data.eiflix; let ri = index">
+                  <div class="slot-top-row">
+                    <mat-form-field appearance="outline" class="slot-multiselect">
+                      <mat-label>Series</mat-label>
+                      <mat-select multiple [(ngModel)]="row.playlist">
+                        <mat-option *ngFor="let s of eiFlixSeriesList" [value]="s.id">{{ s.seriesName }}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'eiflix', ri)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <div class="slot-bottom-row">
+                    <mat-form-field appearance="outline" class="slot-day">
+                      <mat-label>Day</mat-label>
+                      <mat-select [(ngModel)]="row.preferredday">
+                        <mat-option value="all">All Days</mat-option>
+                        <mat-option value="weekday">Weekdays</mat-option>
+                        <mat-option value="weekend">Weekends</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="slot-time" *ngIf="!row.allTime">
+                      <mat-label>Time (24h)</mat-label>
+                      <input matInput type="time" [(ngModel)]="row.preferredtime">
+                    </mat-form-field>
+                    <mat-checkbox class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
+                      All Day
+                    </mat-checkbox>
+                  </div>
+                </div>
+              </div>
+
+              <!-- General Content -->
+              <div class="cat-col">
+                <div class="cat-col-header">
+                  <mat-icon class="cat-icon">library_books</mat-icon>
+                  <span class="cat-title">General Content</span>
+                  <button mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'generalcontent'); $event.stopPropagation()">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+                <div class="empty-cat" *ngIf="month.data.generalcontent.length === 0">No Plan — click + to add</div>
+                <div class="playlist-slot" *ngFor="let row of month.data.generalcontent; let ri = index">
+                  <div class="slot-top-row">
+                    <mat-form-field appearance="outline" class="slot-multiselect">
+                      <mat-label>Content</mat-label>
+                      <mat-select multiple [(ngModel)]="row.playlist">
+                        <mat-option *ngFor="let c of generalContentList" [value]="c.docid">{{ c.title }}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'generalcontent', ri)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <div class="slot-bottom-row">
+                    <mat-form-field appearance="outline" class="slot-day">
+                      <mat-label>Day</mat-label>
+                      <mat-select [(ngModel)]="row.preferredday">
+                        <mat-option value="all">All Days</mat-option>
+                        <mat-option value="weekday">Weekdays</mat-option>
+                        <mat-option value="weekend">Weekends</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="slot-time" *ngIf="!row.allTime">
+                      <mat-label>Time (24h)</mat-label>
+                      <input matInput type="time" [(ngModel)]="row.preferredtime">
+                    </mat-form-field>
+                    <mat-checkbox class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
+                      All Day
+                    </mat-checkbox>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Workshop -->
+              <div class="cat-col cat-col-last">
+                <div class="cat-col-header">
+                  <mat-icon class="cat-icon">event</mat-icon>
+                  <span class="cat-title">Workshop</span>
+                </div>
+                <ng-container *ngIf="(upcomingWorkshop[month.display] || []).length > 0; else noWorkshop">
+                  <mat-form-field appearance="outline" class="slot-multiselect" style="margin-top:10px;width:100%">
+                    <mat-label>Select Workshops</mat-label>
+                    <mat-select multiple [(ngModel)]="month.data.workshop">
+                      <mat-option *ngFor="let w of (upcomingWorkshop[month.display] || [])" [value]="w.docid">
+                        {{ w['detailpage']['title'] }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #noWorkshop>
+                  <div class="no-ws">
+                    <mat-icon>event_busy</mat-icon>
+                    <span>No workshops this month</span>
+                  </div>
+                </ng-template>
+              </div>
+
+            </div>
+          </ng-container>
+        </mat-card>
+      </div>
+    </div>
+  </div>
+
+  <!-- SINGLE BOTTOM BUTTON -->
+  <div class="bottom-action-bar">
+    <button mat-raised-button class="btn-update-plan" (click)="updateParticipantPlan()">
+      <mat-icon>save</mat-icon>
+      Update Participant Plan
+    </button>
+  </div>
+
 </div>
-
-
