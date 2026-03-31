@@ -10519,3 +10519,15 @@ mat-dialog-actions {
 }
 .js-type-badge-eco { background: #E1F5EE; color: #085041; }
 .js-type-badge-dfu { background: #EEEDFE; color: #3C3489; }
+
+.mark-complete-btn {
+  border: 2px solid rgb(232, 92, 92);
+  border-radius: 5px;
+  color: rgb(232, 92, 92);
+}
+
+.book-again-btn {
+  border: 2px solid rgb(224, 152, 44);
+  border-radius: 5px;
+  color: rgb(194, 142, 47);
+}

@@ -2404,21 +2404,32 @@
                   style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
                   (click)="navigatejourneyplan(row)">Journey Plan</button>
                 &nbsp;
+                
                 <button mat-stroked-button class="ml-2" *ngIf="tableType == 'overallParticipants'"
-                  style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
-                  (click)="openSchedule(row, 'coach')">{{[null,
-                  undefined].includes(mapCoachAppointments[row['profileid']]) ?
-                  'Schedule' : (mapCoachAppointments[row['profileid']][0]?.['starttime']?.toDate() | date :
-                  'mediumDate')}}</button>
+                  style="border-radius: 5px;"
+                  [ngStyle]="{
+                    'border' : [null,undefined].includes(mapCoachAppointments[row['profileid']]) ? '2px solid rgb(61, 134, 230)' : '2px solid rgb(46, 187, 18)',
+                    'color' : [null,undefined].includes(mapCoachAppointments[row['profileid']]) ? 'rgb(61, 134, 230)' : 'rgb(46, 187, 18)'
+                  }"
+                  (click)="![null,undefined].includes(mapCoachAppointments[row['profileid']]) && mapCoachAppointments[row['profileid']][0]['attended'] ? null : openSchedule(row, 'coach')">
+                  {{[null,undefined].includes(mapCoachAppointments[row['profileid']]) ? 'Schedule' : mapCoachAppointments[row['profileid']][0]['attended'] ? 'completed' : (mapCoachAppointments[row['profileid']][0]?.['starttime']?.toDate() | date : 'mediumDate')}}
+                </button>
               </span>
 
               <span *ngIf="column.key === 'markcoach'">
-                <button mat-stroked-button class="ml-2"
-                  *ngIf="![null, undefined].includes(mapCoachAppointments[row['profileid']])"
-                  style="border: 2px solid rgb(232, 92, 92); border-radius: 5px;color: rgb(232, 92, 92);"
-                  (click)="markJCcomplete(row, mapCoachAppointments[row['profileid']][0])">{{[null,
-                  undefined].includes(mapCoachAppointments[row['profileid']]) ?
-                  '' : 'Mark Complete'}}</button>
+                <ng-container *ngIf="mapCoachAppointments[row['profileid']]?.[0] as appointment">
+
+                  <button mat-stroked-button class="ml-2 mark-complete-btn" *ngIf="!appointment.attended && !appointment.cancelled; else bookAgain" (click)="markJCcomplete(row, appointment)" >
+                    Mark Complete
+                  </button>
+
+                  <ng-template #bookAgain>
+                    <button mat-stroked-button class="ml-2 book-again-btn" (click)="openSchedule(row, 'coach')" >
+                      Book Again
+                    </button>
+                  </ng-template>
+
+                </ng-container>
               </span>
 
               <!-- Action buttons (if exists) -->
