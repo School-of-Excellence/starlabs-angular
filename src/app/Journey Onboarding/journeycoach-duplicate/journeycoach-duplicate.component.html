@@ -585,8 +585,24 @@
       </span>
     </div>
   
-    <!-- chips + null row — fixed -->
     <div style="padding:14px 16px 10px; flex-shrink:0;">
+  
+      <!-- Journey type filter — top level -->
+      <div class="js-type-chips">
+        <span class="js-type-chip" [class.active]="journeyTypeFilter === 'all'" (click)="journeyTypeFilter = 'all'">
+          All
+        </span>
+        <span class="js-type-chip js-type-eco" [class.active]="journeyTypeFilter === 'ecosystem'"
+          (click)="journeyTypeFilter = 'ecosystem'">
+          Ecosystem
+        </span>
+        <span class="js-type-chip js-type-dfu" [class.active]="journeyTypeFilter === 'dfu'"
+          (click)="journeyTypeFilter = 'dfu'">
+          DFU
+        </span>
+      </div>
+  
+      <!-- Status chips -->
       <div class="js-filter-chips">
         <span class="js-chip" [class.act-all]="activeStatusTab==='all'" (click)="activeStatusTab='all'">
           All · {{ getJourneyStatusGrandTotal() }}
@@ -619,9 +635,9 @@
       </div>
     </div>
   
-    <!-- single scroll container with fixed height -->
-    <div style="max-height:480px; overflow-y:auto; overflow-x:auto; border-top:1px solid var(--border);"      
-      *ngIf="activeStatusTab !== 'null' && journeyStatusMatrix.length > 0">
+    <!-- Table — use filteredJourneyStatusMatrix -->
+    <div style="max-height:480px; overflow-y:auto; overflow-x:auto; border-top:1px solid var(--border);"
+      *ngIf="activeStatusTab !== 'null' && filteredJourneyStatusMatrix.length > 0">
       <table style="width:100%; border-collapse:collapse;">
         <thead>
           <tr>
@@ -629,23 +645,22 @@
               Journey
             </th>
             <th class="js-th" style="position:sticky;top:0;z-index:2;background:var(--bg);"
-              *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">
-              Active
-            </th>
+              *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">Active</th>
             <th class="js-th" style="position:sticky;top:0;z-index:2;background:var(--bg);"
-              *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">
-              Non Active
-            </th>
+              *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">Non Active</th>
             <th class="js-th" style="position:sticky;top:0;z-index:2;background:var(--bg);"
-              *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">
-              Discontinued
-            </th>
+              *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">Discontinued</th>
           </tr>
         </thead>
         <tbody>
-          <tr class="js-row" *ngFor="let j of journeyStatusMatrix">
-            <td class="js-td js-journey-col">{{ j.journeyName }}</td>
-  
+          <tr class="js-row" *ngFor="let j of filteredJourneyStatusMatrix">
+            <td class="js-td js-journey-col">
+              {{ j.journeyName }}
+              <span class="js-type-badge" [class.js-type-badge-eco]="j.journeyType === 'Eco system'"
+                [class.js-type-badge-dfu]="j.journeyType === 'DFU'">
+                {{ j.journeyType === 'Eco system' ? 'Eco' : j.journeyType === 'DFU' ? 'DFU' : '' }}
+              </span>
+            </td>
             <td class="js-td" *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">
               <span class="js-pill js-active" *ngIf="j.statuses['active']?.profiles?.length > 0"
                 (click)="openJourneyStatusDialog(j.statuses['active'].profiles, j.journeyName + ' · Active')">
@@ -653,7 +668,6 @@
               </span>
               <span class="js-zero" *ngIf="!j.statuses['active']?.profiles?.length">—</span>
             </td>
-  
             <td class="js-td" *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">
               <span class="js-pill js-nonactive" *ngIf="j.statuses['non active']?.profiles?.length > 0"
                 (click)="openJourneyStatusDialog(j.statuses['non active'].profiles, j.journeyName + ' · Non Active')">
@@ -661,7 +675,6 @@
               </span>
               <span class="js-zero" *ngIf="!j.statuses['non active']?.profiles?.length">—</span>
             </td>
-  
             <td class="js-td" *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">
               <span class="js-pill js-discontinued" *ngIf="j.statuses['discontinued']?.profiles?.length > 0"
                 (click)="openJourneyStatusDialog(j.statuses['discontinued'].profiles, j.journeyName + ' · Discontinued')">
@@ -887,31 +900,53 @@
     <div class="controls">
       <div class="ctrl-group toggle-group">
         <div class="toggle-btn" [class.active]="filterMode === 'months'" (click)="toggleFilterMode('months')">Months</div>
-        <div class="toggle-btn" [class.active]="filterMode === 'daterange'" (click)="toggleFilterMode('daterange')">Date range</div>
+        <div class="toggle-btn" [class.active]="filterMode === 'daterange'" (click)="toggleFilterMode('daterange')">Date
+          range</div>
+        <div class="toggle-btn" [class.active]="filterMode === 'queue'" (click)="toggleFilterMode('queue')">Queue</div>
       </div>
+    
+      <!-- Months input — unchanged -->
       <div class="ctrl-group" *ngIf="filterMode === 'months'">
         <span class="ctrl-label">Months</span>
         <div class="ctrl-sep"></div>
         <div class="months-input-wrap">
-          <input class="months-input" type="number" [(ngModel)]="numberOfMonths" min="1" max="24" placeholder="—" (change)="onMonthsCountChange()">
+          <input class="months-input" type="number" [(ngModel)]="numberOfMonths" min="1" max="24" placeholder="—"
+            (change)="onMonthsCountChange()">
           <div class="months-spin">
             <button class="spin-btn" (click)="stepMonths(1)">▲</button>
             <button class="spin-btn" (click)="stepMonths(-1)">▼</button>
           </div>
         </div>
       </div>
+    
+      <!-- Date range — unchanged -->
       <mat-form-field appearance="outline" class="date-range-field" *ngIf="filterMode === 'daterange'">
         <mat-label>Date range</mat-label>
         <mat-date-range-input [rangePicker]="rangePicker">
-          <input matStartDate [(ngModel)]="filterStartDate" name="filterStartDate" placeholder="Start date" (dateChange)="onDateRangeChange()">
-          <input matEndDate [(ngModel)]="filterEndDate" name="filterEndDate" placeholder="End date" (dateChange)="onDateRangeChange()">
+          <input matStartDate [(ngModel)]="filterStartDate" name="filterStartDate" placeholder="Start date"
+            (dateChange)="onDateRangeChange()">
+          <input matEndDate [(ngModel)]="filterEndDate" name="filterEndDate" placeholder="End date"
+            (dateChange)="onDateRangeChange()">
         </mat-date-range-input>
         <mat-datepicker-toggle matIconSuffix [for]="rangePicker"></mat-datepicker-toggle>
         <mat-date-range-picker #rangePicker></mat-date-range-picker>
       </mat-form-field>
+    
+      <!-- Queue multiselect — new -->
+      <mat-form-field appearance="outline" class="queue-filter-field" *ngIf="filterMode === 'queue'">
+        <mat-label>Select queues</mat-label>
+        <mat-select [(ngModel)]="selectedQueueIds" multiple placeholder="Choose queues"
+          (selectionChange)="onQueueSelectionChange()">
+          <mat-option *ngFor="let q of queueList" [value]="q.id">
+            {{ q.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    
       <button class="crossover-btn" (click)="openCrossoverMetricsDialog()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="9" cy="9" r="5" /><circle cx="15" cy="15" r="5" />
+          <circle cx="9" cy="9" r="5" />
+          <circle cx="15" cy="15" r="5" />
         </svg>
         Crossover Metrics
       </button>
@@ -920,8 +955,11 @@
 
   <!-- INTERIM ROW -->
   <div class="interim-row">
-  
-    <!-- COLUMN 1 — Interim widget -->
+
+    <!-- COLUMN 1 -->
+    <div class="interim-col1">
+
+      <!-- ROW 1: Progressed / Regressed widget -->
     <div class="widget">
       <!-- Loading -->
       <div class="card" *ngIf="isFetchingData">
@@ -1072,83 +1110,8 @@
         </div>
       </div>
     </div>
-  
-    <!-- COLUMN 2 — Ask AH + Tags stacked -->
-    <div class="interim-col2">
-  
-      <!-- ROW 1: Adjustment Details (35%) + Evolution Progress (rest) -->
-      <div class="interim-col2-row1">
-  
-        <!-- Adjustment Details -->
-        <div class="adj-mini-card card">
-          <div class="ahl-card-hd">
-            <span class="ahl-card-title">Adjustment details</span>
-          </div>
-          <div class="adj-mini-body">
-            <div class="adj-mini-row" *ngFor="let item of evolutionprogressMap | keyvalue">
-              <span class="adj-mini-lbl">{{ item.key }}</span>
-              <span class="adj-mini-val">{{ item.value }}</span>
-            </div>
-            <div class="empty-state" *ngIf="(evolutionprogressMap | keyvalue)?.length === 0">
-              No details
-            </div>
-          </div>
-        </div>
-  
-        <!-- Evolution Progress Table -->
-        <div class="ep-card card" *ngIf="evolutionProgressData">
-          <div class="ahl-card-hd">
-            <span class="ahl-card-title">Evolution progress</span>
-            <span style="font-size:11px;color:var(--text3);margin-left:auto;">
-              {{ evolutionProgressData.keys.length }} keys
-            </span>
-          </div>
-          <div class="ep-table-wrap">
-            <table class="ep-table">
-              <thead>
-                <tr>
-                  <th class="ep-th ep-th-key">Key</th>
-                  <th class="ep-th ep-th-b0">&lt; 25%</th>
-                  <th class="ep-th ep-th-b1">25–50%</th>
-                  <th class="ep-th ep-th-b2">50–75%</th>
-                  <th class="ep-th ep-th-b3">75–100%</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="ep-tr" *ngFor="let key of evolutionProgressData.keys">
-                  <td class="ep-td ep-td-key">
-                    <div class="ep-key-wrap">
-                      <span class="ep-key-dot"></span>{{ key }}
-                    </div>
-                  </td>
-                  <td class="ep-td">
-                    <span class="ep-pill ep-b0" *ngIf="getEpBandCount(key,0)>0; else d0"
-                      (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span>
-                    <ng-template #d0><span class="ep-zero">—</span></ng-template>
-                  </td>
-                  <td class="ep-td">
-                    <span class="ep-pill ep-b1" *ngIf="getEpBandCount(key,1)>0; else d1"
-                      (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span>
-                    <ng-template #d1><span class="ep-zero">—</span></ng-template>
-                  </td>
-                  <td class="ep-td">
-                    <span class="ep-pill ep-b2" *ngIf="getEpBandCount(key,2)>0; else d2"
-                      (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span>
-                    <ng-template #d2><span class="ep-zero">—</span></ng-template>
-                  </td>
-                  <td class="ep-td">
-                    <span class="ep-pill ep-b3" *ngIf="getEpBandCount(key,3)>0; else d3"
-                      (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span>
-                    <ng-template #d3><span class="ep-zero">—</span></ng-template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-  
-      <!-- ROW 2 — Ask AH & Love letter -->
+
+      <!-- ROW 2: Ask AH & Love letter -->
       <div class="ahl-widget" *ngIf="!isFetchingData && askAHLoveLetterSummary">
         <div class="card">
           <div class="ahl-card-hd">
@@ -1279,7 +1242,135 @@
           </table>
         </div>
       </div>
+
+
     </div>
+
+    <!-- COLUMN 2 -->
+    <div class="interim-col2">
+
+      <!-- ROW 1: Participant health overview -->
+      <div class="card health-overview-card">
+        <div class="ahl-card-hd">
+          <span class="ahl-card-title">Participant health overview</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:auto;">
+            dominant key per participant
+          </span>
+        </div>
+      
+        <!-- Table heading -->
+        <div class="hk-table-hd">
+          <span class="hk-th hk-th-rank"></span>
+          <span class="hk-th hk-th-name">Key</span>
+          <span class="hk-th hk-th-bar"></span>
+          <span class="hk-th hk-th-profiles">Profiles</span>
+          <span class="hk-th hk-th-adj">Adjustments</span>
+          <span class="hk-th hk-th-pct">Percent</span>
+        </div>
+      
+        <div class="health-keys">
+          <div class="hk-row" *ngFor="let k of healthKeyData; let i = index" (click)="openHealthKeyDialog(k.key)"
+            style="cursor:pointer;">
+            <span class="hk-rank">#{{ i+1 }}</span>
+            <div class="hk-dot" [style.background]="k.color"></div>
+            <span class="hk-name">{{ k.key }}</span>
+            <div class="hk-bar-wrap">
+              <div class="hk-bar-track">
+                <div class="hk-bar" [style.width.%]="k.barPct" [style.background]="k.color"></div>
+              </div>
+              <span class="hk-bar-label" [style.color]="k.color">{{ k.pct }}%</span>
+            </div>
+            <span class="hk-profiles">{{ k.profileCount }}</span>
+            <span class="hk-count">{{ k.count }}</span>
+            <span class="hk-pct-pill" [style.background]="k.tagBg" [style.color]="k.tagColor">
+              {{ k.pct }}%
+            </span>
+          </div>
+      
+          <div *ngIf="healthKeyData.length === 0" class="empty-state">No data</div>
+        </div>
+      
+        <!-- Total row -->
+        <div class="hk-total-row">
+          <span class="hk-total-lbl">Total</span>
+          <span class="hk-total-profiles">{{ healthTotalProfiles }}</span>
+          <span class="hk-total-adj">{{ healthTotalAdjustments }}</span>
+          <span class="hk-total-pct">100%</span>
+        </div>
+      </div>
+
+      <!-- ROW 2: Adjustment details + Evolution progress -->
+      <div class="interim-col2-row1">
+        <div class="adj-mini-card card">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Adjustment details</span>
+          </div>
+          <div class="adj-mini-body">
+            <div class="adj-mini-row" *ngFor="let item of evolutionprogressMap | keyvalue">
+              <span class="adj-mini-lbl">{{ item.key }}</span>
+              <span class="adj-mini-val">{{ item.value }}</span>
+            </div>
+            <div class="empty-state" *ngIf="(evolutionprogressMap | keyvalue)?.length === 0">
+              No details
+            </div>
+          </div>
+        </div>
+  
+        <div class="ep-card card" *ngIf="evolutionProgressData">
+          <div class="ahl-card-hd">
+            <span class="ahl-card-title">Evolution progress</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:auto;">
+              {{ evolutionProgressData.keys.length }} keys
+            </span>
+          </div>
+          <div class="ep-table-wrap">
+            <table class="ep-table">
+              <thead>
+                <tr>
+                  <th class="ep-th ep-th-key">Key</th>
+                  <th class="ep-th ep-th-b0">&lt; 25%</th>
+                  <th class="ep-th ep-th-b1">25–50%</th>
+                  <th class="ep-th ep-th-b2">50–75%</th>
+                  <th class="ep-th ep-th-b3">75–100%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="ep-tr" *ngFor="let key of evolutionProgressData.keys">
+                  <td class="ep-td ep-td-key">
+                    <div class="ep-key-wrap">
+                      <span class="ep-key-dot"></span>{{ key }}
+                    </div>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b0" *ngIf="getEpBandCount(key,0)>0; else d0"
+                      (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span>
+                    <ng-template #d0><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b1" *ngIf="getEpBandCount(key,1)>0; else d1"
+                      (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span>
+                    <ng-template #d1><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b2" *ngIf="getEpBandCount(key,2)>0; else d2"
+                      (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span>
+                    <ng-template #d2><span class="ep-zero">—</span></ng-template>
+                  </td>
+                  <td class="ep-td">
+                    <span class="ep-pill ep-b3" *ngIf="getEpBandCount(key,3)>0; else d3"
+                      (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span>
+                    <ng-template #d3><span class="ep-zero">—</span></ng-template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      </div>
+
+    </div>
+
   </div>
 
 
@@ -1656,6 +1747,63 @@
     </div>
   </div>
 
+  <!-- ══ HEALTH KEY DIALOG ══ -->
+  <div class="overlay" [class.open]="isHealthDialogOpen" (click)="onHealthDialogOverlayClick($event)">
+    <div class="dialog" style="max-width:860px;">
+      <div class="dlg-hd">
+        <div class="dlg-hd-left">
+          <div class="dlg-av nc">EP</div>
+          <div>
+            <div class="dlg-title">{{ healthDialogTitle }}</div>
+            <div class="dlg-sub">{{ healthDialogProfiles.length }} profiles · dominant key</div>
+          </div>
+        </div>
+        <button class="close-btn" (click)="closeHealthDialog()">✕</button>
+      </div>
+  
+      <!-- Table header -->
+      <div class="hd-tbl-hd">
+        <span class="hd-col hd-name">Profile</span>
+        <span class="hd-col hd-area" *ngFor="let k of getHealthDialogKeys()">{{ k }}</span>
+        <span class="hd-col hd-total">Total</span>
+      </div>
+  
+      <div class="dlg-body" style="padding:12px 18px;">
+        <div *ngIf="healthDialogProfiles.length === 0" style="font-size:12px;color:var(--text3);padding:8px 0;">
+          No profiles
+        </div>
+  
+        <div class="hd-tbl-row" *ngFor="let p of healthDialogProfiles" (click)="navigatetoprofile(p.profileId)">
+  
+          <!-- Name -->
+          <div class="hd-col hd-name">
+            <div class="par-av nc">{{ getInitials(p.profileName) }}</div>
+            <div style="min-width:0;">
+              <div class="par-name">{{ p.profileName }}</div>
+              <div class="par-id">{{ p.profileId }}</div>
+            </div>
+          </div>
+  
+          <!-- Per key count -->
+          <div class="hd-col hd-area" *ngFor="let k of getHealthDialogKeys()">
+            <span class="hd-key-pill" *ngIf="p.areas[k]; else noVal" [class.hd-dominant]="k === healthDialogTitle">
+              {{ p.areas[k] }}
+            </span>
+            <ng-template #noVal>
+              <span class="ep-zero">—</span>
+            </ng-template>
+          </div>
+  
+          <!-- Total -->
+          <div class="hd-col hd-total">
+            <span class="hd-total-pill">{{ p.total }}</span>
+          </div>
+  
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ SUBSCRIPTION END DIALOG ══ -->
   <div class="overlay" [class.open]="isSubDialogOpen" (click)="onSubDialogOverlayClick($event)">
     <div class="dialog sub-dialog">
@@ -1929,7 +2077,6 @@
     </div>
   </div>
 
-</div>
 
 <!-- Table Section with Filter -->
 <div class="table-section" *ngIf="showTable">
