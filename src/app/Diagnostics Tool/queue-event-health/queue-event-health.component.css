@@ -7,9 +7,9 @@ body {
 
 /* CONTAINER */
 .container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 30px auto;
-  padding: 0 10px;
+  padding: 0 16px;
 }
 
 /* HEADER */
@@ -20,33 +20,44 @@ h1 {
 }
 
 /* KPI */
+/* KPI */
 .kpi-grid {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
 .kpi {
-  flex: 1;
+  flex: 1 1 calc(8.33% - 10px);
+  min-width: 80px;
   background: #f7f7f7;
-  padding: 18px;
+  padding: 10px 8px;
   border-radius: 10px;
   text-align: center;
   cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+
+.kpi:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
 }
 
 .kpi.active {
   outline: 2px solid #1976d2;
+  background: #e8f0fe;
 }
 
 .kpi-value {
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 700;
 }
 
 .kpi-label {
-  font-size: 14px;
+  font-size: 11px;
   color: #6b7280;
+  line-height: 1.3;
+  margin-top: 4px;
 }
 
 /* CARD */
@@ -273,4 +284,95 @@ thead {
 
 .btn-primary:hover {
   background-color: #1f5fb3;
+}
+
+.bulk-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* INITIATED NOT IN QUEUE TABLE */
+.initiated-not-in-queue-table {
+  margin-top: 20px;
+}
+
+.initiated-not-in-queue-table table thead {
+  background: #fff3e0;
+}
+
+.initiated-not-in-queue-table .section-title {
+  padding: 14px 16px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e65100;
+  background: #fff8f0;
+  border-bottom: 1px solid #ffe0b2;
+  border-radius: 10px 10px 0 0;
+}
+
+/* TOKEN NOT FOUND badge */
+.badge-missing {
+  display: inline-block;
+  background: #fdecea;
+  color: #c62828;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* EP STATUS badges */
+.badge-approved {
+  display: inline-block;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.badge-denied {
+  display: inline-block;
+  background: #fdecea;
+  color: #c62828;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.badge-notfound {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* PAGINATION */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.pagination button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: #1976d2;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
