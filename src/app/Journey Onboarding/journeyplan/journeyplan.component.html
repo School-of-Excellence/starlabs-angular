@@ -153,7 +153,8 @@
         <ng-template #noSchedules>
           <div class="emi-empty">
             <mat-icon>account_balance_wallet</mat-icon>
-            <p>No EMI schedule found</p>
+            <p *ngIf="watsonLoading">Fetching EMI details...</p>
+            <p *ngIf="!watsonLoading">No EMI schedule found</p>
           </div>
         </ng-template>
       </div>

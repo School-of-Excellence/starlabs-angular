@@ -95,7 +95,9 @@ export class InitiateEventProductComponent {
   alreadyInQueue = [];
 
   // Map Data
-  mapProfile = {}
+  mapProfile = {};
+  mapParticipantMetaData = {};
+  mapJourney = {};
   mapEmailData = {}
   mapProduct = {}
   mapDeliveryItem = {}
@@ -133,14 +135,24 @@ export class InitiateEventProductComponent {
     guard.getRoles().then(roles =>{
       // if(roles["admin"] || roles["ah"] || roles["developer"]){
         this.loadData()
+
       // } 
       // else{
       //   router.navigateByUrl("/")
       // }
     })
+    guard.getJourneyMap().then((map)=>this.mapJourney = map);
+
   }
 
   ngOnInit(): void {
+    getDocs(collection(this.firestore , 'participant metadata')).then((snap)=>{
+      this.mapParticipantMetaData = {};
+      snap.docs.forEach((d)=>{
+        const data = d.data()
+        this.mapParticipantMetaData[data['profileid']] = data;
+      });
+    });
   }
 
   ngAfterViewInit() {
@@ -936,11 +948,17 @@ export class InitiateEventProductComponent {
       this.snackbar.open('No participants to export', 'OK', { duration: 3000 });
       return;
     }
-
     const exportData = participants.map(p => ({
       'Name': this.mapProfile[p.profileid]?.name || 'Unknown',
       'Email': this.mapProfile[p.profileid]?.email || 'No email',
-      'Status': p.status || 'pending'
+      'Active Journey' : this.mapJourney[this.mapParticipantMetaData[p.profileid]?.activejourney || ''] ?? 'N/A',
+      'Total Purchase Value' : this.mapParticipantMetaData[p.profileid]?.pp_totalpurchasevalue ?? 'N/A',
+      'Total Paid' : this.mapParticipantMetaData[p.profileid]?.pp_totalpaid ?? 'N/A',
+      'Due' : this.mapParticipantMetaData[p.profileid]?.pp_totalpurchasevalue - this.mapParticipantMetaData[p.profileid]?.pp_totalpaid,
+      'Financial Status' : this.mapParticipantMetaData[p.profileid]?.financialstatus ?? 'N/A',
+      'Subscription End' : this.formatDate(this.mapParticipantMetaData[p.profileid]?.subscriptionend ),
+      'Status': p.status || 'pending',
+      'Customer Status': this.mapParticipantMetaData[p.profileid]?.customerstatus || 'N/A',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -955,5 +973,13 @@ export class InitiateEventProductComponent {
     this.snackbar.open(`Exported ${participants.length} participants`, 'OK', { duration: 3000 });
   } 
 
-
+  formatDate(date : any){
+    
+    if (date?.toDate) {
+      return date.toDate().toISOString();
+    } else if(date?.toISOString){
+      return date.toISOString()
+    }
+    return 'N/A';
+  }
 }

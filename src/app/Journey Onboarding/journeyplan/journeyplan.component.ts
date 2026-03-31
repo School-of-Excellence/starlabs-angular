@@ -66,6 +66,7 @@ export class JourneyplanComponent {
   cumulativeTotals: any = [];
   private subscription = new Subject<void>();
   watsonDatabase;
+  watsonLoading = false
 
   monthlyPlanData = []
   solarVoicePlaylist = []
@@ -94,6 +95,7 @@ export class JourneyplanComponent {
       });
       await this.participantProducts();
       this.initializeMonthlyPlan();
+      this.watsonParticipantSchedule();
     });
   }
 
@@ -152,7 +154,6 @@ export class JourneyplanComponent {
     //     this.mapProductDeliveryType[data["product"].id] = (data["deliveryoptions"] ?? []).map(e => e["deliverytype"])
     //   }
     // });
-    this.watsonParticipantSchedule();
   }
 
   async initializeMonthlyPlan() {
@@ -527,15 +528,15 @@ export class JourneyplanComponent {
   }
 
   async watsonParticipantSchedule() {
+    this.watsonLoading = true
     this.currentYear = new Date().getFullYear();
-    this.guard.initializeWatson().then(async () => {
-      this.profileid = this.route.snapshot.params['pid'].split('&')[0]
-      await getDoc(doc(this.firestore, "profile_data", this.profileid)).then(profile => {
+    await this.guard.initializeWatson().then(async () => {
+      await getDoc(doc(this.firestore, "profile_data", this.profileid)).then(async profile => {
         this.profileData = profile.data()
         // console.log(this.profileData, 'profileData');
-        this.guard.initializeWatson().then(() => {
+        // this.guard.initializeWatson().then(() => {
           this.watsonDatabase = getFirestore(getApp("watson"))
-          getDocs(collection(this.watsonDatabase, "Participants")).then(async participant => {
+          await getDocs(query(collection(this.watsonDatabase, "Participants"), where("email", "==", this.profileData["email"]))).then(async participant => {
             var participantid = null
             for (let i = 0; i < participant.docs.length; i++) {
               const doc = participant.docs[i];
@@ -553,7 +554,7 @@ export class JourneyplanComponent {
             else {
               console.log("working.....");
 
-              getDocs(query(collection(this.watsonDatabase, "Payment Schedule"), where('participantid', '==', participantid), orderBy('date', 'asc'))).then((schedule) => {
+              await getDocs(query(collection(this.watsonDatabase, "Payment Schedule"), where('participantid', '==', participantid), orderBy('date', 'asc'))).then((schedule) => {
                 // this.watsonScheduleList = schedule.docs.map((e) => e.data()).filter((e) => e['schedulemodified'] != true);
                 this.watsonScheduleList = schedule.docs.map((e) => e.data()).filter((e) => e['schedulemodified'] != true);
                 let runningTotal = 0;
@@ -567,9 +568,10 @@ export class JourneyplanComponent {
               });
             }
           })
-        })
+        // })
       })
     })
+    this.watsonLoading = false
   }
 
 

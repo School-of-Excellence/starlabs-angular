@@ -80,6 +80,7 @@ export class ContentAnalyticsComponent {
   journey: any[] = [];
   journeyMap: any = {};
   tierData :any[] = [];
+  participantanalyticsdata :any[] = [];
   tiermap: any = {};
   isInitialLoadDone = false;
   tierLoading = false;
@@ -88,6 +89,15 @@ export class ContentAnalyticsComponent {
   tierParticipantSummary: any = {};
   journeyWiseData: any = {};
 
+
+    allTierCompletionMap: any = {};
+    allTierParticipantSummary: any = {};
+    allTierStats: typeof this.tierStats = {};
+    allTierSearchQuery = '';
+    allTierViewMode: 'series' | 'participant' = 'participant';
+    allCardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
+    allTierLoading = false;
+  
   constructor(
     public firestore: Firestore,
     private guard : AuthguardService,
@@ -374,6 +384,157 @@ export class ContentAnalyticsComponent {
   getTotalCount(seriesObj: any) {
     return Object.keys(seriesObj).length;
   }
+  
+  async participantContentAnalytics() {
+    this.allTierLoading = true;
+    const snap = await getDocs(collection(this.firestore, 'participant content analytics'));
+    this.participantanalyticsdata = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    this.buildAllTierFromParticipantAnalytics();
+  }
+  
+  buildAllTierFromParticipantAnalytics() {
+    const completedByProfile: { [pid: string]: Set<string> } = {};
+    for (const doc of this.participantanalyticsdata) {
+      const refs: any[] = doc['eiflixseries'] || [];
+      completedByProfile[doc.id] = new Set(refs.map((r: any) => r?.id ?? r).filter(Boolean));
+    }
+
+    const eligibleByTier: { [tierid: string]: string[] } = {};
+    for (const pid in this.mapProfileData) {
+      const pd = this.mapProfileData[pid];
+      if (!pd?.firebaseuserref) continue;
+      for (const t of (pd.tier || [])) {
+        const tid = t.id || t;
+        (eligibleByTier[tid] ??= []).push(pid);
+      }
+    }
+ 
+    const completionMap: any = {};
+    const participantSummary: any = {};
+
+    for (const series of this.seriesDataList) {
+      const sid  = series.id;
+      const name = series.seriesName || sid;
+      for (const tierRef of (series.tier || [])) {
+        const tid  = tierRef.id || tierRef;
+        const pids = eligibleByTier[tid] || [];
+        if (!pids.length) continue;
+        completionMap[tid] ??= {};
+        completionMap[tid][name] ??= {};
+        for (const pid of pids) {
+          const pname = this.mapProfile[pid] || this.mapProfileNew[pid] || pid;
+          completionMap[tid][name][pname] =
+            (completedByProfile[pid] ?? new Set()).has(sid) ? 'completed' : 'pending';
+        }
+      }
+    }
+ 
+    for (const tid in completionMap) {
+      const seriesMap = completionMap[tid];
+      participantSummary[tid] ??= {};
+      for (const pid of (eligibleByTier[tid] || [])) {
+        const pname = this.mapProfile[pid] || this.mapProfileNew[pid] || pid;
+        let completed = 0;
+        for (const sname in seriesMap) {
+          if (seriesMap[sname][pname] === 'completed') completed++;
+        }
+        participantSummary[tid][pname] = { completed, total: Object.keys(seriesMap).length };
+      }
+    }
+ 
+    this.allTierCompletionMap      = completionMap;
+    this.allTierParticipantSummary = participantSummary;
+ 
+    this.allTierStats = {};
+    for (const tid in completionMap) {
+      const sm = completionMap[tid];
+      let seriesDone = 0, seriesCompleted = 0, seriesOnTrack = 0, seriesNotStarted = 0;
+      for (const sname in sm) {
+        const vals  = Object.values(sm[sname]) as string[];
+        const total = vals.length;
+        const comp  = vals.filter(v => v === 'completed').length;
+        if (comp === total && total > 0) { 
+          seriesCompleted++; seriesDone++; 
+        }
+        else if (comp > 0){ 
+          seriesOnTrack++;  seriesDone++; 
+        }
+        else { 
+          seriesNotStarted++;            
+        }
+      }
+      this.allTierStats[tid] ??= {} as any;
+      this.allTierStats[tid].series = { done: seriesDone, completed: seriesCompleted, onTrack: seriesOnTrack, notStarted: seriesNotStarted, total: Object.keys(sm).length };
+    }
+    for (const tid in participantSummary) {
+      const um = participantSummary[tid];
+      let profileDone = 0, profileCompleted = 0, profileOnTrack = 0, profileNotStarted = 0;
+      for (const uname in um) {
+        const u = um[uname];
+        if (u.completed === u.total && u.total > 0) { 
+          profileCompleted++; profileDone++; 
+        } else if (u.completed > 0){ 
+          profileOnTrack++;  profileDone++; 
+        }
+        else { 
+          profileNotStarted++;            
+        }
+      }
+      this.allTierStats[tid] ??= {} as any;
+      this.allTierStats[tid].participant = { done: profileDone, completed: profileCompleted, onTrack: profileOnTrack, notStarted: profileNotStarted, total: Object.keys(um).length };
+    }
+ 
+    this.allTierLoading = false;
+  }
+  openAllDrawer(tierId: string, context: string, filterPreset: string, mode: 'series' | 'participant') {
+    this._drawerItems = [];
+    this.drawerTierName = this.tiermap[tierId]?.tier || tierId;
+ 
+    if (mode === 'series') {
+      const sd = this.allTierCompletionMap[tierId] || {};
+      if (context === 'series' || context === 'all') {
+        const userStatusMap: { [n: string]: string } = {};
+        for (const sname in sd) {
+          for (const uname in sd[sname]) {
+            if (sd[sname][uname] === 'completed') userStatusMap[uname] = 'completed';
+            else userStatusMap[uname] ??= sd[sname][uname];
+          }
+        }
+        this._drawerItems = Object.entries(userStatusMap).map(([name, status]) => ({ name, status }));
+        this.drawerContextLabel = 'All Series';
+      } else {
+        this._drawerItems = Object.entries(sd[context] || {}).map(([name, status]) => ({ name, status: status as string }));
+        this.drawerContextLabel = context;
+      }
+    } else {
+      const pd = this.allTierParticipantSummary[tierId] || {};
+      const sd = this.allTierCompletionMap[tierId] || {};
+      if (context === 'all') {
+        this._drawerItems = Object.entries(pd).map(([name, val]: [string, any]) => ({
+          name,
+          status: val.completed === val.total && val.total > 0 ? 'completed' : 'pending',
+          seriesLabel: `${val.completed}/${val.total} series`
+        }));
+        this.drawerContextLabel = 'All Participants';
+      } else {
+        this._drawerItems = Object.entries(sd).map(([sname, users]: [string, any]) => ({
+          name: context,
+          status: users[context] || 'pending',
+          seriesLabel: sname
+        }));
+        this.drawerContextLabel = context;
+      }
+    }
+ 
+    if (filterPreset === 'completed')                          
+      this.drawerFilter = 'completed';
+    else if (filterPreset === 'ontrack' || filterPreset === 'notstarted') 
+      this.drawerFilter = 'pending';
+    else                                                       
+      this.drawerFilter = 'all';
+ 
+    this.drawerOpen = true;
+  }
 
   checkSeriesCompletion() {
     if (!this.contentAnalytics?.length || !this.seriesDataList?.length) return;
@@ -466,7 +627,22 @@ export class ContentAnalyticsComponent {
         }
       }
     }
-
+    this.seriesDataList.forEach(series => {
+      const seriesName = series.seriesName || series.id;
+      const tiers = series.tier || [];
+      tiers.forEach((tierRef: any) => {
+        const tierid = tierRef.id || tierRef;
+        const eligibleUsers = tierEligibleUsersMap[tierid] || [];
+        if (eligibleUsers.length === 0) return;
+        tierCompletionMap[tierid] ??= {};
+        tierCompletionMap[tierid][seriesName] ??= {};
+        for (const user of eligibleUsers) {
+          if (!tierCompletionMap[tierid][seriesName][user]) {
+            tierCompletionMap[tierid][seriesName][user] = 'pending';
+          }
+        }
+      });
+    });
     for (const tierId in tierCompletionMap) {
       const seriesMapObj = tierCompletionMap[tierId];
       const eligibleUsers = tierEligibleUsersMap[tierId] || [];
@@ -580,8 +756,8 @@ export class ContentAnalyticsComponent {
   }
 
   convertDecimal(value:number){
-    const minutes = Math.floor(value / 60); // Get the whole minutes
-    const remainingSeconds = value % 60; // Get the remaining seconds
+    const minutes = Math.floor(value / 60);
+    const remainingSeconds = value % 60;
     return `${minutes} mins ${remainingSeconds} sec (${value})`
   }
 
@@ -656,6 +832,7 @@ export class ContentAnalyticsComponent {
             setTimeout(() => {
               this.checkSeriesCompletion();
               this.journeyBasedanalytics();
+              this.participantContentAnalytics();
               this.tierLoading = false;
             }, 0);
           }
@@ -997,12 +1174,11 @@ export class ContentAnalyticsComponent {
   downloadFile(data,filename = 'data') {
     if(data.length != 0){
       let csvData = this.ConvertToCSV(data,Object.keys(data[0]));
-      // console.log(csvData)
       let blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
       let dwldLink = document.createElement("a");
       let url = URL.createObjectURL(blob);
       let isSafariBrowser = navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1;
-      if (isSafariBrowser) {  //if Safari open in new window to save file with random filename.
+      if (isSafariBrowser) { 
         dwldLink.setAttribute("target", "_blank");
       }
       dwldLink.setAttribute("href", url);
@@ -1025,7 +1201,6 @@ export class ContentAnalyticsComponent {
       row += headerList[index] + ',';
     }
     row = row.slice(0, -1);
-    // console.log(row);
     
     str += row + '\r\n';
     for (let i = 0; i < array.length; i++) {
@@ -1036,8 +1211,6 @@ export class ContentAnalyticsComponent {
       }
       str += line + '\r\n';
     }
-    // console.log(str);
-    
     return str;
   }
 
@@ -1046,4 +1219,3 @@ export class ContentAnalyticsComponent {
   }
 
 }
-

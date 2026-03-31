@@ -408,7 +408,7 @@
   justify-content: center;
   gap: 8px;
   padding: 40px 16px;
-  color: #d1d5db;
+  color: grey;
   font-size: 14px;
 }
 .emi-empty mat-icon {
