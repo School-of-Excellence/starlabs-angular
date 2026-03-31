@@ -78,6 +78,7 @@ export class SendInterimReportComponent {
           duedate: value["duedate"],
           lockdate: lockdate,
           remainderdate: remainderdate,
+          createdon : serverTimestamp(),
           lastupdate:serverTimestamp(),
           status: null
         }       

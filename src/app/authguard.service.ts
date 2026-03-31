@@ -3,7 +3,7 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { Auth, signOut, user } from '@angular/fire/auth';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Firestore, collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, writeBatch, CollectionReference, DocumentReference, serverTimestamp, addDoc, limit, onSnapshot, Timestamp} from '@angular/fire/firestore';
+import { Firestore, collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, writeBatch, CollectionReference, DocumentReference, serverTimestamp, addDoc, limit, onSnapshot, Timestamp, FieldValue} from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -1775,6 +1775,21 @@ export class AuthguardService {
     }, (error) => {
       console.error('Error listening to unread count:', error);
     });
+  }
+
+  async createOpenViduRoom(roomData: {
+    active:boolean,
+    createddate: FieldValue
+    sessiontype: string,
+    sessionid: string,
+    roomid: string,
+    hosts: Array<string>,
+    participantid: string,
+    title: string,
+    metadata: {}
+  }){
+    const roomDoc = doc(this.firestore, "openviduroom", roomData["roomid"])
+    await setDoc(roomDoc, roomData, {merge: true})
   }
 
 }

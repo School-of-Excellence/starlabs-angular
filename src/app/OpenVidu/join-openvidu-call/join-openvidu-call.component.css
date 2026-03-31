@@ -431,3 +431,92 @@
     padding: 6px 10px;
   }
 }
+
+/* ============================ */
+/* SCREEN SHARE LAYOUT (ZOOM-STYLE) */
+/* ============================ */
+
+.screen-share-layout {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: #000;
+  
+  margin-top: 40px;
+  margin-bottom: 80px;
+  height: calc(100vh - 40px - 80px);
+  overflow: hidden;
+}
+
+/* Main screen share area (left side, 80% width) */
+.screen-share-main {
+  flex: 1;
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen-share-main app-openvidu-video-element,
+.screen-share-main video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* contain for screen share, not cover */
+}
+
+/* Participants sidebar (right side, 20% width) */
+.participants-sidebar {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Small tiles for sidebar */
+.zoom-video-tile-small {
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  min-height: 120px;
+}
+
+.zoom-video-tile-small app-openvidu-video-element,
+.zoom-video-tile-small video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mirrorsharing{
+  transform: scaleX(-1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .screen-share-layout {
+    flex-direction: column;
+  }
+
+  .participants-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: 140px;
+  }
+
+  .zoom-video-tile-small {
+    min-width: 160px;
+    flex-shrink: 0;
+  }
+}

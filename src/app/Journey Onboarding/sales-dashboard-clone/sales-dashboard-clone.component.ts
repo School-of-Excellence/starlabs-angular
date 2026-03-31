@@ -3530,18 +3530,17 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     const cancelledData = [];
     const downgradeData = [];
 
-    // Process each sale
-    for (let i = 0; i < salesleads.length; i++) {
-      const salesLeadsData = salesleads[i];
+    let salesData = salesleads.filter((e)=> !(e['journey'] === 'RXvsMYoK0g4SstvDDURZ' && e['email']?.toLowerCase().includes('soexcellence.com')));
 
-      if ((salesLeadsData['journey'] === 'RXvsMYoK0g4SstvDDURZ' && salesLeadsData['email']?.toLowerCase().includes('soexcellence.com'))
-        || salesLeadsData['journey'] == 'InLXMl7OBAqlDTZcXwK0' || salesLeadsData['status']?.toLowerCase() == 'rejected'
-      ) {
+    // Process each sale
+    for (let i = 0; i < salesData.length; i++) {
+      const salesLeadsData = salesData[i];
+
+      if (salesLeadsData['journey'] == 'InLXMl7OBAqlDTZcXwK0' || salesLeadsData['status']?.toLowerCase() == 'rejected') {
         continue;
       }
 
-      if ((salesLeadsData['purchasedate']?.toDate() >= startdate && salesLeadsData['purchasedate']?.toDate() <= enddate)
-      ) {
+      if ((salesLeadsData['purchasedate']?.toDate() >= startdate && salesLeadsData['purchasedate']?.toDate() <= enddate)) {
         salesLeadsData['type'] = salesLeadsData['journeytype']
         saleLeadsMap[salesLeadsData['docid']] = salesLeadsData
       }

@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { RouterOutlet, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { Firestore, collection, getDocs, query, orderBy, limit } from '@angular/fire/firestore';
 import { ActivatedRoute } from '@angular/router';
@@ -18,8 +18,6 @@ interface ScreenUpdate {
   imports: [
     CommonModule,
     RouterOutlet,
-    RouterLink,
-    RouterLinkActive
   ],
   templateUrl: './content-upload-version2.component.html',
   styleUrl: './content-upload-version2.component.css'

@@ -46,39 +46,6 @@
         </div>
     </div>
     </div>
-  <!-- <div class="metrics-bar">
-    <div class="left-section">
-      <div class="file-upload-section">
-        <button mat-raised-button color="primary" (click)="fileInput.click()">
-          <mat-icon>file_upload</mat-icon>
-          Import Excel/CSV
-        </button>
-        <input #fileInput type="file" 
-               accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
-               (change)="onFileChange($event)" 
-               style="display: none;">
-      </div>
-      <button mat-raised-button color="accent" (click)="exportToCSV()" class="export-btn">
-        <mat-icon>file_download</mat-icon>
-        Export CSV
-      </button>
-    </div>
-    
-    <div class="metrics-section">
-      <div class="metric-item">
-        <span class="metric-label">Total Rows:</span>
-        <span class="metric-value">{{ totalRows }}</span>
-      </div>
-      <div class="metric-item">
-        <span class="metric-label">Matched:</span>
-        <span class="metric-value matched">{{ matchedCount }}</span>
-      </div>
-      <div class="metric-item">
-        <span class="metric-label">Unmatched:</span>
-        <span class="metric-value unmatched">{{ unmatchedCount }}</span>
-      </div>
-    </div>
-  </div> -->
 
 <div *ngIf="isProcessing" class="loading-container">
   <div class="loading-overlay">
@@ -102,10 +69,20 @@
   </div>
 </div>
 
-<!-- Table (only shows when not processing) -->
 <div *ngIf="!isProcessing && dataSource.data.length > 0" class="table-scroll-area">
     <mat-table [dataSource]="dataSource" matSort class="excel-table">
-    <!-- Update your column definitions to specify sort direction -->
+
+    <ng-container matColumnDef="delete">
+    <mat-header-cell *matHeaderCellDef mat-sort-header sortAction="asc"></mat-header-cell>
+    <mat-cell *matCellDef="let row; let i = index">
+      <button mat-icon-button color="warn" (click)="deleteRow(i)">
+        <mat-icon>
+          delete
+        </mat-icon>
+      </button>
+    </mat-cell>
+    </ng-container>
+
     <ng-container matColumnDef="serial">
     <mat-header-cell *matHeaderCellDef mat-sort-header sortAction="asc">#</mat-header-cell>
     <mat-cell *matCellDef="let row; let i = index">{{ i + 1 }}</mat-cell>
@@ -117,11 +94,6 @@
         <mat-cell *matCellDef="let row">{{row.columnA}}</mat-cell>
       </ng-container>
 
-      <!-- <ng-container matColumnDef="columnB">
-        <mat-header-cell *matHeaderCellDef mat-sort-header>Column B</mat-header-cell>
-        <mat-cell *matCellDef="let row">{{row.columnB}}</mat-cell>
-      </ng-container> -->
-<!-- Replace the existing name column with this simplified version -->
 <ng-container matColumnDef="name">
   <mat-header-cell *matHeaderCellDef mat-sort-header>Name</mat-header-cell>
   <mat-cell *matCellDef="let row; let i = index">
@@ -151,7 +123,7 @@
   </mat-cell>
 </ng-container>
 
-<!-- Add new match percentage column -->
+
 <ng-container matColumnDef="matchPercentage">
   <mat-header-cell *matHeaderCellDef mat-sort-header>Match %</mat-header-cell>
   <mat-cell *matCellDef="let row">
@@ -161,44 +133,11 @@
   </mat-cell>
 </ng-container>
 
-      <!-- <ng-container matColumnDef="name">
-        <mat-header-cell *matHeaderCellDef mat-sort-header>Name</mat-header-cell>
-        <mat-cell *matCellDef="let row; let i = index">
-          <ng-container *ngIf="editingRowIndex !== i">
-            <span (click)="startEdit(i)" class="editable-cell">
-              {{ row.name || 'Select Name' }}
-            </span>
-          </ng-container>
-          <ng-container *ngIf="editingRowIndex === i">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-select [formControl]="searchControl"
-                          (selectionChange)="updateSelectedProfile($event.value, row, i)"
-                          (closed)="stopEdit()">
-                <mat-option disabled class="search-option">
-                  <ngx-mat-select-search
-                    [formControl]="searchControl"
-                    placeholderLabel="Search users..."
-                    noEntriesFoundLabel="No match found">
-                  </ngx-mat-select-search>
-                </mat-option>
-                <mat-option *ngFor="let user of filterProfiles(searchControl.value)" [value]="user">
-                  {{ user.name }}
-                </mat-option>
-              </mat-select>
-            </mat-form-field>
-          </ng-container>
-        </mat-cell>
-      </ng-container> -->
-
       <ng-container matColumnDef="email">
         <mat-header-cell *matHeaderCellDef mat-sort-header>Email</mat-header-cell>
         <mat-cell *matCellDef="let row">{{row.email}}</mat-cell>
       </ng-container>
 
-      <!-- <ng-container matColumnDef="profileid">
-        <mat-header-cell *matHeaderCellDef mat-sort-header>Profile ID</mat-header-cell>
-        <mat-cell *matCellDef="let row">{{row.profileid}}</mat-cell>
-      </ng-container> -->
 
       <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
       <mat-row *matRowDef="let row; columns: displayedColumns;" 
@@ -208,5 +147,12 @@
     </mat-table>
     
     <mat-paginator [pageSizeOptions]="[50, 200, 500]" showFirstLastButtons></mat-paginator>
+  </div>
+  <div class="dialog-actions">
+    <button mat-button (click)="onClose()">Close</button>
+
+    <button mat-raised-button color="primary" [disabled]="dataSource.data.length === 0" (click)="onUpdate()">
+      Update
+    </button>
   </div>
 </div>

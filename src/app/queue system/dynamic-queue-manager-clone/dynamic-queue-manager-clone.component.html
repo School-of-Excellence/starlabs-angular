@@ -1,377 +1,826 @@
-<mat-sidenav-container class="example-sidenav-container">
- <mat-sidenav #snav style="width:25%" mode="side" position="end">
-  <!-- chat header -->
-  <div class="panel-header">
-    <h3>
-      <mat-icon>people_outline</mat-icon>
-      <b>{{selectedChatStage}} {{selectedChatStageType}}</b>
-    </h3>
-    <button mat-icon-button (click)="snav.close(); selectedStages = []; selectedTokens.clear()" class="close-panel-btn">
-      <mat-icon>close</mat-icon>
-    </button>
-  </div>
-  <main *ngIf="selectedChatStage != null" class="communication-container">
-    
-    <!-- Stage Multi-Select Dropdown -->
-    <section class="stage-select-section">
-      <mat-form-field appearance="outline" class="w-100">
-        <mat-label>Select Stages</mat-label>
-        <mat-select [(ngModel)]="selectedStages" multiple (selectionChange)="onStageSelectionChange()">
-          <mat-option *ngFor="let stage of getAvailableStagesForComm()" [value]="stage.stageKey">
-            {{ getStageDisplayName(stage) }} ({{ stage.tokenlist?.length || 0 }})
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <!-- <div class="selected-stages-chips" *ngIf="selectedStages.length > 0">
-      <mat-chip-set>
-        <mat-chip *ngFor="let stageKey of selectedStages" (removed)="removeStage(stageKey)">
-          {{ getStageNameByKey(stageKey) }}
-          <span *ngIf="getStageTypeByKey(stageKey)">
-            ({{ getStageTypeByKey(stageKey) }})
-          </span>
-          <mat-icon matChipRemove>cancel</mat-icon>
-        </mat-chip>
-      </mat-chip-set>
-      </div> -->
-    </section>
-
-    <!-- Communication Buttons -->
-    <section class="communication-buttons">
-      <button class="comm-btn whatsapp-btn" [class.active]="selectedCommType === 'whatsapp'"
-        (click)="selectCommType('whatsapp')" [disabled]="getSelectedTokens().length === 0">
-        <i class="bi bi-whatsapp"></i>
-        Whatsapp({{getSelectedTokens().length}})
-      </button>
-      <button class="comm-btn email-btn" [class.active]="selectedCommType === 'email'"
-        (click)="selectCommType('email')" [disabled]="getSelectedTokens().length === 0">
-        <i class="bi bi-envelope"></i>
-        Email({{getSelectedTokens().length}})
-      </button>
-      <button class="comm-btn notification-btn" [class.active]="selectedCommType === 'notification'"
-        (click)="selectCommType('notification')" [disabled]="getSelectedTokens().length === 0">
-        <i class="bi bi-bell-fill"></i>
-        Notification({{getSelectedTokens().length}})
-      </button>
-      <button class="comm-btn notification-btn" (click)="onBulkInvite()" [disabled]="getSelectedTokens().length === 0">
-        <i class="bi bi-bell-fill"></i>
-        BulkInvite({{getSelectedTokens().length}})
-      </button>
-      <button class="comm-btn notification-btn" (click)="bulkAvTest()" [disabled]="getSelectedTokens().length === 0">
-          <i class="bi bi-bell-fill"></i>
-          Bulk AV Test({{getSelectedTokens().length}})
-        </button>
-       <button *ngIf="roles['developer'] || roles['admin'] || roles['tester'] || roles['floor']"
-        class="comm-btn notification-btn"
-        [class.active]="selectedCommType === 'appactionpending'"
-        (click)="selectCommType('appactionpending')"
-        [disabled]="getSelectedTokens().length === 0">
-        <i class="bi bi-bell-fill"></i>
-        Force Action ({{getSelectedTokens().length}})
-      </button>
-      <div class="round-robin-card">
-        <!-- Form View -->
-        <form
-          *ngIf="!isRoundRobinRunning"
-          (ngSubmit)="roundRobin()"
-          #form="ngForm"
-          class="rr-form"
-        >
-          <mat-form-field appearance="outline" class="rr-field">
-            <mat-label>Inv. Count</mat-label>
-            <input
-              matInput
-              type="number"
-              name="participants"
-              [(ngModel)]="roundRobbinformData.howManyParticipantsNeeded"
-              min="1"
-              [max]="getSelectedTokens().length"
-              required
-            />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="rr-field">
-            <mat-label>Duration (mins)</mat-label>
-            <input
-              matInput
-              type="number"
-              name="duration"
-              [(ngModel)]="roundRobbinformData.duration"
-              required
-            />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="rr-field">
-            <mat-label>Max Attempts</mat-label>
-            <input
-              matInput
-              type="number"
-              name="maxcycle"
-              [(ngModel)]="roundRobbinformData.maxcycle"
-              min="2"
-              required
-            />
-          </mat-form-field>
-
-          <button
-            mat-flat-button
-            color="primary"
-            type="submit"
-            [disabled]="form.invalid"
-          >
-            Start Round Robin
-          </button>
-        </form>
-
-        <!-- Status View -->
-        <div *ngIf="isRoundRobinRunning" class="rr-status">
-          <div class="status-items">
-            <div class="status-item">
-              <span class="label">Needed</span>
-              <span class="value">{{ roundRobinStatus.needed }}</span>
-            </div>
-            <div class="status-item">
-              <span class="label">Approved</span>
-              <span class="value success">{{ roundRobinStatus.approved.length }}</span>
-            </div>
-            <div class="status-item">
-              <span class="label">Next Round</span>
-              <span class="value">{{ roundRobinStatus.sleeptimer }}s</span>
-            </div>
-            <div class="status-item">
-              <span class="label">Batch</span>
-              <span class="value">{{ roundRobinStatus.attempts}} / {{ roundRobinStatus.maxattempts}}</span>
-            </div>
-            <div class="status-item">
-              <span class="label">Cycle</span>
-              <span class="value">{{ roundRobinStatus.currentcycle}} / {{ roundRobinStatus.maxcycle}}</span>
-            </div>
-            <div class="status-item">
-              <span class="label">Status</span>
-              <span class="value" [class.success]="roundRobinStatus.status === 'Success'">
-                {{ roundRobinStatus.status }}
-              </span>
-            </div>
-          </div>
-
-          <button
-            mat-stroked-button
-            color="warn"
-            (click)="cancelRoundRobin()"
-          >
-            <span *ngIf="['Success','Completed']"></span>
-            {{roundRobinStatus.status === 'Running' ? 'Cancel Round Robin' : 'Close Round Robin'}}
-            Cancel Round Robin
+  <mat-sidenav-container class="example-sidenav-container">
+    <mat-sidenav #snav style="width:25%" mode="side" position="end">
+      <ng-container *ngIf="sidenavMode === 'comms'">
+        <!-- chat header -->
+        <div class="panel-header">
+          <h3>
+            <mat-icon>people_outline</mat-icon>
+            <b>{{selectedChatStage}} {{selectedChatStageType}}</b>
+          </h3>
+          <button mat-icon-button (click)="snav.close(); selectedStages = []; selectedTokens.clear()" class="close-panel-btn">
+            <mat-icon>close</mat-icon>
           </button>
         </div>
-      </div>
-      <div class="col-auto d-flex gap-2">
-        <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
-          <mat-icon>upload_file</mat-icon> Import
-        </button>
-        <input type="file" #fileInput style="display: none" (change)="onImportData($event)" accept=".csv,.xlsx,.xls" />
-        
-        <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()" [disabled]="getSelectedTokens().length === 0">
-          <mat-icon>local_offer</mat-icon> Add Tag
-        </button>
-      </div>
-    </section>
-
-      <!-- Send Button -->
-      <section class="send-button-section" *ngIf="selectedCommType">
-        <button class="send-btn" (click)="sendCommunication()" [disabled]="getSelectedTokens().length === 0">
-          <i class="bi bi-send-fill"></i>
-          Send {{selectedCommType | titlecase}} to {{getSelectedTokens().length}} participant(s)
-        </button>
-      </section>
-
-      <!-- Participants Section -->
-      <section class="participants-section">
-        <!-- Header -->
-        <div class="participants-header">
-          <h5 class="participants-title">
-            Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length : (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
-          </h5>
-          <div class="select-all-wrapper" (click)="toggleSelectAll()">
-            <div class="custom-checkbox" [class.checked]="areAllSelected()">
-              <i class="bi bi-check" *ngIf="areAllSelected()"></i>
-            </div>
-            <span class="select-all-text">Select All</span>
-          </div>
-        </div>
-
-        <!-- Participants List - Merged from selected stages -->
-        <div class="participants-list" *ngIf="selectedStages.length > 0">
-          <div *ngFor="let token of getMergedParticipants(); let i = index"
-            class="participant-item" (click)="toggleTokenSelection(token)">
-
-            <!-- Checkbox -->
-            <!-- <div class="custom-checkbox" [class.checked]="isTokenSelected(token)">
-              <i class="bi bi-check" *ngIf="isTokenSelected(token)"></i>
+        <main *ngIf="selectedChatStage != null" class="communication-container">
+          
+          <!-- Stage Multi-Select Dropdown -->
+          <section class="stage-select-section">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Select Stages</mat-label>
+              <mat-select [(ngModel)]="selectedStages" multiple (selectionChange)="onStageSelectionChange()">
+                <mat-option *ngFor="let stage of getAvailableStagesForComm()" [value]="stage.stageKey">
+                  {{ getStageDisplayName(stage) }} ({{ stage.tokenlist?.length || 0 }})
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+            <!-- <div class="selected-stages-chips" *ngIf="selectedStages.length > 0">
+            <mat-chip-set>
+              <mat-chip *ngFor="let stageKey of selectedStages" (removed)="removeStage(stageKey)">
+                {{ getStageNameByKey(stageKey) }}
+                <span *ngIf="getStageTypeByKey(stageKey)">
+                  ({{ getStageTypeByKey(stageKey) }})
+                </span>
+                <mat-icon matChipRemove>cancel</mat-icon>
+              </mat-chip>
+            </mat-chip-set>
             </div> -->
+          </section>
 
-            <input type="checkbox" [checked]="isTokenSelected(token)" >
-
-            <!-- Avatar with Number -->
-            <div class="participant-avatar">
-              #{{i + 1}}
-            </div>
-
-            <!-- Participant Info -->
-            <div class="participant-info">
-              <div class="participant-name">
-                <i class="bi bi-person-fill"></i>
-                {{mapProfileData[token.profile_id]?.['name']}}
-              </div>
-              <div class="participant-email">
-                <i class="bi bi-envelope"></i>
-                {{mapProfileData[token.profile_id]?.['email']}}
-              </div>
-              
-              <!-- Stage Info -->
-              <div class="participant-stage">
-                <i class="bi bi-layers"></i>
-                <span class="stage-badge">{{token.fromStage}}</span>
-                <span class="stage-type-badge" *ngIf="token.fromStageType">({{token.fromStageType}})</span>
-              </div>
-              
-              <!-- Segments Display -->
-              <div class="participant-segments" *ngIf="selectedSegments.length > 0 && getParticipantSegments(token.profile_id).length > 0">
-                <i class="bi bi-diagram-3"></i>
-                <span class="segment-badge" *ngFor="let segName of getParticipantSegments(token.profile_id)">
-                  {{segName}}
-                </span>
-              </div>
-              
-              <!-- Tags Display -->
-              <div class="participant-tags" *ngIf="selectedTags.length > 0 && getParticipantTags(token.profile_id).length > 0">
-                <i class="bi bi-tags"></i>
-                <span class="tag-badge" *ngFor="let tagName of getParticipantTags(token.profile_id)">
-                  {{tagName}}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Empty State -->
-          <div *ngIf="getMergedParticipants().length === 0" class="empty-state">
-            <i class="bi bi-person-x"></i>
-            <p>No participants found in selected stages</p>
-          </div>
-        </div>
-
-        <!-- Participants List - Single stage (when no stages selected in dropdown) -->
-        <div class="participants-list" *ngIf="selectedStages.length === 0">
-          <div *ngFor="let token of getStageParticipants(selectedChatStage)?.['tokenlist']; let i = index"
-            class="participant-item" (click)="toggleTokenSelection(token)">
-
-            <!-- Checkbox -->
-            <div class="custom-checkbox" [class.checked]="isTokenSelected(token)">
-              <i class="bi bi-check" *ngIf="isTokenSelected(token)"></i>
-            </div>
-
-            <!-- Avatar with Number -->
-            <div class="participant-avatar">
-              #{{i + 1}}
-            </div>
-
-            <!-- Participant Info -->
-            <div class="participant-info">
-              <div class="participant-name">
-                <i class="bi bi-person-fill"></i>
-                {{mapProfileData[token.profile_id]?.['name']}}
-              </div>
-              <div class="participant-email">
-                <i class="bi bi-envelope"></i>
-                {{mapProfileData[token.profile_id]?.['email']}}
-              </div>
-              
-              <!-- Segments Display -->
-              <div class="participant-segments" *ngIf="selectedSegments.length > 0 && getParticipantSegments(token.profile_id).length > 0">
-                <i class="bi bi-diagram-3"></i>
-                <span class="segment-badge" *ngFor="let segName of getParticipantSegments(token.profile_id)">
-                  {{segName}}
-                </span>
-              </div>
-              
-              <!-- Tags Display -->
-              <div class="participant-tags" *ngIf="selectedTags.length > 0 && getParticipantTags(token.profile_id).length > 0">
-                <i class="bi bi-tags"></i>
-                <span class="tag-badge" *ngFor="let tagName of getParticipantTags(token.profile_id)">
-                  {{tagName}}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Empty State -->
-          <div *ngIf="!getStageParticipants(selectedChatStage)?.['tokenlist']?.length" class="empty-state">
-            <i class="bi bi-person-x"></i>
-            <p>No participants found for this stage</p>
-          </div>
-        </div>
-      </section>
-
-    </main>
-    <!-- list of pinned chat message by login person -->
-    <div style="max-height:200px;min-height:0px;" class="overflow-auto">
-      <span class="d-flex justify-content-center" *ngFor="let pinnedChat of pinnedChatList">
-        <div class="talk-bubblep round">
-          <div class="talktext d-flex justify-content-start flex-column">
-            <span class="d-flex justify-content-between">
-              <p>{{pinnedChat['message']}}</p>
-              <button mat-icon-button type="button">
-                <mat-icon (click)="onChatPinned(pinnedChat['pinned'] ? false : true,pinnedChat)"
-                  style="vertical-align:top;" [ngClass]="pinnedChat['pinned'] ? 'golden' : 'white'">star
-                </mat-icon>
+          <!-- Communication Buttons -->
+          <section class="communication-buttons">
+            <button class="comm-btn whatsapp-btn" [class.active]="selectedCommType === 'whatsapp'"
+              (click)="selectCommType('whatsapp')" [disabled]="getSelectedTokens().length === 0">
+              <i class="bi bi-whatsapp"></i>
+              Whatsapp({{getSelectedTokens().length}})
+            </button>
+            <button class="comm-btn email-btn" [class.active]="selectedCommType === 'email'"
+              (click)="selectCommType('email')" [disabled]="getSelectedTokens().length === 0">
+              <i class="bi bi-envelope"></i>
+              Email({{getSelectedTokens().length}})
+            </button>
+            <button class="comm-btn notification-btn" [class.active]="selectedCommType === 'notification'"
+              (click)="selectCommType('notification')" [disabled]="getSelectedTokens().length === 0">
+              <i class="bi bi-bell-fill"></i>
+              Notification({{getSelectedTokens().length}})
+            </button>
+            <button class="comm-btn notification-btn" (click)="onBulkInvite()" [disabled]="getSelectedTokens().length === 0">
+              <i class="bi bi-bell-fill"></i>
+              BulkInvite({{getSelectedTokens().length}})
+            </button>
+            <button class="comm-btn notification-btn" (click)="bulkAvTest()" [disabled]="getSelectedTokens().length === 0">
+                <i class="bi bi-bell-fill"></i>
+                Bulk AV Test({{getSelectedTokens().length}})
               </button>
-            </span>
-            <span style="font-size: 14px;">
-              <p>{{pinnedChat['date']?.toDate() | date:'short'}}</p>
+            <button *ngIf="roles['developer'] || roles['admin'] || roles['tester'] || roles['floor']"
+              class="comm-btn notification-btn"
+              [class.active]="selectedCommType === 'appactionpending'"
+              (click)="selectCommType('appactionpending')"
+              [disabled]="getSelectedTokens().length === 0">
+              <i class="bi bi-bell-fill"></i>
+              Force Action ({{getSelectedTokens().length}})
+            </button>
+            <div class="round-robin-card">
+              <!-- Form View -->
+              <form
+                *ngIf="!isRoundRobinRunning"
+                (ngSubmit)="roundRobin()"
+                #form="ngForm"
+                class="rr-form"
+              >
+                <mat-form-field appearance="outline" class="rr-field">
+                  <mat-label>Inv. Count</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    name="participants"
+                    [(ngModel)]="roundRobbinformData.howManyParticipantsNeeded"
+                    min="1"
+                    [max]="getSelectedTokens().length"
+                    required
+                  />
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="rr-field">
+                  <mat-label>Duration (mins)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    name="duration"
+                    [(ngModel)]="roundRobbinformData.duration"
+                    required
+                  />
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="rr-field">
+                  <mat-label>Max Attempts</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    name="maxcycle"
+                    [(ngModel)]="roundRobbinformData.maxcycle"
+                    min="2"
+                    required
+                  />
+                </mat-form-field>
+
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="submit"
+                  [disabled]="form.invalid"
+                >
+                  Start Round Robin
+                </button>
+              </form>
+
+              <!-- Status View -->
+              <div *ngIf="isRoundRobinRunning" class="rr-status">
+                <div class="status-items">
+                  <div class="status-item">
+                    <span class="label">Needed</span>
+                    <span class="value">{{ roundRobinStatus.needed }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="label">Approved</span>
+                    <span class="value success">{{ roundRobinStatus.approved.length }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="label">Next Round</span>
+                    <span class="value">{{ roundRobinStatus.sleeptimer }}s</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="label">Batch</span>
+                    <span class="value">{{ roundRobinStatus.attempts}} / {{ roundRobinStatus.maxattempts}}</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="label">Cycle</span>
+                    <span class="value">{{ roundRobinStatus.currentcycle}} / {{ roundRobinStatus.maxcycle}}</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="label">Status</span>
+                    <span class="value" [class.success]="roundRobinStatus.status === 'Success'">
+                      {{ roundRobinStatus.status }}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  mat-stroked-button
+                  color="warn"
+                  (click)="cancelRoundRobin()"
+                >
+                  <span *ngIf="['Success','Completed']"></span>
+                  {{roundRobinStatus.status === 'Running' ? 'Cancel Round Robin' : 'Close Round Robin'}}
+                  Cancel Round Robin
+                </button>
+              </div>
+            </div>
+            <div class="col-auto d-flex gap-2">
+              <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
+                <mat-icon>upload_file</mat-icon> Import
+              </button>
+              <input type="file" #fileInput style="display: none" (change)="onImportData($event)" accept=".csv,.xlsx,.xls" />
+              
+              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()" [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>local_offer</mat-icon> Add Tag
+              </button>
+            </div>
+          </section>
+
+            <!-- Send Button -->
+            <section class="send-button-section" *ngIf="selectedCommType">
+              <button class="send-btn" (click)="sendCommunication()" [disabled]="getSelectedTokens().length === 0">
+                <i class="bi bi-send-fill"></i>
+                Send {{selectedCommType | titlecase}} to {{getSelectedTokens().length}} participant(s)
+              </button>
+            </section>
+
+            <!-- Participants Section -->
+            <section class="participants-section">
+              <!-- Header -->
+              <div class="participants-header">
+                <h5 class="participants-title">
+                  Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length : (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
+                </h5>
+                <div class="select-all-wrapper" (click)="toggleSelectAll()">
+                  <div class="custom-checkbox" [class.checked]="areAllSelected()">
+                    <i class="bi bi-check" *ngIf="areAllSelected()"></i>
+                  </div>
+                  <span class="select-all-text">Select All</span>
+                </div>
+              </div>
+
+              <!-- Participants List - Merged from selected stages -->
+              <div class="participants-list" *ngIf="selectedStages.length > 0">
+                <div *ngFor="let token of getMergedParticipants(); let i = index"
+                  class="participant-item" (click)="toggleTokenSelection(token)">
+
+                  <!-- Checkbox -->
+                  <!-- <div class="custom-checkbox" [class.checked]="isTokenSelected(token)">
+                    <i class="bi bi-check" *ngIf="isTokenSelected(token)"></i>
+                  </div> -->
+
+                  <input type="checkbox" [checked]="isTokenSelected(token)" >
+
+                  <!-- Avatar with Number -->
+                  <div class="participant-avatar">
+                    #{{i + 1}}
+                  </div>
+
+                  <!-- Participant Info -->
+                  <div class="participant-info">
+                    <div class="participant-name">
+                      <i class="bi bi-person-fill"></i>
+                      {{mapProfileData[token.profile_id]?.['name']}}
+                    </div>
+                    <div class="participant-email">
+                      <i class="bi bi-envelope"></i>
+                      {{mapProfileData[token.profile_id]?.['email']}}
+                    </div>
+                    
+                    <!-- Stage Info -->
+                    <div class="participant-stage">
+                      <i class="bi bi-layers"></i>
+                      <span class="stage-badge">{{token.fromStage}}</span>
+                      <span class="stage-type-badge" *ngIf="token.fromStageType">({{token.fromStageType}})</span>
+                    </div>
+                    
+                    <!-- Segments Display -->
+                    <div class="participant-segments" *ngIf="selectedSegments.length > 0 && getParticipantSegments(token.profile_id).length > 0">
+                      <i class="bi bi-diagram-3"></i>
+                      <span class="segment-badge" *ngFor="let segName of getParticipantSegments(token.profile_id)">
+                        {{segName}}
+                      </span>
+                    </div>
+                    
+                    <!-- Tags Display -->
+                    <div class="participant-tags" *ngIf="selectedTags.length > 0 && getParticipantTags(token.profile_id).length > 0">
+                      <i class="bi bi-tags"></i>
+                      <span class="tag-badge" *ngFor="let tagName of getParticipantTags(token.profile_id)">
+                        {{tagName}}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Empty State -->
+                <div *ngIf="getMergedParticipants().length === 0" class="empty-state">
+                  <i class="bi bi-person-x"></i>
+                  <p>No participants found in selected stages</p>
+                </div>
+              </div>
+
+              <!-- Participants List - Single stage (when no stages selected in dropdown) -->
+              <div class="participants-list" *ngIf="selectedStages.length === 0">
+                <div *ngFor="let token of getStageParticipants(selectedChatStage)?.['tokenlist']; let i = index"
+                  class="participant-item" (click)="toggleTokenSelection(token)">
+
+                  <!-- Checkbox -->
+                  <div class="custom-checkbox" [class.checked]="isTokenSelected(token)">
+                    <i class="bi bi-check" *ngIf="isTokenSelected(token)"></i>
+                  </div>
+
+                  <!-- Avatar with Number -->
+                  <div class="participant-avatar">
+                    #{{i + 1}}
+                  </div>
+
+                  <!-- Participant Info -->
+                  <div class="participant-info">
+                    <div class="participant-name">
+                      <i class="bi bi-person-fill"></i>
+                      {{mapProfileData[token.profile_id]?.['name']}}
+                    </div>
+                    <div class="participant-email">
+                      <i class="bi bi-envelope"></i>
+                      {{mapProfileData[token.profile_id]?.['email']}}
+                    </div>
+                    
+                    <!-- Segments Display -->
+                    <div class="participant-segments" *ngIf="selectedSegments.length > 0 && getParticipantSegments(token.profile_id).length > 0">
+                      <i class="bi bi-diagram-3"></i>
+                      <span class="segment-badge" *ngFor="let segName of getParticipantSegments(token.profile_id)">
+                        {{segName}}
+                      </span>
+                    </div>
+                    
+                    <!-- Tags Display -->
+                    <div class="participant-tags" *ngIf="selectedTags.length > 0 && getParticipantTags(token.profile_id).length > 0">
+                      <i class="bi bi-tags"></i>
+                      <span class="tag-badge" *ngFor="let tagName of getParticipantTags(token.profile_id)">
+                        {{tagName}}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Empty State -->
+                <div *ngIf="!getStageParticipants(selectedChatStage)?.['tokenlist']?.length" class="empty-state">
+                  <i class="bi bi-person-x"></i>
+                  <p>No participants found for this stage</p>
+                </div>
+              </div>
+            </section>
+
+          </main>
+          <!-- list of pinned chat message by login person -->
+          <div style="max-height:200px;min-height:0px;" class="overflow-auto">
+            <span class="d-flex justify-content-center" *ngFor="let pinnedChat of pinnedChatList">
+              <div class="talk-bubblep round">
+                <div class="talktext d-flex justify-content-start flex-column">
+                  <span class="d-flex justify-content-between">
+                    <p>{{pinnedChat['message']}}</p>
+                    <button mat-icon-button type="button">
+                      <mat-icon (click)="onChatPinned(pinnedChat['pinned'] ? false : true,pinnedChat)"
+                        style="vertical-align:top;" [ngClass]="pinnedChat['pinned'] ? 'golden' : 'white'">star
+                      </mat-icon>
+                    </button>
+                  </span>
+                  <span style="font-size: 14px;">
+                    <p>{{pinnedChat['date']?.toDate() | date:'short'}}</p>
+                  </span>
+                </div>
+              </div>
             </span>
           </div>
+          <!-- listing chat mesage -->
+          <div *ngIf="selectedChatStage != null" style="height:700px" class="w-100 overflow-auto">
+            <span *ngIf="![null,undefined].includes(chatList[selectedChatStage])">
+              <span *ngFor="let list of chatList[selectedChatStage]">
+                <span *ngIf="list['senderprofileid'] === profileid">
+                  <div class="talk-bubble round" style="float:right;">
+                    <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
+                      <span class="d-flex justify-content-between">
+                        <button mat-icon-button type="button"><mat-icon
+                            (click)="onChatPinned(list['pinned'] ? false : true,list)" style="vertical-align:top;"
+                            [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
+                        <p>{{list['message']}}</p>
+                      </span>
+                      <span style="font-size: 14px;color: deepskyblue;">
+                        <p>{{list['date']?.toDate() | date:'short'}}</p>
+                      </span>
+                    </div>
+                  </div>
+                </span>
+                <span *ngIf="list['senderprofileid'] != profileid">
+                  <div class="talk-bubble1 round">
+                    <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
+                      <span class="d-flex justify-content-between">
+                        <p>{{mapProfileData[list['senderprofileid']]['name']}}</p>
+                        <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
+                            [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
+                      </span>
+                      <span>
+                        <p>{{list['message']}}</p>
+                      </span>
+                      <span style="font-size: 14px;color: rgb(1, 121, 161);">
+                        <p>{{list['date']?.toDate() | date:'short'}}</p>
+                      </span>
+                    </div>
+                  </div>
+                </span>
+              </span>
+            </span>
+          </div>
+      </ng-container>
+      <ng-container *ngIf="sidenavMode === 'filter'">
+        <div class="panel-header">
+          <h3>
+            <mat-icon>tune</mat-icon>
+            <b>Filters</b>
+          </h3>
+          <button mat-icon-button (click)="snav.close()" class="close-panel-btn">
+            <mat-icon>close</mat-icon>
+          </button>
         </div>
-      </span>
-    </div>
-    <!-- listing chat mesage -->
-    <div *ngIf="selectedChatStage != null" style="height:700px" class="w-100 overflow-auto">
-      <span *ngIf="![null,undefined].includes(chatList[selectedChatStage])">
-        <span *ngFor="let list of chatList[selectedChatStage]">
-          <span *ngIf="list['senderprofileid'] === profileid">
-            <div class="talk-bubble round" style="float:right;">
-              <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
-                <span class="d-flex justify-content-between">
-                  <button mat-icon-button type="button"><mat-icon
-                      (click)="onChatPinned(list['pinned'] ? false : true,list)" style="vertical-align:top;"
-                      [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
-                  <p>{{list['message']}}</p>
-                </span>
-                <span style="font-size: 14px;color: deepskyblue;">
-                  <p>{{list['date']?.toDate() | date:'short'}}</p>
-                </span>
+        <div class="filter-sidenav-body" *ngIf="selectedQueue != null">
+
+          <!-- Clear all + count header -->
+          <div class="fsb-header" *ngIf="getActiveFilterCount() > 0">
+            <span class="fsb-active-count">{{getActiveFilterCount()}} filter(s) active — {{totalParticipants}} participants</span>
+            <button class="fsb-clear-btn" (click)="clearAllFilters()">
+              <mat-icon>clear_all</mat-icon> Clear all
+            </button>
+          </div>
+
+          <!-- SEGMENT ROW -->
+          <div class="fsb-expandable" *ngIf="availableSegments.length > 0">
+            <div class="fsb-row" [class.fsb-row-active]="selectedSegments.length > 0"
+                [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
+                (click)="!dfuFilterActive && !selectedStageSlot && (segmentDropdownOpen=!segmentDropdownOpen); !dfuFilterActive && !selectedStageSlot && segmentDropdownOpen && onSegmentDropdownOpen()">
+              <mat-icon class="fsb-icon">group</mat-icon>
+              <span class="fsb-label">
+                <span *ngIf="selectedSegments.length === 0">Filter by Segment</span>
+                <span *ngIf="selectedSegments.length > 0">{{selectedSegments.length}} Segment(s)</span>
+              </span>
+              <span class="fsb-count" *ngIf="selectedSegments.length > 0">{{selectedSegments.length}}</span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="segmentDropdownOpen">expand_more</mat-icon>
+            </div>
+            <div class="fsb-dropdown" *ngIf="segmentDropdownOpen && !dfuFilterActive && !selectedStageSlot">
+              <div class="fsb-dropdown-search">
+                <mat-icon>search</mat-icon>
+                <input type="text" [(ngModel)]="segmentSearchTerm" (input)="filterSegments()"
+                      (click)="$event.stopPropagation()" placeholder="Search segments...">
+                <button *ngIf="segmentSearchTerm" (click)="clearSegmentSearch(); $event.stopPropagation()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="fsb-dropdown-options">
+                <div class="fsb-option" *ngFor="let segment of filteredSegments"
+                    [class.fsb-option-selected]="isSegmentSelected(segment.id)"
+                    (click)="toggleSegmentSelection(segment.id); onSegmentFilterChange(); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{isSegmentSelected(segment.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                  <span>{{segment.segmentname || segment.name || segment.id}}</span>
+                </div>
+                <div class="fsb-empty" *ngIf="filteredSegments.length === 0">No segments found</div>
+              </div>
+              <div class="fsb-dropdown-footer" *ngIf="selectedSegments.length > 0">
+                <button (click)="selectedSegments=[]; onSegmentFilterChange(); $event.stopPropagation()">Clear selection</button>
               </div>
             </div>
-          </span>
-          <span *ngIf="list['senderprofileid'] != profileid">
-            <div class="talk-bubble1 round">
-              <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
-                <span class="d-flex justify-content-between">
-                  <p>{{mapProfileData[list['senderprofileid']]['name']}}</p>
-                  <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
-                      [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
-                </span>
-                <span>
-                  <p>{{list['message']}}</p>
-                </span>
-                <span style="font-size: 14px;color: rgb(1, 121, 161);">
-                  <p>{{list['date']?.toDate() | date:'short'}}</p>
-                </span>
+          </div>
+
+          <!-- TAGS ROW -->
+          <div class="fsb-expandable" *ngIf="availableTags.length > 0">
+            <div class="fsb-row" [class.fsb-row-active]="selectedTags.length > 0"
+                [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
+                (click)="!dfuFilterActive && !selectedStageSlot && (tagDropdownOpen=!tagDropdownOpen); !dfuFilterActive && !selectedStageSlot && tagDropdownOpen && onTagDropdownOpen()">
+              <mat-icon class="fsb-icon">local_offer</mat-icon>
+              <span class="fsb-label">
+                <span *ngIf="selectedTags.length === 0">Filter by Tags</span>
+                <span *ngIf="selectedTags.length > 0">{{selectedTags.length}} Tag(s)</span>
+              </span>
+              <span class="fsb-count" *ngIf="selectedTags.length > 0">{{selectedTags.length}}</span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="tagDropdownOpen">expand_more</mat-icon>
+            </div>
+            <div class="fsb-dropdown" *ngIf="tagDropdownOpen && !dfuFilterActive && !selectedStageSlot">
+              <div class="fsb-dropdown-search">
+                <mat-icon>search</mat-icon>
+                <input type="text" [(ngModel)]="tagSearchTerm" (input)="filterTags()"
+                      (click)="$event.stopPropagation()" placeholder="Search tags...">
+                <button *ngIf="tagSearchTerm" (click)="clearTagSearch(); $event.stopPropagation()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="fsb-dropdown-options">
+                <div class="fsb-option" *ngFor="let tag of filteredTags"
+                    [class.fsb-option-selected]="isTagSelected(tag.docid)"
+                    (click)="toggleTagSelection(tag.docid); onTagFilterChange(); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{isTagSelected(tag.docid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                  <span>{{tag.name}}</span>
+                </div>
+                <div class="fsb-empty" *ngIf="filteredTags.length === 0">No tags found</div>
+              </div>
+              <div class="fsb-dropdown-footer" *ngIf="selectedTags.length > 0">
+                <button (click)="selectedTags=[]; onTagFilterChange(); $event.stopPropagation()">Clear selection</button>
               </div>
             </div>
-          </span>
-        </span>
-      </span>
-    </div>
-  </mat-sidenav>
+          </div>
+
+          <!-- PREASSIGNED ROW -->
+          <div class="fsb-expandable">
+            <div class="fsb-row" [class.fsb-row-active]="preassignedFilter !== 'all'"
+                [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
+                (click)="togglePreassignedDropdown()">
+              <mat-icon class="fsb-icon">assignment_ind</mat-icon>
+              <span class="fsb-label">Preassigned</span>
+              <span class="fsb-value-text" *ngIf="preassignedFilter === 'all'">All participants</span>
+              <span class="fsb-value-text fsb-value-active" *ngIf="preassignedFilter !== 'all'">
+                {{preassignedFilter === 'preassigned' ? 'Pre-assigned only' : 'Not pre-assigned'}}
+              </span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="preassignedDropdownOpen">expand_more</mat-icon>
+            </div>
+            <div class="fsb-dropdown" *ngIf="preassignedDropdownOpen">
+              <div class="fsb-dropdown-options">
+                <div class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'all'"
+                    (click)="preassignedFilter='all'; onPreassignedFilterChange(); preassignedDropdownOpen=false; $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{preassignedFilter === 'all' ? 'radio_button_checked' : 'radio_button_unchecked'}}</mat-icon>
+                  <span>All participants</span>
+                </div>
+                <div class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'preassigned'"
+                    (click)="preassignedFilter='preassigned'; onPreassignedFilterChange(); preassignedDropdownOpen=false; $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{preassignedFilter === 'preassigned' ? 'radio_button_checked' : 'radio_button_unchecked'}}</mat-icon>
+                  <span>Pre-assigned only</span>
+                </div>
+                <div class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'not-preassigned'"
+                    (click)="preassignedFilter='not-preassigned'; onPreassignedFilterChange(); preassignedDropdownOpen=false; $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{preassignedFilter === 'not-preassigned' ? 'radio_button_checked' : 'radio_button_unchecked'}}</mat-icon>
+                  <span>Not pre-assigned</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STAGE SLOT ROW -->
+          <div class="fsb-expandable">
+            <div class="fsb-row" [class.fsb-row-active]="!!selectedStageSlot"
+                [class.fsb-row-disabled]="dfuFilterActive"
+                (click)="toggleStageSlotDropdown()">
+              <mat-icon class="fsb-icon">layers</mat-icon>
+              <span class="fsb-label">Stage Slot</span>
+              <span class="fsb-value-text" *ngIf="!selectedStageSlot">Filter by Stage Slot</span>
+              <span class="fsb-value-text fsb-value-active" *ngIf="selectedStageSlot">{{selectedStageSlot}}</span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="stageSlotDropdownOpen">expand_more</mat-icon>
+            </div>
+            <div class="fsb-dropdown" *ngIf="stageSlotDropdownOpen">
+              <div class="fsb-dropdown-options">
+                <div class="fsb-option" [class.fsb-option-selected]="!selectedStageSlot"
+                    (click)="selectedStageSlot=null; onStageSlotChange(); stageSlotDropdownOpen=false; $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{!selectedStageSlot ? 'radio_button_checked' : 'radio_button_unchecked'}}</mat-icon>
+                  <span>All stages</span>
+                </div>
+                <div class="fsb-option" *ngFor="let stage of availableStagesFromSlot"
+                    [class.fsb-option-selected]="selectedStageSlot === stage"
+                    (click)="selectedStageSlot=stage; onStageSlotChange(); stageSlotDropdownOpen=false; $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">{{selectedStageSlot === stage ? 'radio_button_checked' : 'radio_button_unchecked'}}</mat-icon>
+                  <span>{{stage}}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Date range — shown when stage slot selected -->
+            <div class="fsb-sub-section" *ngIf="selectedStageSlot">
+              <div class="fsb-row fsb-row-sub" [class.fsb-row-active]="dateRangeStart && dateRangeEnd">
+                <mat-icon class="fsb-icon">date_range</mat-icon>
+                <mat-form-field appearance="outline" class="fsb-date-field">
+                  <mat-label>Date range</mat-label>
+                  <mat-date-range-input [rangePicker]="sidenavRangePicker">
+                    <input matStartDate [ngModel]="dateRangeStart"
+                          (ngModelChange)="dateRangeStart=$event"
+                          (dateChange)="onDateRangeChange()" placeholder="Start">
+                    <input matEndDate [ngModel]="dateRangeEnd"
+                          (ngModelChange)="dateRangeEnd=$event"
+                          (dateChange)="onDateRangeChange()" placeholder="End">
+                  </mat-date-range-input>
+                  <mat-datepicker-toggle matSuffix [for]="sidenavRangePicker"></mat-datepicker-toggle>
+                  <mat-date-range-picker #sidenavRangePicker></mat-date-range-picker>
+                </mat-form-field>
+              </div>
+
+              <!-- Time slots -->
+              <ng-container *ngIf="availableTimeSlots.length > 0">
+                <div class="fsb-row fsb-row-sub fsb-row-label-only">
+                  <mat-icon class="fsb-icon">schedule</mat-icon>
+                  <span class="fsb-label">Time slot</span>
+                </div>
+                <div class="fsb-timeslot-list">
+                  <div class="fsb-option" [class.fsb-option-selected]="selectedTimeSlots.length === 0"
+                      (click)="selectTimeSlot(null)">
+                    <mat-icon class="fsb-option-check">
+                      {{selectedTimeSlots.length === 0 ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                    </mat-icon>
+                    <span>All times ({{getTotalSlotCount()}})</span>
+                  </div>
+                  <div class="fsb-option" *ngFor="let slot of availableTimeSlots"
+                      [class.fsb-option-selected]="selectedTimeSlots.includes(slot.timeRange)"
+                      (click)="selectTimeSlot(slot.timeRange)">
+                    <mat-icon class="fsb-option-check">
+                      {{selectedTimeSlots.includes(slot.timeRange) ? 'check_box' : 'check_box_outline_blank'}}
+                    </mat-icon>
+                    <span>{{slot.timeRange}} ({{slot.count}})</span>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+
+          <!-- CUSTOMER SUPPORT FILTER ROW -->
+          <div class="fsb-expandable" *ngIf="availableCustomerSupportCategories.length > 0">
+            <div class="fsb-row"
+                [class.fsb-row-active]="selectedCustomerSupportCategories.length > 0"
+                (click)="customerSupportDropdownOpen = !customerSupportDropdownOpen">
+              <mat-icon class="fsb-icon">support_agent</mat-icon>
+              <span class="fsb-label">Customer Support</span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="customerSupportDropdownOpen">
+                expand_more
+              </mat-icon>
+            </div>
+            <div class="fsb-dropdown" *ngIf="customerSupportDropdownOpen">
+              <div class="fsb-dropdown-options">
+                <div class="fsb-option"
+                    *ngFor="let category of availableCustomerSupportCategories"
+                    [class.fsb-option-selected]="selectedCustomerSupportCategories.includes(category)"
+                    (click)="toggleCustomerSupportCategory(category); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{selectedCustomerSupportCategories.includes(category) ? 'check_box' : 'check_box_outline_blank'}}
+                  </mat-icon>
+                  <span>{{category}}</span>
+                </div>
+              </div>
+              <div class="fsb-dropdown-footer" *ngIf="selectedCustomerSupportCategories.length > 0">
+                <button (click)="selectedCustomerSupportCategories=[]; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                  Clear selection
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- EVENT PARTICIPATION FILTER ROW -->
+          <div class="fsb-expandable">
+            <div class="fsb-row"
+                [class.fsb-row-active]="!!selectedArenaEventId"
+                (click)="eventParticipationDropdownOpen = !eventParticipationDropdownOpen; !eventParticipationListLoaded && loadEventParticipationList()">
+              <mat-icon class="fsb-icon">event</mat-icon>
+              <span class="fsb-label">Event Participation</span>
+              <span class="fsb-value-text" *ngIf="!selectedArenaEventId">Select Event</span>
+              <span class="fsb-value-text fsb-value-active" *ngIf="selectedArenaEventId">
+                {{getArenaEventName(selectedArenaEventId)}}
+              </span>
+              <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="eventParticipationDropdownOpen">
+                expand_more
+              </mat-icon>
+            </div>
+
+            <!-- Dropdown — shows event/queue list -->
+            <div class="fsb-dropdown" *ngIf="eventParticipationDropdownOpen">
+              
+              <!-- Loading state -->
+              <div *ngIf="arenaEventLoading" style="padding:16px; text-align:center; color:#999; font-size:13px;">
+                <mat-icon class="spin" style="font-size:18px; width:18px; height:18px;">sync</mat-icon>
+                Loading...
+              </div>
+
+              <!-- Event/Queue list -->
+              <div class="fsb-dropdown-search" *ngIf="!arenaEventLoading && arenaEventFilterList.length === 0">
+                  <mat-icon>search</mat-icon>
+                  <input type="text"
+                        [(ngModel)]="eventParticipationSearchTerm"
+                        (click)="$event.stopPropagation()"
+                        placeholder="Search events...">
+                  <button *ngIf="eventParticipationSearchTerm" 
+                          (click)="eventParticipationSearchTerm=''; $event.stopPropagation()">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              <div class="fsb-dropdown-options" *ngIf="!arenaEventLoading && arenaEventFilterList.length === 0">
+                <div class="fsb-option"
+                    *ngFor="let item of filteredEventParticipationList"
+                    [class.fsb-option-selected]="selectedEventParticipation?.docid === item.docid"
+                    (click)="onEventParticipationSelect(item); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{selectedEventParticipation?.docid === item.docid ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span style="white-space:normal; word-break:break-word; line-height:1.3;">
+                    {{item.name || item.eventname}} 
+                    <span style="font-size:11px; color:#999;">({{item.type | uppercase}})</span>
+                  </span>
+                </div>
+                <div class="fsb-empty" *ngIf="eventParticipationList.length === 0">
+                  No events found
+                </div>
+              </div>
+
+              <!-- Arena events sub-list — shown after event/queue is selected -->
+              <div *ngIf="!arenaEventLoading && arenaEventFilterList.length > 0">
+                
+                <!-- Back button to reselect event/queue -->
+                <div class="fsb-option" 
+                    style="border-bottom:1px solid #e0e0e0; color:#1976d2;"
+                    (click)="selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check" style="color:#1976d2;">arrow_back</mat-icon>
+                  <span>{{selectedEventParticipation?.name || selectedEventParticipation?.eventname}}</span>
+                </div>
+
+                <!-- All Events option -->
+                <div class="fsb-dropdown-options">
+                  <div class="fsb-option"
+                      [class.fsb-option-selected]="!selectedArenaEventId"
+                      (click)="selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                    <mat-icon class="fsb-option-check">
+                      {{!selectedArenaEventId ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                    </mat-icon>
+                    <span>All Events</span>
+                  </div>
+
+                  <!-- Individual arena events -->
+                  <div class="fsb-option"
+                      *ngFor="let event of arenaEventFilterList"
+                      [class.fsb-option-selected]="selectedArenaEventId === event.docid"
+                      (click)="selectedArenaEventId=event.docid; processTokensIntoStages(allTokensData); arenaEventDropdownOpen=false; $event.stopPropagation()">
+                    <mat-icon class="fsb-option-check">
+                      {{selectedArenaEventId === event.docid ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                    </mat-icon>
+                    <span style="white-space:normal; word-break:break-word; line-height:1.3;">
+                      {{event.name}}
+                    </span>
+                    <span style="font-size:11px; color:#999; margin-left:4px; flex-shrink:0;">
+                      ({{getArenaEventQueueCount(event.docid)}})
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Clear selection -->
+                <div class="fsb-dropdown-footer" *ngIf="selectedArenaEventId">
+                  <button (click)="selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- ATC FILTER ROW -->
+          <div class="fsb-expandable">
+            
+            <!-- Main toggle row -->
+            <div class="fsb-row fsb-toggle-row"
+                [class.fsb-row-active]="atcFilterActive"
+                (click)="toggleATCFilter()">
+              <mat-icon class="fsb-icon">medical_services</mat-icon>
+              <span class="fsb-label">Has ATC</span>
+              <span class="fsb-count" *ngIf="atcDataLoaded && getTotalATCCount() > 0">
+                {{getTotalATCCount()}}
+              </span>
+              <div class="fsb-toggle" [class.fsb-toggle-on]="atcFilterActive">
+                <div class="fsb-toggle-knob"></div>
+              </div>
+            </div>
+
+            <!-- Sub filter dropdown — only shown when main toggle is ON -->
+            <div class="fsb-dropdown" *ngIf="atcFilterActive">
+
+              <!-- Loading state -->
+              <div *ngIf="!atcDataLoaded" 
+                  style="padding:16px; text-align:center; color:#999; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <mat-icon class="spin" style="font-size:18px; width:18px; height:18px;">sync</mat-icon>
+                Loading...
+              </div>
+
+              <!-- Options — shown only after loaded -->
+              <div class="fsb-dropdown-options" *ngIf="atcDataLoaded">
+                
+                <!-- All ATC -->
+                <div class="fsb-option"
+                    [class.fsb-option-selected]="atcFilter === 'none'"
+                    (click)="selectATCFilter('none'); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{atcFilter === 'none' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span>All ATC</span>
+                  <span style="font-size:11px; color:#999; margin-left:4px;">
+                    ({{getTotalATCCount()}})
+                  </span>
+                </div>
+
+                <!-- Validated -->
+                <div class="fsb-option"
+                    [class.fsb-option-selected]="atcFilter === 'validated'"
+                    (click)="selectATCFilter('validated'); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{atcFilter === 'validated' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span>Validated</span>
+                  <span style="font-size:11px; color:#999; margin-left:4px;">
+                    ({{getATCValidatedCount()}})
+                  </span>
+                </div>
+
+                <!-- Unvalidated -->
+                <div class="fsb-option"
+                    [class.fsb-option-selected]="atcFilter === 'unvalidated'"
+                    (click)="selectATCFilter('unvalidated'); $event.stopPropagation()">
+                  <mat-icon class="fsb-option-check">
+                    {{atcFilter === 'unvalidated' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                  </mat-icon>
+                  <span>Unvalidated</span>
+                  <span style="font-size:11px; color:#999; margin-left:4px;">
+                    ({{getATCUnvalidatedCount()}})
+                  </span>
+                </div>
+
+              </div>
+
+              <!-- Clear selection footer -->
+              <div class="fsb-dropdown-footer" *ngIf="atcDataLoaded && atcFilter !== 'none'">
+                <button (click)="atcFilter='none'; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                  Clear selection
+                </button>
+              </div>
+
+            </div>
+          </div>
+          <!-- DFU ROW -->
+          <div class="fsb-row fsb-toggle-row"
+              [class.fsb-row-active]="dfuFilterActive"
+              [class.fsb-row-disabled]="!!selectedStageSlot"
+              (click)="!selectedStageSlot && toggleDFUFilter()">
+            <mat-icon class="fsb-icon">priority_high</mat-icon>
+            <span class="fsb-label">DFU participants only</span>
+            <span class="fsb-count" *ngIf="getTotalDFUCount() > 0">{{getTotalDFUCount()}}</span>
+            <div class="fsb-toggle" [class.fsb-toggle-on]="dfuFilterActive">
+              <div class="fsb-toggle-knob"></div>
+            </div>
+          </div>
+
+          <!-- TODAY REMINDERS ROW -->
+          <div class="fsb-row fsb-toggle-row"
+              *ngIf="todayReminders.length > 0"
+              [class.fsb-row-active]="reminderTodayFilterActive"
+              [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
+              (click)="!dfuFilterActive && !selectedStageSlot && toggleReminderTodayFilter()">
+            <mat-icon class="fsb-icon">alarm</mat-icon>
+            <span class="fsb-label">Today's reminders</span>
+            <span class="fsb-count">{{todayReminders.length}}</span>
+            <div class="fsb-toggle" [class.fsb-toggle-on]="reminderTodayFilterActive">
+              <div class="fsb-toggle-knob"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-sidenav-empty" *ngIf="selectedQueue == null">
+          <mat-icon>filter_list_off</mat-icon>
+          <p>Select a queue first to use filters</p>
+        </div>
+      </ng-container>
+    </mat-sidenav>
   <mat-sidenav-content>
     <div class="mainscreen" [class.panel-open]="showStageCountPanel">
       <!-- Header -->
@@ -390,9 +839,9 @@
           </mat-form-field>
 
           <span *ngIf="selectedQueue != null">
-            <h5 style="font-size: 16px;"><b style="font-weight: bold;color:rgb(0, 101, 135);">Total Participants</b> :
-              {{currentQueueParticipants.length}}
-            </h5>
+          <h5 style="font-size: 16px;"><b style="font-weight: bold;color:rgb(0, 101, 135);">Total Participants</b> :
+            {{totalParticipants}}
+          </h5>
           </span>
         </div>
 
@@ -420,10 +869,20 @@
 
             <!-- Existing buttons -->
             <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button" (click)="exportCSV()">Export CSV</button>
-            <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button" (click)="selectedChatStage = 'queueadmin';snav.open()">Admin Stage</button>
+            <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button" (click)="sidenavMode='comms'; selectedChatStage='queueadmin'; snav.open()">Admin Stage</button>
 
             <button mat-icon-button [matMenuTriggerFor]="quickLinksMenu" matTooltip="Quick Access" color="primary">
               <mat-icon>visibility</mat-icon>
+            </button>
+
+            <!-- ADD THIS right before the quick links eye button -->
+            <button mat-icon-button (click)="sidenavMode='filter'; snav.open()" matTooltip="Filters"
+                    [style.color]="getActiveFilterCount() > 0 ? 'var(--color-text-info)' : null"
+                    style="position:relative">
+              <mat-icon>tune</mat-icon>
+              <span *ngIf="getActiveFilterCount() > 0" class="filter-btn-badge">
+                {{getActiveFilterCount()}}
+              </span>
             </button>
 
             <mat-menu #quickLinksMenu="matMenu" panelClass="quick-links-menu" xPosition="before">
@@ -530,7 +989,6 @@
           </div>
         </div>
       </div>
-
       <div class="row w-100">
         <div class="col-sm">
           <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1">
@@ -546,320 +1004,121 @@
         </div>
       </div>
 
-      <!-- ============= ENHANCED: Browser-like Search Section ============= -->
-      <div class="filter-section" [class.panel-open]="showStageCountPanel" *ngIf="selectedQueue != null">
-        <div class="filter-row">
-          <!-- Enhanced Search Field -->
-          <div class="browser-search-container">
-            <mat-form-field appearance="outline" class="search-field-main">
-              <mat-label>Search (Ctrl+F)</mat-label>
-              <input #searchBox matInput [(ngModel)]="searchFilter" 
-                     (ngModelChange)="onSearchChange()"
-                     (keydown.enter)="$event.preventDefault(); goToNextMatch()"
-                     (keydown.shift.enter)="$event.preventDefault(); goToPreviousMatch()"
-                     (focus)="isSearchActive = true"
-                     placeholder="Search name, email, phone, token, stage...">
-              <mat-icon matPrefix>search</mat-icon>
-              
-              <!-- Match Counter -->
-              <span matSuffix class="match-counter" *ngIf="isSearchActive && searchFilter"
-                    [class.no-match]="searchMatches.length === 0">
-                {{ getMatchPositionText() }}
-              </span>
-              <mat-hint>(Ctrl + G) for Browser Search</mat-hint>
-            </mat-form-field>
+<!-- Search Bar + Active Chips Row -->
+<div *ngIf="selectedQueue != null" style="margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+  
+  <!-- Search Input -->
+  <div class="fsb-row" [class.fsb-row-active]="searchFilter"
+       style="background:#f5f5f5; border-radius:8px; padding:6px 12px; display:flex; align-items:center; gap:8px; max-width:400px;">
+    <mat-icon style="color:#888; font-size:20px;">search</mat-icon>
+    <input #searchBox
+           style="border:none; background:transparent; outline:none; flex:1; font-size:14px; color:#333;"
+           [(ngModel)]="searchFilter"
+           (ngModelChange)="onSearchChange()"
+           placeholder="Search participants..."
+           [disabled]="dfuFilterActive || !!selectedStageSlot">
+    <span style="font-size:12px; color:#1976d2; font-weight:500;"
+          *ngIf="searchFilter && searchMatches.length > 0">
+      {{getMatchPositionText()}}
+    </span>
+    <span style="font-size:12px; color:#e53935;"
+          *ngIf="searchFilter && searchMatches.length === 0">0</span>
+    <button *ngIf="searchFilter"
+            style="border:none; background:none; cursor:pointer; padding:0; display:flex; align-items:center;"
+            (click)="clearSearch()">
+      <mat-icon style="font-size:18px; color:#888;">close</mat-icon>
+    </button>
+  </div>
 
-            <!-- Case Sensitive Toggle -->
-            <button mat-icon-button (click)="toggleCaseSensitive()" [class.active-toggle]="caseSensitiveSearch"
-              matTooltip="Match case" *ngIf="searchFilter">
-              <mat-icon>text_fields</mat-icon>
-            </button>
+  <!-- Active Filter Chips -->
+  <mat-chip-set *ngIf="getActiveFilterCount() > 0" style="display:flex; flex-wrap:wrap; gap:4px;">
+    <mat-chip *ngIf="searchFilter" (removed)="clearSearch()">
+      <mat-icon matChipAvatar>search</mat-icon>"{{searchFilter}}"
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngFor="let segId of selectedSegments"
+              (removed)="removeSegment(segId); onSegmentFilterChange()">
+      {{(availableSegments | segmentName:segId) || segId}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)">
+      {{getTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="preassignedFilter !== 'all'"
+              (removed)="preassignedFilter='all'; onPreassignedFilterChange()">
+      {{preassignedFilter === 'preassigned' ? 'Pre-assigned only' : 'Not pre-assigned'}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="selectedStageSlot" (removed)="clearStageSlotFilter()">
+      Stage: {{selectedStageSlot}}<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
+      DFU only<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="selectedArenaEventId"
+              (removed)="selectedArenaEventId=null; selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; processTokensIntoStages(allTokensData)">
+      Event: {{getArenaEventName(selectedArenaEventId)}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="atcFilterActive"
+              (removed)="atcFilterActive=false; atcFilter='none'; processTokensIntoStages(allTokensData)">
+      ATC: {{atcFilter === 'none' ? 'All' : atcFilter === 'validated' ? 'Validated' : 'Unvalidated'}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+    <mat-chip *ngIf="selectedCustomerSupportCategories.length > 0"
+              (removed)="selectedCustomerSupportCategories=[]; processTokensIntoStages(allTokensData)">
+      CS: {{selectedCustomerSupportCategories.length}} categor{{selectedCustomerSupportCategories.length > 1 ? 'ies' : 'y'}}
+      <mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+  </mat-chip-set>
 
-            <!-- Clear Search Button -->
-            <button mat-icon-button (click)="clearSearch()" matTooltip="Clear search (Esc)" *ngIf="searchFilter">
-              <mat-icon>close</mat-icon>
-            </button>
-          </div>
+</div>
 
-          <div class="filter-dropdown-wrapper" *ngIf="availableSegments.length > 0">
-            <div class="filter-dropdown-trigger" (click)="!selectedStageSlot && (segmentDropdownOpen = !segmentDropdownOpen); !selectedStageSlot && onSegmentDropdownOpen()"[class.disabled-filter]="selectedStageSlot|| dfuFilterActive">
-              <div class="filter-dropdown-label">
-                <mat-icon>diagram_3</mat-icon>
-                <span *ngIf="selectedSegments.length === 0">Filter by Segment</span>
-                <span *ngIf="selectedSegments.length > 0">{{selectedSegments.length}} Segment(s) Selected</span>
-              </div>
-              <mat-icon class="dropdown-arrow" [class.rotated]="segmentDropdownOpen">expand_more</mat-icon>
-            </div>
-            
-            <div class="filter-dropdown-menu" *ngIf="segmentDropdownOpen">
-              <div class="filter-search-box">
-                <mat-icon>search</mat-icon>
-                <input type="text" 
-                      [(ngModel)]="segmentSearchTerm" 
-                      (input)="filterSegments()"
-                      (click)="$event.stopPropagation()"
-                      placeholder="Search segments...">
-                <button *ngIf="segmentSearchTerm" (click)="clearSegmentSearch(); $event.stopPropagation()">
-                  <mat-icon>close</mat-icon>
-                </button>
-              </div>
-              
-              <div class="filter-options-list">
-                <div class="filter-option" 
-                    *ngFor="let segment of filteredSegments" 
-                    (click)="toggleSegmentSelection(segment.id); $event.stopPropagation()">
-                  <div class="custom-checkbox small" [class.checked]="isSegmentSelected(segment.id)">
-                    <mat-icon *ngIf="isSegmentSelected(segment.id)">check</mat-icon>
-                  </div>
-                  <span class="option-label">{{segment.segmentname || segment.name || segment.id}}</span>
-                </div>
-                
-                <div class="no-results" *ngIf="filteredSegments.length === 0">
-                  No segments found
-                </div>
-              </div>
-              
-              <div class="filter-dropdown-footer" *ngIf="selectedSegments.length > 0">
-                <button class="clear-selection-btn" (click)="selectedSegments = []; onSegmentFilterChange(); $event.stopPropagation()">
-                  Clear Selection
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tags Filter with Search -->
-          <div class="filter-dropdown-wrapper" *ngIf="availableTags.length > 0">
-            <div class="filter-dropdown-trigger" (click)="!selectedStageSlot && (tagDropdownOpen = !tagDropdownOpen); !selectedStageSlot && onTagDropdownOpen()"[class.disabled-filter]="selectedStageSlot|| dfuFilterActive">
-              <div class="filter-dropdown-label">
-                <mat-icon>local_offer</mat-icon>
-                <span *ngIf="selectedTags.length === 0">Filter by Tags</span>
-                <span *ngIf="selectedTags.length > 0">{{selectedTags.length}} Tag(s) Selected</span>
-              </div>
-              <mat-icon class="dropdown-arrow" [class.rotated]="tagDropdownOpen">expand_more</mat-icon>
-            </div>
-            
-            <div class="filter-dropdown-menu" *ngIf="tagDropdownOpen">
-              <div class="filter-search-box">
-                <mat-icon>search</mat-icon>
-                <input type="text" 
-                      [(ngModel)]="tagSearchTerm" 
-                      (input)="filterTags()"
-                      (click)="$event.stopPropagation()"
-                      placeholder="Search tags...">
-                <button *ngIf="tagSearchTerm" (click)="clearTagSearch(); $event.stopPropagation()">
-                  <mat-icon>close</mat-icon>
-                </button>
-              </div>
-              
-              <div class="filter-options-list">
-                <div class="filter-option" 
-                    *ngFor="let tag of filteredTags" 
-                    (click)="toggleTagSelection(tag.docid); $event.stopPropagation()">
-                  <div class="custom-checkbox small" [class.checked]="isTagSelected(tag.docid)">
-                    <mat-icon *ngIf="isTagSelected(tag.docid)">check</mat-icon>
-                  </div>
-                  <span class="option-label">{{tag.name}}</span>
-                </div>
-                
-                <div class="no-results" *ngIf="filteredTags.length === 0">
-                  No tags found
-                </div>
-              </div>
-              
-              <div class="filter-dropdown-footer" *ngIf="selectedTags.length > 0">
-                <button class="clear-selection-btn" (click)="selectedTags = []; onTagFilterChange(); $event.stopPropagation()">
-                  Clear Selection
-                </button>
-              </div>
-            </div>
-          </div>
-    
-          <!-- DFU Filter -->
-          <button mat-stroked-button  class="dfu-filter-btn" [class.active]="dfuFilterActive" (click)="toggleDFUFilter()">
-            DFU Participants ({{ getTotalDFUCount() }})
-          </button>
-          <!-- Preassigned Filter -->
-          <div class="filter-dropdown-wrapper">
-            <mat-form-field appearance="outline" class="preassigned-filter-field">
-              <mat-label>Preassigned Status</mat-label>
-              <mat-select [(ngModel)]="preassignedFilter" (selectionChange)="onPreassignedFilterChange()"[disabled]="selectedStageSlot !== null || dfuFilterActive">
-                <mat-option value="all">All Participants</mat-option>
-                <mat-option value="preassigned">Pre-assigned Only</mat-option>
-                <mat-option value="not-preassigned">Not Pre-assigned</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-
-          <div class="filter-dropdown-wrapper stage-slot-combined">
-            <!-- Stage Slot Select -->
-            <mat-form-field appearance="outline" class="stage-slot-filter-field">
-              <mat-label>Filter by Stage Slot</mat-label>
-              <mat-select [(ngModel)]="selectedStageSlot"  (selectionChange)="onStageSlotChange()" panelClass="stage-slot-dropdown" [disabled]="dfuFilterActive">
-                <mat-option [value]="null">All Stages</mat-option>
-                <mat-option *ngFor="let stage of availableStagesFromSlot" [value]="stage">
-                  {{stage}}
-                </mat-option>
-              </mat-select>
-
-              <!-- Inline date range picker icon as suffix when stage selected -->
-              <span matSuffix *ngIf="selectedStageSlot" class="inline-date-suffix">
-                <mat-date-range-picker #inlineRangePicker></mat-date-range-picker>
-                <mat-datepicker-toggle [for]="inlineRangePicker"
-                  [matTooltip]="dateRangeStart && dateRangeEnd ? 
-                    (dateRangeStart | date:'MMM d, y') + ' – ' + (dateRangeEnd | date:'MMM d, y') : 
-                    'Filter by date range'">
-                </mat-datepicker-toggle>
-                <mat-date-range-input style="width:0;height:0;overflow:hidden;position:absolute;" [rangePicker]="inlineRangePicker">
-                  <input matStartDate  [ngModel]="dateRangeStart" (ngModelChange)="dateRangeStart = $event"(dateChange)="onDateRangeChange()">
-                  <input matEndDate [ngModel]="dateRangeEnd" (ngModelChange)="dateRangeEnd = $event" (dateChange)="onDateRangeChange()">
-                </mat-date-range-input>
-                 <!-- Clock icon with dropdown -->
-                <div class="time-slot-dropdown-wrapper" *ngIf="showTimeSlotPicker" (click)="$event.stopPropagation()">
-                <button class="clock-btn"  [class.active]="selectedTimeSlots.length > 0" (click)="openTimeDropdown($event)" [matTooltip]="selectedTimeSlots.length > 0 ? selectedTimeSlots.join(', ') : 'Filter by time'">
-                  <mat-icon>schedule</mat-icon>
-                  <span *ngIf="selectedTimeSlots.length > 0" class="clock-active-dot"></span>
-                </button>
-
-                <!-- Dropdown Panel -->
-                <div class="time-dropdown-panel" *ngIf="showTimeDropdown"[style.top]="timeDropdownPosition.top"[style.right]="timeDropdownPosition.right"[style.left]="timeDropdownPosition.left">
-                  <div class="time-dropdown-header">
-                  <mat-icon>schedule</mat-icon>
-                  <span>Select Time</span>
-                  <span class="time-dropdown-date" *ngIf="dateRangeStart && dateRangeEnd">
-                    {{dateRangeStart | date:'MMM d'}} – {{dateRangeEnd | date:'MMM d'}}
-                  </span>
-                </div>
-
-                  <div class="time-dropdown-list">
-                    <!-- All option -->
-                      <div class="time-dropdown-item"[class.active]="selectedTimeSlots.length === 0" (click)="selectTimeSlot(null)">
-                        <span class="item-time">All Times</span>
-                        <span class="item-count">{{getTotalSlotCount()}}</span>
-                      </div>
-                      <!-- Time range options -->
-                      <div class="time-dropdown-item"
-                          *ngFor="let slot of availableTimeSlots"
-                          [class.active]="selectedTimeSlots.includes(slot.timeRange)"
-                          (click)="selectTimeSlot(slot.timeRange)">
-                        <div class="item-left">
-                          <div class="multi-check" [class.checked]="selectedTimeSlots.includes(slot.timeRange)">
-                            <mat-icon *ngIf="selectedTimeSlots.includes(slot.timeRange)">check</mat-icon>
-                          </div>
-                          <span class="item-time">{{slot.timeRange}}</span>
-                        </div>
-                        <span class="item-count">{{slot.count}}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </span>
-            </mat-form-field>
-          </div>
-          <!-- Clear Filters Button -->
-          <button mat-stroked-button color="warn" class="clear-filters-btn" *ngIf="searchFilter || selectedSegments.length > 0 || selectedTags.length > 0 ||  preassignedFilter !== 'all' || selectedStageSlot || dateRangeStart || dateRangeEnd || dfuFilterActive || reminderTodayFilterActive" (click)="clearAllFilters()">
-            <mat-icon>clear_all</mat-icon>
-            Clear Filters
-          </button>
-        </div>
-        
-        <!-- Active Filters Display -->
-        <div class="active-filters" *ngIf="searchFilter || selectedSegments.length > 0 ||  selectedTags.length > 0 || preassignedFilter !== 'all' ||   selectedStageSlot || dateRangeStart || dateRangeEnd || selectedTimeSlots.length > 0">
-          <span class="filter-label">Active Filters:</span>
-          <h5 style="font-size: 16px; margin-top: 10px;">
-            <b style="font-weight: bold; color: rgb(0, 101, 135);">Filtered Participants</b> :
-            {{totalParticipants}}
-          </h5>
-          <mat-chip-set class="styled-chip-set">
-            <mat-chip class="filter-chip search-chip" *ngIf="searchFilter" (removed)="clearSearch()">
-              <mat-icon matChipAvatar>search</mat-icon>
-              "{{searchFilter}}" 
-              <span class="chip-count">{{searchMatches.length}}</span>
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-
-            <mat-chip class="filter-chip segment-chip" *ngFor="let segId of selectedSegments"  (removed)="removeSegment(segId); onSegmentFilterChange()">
-              <mat-icon matChipAvatar>group</mat-icon>
-              {{(availableSegments | segmentName:segId) || segId}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-
-            <mat-chip class="filter-chip tag-chip"   *ngFor="let tagId of selectedTags"  (removed)="removeTag(tagId)">
-              <mat-icon matChipAvatar>local_offer</mat-icon>
-              {{getTagName(tagId)}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-
-            <mat-chip class="filter-chip preassign-chip"  *ngIf="preassignedFilter !== 'all'"  (removed)="preassignedFilter = 'all'; onPreassignedFilterChange()">
-              <mat-icon matChipAvatar>assignment_ind</mat-icon>
-              {{preassignedFilter === 'preassigned' ? 'Pre-assigned Only' : 'Not Pre-assigned'}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip class="filter-chip reminder-today-chip" *ngIf="reminderTodayFilterActive" (removed)="toggleReminderTodayFilter()">
-              <mat-icon matChipAvatar>alarm</mat-icon>
-              Today's Reminders ({{todayReminders.length}})
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip class="filter-chip dfu-chip" *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
-              DFU Participants ({{ getTotalDFUCount() }})
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-            <mat-chip class="filter-chip stage-chip"   *ngIf="selectedStageSlot"  (removed)="clearStageSlotFilter()">
-              <mat-icon matChipAvatar>layers</mat-icon>
-              Stage: {{selectedStageSlot}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-
-            <mat-chip class="filter-chip date-chip"  *ngIf="dateRangeStart && dateRangeEnd" 
-                      (removed)="dateRangeStart = null; dateRangeEnd = null; selectedTimeSlots = null; availableTimeSlots = []; showTimeSlotPicker = false; onDateRangeChange()">
-              <mat-icon matChipAvatar>date_range</mat-icon>
-               {{dateRangeStart | date:'MMM d'}} – {{dateRangeEnd | date:'MMM d, y'}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-
-            <!-- <mat-chip class="filter-chip time-chip" 
-              *ngIf="selectedTimeSlots.length > 0" 
-              (removed)="selectTimeSlot(null)">
-              <mat-icon matChipAvatar>schedule</mat-icon>
-              {{selectedTimeSlots.length === 1 ? selectedTimeSlots[0] : selectedTimeSlots.length + ' times selected'}}
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip> -->
-
-          </mat-chip-set>
-        </div>
-      </div>
-      <!-- ============= END: Enhanced Search Section ============= -->
       <!-- Reminder Banner -->
-      <div class="reminder-chip" *ngIf="reminders.length > 0 && showReminderBanner">
-        <span class="reminder-chip-content" (click)="openReminderListModal('today')">
-          <mat-icon>notifications_active</mat-icon>
-          <span>Reminders</span>
-          <span class="reminder-chip-count" 
-                (click)="toggleReminderTodayFilter(); $event.stopPropagation()"
-                [style.background]="reminderTodayFilterActive ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)'"
-                [style.color]="reminderTodayFilterActive ? '#667eea' : 'white'"
-                matTooltip="Click to filter today's reminders on stage">
-            Today - {{todayReminders.length}}
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px;">
+        
+        <!-- Reminder Banner -->
+        <div class="reminder-chip" *ngIf="reminders.length > 0 && showReminderBanner">
+          <span class="reminder-chip-content" (click)="openReminderListModal('today')">
+            <mat-icon>notifications_active</mat-icon>
+            <span>Reminders</span>
+            <span class="reminder-chip-count"
+                  (click)="toggleReminderTodayFilter(); $event.stopPropagation()"
+                  [style.background]="reminderTodayFilterActive ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)'"
+                  [style.color]="reminderTodayFilterActive ? '#667eea' : 'white'"
+                  matTooltip="Click to filter today's reminders on stage">
+              Today - {{todayReminders.length}}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
 
-      <div class="stagebox" [class.panel-open]="showStageCountPanel" *ngIf="selectedQueue != null">
-          <!-- Stage Count Chips Row -->
-          <div class="stage-count-chips-row" *ngIf="stageCountCards.length > 0">
-            <span class="stage-count-chips-label">Stage Counts:</span>
-            <div class="stage-count-chip" 
+        <!-- Stage Count Chips -->
+        <div class="stage-count-chips-row" *ngIf="stageCountCards.length > 0"
+            style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+
+          <div class="stage-count-chip"
+              (click)="showStageCountDropdown = !showStageCountDropdown"
+              [class.active]="showStageCountDropdown">
+            <span class="chip-name">Stage Counts</span>
+            <mat-icon style="font-size:16px; width:16px; height:16px; transition:transform 0.2s"
+                      [style.transform]="showStageCountDropdown ? 'rotate(180deg)' : 'rotate(0deg)'">
+              expand_more
+            </mat-icon>
+          </div>
+
+          <ng-container *ngIf="showStageCountDropdown">
+            <div class="stage-count-chip"
                 *ngFor="let card of stageCountCards"
                 (click)="openStageCountPanel(card)"
                 [class.active]="selectedStageCountCard?.docid === card.docid">
               <span class="chip-name">{{ card.stagename }}</span>
               <span class="chip-badge">{{ getStageCountTotal(card) }}</span>
             </div>
-            <button class="clear-stage-filter-btn"  *ngIf="activeStageCountFilter.length > 0"(click)="clearStageCountFilter()" matTooltip="Clear stage count filter">
-              <mat-icon>clear</mat-icon>
-              Clear Filter
-            </button>
-          </div>
+          </ng-container>
+        </div>
+      </div>
 
+      <div class="stagebox" [class.panel-open]="showStageCountPanel" *ngIf="selectedQueue != null">
           <!-- Stage Count Side Panel -->
           <div class="stage-count-panel" [class.open]="showStageCountPanel">
             <div class="stage-count-panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 2px solid #ccc; background: white;">
@@ -902,7 +1161,7 @@
                   <span *ngIf="column.type != null">&nbsp;(<span [innerHTML]="highlightText(column.type)"></span>)</span>
                   - <span>{{column.allTokens?.length || column.tokenlist.length}}</span>
                   <button class="m-2 text-secondary" mat-icon-button
-                    (click)="selectedChatStage = column.stagename;selectedChatStageType = column.type != null ? ' - ' + column.type : '';snav.open();selectedStageType = column.type;">
+                    (click)="sidenavMode='comms'; selectedChatStage=column.stagename; selectedChatStageType=column.type!=null?' - '+column.type:''; snav.open(); selectedStageType=column.type">
                     <mat-icon>message</mat-icon>
                   </button>
                   <button *ngIf="roles['developer']" class="text-secondary" mat-icon-button
@@ -1083,10 +1342,10 @@
                         <span class="stage-entry">
                           <b>{{ stage.key }}:</b>
                           <span *ngFor="let studioId of stage.value; let isLastStudio = last">
-                            <span
-                              *ngFor="let participant of mapStudio[studioId]['participants']; let isLastParticipant = last">
-                              {{ mapProfileData[participant]['name'] }}<span *ngIf="!isLastParticipant">, </span>
-                            </span>
+                          <span
+                            *ngFor="let participant of (mapStudio[studioId]?.['participants'] || []); let isLastParticipant = last">
+                            {{ mapProfileData[participant]?.['name'] }}<span *ngIf="!isLastParticipant">, </span>
+                          </span>
                             <span *ngIf="!isLastStudio"> | </span>
                           </span>
                         </span>
@@ -1114,6 +1373,26 @@
                         </span>
                       </div>
                     </div>
+
+                    <!-- Customer Support Indicator -->
+                    <span *ngIf="hasCustomerSupport(token.profile_id)"
+                          class="cs-indicator"
+                          [matTooltip]="getCustomerSupportTooltip(token.profile_id)"
+                          matTooltipClass="multiline-tooltip">
+                      <mat-icon style="font-size:16px; width:16px; height:16px; color:#e53935; vertical-align:middle;">
+                        support_agent
+                      </mat-icon>
+                      <span class="cs-count" style="vertical-align:middle;">
+                        {{getCustomerSupportEntries(token.profile_id).length}}
+                      </span>
+                    </span>
+
+                    <span *ngIf="isATCDateRangeOnly(token.profile_id)"
+                          style="font-size:10px; background:#fff3e0; color:#e65100; border:1px solid #e65100; 
+                                border-radius:10px; padding:1px 6px; margin-left:4px;"
+                          matTooltip="ATC validated via date range — no queueid assigned">
+                      ATC*
+                    </span>
 
                     <div class="icon-row">
                       <!-- Left: P in Square (Unconsumed/Package) -->
@@ -1163,6 +1442,14 @@
                         </span>
                       </div>
                     </div>
+
+                    <!-- Notification Timeline Icon -->
+                    <!-- <span style="display:inline-flex; align-items:center; margin-left:4px;"
+                          (click)="openNotificationTimeline(token); $event.stopPropagation()"
+                          matTooltip="View Notification Timeline"
+                          style="cursor:pointer;">
+                      <mat-icon style="font-size:18px; width:18px; height:18px; color:#1976d2;">notifications</mat-icon>
+                    </span> -->
 
                     <div class="notes-tags-indicators" *ngIf="hasNotesOrTags(token)">
                       <div *ngIf="token.notes || (token.notesList && token.notesList.length > 0)" class="notes-indicator"
@@ -1231,8 +1518,8 @@
                                 <span *ngIf="['queued', 'invited'].includes(list['status'])" class="badge queued">Q</span>
                                 <span *ngIf="list['status'] == 'ready'" class="badge waiting">W</span>
                                 <span *ngIf="list['liveassignmentid']" class="badge activity">A</span>
-                                <span *ngIf="list['movedby']" class="log-meta">
-                                  <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]['name']}}
+                                <span *ngIf="list['movedby'] && mapProfileData[list['movedby']]" class="log-meta">
+                                  <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]?.['name']}}
                                 </span>
                                 <span *ngIf="list['movedthrough']" class="log-via" [ngClass]="list['movedthrough']?.toLowerCase()">
                                   {{list['movedthrough']}}
@@ -1545,6 +1832,95 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Timeline Dialog -->
+<div class="reminder-modal-overlay" *ngIf="showTimelineDialog" (click)="closeTimelineDialog()">
+  <div class="reminder-modal" (click)="$event.stopPropagation()"
+       style="max-width:500px; width:90vw; max-height:80vh; overflow-y:auto;">
+    
+    <!-- Header -->
+    <div class="reminder-header">
+      <div class="reminder-title">
+        <mat-icon>notifications</mat-icon>
+        <h3>
+          Notification Timeline — 
+          {{mapProfileData[selectedTimelineToken?.profile_id]?.['name']}}
+          (#{{selectedTimelineToken?.tokennumber}})
+        </h3>
+      </div>
+      <button mat-icon-button (click)="closeTimelineDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="notificationTimelineLoading"
+         style="padding:32px; text-align:center; color:#999; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <mat-icon class="spin">sync</mat-icon>
+      Loading timeline...
+    </div>
+
+    <!-- Timeline -->
+    <div *ngIf="!notificationTimelineLoading" style="padding:24px 16px;">
+
+      <!-- Empty state -->
+      <div *ngIf="(notificationTimelineMap[selectedTimelineToken?.profile_id] || []).length === 0"
+          style="text-align:center; color:#999; padding:32px;">
+        <mat-icon style="font-size:40px; width:40px; height:40px;">notifications_off</mat-icon>
+        <p>No notifications sent to this participant</p>
+      </div>
+
+      <!-- Horizontal Timeline -->
+      <div *ngIf="(notificationTimelineMap[selectedTimelineToken?.profile_id] || []).length > 0"
+          style="display:flex; align-items:flex-start; overflow-x:auto; padding-bottom:16px; gap:0;">
+
+        <div *ngFor="let item of notificationTimelineMap[selectedTimelineToken?.profile_id]; let last = last"
+            style="display:flex; flex-direction:column; align-items:center; min-width:80px; max-width:80px; position:relative;">
+
+          <!-- Horizontal line before circle (not for first) -->
+          <div style="display:flex; align-items:center; width:100%; position:relative; justify-content:center;">
+            
+            <!-- Left line -->
+            <div style="flex:1; height:2px; background:#e0e0e0;"></div>
+
+            <!-- Circle -->
+            <div [matTooltip]="item.message"
+                matTooltipClass="multiline-tooltip"
+                style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
+                        display:flex; align-items:center; justify-content:center;
+                        cursor:pointer; border:2px solid; z-index:1;"
+                [style.background]="item.status === 'success' ? '#e8f5e9' : '#ffebee'"
+                [style.border-color]="item.status === 'success' ? '#4caf50' : '#f44336'">
+              <mat-icon style="font-size:16px; width:16px; height:16px; line-height:16px;"
+                        [style.color]="item.status === 'success' ? '#4caf50' : '#f44336'">
+                {{item.status === 'success' ? 'check' : 'close'}}
+              </mat-icon>
+            </div>
+
+            <!-- Right line (hidden for last) -->
+            <div style="flex:1; height:2px;"
+                [style.background]="last ? 'transparent' : '#e0e0e0'"></div>
+          </div>
+
+          <!-- Date below circle -->
+          <div style="font-size:10px; color:#999; margin-top:6px; text-align:center; line-height:1.3; word-break:break-word;">
+            {{item.logdate?.toDate() | date:'MMM d'}}
+          </div>
+          <div style="font-size:10px; color:#bbb; text-align:center;">
+            {{item.logdate?.toDate() | date:'h:mm a'}}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Total count -->
+      <div style="margin-top:8px; font-size:12px; color:#999; text-align:right;">
+        {{(notificationTimelineMap[selectedTimelineToken?.profile_id] || []).length}} notification(s)
+      </div>
+
     </div>
   </div>
 </div>
