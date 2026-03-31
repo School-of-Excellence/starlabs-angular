@@ -646,8 +646,13 @@ export class JourneycoachDuplicateComponent {
       this.subscriptions['appointments'] = collectionData(query(collection(this.firestore, "appointments"), where("journeycoach", "==", true)), { idField: 'id' }).subscribe((appointments) => {
         let tempArray = [];
         let tempMap = {};
-        for (let i = 0; i < appointments.length; i++) {
-          const element = appointments[i];
+
+        const appointmentsList = appointments.sort((a,b)=> a['appointmentend'] - b['appointmentend']);
+
+        // sort
+        for (let i = 0; i < appointmentsList.length; i++) {
+          const element = appointmentsList[i];
+          element["docid"] = element["id"];
 
           this.mapOnboardingAppointments[element.id] = element['hosts']
 
@@ -660,7 +665,7 @@ export class JourneycoachDuplicateComponent {
 
           tempArray.push(element);
 
-          if (i + 1 == appointments.length) {
+          if (i + 1 == appointmentsList.length) {
             this.appointmentsData = tempArray;
             this.mapCoachAppointments = tempMap;
           }
@@ -2910,7 +2915,7 @@ export class JourneycoachDuplicateComponent {
   // Function to open schedule dialog 
   openSchedule(element, type) {
     if (type == 'coach') {
-      element['isReschedule'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) ? true : false;
+      element['isReschedule'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) && !this.mapCoachAppointments[element['profileid']][0]['attended'] ? true : false;
       element['appointmentid'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) ? this.mapCoachAppointments[element['profileid']][0]['docid'] : null;
     } else if (type == 'onboarding') {
       element['isReschedule'] = element['onboardingscheduled'] != null ? true : false;
