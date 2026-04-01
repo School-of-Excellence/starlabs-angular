@@ -1,30 +1,14 @@
-// import { Component } from '@angular/core';
-
-// @Component({
-//   selector: 'app-content-analytics-dashboard',
-//   imports: [],
-//   templateUrl: './content-analytics-dashboard.component.html',
-//   styleUrl: './content-analytics-dashboard.component.css'
-// })
-// export class ContentAnalyticsDashboardComponent {
-
-// }
-
 import {
   Component,
   OnInit,
   AfterViewInit,
   ViewChild,
-  ElementRef,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  Pipe,
-  PipeTransform,
   OnDestroy,
-  signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormControl, FormControlName, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -39,8 +23,8 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
-
-import { from, retry, Subject, takeUntil } from 'rxjs';
+import { MatSortModule } from '@angular/material/sort';
+import { Subject, takeUntil } from 'rxjs';
 import { collectionData, limit, orderBy, query, where } from '@angular/fire/firestore';
 import { Firestore } from '@angular/fire/firestore';
 import { collection, getDocs, Timestamp } from 'firebase/firestore';
@@ -59,10 +43,11 @@ import {
   NgApexchartsModule,
   ChartComponent
 } from "ng-apexcharts";
-import { MatDatepickerModule, MatDateRangePicker } from '@angular/material/datepicker';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import * as XLSX from 'xlsx';
 
 interface ParticipantContentMapInterface {
+  rank ?: number;
   profileid: string;
   totalWatchHours: number;
   activePlatforms: Set<string>;
@@ -76,9 +61,10 @@ interface ParticipantContentMapInterface {
   contents: { [key: string]: Array<any> };
 }
 
-type participantType = 'superfan' | 'risingfan' | 'fan';
+type participantType = 'superfan' | 'risingfan' | 'guest';
 
 interface ContentMapInterface {
+  rank ?: number;
   contentid: string;
   contentname: string;
   platform: string;
@@ -173,22 +159,21 @@ export interface PlayListMix {
     NgApexchartsModule,
     MatFormFieldModule,
     MatDatepickerModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    MatSortModule
   ],
   templateUrl: './content-analytics-dashboard.component.html',
   styleUrl: './content-analytics-dashboard.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ContentAnalyticsDashboardComponent
-  implements OnInit, AfterViewInit, OnDestroy {
+export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('participantsort') participantSort !: MatSort;
   @ViewChild('participantpagination') participantPagination !: MatPaginator
-  @ViewChild('cotentsort') contentSort !: MatSort;
+  @ViewChild('contentsort') contentSort !: MatSort;
   @ViewChild('contentpagination') contentPagination !: MatPaginator;
   @ViewChild('playlistsort') playlistSort !: MatSort;
   @ViewChild('playlistpagination') playlistPagination !: MatPaginator;
-
   @ViewChild('activeuserchart') activeUserChart !: ChartComponent;
   @ViewChild('watchhourschart') watchHoursChart !: ChartComponent;
 
@@ -197,8 +182,7 @@ export class ContentAnalyticsDashboardComponent
 
   destroy$ = new Subject<void>();
 
-  // contentAnalytics = signal<any[]>([]);
-
+  // objects
   participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
   contentMap: { [key: string]: ContentMapInterface } = {};
   participantMetaDataMap: { [key: string]: any } = {};
@@ -207,34 +191,40 @@ export class ContentAnalyticsDashboardComponent
   playListMap: { [key: string]: Partial<PlayList> } = {};
   contentTypeMap: { [key: string]: ContentType } = {};
 
+  // number
   totalUniqueUsers = 0;
   totalUniueContents = 0;
   totalWatchHours = 0;
   totalSuperFans = 0;
   totalRisingFans = 0;
+  pickerOpen = false;
 
-
-  participantTableColumns = ['rank', 'participant', 'type', 'mode', 'source', 'hours', 'days', 'completion', 'sessions', 'playlists', 'modesplaylists']
+  // tabel columns
+  participantTableColumns = ['rank', 'participant', 'type', 'mode', 'source', 'hours', 'days', 'completion', 'sessions', 'playlists']
   contentTableColumns = ['rank', 'content', 'source', 'watchhours', 'viewers', 'hviewer', 'completion', 'rewatches']
   playListTableColumns = ['title', 'assigned', 'started', 'ongoing', 'completed', 'notstarted', 'avgwatchtime']
 
+  // tables sources
   participantTableDataSource = new MatTableDataSource<ParticipantContentMapInterface>();
   contentTableDataSource = new MatTableDataSource<ContentMapInterface>();
   playListTableDateSource = new MatTableDataSource<Partial<PlayListMix>>();
+
+  // side panel
   sidePanelOpen = false;
   sidePanelTitle = '';
   sidePanelProfiles = [];
 
+  // loading status
+  isLoading = true;
   loadingStatus = {
     contentanalytics: true,
     recommendedMixPlaylist: true,
     bufferMixArchive: false
   }
 
+  // date range filter
   startDate = new FormControl<Date | null>(null);
   endDate = new FormControl<Date | null>(null);
-
-  isLoading = true;
 
   constructor(
     public cdr: ChangeDetectorRef,
@@ -253,13 +243,22 @@ export class ContentAnalyticsDashboardComponent
 
   ngAfterViewInit(): void {
     this.participantTableDataSource.sort = this.participantSort;
+    this.participantTableDataSource.sortingDataAccessor = this.participantCustomSorting;
     this.participantTableDataSource.paginator = this.participantPagination;
+    this.participantTableDataSource.filterPredicate = this.filterParticipants
 
     this.contentTableDataSource.sort = this.contentSort;
     this.contentTableDataSource.paginator = this.contentPagination;
+    this.contentTableDataSource.filterPredicate = this.filterPredicateContent;
+    this.contentTableDataSource.sortingDataAccessor = this.contentCustomSorting;
 
     this.playListTableDateSource.sort = this.playlistSort;
     this.playListTableDateSource.paginator = this.playlistPagination;
+    this.playListTableDateSource.filterPredicate = this.filterPredicatePlayList;
+    this.playListTableDateSource.sortingDataAccessor = this.playListCustomSorting;
+
+    console.log('sorting : ', this.participantSort)
+    // this.participantSort.sortChange.subscribe((d)=>console.log('changes'))
   }
 
   ngOnDestroy(): void {
@@ -267,18 +266,7 @@ export class ContentAnalyticsDashboardComponent
     this.destroy$.complete();
   }
 
-  getInitials(profileId: string): string {
-    const name = this.participantMetaDataMap[profileId]?.name || ' '
-    return name
-      .split(' ')
-      .slice(0, 2)
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
-  }
-  
-  // 
-
+  // function to patch date range flilter on screen load
   setDateRange() {
     const start = new Date();
     const end = new Date();
@@ -290,12 +278,271 @@ export class ContentAnalyticsDashboardComponent
 
   }
 
+  // function to check loading status of screen
   checkIsAllLoaded() {
     const isAllLoaded = !Object.values(this.loadingStatus).includes(true);
     if (isAllLoaded) {
       this.isLoading = false;
       this.cdr.detectChanges();
     }
+  }
+
+  // function to initalize active users tabel
+  initActiveUsersChart() {
+    this.activeUsersChartOptions = {
+      series: [
+        {
+          name: "Users",
+          data: []
+        }
+      ],
+
+      chart: {
+        type: "bar",
+        height: 200,
+        toolbar: { show: false },
+        background: "transparent",
+      },
+
+      plotOptions: {
+        bar: {
+          borderRadius: 6,
+          columnWidth: "60%",
+          dataLabels: {
+            position: "center"   // 🔥 label inside bar
+          }
+        }
+      },
+
+
+      dataLabels: {
+        enabled: true,
+        formatter: (val: number): string => val > 0 ? `${val}` : '', // hide 0
+        style: {
+          colors: ["#ffffff"],   // white text
+          fontSize: "12px",
+          fontWeight: "600"
+        }
+      },
+
+      grid: {
+        show: false
+      },
+
+      xaxis: {
+        categories: [],
+        labels: {
+          style: {
+            colors: "#9CA3AF"
+          }
+        }
+      },
+
+      yaxis: {
+        labels: {
+          style: {
+            colors: "#9CA3AF"
+          }
+        }
+      },
+      tooltip: {
+        y: {
+          formatter: (val: number) => `${val} users`
+        }
+      },
+
+      colors: this.getBarColors([])
+    }
+  }
+
+  // function to update active user chart
+  updateDaliyActiveUsersChart() {
+    const start = new Date(this.startDate.value);
+    const end = new Date(this.endDate.value)
+    const datesMap = new Map();
+    const profiles = Object.values(this.participantContentMap);
+    while (start <= end) {
+      datesMap.set(start.toDateString(), 0);
+      start.setDate(start.getDate() + 1);
+    }
+
+    profiles.forEach((p: ParticipantContentMapInterface) => {
+      const contentDates = Object.keys(p.contents);
+      contentDates.forEach((d) => {
+        if (datesMap.has(d)) {
+          datesMap.set(d, datesMap.get(d) + 1);
+        }
+      })
+    });
+
+
+    const dates = Array.from(datesMap.keys()).map((d) => {
+      const dateSplit = d.split(' ');
+      return `${dateSplit[1]} ${dateSplit[2]}`;
+    });
+    console.log(dates)
+    const uniqueProfiles = Array.from(datesMap.values());
+
+    this.activeUserChart.updateOptions({
+      xaxis: {
+        categories: dates,
+        labels: {
+          style: {
+            colors: "#9CA3AF"
+          }
+        },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      },
+      chart: {
+        type: "bar",
+        height: 300,
+        toolbar: { show: false },
+        background: "transparent",
+        width: uniqueProfiles.length > 20 ? uniqueProfiles.length * 100 : 750
+      },
+      colors: this.getBarColors(uniqueProfiles),
+    }, true, true);
+
+    this.activeUserChart.updateSeries([
+      {
+        name: "Users",
+        data: uniqueProfiles
+      }
+    ])
+  }
+
+  // helper function for charts
+  getBarColors(values: number[]): string[] {
+    return values.map((val, i) => {
+      if (i < 2) return "#6EE7B7";
+      if (i < 5) return "#93C5FD";
+      return "#FCA5A5";
+    });
+  }
+
+  // function to initate watchhours chart
+  initWatchHoursChartOptions() {
+    this.watchHoursChartOptions = {
+      series: [
+        {
+          name: "Hours",
+          data: []
+        }
+      ],
+
+      chart: {
+        type: "bar",
+        height: 200,
+        toolbar: { show: false },
+        background: "transparent"
+      },
+
+      plotOptions: {
+        bar: {
+          borderRadius: 6,
+          columnWidth: "60%",
+          dataLabels: {
+            position: "center"   // 🔥 label inside bar
+          }
+        }
+      },
+
+      dataLabels: {
+        enabled: true,
+        formatter: (val: number): string => val > 0 ? `${val}` : '', // hide 0
+        style: {
+          colors: ["#ffffff"],   // white text
+          fontSize: "12px",
+          fontWeight: "600"
+        }
+      },
+
+      grid: {
+        show: false
+      },
+
+      xaxis: {
+        categories: [],
+        labels: {
+          style: {
+            colors: "#9CA3AF"
+          }
+        }
+      },
+
+      yaxis: {
+        labels: {
+          style: {
+            colors: "#9CA3AF"
+          }
+        }
+      },
+
+      tooltip: {
+        y: {
+          formatter: (val: number) => `${val} hours`
+        }
+      },
+
+      colors: this.getBarColors([])
+    };
+  }
+
+  // function to update watch hours chart
+  updateDailyWatchHoursChart() {
+    const start = new Date(this.startDate.value);
+    const end = new Date(this.endDate.value)
+    const datesMap = new Map();
+    const profiles = Object.values(this.participantContentMap);
+    while (start <= end) {
+      datesMap.set(start.toDateString(), 0);
+      start.setDate(start.getDate() + 1);
+    }
+
+    profiles.forEach((p: ParticipantContentMapInterface) => {
+      const contentDates = Object.keys(p.contents);
+      contentDates.forEach((d) => {
+        if (datesMap.has(d)) {
+          const contents = (p.contents[d] || []).reduce((t, c) => t + c['totaltimespend'] || 0, 0);
+          datesMap.set(d, datesMap.get(d) + contents);
+        }
+      })
+    });
+
+    const dates = Array.from(datesMap.keys()).map((d) => {
+      const dateSplit = d.split(' ');
+      return `${dateSplit[1]} ${dateSplit[2]}`;
+    });
+    const values = Array.from(datesMap.values()).map((v) => Number.parseFloat(this.convertToHours(v).toFixed(1)));
+    console.log(values)
+    this.watchHoursChart.updateOptions({
+      xaxis: {
+        categories: dates,
+        labels: {
+          style: {
+            colors: "#9CA3AF"
+          }
+        },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      },
+      chart: {
+        type: "bar",
+        height: 300,
+        toolbar: { show: false },
+        background: "transparent",
+        width: values.length > 20 ? values.length * 100 : 750
+      },
+      colors: ['#C4B5FD']
+    }, true, true)
+
+    this.watchHoursChart.updateSeries([
+      {
+        name: "Hours",
+        data: values
+      }
+    ])
   }
 
   formatDate(date: any): Date | null {
@@ -366,7 +613,7 @@ export class ContentAnalyticsDashboardComponent
           sessions: 0,
           completedContents: new Set(),
           days: 1,
-          type: 'fan',
+          type: 'guest',
           contents: {}
         }
         totalUniqueUsers++
@@ -409,12 +656,6 @@ export class ContentAnalyticsDashboardComponent
           watchHours: 0
         }
       }
-
-      // aggregate rising fans and super fans
-
-      // if (participantTypeMap.has(profileId)) {
-      //   console.log(participantTypeMap.get(profileId))
-      // }
 
       if (!participantTypeMap.has(profileId)) {
         const log = new Date(logDate);
@@ -503,20 +744,38 @@ export class ContentAnalyticsDashboardComponent
     this.contentMap = contentMap;
     this.contentTypeMap = contentTypeMap;
 
-    const dataSource = Object.values(participantContentMap).map((p) => ({ ...p, type: this.getParicipantType(p) }));
-    // const dataSource = Object.values(participantContentMap);
-    dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type])
-    this.participantTableDataSource.data = dataSource;
+    const superFans: ParticipantContentMapInterface[] = [];
+    const raisingFans: ParticipantContentMapInterface[] = [];
+    const fans: ParticipantContentMapInterface[] = [];
+
+    Object.values(participantContentMap).forEach((p) => {
+      const data = { ...p, type: this.getParicipantType(p) };
+      if (data.type === 'superfan') {
+        superFans.push(data);
+      } else if (data.type === 'risingfan') {
+        raisingFans.push(data)
+      } else {
+        fans.push(data);
+      }
+    }
+    );
+    superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+    raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+    fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+    const dataSource = [...superFans, ...raisingFans, ...fans];
+    // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
+    this.participantTableDataSource.data = dataSource.map(( p, index)=>({...p , rank : index + 1}));
 
     const contentDataSoruce = Object.values(contentMap)
     contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-    this.contentTableDataSource.data = contentDataSoruce;
+    this.contentTableDataSource.data = contentDataSoruce.map((c , index )=>({...c , rank : index + 1}));
 
+    this.ngAfterViewInit();
     this.updateDaliyActiveUsersChart();
     this.updateDailyWatchHoursChart();
     this.loadingStatus.contentanalytics = false;
     this.checkIsAllLoaded()
-  
+
   }
 
   async fetchParticipantMetaData() {
@@ -696,10 +955,16 @@ export class ContentAnalyticsDashboardComponent
         this.playListTableDateSource.data = Object.values(playListMixMap)
         this.recommendedMixPlaylistMap = recommendedMixPlaylistMap;
         this.loadingStatus.recommendedMixPlaylist = false;
+        this.ngAfterViewInit()
         this.checkIsAllLoaded();
       });
   }
 
+  applyDateRangeFilter() {
+    this.ngOnDestroy();
+    this.fetchContentAnalytics();
+    this.fetchRecommendedMixPlayList();
+  }
 
   // fetchBufferMixArchive() {
   //   this.loadingStatus.bufferMixArchive = true;
@@ -793,7 +1058,6 @@ export class ContentAnalyticsDashboardComponent
   // }
 
   isParticipantStartedPlayList(contentId: string[], profileId: string, date: Date, playList) {
-
     const participant = this.participantContentMap[profileId]?.contents;
     if (!date || !participant) {
       return false;
@@ -826,7 +1090,6 @@ export class ContentAnalyticsDashboardComponent
       return wholeTotal + Object.keys(participant).reduce((total: number, dateString: string) => {
 
         const contentDate = new Date(dateString).getTime();
-        // console.log(new Date(seconds).toDateString() , new Date(contentDate).toDateString())
         if (seconds <= contentDate) {
           return total + participant[dateString].reduce((watchtime, content) => {
             const cId = content['videoid'];
@@ -834,7 +1097,6 @@ export class ContentAnalyticsDashboardComponent
             if (!cId && !playListId) {
               return watchtime;
             }
-            // console.log(playListContents.includes(cId), playListContents, cId)
             if (playListContents.includes(cId) || playListContents.includes(playListId)) {
               return watchtime + content['totaltimespend'] || 0;
             }
@@ -949,7 +1211,7 @@ export class ContentAnalyticsDashboardComponent
     } else if (dates.length >= 5 && watchHours >= 10800) {
       return 'risingfan';
     } else {
-      return 'fan'
+      return 'guest'
     }
   }
 
@@ -981,10 +1243,6 @@ export class ContentAnalyticsDashboardComponent
   //   }).length
   // }
 
-  convertToHours(seconds: number): number {
-    return seconds / 3600
-  }
-
   // getTotalPlayListForParticipant(p: ParticipantContentMapInterface): number {
   //   const playlist = this.recommendedMixPlaylistMap[p.profileid];
   //   if (!playlist) {
@@ -1008,247 +1266,11 @@ export class ContentAnalyticsDashboardComponent
   //   }).length
   // }
 
-  initActiveUsersChart() {
-    this.activeUsersChartOptions = {
-      series: [
-        {
-          name: "Users",
-          data: []
-        }
-      ],
-
-      chart: {
-        type: "bar",
-        height: 200,
-        toolbar: { show: false },
-        background: "transparent",
-      },
-
-
-
-      plotOptions: {
-        bar: {
-          borderRadius: 6,
-          columnWidth: "60%"
-        }
-      },
-
-      dataLabels: {
-        enabled: false
-      },
-
-      grid: {
-        show: false
-      },
-
-      xaxis: {
-        categories: [],
-        labels: {
-          style: {
-            colors: "#9CA3AF"
-          }
-        }
-      },
-
-      yaxis: {
-        labels: {
-          style: {
-            colors: "#9CA3AF"
-          }
-        }
-      },
-      tooltip: {
-        y: {
-          formatter: (val: number) => `${val} users`
-        }
-      },
-
-      colors: this.getBarColors([])
-    }
+  convertToHours(seconds: number): number {
+    return seconds / 3600
   }
 
-  updateDaliyActiveUsersChart() {
-    // console.log('comes in')
-    const start = new Date(this.startDate.value);
-    const end = new Date(this.endDate.value)
-    const datesMap = new Map();
-    const profiles = Object.values(this.participantContentMap);
-    while (start <= end) {
-      datesMap.set(start.toDateString(), 0);
-      start.setDate(start.getDate() + 1);
-    }
-    // console.log('lebels : ', datesMap);
-
-    profiles.forEach((p: ParticipantContentMapInterface) => {
-      const contentDates = Object.keys(p.contents);
-      contentDates.forEach((d) => {
-        if (datesMap.has(d)) {
-          datesMap.set(d, datesMap.get(d) + 1);
-        }
-      })
-    });
-
-    const dates = Array.from(datesMap.keys()).map((d) => {
-      const dateSplit = d.split(' ');
-      return `${dateSplit[1]} ${dateSplit[2]}`;
-    });
-    const uniqueProfiles = Array.from(datesMap.values());
-    // console.log(uniqueProfiles)
-
-    this.activeUserChart.updateSeries([
-      {
-        name: "Users",
-        data: uniqueProfiles
-      }
-    ])
-    this.activeUserChart.updateOptions({
-      xaxis: {
-        categories: dates,
-        labels: {
-          style: {
-            colors: "#9CA3AF"
-          }
-        },
-        axisBorder: { show: false },
-        axisTicks: { show: false }
-      },
-      chart: {
-        type: "bar",
-        height: 300,
-        toolbar: { show: false },
-        background: "transparent",
-        width: uniqueProfiles.length > 20 ? uniqueProfiles.length * 100 : 600
-      },
-      colors: this.getBarColors(uniqueProfiles),
-    }, true, true)
-  }
-
-  getBarColors(values: number[]): string[] {
-    return values.map((val, i) => {
-      if (i < 2) return "#6EE7B7";     // green
-      if (i < 5) return "#93C5FD";     // blue
-      return "#FCA5A5";                // red
-    });
-  }
-
-  initWatchHoursChartOptions() {
-    this.watchHoursChartOptions = {
-      series: [
-        {
-          name: "Hours",
-          data: []
-        }
-      ],
-
-      chart: {
-        type: "bar",
-        height: 200,
-        toolbar: { show: false },
-        background: "transparent"
-      },
-
-      plotOptions: {
-        bar: {
-          borderRadius: 6,
-          columnWidth: "60%"
-        }
-      },
-
-      dataLabels: {
-        enabled: false
-      },
-
-      grid: {
-        show: false
-      },
-
-      xaxis: {
-        categories: [],
-        labels: {
-          style: {
-            colors: "#9CA3AF"
-          }
-        }
-      },
-
-      yaxis: {
-        labels: {
-          style: {
-            colors: "#9CA3AF"
-          }
-        }
-      },
-      tooltip: {
-        y: {
-          formatter: (val: number) => `${val} users`
-        }
-      },
-
-      colors: this.getBarColors([])
-    }
-  }
-
-  updateDailyWatchHoursChart() {
-    const start = new Date(this.startDate.value);
-    const end = new Date(this.endDate.value)
-    const datesMap = new Map();
-    const profiles = Object.values(this.participantContentMap);
-    while (start <= end) {
-      datesMap.set(start.toDateString(), 0);
-      start.setDate(start.getDate() + 1);
-    }
-    // console.log('lebels : ', datesMap);
-
-    profiles.forEach((p: ParticipantContentMapInterface) => {
-      const contentDates = Object.keys(p.contents);
-      contentDates.forEach((d) => {
-        if (datesMap.has(d)) {
-          const contents = (p.contents[d] || []).reduce((t, c) => t + c['totaltimespend'] || 0, 0);
-          datesMap.set(d, datesMap.get(d) + contents);
-        }
-      })
-    });
-
-    const dates = Array.from(datesMap.keys()).map((d) => {
-      const dateSplit = d.split(' ');
-      return `${dateSplit[1]} ${dateSplit[2]}`;
-    });
-    const values = Array.from(datesMap.values()).map((v) => Math.floor(this.convertToHours(v)));
-
-    this.watchHoursChart.updateSeries([
-      {
-        name: "Hours",
-        data: values
-      }
-    ])
-    this.watchHoursChart.updateOptions({
-      xaxis: {
-        categories: dates,
-        labels: {
-          style: {
-            colors: "#9CA3AF"
-          }
-        },
-        axisBorder: { show: false },
-        axisTicks: { show: false }
-      },
-      chart: {
-        type: "bar",
-        height: 300,
-        toolbar: { show: false },
-        background: "transparent",
-        width: values.length > 20 ? values.length * 100 : 600
-      },
-      colors: ['#C4B5FD']
-    }, true, true)
-  }
-
-  applyDateRangeFilter() {
-    this.ngOnDestroy();
-    this.fetchContentAnalytics();
-    this.fetchRecommendedMixPlayList();
-  }
-
+  // function to open side panel for cards
   openCards(type: string) {
     let data = [];
     let title = ''
@@ -1286,6 +1308,7 @@ export class ContentAnalyticsDashboardComponent
     this.openSidePanel(title, data)
   }
 
+  // function to open side panel for platform comaparision
   openPlatformComparView(platform: string, completed: boolean) {
     let data = [];
     let title = '';
@@ -1300,6 +1323,7 @@ export class ContentAnalyticsDashboardComponent
     this.openSidePanel(title, data)
   }
 
+  // function to open side panel for playlist table
   openPlayListPanelView(playlist: PlayListMix, type: string) {
     let data: string[] = Array.from(playlist[type]?.values() || []);
     let title = `Playlist ${playlist.title}`;
@@ -1307,6 +1331,7 @@ export class ContentAnalyticsDashboardComponent
     this.openSidePanel(title, data);
   }
 
+  // function to open side panel for content table
   openContentPanelView(content: ContentMapInterface, type: string) {
     let data: string[] = Array.from(content[type]?.values() || []);
     let title = `Content ${content.contentname}`;
@@ -1314,6 +1339,7 @@ export class ContentAnalyticsDashboardComponent
     this.openSidePanel(title, data);
   }
 
+  // function to handle export in side panel
   exportPanelData() {
     const exportData = this.sidePanelProfiles.map((p) => ({
       'Name': p['name'] || 'N/A',
@@ -1329,14 +1355,144 @@ export class ContentAnalyticsDashboardComponent
   }
 
 
+  // function to open side panel
   openSidePanel(title: string, profileid: string[]) {
     this.sidePanelOpen = true;
     this.sidePanelTitle = title;
     this.sidePanelProfiles = profileid.map((p) => this.participantMetaDataMap[p]);
   }
 
+  // function to close panel
   closeSidePanel() {
     this.sidePanelOpen = false;
   }
 
+  // helper function to get initial for participant
+  getInitials(profileId: string): string {
+    const name = this.participantMetaDataMap[profileId]?.name || ' '
+    return name
+      .split(' ')
+      .slice(0, 2)
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+  }
+
+  filterParticipants = (p: ParticipantContentMapInterface, filter: string) => {
+    console.log(this.participantMetaDataMap)
+    const name = (this.participantMetaDataMap[p.profileid]?.name || '')?.toLocaleLowerCase()?.trim();
+    if (!name) {
+      return false
+    }
+    return name.includes(filter?.toLocaleLowerCase()?.trim())
+  };
+
+  filterParticipantTabel(search: string) {
+    this.participantTableDataSource.filter = search;
+  }
+
+  filterPredicatePlayList = (p: PlayListMix, filter: string) => {
+    const title = (p.title || '')?.toLocaleLowerCase();
+    if (!title) {
+      return false
+    }
+    return title.includes(filter?.toLocaleLowerCase()?.trim())
+  };
+
+  filterPlayListTabel(search: string) {
+    this.playListTableDateSource.filter = search;
+  }
+
+  filterPredicateContent = (p: ContentMapInterface, filter: string) => {
+    const title = (p.contentname || '')?.toLocaleLowerCase();
+    if (!title) {
+      return false
+    }
+    return title.includes(filter?.toLocaleLowerCase()?.trim())
+  };
+
+  filterContentTabel(search: string) {
+    this.contentTableDataSource.filter = search;
+  }
+
+  participantCustomSorting = (item: ParticipantContentMapInterface, property: string): any => {
+    switch (property) {
+       case 'rank':
+        return item?.rank
+      case 'participant':
+        return this.participantMetaDataMap[item.profileid]?.name || ''
+      case 'type':
+        return item.type
+      case 'mode':
+        return this.participantMetaDataMap[item.profileid]?.participantmode || ''
+      case 'source':
+        return item.activePlatforms.size
+      case 'hours':
+        return item.totalWatchHours
+      case 'days':
+        return item.days
+      case 'completion':
+        return item.completedContents.size
+      case 'sessions':
+        return item.sessions
+      case 'playlists':
+        return item.completedPlayList.size
+      default:
+        break;
+    }
+  };
+
+  contentCustomSorting = (item: ContentMapInterface, property: string): any => {
+    switch (property) {
+      case 'rank':
+        return item?.rank
+      case 'content':
+        return item.contentname || ''
+      case 'source':
+        return item.type || ''
+      case 'watchhours':
+        return item.totalWatchHours
+      case 'viewers':
+        return item.profileid.size
+      case 'hviewer':
+        return (item.completedProfiles.size / item.profileid.size || 1)
+      case 'completion':
+        return item.completedProfiles.size
+      case 'rewatches':
+        return item.rewatchedProfiles.size
+      default:
+        break;
+    }
+  };
+
+  playListCustomSorting = (item: PlayListMix, property: string): any => {
+    switch (property) {
+      case 'title':
+        return item.title || ''
+      case 'assigned':
+        return item.profileid.size
+      case 'started':
+        return 0
+      case 'ongoing':
+        return item.ongoingProfiles.size
+      case 'completed':
+        return item.completedProfiles.size
+      case 'notstarted':
+        return item.notStartedProfiles.size
+      case 'avgwatchtime':
+        return 0
+      default:
+        break;
+    }
+  };
+
+  togglePicker() {
+    this.pickerOpen = !this.pickerOpen;
+  }
+
+  clearDates(event: Event) {
+    event.stopPropagation();
+    this.startDate.reset();
+    this.endDate.reset();
+  }
 }

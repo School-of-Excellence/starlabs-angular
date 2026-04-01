@@ -796,6 +796,7 @@ export class ParticipantsAnalyticsComponent {
   async onDataSearch() {
     let loadingref = this.loading
     let data = Object.assign({}, this.filterdata);
+    console.log('data : ',data)
 
     for (const key in data) {
       if (data[key] === null || data[key] === undefined) delete data[key]
@@ -841,7 +842,7 @@ export class ParticipantsAnalyticsComponent {
             } else if (this.range.includes(key)) {
               if (![null, undefined].includes(e[key])) {
                 // console.log('range', e[key], new Date(data[key]['start']),  new Date(data[key]['end']));
-
+                console.log('key : ' , e[key].toDate())
                 if (e[key].toDate() >= new Date(data[key]['start']) && e[key].toDate() <= new Date(data[key]['end'])) { booleanarray.push(true) }
                 else { booleanarray.push(false) }
               } else { booleanarray.push(false) }
@@ -1995,7 +1996,30 @@ export class ParticipantsAnalyticsComponent {
             { key: 'higherorderpurchase', header: 'Higher Order Purchase' }
           ]
         }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
       });
+    } else if(type==='watsonstatus'){
+      let data = this.dashboardEntireData.filter(p =>['late' , 'banned' ,'discontinued'].includes(p?.customerstatus) && p?.customerstatus !== p.financialstatus)
+      const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: type,
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'customerstatus', header: 'Star Labs' },
+            { key: 'financialstatus', header: 'Watson' }
+          ]
+        }
+      })
 
       // Handle dialog result if needed
       dialogRef.afterClosed().subscribe(result => {
@@ -2004,6 +2028,25 @@ export class ParticipantsAnalyticsComponent {
         }
       });
     }
+  }
+
+  // function to patch participant with no customer status
+  patchCustomerStatus(){ 
+    this.onformreset();
+    this.selection.clear();
+    const participants = this.dataSource.data.filter((p : any)=>[null , undefined , ''].includes(p?.customerstatus));
+    this.selection.select(...participants);
+    this.dataSource.data = participants;
+  }
+
+  // function to clear participant with no customer status active option
+  clearCustomerStatus(){
+    this.selection.clear();
+    this.onDataSearch();
+  }
+
+  openWatsonCustomerStatus(){
+
   }
 
   // Function to add products to participant Journey 
