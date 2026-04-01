@@ -109,7 +109,8 @@ interface CurriculumItem {
   type: 'zoomcall' | 'challenge' | '';
   zoomlink?: string;
   completedzoomurl?: string;
-  status?: 'completed' | null; 
+  // status?: 'completed' | null; 
+  status?: 'completed'; 
   hidezoom?:boolean;
   startlivecall?:string;
   headicon?: string;
@@ -603,6 +604,8 @@ onTemplateFilterChange(selectedIds: string[]): void {
 }
 async ngOnInit() {
   try {
+    const roles = await this.guard.getRoles();
+    this.loggedinProfile = roles["profile_ref"].id;
     const chatgroupsRef = collection(this.firestore, 'supportchat');
     const q = query(chatgroupsRef, where('type', '==', 'group'));
     const querySnapshot = await getDocs(q);
@@ -813,6 +816,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
+      triggerFunction:[false],
       activeparticipants: [false],
       newusersonly:[false],
       journeybased: [false],
@@ -866,10 +870,18 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       primarylyTaught: this.fb.array([]),
       thumbnailImage: [''],
       titleVideo: [''],
-      registrationStartDate: ['',],
-      registrationEndDate: ['',],
-      workshopStartDate: ['',],
-      workshopEndDate: ['',],
+      // registrationStartDate: ['',],
+      // registrationEndDate: ['',],
+      // workshopStartDate: ['',],
+      // workshopEndDate: ['',],
+      registrationStartDate: [''],
+      registrationStartTime: [null],
+      registrationEndDate:   [''],
+      registrationEndTime:   [null],
+      workshopStartDate:     [''],
+      workshopStartTime:     [null],
+      workshopEndDate:       [''],
+      workshopEndTime:       [null],
       learnings: this.fb.array([
         this.fb.control('',),
       ]),
@@ -1039,6 +1051,10 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       registrationEndDate: this.convertTimestamp(data.detailpage.registrationEndDate),
       workshopStartDate: this.convertTimestamp(data.detailpage.workshopStartDate),
       workshopEndDate: this.convertTimestamp(data.detailpage.workshopEndDate),
+      registrationStartTime: this.convertTimestamp(data.detailpage.registrationStartDate),
+      registrationEndTime:   this.convertTimestamp(data.detailpage.registrationEndDate),
+      workshopStartTime:     this.convertTimestamp(data.detailpage.workshopStartDate),
+      workshopEndTime:       this.convertTimestamp(data.detailpage.workshopEndDate),
     });
 
     const primarylyTaughtArray = this.getFormArray('primarylyTaught');
@@ -1195,27 +1211,68 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
 
   //   return data;
   // }
-private buildDetailPageData(): any {
-  const formValue = this.detailPageForm.value;
-  const data = { ...formValue };
-  
-  this.richTextFields.forEach(field => {
-    data[field.key] = this.richTextContents[field.key];
-  });
-  
-  this.iconWithTextSections.forEach(section => {
-    data[section.key] = this.getFormArray(section.key).value.map(item => ({
-      question: item.question,
-      answer: item.answer
-    }));
-  });
 
-  // Remove selectedTestimonials and add testimonialmap instead
-  delete data.selectedTestimonials;
-  data.testimonialmap = this.testimonialMap;
+  private mergeDateTime(date: Date, time: Date): Date | null {
+    if (!date) return null;
+    const merged = new Date(date);
+    if (time) {
+      merged.setHours(time.getHours(), time.getMinutes(), 0, 0);
+    }
+    return merged;
+  }
+  // private buildDetailPageData(): any {
+  //   const formValue = this.detailPageForm.value;
+  //   const data = { ...formValue };
+    
+  //   this.richTextFields.forEach(field => {
+  //     data[field.key] = this.richTextContents[field.key];
+  //   });
+    
+  //   this.iconWithTextSections.forEach(section => {
+  //     data[section.key] = this.getFormArray(section.key).value.map(item => ({
+  //       question: item.question,
+  //       answer: item.answer
+  //     }));
+  //   });
 
-  return data;
-}
+    
+  //   delete data.selectedTestimonials;
+  //   data.testimonialmap = this.testimonialMap;
+
+  //   return data;
+  // }
+  private buildDetailPageData(): any {
+    const formValue = this.detailPageForm.value;
+    const data = { ...formValue };
+
+    this.richTextFields.forEach(field => {
+      data[field.key] = this.richTextContents[field.key];
+    });
+
+    this.iconWithTextSections.forEach(section => {
+      data[section.key] = this.getFormArray(section.key).value.map(item => ({
+        question: item.question,
+        answer: item.answer
+      }));
+    });
+
+    delete data.selectedTestimonials;
+    data.testimonialmap = this.testimonialMap;
+    const merge = (date: Date, time: Date) => {
+      const d = this.mergeDateTime(date, time);
+      return d ? Timestamp.fromDate(d) : null;
+    };
+
+    data.registrationStartDate = merge(data.registrationStartDate, data.registrationStartTime);
+    data.registrationEndDate   = merge(data.registrationEndDate,   data.registrationEndTime);
+    data.workshopStartDate     = merge(data.workshopStartDate,     data.workshopStartTime);
+    data.workshopEndDate       = merge(data.workshopEndDate,       data.workshopEndTime);
+    delete data.registrationStartTime;
+    delete data.registrationEndTime;
+    delete data.workshopStartTime;
+    delete data.workshopEndTime;
+    return data;
+  }
   
   uploadThumbnail(): void {
       const fileInput = document.createElement('input');
@@ -1349,8 +1406,9 @@ private buildDetailPageData(): any {
   addCurriculum(): void {
     const curriculumGroup = this.fb.group({
       type: ['', Validators.required],
+      challengeid: [this.generateId()],
       zoomlink: [''],
-      status: [null],
+      status: [undefined],
       hidezoom: [null],
       completedzoomurl:[''],
       headicon:[''],
@@ -1394,6 +1452,8 @@ private buildDetailPageData(): any {
     const challengeIndex = this.challengesArray.controls.indexOf(curriculumGroup);
     const activityIndex = this.getChallengeArray(curriculumGroup).length;
     const challengeGroup = this.fb.group({
+      challengeid: [this.generateId()], 
+      zoomattend: [[]], 
       name: ['',],
       description: ['',],
       type:['',],
@@ -1455,6 +1515,9 @@ private buildDetailPageData(): any {
   //   this.rebuildActivityIds(); 
   //   }
   // }
+  generateId(): string {
+    return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  }
 removeSubChallenge(curriculumGroup, index) {
   const confirmDelete = confirm("Are you sure you want to delete this sub-challenge?");
   if (!confirmDelete) return;
@@ -1617,9 +1680,12 @@ private rebuildActivityIds(): void {
   data.challenges.forEach((challenge: CurriculumItem, challengeIndex: number) => {
     const curriculumGroup = this.fb.group({
       type: [challenge.type || ''],
+      challengeid: [challenge['challengeid'] || this.generateId()],
+      zoomattend: [challenge['zoomattend'] || []],
       zoomlink: [challenge.zoomlink || ''],
       completedzoomurl: [challenge.completedzoomurl || ''],
-      status: [challenge.status ?? null],
+      // status: [challenge.status ?? null],
+      status: [challenge.status || undefined],
       hidezoom: [challenge.hidezoom ?? false],
       startlivecall: [challenge.startlivecall || ''],
       headicon:[challenge.headicon || ''],
@@ -1658,6 +1724,8 @@ private rebuildActivityIds(): void {
       subChallengeArray.push(
         this.fb.group({
           name: [c.name || ''],
+          challengeid: [c['challengeid'] || this.generateId()],
+          zoomattend: [c['zoomattend']], 
           description: [c.description || ''],
           type:[c.type || ''],
           contentref: [c.contentref ||''],
@@ -1732,14 +1800,24 @@ private rebuildActivityIds(): void {
     this.loading = true;
     this.isSaving = true;
     try {
-      const challengesData = this.challengesPageForm.value.challenges;
+      const challengesData = this.challengesPageForm.value.challenges.map((challenge: any) => {
+        const cleaned = { ...challenge };
+        if (!cleaned.status) {
+          delete cleaned.status;
+        }
+        return cleaned;
+      });
+
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, { challenges: challengesData });
+      // const challengesData = this.challengesPageForm.value.challenges;
+      // const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
+      // await updateDoc(ref, { challenges: challengesData });
 
-      if (refresh) {
-        // this.snackBar.open('Challenges configuration saved successfully!', 'Close', { duration: 2000 });
-        // this.refetchWorkshop(); // (example only)
-      }
+      // if (refresh) {
+      //   // this.snackBar.open('Challenges configuration saved successfully!', 'Close', { duration: 2000 });
+      //   // this.refetchWorkshop(); // (example only)
+      // }
 
     } catch (error) {
       console.error('Error saving challenges:', error);
@@ -1819,6 +1897,7 @@ private rebuildActivityIds(): void {
         qanda: data['qanda'] || false,
         breakdown : data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
+        triggerFunction: data['triggerFunction'] || false,
         activeparticipants : data['activeparticipants'] || false,
         newusersonly : data['newusersonly'] || false,
         journeybased: data['journeybased'] || false,
@@ -1859,6 +1938,7 @@ private rebuildActivityIds(): void {
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
+        triggerFunction: this.settingsForm.get('triggerFunction')?.value || false,
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
         newusersonly: this.settingsForm.get('newusersonly')?.value || false,
         journeybased: this.settingsForm.get('journeybased')?.value || false,
@@ -1929,7 +2009,7 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased', event: any): void {
+  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }

@@ -1,0 +1,92 @@
+<div class="uad-root">
+
+  <!-- Header -->
+  <div class="uad-header">
+    <div class="uad-user-info">
+      <div class="uad-avatar">{{ getInitials(name) }}</div>
+      <div class="uad-user-meta">
+        <span class="uad-name">{{ name }}</span>
+        <span class="uad-journey" *ngIf="profile?.activejourney">{{ journeyMap[profile.activejourney]['journey'] }}</span>
+      </div>
+    </div>
+    <div class="uad-summary-chips">
+      <div class="uad-chip">
+        <span class="uad-chip-val">{{ totalLogs }}</span>
+        <span class="uad-chip-label">Total Logs</span>
+      </div>
+      <div class="uad-chip uad-chip-green">
+        <span class="uad-chip-val">{{ completedLogs }}</span>
+        <span class="uad-chip-label">Completed</span>
+      </div>
+      <div class="uad-chip uad-chip-teal">
+        <span class="uad-chip-val">{{ totalWatchHrs }}</span>
+        <span class="uad-chip-label">Watch Time</span>
+      </div>
+    </div>
+    <button class="uad-close-btn" (click)="close()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="uad-table-wrap">
+    <table class="uad-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Video</th>
+          <th>Type</th>
+          <th>From</th>
+          <th>Status</th>
+          <th class="align-right">Total Runtime</th>
+          <th class="align-right">Time Spent</th>
+          <th class="align-right">Completion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let log of logs" class="uad-row">
+          <td class="uad-date">{{ formatDate(log.logdate) }}</td>
+          <td class="uad-video">
+            <span class="uad-video-name" [title]="log.videoname">{{ log.videoname || '—' }}</span>
+          </td>
+          <td>
+            <span class="uad-type-badge">{{ log.type || '—' }}</span>
+          </td>
+          <td class="uad-from">{{ log.from || '—' }}</td>
+          <td>
+            <span class="uad-status-badge"
+              [class.badge-complete]="log.status === 'complete'"
+              [class.badge-pending]="log.status !== 'complete'">
+              {{ log.status || '—' }}
+            </span>
+          </td>
+          <td class="align-right uad-time">{{ formatSeconds(log.totalruntime) }}</td>
+          <td class="align-right uad-time">{{ formatSeconds(log.totaltimespend) }}</td>
+          <td class="align-right">
+            <div class="uad-comp-wrap">
+              <span class="uad-comp-val"
+                [class.comp-full]="getCompletionPct(log) >= 100"
+                [class.comp-mid]="getCompletionPct(log) >= 50 && getCompletionPct(log) < 100"
+                [class.comp-low]="getCompletionPct(log) < 50 && getCompletionPct(log) > 0"
+                [class.comp-zero]="getCompletionPct(log) === 0">
+                {{ getCompletionPct(log) > 0 ? getCompletionPct(log) + '%' : '—' }}
+              </span>
+              <div class="uad-comp-bar-wrap" *ngIf="getCompletionPct(log) > 0">
+                <div class="uad-comp-bar"
+                  [class.cbar-full]="getCompletionPct(log) >= 100"
+                  [class.cbar-mid]="getCompletionPct(log) >= 50 && getCompletionPct(log) < 100"
+                  [class.cbar-low]="getCompletionPct(log) < 50"
+                  [style.width.%]="getCompletionPct(log)">
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="logs.length === 0">
+          <td colspan="8" class="uad-empty">No logs found for this user</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>

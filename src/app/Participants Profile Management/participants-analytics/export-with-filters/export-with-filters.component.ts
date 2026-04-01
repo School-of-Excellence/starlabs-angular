@@ -16,14 +16,6 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { AuthguardService } from '../../../authguard.service';
 import * as   XLSX from 'xlsx';
 
-interface ParticipantProduct {
-  profileId: string;
-  participantName: string;
-  productId: string;
-  productName: string;
-  consumedCount: number;
-  unconsumedCount: number;
-}
 
 interface GroupedParticipant {
   profileId: string;
@@ -61,23 +53,23 @@ interface GroupedParticipant {
 })
 export class ExportWithFiltersComponent {
   // Filter selection
-  selectedFilter: string = '';
+  selectedFilter: string = 'productconsumption';
   isFiltered: boolean = false;
 
   // Filter values
-  filters: any = {
-    consumedproducts: [],
-    consumedcount: null,
-    unconsumedproducts: [],
-    unconsumedcount: null,
-  };
+  // filters: any = {
+  //   consumedproducts: [],
+  //   consumedcount: null,
+  //   unconsumedproducts: [],
+  //   unconsumedcount: null,
+  // };
 
-  resetfilters: any = {
-    consumedproducts: [],
-    consumedcount: null,
-    unconsumedproducts: [],
-    unconsumedcount: null,
-  };
+  // resetfilters: any = {
+  //   consumedproducts: [],
+  //   consumedcount: null,
+  //   unconsumedproducts: [],
+  //   unconsumedcount: null,
+  // };
 
   filterproductlist: string = '';
   filterunconsumedproductlist: string = '';
@@ -92,6 +84,9 @@ export class ExportWithFiltersComponent {
   displayedColumns: string[] = ['name'];
   filteredData: any[] = [];
   allData: any[] = [];
+
+  productsFilteredData = [];
+  rawProductsData = [];
 
   filterForm!: FormGroup;
 
@@ -109,7 +104,7 @@ export class ExportWithFiltersComponent {
   }
 
   async ngOnInit() {
-    const [ productsSnap ] = await Promise.all([
+    const [productsSnap] = await Promise.all([
       getDocs(collection(this.firestore, "products"))
     ]);
 
@@ -124,8 +119,37 @@ export class ExportWithFiltersComponent {
       unconsumedProducts: this.fb.array([])
     });
 
+    this.data.consumed.forEach((d) => {
+
+      this.consumedProducts.push(
+        this.fb.group({
+          productId: [d.productId,],
+          count: [d.count, Validators.required],
+          comparison: [d.comparison, Validators.required]
+        })
+      );
+    })
+    this.data.unconsumed.forEach((d) => {
+      this.unconsumedProducts.push(
+        this.fb.group({
+          productId: [d.productId,],
+          count: [d.count, Validators.required],
+          comparison: [d.comparison, Validators.required]
+        })
+      );
+
+    })
+    // this.filteredData = Object.values(this.data.participantProduct);
+
+    if (this.data.consumed.length > 0 || this.data.unconsumed.length > 0) {
+      this.isFiltered = true;
+      this.productsFilteredData = this.data.productsFilteredData;
+      this.rawProductsData = this.data.rawProductsData || [];
+    }
+
     // this.addConsumedProduct();
     // this.addUnconsumedProduct();
+
   }
 
   get consumedProducts(): FormArray {
@@ -135,7 +159,8 @@ export class ExportWithFiltersComponent {
   createConsumedProductGroup(): FormGroup {
     return this.fb.group({
       productId: ['',],
-      count: [0, Validators.required]
+      count: [0, Validators.required],
+      comparison: ['equalto', Validators.required]
     });
   }
 
@@ -143,10 +168,15 @@ export class ExportWithFiltersComponent {
     this.consumedProducts.push(this.createConsumedProductGroup());
   }
 
+  // removeConsumedProduct(index: number): void {
+  //   if (this.consumedProducts.length > 1) {
+  //     this.consumedProducts.removeAt(index);
+  //   }
+  // }
+
+  // function to remove consumed product
   removeConsumedProduct(index: number): void {
-    if (this.consumedProducts.length > 1) {
-      this.consumedProducts.removeAt(index);
-    }
+    this.consumedProducts.removeAt(index);
   }
 
   // Unconsumed Products FormArray
@@ -157,7 +187,8 @@ export class ExportWithFiltersComponent {
   createUnconsumedProductGroup(): FormGroup {
     return this.fb.group({
       productId: ['',],
-      count: [0, Validators.required]
+      count: [0, Validators.required],
+      comparison: ['equalto', Validators.required]
     });
   }
 
@@ -165,10 +196,15 @@ export class ExportWithFiltersComponent {
     this.unconsumedProducts.push(this.createUnconsumedProductGroup());
   }
 
+  // removeUnconsumedProduct(index: number): void {
+  //   if (this.unconsumedProducts.length > 1) {
+  //     this.unconsumedProducts.removeAt(index);
+  //   }
+  // }
+
+  // function to remove unconsumed product
   removeUnconsumedProduct(index: number): void {
-    if (this.unconsumedProducts.length > 1) {
-      this.unconsumedProducts.removeAt(index);
-    }
+    this.unconsumedProducts.removeAt(index);
   }
 
   onfilterproducts() {
@@ -203,12 +239,12 @@ export class ExportWithFiltersComponent {
 
       // Check if at least one filter is provided
       if (consumedData.length === 0 && unconsumedData.length === 0) {
-        alert('Please select at least one product filter');
+        this.clearFilters()
         this.isLoading = false;
-        return;
-      }
 
-      await this.fetchAndFilterByDocumentCount(consumedData, unconsumedData);
+      } else {
+        await this.fetchAndFilterByDocumentCount(consumedData, unconsumedData);
+      }
 
     } catch (error) {
       console.error('Error applying filter:', error);
@@ -225,8 +261,11 @@ export class ExportWithFiltersComponent {
     consumed.forEach(c => productIds.add(c.productId));
     unconsumed.forEach(u => productIds.add(u.productId));
 
+    const consumedProductIds = consumed.map(c => c.productId);
+    const unconsumedProductIds = unconsumed.map(c => c.productId);
+
     if (productIds.size === 0) {
-      this.filteredData = [];
+      this.clearFilters();
       return;
     }
 
@@ -239,7 +278,7 @@ export class ExportWithFiltersComponent {
 
       querySnapshot.docs.forEach(doc => {
         const data = doc.data();
-        if([null, 'completed'].includes(data['status'])) {
+        if ([null, 'completed'].includes(data['status'])) {
           allDocs.push({
             profileId: data['profileid'] || 'N/A',
             status: data['status'],
@@ -274,10 +313,10 @@ export class ExportWithFiltersComponent {
         };
       }
 
-      if(doc['status'] == 'completed') {
+      if (doc['status'] == 'completed' && consumedProductIds.includes(doc.productId)) {
         participant.products[doc.productId].consumedCount++;
         participant.products[doc.productId].consumedDocuments.push(doc);
-      } else if(doc['status'] == null) {
+      } else if (doc['status'] == null && unconsumedProductIds.includes(doc.productId)) {
         participant.products[doc.productId].unConsumedCount++;
         participant.products[doc.productId].unConsumedDocuments.push(doc);
       }
@@ -285,6 +324,7 @@ export class ExportWithFiltersComponent {
 
     // Step 3: Filter based on document count
     const filteredParticipants: any[] = [];
+    const productsFilteredData: any[] = [];
 
     for (const [participantId, participant] of grouped) {
       // Default to true if no filters provided for that type
@@ -295,15 +335,25 @@ export class ExportWithFiltersComponent {
       if (consumed.length > 0) {
         matchesConsumed = consumed.every(filter => {
           const productData = participant.products[filter.productId];
+          // console.log(productData)
           if (!productData) return false;
 
-          if (filter.count === 0) {
-            if(productData.consumedCount > 0) {
-              return true;
-            } else {
-              return false;
-            }
-          } 
+          // if (filter.count === 0) {
+          //   if (productData.consumedCount > 0) {
+          //     return true;
+          //   } else {
+          //     return false;
+          //   }
+          // }
+          // console.log(productData.consumedCount , filter.count)
+
+          if (filter.comparison === 'equalto') {
+            return productData.consumedCount == filter.count;
+          } else if (filter.comparison === 'groreqto') {
+            return productData.consumedCount >= filter.count;
+          } else if (filter.comparison === 'lsoreqto') {
+            return productData.consumedCount <= filter.count;
+          }
           return productData.consumedCount == filter.count;
         });
       }
@@ -315,13 +365,21 @@ export class ExportWithFiltersComponent {
           if (!productData) return false;
 
           // Count = 0 means get all with that product
-          if (filter.count === 0) {
-            if(productData.unConsumedCount > 0) {
-              return true;
-            } else {
-              return false;
-            }
-          } 
+          // if (filter.count === 0) {
+          //   if (productData.unConsumedCount > 0) {
+          //     return true;
+          //   } else {
+          //     return false;
+          //   }
+          // }
+
+          if (filter.comparison === 'equalto') {
+            return productData.unConsumedCount == filter.count;
+          } else if (filter.comparison === 'groreqto') {
+            return productData.unConsumedCount >= filter.count;
+          } else if (filter.comparison === 'lsoreqto') {
+            return productData.unConsumedCount <= filter.count;
+          }
 
           return productData.unConsumedCount == filter.count;
         });
@@ -329,19 +387,24 @@ export class ExportWithFiltersComponent {
 
       if (matchesConsumed && matchesUnconsumed) {
         // console.log("Name", participant);
-        filteredParticipants.push(participant)
+        productsFilteredData.push(participant)
+        if (this.data.participants?.has(participant['profileId'])) {
+          filteredParticipants.push(participant)
+        }
       }
     }
 
-    if(consumed.length > 0) {
+    if (consumed.length > 0) {
       this.displayedColumns.push('consumed')
     }
 
-    if(unconsumed.length > 0) {
+    if (unconsumed.length > 0) {
       this.displayedColumns.push('unconsumed')
     }
 
+    this.productsFilteredData = productsFilteredData;
     this.filteredData = filteredParticipants;
+    this.rawProductsData = Array.from(grouped.values());
   }
 
   getConsumedCount(products: any): number {
@@ -355,66 +418,14 @@ export class ExportWithFiltersComponent {
   }
 
   filterConsumption() {
-    
+
   }
 
-  selectFilter(filterType: string): void {
-    this.filters = this.resetfilters;
-    this.selectedFilter = filterType;
-    this.isFiltered = false;
-  }
-
-
-  filterByDateRange(): void {
-    if (!this.filters.startDate || !this.filters.endDate) {
-      this.filteredData = [...this.allData];
-      return;
-    }
-
-    this.filteredData = this.allData.filter(item => {
-      const itemDate = new Date(item.date);
-      const startDate = new Date(this.filters.startDate);
-      const endDate = new Date(this.filters.endDate);
-      return itemDate >= startDate && itemDate <= endDate;
-    });
-  }
-
-  filterByStatus(): void {
-    if (this.filters.status.length === 0) {
-      this.filteredData = [...this.allData];
-      return;
-    }
-    this.filteredData = this.allData.filter(item =>
-      this.filters.status.includes(item.status)
-    );
-  }
-
-  filterByCategory(): void {
-    if (!this.filters.category) {
-      this.filteredData = [...this.allData];
-      return;
-    }
-    this.filteredData = this.allData.filter(item =>
-      item.category === this.filters.category
-    );
-  }
-
-  filterByCustom(): void {
-    if (!this.filters.searchTerm || !this.filters.searchField) {
-      this.filteredData = [...this.allData];
-      return;
-    }
-    const searchTerm = this.filters.searchTerm.toLowerCase();
-    const field = this.filters.searchField;
-
-    this.filteredData = this.allData.filter(item =>
-      item[field]?.toString().toLowerCase().includes(searchTerm)
-    );
-  }
-
-  exportData(): void {
-    
-  }
+  // selectFilter(filterType: string): void {
+  //   this.filters = this.resetfilters;
+  //   this.selectedFilter = filterType;
+  //   this.isFiltered = false;
+  // }
 
   // Optional: CSV export helper method
   downloadCSV(data: any[]): void {
@@ -449,67 +460,92 @@ export class ExportWithFiltersComponent {
     return csvRows.join('\n');
   }
 
-  getProducts(products : any = {}){
+  getProducts(products: any = {}) {
     const productsId = Object.keys(products);
     const consumedProductsName = [];
     const unConsumedProductsName = [];
 
-    for(let productId of productsId){
+    for (let productId of productsId) {
       const p = products[productId];
-      if(p.consumedCount > 0){
+      if (p.consumedCount > 0) {
         consumedProductsName.push(this.mapProductName[productId]);
       }
-      if(p.unConsumedCount > 0){
+      if (p.unConsumedCount > 0) {
         unConsumedProductsName.push(this.mapProductName[productId]);
       }
     }
 
-    return [consumedProductsName , unConsumedProductsName];
+    return [consumedProductsName, unConsumedProductsName];
   }
 
   exportToExcel() {
-      const data = this.filteredData;
-      const sheetData: any[][] = [];
-  
-      // Header
+    const data = this.filteredData;
+    const sheetData: any[][] = [];
+
+    // Header
+    sheetData.push([
+      'S.No',
+      'Name',
+      'Email',
+      'Consumed',
+      'Unconsumed'
+    ]);
+
+    data.forEach((item: any, index) => {
+      const [consumed, unconsumed] = this.getProducts(item.products)
       sheetData.push([
-        'S.No',
-        'Name',
-        'Email',
-        'Consumed',
-        'Unconsumed'
+        index + 1,
+        this.mapProfile[item.profileId] || '',
+        this.mapProfileData[item.profileId]?.email || '',
+        consumed.join(','),
+        unconsumed.join(',')
       ]);
-  
-      data.forEach((item: any , index) => {
-        const [consumed , unconsumed] = this.getProducts(item.products) 
-          sheetData.push([
-            index + 1,
-            this.mapProfile[item.profileId] || '',
-            this.mapProfileData[item.profileId]?.email || '',
-            consumed.join(','),
-            unconsumed.join(',')
-          ]);
-      });
-  
-      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-      // // worksheet['!merges'] = merges;
-  
-      // // Optional column widths
-      worksheet['!cols'] = [
-        { wch: 8 },
-        { wch: 18 },
-        { wch: 30 },
-        { wch: 50 },
-        { wch: 50 },
-      ];
-  
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Participant List');
-  
-      XLSX.writeFile(
-        workbook,
-        `participant_list_${new Date().toISOString().split('T')[0]}.xlsx`
-      );
-    }
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    // // worksheet['!merges'] = merges;
+
+    // // Optional column widths
+    worksheet['!cols'] = [
+      { wch: 8 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 50 },
+      { wch: 50 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Participant List');
+
+    XLSX.writeFile(
+      workbook,
+      `participant_list_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
+  }
+
+  closeDialog() {
+    const participants = this.productsFilteredData.reduce((map, p) => {
+      map[p['profileId']] = p
+      return map;
+    }, {});
+    
+    const consumed = this.isFiltered ? this.consumedProducts.value || [] : [];
+    const unconsumed = this.isFiltered ? this.unconsumedProducts.value || [] : [];
+    this.dialogRef.close({
+      consumed,
+      unconsumed,
+      participants,
+      rawProductsData : this.rawProductsData
+    });
+  }
+
+  clearFilters() {
+    this.consumedProducts.clear()
+    this.unconsumedProducts.clear();
+    this.filteredData = [];
+    this.rawProductsData = [];
+    this.productsFilteredData = [];
+    this.isFiltered = false;
+  }
 
 }

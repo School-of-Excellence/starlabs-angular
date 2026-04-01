@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, signal } from '@angular/core';
-import { lastValueFrom, Subject, takeUntil } from 'rxjs';
+import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { LocalVideoTrack, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent } from 'livekit-client';
 import { collection, collectionData, Firestore, limit, query, where } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
@@ -10,6 +10,8 @@ import { AuthguardService } from '../../authguard.service';
 import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvidu-audio-element.component';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { MatDialog } from '@angular/material/dialog';
+import { InstanceStatusService, InfrastructureStatus } from '../../instance-status.service';
+
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -43,11 +45,18 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
   ghostID: " - Ghost" = " - Ghost"
 
+  infraStatus: InfrastructureStatus | null = null;
+  infraActionInProgress = false;
+  infraError: string | null = null;
+  infraSuccess: string | null = null;
+  private destroy$ = new Subject<void>();
+
   constructor(
     public http: HttpClient,
     public firestore: Firestore,
     public guard: AuthguardService,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private infraService: InstanceStatusService
   ){
     this.guard.getRoles().then(roles =>{
       this.loggedinProfileid = roles["profile_ref"].id
@@ -75,7 +84,13 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
           }
         }
       })
+
+      if(roles["developer"]) this.loadInfrastructureStatus();
     })
+  }
+
+  ngOnInit() {
+    
   }
 
   ngOnDestroy() {
@@ -87,6 +102,8 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       room?.removeAllListeners();
     });
     this.roomConnections.clear();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   async joinRoom(roomName:string){
@@ -178,23 +195,55 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
     } catch (error: any) {
       // Handle connection errors gracefully
+      console.log(error)
       console.log('There was an error connecting to the room:', error?.error?.errorMessage || error?.message || error);
       this.leaveRoom(roomName);
     }
   }
 
   // Get LiveKit Token
-  async getToken(roomName: string) {
-    const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`;
+  async getToken(roomID: string) {
+    // const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`;
 
-    const participantName = this.loggedinProfileRole["name"] + this.ghostID
-    const participantId = this.loggedinProfileid + this.ghostID
+    // const participantName = this.loggedinProfileRole["name"] + this.ghostID
+    // const participantId = this.loggedinProfileid + this.ghostID
 
-    const response = await lastValueFrom(
-      this.http.post<{url: string, token: string }>(url, { roomName, participantName, participantId })
-    );
+    // const response = await lastValueFrom(
+    //   this.http.post<{url: string, token: string }>(url, { roomName, participantName, participantId })
+    // );
 
-    return response;
+    // return response;
+
+    const roomName = roomID;
+    const participantId = (this.loggedinProfileid || `user-${Date.now()}`) + this.ghostID;
+    const participantName = (this.loggedinProfileRole["name"] || 'Guest') + this.ghostID;
+
+    console.log({roomName, participantId, participantName})
+    
+    let retryCount = 0;
+
+    while (retryCount <= 3) {
+      try {
+        return await firstValueFrom(
+          this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
+            roomName,
+            participantName,
+            participantId
+          })
+        );
+      } catch (error: any) {
+        if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
+          retryCount++;
+          if (retryCount > 3) throw new Error('System at capacity');
+          
+          const wait = error.error?.retryAfter || 60;
+          console.log(`Scaling... retry in ${wait}s`);
+          await new Promise(r => setTimeout(r, wait * 1000));
+        } else {
+          throw error;
+        }
+      }
+    }
   }
 
   async endCall(RoomId){
@@ -252,5 +301,143 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
   returnRemoteParticipantTrack(room: MapIterator<TrackInfo>) : TrackInfo[]{
     return Array.from(room)
+  }
+
+  loadInfrastructureStatus() {
+    this.infraService.getStatus()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (status) => {
+          
+          if (status) {
+            this.infraStatus = status;
+            console.log(this.infraStatus, 'getStatus()');
+          }
+        },
+        error: (err) => {
+          console.error('Infrastructure status error:', err);
+        }
+      });
+  }
+
+  startMasterNode() {
+    if (!confirm('Start master node?')) return;
+
+    this.infraActionInProgress = true;
+    this.infraError = null;
+
+    this.infraService.startMaster()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.infraSuccess = 'Master node starting...';
+          this.infraActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to start';
+          this.infraActionInProgress = false;
+        }
+      });
+  }
+
+  stopMasterNode() {
+    if (!confirm('Stop master node?')) return;
+
+    this.infraActionInProgress = true;
+    this.infraError = null;
+
+    this.infraService.stopMaster()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.infraSuccess = 'Master node stopping...';
+          this.infraActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to stop';
+          this.infraActionInProgress = false;
+        }
+      });
+  }
+
+  scaleMediaUp() {
+    this.infraActionInProgress = true;
+    this.infraError = null;
+
+    this.infraService.scaleUp()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.infraSuccess = 'Scaling up...';
+          this.infraActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to scale up';
+          this.infraActionInProgress = false;
+        }
+      });
+  }
+
+  scaleMediaDown() {
+    if (!confirm('Scale down?')) return;
+
+    this.infraActionInProgress = true;
+    this.infraError = null;
+
+    this.infraService.scaleDown()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.infraSuccess = 'Scaling down...';
+          this.infraActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to scale down';
+          this.infraActionInProgress = false;
+        }
+      });
+  }
+
+  canStartMaster(): boolean {
+    return this.infraStatus?.master?.state === 'stopped' && !this.infraActionInProgress;
+  }
+
+  canStopMaster(): boolean {
+    return this.infraStatus?.master?.state === 'running' && !this.infraActionInProgress;
+  }
+
+  canScaleUp(): boolean {
+    return !this.infraActionInProgress && 
+           !!this.infraStatus?.media &&
+           this.infraStatus.media.desiredCapacity < this.infraStatus.media.maxSize;
+  }
+
+  canScaleDown(): boolean {
+    return !this.infraActionInProgress && 
+           !!this.infraStatus?.media &&
+           this.infraStatus.media.desiredCapacity > this.infraStatus.media.minSize;
+  }
+
+  getMasterState(): string {
+    return this.infraStatus?.master?.state || 'unknown';
+  }
+
+  getMasterStateClass(): string {
+    const state = this.infraStatus?.master?.state;
+    if (state === 'running') return 'state-running';
+    if (state === 'stopped') return 'state-stopped';
+    if (state === 'starting' || state === 'stopping') return 'state-transitioning';
+    return 'state-unknown';
+  }
+
+  getMediaStateClass(): string {
+    const status = this.infraStatus?.media?.scalingStatus;
+    if (status === 'stable') return 'state-stable';
+    if (status === 'scaling-up' || status === 'scaling-down') return 'state-transitioning';
+    return 'state-unknown';
   }
 }
