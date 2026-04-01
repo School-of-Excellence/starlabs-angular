@@ -7,6 +7,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { TextFieldModule } from '@angular/cdk/text-field';
 import { AuthguardService } from '../../authguard.service';
 import { VideoPlayerComponent } from '../../video-player/video-player.component';
+import { ParticipantEvolutionMappingComponent } from '../../EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component';
+import { FormtemplateComponent } from '../../Product Designer/delivery-set/formtemplate/formtemplate.component';
+import { ListOpenviduRoomComponent } from '../../OpenVidu/list-openvidu-room/list-openvidu-room.component';
 @Component({
   selector: 'app-queue-web-version1',
   templateUrl: './queue-web-version1.component.html',
@@ -20,6 +23,9 @@ import { VideoPlayerComponent } from '../../video-player/video-player.component'
     MatButtonModule,
     TextFieldModule,
     VideoPlayerComponent,
+    ParticipantEvolutionMappingComponent,
+    FormtemplateComponent,
+    ListOpenviduRoomComponent
   ],
 })
 export class QueueWebVersion1Component implements OnInit, OnDestroy {
@@ -30,7 +36,8 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
   @ViewChildren('stageElement') stageElements!: QueryList<ElementRef>;
   private chatListUnsub:   (() => void) | null = null;
   private pinnedChatUnsub: (() => void) | null = null;
-  private queueLiveUnsub:  (() => void) | null = null;  
+  private queueLiveUnsub:    (() => void) | null = null;
+  private queueTokenUnsub:   (() => void) | null = null;
   user: any = {};
   mapProfile:      Record<string, any> = {};
   mapproduct:      Record<string, any> = {};
@@ -43,6 +50,9 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
   loadingQueue:boolean = true;
   currentQueueStageIndex:number  = 0;
   stageMessage:string  = '';
+  showInlineForm: boolean = false;
+  inlineFormId: string = null;
+  inlineQueueId: string = null;
 
   constructor() {
     // Resolve user and profile map before fetching queue data
@@ -71,8 +81,16 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.chatListUnsub?.();
     this.pinnedChatUnsub?.();
-    this.queueLiveUnsub?.();  
+    this.queueLiveUnsub?.();
+    this.queueTokenUnsub?.();
+  }
 
+  objectKeys(obj: any): string[] {
+    return obj ? Object.keys(obj) : [];
+  }
+
+  isInStudio(): boolean {
+    return this.profileJourneyProduct?.['queuetoken']?.['status'] === 'instudio';
   }
 
   async fetchOngoingQueue(): Promise<void> {
@@ -101,7 +119,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     //Participant product (ongoing / Event Mode)
     const p_product = await getDocs( query( collection(this.firestore, 'participantsproduct'), where('profileid', '==', this.user.profileid),  where('mode', '==', 'Event Mode'),  where('status', '==', 'ongoing'), limit(1) ) );
-
+    
     if (p_product.docs.length === 0) {
         console.log('No Ongoing Events');
         this.loadingQueue = false;
@@ -122,11 +140,13 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     this.profileJourneyProduct['deliverables'] = delivery.docs[0].data();
 
-    //Queue token 
+    //Queue token
     const filerefArray = this.profileJourneyProduct['deliverables']['fileref'];
     const lastFileref  = filerefArray[filerefArray.length - 1] as DocumentReference;
     const queuetoken   = await getDoc(lastFileref);
 
+    console.log('lastFileref path:', lastFileref.path);
+    console.log('queuetoken from lastFileref:', queuetoken.data());
     if (!queuetoken.exists()) {
         console.log('NO QUEUE TOKEN FOUND');
         this.loadingQueue = false;
@@ -135,6 +155,16 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     this.profileJourneyProduct['queuetoken']   = queuetoken.data();
     this.profileJourneyProduct['currentstage'] = queuetoken.data()!['currentstage'];
+
+
+    // Fetch variation stages if variationid exists
+    const variationId = queuetoken.data()!['variationid'];
+    if (variationId) {
+      const variationSnap = await getDoc(doc(this.firestore, 'queue variation', variationId));
+      if (variationSnap.exists()) {
+        this.profileJourneyProduct['variationStages'] = variationSnap.data()['stages'];
+      }
+    }
 
     // Queue data 
     const queueDocRef = this.profileJourneyProduct['queuetoken']['queueref'] as DocumentReference;
@@ -149,6 +179,31 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
     }
 
     this.profileJourneyProduct['queueData'] = queueDataSnap.data() ?? {};
+
+    // Live listener on queue token — registered AFTER queueData is set
+    this.queueTokenUnsub?.();
+    this.queueTokenUnsub = onSnapshot(lastFileref, (tokenSnap) => {
+      if (!tokenSnap.exists()) return;
+      const tokenData = tokenSnap.data();
+
+      const activeStages = this.profileJourneyProduct['variationStages'] 
+        ?? this.profileJourneyProduct['queueData']?.['stages'];
+      
+      let newIndex = this.currentQueueStageIndex;
+      if (activeStages) {
+        const idx = activeStages.findIndex((e: any) => e === tokenData['currentstage']);
+        newIndex = idx !== -1 ? idx : 0;
+      }
+
+      // Spread to new object reference to trigger Angular change detection
+      this.profileJourneyProduct = {
+        ...this.profileJourneyProduct,
+        queuetoken: tokenData,
+        currentstage: tokenData['currentstage'],
+      };
+
+      this.currentQueueStageIndex = newIndex;
+    });
 
     //  Check if this queue is actually live 
     const now        = new Date();
@@ -165,34 +220,58 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
         let liveTokenFound = false;
 
         for (const tokenDoc of allTokensSnap.docs) {
-        const tokenData        = tokenDoc.data();
-        const linkedQueueSnap  = await getDoc(tokenData['queueref'] as DocumentReference);
+          const tokenData        = tokenDoc.data();
+          const linkedQueueSnap  = await getDoc(tokenData['queueref'] as DocumentReference);
 
-        if (!linkedQueueSnap.exists()) continue;
+          if (!linkedQueueSnap.exists()) continue;
 
-        const linkedQueueData  = linkedQueueSnap.data()!;
-        const lStart: Date     = linkedQueueData['queuestartdate']?.toDate();
-        const lEnd: Date       = linkedQueueData['queueenddate']?.toDate();
-        const linkedIsLive     = lStart && lEnd && now >= lStart && now <= lEnd;
+          const linkedQueueData  = linkedQueueSnap.data()!;
+          const lStart: Date     = linkedQueueData['queuestartdate']?.toDate();
+          const lEnd: Date       = linkedQueueData['queueenddate']?.toDate();
+          const linkedIsLive     = lStart && lEnd && now >= lStart && now <= lEnd;
 
-        if (linkedIsLive) {
+          if (linkedIsLive) {
             console.log('Found live queue:', linkedQueueData['queuename']);
 
-            // Re-fetch participantsproduct linked to this live queue token
-            const correctPPSnap = await getDocs(
-            query(  collection(this.firestore, 'participantsproduct'),  where('profileid', '==', this.user.profileid), where('mode', '==', 'Event Mode'), where('status', '==', 'ongoing'), limit(1) ) );
+            // Find the deliverable that references this token doc
+            const tokenDocRef = tokenDoc.ref;
+            const matchingDeliverySnap = await getDocs(
+              query(
+                collection(this.firestore, 'deliverables'),
+                where('profileid', '==', this.user.profileid),
+                where('type', '==', 'queue'),
+                where('status', '==', 'ongoing'),
+                where('fileref', 'array-contains', tokenDocRef)
+              )
+            );
 
-            if (correctPPSnap.docs.length === 0) break;
+            if (matchingDeliverySnap.docs.length === 0) {
+              console.log('No matching deliverable for this live token, skipping...');
+              continue;
+            }
 
-            this.profileJourneyProduct['participantproductid']   = correctPPSnap.docs[0].id;
-            this.profileJourneyProduct['participantproductdata'] = correctPPSnap.docs[0].data();
+            const matchingDelivery = matchingDeliverySnap.docs[0].data();
+            const participantproductid = matchingDelivery['participantproductid'];
+
+            // Get the participantsproduct using the id from deliverable
+            const correctPPSnap = await getDoc(
+              doc(this.firestore, 'participantsproduct', participantproductid)
+            );
+
+            if (!correctPPSnap.exists()) {
+              console.log('No participantsproduct found, skipping...');
+              continue;
+            }
+
+            this.profileJourneyProduct['participantproductid']   = correctPPSnap.id;
+            this.profileJourneyProduct['participantproductdata'] = correctPPSnap.data();
             this.profileJourneyProduct['queueData']              = linkedQueueData;
             this.profileJourneyProduct['queuetoken']             = tokenData;
             this.profileJourneyProduct['currentstage']           = tokenData['currentstage'];
 
             liveTokenFound = true;
             break;
-        }
+          }
         }
 
         if (!liveTokenFound) {
@@ -232,8 +311,14 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
         }
     );
 
+    
+    // Use variation stages if available, otherwise fall back to all queue stages
+    const activeStages = this.profileJourneyProduct['variationStages'] 
+      ?? this.profileJourneyProduct['queueData']['stages'];
+    this.profileJourneyProduct['activeStages'] = activeStages;
+
     // Set current stage index in timeline
-    const stageIndex = this.profileJourneyProduct['queueData']['stages'].findIndex(
+    const stageIndex = activeStages.findIndex(
         (e: any) => e === this.profileJourneyProduct['currentstage']
     );
     this.currentQueueStageIndex = stageIndex !== -1 ? stageIndex : 0;
@@ -285,6 +370,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     this.pinnedChatUnsub = onSnapshot( query( stageChatCol, where('senderprofileid', '==', this.user.profileid),  where('pinned', '==', true), orderBy('date', 'desc')), (snap) => {this.pinnedChatList = snap.docs.map((d) => d.data()); } );
     this.loadingQueue = false;
+    
 }
 
   
@@ -344,12 +430,9 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
     if (stageproperty['actiontype'] === 'link') {
       window.open(stageproperty['actionresource'], '_blank');
     } else if (stageproperty['actiontype'] === 'form') {
-      const formId  = stageproperty['actionresource'].id ?? '';
-      const queueId = data['docid'];
-      window.open(
-        window.location.origin + '/formtemplate?id=' + formId + '&type=form&queueid=' + queueId,
-        '_blank'
-      );
+      this.inlineFormId  = stageproperty['actionresource'].id ?? '';
+      this.inlineQueueId = data['docid'];
+      this.showInlineForm = true;
     } else if (stageproperty['actiontype'] === 'videoask') {
       // handle videoask — no-op for now
     } else if (stageproperty['selfmovable'] === true) {
@@ -376,7 +459,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
     } else if (stageproperty[stage]['selfmovable'] === true) {
       type        = 'selfmovable';
       buttonlabel = stageproperty[stage]['calltoaction'] ?? 'Ready for Next Stage';
-    } else if ((stageproperty[stage]['compulsoryactivity'] ?? []).length !== 0) {
+    } else if (stageproperty[stage]['compulsoryactivity'] && Object.keys(stageproperty[stage]['compulsoryactivity']).length !== 0) {
       type = 'activity';
       if (queueTokenData['status'] === 'instudio') {
         buttonlabel = 'In Studio';

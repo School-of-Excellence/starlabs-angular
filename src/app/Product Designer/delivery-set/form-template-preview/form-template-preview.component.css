@@ -84,21 +84,21 @@
   }
   
   .preview-array-field {
-    margin-bottom: 10px;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    margin-bottom: 12px;
   }
-  
+
   .preview-array-field-name {
-    font-weight: 500;
+    font-size: 14px;
     color: #7f8c8d;
-    width: 30%;
-    padding-right: 12px;
+    margin-bottom: 4px;
   }
-  
+
   .preview-array-field-value {
-    width: 70%;
-    color: #34495e;
+    font-size: 15px;
+    color: #2c3e50;
+    font-weight: 500;
   }
   
   .preview-actions {
