@@ -1,19 +1,17 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { Firestore, collection, collectionData,query, where, getDocs,doc, updateDoc, deleteDoc } from '@angular/fire/firestore';
-
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage, ref as afRef, uploadBytes as afUploadBytes, getDownloadURL as afGetDownloadURL } from '@angular/fire/storage';
 import { inject } from '@angular/core';
-  import { MatDialog } from '@angular/material/dialog';
-  import { Router } from '@angular/router';
-
-  import { MatSort } from '@angular/material/sort';
-  import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-  import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
-  import { MatSnackBar } from '@angular/material/snack-bar';
-  import { DomSanitizer } from '@angular/platform-browser';
-import { LiveEvolutionMappingComponent } from './live-evolution-mapping/live-evolution-mapping.component';
+import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
+import { MatSort } from '@angular/material/sort';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { DomSanitizer } from '@angular/platform-browser';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { LiveEvolutionMappingComponent } from '../evolution-mapping/live-evolution-mapping/live-evolution-mapping.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -23,8 +21,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { AuthguardService } from '../../authguard.service';
 import { MatInputModule } from '@angular/material/input';
-import { EvolutiomMappingAddComponent } from './evolutiom-mapping-add/evolutiom-mapping-add.component';
 import { MatButtonModule } from '@angular/material/button';
+import { EvolutionMappingAddV2Component } from './evolution-mapping-add-v2/evolution-mapping-add-v2.component';
 
 interface LiveEvolutionMapping {
   profileid: string;
@@ -34,12 +32,12 @@ interface LiveEvolutionMapping {
 }
 
 @Component({
-  selector: 'app-evolution-mapping',
+  selector: 'app-evolution-mapping-v2',
   imports: [MatPaginatorModule, MatSort,MatFormFieldModule,CommonModule,FormsModule,MatTooltipModule,MatIconModule,MatTabsModule,MatSelectModule,MatTableModule,MatCheckboxModule,MatInputModule,MatButtonModule],
-  templateUrl: './evolution-mapping.component.html',
-  styleUrl: './evolution-mapping.component.css'
+  templateUrl: './evolution-mapping-v2.component.html',
+  styleUrl: './evolution-mapping-v2.component.css'
 })
-export class EvolutionMappingComponent {
+export class EvolutionMappingV2Component {
       mapProfile = {};
     mapVideoTitle: {} = {};
     tabledata: any[] = [];
@@ -92,38 +90,38 @@ export class EvolutionMappingComponent {
     isSelected(row: any): boolean {
       return Array.from(this.selection).some(item => item.docid === row.docid);
     }
-toggleSelection(event: any, row: any): boolean {
-  const existingSelection = Array.from(this.selection).find(item => item.docid === row.docid);
-  const firstSelectedProfileId = this.selection.size > 0 ? Array.from(this.selection)[0].profileid : null;
+    toggleSelection(event: any, row: any): boolean {
+      const existingSelection = Array.from(this.selection).find(item => item.docid === row.docid);
+      const firstSelectedProfileId = this.selection.size > 0 ? Array.from(this.selection)[0].profileid : null;
 
-  if (existingSelection) {
-    this.selection.delete(existingSelection);
-    return true;
-  } else {
-    if (!firstSelectedProfileId || row.profileid === firstSelectedProfileId) {
-      this.selection.add({
-        docid: row.docid,
-        profileid: row.profileid,
-        title: row.title,
-        videourl: row.videourl,
-        recordeddate: row.recordeddate,
-        created: row.created,
-        name: this.mapProfile[row.profileid]
-      });
-      return true;
-    } else {
-      event.source.checked = false;
-      setTimeout(() => {
-        event.source.checked = false;
-      });
+      if (existingSelection) {
+        this.selection.delete(existingSelection);
+        return true;
+      } else {
+        if (!firstSelectedProfileId || row.profileid === firstSelectedProfileId) {
+          this.selection.add({
+            docid: row.docid,
+            profileid: row.profileid,
+            title: row.title,
+            videourl: row.videourl,
+            recordeddate: row.recordeddate,
+            created: row.created,
+            name: this.mapProfile[row.profileid]
+          });
+          return true;
+        } else {
+          event.source.checked = false;
+          setTimeout(() => {
+            event.source.checked = false;
+          });
 
-      this.snackBar.open('You can only select rows with the same participant.', 'Close', {
-        duration: 2000,
-      });
-      return false;
+          this.snackBar.open('You can only select rows with the same participant.', 'Close', {
+            duration: 2000,
+          });
+          return false;
+        }
+      }
     }
-  }
-}
 
     // toggleSelection(event: any, row: any) {
     //   const existingSelection = Array.from(this.selection).find(item => item.docid === row.docid);
@@ -246,44 +244,44 @@ toggleSelection(event: any, row: any): boolean {
     // }
     async getLiveEvolutionMapping() {
   // Initialize empty maps
-  const mapLiveData: any[] = [];
+    const mapLiveData: any[] = [];
 
-  // Create reference to the collection
-  const liveEvolutionRef = collection(this.firestore, 'liveevolutionmapping');
+    // Create reference to the collection
+    const liveEvolutionRef = collection(this.firestore, 'liveevolutionmapping');
 
-  // Create Firestore query
-  const q = query(liveEvolutionRef, where('videolist', '>', []));
+    // Create Firestore query
+    const q = query(liveEvolutionRef, where('videolist', '>', []));
 
-  // Fetch query results
-  const res = await getDocs(q);
+    // Fetch query results
+    const res = await getDocs(q);
 
-  // Process documents
-  res.forEach((doc) => {
-    const data: any = doc.data();
+    // Process documents
+    res.forEach((doc) => {
+      const data: any = doc.data();
 
-    const obj = {
-      profileid: data.profileid,
-      title: data.title,
-      live: data.live,
-      videolist: data.videolist || []
-    };
+      const obj = {
+        profileid: data.profileid,
+        title: data.title,
+        live: data.live,
+        videolist: data.videolist || []
+      };
 
-    mapLiveData.push(obj);
-  });
+      mapLiveData.push(obj);
+    });
 
-  // Assign to local variables
-  this.originalLiveData = [...mapLiveData];
-  this.dataSource2.data = mapLiveData;
+    // Assign to local variables
+    this.originalLiveData = [...mapLiveData];
+    this.dataSource2.data = mapLiveData;
 
-  // Build unique profile dropdown
-  const uniqueProfiles = Array.from(new Set(mapLiveData.map(item => item.profileid)));
-  this.profileOptionsLive = uniqueProfiles
-    .map(id => ({
-      id,
-      name: this.mapProfile[id]
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+    // Build unique profile dropdown
+    const uniqueProfiles = Array.from(new Set(mapLiveData.map(item => item.profileid)));
+    this.profileOptionsLive = uniqueProfiles
+      .map(id => ({
+        id,
+        name: this.mapProfile[id]
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    }
     // applyProfileFilter() {
     //   let filteredData = [...this.originalData];
     //   if (this.selectedProfileId) {
@@ -430,7 +428,7 @@ toggleSelection(event: any, row: any): boolean {
     //   }
     // }
     addEvolution() {
-      var dialogRef = this.dialog.open(EvolutiomMappingAddComponent, { 
+      var dialogRef = this.dialog.open(EvolutionMappingAddV2Component, { 
         disableClose: true,
         autoFocus: false,
         width: '90%',
@@ -444,7 +442,7 @@ toggleSelection(event: any, row: any): boolean {
     }
 
     edit(row: any) {
-      var dialogRef = this.dialog.open(EvolutiomMappingAddComponent, { 
+      var dialogRef = this.dialog.open(EvolutionMappingAddV2Component, { 
         data: row,
         disableClose: true,
         autoFocus: false,

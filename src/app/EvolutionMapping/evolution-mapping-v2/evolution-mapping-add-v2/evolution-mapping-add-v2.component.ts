@@ -19,7 +19,7 @@ import { MatTableModule } from '@angular/material/table';
 import { VideoPlayerComponent } from '../../video-player.component';
 
 @Component({
-  selector: 'app-evolutiom-mapping-add',
+  selector: 'app-evolution-mapping-add-v2',
   imports: [
     MatFormFieldModule,
     CommonModule, MatDatepickerModule, FormsModule, MatSelectModule,
@@ -27,10 +27,10 @@ import { VideoPlayerComponent } from '../../video-player.component';
     MatButtonModule, MatIconModule, MatTableModule,
     VideoPlayerComponent
   ],
-  templateUrl: './evolutiom-mapping-add.component.html',
-  styleUrl: './evolutiom-mapping-add.component.css'
+  templateUrl: './evolution-mapping-add-v2.component.html',
+  styleUrl: './evolution-mapping-add-v2.component.css'
 })
-export class EvolutiomMappingAddComponent implements OnInit {
+export class EvolutionMappingAddV2Component implements OnInit {
 
   mapProfile: { [key: string]: string } = {};
   loading: boolean = true;
@@ -52,7 +52,7 @@ export class EvolutiomMappingAddComponent implements OnInit {
     private guard: AuthguardService,
     private storage: Storage,
     public dialog: MatDialog,
-    public dialogRef: MatDialogRef<EvolutiomMappingAddComponent>,
+    public dialogRef: MatDialogRef<EvolutionMappingAddV2Component>,
     @Inject(MAT_DIALOG_DATA) public data: any,
     public router: Router,
   ) {

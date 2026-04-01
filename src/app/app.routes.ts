@@ -102,6 +102,7 @@ export const routes: Routes = [
   {path: 'view-participants-form', loadComponent: () => import('./Participants Profile Management/view-participants-form/view-participants-form.component').then(m => m.ViewParticipantsFormComponent), canActivate:[authGuard]},
   {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
   {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
+  {path: 'content-analytics-dashboard', loadComponent: () => import('./content/content-analytics-dashboard/content-analytics-dashboard.component').then(m => m.ContentAnalyticsDashboardComponent), canActivate:[authGuard]},
   {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
   {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard], children: [
     {path:'addseries', loadComponent: () => import('./content/series-dashboard/add-series/add-series.component').then(m => m.AddSeriesComponent), canActivate: [authGuard]},
@@ -266,9 +267,8 @@ export const routes: Routes = [
   // Evolution Mapping
   {path: 'evolutionmapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
   {path: 'evolutionmappingnew', loadComponent: () => import('./EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component').then(m => m.EvolutionMappingNewComponent), canActivate:[authGuard]},
-  {path: 'evolutionmappingclone', loadComponent: () => import('./EvolutionMapping/evolution-mapping-clone/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
   {path: 'participantevolution', loadComponent: () => import('./EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component').then(m => m.ParticipantEvolutionMappingComponent), canActivate:[authGuard]},
-
+  {path: 'evolutionmappingv2', loadComponent: () => import('./EvolutionMapping/evolution-mapping-v2/evolution-mapping-v2.component').then(m => m.EvolutionMappingV2Component), canActivate:[authGuard]},
   // Taxonomy
   {path: 'updateprofiletaxonomy', loadComponent: () => import('./AppEngagement/taxonomy/update-adjustment-taxonomy/update-adjustment-taxonomy.component').then(m => m.UpdateAdjustmentTaxonomyComponent), canActivate:[authGuard]},
 

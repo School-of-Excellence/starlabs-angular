@@ -364,3 +364,8 @@ mat-cell[matColumnDef="serial"] {
   top: 0;
   z-index: 20;
 }
+
+.mat-column-delete {
+  width: 60px;
+  text-align: center;
+}

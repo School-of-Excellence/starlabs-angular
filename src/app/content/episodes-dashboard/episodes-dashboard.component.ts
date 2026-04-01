@@ -23,7 +23,10 @@ export class uploadingelement {
   id:String | null;
   duration: string | null;
   title:String | null;
+  reftitle:String | null;
   description:String | null;
+  videoSize:String | null;
+  videoSizeBytes:number | null;
   imageUrl:string | null;
   videoUrl:string | null;
   screenshot:string | null
@@ -198,6 +201,9 @@ export class EpisodesDashboardComponent {
     this.uploadEpisodeDoc = new uploadingelement
     this.uploadEpisodeDoc.id = doc.id
     this.uploadEpisodeDoc.title= doc.title ?? null
+    this.uploadEpisodeDoc.reftitle= doc.reftitle ?? null
+    this.uploadEpisodeDoc.videoSize= doc.videoSize ?? null
+    this.uploadEpisodeDoc.videoSizeBytes= doc.videoSizeBytes ?? null
     this.uploadEpisodeDoc.description = doc.description ?? null
     this.uploadEpisodeDoc.duration = doc.duration ?? null
     this.uploadEpisodeDoc.tags = doc.tags ?? []
@@ -546,19 +552,30 @@ export class EpisodesDashboardComponent {
     if(!checkuploaded.includes(false)){
       const episode = this.uploadingTask[index];
       const docRef = doc(this.firestore, `episodes/${episode.id}`);
-      let sizeInfo = null;
+      // let sizeInfo = null;
+
+      // if (episode.uploadVideoFile) {
+      //   sizeInfo = this.getVideoSizeInfo(episode.uploadVideoFile);
+      // }
+      let videoSizeBytes = episode.videoSizeBytes ?? null;
+      let videoSize = episode.videoSize ?? null;
 
       if (episode.uploadVideoFile) {
-        sizeInfo = this.getVideoSizeInfo(episode.uploadVideoFile);
+        const sizeInfo = this.getVideoSizeInfo(episode.uploadVideoFile);
+        videoSizeBytes = sizeInfo.videoSizeBytes;
+        videoSize = sizeInfo.videoSize;
       }
       const episodeData = {
         id: episode.id,
         title: episode.title ?? null,
+        reftitle: episode.reftitle ?? null,
         videoUrl: episode.videoUrl ?? null,
         imageUrl: episode.imageUrl ?? null,
         imagesize: episode.uploadImageFile ? episode.uploadImageFile.size ?? null : null,
-        videoSizeBytes: sizeInfo ? sizeInfo.videoSizeBytes : null,
-        videoSize: sizeInfo ? sizeInfo.videoSize : null,
+        // videoSizeBytes: sizeInfo ? sizeInfo.videoSizeBytes : null,
+        // videoSize: sizeInfo ? sizeInfo.videoSize : null,
+        videoSizeBytes: videoSizeBytes,
+        videoSize: videoSize,
         srt: episode.srt ?? null,
         screenshot: episode.screenshot ?? null,
         description: episode.description ?? null,

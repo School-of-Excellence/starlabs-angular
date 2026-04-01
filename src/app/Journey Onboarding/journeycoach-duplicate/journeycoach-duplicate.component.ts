@@ -507,7 +507,6 @@ export class JourneycoachDuplicateComponent {
     return this.activeMonthSummary
       ? Math.round((this.activeMonthSummary.noChangeCount / this.activeMonthSummary.totalInterims) * 100) : 0;
   }
-  filterMode: 'months' | 'daterange' = 'months';
   loggedInProfileid: string = "";
 
   // ── Dialog state ──────────────────────────────────────────────────────────
@@ -558,6 +557,7 @@ export class JourneycoachDuplicateComponent {
   activeStatusFilter: 'active' | 'non active' | 'discontinued' | 'null' | 'all' = 'all';
   journeyStatusMatrix: {
     journeyName: string;
+    journeyType: string;
     statuses: Record<string, { status: string; profiles: any[] }>;
     total: number;
   }[] = [];
@@ -570,6 +570,32 @@ export class JourneycoachDuplicateComponent {
   journeyStatusDialogProfiles: any[] = [];
   activeStatusTab: string = 'all';
   expandedEpProfile: string | null = null;
+
+  healthKeyData: {
+    key: string;
+    count: number;       // total adjustments
+    pct: number;         // % of total adjustments
+    barPct: number;
+    profileCount: number; // unique profiles with this dominant key
+    color: string;
+    tag: string;
+    tagBg: string;
+    tagColor: string;
+  }[] = [];
+
+  healthInsights: { label: string; value: string; sub: string; color: string; }[] = [];
+  isHealthDialogOpen = false;
+  healthDialogTitle = '';
+  healthDialogProfiles: {
+    profileId: string;
+    profileName: string;
+    areas: Record<string, number>;
+    total: number;
+  }[] = [];
+  filterMode: 'months' | 'daterange' | 'queue' = 'months';
+  selectedQueueIds: string[] = [];
+  queueList: { id: string; name: string }[] = [];
+  journeyTypeFilter: 'all' | 'ecosystem' | 'dfu' = 'all';
 
   constructor(
     public firestore: Firestore,
@@ -620,8 +646,13 @@ export class JourneycoachDuplicateComponent {
       this.subscriptions['appointments'] = collectionData(query(collection(this.firestore, "appointments"), where("journeycoach", "==", true)), { idField: 'id' }).subscribe((appointments) => {
         let tempArray = [];
         let tempMap = {};
-        for (let i = 0; i < appointments.length; i++) {
-          const element = appointments[i];
+
+        const appointmentsList = appointments.sort((a,b)=> b['endtime'].toDate() - a['endtime'].toDate());
+
+        // sort
+        for (let i = 0; i < appointmentsList.length; i++) {
+          const element = appointmentsList[i];
+          element["docid"] = element["id"];
 
           this.mapOnboardingAppointments[element.id] = element['hosts']
 
@@ -634,7 +665,7 @@ export class JourneycoachDuplicateComponent {
 
           tempArray.push(element);
 
-          if (i + 1 == appointments.length) {
+          if (i + 1 == appointmentsList.length) {
             this.appointmentsData = tempArray;
             this.mapCoachAppointments = tempMap;
           }
@@ -652,6 +683,7 @@ export class JourneycoachDuplicateComponent {
       });
 
       this.fetchData();
+      this.loadQueueList();
 
       this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map);
     } catch (error) {
@@ -793,6 +825,22 @@ export class JourneycoachDuplicateComponent {
     // this.loadCustomerSupport();
     this.loadModes();
     this.getModes();
+  }
+
+  loadQueueList(): void {
+    const queueQuery = query(
+      collection(this.firestore, 'queue generation'),
+      orderBy('queueenddate', 'desc')
+    );
+
+    getDocs(queueQuery).then(snap => {
+      this.queueList = [];
+
+      snap.forEach(doc => {
+        const name = doc.data()['queuename'] ?? doc.id;
+        this.queueList.push({ id: doc.id, name });
+      });
+    });
   }
 
   // Function to initialize columns for each column 
@@ -1779,13 +1827,16 @@ export class JourneycoachDuplicateComponent {
             if (['active', 'non active', 'discontinued'].includes(customerStatus)) {
               const journeyField = mapCustomerStatusVariable[customerStatus];
               if (journeyField) {
-                const journeyName = this.mapjourneyname[metaData[journeyField]]?.toLowerCase();
+                const journeyId = metaData[journeyField];
+                const journeyName = this.mapjourneyname[journeyId];
                 if (journeyName) {
                   if (!tempActiveJourney[journeyName]) tempActiveJourney[journeyName] = {};
                   if (!tempActiveJourney[journeyName][customerStatus]) {
                     tempActiveJourney[journeyName][customerStatus] = { status: customerStatus, profiles: [] };
                   }
                   tempActiveJourney[journeyName][customerStatus].profiles.push(metaData);
+                  // Store journeyId for type lookup
+                  (tempActiveJourney[journeyName] as any)['_journeyId'] = journeyId;
                 }
               }
             } else if (customerStatus === null || customerStatus === undefined || customerStatus === '') {
@@ -1874,12 +1925,18 @@ export class JourneycoachDuplicateComponent {
 
               this.modeMap = tempModeMap;
 
-              this.journeyStatusMatrix = Object.entries(tempActiveJourney).map(([journeyName, statusMap]) => ({
-                journeyName,
-                statuses: statusMap,
-                total: Object.values(statusMap).reduce((a, b) => a + b.profiles.length, 0)
-              })).sort((a, b) => b.total - a.total);
-
+              this.journeyStatusMatrix = Object.entries(tempActiveJourney).map(([journeyName, statusMap]) => {
+                const journeyId = (statusMap as any)['_journeyId'] ?? '';
+                const journeyType = this.journeyTypeMap[journeyId] ?? 'Other';
+                const statuses = { ...statusMap };
+                delete (statuses as any)['_journeyId'];
+                return {
+                  journeyName,
+                  journeyType,
+                  statuses,
+                  total: Object.values(statuses).reduce((a, b) => a + b.profiles.length, 0)
+                };
+              }).sort((a, b) => b.total - a.total);
               this.nullStatusProfiles = tempNullStatusProfiles;
 
               this.updateTableDataIfOpen(this.tableType);
@@ -2677,18 +2734,18 @@ export class JourneycoachDuplicateComponent {
         }
 
         // Updating Journey Status as Upgraded for previous Journey
-        if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
-          const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
-          await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
-            journeystatus: 'Upgraded'
-          }).then(() => {
-            console.log("Previous Journey Status Updated");
-            this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
-          }).catch((error) => {
-            this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
-            console.log("Oops Error While Updating Previous Journey Status")
-          });
-        }
+        // if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
+        //   const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
+        //   await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
+        //     journeystatus: 'Upgraded'
+        //   }).then(() => {
+        //     console.log("Previous Journey Status Updated");
+        //     this.guard.openSnackBar("Previous Journey Status Updated to Upgraded", "OK", 600);
+        //   }).catch((error) => {
+        //     this.guard.openSnackBar("Oops Error While Updating Previous Journey Status", "OK", 600);
+        //     console.log("Oops Error While Updating Previous Journey Status")
+        //   });
+        // }
 
         dialogRef.close();
 
@@ -2858,7 +2915,7 @@ export class JourneycoachDuplicateComponent {
   // Function to open schedule dialog 
   openSchedule(element, type) {
     if (type == 'coach') {
-      element['isReschedule'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) ? true : false;
+      element['isReschedule'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) && !this.mapCoachAppointments[element['profileid']][0]['attended'] ? true : false;
       element['appointmentid'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) ? this.mapCoachAppointments[element['profileid']][0]['docid'] : null;
     } else if (type == 'onboarding') {
       element['isReschedule'] = element['onboardingscheduled'] != null ? true : false;
@@ -3873,261 +3930,246 @@ export class JourneycoachDuplicateComponent {
 
   // Function to get atc alpha data 
   getAtcAlpha() {
-    const startInput = this.filterStartDate ? new Date(this.filterStartDate) : new Date();
-    const endInput = this.filterEndDate ? new Date(this.filterEndDate) : new Date();
+    let atcQuery: any;
+    let unvalidatedATCQuery: any;
 
-    const currentMonthStart = new Date(startInput);
-    currentMonthStart.setHours(0, 0, 0, 0);
-    const currentMonthEnd = new Date(endInput);
-    currentMonthEnd.setHours(23, 59, 59, 999);
+    if (this.filterMode === 'queue' && this.selectedQueueIds.length > 0) {
+      // Queue mode — no date filter
+      atcQuery = query(
+        collection(this.firestore, "atc_alpha"),
+        where('queueid', 'in', this.selectedQueueIds),
+        where("isdelete", "==", false)
+      );
+      unvalidatedATCQuery = query(
+        collection(this.firestore, "atc_to_validate"),
+        where('queueid', 'in', this.selectedQueueIds),
+        where("isdelete", "==", false)
+      );
+      this.dateRangeHint = `${this.selectedQueueIds.length} queue${this.selectedQueueIds.length > 1 ? 's' : ''} selected`;
+    } else {
+      // Date mode
+      const startInput = this.filterStartDate ? new Date(this.filterStartDate) : new Date();
+      const endInput = this.filterEndDate ? new Date(this.filterEndDate) : new Date();
 
-    currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
-    currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
+      const currentMonthStart = new Date(startInput);
+      currentMonthStart.setHours(0, 0, 0, 0);
+      const currentMonthEnd = new Date(endInput);
+      currentMonthEnd.setHours(23, 59, 59, 999);
 
-    let startdate = Timestamp.fromDate(currentMonthStart).toDate();
-    let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
+      currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
+      currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
 
-    if (startdate && enddate) {
-      const atcQuery = query(
+      const startdate = Timestamp.fromDate(currentMonthStart).toDate();
+      const enddate = Timestamp.fromDate(currentMonthEnd).toDate();
+
+      if (!startdate || !enddate) return;
+
+      atcQuery = query(
         collection(this.firestore, "atc_alpha"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
       );
-
-      const unvalidatedATCQuery = query(
+      unvalidatedATCQuery = query(
         collection(this.firestore, "atc_to_validate"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
       );
 
-      this.subscriptions['atctovalidate'] = collectionData(unvalidatedATCQuery).subscribe((unvalidated) => {
-        this.unvalidatedATC = unvalidated;
-      })
-
-      this.subscriptions['atcalpha'] = collectionData(atcQuery, { idField: 'id' }).subscribe((docs: any[]) => {
-        // Filter out deleted documents
-        const validDocs = docs;
-        const docCount = docs.length;
-
-        // Temporary variables
-        let tempTotalAdjustmentsCompleted = 0;
-        let tempEvolutionYearSaved = 0;
-        let tempEvolutionYearWasted = 0;
-        let tempTotalAdjustmentAware = 0;
-        let tempTotalAdjustmentUnAware = 0;
-        let tempExtendedLifeImpactTotal = 0;
-        let tempExtendedLifeImpactMap: { [key: string]: number } = {};
-        let tempEvolutionprogressMap: { [key: string]: number } = {};
-        let tempProductCountMap: { [key: string]: string[] } = {};
-        let tempTotalATC: { [key: number]: string[] } = {};
-        let tempPercentageCompleted = [];
-        let tempPercentageOngoing = 0;
-        let tempTotalProductCount = 0;
-        let tempEvolutionProgressProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]> = {};
-
-        let tempTotalAdjustmentUnAwareMap = {
-          count: 0,
-          profileIds: [] as string[],
-          data: [],
-          profileIdWiseCount: {} as { [key: string]: number }
-        };
-
-        let tempTotalAdjustmentAwareMap = {
-          count: 0,
-          profileIds: [] as string[],
-          data: [],
-          profileIdWiseCount: {} as { [key: string]: number }
-        };
-
-        let tempEvolutionYearWastedMap = {
-          count: 0,
-          data: [],
-          profileIds: [] as string[],
-          profileIdWiseCount: {} as { [key: string]: number }
-        };
-
-        let tempEvolutionYearSavedMap = {
-          count: 0,
-          profileIds: [] as string[],
-          data: [],
-          profileIdWiseCount: {} as { [key: string]: number }
-        };
-
-        let tempTotalAdjustmentsCompletedMap = {
-          count: 0,
-          profileIds: [] as string[],
-          data: [],
-          profileIdWiseCount: {} as { [key: string]: number }
-        };
-
-        // Process each document
-        validDocs.forEach((atcData) => {
-          const profileId = atcData['profileid'];
-
-          // Total ATC tracking
-          if (!tempTotalATC[docCount]) {
-            tempTotalATC[docCount] = [];
-          }
-          if (atcData) {
-            tempTotalATC[docCount].push(atcData);
-          }
-
-          // Percentage calculation
-          const totalAdjustments = atcData['totaladjustment'] || 0;
-          const totalAdjustmentsCompleted = atcData['totaladjustmentcompleted'] || 0;
-          const percentageCompleted = totalAdjustments > 0
-            ? (totalAdjustmentsCompleted / totalAdjustments) * 100
-            : 0;
-
-          if (percentageCompleted >= 75) {
-            tempPercentageCompleted.push(atcData);
-          } else {
-            tempPercentageOngoing += 1;
-          }
-
-          // Total Adjustments Completed
-          if (atcData['totaladjustment'] != null) {
-            const adjSavedCount = atcData['totaladjustment'];
-            tempTotalAdjustmentsCompleted += adjSavedCount;
-            tempTotalAdjustmentsCompletedMap.count = tempTotalAdjustmentsCompleted;
-            tempTotalAdjustmentsCompletedMap.data.push(atcData);
-
-            if (profileId && !tempTotalAdjustmentsCompletedMap.profileIds.includes(profileId)) {
-              tempTotalAdjustmentsCompletedMap.profileIds.push(profileId);
-            }
-            if (!tempTotalAdjustmentsCompletedMap.profileIdWiseCount[profileId]) {
-              tempTotalAdjustmentsCompletedMap.profileIdWiseCount[profileId] = 0;
-            }
-            tempTotalAdjustmentsCompletedMap.profileIdWiseCount[profileId] += adjSavedCount;
-          }
-
-          // Evolution Year Saved
-          if (atcData['evolutionyearsaved'] != null) {
-            const savedAmount = atcData['evolutionyearsaved'];
-            tempEvolutionYearSaved += savedAmount;
-            tempEvolutionYearSavedMap.count = tempEvolutionYearSaved;
-            tempEvolutionYearSavedMap.data.push(atcData);
-
-            if (profileId && !tempEvolutionYearSavedMap.profileIds.includes(profileId)) {
-              tempEvolutionYearSavedMap.profileIds.push(profileId);
-            }
-            if (!tempEvolutionYearSavedMap.profileIdWiseCount[profileId]) {
-              tempEvolutionYearSavedMap.profileIdWiseCount[profileId] = 0;
-            }
-            tempEvolutionYearSavedMap.profileIdWiseCount[profileId] += savedAmount;
-          }
-
-          // Evolution Year Wasted
-          if (atcData['evolutionyearwasted'] != null) {
-            const wastedAmount = atcData['evolutionyearwasted'];
-            tempEvolutionYearWasted += wastedAmount;
-            tempEvolutionYearWastedMap.count = tempEvolutionYearWasted;
-            tempEvolutionYearWastedMap.data.push(atcData);
-
-            if (profileId && !tempEvolutionYearWastedMap.profileIds.includes(profileId)) {
-              tempEvolutionYearWastedMap.profileIds.push(profileId);
-            }
-            if (!tempEvolutionYearWastedMap.profileIdWiseCount[profileId]) {
-              tempEvolutionYearWastedMap.profileIdWiseCount[profileId] = 0;
-            }
-            tempEvolutionYearWastedMap.profileIdWiseCount[profileId] += wastedAmount;
-          }
-
-          // Total Adjustment Aware
-          if (atcData['totaladjustmentaware'] != null) {
-            const awareCount = atcData['totaladjustmentaware'];
-            tempTotalAdjustmentAware += awareCount;
-            tempTotalAdjustmentAwareMap.count = tempTotalAdjustmentAware;
-            tempTotalAdjustmentAwareMap.data.push(atcData);
-
-            if (profileId && !tempTotalAdjustmentAwareMap.profileIds.includes(profileId)) {
-              tempTotalAdjustmentAwareMap.profileIds.push(profileId);
-            }
-            if (!tempTotalAdjustmentAwareMap.profileIdWiseCount[profileId]) {
-              tempTotalAdjustmentAwareMap.profileIdWiseCount[profileId] = 0;
-            }
-            tempTotalAdjustmentAwareMap.profileIdWiseCount[profileId] += awareCount;
-          }
-
-          // Total Adjustment Unaware
-          if (atcData['totaladjustmentunaware'] != null) {
-            const unAwareCount = atcData['totaladjustmentunaware'];
-            tempTotalAdjustmentUnAware += unAwareCount;
-            tempTotalAdjustmentUnAwareMap.count = tempTotalAdjustmentUnAware;
-            tempTotalAdjustmentUnAwareMap.data.push(atcData);
-
-            if (profileId && !tempTotalAdjustmentUnAwareMap.profileIds.includes(profileId)) {
-              tempTotalAdjustmentUnAwareMap.profileIds.push(profileId);
-            }
-            if (!tempTotalAdjustmentUnAwareMap.profileIdWiseCount[profileId]) {
-              tempTotalAdjustmentUnAwareMap.profileIdWiseCount[profileId] = 0;
-            }
-            tempTotalAdjustmentUnAwareMap.profileIdWiseCount[profileId] += unAwareCount;
-          }
-
-          // Product Count
-          if (atcData['product'] != null) {
-            const product = atcData['product'];
-            if (!tempProductCountMap[product]) {
-              tempProductCountMap[product] = [];
-            }
-            if (profileId) {
-              tempProductCountMap[product].push(profileId);
-            }
-            tempTotalProductCount += 1;
-          }
-
-          // Extended Life Impact
-          if (atcData['extendedlifeimpact'] != null) {
-            Object.entries(atcData['extendedlifeimpact']).forEach(([key, value]) => {
-              tempExtendedLifeImpactTotal += value as number;
-              tempExtendedLifeImpactMap[key] = (tempExtendedLifeImpactMap[key] || 0) + (value as number);
-            });
-          }
-
-          // Evolution Progress
-          if (atcData['evolutionprogress'] != null) {
-            Object.entries(atcData['evolutionprogress']).forEach(([key, value]) => {
-              tempEvolutionprogressMap[key] = (tempEvolutionprogressMap[key] || 0) + (value as number);
-
-              const profileId = atcData['profileid'] ?? atcData['id'];
-              const docTotal = Object.values(atcData['evolutionprogress'] as Record<string, number>)
-                .reduce((a, b) => a + b, 0);
-
-              if (!tempEvolutionProgressProfileMap[key]) tempEvolutionProgressProfileMap[key] = [];
-              tempEvolutionProgressProfileMap[key].push({
-                profileId,
-                sum: Number(value),
-                docTotal
-              });
-            });
-          }
-        });
-
-        // Assign temporary variables to original variables at last
-        this.evolutionYearSaved = tempEvolutionYearSaved;
-        this.evolutionYearWasted = tempEvolutionYearWasted;
-        this.totalAdjustmentAware = tempTotalAdjustmentAware;
-        this.totalAdjustmentUnAware = tempTotalAdjustmentUnAware;
-        this.extendedLifeImpactTotal = tempExtendedLifeImpactTotal;
-        this.extendedLifeImpactMap = tempExtendedLifeImpactMap;
-        this.evolutionprogressMap = tempEvolutionprogressMap;
-        this.productCountMap = tempProductCountMap;
-        this.totalATC = tempTotalATC;
-        this.percentageCompleted = tempPercentageCompleted;
-        this.percentageOngoing = tempPercentageOngoing;
-        this.totalProductCount = tempTotalProductCount;
-        this.totalAdjustmentUnAwareMap = tempTotalAdjustmentUnAwareMap;
-        this.totalAdjustmentAwareMap = tempTotalAdjustmentAwareMap;
-        this.evolutionYearWastedMap = tempEvolutionYearWastedMap;
-        this.evolutionYearSavedMap = tempEvolutionYearSavedMap;
-        this.totalAdjustmentsCompletedMap = tempTotalAdjustmentsCompletedMap;
-        this.evolutionprogressMap = tempEvolutionprogressMap;
-        this.processEvolutionProgressFromMap(tempEvolutionProgressProfileMap);
-      });
+      if (this.filterStartDate && this.filterEndDate) {
+        const sf = new Date(this.filterStartDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        const ef = new Date(this.filterEndDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        this.dateRangeHint = `${sf} → ${ef}`;
+      }
     }
+
+    this.subscriptions['atctovalidate'] = collectionData(unvalidatedATCQuery).subscribe((unvalidated) => {
+      this.unvalidatedATC = unvalidated;
+    });
+
+    this.subscriptions['atcalpha'] = collectionData(atcQuery, { idField: 'id' }).subscribe((docs: any[]) => {
+      const validDocs = docs;
+      const docCount = docs.length;
+
+      // Build queue list from docs when in date mode
+      if (this.filterMode !== 'queue') {
+        this.buildQueueList(docs);
+      }
+
+      let tempTotalAdjustmentsCompleted = 0;
+      let tempEvolutionYearSaved = 0;
+      let tempEvolutionYearWasted = 0;
+      let tempTotalAdjustmentAware = 0;
+      let tempTotalAdjustmentUnAware = 0;
+      let tempExtendedLifeImpactTotal = 0;
+      let tempExtendedLifeImpactMap: { [key: string]: number } = {};
+      let tempEvolutionprogressMap: { [key: string]: number } = {};
+      let tempProductCountMap: { [key: string]: string[] } = {};
+      let tempTotalATC: { [key: number]: string[] } = {};
+      let tempPercentageCompleted = [];
+      let tempPercentageOngoing = 0;
+      let tempTotalProductCount = 0;
+      let tempEvolutionProgressProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]> = {};
+
+      let tempTotalAdjustmentUnAwareMap = {
+        count: 0, profileIds: [] as string[], data: [],
+        profileIdWiseCount: {} as { [key: string]: number }
+      };
+      let tempTotalAdjustmentAwareMap = {
+        count: 0, profileIds: [] as string[], data: [],
+        profileIdWiseCount: {} as { [key: string]: number }
+      };
+      let tempEvolutionYearWastedMap = {
+        count: 0, data: [], profileIds: [] as string[],
+        profileIdWiseCount: {} as { [key: string]: number }
+      };
+      let tempEvolutionYearSavedMap = {
+        count: 0, profileIds: [] as string[], data: [],
+        profileIdWiseCount: {} as { [key: string]: number }
+      };
+      let tempTotalAdjustmentsCompletedMap = {
+        count: 0, profileIds: [] as string[], data: [],
+        profileIdWiseCount: {} as { [key: string]: number }
+      };
+
+      validDocs.forEach((atcData) => {
+        const profileId = atcData['profileid'];
+
+        if (!tempTotalATC[docCount]) tempTotalATC[docCount] = [];
+        if (atcData) tempTotalATC[docCount].push(atcData);
+
+        const totalAdjustments = atcData['totaladjustment'] || 0;
+        const totalAdjustmentsCompleted = atcData['totaladjustmentcompleted'] || 0;
+        const percentageCompleted = totalAdjustments > 0
+          ? (totalAdjustmentsCompleted / totalAdjustments) * 100 : 0;
+
+        if (percentageCompleted >= 75) {
+          tempPercentageCompleted.push(atcData);
+        } else {
+          tempPercentageOngoing += 1;
+        }
+
+        if (atcData['totaladjustment'] != null) {
+          const adjSavedCount = atcData['totaladjustment'];
+          tempTotalAdjustmentsCompleted += adjSavedCount;
+          tempTotalAdjustmentsCompletedMap.count = tempTotalAdjustmentsCompleted;
+          tempTotalAdjustmentsCompletedMap.data.push(atcData);
+          if (profileId && !tempTotalAdjustmentsCompletedMap.profileIds.includes(profileId))
+            tempTotalAdjustmentsCompletedMap.profileIds.push(profileId);
+          if (!tempTotalAdjustmentsCompletedMap.profileIdWiseCount[profileId])
+            tempTotalAdjustmentsCompletedMap.profileIdWiseCount[profileId] = 0;
+          tempTotalAdjustmentsCompletedMap.profileIdWiseCount[profileId] += adjSavedCount;
+        }
+
+        if (atcData['evolutionyearsaved'] != null) {
+          const savedAmount = atcData['evolutionyearsaved'];
+          tempEvolutionYearSaved += savedAmount;
+          tempEvolutionYearSavedMap.count = tempEvolutionYearSaved;
+          tempEvolutionYearSavedMap.data.push(atcData);
+          if (profileId && !tempEvolutionYearSavedMap.profileIds.includes(profileId))
+            tempEvolutionYearSavedMap.profileIds.push(profileId);
+          if (!tempEvolutionYearSavedMap.profileIdWiseCount[profileId])
+            tempEvolutionYearSavedMap.profileIdWiseCount[profileId] = 0;
+          tempEvolutionYearSavedMap.profileIdWiseCount[profileId] += savedAmount;
+        }
+
+        if (atcData['evolutionyearwasted'] != null) {
+          const wastedAmount = atcData['evolutionyearwasted'];
+          tempEvolutionYearWasted += wastedAmount;
+          tempEvolutionYearWastedMap.count = tempEvolutionYearWasted;
+          tempEvolutionYearWastedMap.data.push(atcData);
+          if (profileId && !tempEvolutionYearWastedMap.profileIds.includes(profileId))
+            tempEvolutionYearWastedMap.profileIds.push(profileId);
+          if (!tempEvolutionYearWastedMap.profileIdWiseCount[profileId])
+            tempEvolutionYearWastedMap.profileIdWiseCount[profileId] = 0;
+          tempEvolutionYearWastedMap.profileIdWiseCount[profileId] += wastedAmount;
+        }
+
+        if (atcData['totaladjustmentaware'] != null) {
+          const awareCount = atcData['totaladjustmentaware'];
+          tempTotalAdjustmentAware += awareCount;
+          tempTotalAdjustmentAwareMap.count = tempTotalAdjustmentAware;
+          tempTotalAdjustmentAwareMap.data.push(atcData);
+          if (profileId && !tempTotalAdjustmentAwareMap.profileIds.includes(profileId))
+            tempTotalAdjustmentAwareMap.profileIds.push(profileId);
+          if (!tempTotalAdjustmentAwareMap.profileIdWiseCount[profileId])
+            tempTotalAdjustmentAwareMap.profileIdWiseCount[profileId] = 0;
+          tempTotalAdjustmentAwareMap.profileIdWiseCount[profileId] += awareCount;
+        }
+
+        if (atcData['totaladjustmentunaware'] != null) {
+          const unAwareCount = atcData['totaladjustmentunaware'];
+          tempTotalAdjustmentUnAware += unAwareCount;
+          tempTotalAdjustmentUnAwareMap.count = tempTotalAdjustmentUnAware;
+          tempTotalAdjustmentUnAwareMap.data.push(atcData);
+          if (profileId && !tempTotalAdjustmentUnAwareMap.profileIds.includes(profileId))
+            tempTotalAdjustmentUnAwareMap.profileIds.push(profileId);
+          if (!tempTotalAdjustmentUnAwareMap.profileIdWiseCount[profileId])
+            tempTotalAdjustmentUnAwareMap.profileIdWiseCount[profileId] = 0;
+          tempTotalAdjustmentUnAwareMap.profileIdWiseCount[profileId] += unAwareCount;
+        }
+
+        if (atcData['product'] != null) {
+          const product = atcData['product'];
+          if (!tempProductCountMap[product]) tempProductCountMap[product] = [];
+          if (profileId) tempProductCountMap[product].push(profileId);
+          tempTotalProductCount += 1;
+        }
+
+        if (atcData['extendedlifeimpact'] != null) {
+          Object.entries(atcData['extendedlifeimpact']).forEach(([key, value]) => {
+            tempExtendedLifeImpactTotal += value as number;
+            tempExtendedLifeImpactMap[key] = (tempExtendedLifeImpactMap[key] || 0) + (value as number);
+          });
+        }
+
+        if (atcData['evolutionprogress'] != null) {
+          Object.entries(atcData['evolutionprogress']).forEach(([key, value]) => {
+            tempEvolutionprogressMap[key] = (tempEvolutionprogressMap[key] || 0) + (value as number);
+            const pid = atcData['profileid'] ?? atcData['id'];
+            const docTotal = Object.values(atcData['evolutionprogress'] as Record<string, number>)
+              .reduce((a, b) => a + b, 0);
+            if (!tempEvolutionProgressProfileMap[key]) tempEvolutionProgressProfileMap[key] = [];
+            tempEvolutionProgressProfileMap[key].push({ profileId: pid, sum: Number(value), docTotal });
+          });
+        }
+      });
+
+      this.evolutionYearSaved = tempEvolutionYearSaved;
+      this.evolutionYearWasted = tempEvolutionYearWasted;
+      this.totalAdjustmentAware = tempTotalAdjustmentAware;
+      this.totalAdjustmentUnAware = tempTotalAdjustmentUnAware;
+      this.extendedLifeImpactTotal = tempExtendedLifeImpactTotal;
+      this.extendedLifeImpactMap = tempExtendedLifeImpactMap;
+      this.evolutionprogressMap = tempEvolutionprogressMap;
+      this.productCountMap = tempProductCountMap;
+      this.totalATC = tempTotalATC;
+      this.percentageCompleted = tempPercentageCompleted;
+      this.percentageOngoing = tempPercentageOngoing;
+      this.totalProductCount = tempTotalProductCount;
+      this.totalAdjustmentUnAwareMap = tempTotalAdjustmentUnAwareMap;
+      this.totalAdjustmentAwareMap = tempTotalAdjustmentAwareMap;
+      this.evolutionYearWastedMap = tempEvolutionYearWastedMap;
+      this.evolutionYearSavedMap = tempEvolutionYearSavedMap;
+      this.totalAdjustmentsCompletedMap = tempTotalAdjustmentsCompletedMap;
+      this.evolutionprogressMap = tempEvolutionprogressMap;
+      this.processEvolutionProgressFromMap(tempEvolutionProgressProfileMap);
+      this.buildHealthOverview();
+    });
+  }
+
+  buildQueueList(docs: any[]): void {
+    const seen = new Set<string>();
+    docs.forEach(doc => {
+      const qid = doc['queueid'];
+      if (qid && !seen.has(qid)) {
+        seen.add(qid);
+        if (!this.queueList.find(q => q.id === qid)) {
+          this.queueList.push({ id: qid, name: doc['queuename'] ?? qid });
+        }
+      }
+    });
   }
 
   // Function to calculate evolution process percentage 
@@ -4160,6 +4202,59 @@ export class JourneycoachDuplicateComponent {
     });
 
     this.evolutionProgressData = { keys, bands, totals };
+  }
+
+  buildHealthOverview(): void {
+    const map = this.evolutionprogressMap as Record<string, number>;
+    const total = Object.values(map).reduce((a: number, b: number) => a + b, 0);
+    if (total === 0) return;
+
+    const colors = ['#639922', '#1D9E75', '#378ADD', '#EF9F27', '#E24B4A'];
+    const tags = [
+      { t: 'Top key', bg: '#EAF3DE', c: '#27500A' },
+      { t: 'Strong', bg: '#E1F5EE', c: '#085041' },
+      { t: 'Moderate', bg: '#E6F1FB', c: '#0C447C' },
+      { t: 'Watch', bg: '#FAEEDA', c: '#633806' },
+      { t: 'At risk', bg: '#FCEBEB', c: '#791F1F' },
+    ];
+
+    const sorted: [string, number][] = (Object.entries(map) as [string, number][])
+      .sort((a, b) => b[1] - a[1]);
+
+    const maxCount: number = sorted[0]?.[1] ?? 1;
+
+    // Count unique profiles per dominant key from evolutionProgressData
+    const profileCountPerKey: Record<string, number> = {};
+    if (this.evolutionProgressData) {
+      const profileAllAreas: Record<string, Record<string, number>> = {};
+      this.evolutionProgressData.keys.forEach(k => {
+        this.evolutionProgressData!.bands.forEach(band => {
+          (band.profiles[k] ?? []).forEach(p => {
+            if (!profileAllAreas[p.profileId]) profileAllAreas[p.profileId] = {};
+            profileAllAreas[p.profileId][k] = (profileAllAreas[p.profileId][k] ?? 0) + p.total;
+          });
+        });
+      });
+      Object.entries(profileAllAreas).forEach(([, areas]) => {
+        const dominant = Object.entries(areas).sort((a, b) => b[1] - a[1])[0]?.[0];
+        if (dominant) profileCountPerKey[dominant] = (profileCountPerKey[dominant] ?? 0) + 1;
+      });
+    }
+
+    this.healthKeyData = sorted.map(([key, count], i) => ({
+      key,
+      count,
+      pct: Math.round((count / total) * 100),
+      barPct: Math.round((count / maxCount) * 100),
+      profileCount: profileCountPerKey[key] ?? 0,
+      color: colors[i] ?? '#888780',
+      tag: tags[i]?.t ?? '',
+      tagBg: tags[i]?.bg ?? '#F1EFE8',
+      tagColor: tags[i]?.c ?? '#444441',
+    }));
+
+    // Clear insights — no longer used
+    this.healthInsights = [];
   }
 
   openDialog(key: string) {
@@ -4350,8 +4445,6 @@ export class JourneycoachDuplicateComponent {
       this.dateRangeHint = `${sf} → ${ef}`;
     }
   }
-
-  // ── Core fetch function (from your previous implementation) ───────────────
 
   private async fetchAELAndInterimData(startDate: Date, endDate: Date): Promise<any[]> {
     const CATEGORIES = this.CATEGORIES;
@@ -4764,22 +4857,24 @@ export class JourneycoachDuplicateComponent {
     return [...profile.progressedAreas, ...profile.regressedAreas];
   }
 
-  toggleFilterMode(mode: 'months' | 'daterange'): void {
-    if (this.filterMode === mode) return;
+  toggleFilterMode(mode: 'months' | 'daterange' | 'queue'): void {
     this.filterMode = mode;
-    // Reset the other mode's data
-    if (mode === 'months') {
-      this.filterStartDate = null;
-      this.filterEndDate = null;
-      this.numberOfMonths = null;
-      this.onMonthsCountChange();
+    // Clear the other filter's state when switching
+    if (mode === 'queue') {
+      // don't auto-fetch — wait for queue selection
     } else {
-      this.filterStartDate = null;
-      this.filterEndDate = null;
-      this.numberOfMonths = null;
-      this.monthSummaries = [];
-      this.updateDateRangeHint();
+      this.selectedQueueIds = [];
+      if (mode === 'months' && this.numberOfMonths) {
+        this.onMonthsCountChange();
+      } else if (mode === 'daterange' && this.filterStartDate && this.filterEndDate) {
+        this.onDateRangeChange();
+      }
     }
+  }
+
+  onQueueSelectionChange(): void {
+    if (this.selectedQueueIds.length === 0) return;
+    this.getAtcAlpha();
   }
 
   getOverallTotal(): number {
@@ -5068,16 +5163,6 @@ export class JourneycoachDuplicateComponent {
     return Object.values(journey.statuses).flatMap((s: any) => s.profiles);
   }
 
-  getTotalForStatus(status: string): number {
-    return this.journeyStatusMatrix.reduce((a, j) =>
-      a + (j.statuses[status]?.profiles.length ?? 0), 0);
-  }
-
-  getJourneyStatusGrandTotal(): number {
-    const matrixTotal = this.journeyStatusMatrix.reduce((a, j) => a + j.total, 0);
-    return matrixTotal + this.nullStatusProfiles.length;
-  }
-
   toggleEpProfileExpand(profileId: string): void {
     this.expandedEpProfile = this.expandedEpProfile === profileId ? null : profileId;
   }
@@ -5096,5 +5181,105 @@ export class JourneycoachDuplicateComponent {
     });
 
     return result.sort((a, b) => b.pct - a.pct);
+  }
+
+  openHealthKeyDialog(key: string): void {
+    if (!this.evolutionProgressData) return;
+
+    // Get all profiles whose dominant key is this key
+    const allKeyProfiles: Record<string, { sum: number; docTotal: number }[]> =
+      (this as any)._tempEvolutionProgressProfileMap ?? {};
+
+    // Rebuild from evolutionProgressData bands — collect all profiles that appear under this key
+    const profileMap: Record<string, { areas: Record<string, number>; total: number }> = {};
+
+    // For each profile in any band under this key, get their count
+    this.evolutionProgressData.bands.forEach(band => {
+      (band.profiles[key] ?? []).forEach(p => {
+        if (!profileMap[p.profileId]) {
+          profileMap[p.profileId] = {
+            areas: {},
+            total: 0
+          };
+        }
+        profileMap[p.profileId].areas[band.label] = p.total;
+        profileMap[p.profileId].total += p.total;
+      });
+    });
+
+    // Also get all areas (all keys) for each profile from evolutionProgressData
+    // We need per-profile breakdown across ALL keys, not just this one
+    const profileAllAreas: Record<string, Record<string, number>> = {};
+
+    this.evolutionProgressData.keys.forEach(k => {
+      this.evolutionProgressData!.bands.forEach(band => {
+        (band.profiles[k] ?? []).forEach(p => {
+          if (!profileAllAreas[p.profileId]) profileAllAreas[p.profileId] = {};
+          profileAllAreas[p.profileId][k] = (profileAllAreas[p.profileId][k] ?? 0) + p.total;
+        });
+      });
+    });
+
+    // Only include profiles whose dominant key matches the clicked key
+    const result: typeof this.healthDialogProfiles = [];
+
+    Object.entries(profileAllAreas).forEach(([profileId, areas]) => {
+      const dominant = Object.entries(areas).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (dominant === key) {
+        const total = Object.values(areas).reduce((a, b) => a + b, 0);
+        result.push({
+          profileId,
+          profileName: this.mapprofile[profileId] ?? profileId,
+          areas,
+          total
+        });
+      }
+    });
+
+    result.sort((a, b) => b.total - a.total);
+
+    this.healthDialogTitle = key;
+    this.healthDialogProfiles = result;
+    this.isHealthDialogOpen = true;
+  }
+
+  closeHealthDialog(): void {
+    this.isHealthDialogOpen = false;
+    this.healthDialogProfiles = [];
+  }
+
+  onHealthDialogOverlayClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).classList.contains('overlay')) this.closeHealthDialog();
+  }
+
+  getHealthDialogKeys(): string[] {
+    if (!this.evolutionProgressData) return [];
+    return this.evolutionProgressData.keys;
+  }
+
+  get healthTotalProfiles(): number {
+    return this.healthKeyData.reduce((a, k) => a + k.profileCount, 0);
+  }
+
+  get healthTotalAdjustments(): number {
+    return this.healthKeyData.reduce((a, k) => a + k.count, 0);
+  }
+
+  // Computed filtered matrix
+  get filteredJourneyStatusMatrix() {
+    if (this.journeyTypeFilter === 'all') return this.journeyStatusMatrix;
+    const type = this.journeyTypeFilter === 'ecosystem' ? 'Eco system' : 'DFU';
+    return this.journeyStatusMatrix.filter(j => j.journeyType === type);
+  }
+
+  // Update getTotalForStatus to use filtered matrix
+  getTotalForStatus(status: string): number {
+    return this.filteredJourneyStatusMatrix.reduce((a, j) =>
+      a + (j.statuses[status]?.profiles.length ?? 0), 0);
+  }
+
+  getJourneyStatusGrandTotal(): number {
+    const matrixTotal = this.filteredJourneyStatusMatrix.reduce((a, j) => a + j.total, 0);
+    return matrixTotal + (this.journeyTypeFilter === 'all' ? this.nullStatusProfiles.length : 0);
   }
 }
