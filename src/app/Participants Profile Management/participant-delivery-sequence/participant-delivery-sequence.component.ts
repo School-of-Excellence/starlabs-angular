@@ -346,11 +346,14 @@ export class ParticipantDeliverySequenceComponent {
   }
 
   deleteDeliverable(index, activityname, sequenceRef) {
+    if(this.clientAppointment.length > 0) alert("You cannot remove this delivery because appointments are booked for it. If you want to remove it, please cancel those appointments first.");
+    if(this.clientAppointment.length === 0){
     if (confirm("Sure, Do you want to remove '" + activityname + "' from this delivery List")) {
       this.participantProducts[this.selectedProductIndex].delivery.splice(index, 1)
       this.mapDeliveryDoc[sequenceRef]["delete"] = true
       this.clearDeliveryData()
     }
+  }
   }
 
   newDeliverable() {
