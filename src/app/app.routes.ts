@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 
 export const routes: Routes = [
+  {path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.JourneyOnboardingFormComponent)},
   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
   {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
   {path: 'routeconfiguration', loadComponent: () => import('./route-configuration-duplicate/route-configuration.component').then(m => m.RouteConfigurationComponent), canActivate:[authGuard]},
@@ -202,7 +203,7 @@ export const routes: Routes = [
 
   // Customer Support
   { path: 'customersupportdashboard', loadComponent: () => import('./Customer Support/customer-support-dashboard/customer-support-dashboard.component').then(m => m.CustomerSupportDashboardComponent), canActivate: [authGuard] },
-  { path: 'customersupportdashboard/ticket/:ticketid/:ticketno', loadComponent: () => import('./Customer Support/customer-chat-screen/customer-chat-screen.component').then(m => m.CustomerChatScreenComponent), canActivate: [authGuard] },  
+  { path: 'customersupportdashboard/ticket/:ticketid/:ticketno', loadComponent: () => import('./Customer Support/customer-chat-screen/customer-chat-screen.component').then(m => m.CustomerChatScreenComponent), canActivate: [authGuard] },
   {path: 'customer-support-tickets', loadComponent: () => import('./Customer Support/customer-ticket-new/customer-ticket-new.component').then(m => m.CustomerTicketNewComponent), canActivate: [authGuard]},
   {path: 'customertickets', loadComponent: () => import('./Customer Support/customertickets/customertickets.component').then(m => m.CustomerticketsComponent), canActivate:[authGuard]},
 
@@ -301,9 +302,9 @@ export const routes: Routes = [
   {path: 'ahcrm',loadComponent: () => import('./AppEngagement/ahcrm_home/participant-list/participant-list.component').then(m => m.ParticipantListComponent), canActivate: [authGuard] },
 
   {path: 'eventzonemanagement',loadComponent: () => import('./Zone Management/event-zone-management/event-zone-management.component').then(m => m.EventZoneManagementComponent), canActivate: [authGuard] },
-  
 
-  // ai generated atc view screen 
+
+  // ai generated atc view screen
   {path: 'viewaigeneratedatc', loadComponent: () => import('./view-ai-generated-atc/view-ai-generated-atc.component').then(m => m.ViewAiGeneratedAtcComponent), canActivate: [authGuard]},
 
   //Vadivel
@@ -503,7 +504,7 @@ export const routes: Routes = [
 // export const routes: Routes = [
 //   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
 //   {path: 'login', component: LoginComponent },
-//   // {path: 'EISDashboard', component: MainDashboardComponent,canActivate:[authGuard]},  
+//   // {path: 'EISDashboard', component: MainDashboardComponent,canActivate:[authGuard]},
 //   {path: 'routeconfiguration', component: RouteConfigurationComponent,canActivate:[authGuard]},
 //   {path: 'addjourney', component: AddjourneyComponent,canActivate:[authGuard]},
 //   {path: 'addpackage', component: AddpackageComponent,canActivate:[authGuard]},
@@ -533,7 +534,7 @@ export const routes: Routes = [
 //     {path: 'edit-playlist', component: EditComponent , canActivate : [authGuard]},
 //     {path: 'add-playlist', component: SolarPlaylistComponent , canActivate : [authGuard]},
 //   ]},
- 
+
 //   {path: 'playlistads',component:PlaylistAdsComponent,canActivate:[authGuard]},
 //   {path: 'healthstories',component:HealthStoriesComponent,canActivate:[authGuard]},
 //   {path: 'ads',component:ClickAdsComponent,canActivate:[authGuard]},
@@ -582,7 +583,7 @@ export const routes: Routes = [
 //   {path: 'appointmentstudio', component: AppointmentStudioComponent, canActivate:[authGuard]},
 //   {path: 'openappointmentzoom/:id', component: AppointmentZoomViewComponent, canActivate:[authGuard]},
 //   {path: 'appointment-status-update', component: AppointmentStatusUpdateComponent, canActivate:[authGuard]},
-  
+
 
 //   {path: 'appactionpending', component: AppActionPendingComponent, canActivate: [authGuard]},
 //   {path: 'interimreportlog', component: InterimReportLogComponent, canActivate: [authGuard]},
