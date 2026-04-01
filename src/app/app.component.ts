@@ -246,7 +246,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
             this.guard.setCache('cache_loggedInProfile', this.profileData);
 
-            if (Object.keys(this.guard.loggedinRoles).length == 0 || !cachedRoles) {
+            // if (Object.keys(this.guard.loggedinRoles).length == 0 || !cachedRoles) {
               const roleRef = this.profileData["role_ref"].path;
               const roleDocRef = doc(this.firestore, roleRef);
 
@@ -254,6 +254,8 @@ export class AppComponent implements OnInit, OnDestroy {
                 if (roleShot.exists()) {
                   const roleData = roleShot.data();
                   this.guard.loggedinRoles = roleData;
+
+                  console.log("User Roles", this.guard.loggedinRoles)
 
                   // Cache roles
                   this.guard.setCache('cache_loggedInRoles', roleData);
@@ -267,7 +269,7 @@ export class AppComponent implements OnInit, OnDestroy {
                 }
               });
               this.unsubscribeFunctions.push(unsubscribeRole);
-            }
+            // }
 
             this.guard['userPreferences'] = {
               email: user.email,
