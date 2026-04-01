@@ -820,7 +820,6 @@ export class DeliveryDashboardCloneComponent {
         appointment.appointmentTypeName = appointmenttype;
       }
       const attendedAppointments = appointments.filter(app => app.attended === true);
-      const scheduledAppointments = appointments.filter(app => app.attended === false && app.appointmentstart);
 
       if (attendedAppointments.length === 0) {
         if (!data.tentativestart) {
@@ -844,13 +843,6 @@ export class DeliveryDashboardCloneComponent {
         const welcomeCallAppointment = attendedAppointments.find(app =>
           app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} welcome call`
         );
-        // const implementationAppointment =
-        //   attendedAppointments.find(app =>
-        //     app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
-        //   ) ||
-        //   scheduledAppointments.find(app =>
-        //     app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
-        //   );
 
         if (implementationAppointment) {
           mergedData = {
@@ -877,10 +869,6 @@ export class DeliveryDashboardCloneComponent {
           this.productData.onBoarded.push(mergedData);
         }
       }
-
-      if (scheduledAppointments.length > 0) {
-
-      }
     }
 
     // Filter Report Data
@@ -888,7 +876,6 @@ export class DeliveryDashboardCloneComponent {
 
     // Filter Celebration Call Completed
     this.productData.celebrationCall = this.getCardFunnel(productId).completed;
-    console.log("all data", this.productData);
   }
 
   handleMonthCategory(itemMonth: number, itemYear: number, data: any) {
