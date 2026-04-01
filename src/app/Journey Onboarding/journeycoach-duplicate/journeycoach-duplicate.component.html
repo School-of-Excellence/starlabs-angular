@@ -67,7 +67,8 @@
         <mat-icon class="heart-icon">favorite</mat-icon>
         <span class="love-factor-label">Love Factor</span>
         <span class="equals">=</span>
-        <span class="cura-label"> <b>{{totalCURASales}}</b> - ({{this.originalData['continuitySales'].count}} + {{this.originalData['upgradeSales'].count}} +
+        <span class="cura-label"> <b>{{totalCURASales}}</b> - ({{this.originalData['continuitySales'].count}} +
+          {{this.originalData['upgradeSales'].count}} +
           {{this.originalData['referralSales'].count}} + {{this.originalData['addonSales'].count}})</span>
         <span class="divider">/</span>
         <span class="mts-label">{{totalMTSSales}}</span>
@@ -116,16 +117,20 @@
             <div class="split-item" (click)="onGrossSplitClick($event, 'grossNewSales')" style="cursor: pointer;">
               <span class="split-label">New</span>
               <span class="split-value orange">{{grossSalesSplit['new']}}</span>
+              <div>{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div>
             </div>
             <!-- <div class="vertical-separator-line"></div> -->
             <div class="split-item" (click)="onGrossSplitClick($event, 'grossUpgradeSales')" style="cursor: pointer;">
               <span class="split-label">Upgrades</span>
               <span class="split-value orange">{{grossSalesSplit['upgrades']}}</span>
+              <div> {{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div>
             </div>
+            
             <!-- <div class="vertical-separator-line"></div> -->
             <div class="split-item" (click)="onGrossSplitClick($event, 'grossAddonSales')" style="cursor: pointer;">
               <span class="split-label">Add-On</span>
               <span class="split-value orange">{{grossSalesSplit['addons']}}</span>
+              <div>{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div>
             </div>
           </div>
           <div class="separator-line"></div>
@@ -188,16 +193,23 @@
             <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredNewSales')" style="cursor: pointer;">
               <span class="split-label">New</span>
               <span class="split-value green">{{assuredSalesSplit['new']}}</span>
+              <div class>{{assuredSalesSplit['newEMI'].toLocaleString('en-IN')}}
+              </div>
             </div>
+
             <!-- <div class="vertical-separator-line"></div> -->
-            <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredUpgradeSales')" style="cursor: pointer;">
+            <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredUpgradeSales')"
+              style="cursor: pointer;">
               <span class="split-label">Upgrades</span>
               <span class="split-value green">{{assuredSalesSplit['upgrades']}}</span>
+              <div class> {{assuredSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div>
+              
             </div>
             <!-- <div class="vertical-separator-line"></div> -->
-            <div class="split-item"(click)="onAssuredSplitClick($event, 'assuredAddonSales')" style="cursor: pointer;">
+            <div class="split-item" (click)="onAssuredSplitClick($event, 'assuredAddonSales')" style="cursor: pointer;">
               <span class="split-label">Add-On</span>
               <span class="split-value green">{{assuredSalesSplit['addons']}}</span>
+              <div class>{{assuredSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div>
             </div>
           </div>
           <div class="separator-line"></div>
@@ -328,9 +340,9 @@
 
       <!-- Top row with three boxes -->
       <div class="onboarding-top-row">
-        <div class="onboarding-call-box">
+        <div class="onboarding-call-box" (click)="openDialog('onboardingScheduled')" style="cursor: pointer;">
           <div class="call-label">Onboarding Call Scheduled</div>
-          <div class="call-value"> {{ getTotalOnboardingScheduledCount()}}</div>
+          <div class="call-value"> {{ getTotalOnboardingScheduledCount() }}</div>
         </div>
 
         <div class="journey-coaching-calls">
@@ -687,29 +699,31 @@
       </button>
     </div>
 
-<div class="modes-list">
-  <!-- First Column -->
-  <div class="modes-column">
-    <div class="mode-item" *ngFor="let mode of modesList.slice(0, Math.ceil(modesList.length / 2))" (click)="openDialog(mode)">
-      <span class="mode-name">{{mode}}</span>
-      <div class="mode-badge">
-        <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
-        <span class="mode-arrow">›</span>
+    <div class="modes-list">
+      <!-- First Column -->
+      <div class="modes-column">
+        <div class="mode-item" *ngFor="let mode of modesList.slice(0, Math.ceil(modesList.length / 2))"
+          (click)="openDialog(mode)">
+          <span class="mode-name">{{mode}}</span>
+          <div class="mode-badge">
+            <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
+            <span class="mode-arrow">›</span>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Second Column -->
-  <div class="modes-column">
-    <div class="mode-item" *ngFor="let mode of modesList.slice(Math.ceil(modesList.length / 2))" (click)="openDialog(mode)">
-      <span class="mode-name">{{mode}}</span>
-      <div class="mode-badge">
-        <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
-        <span class="mode-arrow">›</span>
+      <!-- Second Column -->
+      <div class="modes-column">
+        <div class="mode-item" *ngFor="let mode of modesList.slice(Math.ceil(modesList.length / 2))"
+          (click)="openDialog(mode)">
+          <span class="mode-name">{{mode}}</span>
+          <div class="mode-badge">
+            <span class="mode-count">{{modeMap[mode]?.length ?? 0}}</span>
+            <span class="mode-arrow">›</span>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
   </div>
 </div>
 
@@ -722,8 +736,8 @@
     </div>
     <button class="crossover-btn" (click)="openCrossoverMetricsDialog()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="9" cy="9" r="5"/>
-        <circle cx="15" cy="15" r="5"/>
+        <circle cx="9" cy="9" r="5" />
+        <circle cx="15" cy="15" r="5" />
       </svg>
       Crossover Metrics
     </button>
@@ -739,8 +753,8 @@
           <div class="eco-card-header">
             <div class="eco-card-icon blue">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 12l2 2 4-4"/>
-                <circle cx="12" cy="12" r="10"/>
+                <path d="M9 12l2 2 4-4" />
+                <circle cx="12" cy="12" r="10" />
               </svg>
             </div>
             <span class="eco-card-title">ATC Status</span>
@@ -752,7 +766,7 @@
                 <div class="atc-label">Validated Total ATC</div>
                 <div class="atc-tag success" (click)="openEcoDialog(percentageCompleted,'Completed ATC')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
                   {{percentageCompleted.length}} Completed
                 </div>
@@ -762,8 +776,8 @@
                 <div class="atc-label">Unvalidated ATC</div>
                 <div class="atc-tag warning">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 6v6l4 2"/>
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
                   </svg>
                   Awaiting Review
                 </div>
@@ -779,8 +793,8 @@
           <div class="eco-card-header">
             <div class="eco-card-icon purple">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
-                <line x1="7" y1="7" x2="7.01" y2="7"/>
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
               </svg>
             </div>
             <span class="eco-card-title">Products</span>
@@ -788,9 +802,8 @@
           </div>
           <div class="eco-card-body">
             <ul class="eco-list">
-              <li class="eco-list-item" 
-                  *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc"
-                  (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
+              <li class="eco-list-item" *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc"
+                (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
                 <span class="eco-list-text">{{impact.key}}</span>
                 <span class="eco-list-badge blue">{{impact.value.length}}</span>
               </li>
@@ -811,26 +824,29 @@
           <div class="eco-card-header">
             <div class="eco-card-icon teal">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 20V10"/>
-                <path d="M18 20V4"/>
-                <path d="M6 20v-4"/>
+                <path d="M12 20V10" />
+                <path d="M18 20V4" />
+                <path d="M6 20v-4" />
               </svg>
             </div>
             <span class="eco-card-title">Total Adjustments</span>
           </div>
           <div class="eco-card-body">
-            <div class="adjustment-hero" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment', totalAdjustmentsCompletedMap['count'])">
+            <div class="adjustment-hero"
+              (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment', totalAdjustmentsCompletedMap['count'])">
               <span class="adjustment-number">{{totalAdjustmentsCompletedMap['count']}}</span>
             </div>
             <div class="adjustment-split">
-              <div class="adjustment-item" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware', totalAdjustmentAwareMap['count'])">
+              <div class="adjustment-item"
+                (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware', totalAdjustmentAwareMap['count'])">
                 <div class="adjustment-bar blue"></div>
                 <div class="adjustment-info">
                   <span class="adjustment-value">{{totalAdjustmentAwareMap['count']}}</span>
                   <span class="adjustment-label">Aware</span>
                 </div>
               </div>
-              <div class="adjustment-item" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware', totalAdjustmentUnAwareMap['count'])">
+              <div class="adjustment-item"
+                (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware', totalAdjustmentUnAwareMap['count'])">
                 <div class="adjustment-bar green"></div>
                 <div class="adjustment-info">
                   <span class="adjustment-value">{{totalAdjustmentUnAwareMap['count']}}</span>
@@ -848,10 +864,10 @@
           <div class="eco-card-header">
             <div class="eco-card-icon orange">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
               </svg>
             </div>
             <span class="eco-card-title">Adjustment Details</span>
@@ -863,7 +879,7 @@
                 <div class="eco-list-arrow">
                   <span class="eco-list-badge teal">{{impact.value}}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 18l6-6-6-6"/>
+                    <path d="M9 18l6-6-6-6" />
                   </svg>
                 </div>
               </li>
@@ -881,11 +897,12 @@
       <!-- Row 1: Metric Cards Only -->
       <div class="eco-row-top">
         <div class="eco-metrics-grid">
-          <div class="eco-metric-card red" (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
+          <div class="eco-metric-card red"
+            (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
             <div class="eco-metric-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 6v6l4 2"/>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
               </svg>
             </div>
             <div class="eco-metric-content">
@@ -894,10 +911,11 @@
             </div>
           </div>
 
-          <div class="eco-metric-card green" (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
+          <div class="eco-metric-card green"
+            (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
             <div class="eco-metric-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
             <div class="eco-metric-content">
@@ -909,7 +927,8 @@
           <div class="eco-metric-card amber">
             <div class="eco-metric-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </div>
             <div class="eco-metric-content">
@@ -926,7 +945,8 @@
           <div class="eco-card-header">
             <div class="eco-card-icon pink">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                <path
+                  d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
               </svg>
             </div>
             <span class="eco-card-title">Extended Life Impact</span>
@@ -938,14 +958,13 @@
           <div class="eco-card-body">
             <ul class="eco-list">
               <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
-                <li class="eco-list-item" 
-                    *ngIf="mapprofile[impact.key] != null"
-                    (click)="profileNavigation(impact.key)">
+                <li class="eco-list-item" *ngIf="mapprofile[impact.key] != null"
+                  (click)="profileNavigation(impact.key)">
                   <span class="eco-list-text">{{mapprofile[impact.key] || "No Name"}}</span>
                   <div class="eco-list-arrow">
                     <span class="eco-list-badge pink">{{impact.value}}</span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M9 18l6-6-6-6"/>
+                      <path d="M9 18l6-6-6-6" />
                     </svg>
                   </div>
                 </li>
@@ -1187,11 +1206,12 @@
             <mat-label>Sale Type</mat-label>
             <mat-select placeholder="Filter Sale Type" formControlName="saleType"
               (selectionChange)="filterTableData(filterForm.value)">
-              <mat-option *ngFor="let saleType of saleTypeList" [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
+              <mat-option *ngFor="let saleType of saleTypeList"
+                [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
-        
+
         <div *ngIf="currentTableConfig?.filters?.includes('customerStatus')">
           <mat-form-field appearance="outline">
             <mat-label>Customer Status</mat-label>
@@ -1282,17 +1302,19 @@
           <tr *ngFor="let row of updatePaginatedData let i = index" [ngClass]="highlightRow(row)"
             [class.even-row]="i % 2 === 0">
             <td>{{ (currentPage - 1) * itemsPerPage + i + 1 }}.</td>
-            <td *ngFor="let column of currentTableConfig?.columns" [class.highlight-cell]="shouldHighlightCell(column.key)">
-        
+            <td *ngFor="let column of currentTableConfig?.columns"
+              [class.highlight-cell]="shouldHighlightCell(column.key)">
+
               <span [class.badge-cell]="isBadgeColumn(column.key)"
                 *ngIf="column.header !== 'Name' && !['schedule', 'schedulefor', 'action', 'notes', 'journeyplan', 'addnotes', 'generalnotes', 'waitingperiod', 'delayeddays', 'menubutton', 'salenotes', 'subscriptionend'].includes(column.key)">
                 {{ formatCellValue(row, column) }}
               </span>
 
-              <span *ngIf="column.header === 'Name'" class="clickable-name" (click)="navigatetoprofile(row['profileid'])">
+              <span *ngIf="column.header === 'Name'" class="clickable-name"
+                (click)="navigatetoprofile(row['profileid'])">
                 {{ formatCellValue(row, column) }}
               </span>
-        
+
               <span *ngIf="column.key === 'schedule'">
                 <span [ngStyle]="{ 'padding': '5px', 'background-color': row['onboardingscheduled'] ? 
                                           (row['onboardingscheduled'].toDate() > currentDate ? 'green' : 'red') : 
@@ -1349,13 +1371,15 @@
               <span *ngIf="column.key === 'waitingperiod'">
                 {{ formatCellValue(row, column) }} days
               </span>
-              
+
               <span *ngIf="column.key === 'delayeddays'">
                 {{ formatCellValue(row, column) }} days
               </span>
 
               <span *ngIf="column.key === 'subscriptionend'">
-                {{ (![null, undefined, ""].includes(row['subscriptionend']) ? row['subscriptionend'] : [null, undefined, ""].includes(row['lastsubscriptionend']) ? null : row['lastsubscriptionend'])?.toDate() | date:'medium'}}
+                {{ (![null, undefined, ""].includes(row['subscriptionend']) ? row['subscriptionend'] : [null, undefined,
+                ""].includes(row['lastsubscriptionend']) ? null : row['lastsubscriptionend'])?.toDate() |
+                date:'medium'}}
               </span>
 
               <span *ngIf="column.key === 'generalnotes'" #notesContainer
@@ -1409,20 +1433,24 @@
               </span>
 
               <span *ngIf="column.key === 'journeyplan'" [ngClass]="getColumnClass(row.tentativestart)">
-                <button mat-stroked-button
-                  class="ml-2" style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
+                <button mat-stroked-button class="ml-2"
+                  style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
                   (click)="navigatejourneyplan(row)">Journey Plan</button>
                 &nbsp;
                 <button mat-stroked-button class="ml-2" *ngIf="tableType == 'overallParticipants'"
                   style="border: 2px solid rgb(61, 134, 230); border-radius: 5px;color: rgb(61, 134, 230);"
-                  (click)="openSchedule(row, 'coach')">{{[null, undefined].includes(mapCoachAppointments[row['profileid']]) ?
-                  'Schedule' : (mapCoachAppointments[row['profileid']][0]?.['starttime']?.toDate() | date : 'mediumDate')}}</button>
+                  (click)="openSchedule(row, 'coach')">{{[null,
+                  undefined].includes(mapCoachAppointments[row['profileid']]) ?
+                  'Schedule' : (mapCoachAppointments[row['profileid']][0]?.['starttime']?.toDate() | date :
+                  'mediumDate')}}</button>
               </span>
 
               <span *ngIf="column.key === 'markcoach'">
-                <button mat-stroked-button class="ml-2" *ngIf="![null, undefined].includes(mapCoachAppointments[row['profileid']])"
+                <button mat-stroked-button class="ml-2"
+                  *ngIf="![null, undefined].includes(mapCoachAppointments[row['profileid']])"
                   style="border: 2px solid rgb(232, 92, 92); border-radius: 5px;color: rgb(232, 92, 92);"
-                  (click)="markJCcomplete(row, mapCoachAppointments[row['profileid']][0])">{{[null, undefined].includes(mapCoachAppointments[row['profileid']]) ?
+                  (click)="markJCcomplete(row, mapCoachAppointments[row['profileid']][0])">{{[null,
+                  undefined].includes(mapCoachAppointments[row['profileid']]) ?
                   '' : 'Mark Complete'}}</button>
               </span>
 
@@ -1546,10 +1574,6 @@
 
         <!-- Summary Section -->
         <div class="schedule-summary">
-          <!-- <div class="summary-item">
-            <span class="summary-label">Upcoming For You:</span>
-            <span class="summary-count blue">{{ getUpcomingCount() }}</span>
-          </div> -->
           <div class="summary-item">
             <span class="summary-label">Today Schedules:</span>
             <span class="summary-count blue">{{ getTodayCount() }}</span>
@@ -1564,7 +1588,8 @@
       <!-- Schedule Details Section -->
       <div class="calendar-right">
         <div class="schedule-list">
-          <div *ngFor="let schedule of selectedDateSchedules" [ngClass]="schedule.cancelled ? 'schedule-item-cancelled' : schedule.attended ? 'schedule-item-completed' : 'schedule-item-active'">
+          <div *ngFor="let schedule of selectedDateSchedules"
+            [ngClass]="schedule.cancelled ? 'schedule-item-cancelled' : schedule.attended ? 'schedule-item-completed' : 'schedule-item-active'">
             <div class="schedule-info">
               <div class="participant-name">
                 <strong>Participant name:</strong> {{ mapprofile[schedule.bookedby.id] }}
@@ -1608,19 +1633,19 @@
             <div *ngIf="originalData['continuitySales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['continuitySales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1634,19 +1659,19 @@
             <div *ngIf="originalData['upgradeSales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['upgradeSales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1660,19 +1685,19 @@
             <div *ngIf="originalData['referralSales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['referralSales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1686,19 +1711,19 @@
             <div *ngIf="originalData['addonSales']?.data?.length > 0; else noData">
               <div class="scrollable-table-wrapper">
                 <table mat-table [dataSource]="originalData['addonSales'].data" class="data-grid">
-              
+
                   <!-- Serial Number Column -->
                   <ng-container matColumnDef="sno">
                     <th mat-header-cell *matHeaderCellDef>S.No</th>
                     <td mat-cell *matCellDef="let element; let i = index">{{ i + 1 }}</td>
                   </ng-container>
-              
+
                   <!-- Name Column -->
                   <ng-container matColumnDef="name">
                     <th mat-header-cell *matHeaderCellDef>Name</th>
                     <td mat-cell *matCellDef="let element">{{ element.name }}</td>
                   </ng-container>
-              
+
                   <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
                   <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
                 </table>
@@ -1726,7 +1751,8 @@
     <div class="modal-header">
       <div class="header-content">
         <h2 mat-dialog-title>{{ dialogConfig.title }}</h2>
-        <span *ngIf="dialogConfig.avg"> : ( {{ dialogConfig.table.data.length > 0 ? dialogConfig.avg.toFixed(2) ?? 0 : 'N/A' }} )</span>
+        <span *ngIf="dialogConfig.avg"> : ( {{ dialogConfig.table.data.length > 0 ? dialogConfig.avg.toFixed(2) ?? 0 :
+          'N/A' }} )</span>
         <span class="header-subtitle">{{ dialogConfig.table.data.length }} records</span>
       </div>
 
@@ -1766,27 +1792,17 @@
               </td>
             </tr>
             <tr *ngIf="dialogConfig?.table.data.length === 0">
-            <td
-              [attr.colspan]="(dialogConfig?.table?.columns?.length || 0) + 1"
-              class="no-data"
-            >
-              <div class="no-data-message">
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                  <path d="M2 17l10 5 10-5"></path>
-                  <path d="M2 12l10 5 10-5"></path>
-                </svg>
-                <p>No data available</p>
-              </div>
-            </td>
-          </tr>
+              <td [attr.colspan]="(dialogConfig?.table?.columns?.length || 0) + 1" class="no-data">
+                <div class="no-data-message">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                  <p>No data available</p>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -1799,4 +1815,6 @@
     </mat-dialog-actions>
   </div>
 </ng-template>
+
+
 
