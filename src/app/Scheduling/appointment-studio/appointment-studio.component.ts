@@ -764,4 +764,11 @@ export class AppointmentStudioComponent {
     })
   }
 
+  openJourneyPlan(appointment){
+    console.log(appointment)
+    const profileid = appointment.meta["bookedby"].id
+    const url = this.router.createUrlTree(['/journeysupport', profileid]).toString();
+    window.open(url, '_blank');
+  }
+
 }
