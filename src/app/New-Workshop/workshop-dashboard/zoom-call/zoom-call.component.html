@@ -94,44 +94,44 @@
         <mat-cell *matCellDef="let row">{{row.columnA}}</mat-cell>
       </ng-container>
 
-<ng-container matColumnDef="name">
-  <mat-header-cell *matHeaderCellDef mat-sort-header>Name</mat-header-cell>
-  <mat-cell *matCellDef="let row; let i = index">
-    <ng-container *ngIf="editingRowIndex !== i">
-      <span (click)="startEdit(i)" class="editable-cell">
-        {{ row.name || 'Select Name' }}
-      </span>
-    </ng-container>
-    <ng-container *ngIf="editingRowIndex === i">
-      <mat-form-field appearance="outline" class="full-width name-select">
-        <mat-select [formControl]="searchControl"
-                    (selectionChange)="updateSelectedProfile($event.value, row, i)"
-                    (closed)="stopEdit()">
-          <mat-option disabled class="search-option">
-            <ngx-mat-select-search
-              [formControl]="searchControl"
-              placeholderLabel="Search users..."
-              noEntriesFoundLabel="No match found">
-            </ngx-mat-select-search>
-          </mat-option>
-          <mat-option *ngFor="let user of filterProfiles(searchControl.value)" [value]="user">
-            {{ user.name }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-    </ng-container>
-  </mat-cell>
-</ng-container>
+      <ng-container matColumnDef="name">
+        <mat-header-cell *matHeaderCellDef mat-sort-header>Name</mat-header-cell>
+        <mat-cell *matCellDef="let row; let i = index">
+          <ng-container *ngIf="editingRowIndex !== i">
+            <span (click)="startEdit(i)" class="editable-cell">
+              {{ row.name || 'Select Name' }}
+            </span>
+          </ng-container>
+          <ng-container *ngIf="editingRowIndex === i">
+            <mat-form-field appearance="outline" class="full-width name-select">
+              <mat-select [formControl]="searchControl"
+                          (selectionChange)="updateSelectedProfile($event.value, row, i)"
+                          (closed)="stopEdit()">
+                <mat-option disabled class="search-option">
+                  <ngx-mat-select-search
+                    [formControl]="searchControl"
+                    placeholderLabel="Search users..."
+                    noEntriesFoundLabel="No match found">
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let user of filterProfiles(searchControl.value)" [value]="user">
+                  {{ user.name }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </ng-container>
+        </mat-cell>
+      </ng-container>
 
 
-<ng-container matColumnDef="matchPercentage">
-  <mat-header-cell *matHeaderCellDef mat-sort-header>Match %</mat-header-cell>
-  <mat-cell *matCellDef="let row">
-    <span [class]="row.matchPercentage ? 'match-percent' : 'no-match-percent'">
-      {{ row.matchPercentage ? (row.matchPercentage | number:'1.0-0') + '%' : '0%' }}
-    </span>
-  </mat-cell>
-</ng-container>
+      <ng-container matColumnDef="matchPercentage">
+        <mat-header-cell *matHeaderCellDef mat-sort-header>Match %</mat-header-cell>
+        <mat-cell *matCellDef="let row">
+          <span [class]="row.matchPercentage ? 'match-percent' : 'no-match-percent'">
+            {{ row.matchPercentage ? (row.matchPercentage | number:'1.0-0') + '%' : '0%' }}
+          </span>
+        </mat-cell>
+      </ng-container>
 
       <ng-container matColumnDef="email">
         <mat-header-cell *matHeaderCellDef mat-sort-header>Email</mat-header-cell>
