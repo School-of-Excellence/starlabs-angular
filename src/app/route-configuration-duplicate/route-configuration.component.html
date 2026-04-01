@@ -5,7 +5,7 @@
       <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Dashboard" #input>
       <mat-icon matSuffix>search</mat-icon>
     </mat-form-field>&nbsp;&nbsp;&nbsp;
-    <button mat-stroked-button type="button" (click)="createRoute()">Create Route</button>&nbsp;
+    <button *ngIf="loggedinProfileRoles['developer']" mat-stroked-button type="button" (click)="createRoute()">Create Route</button>&nbsp;
     <button mat-stroked-button type="button" (click)="toggleExpandAll()">
       {{ isAllExpanded ? 'Collapse All' : 'Expand All' }}
     </button>
@@ -95,7 +95,7 @@
         <th mat-header-cell *matHeaderCellDef> Delete </th>
         <td mat-cell *matCellDef="let element">
           <button mat-mini-fab
-          [disabled]="element.route === '/routeconfiguration'"
+          [disabled]="element.route === '/routeconfiguration' || loggedinProfileRoles['developer'] != true"
             *ngIf="!element.isChild" 
             color="warn" 
             (click)="deleteRoute(element)"
