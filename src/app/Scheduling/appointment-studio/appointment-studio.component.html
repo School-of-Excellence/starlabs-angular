@@ -77,6 +77,7 @@
             <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 5; else watingmessage">
               <div>
                 <button class="zoomlaunchbtn" mat-button (click)="startMeeting(appointment)">Launch Meeting Now</button>
+                <button class="ms-4 journeyplanbtn" mat-button (click)="openJourneyPlan(appointment)">Open Journey Plan</button>
               </div>
             </div>
             <ng-template #watingmessage>

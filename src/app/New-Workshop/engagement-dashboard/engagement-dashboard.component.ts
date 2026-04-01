@@ -153,7 +153,7 @@ export class EngagementDashboardComponent implements OnInit, OnDestroy {
       this.loadEngagementDataInBackground();
       
     } catch (error) {
-      console.error('Init error:', error);
+      console.error('error:', error);
       this.loading = false;
     }
   }
@@ -166,7 +166,7 @@ export class EngagementDashboardComponent implements OnInit, OnDestroy {
       ]);
       this.recalculateBreakdowns();
     } catch (error) {
-      console.error('Background load error:', error);
+      console.error('error:', error);
     }
   }
 
@@ -1041,40 +1041,25 @@ private async saveCurrentEngagementSnapshot() {
   try {
     for (const mode of ['active', 'inactive'] as StatusMode[]) {
       this.participantStatusMode = mode;
-      
-      // Step 1: Load base data with 'both' filter
       this.engagementFilter = 'both';
       await this.runDataLoad(true);
-      
-      // Step 2: Ensure event/appointment engagement is loaded
       if (this.eventsDisplay.length && !this.eventEngagementDisplay.length) {
         await this.fetchEventEngagement();
       }
       if (this.appointmentsDisplay.length && !this.appointmentEngagementDisplay.length) {
         await this.fetchAppointmentEngagement();
       }
-      
-      // Step 3: Calculate ALL breakdowns (both, event, and product)
-      // First capture 'both' breakdown
       this.engagementFilter = 'both';
       this.recalculateBreakdowns();
       const combinedBreakdown = [...this.journeysCombinedDisplay];
-      
-      // Then capture 'product' breakdown
       this.engagementFilter = 'product';
       this.recalculateBreakdowns();
       const contentBreakdown = [...this.journeysDisplay];
-      
-      // Finally capture 'event' breakdown
       this.engagementFilter = 'event';
       this.recalculateBreakdowns();
       const eventBreakdown = [...this.journeysEventDisplay];
       const appointmentBreakdown = [...this.journeysAppointmentDisplay];
-      
-      // Step 4: Build reference arrays
       const refArrays = this.buildReferenceArrays();
-      
-      // Step 5: Capture snapshot with ALL data
       const snapshot: any = {
         ref: refArrays,
         overview: { ...this.overview },
@@ -1118,7 +1103,6 @@ private async saveCurrentEngagementSnapshot() {
           notEngagedCount: e.notEngagedCount,
           engagedParticipantIds: e.engagedParticipants.map(p => p.profileid),
           notEngagedParticipantIds: e.notEngagedParticipants.map(p => p.profileid),
-          // Save additional queue-specific data if present
           engagedParticipantsDetails: e.engagedParticipants.map(p => ({
             profileId: p.profileid,
             activities: p.activities || [],
@@ -1151,7 +1135,6 @@ private async saveCurrentEngagementSnapshot() {
       snapshots[`${mode}Snapshot`] = snapshot;
     }
 
-    // Restore original state
     this.participantStatusMode = original.mode;
     this.engagementFilter = original.filter;
     await this.runDataLoad(true);
@@ -1165,7 +1148,7 @@ private async saveCurrentEngagementSnapshot() {
       currentYear: this.currentYear, 
       savedAt: timestamp, 
       savedBy: 'dashboard', 
-      v: 3  // Increment version to track this fix
+      v: 3
     };
     
     await Promise.all([
@@ -1200,7 +1183,6 @@ private async saveCurrentEngagementSnapshot() {
   }
 }
 
-// Helper method to build reference arrays (extracted to avoid duplication)
 private buildReferenceArrays(): { journeys: string[], content: string[] } {
   const journeyRefList = Object.values(this.journeyIdToName);
   const contentRefList: string[] = [];
@@ -1218,7 +1200,6 @@ private buildReferenceArrays(): { journeys: string[], content: string[] } {
   return { journeys: journeyRefList, content: contentRefList };
 }
 
-// Helper method to build content analytics (extracted to avoid duplication)
 private buildContentAnalytics(): Record<string, { contentIndex: number; lastDate: string }> {
   const { content: contentRefList } = this.buildReferenceArrays();
   const contentRefMap = new Map<string, number>();
@@ -1284,47 +1265,24 @@ private async loadSnapshotIfExists(monthKey: string): Promise<boolean> {
       getDocs(query(collection(this.firestore, 'engagement_snapshots'), where('type', '==', `${monthKey}_inactive`), limit(1)))
     ]);
     if (activeSnap.empty || inactiveSnap.empty) {
-      console.log('❌ No snapshot found');
       return false;
     }
-    
     const activeData = activeSnap.docs[0].data()['snapshot'];
-    const inactiveData = inactiveSnap.docs[0].data()['snapshot'];
-    
-    // DIAGNOSTIC: Check what's actually in the snapshot
-    console.log('📊 Active Snapshot Check:');
-    console.log('  - journeys.combinedEngagement:', activeData?.journeys?.combinedEngagement?.length || 0);
-    console.log('  - journeys.eventEngagement:', activeData?.journeys?.eventEngagement?.length || 0);
-    console.log('  - events:', activeData?.events?.length || 0);
-    console.log('  - eventEngagementDisplay will become:', activeData?.events?.length || 0);
-    
+    const inactiveData = inactiveSnap.docs[0].data()['snapshot'];  
     this.savedSnapshot = { 
       activeSnapshot: activeData, 
       inactiveSnapshot: inactiveData 
     };
     this.isSnapshotLocked = true;
     this.snapshotStatus = 'locked';
-    
-    // Ensure we have the month's events filtered
     this.filterEventsForMonth();
-    this.filterAppointmentsForMonth();
-    
+    this.filterAppointmentsForMonth()
     const currentSnapshot = this.savedSnapshot[this.participantStatusMode === 'active' ? 'activeSnapshot' : 'inactiveSnapshot'];
-    
     this.restoreOptimizedSnapshot(currentSnapshot);
-    
-    // DIAGNOSTIC: Check what was restored
-    console.log('📊 After Restoration:');
-    console.log('  - journeysCombinedDisplay.length:', this.journeysCombinedDisplay.length);
-    console.log('  - journeysEventDisplay.length:', this.journeysEventDisplay.length);
-    console.log('  - eventEngagementDisplay.length:', this.eventEngagementDisplay.length);
-    console.log('  - eventsDisplay.length:', this.eventsDisplay.length);
-    console.log('  - engagementFilter:', this.engagementFilter);
-    
     this.snackbarService.show(`Loaded snapshot for ${this.selectedMonth} (${this.participantStatusMode})`, 'info');
     return true;
   } catch (e) { 
-    console.error('Load snapshot error:', e); 
+    console.error('error:', e); 
     return false; 
   }
 }
@@ -1349,7 +1307,6 @@ private restoreOptimizedSnapshot(snapshot: any) {
       email: metadata?.['email'] || '', 
       phonenumber: metadata?.['phonenumber'] || '', 
       metadata: metadata || {},
-      // Add any extra data passed in (for events/appointments)
       ...(extraData || {})
     };
   };
@@ -1376,9 +1333,7 @@ private restoreOptimizedSnapshot(snapshot: any) {
   this.allActiveParticipants = (snapshot.participants?.allParticipantIds || []).map((pid: string) => reconstructParticipant(pid)).filter(Boolean);
   this.allEngagedParticipantsGlobal = (snapshot.participants?.engagedParticipantIds || []).map((pid: string) => ({ ...reconstructParticipant(pid), status: 'engaged' })).filter(Boolean);
   this.allNotEngagedParticipantsGlobal = (snapshot.participants?.notEngagedParticipantIds || []).map((pid: string) => ({ ...reconstructParticipant(pid), status: 'not-engaged' })).filter(Boolean);
-  
   this.journeysDisplay = (snapshot.journeys?.contentEngagement || []).map(decompressJourney);
-  
   this.journeysCombinedDisplay = (snapshot.journeys?.combinedEngagement || []).map((j: any) => ({ 
     ...decompressJourney(j), 
     engagedParticipants: (j.engagedParticipants || []).map((item: any) => ({ 

@@ -243,7 +243,7 @@ export class AppointmentStudioComponent {
         // Skip if Cancelled or Marked Attended
         if(appointmentData["cancelled"] || appointmentData["attended"]) continue
 
-        if(eligibleProduct.includes(appointmentData["productid"]) || (this.superRole && appointmentData["onboarding"])){
+        if(eligibleProduct.includes(appointmentData["productid"]) || (this.superRole && appointmentData["journeycoach"])){
           var hostData = []
           var hostNames = []
           var hostID = []
@@ -296,6 +296,9 @@ export class AppointmentStudioComponent {
             }
             else if(appointmentData["onboarding"]){
               upcomingModel.push("Onboarding")
+            }
+            else if(appointmentData["journeycoach"]){
+              upcomingModel.push("Journey Coach")
             }
           }
         }
@@ -762,6 +765,13 @@ export class AppointmentStudioComponent {
     updateDoc(doc(this.firestore, "appointments", appointmentData["docid"]), {
       platform: enableOpenVidu ? "openvidu" : "zoom"
     })
+  }
+
+  openJourneyPlan(appointment){
+    console.log(appointment)
+    const profileid = appointment.meta["bookedby"].id
+    const url = this.router.createUrlTree(['/journeysupport', profileid]).toString();
+    window.open(url, '_blank');
   }
 
 }

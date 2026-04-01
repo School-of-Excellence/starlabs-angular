@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, computed, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { collection, collectionData, doc, DocumentData, documentId, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, onSnapshot, documentId, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { combineLatest, firstValueFrom, Observable, Subject, Subscription } from 'rxjs';
 import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-bulk-invitation.component';
@@ -42,12 +42,41 @@ import { AddPendingActionComponent } from '../../AppEngagement/app-action-pendin
 import { TagParticipantsComponent } from '../../Participants Profile Management/participants-analytics/tag-participants/tag-participants.component';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 interface SearchMatch {
   tokenId: string;
   stageIndex: number;
   tokenIndex: number;
   type: 'token' | 'stage'; // Track if match is token or stage name
+}
+
+interface NotificationEvent {
+  channel: 'push' | 'whatsapp' | 'email';
+  status:  'success' | 'failure' | 'pending';
+  message: string;
+  title:   string;
+  logdate: any;
+}
+
+interface ProfileNotificationSummary {
+  profileId:         string;
+  pushSent:          number;
+  pushFailed:        number;
+  whatsappSent:      number;
+  whatsappFailed:    number;
+  emailSent:         number;
+  emailFailed:       number;
+  totalSuccess:      number;
+  totalFailed:       number;
+  timeline:          NotificationEvent[];
+  // pre-computed — no pipes needed
+  pushTimeline:      NotificationEvent[];
+  whatsappTimeline:  NotificationEvent[];
+  emailTimeline:     NotificationEvent[];
+  lastPushStatus:    'success' | 'failure' | null;
+  lastWaStatus:      'success' | 'failure' | null;
+  lastEmailStatus:   'success' | 'failure' | null;
 }
 
 @Component({
@@ -69,7 +98,8 @@ interface SearchMatch {
     MatChipSet,
     MatTooltipModule,
     MatDatepickerModule,
-    MatNativeDateModule
+    MatNativeDateModule,
+    MatProgressSpinnerModule
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
@@ -321,6 +351,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   unsubscribeRR: Subscription | null = null;
 
   isRoundRobinCancelled:boolean = false  
+
+  showQueueTimelineDialog = false;
+  queueTimelineLoading = false;
+  profileSummaries: ProfileNotificationSummary[] = [];
+  expandedProfileId: string | null = null;
+  showTimelineOverlay = false;
+  private shouldScrollTracks = false;
+  timelineSearchQuery = '';
+  selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
+
+  // keep unsubscribe handles to tear down on close
+  private timelineUnsubs: (() => void)[] = [];
+  private pushDocs: any[] = [];
+  private watiDocs: any[] = [];
+  private emailDocs: any[] = [];
 
   @ViewChildren('tokenElement') tokenElements!: QueryList<ElementRef>;
 
@@ -1541,15 +1586,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       )
     });
 
-    this.participantSubscription = collectionData(collection(this.firestore, 'participant metadata'),{ idField: 'id' }).pipe(takeUntil(this.subscriptionHandle)).subscribe((participantdoc) => {
+    this.participantSubscription = collectionData(collection(this.firestore, 'participant metadata'), { idField: 'id' }).pipe(takeUntil(this.subscriptionHandle)).subscribe((participantdoc) => {
       participantdoc.forEach((data) => {
         this.participantMetaDataMap[data['profileid']] = data;
       });
-    this.allParticipants.set(participantdoc);
-      if (this.dfuFilterActive && this.allTokensData.length > 0) {
-      this.processTokensIntoStages(this.allTokensData);
-    }
 
+      this.allParticipants.set(participantdoc);
+      if (this.dfuFilterActive && this.allTokensData.length > 0) {
+        this.processTokensIntoStages(this.allTokensData);
+      }
     });
   }
 
@@ -1574,6 +1619,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
     if (this.remindersSubscription) {
       this.remindersSubscription.unsubscribe();
+    }
+
+    this.timelineUnsubs.forEach(u => u());
+  }
+
+  ngAfterViewChecked() {
+    if (this.shouldScrollTracks) {
+      this.shouldScrollTracks = false;
+      this.scrollTracksToEnd();
     }
   }
 
@@ -4079,35 +4133,29 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     });
 
     dialogRef.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result => {
-      if (result != null && result != undefined) {
-        if (result == 'success') {
-          this.guard.openSnackBar("Wati Message Sent Successfully", "OK",600);
-          if (result['status'] == 'sendtoparticipants') {
-            let url: string;
+      if (!result) return;
 
-            if (environment.firebase.projectId == 'starlabs-test') {
-              url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
-            } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
-              url = ""
+      // Normalize: support both string and object result
+      const status = typeof result === 'string' ? result : result.status;
+      const archiveid = typeof result === 'object' ? result.archiveid : null;
+
+      if (status === 'success') {
+        this.guard.openSnackBar("Wati Message Sent Successfully", "OK", 600);
+
+        if (archiveid) {
+          const docRef = doc(collection(this.firestore, 'wati archive'), archiveid);
+          await updateDoc(docRef, {
+            templatevalidated: true,
+            type: 'queue',
+            metadata: {
+              'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
             }
-
-            const docRef = doc(collection(this.firestore, 'wati archive'), result['archiveid']);
-            await updateDoc(docRef, {
-              templatestatus: "created",
-              templatevalidated: true,
-            }).then(() => {
-              console.log("Wati Archive Document Created");
-            }).catch((error) => {
-              console.log("Error Creating Wati Archive");
-            });
-
-            const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
-            console.log("Response : ", response);
-            this.selectedTokens.clear();
-          }
-        } else if (result == 'failed') {
-          this.guard.openSnackBar("Sending Wati Message Failed", "OK",600);
+          });
+          this.selectedTokens.clear();
         }
+
+      } else if (status === 'failed') {
+        this.guard.openSnackBar("Sending Wati Message Failed", "OK", 600);
       }
     });
   }
@@ -4130,6 +4178,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         console.log(result);
 
         const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+
+        if(result) {
+          result['type'] = 'queue';
+          result['metadata'] = {
+              'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
+            }
+        }
         if (result['status'] == 'queued' || result['status'] == 'send') {
           await setDoc(docRef, result, { merge: true }).then(() => {
             this.guard.openSnackBar("Email Sent", "OK",600);
@@ -4206,12 +4261,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           title: result["title"],
           message: result["message"],
           subtitle: result["subtitle"] ?? null,
-          notificationtype: "ahupdate",
+          notificationtype: "queue",
           notificationimage: notificationimage,
           sticky: result["sticky"],
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          metadata: {
+            'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
+          }
         }).then(() => {
           console.log(notificationimage);
           this.selectedTokens.clear();
@@ -5126,62 +5184,367 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       token.tokenstatus === 'Active'
     ).length;
   }
+  
   isATCDateRangeOnly(profileId: string): boolean {
     return this.atcDateRangeOnlyProfileIds.has(profileId);
   }
+
   async openNotificationTimeline(token: any) {
-  this.selectedTimelineToken = token;
-  this.showTimelineDialog = true;
-  this.notificationTimelineLoading = true;
+    this.selectedTimelineToken = token;
+    this.showTimelineDialog = true;
+    this.notificationTimelineLoading = true;
 
-  // Fetch notificationrecord where metadata.queueref == selectedQueue
-  const snap = await getDocs(query(
-    collection(this.firestore, 'notificationrecord'),
-    where('metadata.queueref', '==', doc(this.firestore, 'queue generation', this.selectedQueue.docid))
-  ));
+    // Fetch notificationrecord where metadata.queueref == selectedQueue
+    const snap = await getDocs(query(
+      collection(this.firestore, 'notificationrecord'),
+      where("notificationtype", "==", "queue"),
+      where('metadata.queueref', '==', doc(this.firestore, 'queue generation', this.selectedQueue.docid)),
+      orderBy("date", "asc")
+    ));
 
-  const timeline: any[] = [];
+    const timeline: any[] = [];
 
-  snap.docs.forEach(d => {
-    const data = d.data();
-    const profileids: string[] = data['profileid'] || [];
-    const profileId = token.profile_id;
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const profileids: string[] = data['profileid'] || [];
+      const profileId = token.profile_id;
 
-    // Check if this notification was sent to this participant
-    if (!profileids.includes(profileId)) return;
+      // Check if this notification was sent to this participant
+      if (!profileids.includes(profileId)) return;
 
-    const profilesuccess: string[] = data['profilesuccess'] || [];
-    const profilefailure: string[] = data['profilefailed'] || [];
+      const profilesuccess: string[] = data['profilesuccess'] || [];
+      const profilefailure: string[] = data['profilefailed'] || [];
 
-    let status: 'success' | 'failure' | 'pending' = 'pending';
-    if (profilesuccess.includes(profileId)) {
-      status = 'success';
-    } else if (profilefailure.includes(profileId)) {
-      status = 'failure';
+      let status: 'success' | 'failure' | 'pending' = 'pending';
+      if (profilesuccess.includes(profileId)) {
+        status = 'success';
+      } else if (profilefailure.includes(profileId)) {
+        status = 'failure';
+      }
+
+      timeline.push({
+        message: data['message'] || '',
+        logdate: data['metadata']?.['logdate'],
+        status: status,
+        title: data['title'] || '',
+        notificationtype: data['notificationtype'] || ''
+      });
+    });
+
+    // Sort by date ascending 
+    timeline.sort((a, b) => {
+      const dateA = a.logdate?.toDate?.() || new Date(0);
+      const dateB = b.logdate?.toDate?.() || new Date(0);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    this.notificationTimelineMap[token.profile_id] = timeline;
+    this.notificationTimelineLoading = false;
+  }
+
+  closeTimelineDialog() {
+    this.showTimelineDialog = false;
+    this.selectedTimelineToken = null;
+  }
+
+  // ── open ──────────────────────────────────────────────────────────────────
+  openQueueTimeline() {
+    this.showTimelineOverlay = true;
+    this.queueTimelineLoading = true;
+    this.profileSummaries = [];
+    this.expandedProfileId = null;
+    this.timelineSearchQuery = ''; // ← reset search
+    this.pushDocs = [];
+    this.watiDocs = [];
+    this.emailDocs = [];
+    this.listenQueueNotifications();
+  }
+
+  // ── close ─────────────────────────────────────────────────────────────────
+  closeQueueTimeline() {
+    this.showTimelineOverlay = false;
+    this.selectedEmailPreview = null;
+    this.timelineUnsubs.forEach(u => u());
+    this.timelineUnsubs = [];
+  }
+
+  // ── toggle row ────────────────────────────────────────────────────────────
+  toggleProfileTimeline(profileId: string) {
+    this.expandedProfileId =
+      this.expandedProfileId === profileId ? null : profileId;
+
+    if (this.expandedProfileId) {
+      this.shouldScrollTracks = true;
+    }
+  }
+
+  private scrollTracksToEnd() {
+    const tracks = document.querySelectorAll('.h-track');
+    if (!tracks.length) return;
+    tracks.forEach((el: Element) => {
+      const track = el as HTMLElement;
+      track.scrollLeft = track.scrollWidth;
+    });
+  }
+
+  // ── listeners ─────────────────────────────────────────────────────────────
+  private listenQueueNotifications() {
+    const queueRef = doc(
+      this.firestore, 'queue generation', this.selectedQueue.docid
+    );
+
+    const unsub1 = onSnapshot(
+      query(
+        collection(this.firestore, 'notificationrecord'),
+        where('notificationtype', '==', 'queue'),
+        where('metadata.queueref', '==', queueRef),
+        orderBy('date', 'asc')
+      ),
+      snap => {
+        this.pushDocs = snap.docs.map(d => d.data());
+        this.rebuildSummaries();
+      }
+    );
+
+    const unsub2 = onSnapshot(
+      query(
+        collection(this.firestore, 'wati archive'),
+        where('type', '==', 'queue'),
+        where('metadata.queueref', '==', queueRef),
+        orderBy('date', 'asc')
+      ),
+      snap => {
+        this.watiDocs = snap.docs.map(d => d.data());
+        this.rebuildSummaries();
+      }
+    );
+
+    const unsub3 = onSnapshot(
+      query(
+        collection(this.firestore, 'email archive'),
+        where('type', '==', 'queue'),
+        where('metadata.queueref', '==', queueRef),
+        orderBy('date', 'asc')
+      ),
+      snap => {
+        this.emailDocs = snap.docs.map(d => d.data());
+        this.rebuildSummaries();
+      }
+    );
+
+    this.timelineUnsubs = [unsub1, unsub2, unsub3];
+  }
+
+  private rebuildSummaries() {
+    const map = new Map<string, ProfileNotificationSummary>();
+
+    const getOrCreate = (profileId: string): ProfileNotificationSummary => {
+      if (!map.has(profileId)) {
+        map.set(profileId, {
+          profileId,
+          pushSent: 0, pushFailed: 0,
+          whatsappSent: 0, whatsappFailed: 0,
+          emailSent: 0, emailFailed: 0,
+          totalSuccess: 0, totalFailed: 0,
+          timeline: [],
+          pushTimeline: [],
+          whatsappTimeline: [],
+          emailTimeline: [],
+          lastPushStatus: null,
+          lastWaStatus: null,
+          lastEmailStatus: null,
+        });
+      }
+      return map.get(profileId)!;
+    };
+
+    // ── push ──────────────────────────────────────────────────────────────
+    this.pushDocs.forEach(data => {
+      const profileids: string[] = data['profileid'] || [];
+      const profilesuccess: string[] = data['profilesuccess'] || [];
+      const profilefailure: string[] = data['profilefailed'] || [];
+
+      profileids.forEach(profileId => {
+        const entry = getOrCreate(profileId);
+        let status: 'success' | 'failure' | 'pending' = 'pending';
+
+        if (profilesuccess.includes(profileId)) {
+          status = 'success';
+          entry.pushSent++;
+          entry.totalSuccess++;
+        } else if (profilefailure.includes(profileId)) {
+          status = 'failure';
+          entry.pushFailed++;
+          entry.totalFailed++;
+        }
+
+        entry.timeline.push({
+          channel: 'push', status,
+          message: data['message'] || '',
+          title: data['title'] || '',
+          logdate: data['date'],
+        });
+      });
+    });
+
+    // ── whatsapp ──────────────────────────────────────────────────────────
+    this.watiDocs.forEach(data => {
+      const numbersmap: Record<string, string> = data['numbermap'] || {};
+      const sent: string[] = data['sent'] || [];
+      const failed: string[] = data['failed'] || [];
+
+      sent.forEach(phone => {
+        const profileId = numbersmap[phone];
+        if (!profileId) return;
+        const entry = getOrCreate(profileId);
+        entry.whatsappSent++;
+        entry.totalSuccess++;
+        entry.timeline.push({
+          channel: 'whatsapp', status: 'success',
+          message: data['message'] || '',
+          title: data['title'] || '',
+          logdate: data['date'],
+        });
+      });
+
+      failed.forEach(phone => {
+        const profileId = numbersmap[phone];
+        if (!profileId) return;
+        const entry = getOrCreate(profileId);
+        entry.whatsappFailed++;
+        entry.totalFailed++;
+        entry.timeline.push({
+          channel: 'whatsapp', status: 'failure',
+          message: data['message'] || '',
+          title: data['title'] || '',
+          logdate: data['date'],
+        });
+      });
+    });
+
+    // ── email ─────────────────────────────────────────────────────────────
+    this.emailDocs.forEach(data => {
+      const emailmap: Record<string, string> = data['emailmap'] || {};
+      const datamodel: Record<string, any> = data['datamodel'] || {};
+      const sent: string[] = data['sent'] || [];
+      const failed: string[] = data['failed'] || [];
+
+      sent.forEach(email => {
+        const profileId = emailmap[email];
+        if (!profileId) return;
+        const entry = getOrCreate(profileId);
+        entry.emailSent++;
+        entry.totalSuccess++;
+        entry.timeline.push({
+          channel: 'email',
+          status: 'success',
+          message: this.renderMessage(data['body'] || '', datamodel),
+          title: data['title'] || '',
+          logdate: data['date'],
+        });
+      });
+
+      failed.forEach(email => {
+        const profileId = emailmap[email];
+        if (!profileId) return;
+        const entry = getOrCreate(profileId);
+        entry.emailFailed++;
+        entry.totalFailed++;
+        entry.timeline.push({
+          channel: 'email',
+          status: 'failure',
+          message: this.renderMessage(data['body'] || '', datamodel),
+          title: data['title'] || '',
+          logdate: data['date'],
+        });
+      });
+    });
+
+    // ── sort + pre-compute per-channel splits ─────────────────────────────
+    const lastStatus = (arr: NotificationEvent[]) =>
+      arr.length ? arr[arr.length - 1].status as 'success' | 'failure' : null;
+
+    map.forEach(entry => {
+      entry.timeline.sort((a, b) => {
+        const da = a.logdate?.toDate?.() || new Date(0);
+        const db = b.logdate?.toDate?.() || new Date(0);
+        return da.getTime() - db.getTime();
+      });
+
+      entry.pushTimeline = entry.timeline.filter(e => e.channel === 'push');
+      entry.whatsappTimeline = entry.timeline.filter(e => e.channel === 'whatsapp');
+      entry.emailTimeline = entry.timeline.filter(e => e.channel === 'email');
+
+      entry.lastPushStatus = lastStatus(entry.pushTimeline);
+      entry.lastWaStatus = lastStatus(entry.whatsappTimeline);
+      entry.lastEmailStatus = lastStatus(entry.emailTimeline);
+    });
+
+    this.profileSummaries = Array.from(map.values());
+    this.queueTimelineLoading = false;
+
+    setTimeout(() => {
+      document.querySelectorAll('.h-track').forEach(el => {
+        el.scrollLeft = el.scrollWidth;
+      });
+    }, 50);
+  }
+
+  renderMessage(template: string, datamodel: Record<string, any>): string {
+    if (!template || !datamodel) return template || '';
+
+    let rendered = template;
+
+    // simple {{variable}}
+    rendered = rendered.replace(/\{\{([^#\/][^}]*)\}\}/g, (_match, key) => {
+      const value = datamodel[key.trim()];
+      return value !== undefined && value !== null ? String(value) : '';
+    });
+
+    // {{#section}}...{{.}}...{{/section}}
+    rendered = rendered.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_match, key, content) => {
+      const value = datamodel[key.trim()];
+      if (value !== undefined && value !== null && value !== '') {
+        return content.replace(/\{\{\.\}\}/g, String(value));
+      }
+      return '';
+    });
+
+    return rendered;
+  }
+
+  get filteredProfileSummaries(): ProfileNotificationSummary[] {
+    let list = [...this.profileSummaries];
+
+    // sort alphabetically by name
+    list.sort((a, b) => {
+      const nameA = (this.mapProfileData[a.profileId]?.['name'] || '').toLowerCase();
+      const nameB = (this.mapProfileData[b.profileId]?.['name'] || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    // filter by search
+    if (this.timelineSearchQuery.trim()) {
+      const q = this.timelineSearchQuery.trim().toLowerCase();
+      list = list.filter(p => {
+        const name = (this.mapProfileData[p.profileId]?.['name'] || '').toLowerCase();
+        const id = p.profileId.toLowerCase();
+        return name.includes(q) || id.includes(q);
+      });
     }
 
-    timeline.push({
-      message: data['message'] || '',
-      logdate: data['metadata']?.['logdate'],
-      status: status,
-      title: data['title'] || '',
-      notificationtype: data['notificationtype'] || ''
-    });
-  });
+    return list;
+  }
 
-  // Sort by date ascending 
-  timeline.sort((a, b) => {
-    const dateA = a.logdate?.toDate?.() || new Date(0);
-    const dateB = b.logdate?.toDate?.() || new Date(0);
-    return dateA.getTime() - dateB.getTime();
-  });
+  toggleEmailPreview(item: NotificationEvent, profileId: string) {
+    if (
+      this.selectedEmailPreview?.profileId === profileId &&
+      this.selectedEmailPreview?.item === item
+    ) {
+      this.selectedEmailPreview = null;
+    } else {
+      this.selectedEmailPreview = { profileId, item };
+    }
+  }
 
-  this.notificationTimelineMap[token.profile_id] = timeline;
-  this.notificationTimelineLoading = false;
-}
-
-closeTimelineDialog() {
-  this.showTimelineDialog = false;
-  this.selectedTimelineToken = null;
-}
 }

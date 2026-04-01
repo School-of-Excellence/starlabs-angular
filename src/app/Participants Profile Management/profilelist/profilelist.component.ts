@@ -72,14 +72,15 @@ export class ProfilelistComponent {
   expandedElement
   unsubscribeProfile: (() => void) | undefined;
 
+  loggedinProfileRoles = {}
 
- 
   // firestore collection reference
   // dataBufferSubscription: Subscription;
   // profileDataSubscription : Subscription
   constructor(public guard: AuthguardService, public router:Router, public firestore: Firestore, public dialog: MatDialog, public snackbar: MatSnackBar) {
     
     guard.getRoles().then(async roles=>{
+      this.loggedinProfileRoles = roles
       this.developerAccess = roles.developer ?? false
       console.log(this.developerAccess, 'developerAccess');
       
@@ -146,7 +147,7 @@ export class ProfilelistComponent {
         const docref = doc(this.firestore, 'starlabs roles', 'roles')
         getDoc(docref).then(role => {
           if(role.exists()){
-           let names = (role.data()["name"] ?? []).filter(e => e.toLowerCase() != "developer").sort((a, b) => a.localeCompare(b))
+           let names = (role.data()["name"] ?? []).filter(e => this.developerAccess || !["rolemanager", "developer"].includes(e.toLowerCase())).sort((a, b) => a.localeCompare(b))
             this.roleList = [...names, { productowner: this.atcmodelList }];
             console.log(this.roleList);
           }
