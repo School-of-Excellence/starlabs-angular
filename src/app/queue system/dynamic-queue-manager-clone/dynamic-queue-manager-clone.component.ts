@@ -4133,35 +4133,29 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     });
 
     dialogRef.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result => {
-      if (result != null && result != undefined) {
-        if (result == 'success') {
-          this.guard.openSnackBar("Wati Message Sent Successfully", "OK",600);
-          if (result['status'] == 'sendtoparticipants') {
-            let url: string;
+      if (!result) return;
 
-            if (environment.firebase.projectId == 'starlabs-test') {
-              url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
-            } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
-              url = ""
+      // Normalize: support both string and object result
+      const status = typeof result === 'string' ? result : result.status;
+      const archiveid = typeof result === 'object' ? result.archiveid : null;
+
+      if (status === 'success') {
+        this.guard.openSnackBar("Wati Message Sent Successfully", "OK", 600);
+
+        if (archiveid) {
+          const docRef = doc(collection(this.firestore, 'wati archive'), archiveid);
+          await updateDoc(docRef, {
+            templatevalidated: true,
+            type: 'queue',
+            metadata: {
+              'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
             }
-
-            const docRef = doc(collection(this.firestore, 'wati archive'), result['archiveid']);
-            await updateDoc(docRef, {
-              templatestatus: "created",
-              templatevalidated: true,
-            }).then(() => {
-              console.log("Wati Archive Document Created");
-            }).catch((error) => {
-              console.log("Error Creating Wati Archive");
-            });
-
-            const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
-            console.log("Response : ", response);
-            this.selectedTokens.clear();
-          }
-        } else if (result == 'failed') {
-          this.guard.openSnackBar("Sending Wati Message Failed", "OK",600);
+          });
+          this.selectedTokens.clear();
         }
+
+      } else if (status === 'failed') {
+        this.guard.openSnackBar("Sending Wati Message Failed", "OK", 600);
       }
     });
   }
@@ -4184,6 +4178,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         console.log(result);
 
         const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+
+        if(result) {
+          result['type'] = 'queue';
+          result['metadata'] = {
+              'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
+            }
+        }
         if (result['status'] == 'queued' || result['status'] == 'send') {
           await setDoc(docRef, result, { merge: true }).then(() => {
             this.guard.openSnackBar("Email Sent", "OK",600);
@@ -4260,12 +4261,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           title: result["title"],
           message: result["message"],
           subtitle: result["subtitle"] ?? null,
-          notificationtype: "ahupdate",
+          notificationtype: "queue",
           notificationimage: notificationimage,
           sticky: result["sticky"],
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          metadata: {
+            'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
+          }
         }).then(() => {
           console.log(notificationimage);
           this.selectedTokens.clear();
@@ -5378,7 +5382,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           channel: 'push', status,
           message: data['message'] || '',
           title: data['title'] || '',
-          logdate: data['metadata']?.['logdate'],
+          logdate: data['date'],
         });
       });
     });
@@ -5399,7 +5403,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           channel: 'whatsapp', status: 'success',
           message: data['message'] || '',
           title: data['title'] || '',
-          logdate: data['metadata']?.['logdate'],
+          logdate: data['date'],
         });
       });
 
@@ -5413,7 +5417,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           channel: 'whatsapp', status: 'failure',
           message: data['message'] || '',
           title: data['title'] || '',
-          logdate: data['metadata']?.['logdate'],
+          logdate: data['date'],
         });
       });
     });
@@ -5436,7 +5440,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           status: 'success',
           message: this.renderMessage(data['body'] || '', datamodel),
           title: data['title'] || '',
-          logdate: data['metadata']?.['logdate'],
+          logdate: data['date'],
         });
       });
 
@@ -5451,7 +5455,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           status: 'failure',
           message: this.renderMessage(data['body'] || '', datamodel),
           title: data['title'] || '',
-          logdate: data['metadata']?.['logdate'],
+          logdate: data['date'],
         });
       });
     });
