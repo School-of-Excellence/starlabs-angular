@@ -647,7 +647,7 @@ export class JourneycoachDuplicateComponent {
         let tempArray = [];
         let tempMap = {};
 
-        const appointmentsList = appointments.sort((a,b)=> a['appointmentend'] - b['appointmentend']);
+        const appointmentsList = appointments.sort((a,b)=> b['endtime'].toDate() - a['endtime'].toDate());
 
         // sort
         for (let i = 0; i < appointmentsList.length; i++) {
