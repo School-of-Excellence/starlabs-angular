@@ -63,12 +63,15 @@ export class CreateroutedialogComponent {
   selectedProfiles: string[] = [];
   loading = true;
 
+  loggedProfileRoles = {}
+
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
     public dialogRef: MatDialogRef<any>,
     private firestore: Firestore,
     private authguard: AuthguardService
   ) {
+    this.loggedProfileRoles = data["profileroles"]
     const docref = doc(this.firestore, 'starlabs roles', 'roles')
     getDoc(docref).then(role => {
       if (role.exists()) {

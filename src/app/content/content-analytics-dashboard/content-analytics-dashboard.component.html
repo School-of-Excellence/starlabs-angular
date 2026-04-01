@@ -1,0 +1,738 @@
+<div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+        <div class="loading-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-root">
+
+    <!-- ══════════════════════════ HEADER ══════════════════════════ -->
+    <header class="dash-header">
+        <div class="dash-header-inner">
+            <div class="header-left">
+                <div class="header-badge">
+                    <span class="header-dot"></span>
+                    <span class="header-label">Content Analytics</span>
+                </div>
+                <h1 class="header-title">Content Intelligence</h1>
+
+            </div>
+            <div class="date-filter">
+                <mat-form-field appearance="outline">
+                    <mat-label>Select Date Range</mat-label>
+                    <mat-date-range-input [rangePicker]="rangePicker">
+                        <input matStartDate [formControl]="startDate" placeholder="Start date">
+                        <input matEndDate [formControl]="endDate" placeholder="End date">
+                    </mat-date-range-input>
+                    <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+                    <mat-date-range-picker #rangePicker></mat-date-range-picker>
+                </mat-form-field>
+                <div class="date-badge" (click)="applyDateRangeFilter()">
+                    <button mat-button><span class="date-text">Apply</span></button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ══════════════════════════ MAIN ══════════════════════════ -->
+    <div class="dash-main">
+
+        <!-- ── PLATFORM OVERVIEW ── -->
+        <div class="section-divider">
+            <span class="divider-label">Platform Overview</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Unique Users</div>
+                <div class="kpi-value" style="color:#93C5FD" (click)="openCards('uniqueusers')">{{totalUniqueUsers}}
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total Hours</div>
+                <div class="kpi-value" style="color:#6EE7B7">{{convertToHours(totalWatchHours)?.toFixed(0)}}h</div>
+            </div>
+            <!-- <div class="kpi-card">
+                <div class="kpi-label">Sessions</div>
+                <div class="kpi-value" style="color:#C4B5FD">8,638</div>
+            </div> -->
+            <div class="kpi-card">
+                <div class="kpi-label">Unique Videos</div>
+                <div class="kpi-value" style="color:#FCD34D">{{totalUniueContents}}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">SuperFans</div>
+                <div class="kpi-value" style="color:#FCA5A5" (click)="openCards('superfans')">{{getSuperFans()?.length}}
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">At Risk</div>
+                <div class="kpi-value" style="color:#FCA5A5" (click)="openCards('atrisk')">
+                    {{getAtRiskParticipants()?.length}}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Rising Fans</div>
+                <div class="kpi-value" style="color:#C4B5FD" (click)="openCards('risingfans')">
+                    {{getRaisingFans()?.length}}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Avg / User</div>
+                <div class="kpi-value" style="color:#6EE7B7">{{(totalWatchHours / totalUniqueUsers)?.toFixed(1)}}h
+                </div>
+            </div>
+        </div>
+
+        <!-- ── REVENUE ACTIONS ── -->
+        <!-- <div class="section-divider">
+            <span class="divider-label">Revenue Actions — What to do today</span>
+            <div class="divider-line"></div>
+        </div> -->
+
+        <!-- <div class="grid-3">
+            @for (a of ACTIONS; track a.title) {
+            <div class="card" [style.--accent]="a.lc">
+                <div class="action-header">
+                    <div>
+                        <div class="action-title">{{ a.emoji }} {{ a.title }}</div>
+                        <div class="action-unit">{{ a.unit }}</div>
+                    </div>
+                    <span class="action-label-badge" [style.background]="a.lc + '18'" [style.color]="a.lc"
+                        [style.borderColor]="a.lc + '28'">{{ a.label }}</span>
+                </div>
+                <div class="action-count mono" [style.color]="a.lc">{{ a.count }}</div>
+                <p class="action-desc">{{ a.desc }}</p>
+                <div class="action-first-label">Act on these first</div>
+                <div class="names-wrap">
+                    @for (n of a.names; track n) {
+                    <span class="name-pill" [style.background]="a.lc + '14'" [style.color]="a.lc"
+                        [style.borderColor]="a.lc + '28'">{{ n }}</span>
+                    }
+                </div>
+            </div>
+            }
+        </div> -->
+
+        <div class="section-divider" id="users-section">
+            <span class="divider-label">Participant &amp; Fan Leaderboard</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-scroll">
+                <table mat-table [dataSource]="participantTableDataSource" matSort="participantsort"
+                    class="participant-mat-table">
+
+                    <!-- Rank Column -->
+                    <ng-container matColumnDef="rank">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Rank</th>
+                        <td mat-cell *matCellDef="let pageSizeOptions; let i = index">
+                            <span class="mono rank-label">
+                                #{{ i + 1 }}
+                            </span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Participant Column -->
+                    <ng-container matColumnDef="participant">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+                        <td mat-cell *matCellDef="let p">
+                            <div class="user-cell">
+                                <div class="user-avatar">
+                                    {{ getInitials(p.profileid) }}
+                                </div>
+                                <div>
+                                    <div class="user-name">{{ participantMetaDataMap[p.profileid]?.name }}</div>
+                                </div>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Type Column -->
+                    <ng-container matColumnDef="type">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="status-badge">
+                                {{ p.type }}
+                            </span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Mode Column -->
+                    <ng-container matColumnDef="mode">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Mode</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="chip-tag">
+                                {{ participantMetaDataMap[p.profileid]?.participantmode }}
+                            </span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Platform Column -->
+                    <ng-container matColumnDef="source">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Source</th>
+                        <td mat-cell *matCellDef="let p">
+                            <div style="display:flex;gap:5px;">
+                                <span class="chip-tag" *ngFor="let type of getParticipantActivePlatforms(p)">
+                                    {{ type }}
+                                </span>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Hours Column -->
+                    <ng-container matColumnDef="hours">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Hours</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono hours-val">
+                                {{ convertToHours(p.totalWatchHours).toFixed(1) }}h
+                            </span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Days Column -->
+                    <ng-container matColumnDef="days">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Days</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono days-val">{{ getMaxConsistentWatchDays(p).length }}d</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Completion Column -->
+                    <!-- <ng-container matColumnDef="completion">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Completion</th>
+                        <td mat-cell *matCellDef="let u" style="min-width:120px">
+                            <div class="prog-wrap">
+                                <div class="prog-track">
+                                    <div class="prog-fill" [style.width.%]="u.completion"
+                                        [style.background]="completionColor(u.completion)">
+                                    </div>
+                                </div>
+                                <span class="prog-label mono" [style.color]="completionColor(u.completion)">
+                                    {{ u.completion }}%
+                                </span>
+                            </div>
+                        </td>
+                    </ng-container> -->
+                    <ng-container matColumnDef="completion">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono days-val">{{ p.completedContents?.size }}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Sessions Column -->
+                    <ng-container matColumnDef="sessions">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Sessions</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono sessions-val">{{p?.sessions || 0}}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Playlists Column -->
+                    <ng-container matColumnDef="playlists">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Playlists</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono sessions-val">{{p.completedPlayList.size}}/{{p.playlist.size}}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Modes Playlists Column -->
+                    <ng-container matColumnDef="modesplaylists">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Modes Playlists</th>
+                        <td mat-cell *matCellDef="let u">
+                            <span class="mono sessions-val">0/0</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Header & Row definitions -->
+                    <tr mat-header-row *matHeaderRowDef="participantTableColumns; sticky: true"></tr>
+                    <tr mat-row *matRowDef="let u; columns: participantTableColumns;" class="participant-row" matRipple>
+                    </tr>
+
+                    <!-- No-data row -->
+                    <tr class="mat-row no-data-row" *matNoDataRow>
+                        <td class="mat-cell" [attr.colspan]="participantTableColumns.length">
+                            <div class="empty-state">No users match the current filters.</div>
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+
+            <mat-paginator #participantpagination [pageSizeOptions]="[15 ,25, 50, 100]" [pageSize]="15"
+                showFirstLastButtons aria-label="Select page">
+            </mat-paginator>
+        </div>
+
+        <!-- ── OPPORTUNITIES ── -->
+        <div class="section-divider">
+            <span class="divider-label">Revenue and Engagement Opportunities</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="grid-3">
+            <div class="card" style="border-color:rgba(252,211,77,0.15)">
+                <div class="opp-icon">🎯</div>
+                <div class="opp-title">SolarVoice</div><span class="sm-tag"
+                    style="background:rgba(252,211,77,0.18);color:#FCD34D;border:1px solid rgba(252,211,77,0.28)"
+                    (click)="openCards('onlysolarvoice')">{{getProfilesOnlyWatchSolarVoice().length}}</span>
+                <!-- <p class="opp-desc">160 SolarVoice users who have never touched Eiflix. Warm, high-intent, already trust
+                    the
+                    platform.</p>
+                <div class="opp-names" style="color:#FCD34D">Placeholder Name, Placeholder Name, Placeholder Name,
+                    Placeholder
+                    Name</div> -->
+            </div>
+            <div class="card" style="border-color:rgba(147,197,253,0.15)">
+                <div class="opp-icon">🔄</div>
+                <div class="opp-title">Eiflix</div><span class="sm-tag"
+                    style="background:rgba(147,197,253,0.18);color:#93C5FD;border:1px solid rgba(147,197,253,0.28)"
+                    (click)="openCards('onlyeiflix')">{{getProfilesOnlyWatchEifilx().length}}</span>
+                <!-- <p class="opp-desc">78 Eiflix-only users who have never explored SolarVoice. GONG Trance or Crossover
+                    could
+                    double their time.</p>
+                <div class="opp-names" style="color:#93C5FD">Placeholder Name, Placeholder Name, Placeholder Name</div> -->
+            </div>
+            <!-- <div class="card" style="border-color:rgba(110,231,183,0.15)">
+                <div class="opp-icon">🏆</div>
+                <div class="opp-title">SuperFan Activation Program</div><span class="sm-tag"
+                    style="background:rgba(110,231,183,0.18);color:#6EE7B7;border:1px solid rgba(110,231,183,0.28)">20
+                    SuperFans</span>
+                <p class="opp-desc">20 users with 10+ days and 10+ hours. Your most loyal advocates for VIP programme
+                    and
+                    ambassador initiatives.</p>
+                <div class="opp-names" style="color:#6EE7B7">Placeholder Name, Placeholder Name, Placeholder Name,
+                    Placeholder
+                    Name</div>
+            </div>
+            <div class="card" style="border-color:rgba(196,181,253,0.15)">
+                <div class="opp-icon">🌟</div>
+                <div class="opp-title">High-Completion Re-Engagers</div><span class="sm-tag"
+                    style="background:rgba(196,181,253,0.18);color:#C4B5FD;border:1px solid rgba(196,181,253,0.28)">20
+                    High-Intent</span>
+                <p class="opp-desc">20 users with 75%+ completion and 1+ hours. They finish what they start and are most
+                    receptive to new content.</p>
+                <div class="opp-names" style="color:#C4B5FD">Placeholder Name, Placeholder Name, Placeholder Name</div>
+            </div>
+            <div class="card" style="border-color:rgba(110,231,183,0.15)">
+                <div class="opp-icon">📈</div>
+                <div class="opp-title">Rising Fan Nurture Path</div><span class="sm-tag"
+                    style="background:rgba(110,231,183,0.18);color:#6EE7B7;border:1px solid rgba(110,231,183,0.28)">78
+                    Rising
+                    Fans</span>
+                <p class="opp-desc">One personalised milestone message tips them to SuperFan and locks renewal.</p>
+                <div class="opp-names" style="color:#6EE7B7">Placeholder Name, Placeholder Name, Placeholder Name,
+                    Placeholder
+                    Name</div>
+            </div>
+            <div class="card" style="border-color:rgba(252,165,165,0.15)">
+                <div class="opp-icon">⏰</div>
+                <div class="opp-title">Prime Time Content Push</div><span class="sm-tag"
+                    style="background:rgba(252,165,165,0.18);color:#FCA5A5;border:1px solid rgba(252,165,165,0.28)">6PM
+                    + 11PM
+                    Peak</span>
+                <p class="opp-desc">6PM peaks at 963 sessions. 11PM to 1AM totals 2,575 sessions. Saturday and Monday
+                    outperform
+                    mid-week.</p>
+                <div class="opp-names" style="color:#FCA5A5">Schedule drops at 6PM. Re-engagement campaigns at 11PM
+                    Saturday
+                </div>
+            </div> -->
+        </div>
+
+        <!-- ── TEMPORAL ACTIVITY ── -->
+        <div class="section-divider">
+            <span class="divider-label">Temporal Activity</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card graphs-wrapper">
+                <div class="chart-title">Daily Active Users</div>
+                <div class="chart-wrap">
+                    <apx-chart #activeuserchart [series]="activeUsersChartOptions.series"
+                        [chart]="activeUsersChartOptions.chart" [xaxis]="activeUsersChartOptions.xaxis"
+                        [yaxis]="activeUsersChartOptions.yaxis" [plotOptions]="activeUsersChartOptions.plotOptions"
+                        [dataLabels]="activeUsersChartOptions.dataLabels" [grid]="activeUsersChartOptions.grid"
+                        [tooltip]="activeUsersChartOptions.tooltip" [colors]="activeUsersChartOptions.colors">
+                    </apx-chart>
+                </div>
+            </div>
+            <div class="card">
+                <div class="chart-title">Daily Watch Hours</div>
+                <div class="chart-wrap">
+                    <apx-chart #watchhourschart [series]="watchHoursChartOptions.series"
+                        [chart]="watchHoursChartOptions.chart" [xaxis]="watchHoursChartOptions.xaxis"
+                        [yaxis]="watchHoursChartOptions.yaxis" [plotOptions]="watchHoursChartOptions.plotOptions"
+                        [dataLabels]="watchHoursChartOptions.dataLabels" [grid]="watchHoursChartOptions.grid"
+                        [tooltip]="watchHoursChartOptions.tooltip" [colors]="watchHoursChartOptions.colors">
+                    </apx-chart>
+                </div>
+            </div>
+            <!-- <div class="card">
+                <div class="chart-title">Sessions by Hour</div>
+                <div class="chart-sub">6PM peak 963 · midnight spike 1,728</div>
+                <div class="chart-wrap"><canvas #chartHourly></canvas></div>
+            </div> -->
+        </div>
+
+        <!-- ── PLATFORM COMPARISON ── -->
+        <div class="section-divider">
+            <span class="divider-label">Platform Comparison</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="grid-3">
+            <div class="card" style="border-color:rgba(110,231,183,0.13)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                    <div>
+                        <div style="font-size:15px;font-weight:700;margin-bottom:3px;color:white">SolarVoice</div>
+                    </div>
+                    <!-- <span class="mono" style="font-size:24px;font-weight:700;color:#6EE7B7">{{(contentTypeMap['solarvoice']?.watchHours / totalWatchHours).toFixed(0)}}</span> -->
+                </div>
+                <div class="plat-row" (click)="openPlatformComparView('solarvoice' , false)"><span
+                        class="plat-row-label">Participants</span><span class="plat-row-val"
+                        style="color:#6EE7B7">{{contentTypeMap['solarvoice']?.profileid.size}}</span></div>
+                <div class="plat-row"><span class="plat-row-label">Hours</span><span class="plat-row-val"
+                        style="color:#6EE7B7">{{convertToHours(contentTypeMap['solarvoice']?.watchHours).toFixed(1)}}h</span>
+                </div>
+                <div class="plat-row" (click)="openPlatformComparView('solarvoice' , true)"><span
+                        class="plat-row-label">Completed</span><span class="plat-row-val"
+                        style="color:#6EE7B7">{{(contentTypeMap['solarvoice']?.completed.size)}}</span>
+                </div>
+                <div class="plat-bar-track">
+                    <div class="plat-bar-fill" style="width:100%;background:#6EE7B7"></div>
+                </div>
+                <!-- <div class="insight-box"
+                    style="background:rgba(252,211,77,0.07);border:1px solid rgba(252,211,77,0.18);color:#FCD34D">Strong
+                    platform.
+                    276 users and 1,183h logged. The flagship.</div> -->
+            </div>
+            <div class="card" style="border-color:rgba(147,197,253,0.13)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                    <div>
+                        <div style="font-size:15px;font-weight:700;margin-bottom:3px;color:white">Eiflix</div>
+                        <!-- <div style="font-size:11px;color:#6B7280">224 users · 410h total</div> -->
+                    </div><span class="mono" style="font-size:24px;font-weight:700;color:#93C5FD"></span>
+                </div>
+                <div class="plat-row" (click)="openPlatformComparView('eiflixcontent' , false)"><span
+                        class="plat-row-label">Participant</span><span class="plat-row-val"
+                        style="color:#6EE7B7">{{(contentTypeMap['eiflixcontent']?.profileid.size)}}</span>
+                </div>
+                <div class="plat-row"><span class="plat-row-label">Hours</span><span class="plat-row-val"
+                        style="color:#93C5FD">{{convertToHours(contentTypeMap['eiflixcontent']?.watchHours).toFixed(1)}}h</span>
+                </div>
+                <div class="plat-row" (click)="openPlatformComparView('eiflixcontent' , true)"><span
+                        class="plat-row-label">Completed</span><span class="plat-row-val"
+                        style="color:#FCD34D">{{(contentTypeMap['eiflixcontent']?.completed.size)}}</span></div>
+                <div class="plat-bar-track">
+                    <div class="plat-bar-fill" style="width:100%;background:#93C5FD"></div>
+                </div>
+                <!-- <div class="insight-box"
+                    style="background:rgba(252,211,77,0.07);border:1px solid rgba(252,211,77,0.18);color:#FCD34D">78
+                    Eiflix-only
+                    users have never tried SolarVoice. GONG Trance is the right hook.</div> -->
+            </div>
+            <div class="card" style="border-color:rgba(252,211,77,0.13)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                    <div>
+                        <div style="font-size:15px;font-weight:700;margin-bottom:3px;color: white;">General</div>
+                        <!-- <div style="font-size:11px;color:#6B7280">138 users · 36h total</div> -->
+                    </div><span class="mono" style="font-size:24px;font-weight:700;color:#FCD34D"></span>
+                </div>
+                <div class="plat-row" (click)="openPlatformComparView('generalcontent' , false)"><span
+                        class="plat-row-label">Participant</span><span class="plat-row-val"
+                        style="color:#6EE7B7">{{(contentTypeMap['generalcontent']?.profileid.size)}}</span></div>
+                <div class="plat-row"><span class="plat-row-label">Hours</span><span class="plat-row-val"
+                        style="color:#FCD34D">{{convertToHours(contentTypeMap['generalcontent']?.watchHours).toFixed(1)}}h</span>
+                </div>
+                <div class="plat-row" (click)="openPlatformComparView('generalcontent' , true)"><span
+                        class="plat-row-label">Completed</span><span class="plat-row-val"
+                        style="color:#FCA5A5">{{(contentTypeMap['generalcontent']?.completed.size)}}</span></div>
+
+                <div class="plat-bar-track">
+                    <div class="plat-bar-fill" style="width:100%;background:#FCD34D"></div>
+                </div>
+                <!-- <div class="insight-box"
+                    style="background:rgba(252,165,165,0.07);border:1px solid rgba(252,165,165,0.18);color:#FCA5A5">48%
+                    completion
+                    is the lowest of all platforms. These users need criteria assignment urgently.</div> -->
+            </div>
+        </div>
+
+        <!-- ── PLAYLIST JOURNEY HEALTH ── -->
+        <div class="section-divider">
+            <span class="divider-label">Playlist Journey Health</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="table-card">
+
+            <!-- Card Header -->
+            <div class="card-header">
+                <div>
+                    <div class="card-header-title">Playlist</div>
+                </div>
+            </div>
+
+            <div class="table-scroll">
+                <table mat-table [dataSource]="playListTableDateSource" matSort="playlistsort"
+                    class="playlist-mat-table">
+
+                    <!-- Title Column -->
+                    <ng-container matColumnDef="title">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Playlist</th>
+                        <td mat-cell *matCellDef="let p">
+                            <div class="playlist-name-cell">
+                                <div class="playlist-dot"></div>
+                                <div>
+                                    <div class="playlist-title">{{ p.title }}</div>
+                                </div>
+                            </div>
+                        </td>
+                    </ng-container>
+
+                    <!-- Assigned Column -->
+                    <ng-container matColumnDef="assigned">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Assigned</th>
+                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'profileid')">
+                            <span class="mono stat-val">{{ p?.profileid?.size }}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Started Column -->
+                    <ng-container matColumnDef="started">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Started</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono stat-val started-val">N/A</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Ongoing Column -->
+                    <ng-container matColumnDef="ongoing">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Ongoing</th>
+                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'ongoingProfiles')">
+                            <span class="mono stat-val ongoing-val">{{ p.ongoingProfiles?.size }}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Completed Column -->
+                    <ng-container matColumnDef="completed">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
+                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'completedProfiles')">
+                            <span class="mono stat-val completed-val">{{ p.completedProfiles?.size }}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Not Started Column -->
+                    <ng-container matColumnDef="notstarted">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Not Started</th>
+                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'notStartedProfiles')">
+                            <span class="mono stat-val notstarted-val">{{ p.notStartedProfiles?.size }}</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Avg Watch Time Column -->
+                    <ng-container matColumnDef="avgwatchtime">
+                        <th mat-header-cell *matHeaderCellDef mat-sort-header>Avg Watch Time</th>
+                        <td mat-cell *matCellDef="let p">
+                            <span class="mono avgtime-val">N/A</span>
+                        </td>
+                    </ng-container>
+
+                    <!-- Header & Row definitions -->
+                    <tr mat-header-row *matHeaderRowDef="playListTableColumns; sticky: true"></tr>
+                    <tr mat-row *matRowDef="let p; columns: playListTableColumns;" class="playlist-row" matRipple>
+                    </tr>
+
+                    <!-- No-data row -->
+                    <tr class="mat-row no-data-row" *matNoDataRow>
+                        <td class="mat-cell" [attr.colspan]="playListTableColumns.length">
+                            <div class="empty-state">No playlist data available.</div>
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+
+            <mat-paginator #playlistpagination [pageSizeOptions]="[10,25, 50, 100]" [pageSize]="10" showFirstLastButtons
+                aria-label="Select page">
+            </mat-paginator>
+
+        </div>
+
+        <!-- ── VIDEO PERFORMANCE ── -->
+        <div class="section-divider" id="video-section">
+            <span class="divider-label">Video Performance</span>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="card card-flush">
+            <div class="card-header">
+                <div>
+                    <div class="card-header-title">Content Performance</div>
+                </div>
+            </div>
+            <div class="table-scroll">
+                <div class="table-card">
+                    <div class="table-scroll">
+                        <table mat-table [dataSource]="contentTableDataSource" matSort="contentsort"
+                            class="content-mat-table">
+
+                            <ng-container matColumnDef="rank">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>S.No</th>
+                                <td mat-cell *matCellDef="let i = index">
+                                    <div class="video-title-cell">
+                                        #{{i+1}}
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <!-- Content name -->
+                            <ng-container matColumnDef="content">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Content</th>
+                                <td mat-cell *matCellDef="let c">
+                                    <div class="video-title-cell">
+                                        <div class="video-title">{{ c.contentname }}</div>
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <!-- Source Column -->
+                            <ng-container matColumnDef="source">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Source</th>
+                                <td mat-cell *matCellDef="let c">
+                                    <div class="video-title-cell">
+                                        <div class="video-title">{{ c.from }}</div>
+                                    </div>
+                                </td>
+                            </ng-container>
+
+                            <!-- Watch Hours Column -->
+                            <ng-container matColumnDef="watchhours">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Watch Hours</th>
+                                <td mat-cell *matCellDef="let c">
+                                    <span class="mono hours-val">{{ convertToHours(c.totalWatchHours).toFixed(0)
+                                        }}h</span>
+                                </td>
+                            </ng-container>
+
+                            <!-- Viewers Column -->
+                            <ng-container matColumnDef="viewers">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Viewers</th>
+                                <td mat-cell *matCellDef="let c" (click)="openContentPanelView(c , 'profileid')">
+                                    <span class="mono viewers-val">{{ c.profileid?.size }}</span>
+                                </td>
+                            </ng-container>
+
+                            <!-- Highest Viewer Column -->
+                            <ng-container matColumnDef="hviewer">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Avg Watch Hour</th>
+                                <td mat-cell *matCellDef="let c">
+                                    <span class="mono viewers-val">{{ (convertToHours(c.totalWatchHours) /
+                                        c.profileid?.size).toFixed(2)}}h</span>
+                                </td>
+                            </ng-container>
+
+                            <!-- Completion Column -->
+                            <!-- <ng-container matColumnDef="completion">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Completion</th>
+                                <td mat-cell *matCellDef="let c" style="min-width:130px">
+                                    <div class="prog-wrap">
+                                        <div class="prog-track">
+                                            <div class="prog-fill" [style.width.%]="c.completion"
+                                                [style.background]="completionColor(c.completion)">
+                                            </div>
+                                        </div>
+                                        <span class="prog-label mono" [style.color]="completionColor(c.completion)">
+                                            {{ (c.completedProfiles.size / c.profileid.size).toFixed(1)  }}%
+                                        </span>
+                                    </div>
+                                </td>
+                            </ng-container> -->
+
+                            <ng-container matColumnDef="completion">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
+                                <td mat-cell *matCellDef="let c"
+                                    (click)="openContentPanelView(c , 'completedProfiles')">
+                                    <span class="mono viewers-val">{{c.completedProfiles.size}}</span>
+                                </td>
+                            </ng-container>
+
+                            <!-- Rewatches Column -->
+                            <ng-container matColumnDef="rewatches">
+                                <th mat-header-cell *matHeaderCellDef mat-sort-header>Rewatches</th>
+                                <td mat-cell *matCellDef="let c"
+                                    (click)="openContentPanelView(c , 'rewatchedProfiles')">
+                                    <span class="mono viewers-val">{{ c.rewatchedProfiles.size }}</span>
+                                </td>
+                            </ng-container>
+
+                            <!-- Header & Row definitions -->
+                            <tr mat-header-row *matHeaderRowDef="contentTableColumns; sticky: true"></tr>
+                            <tr mat-row *matRowDef="let v; columns: contentTableColumns;" class="content-row" matRipple>
+                            </tr>
+
+                            <!-- No-data row -->
+                            <tr class="mat-row no-data-row" *matNoDataRow>
+                                <td class="mat-cell" [attr.colspan]="contentTableColumns.length">
+                                    <div class="empty-state">No video data available.</div>
+                                </td>
+                            </tr>
+
+                        </table>
+                    </div>
+
+                    <mat-paginator #contentpagination [pageSizeOptions]="[5,25, 50, 100]" [pageSize]="5"
+                        showFirstLastButtons aria-label="Select page">
+                    </mat-paginator>
+                </div>
+            </div>
+
+    </div><!-- /dash-main -->
+
+</div><!-- /dashboard-root -->
+
+<div class="side-panel">
+    <div class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+    <div class="rp-side-panel" [class.rp-side-panel-open]="sidePanelOpen">
+        <div class="rp-side-panel-header">
+            <h3 class="rp-side-panel-title">{{ sidePanelTitle }}</h3>
+            <!-- <button mat-icon-button class="close-button" (click)="sendWatti()">
+        <i class="fa-brands fa-whatsapp"></i>
+    </button>
+    <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
+        <mat-icon>notifications_active</mat-icon>
+    </button> -->
+            <div style="display:flex;gap:15px;align-items:center;">
+                <button mat-stroked-button (click)="exportPanelData()">Export</button>
+                <button mat-icon-button class="close-button" (click)="closeSidePanel()">
+                    <mat-icon>close</mat-icon>
+                </button>
+            </div>
+        </div>
+        <div class="rp-side-panel-count">{{ sidePanelProfiles.length }} profiles</div>
+        <div class="rp-side-panel-body">
+            <div class="rp-side-panel-item" *ngFor="let p of sidePanelProfiles">
+                <span class="rp-cell-text">{{ p?.name }}</span>
+                <!-- <span *ngIf="p.percentage !== undefined" class="rp-chip">
+        {{ p.percentage }}%
+      </span> -->
+                <!-- <span class="rp-chip" [class.rp-chip-yes]="p.completed" [class.rp-chip-no]="!p.completed">
+        {{ p.completed ? 'Completed' : 'Pending' }}
+      </span> -->
+            </div>
+            <div *ngIf="sidePanelProfiles.length === 0" class="rp-empty" style="padding:32px 0;">
+                <mat-icon>person_off</mat-icon>
+                <p>No profiles found</p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -39,7 +39,7 @@
           <button mat-icon-button class="editbtn" (click)="updateProfile(row)">
             <mat-icon>edit</mat-icon>
           </button>
-          <button mat-icon-button class="editbtn" (click)="toggleRow(row)">
+          <button *ngIf="loggedinProfileRoles['rolemanager'] || loggedinProfileRoles['developer']" mat-icon-button class="editbtn" (click)="toggleRow(row)">
             <mat-icon>account_box</mat-icon>
           </button>
           <button mat-icon-button class="editbtn" [matMenuTriggerFor]="menu" #menuTrigger="matMenuTrigger" aria-label="Example icon-button with a menu">

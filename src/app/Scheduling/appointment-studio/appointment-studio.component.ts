@@ -243,7 +243,7 @@ export class AppointmentStudioComponent {
         // Skip if Cancelled or Marked Attended
         if(appointmentData["cancelled"] || appointmentData["attended"]) continue
 
-        if(eligibleProduct.includes(appointmentData["productid"]) || (this.superRole && appointmentData["onboarding"])){
+        if(eligibleProduct.includes(appointmentData["productid"]) || (this.superRole && appointmentData["journeycoach"])){
           var hostData = []
           var hostNames = []
           var hostID = []
@@ -296,6 +296,9 @@ export class AppointmentStudioComponent {
             }
             else if(appointmentData["onboarding"]){
               upcomingModel.push("Onboarding")
+            }
+            else if(appointmentData["journeycoach"]){
+              upcomingModel.push("Journey Coach")
             }
           }
         }

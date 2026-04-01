@@ -27,6 +27,7 @@ export class uploadingelement {
   description:String | null;
   videoSize:String | null;
   videoSizeBytes:number | null;
+  imagesize:number | null;
   imageUrl:string | null;
   videoUrl:string | null;
   screenshot:string | null
@@ -78,7 +79,7 @@ export class uploadingelement {
 
 export class EpisodesDashboardComponent {
   // displayedColumns: string[] = [ 'Title', 'Description','tags', 'convertedtohls', 'Series', 'Thumbnail', 'Episode', 'Edit', 'Delete'];
-  displayedColumns: string[] = [ 'Title', 'Description','Duration', 'added','tags', 'convertedtohls',  'videosize', 'Series', 'Edit', 'Delete'];
+  displayedColumns: string[] = [ 'Title', 'Referencetitle','Duration', 'added', 'convertedtohls',  'videosize', 'Series', 'Edit', 'Delete'];
   dataSource = new MatTableDataSource();
 
   @ViewChild(MatPaginator) paginator : MatPaginator | any
@@ -204,6 +205,7 @@ export class EpisodesDashboardComponent {
     this.uploadEpisodeDoc.reftitle= doc.reftitle ?? null
     this.uploadEpisodeDoc.videoSize= doc.videoSize ?? null
     this.uploadEpisodeDoc.videoSizeBytes= doc.videoSizeBytes ?? null
+    this.uploadEpisodeDoc.imagesize= doc.imagesize ?? null
     this.uploadEpisodeDoc.description = doc.description ?? null
     this.uploadEpisodeDoc.duration = doc.duration ?? null
     this.uploadEpisodeDoc.tags = doc.tags ?? []
@@ -565,13 +567,19 @@ export class EpisodesDashboardComponent {
         videoSizeBytes = sizeInfo.videoSizeBytes;
         videoSize = sizeInfo.videoSize;
       }
+      let imagesize = episode.imagesize ?? null;
+
+      if (episode.uploadImageFile) {
+        imagesize = episode.uploadImageFile.size ?? null;
+      }
       const episodeData = {
         id: episode.id,
         title: episode.title ?? null,
         reftitle: episode.reftitle ?? null,
         videoUrl: episode.videoUrl ?? null,
         imageUrl: episode.imageUrl ?? null,
-        imagesize: episode.uploadImageFile ? episode.uploadImageFile.size ?? null : null,
+        imagesize: imagesize,
+        // imagesize: episode.uploadImageFile ? episode.uploadImageFile.size ?? null : null,
         // videoSizeBytes: sizeInfo ? sizeInfo.videoSizeBytes : null,
         // videoSize: sizeInfo ? sizeInfo.videoSize : null,
         videoSizeBytes: videoSizeBytes,
