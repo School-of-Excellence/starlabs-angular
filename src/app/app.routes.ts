@@ -102,6 +102,7 @@ export const routes: Routes = [
   {path: 'view-participants-form', loadComponent: () => import('./Participants Profile Management/view-participants-form/view-participants-form.component').then(m => m.ViewParticipantsFormComponent), canActivate:[authGuard]},
   {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
   {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
+  {path: 'content-analytics-dashboard', loadComponent: () => import('./content/content-analytics-dashboard/content-analytics-dashboard.component').then(m => m.ContentAnalyticsDashboardComponent), canActivate:[authGuard]},
   {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
   {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard], children: [
     {path:'addseries', loadComponent: () => import('./content/series-dashboard/add-series/add-series.component').then(m => m.AddSeriesComponent), canActivate: [authGuard]},
