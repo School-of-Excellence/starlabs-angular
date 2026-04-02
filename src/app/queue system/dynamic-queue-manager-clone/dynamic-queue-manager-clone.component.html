@@ -1565,6 +1565,7 @@
             <span *ngIf="selectedReminderFilter === 'overdue'">Overdue Reminders</span>
             <span *ngIf="selectedReminderFilter === 'today'">Today's Reminders</span>
             <span *ngIf="selectedReminderFilter === 'upcoming'">Upcoming Reminders</span>
+            <span *ngIf="selectedReminderFilter === 'completed'">Completed Reminders</span>
           </h2>
           <button mat-icon-button (click)="closeReminderListModal()">
             <mat-icon>close</mat-icon>
@@ -1584,6 +1585,10 @@
           <button class="tab-btn" [class.active]="selectedReminderFilter === 'overdue'"
             (click)="selectedReminderFilter = 'overdue'" *ngIf="overdueReminders.length > 0">
             Overdue ({{overdueReminders.length}})
+          </button>
+          <button class="tab-btn" [class.active]="selectedReminderFilter === 'completed'"
+            (click)="selectedReminderFilter = 'completed'" *ngIf="completedReminders.length > 0">
+            Completed ({{completedReminders.length}})
           </button>
         </div>
 
