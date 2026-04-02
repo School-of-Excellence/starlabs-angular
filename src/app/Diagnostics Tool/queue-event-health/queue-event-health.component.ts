@@ -2,7 +2,7 @@ import { Component , HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updateDoc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updateDoc, serverTimestamp,getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
@@ -15,7 +15,7 @@ import { Firestore } from '@angular/fire/firestore';
   styleUrl: './queue-event-health.component.css'
 })
 export class QueueEventHealthComponent {
-  
+
   /* ================= UI STATE ================= */
 
   showDashboard = false;
@@ -43,6 +43,10 @@ export class QueueEventHealthComponent {
   showQueueDropdown = false;
   queueSearchText = '';
   reportLoaded = false;
+  initiatedNotInQueueDocs: any[] = [];
+  initiatedNotInQueueRecords: any[] = [];
+  initiatedNotInQueuePpUnsub: any;
+  activeView: 'main' | 'initiated_not_in_queue' = 'main';
 
   /* ================= DATA ================= */
 
@@ -97,7 +101,7 @@ export class QueueEventHealthComponent {
     | 'invalid_reason'
     | 'invalid_product'
     | 'invalid_event_status'
-
+    | 'initiated_not_in_queue'
     | null = null;
 
   /* ================= PAGINATION ================= */
@@ -118,7 +122,8 @@ export class QueueEventHealthComponent {
     failed: 0,
     active: 0,
     inactive: 0,
-    shifted:0
+    shifted:0,
+    initiatedNotInQueue: 0
   };
 
   constructor(
@@ -163,7 +168,7 @@ export class QueueEventHealthComponent {
         'performance mode',
         'extended performance mode',
         'after extended performance mode'
-      ].includes(mode)) || status == "shifted" && 
+      ].includes(mode)) || status == "shifted" &&
       epstatus == 'attended'
     ) {
       return {
@@ -275,7 +280,7 @@ export class QueueEventHealthComponent {
 
   calculateDashboardCounts() {
     this.dashboard.total = this.allRecords.length;
-
+    this.dashboard.initiatedNotInQueue = this.initiatedNotInQueueRecords.length;
     this.dashboard.completed = this.allRecords.filter(
       r => r.productStatus?.toLowerCase() === 'completed'
     ).length;
@@ -321,7 +326,7 @@ export class QueueEventHealthComponent {
       return;
     }
 
-    const queueId = this.selectedQueueId; 
+    const queueId = this.selectedQueueId;
     this.lastQueueId = queueId;
 
     //console.log('Queue selected:', queueId);
@@ -340,6 +345,14 @@ export class QueueEventHealthComponent {
     this.paginatedRecords = [];
     this.validationFailures = [];
     this.activeKpiFilter = null;
+    this.initiatedNotInQueueRecords = [];
+    this.initiatedNotInQueueDocs = [];
+    this.activeView = 'main';
+
+    if (this.initiatedNotInQueuePpUnsub) {
+      this.initiatedNotInQueuePpUnsub();
+      this.initiatedNotInQueuePpUnsub = null;
+    }
 
     this.dashboard = {
       total: 0,
@@ -351,7 +364,8 @@ export class QueueEventHealthComponent {
       failed: 0,
       active: 0,
       inactive:0,
-      shifted:0
+      shifted:0,
+      initiatedNotInQueue: 0
     };
   }
 
@@ -437,14 +451,14 @@ export class QueueEventHealthComponent {
           : 'denied';
 
       //Create event participation request
-      // Generate docID 
+      // Generate docID
       const epRef = doc(
         collection(this.firestore, 'event participation request')
       );
 
       // SINGLE atomic write
       await setDoc(epRef, {
-        docid: epRef.id,                     
+        docid: epRef.id,
         doccreateddate: serverTimestamp(),
         eventref: selectedQueueRef,
         productref: productRef,
@@ -456,7 +470,7 @@ export class QueueEventHealthComponent {
       });
 
 
-      // eventparticipationid into participantsproduct 
+      // eventparticipationid into participantsproduct
       const ppQuery = query(
         collection(this.firestore, 'participantsproduct'),
         where('docid', '==', ppid)
@@ -467,7 +481,7 @@ export class QueueEventHealthComponent {
       if (!ppSnap.empty) {
         await updateDoc(ppSnap.docs[0].ref, {
           eventparticipationid: epRef.id,
-          eventref: selectedQueueRef,  
+          eventref: selectedQueueRef,
           arenaeventid: arenaeventid
         });
       } else {
@@ -581,21 +595,185 @@ export class QueueEventHealthComponent {
 
   /* ================= LOAD QUEUES ================= */
 
-  async loadQueues() { 
-    const snap = await getDocs(collection(this.firestore, 'queue generation')); 
-    this.queues = snap.docs .map(d => ({ 
-    id: d.id, ...d.data() })) .sort((a: any, b: any) => { 
-      if (!a.queueenddate) return 1; 
-      if (!b.queueenddate) return -1; 
-      return b.queueenddate.toMillis() - a.queueenddate.toMillis(); 
-    }); 
+  async loadQueues() {
+    const snap = await getDocs(collection(this.firestore, 'queue generation'));
+    this.queues = snap.docs .map(d => ({
+    id: d.id, ...d.data() })) .sort((a: any, b: any) => {
+      if (!a.queueenddate) return 1;
+      if (!b.queueenddate) return -1;
+      return b.queueenddate.toMillis() - a.queueenddate.toMillis();
+    });
   }
 
+  async buildInitiatedNotInQueueRecords() {
+    const queueProductRefIds = new Set<string>(
+      [...this.arenaEventMap.keys()]
+    );
+
+    const tokenPpIds = new Set<string>(
+      this.liveTokens
+        .map(t => t['participantproductid'])
+        .filter(Boolean)
+    );
+
+    const filtered = this.initiatedNotInQueueDocs
+      .filter(pp => {
+        const productRefId = pp.productref?.id ?? null;
+        return productRefId && queueProductRefIds.has(productRefId);
+      })
+      .filter(pp => !tokenPpIds.has(pp.id));
+
+    const resolved = await Promise.all(
+      filtered.map(async (pp) => {
+
+        let participantName = '-';
+        if (pp.profileid) {
+          try {
+            const profileSnap = await getDoc(
+              doc(this.firestore, 'profile_data', pp.profileid)
+            );
+            if (profileSnap.exists()) {
+              const d = profileSnap.data();
+              participantName = d['name'] ?? '-';
+            }
+          } catch (e) {
+            console.warn('Failed to fetch profile_data', pp.profileid, e);
+          }
+        }
+
+        let productName = '-';
+        const productRefId = pp.productref?.id ?? null;
+        if (productRefId) {
+          try {
+            const productSnap = await getDoc(
+              doc(this.firestore, 'products', productRefId)
+            );
+            if (productSnap.exists()) {
+              const d = productSnap.data();
+              productName = d['product'] ?? '-';
+            }
+          } catch (e) {
+            console.warn('Failed to fetch product', productRefId, e);
+          }
+        }
+
+        const epId = pp.eventparticipationid ?? null;
+        let epStatus = 'Not Found';
+
+        if (epId) {
+          try {
+            const epSnap = await getDoc(
+              doc(this.firestore, 'event participation request', epId)
+            );
+            if (epSnap.exists()) {
+              epStatus = epSnap.data()['status'] ?? 'Found (status missing)';
+            }
+          } catch (e) {
+            console.warn('Failed to fetch EP doc', epId, e);
+          }
+        }
+        return {
+          participantName,
+          productName,
+          productStatus: pp.status ?? '-',
+          epStatus,
+          tokenDocId: null,
+          participantproductid: pp.id,
+          eventParticipationId: epId ?? null,
+          selected: false
+        };
+      })
+    );
+
+    this.initiatedNotInQueueRecords = resolved;
+    this.dashboard.initiatedNotInQueue = this.initiatedNotInQueueRecords.length;
+
+    // Reuse main pagination if currently in this view
+    if (this.activeView === 'initiated_not_in_queue') {
+      this.filteredRecords = this.initiatedNotInQueueRecords;
+      this.currentPage = 1;
+      this.calculatePagination();
+    }
+  }
+
+  get initiatedNotInQueueSelectedCount(): number {
+    return this.initiatedNotInQueueRecords.filter(r => r.selected).length;
+  }
+
+  toggleSelectAllInitiated(event: any) {
+    const checked = event.target.checked;
+    this.initiatedNotInQueueRecords.forEach(r => r.selected = checked);
+  }
+
+  // async bulkMarkInitiatedUnattended() {
+  //   const selectedRecords = this.initiatedNotInQueueRecords.filter(r => r.selected);
+
+  //   if (selectedRecords.length === 0) {
+  //     alert('No participants selected');
+  //     return;
+  //   }
+
+  //   const confirmAction = confirm(
+  //     `Are you sure you want to mark ${selectedRecords.length} participant(s) as Unattended?\n\n` +
+  //     `This will:\n` +
+  //     `• Set Product Status → cancelled\n` +
+  //     `• Set Event Participation → unattended (if exists)\n\n` +
+  //     `This action cannot be undone.`
+  //   );
+
+  //   if (!confirmAction) return;
+
+  //   const batch = writeBatch(this.firestore);
+
+  //   for (const record of selectedRecords) {
+  //     // Update participantsproduct → cancelled
+  //     if (record.ppId) {
+  //       const ppRef = doc(this.firestore, 'participantsproduct', record.ppId);
+  //       batch.update(ppRef, {
+  //         status: 'cancelled',
+  //         'statusdate.cancelled': serverTimestamp()
+  //       });
+  //     }
+
+  //     // Update event participation → unattended (only if ep exists)
+  //     if (record.epId) {
+  //       const epRef = doc(
+  //         this.firestore,
+  //         'event participation request',
+  //         record.epId
+  //       );
+  //       batch.update(epRef, {
+  //         status: 'unattended'
+  //       });
+  //     }
+  //   }
+
+  //   await batch.commit();
+
+  //   // Clear selection
+  //   this.initiatedNotInQueueRecords.forEach(r => r.selected = false);
+  // }
   /* ================= LOAD REPORT ================= */
 
   loadReport(queueId: string) {
     this.loading = true;
     this.resetReport();
+    // ---- INITIATED NOT IN QUEUE LISTENER ----
+    if (this.initiatedNotInQueuePpUnsub) this.initiatedNotInQueuePpUnsub();
+
+    this.initiatedNotInQueuePpUnsub = onSnapshot(
+      query(
+        collection(this.firestore, 'participantsproduct'),
+        where('status', '==', 'initiated')
+      ),
+      (snap) => {
+        this.initiatedNotInQueueDocs = snap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+        this.buildInitiatedNotInQueueRecords();
+      }
+    );
 
     const queueRef = doc(this.firestore, 'queue generation', queueId);
       onSnapshot(
@@ -619,7 +797,6 @@ export class QueueEventHealthComponent {
           });
         }
       );
-
 
     // Stop previous listeners
     if (this.tokenUnsub) this.tokenUnsub();
@@ -674,7 +851,7 @@ export class QueueEventHealthComponent {
         ),
         (tokenSnap) => {
           this.liveTokens = tokenSnap.docs.map(d => ({
-            docId: d.id,  
+            docId: d.id,
             ...d.data()
           }));
           this.buildLiveReport();
@@ -705,8 +882,8 @@ export class QueueEventHealthComponent {
         ),
         (epSnap) => {
           this.liveEventParticipationDocs = epSnap.docs.map(d => ({
-            id: d.id,       
-            ...d.data()      
+            id: d.id,
+            ...d.data()
           }));
           this.buildLiveReport();
         }
@@ -720,7 +897,7 @@ export class QueueEventHealthComponent {
     }
   }
 
-    
+
 
   buildLiveReport() {
     this.allRecords = [];
@@ -743,14 +920,14 @@ export class QueueEventHealthComponent {
 
       // ---------------- CREATE RECORD (MISSING PIECE) ----------------
       const record = {
-        tokenDocId: token.docId, 
+        tokenDocId: token.docId,
         selected : false,
         eventParticipationId: eventParticipation?.id ?? null,
         participantName: token['profile_name'] ?? '-',
-        participantproductid: token['participantproductid'], 
-        eventref: token['eventref'],                           
-        productref: token['productref'],                       
-        profileid: token['profile_id'],                        
+        participantproductid: token['participantproductid'],
+        eventref: token['eventref'],
+        productref: token['productref'],
+        profileid: token['profile_id'],
         productName: token['participantproductid']
         ? (token['productname'] ?? '-')
         : 'No Participant Product ID found',
@@ -809,11 +986,11 @@ export class QueueEventHealthComponent {
         a => a.source === 'atc_to_validate'
       ).length;
 
-      console.log(
-        'ATCs for profile',
-        record.profileid,
-        participantATCs
-      );
+      // console.log(
+      //   'ATCs for profile',
+      //   record.profileid,
+      //   participantATCs
+      // );
 
       // ---------------- RUN VALIDATION ----------------
       const validation = this.validateRecord(
@@ -930,7 +1107,7 @@ export class QueueEventHealthComponent {
         ])
       ).values()
     );
-
+    this.buildInitiatedNotInQueueRecords();
     this.prepareDashboard();
     this.applyFilters();
     this.calculateDashboardCounts();
@@ -940,12 +1117,17 @@ export class QueueEventHealthComponent {
   }
 
   get selectedCount(): number {
+    if (this.activeView === 'initiated_not_in_queue') {
+      return this.initiatedNotInQueueRecords.filter(r => r.selected).length;
+    }
     return this.allRecords.filter(r => r.selected).length;
   }
 
   // Mark as Unattended function
   async bulkMarkUnattended() {
-    const selectedRecords = this.allRecords.filter(r => r.selected);
+    const selectedRecords = this.activeView === 'initiated_not_in_queue'
+    ? this.initiatedNotInQueueRecords.filter(r => r.selected)
+    : this.allRecords.filter(r => r.selected);
     if (selectedRecords.length === 0) {
       alert('No participants selected');
       return;
@@ -1021,11 +1203,26 @@ export class QueueEventHealthComponent {
   /* ================= KPI CLICK ================= */
 
   onKpiClick(
-    type: 'completed' | 'initiated' | 'active' | 'inactive' | 'shifted' | 'ongoing' | 'cancelled' | 'valid' | 'invalid' | 'invalid_reason' | 'invalid_product' | 'invalid_event_status'
+    type: 'completed' | 'initiated' | 'active' | 'inactive' | 'shifted' | 'ongoing' | 'cancelled' | 'valid' | 'invalid' | 'invalid_reason' | 'invalid_product' | 'invalid_event_status' | 'initiated_not_in_queue'
   ) {
+    if (type === 'initiated_not_in_queue') {
+      this.activeView =
+        this.activeView === 'initiated_not_in_queue' ? 'main' : 'initiated_not_in_queue';
+
+      if (this.activeView === 'initiated_not_in_queue') {
+        this.filteredRecords = this.initiatedNotInQueueRecords;
+        this.currentPage = 1;
+        this.calculatePagination();
+      } else {
+        this.applyFilters();
+      }
+      return;
+    }
+    this.activeView = 'main';
     this.activeKpiFilter = this.activeKpiFilter === type ? null : type;
     this.applyFilters();
   }
+
 
   /* ================= FILTERS ================= */
 
@@ -1107,7 +1304,7 @@ export class QueueEventHealthComponent {
       String(r.tokenStatus).trim().toLowerCase() !== 'active'
     ) {
       return false;
-    } 
+    }
 
     if (
       this.activeKpiFilter === 'inactive' &&
@@ -1166,7 +1363,7 @@ export class QueueEventHealthComponent {
     this.filteredRecords.sort((a, b) =>
       (a.validationReason || '').localeCompare(b.validationReason || '') ||
       (a.productName || '').localeCompare(b.productName || '') ||
-      (a.eventParticipationStatus || '').localeCompare(b.eventParticipationStatus || '') 
+      (a.eventParticipationStatus || '').localeCompare(b.eventParticipationStatus || '')
     );
   }
 
