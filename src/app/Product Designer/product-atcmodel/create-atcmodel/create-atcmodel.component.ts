@@ -46,7 +46,7 @@ export class CreateAtcmodelComponent {
       description:[null,[Validators.required]],
       category:[[],],
       videourl:[[],],
-      ATC_Directive:[null,[Validators.required]],
+      directive:[null,[Validators.required]],
       docid: [doc(collection(this.firestore, 'atc model')).id]
     })
     const contentCollection = collection(this.firestore, 'content_urls')

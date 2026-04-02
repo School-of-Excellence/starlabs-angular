@@ -28,7 +28,7 @@ import { MatButtonModule } from '@angular/material/button';
 })
 export class ViewAtcmodelComponent {
   private subscription  = new Subject<void>();
-  displayedColumns: string[] = ['atcmodel','evolutiontype','category','description','videourl','edit'];
+  displayedColumns: string[] = ['atcmodel','evolutiontype','category','description','Directive','videourl','edit'];
   dataSource = new MatTableDataSource()
   atcmodelData = []
   @ViewChild(MatPaginator) paginator: MatPaginator;
