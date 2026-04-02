@@ -12,6 +12,8 @@
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingEmailsList.length" matBadgePosition="after" class="ms-2" (click)="sendEmailToSelectedParicipant()"> Queued Emails </button>
     <mat-menu #Checklists="matMenu">
       <button mat-menu-item (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
+      <button mat-menu-item (click)="patchCustomerStatus()">Customer Status</button>
+      <button mat-menu-item (click)="navigateTochecklists('watsonstatus')">Watson Status</button>
     </mat-menu>
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">
@@ -441,19 +443,24 @@
   </section>
 
   <section>
-    <div class="d-flex flex-row">
-      <span  style="margin-top: 30px;">
-        <h3>Total: {{ dataSource.data.length }}</h3>
-      </span>&nbsp;&nbsp;&nbsp;&nbsp;
-      <span>
-        <mat-form-field appearance="fill" style="min-width: 300px;">
-        <mat-label>Filter</mat-label>
-        <input matInput (keyup)="applyFilter($event)" #input>
-      </mat-form-field>
-      </span>&nbsp;&nbsp;&nbsp;&nbsp;
-      <span style="margin-top: 40px;">
-        Selected Participants - {{this.selection.selected.length}}
-      </span>
+    <div style="display:flex; justify-content: space-between; align-items: center;">
+      <div class="d-flex flex-row">
+        <span style="margin-top: 30px;">
+          <h3>Total: {{ dataSource.data.length }}</h3>
+        </span>&nbsp;&nbsp;&nbsp;&nbsp;
+        <span>
+          <mat-form-field appearance="fill" style="min-width: 300px;">
+            <mat-label>Filter</mat-label>
+            <input matInput (keyup)="applyFilter($event)" #input>
+          </mat-form-field>
+        </span>&nbsp;&nbsp;&nbsp;&nbsp;
+        <span style="margin-top: 40px;">
+          Selected Participants - {{this.selection.selected.length}}
+        </span>
+      </div>
+      <!-- <div>
+        <button mat-stroked-button (click)="clearCustomerStatus()">Clear CustomerStatus</button>
+      </div> -->
     </div>
     <div>
       <table #Table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>

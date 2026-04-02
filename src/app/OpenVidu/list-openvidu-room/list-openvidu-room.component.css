@@ -194,7 +194,7 @@
 }
 
 .zoomlaunchbtn {
-  background: linear-gradient(135deg, #28a745, #20c997);
+  background: linear-gradient(135deg, #28a745, #20c997) !important;
   color: white !important;
   border: none;
   padding: 12px 30px;

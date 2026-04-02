@@ -20,7 +20,8 @@
       <h4 *ngIf="![null, undefined, ''].includes(profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation'])" class="stageexplanation">{{profileJourneyProduct['queueData']['stageproperty'][profileJourneyProduct['currentstage']]['stageexplanation']}}</h4>
     </div> -->
 
-    <div style="display: flex;justify-content: center;flex-direction: column;text-align: center;" *ngIf="![null,undefined,''].includes(queueGenerationDoc) && ![null,undefined,''].includes(queueGenerationDoc['queuename']) ">
+    <!-- Queue name hidden when embedded in queue-web -->
+    <div style="display: flex;justify-content: center;flex-direction: column;text-align: center;" *ngIf="![null,undefined,''].includes(queueGenerationDoc) && ![null,undefined,''].includes(queueGenerationDoc['queuename']) && !queueidInput">
       <h2><b>{{queueGenerationDoc['queuename'] || null}}</b></h2>
       <h3  *ngIf="![null, undefined, ''].includes(queueToken['currentstage'])">{{queueToken['currentstage']}}<b></b></h3>
       <!-- <h4 *ngIf="![null, undefined, ''].includes(queueToken['queueposition'])" class="current-label">Queue Position : {{queueToken['queueposition']}}</h4> -->
