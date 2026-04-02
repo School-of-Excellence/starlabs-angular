@@ -113,12 +113,11 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   private eventFilterSearchSub: Subscription | null = null;  
   private videoFilterSearchSub: Subscription | null = null;  
 
+  //Edit
   showEditVideoOverlay = false;
   editVideoIndex: number | null = null;
-  editVideoDocId: string = '';
-  editVideoEventId: string = '';
-  editVideoRecordedDate: Date | null = null;
-  editVideoSaving = false;
+  editVideoForm!: FormGroup;
+  editVideoSaving = false;;
 
   // Bulk import
   activeTab: 'manual' | 'bulk' = 'manual';
@@ -868,24 +867,42 @@ onJourneyFilterChange() {
 
     // Videos with eventref that didn't match any attended event card
     const matchedEventPaths = new Set(eventItems.map(e => (e as any).eventId));
-    const unmatchedEventVideos = Object.entries(videoByEventRef)
-      .filter(([path]) => !matchedEventPaths.has(path))
-      .flatMap(([, videos]) => videos.map((v: any) => {
-        let date: Date | null = null;
-        if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
-        else if (v['recordeddate']) date = new Date(v['recordeddate']);
-        return {
-          type: 'video' as const,
-          eventName: v['title'] || 'Untitled Video',
-          date,
-          hasVideo: true,
-          videoUrl: v['videourl'],
-          videoTitle: v['title'],
-          videoType: v['type'],
-          docId: v['docId'] || null,
-          extraVideos: [],
-        };
-      }));
+    const unmatchedEntries = Object.entries(videoByEventRef)
+      .filter(([path]) => !matchedEventPaths.has(path));
+
+    const unmatchedEventVideos = await Promise.all(
+      unmatchedEntries.flatMap(([path, videos]) =>
+        videos.map(async (v: any) => {
+          let date: Date | null = null;
+          if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
+          else if (v['recordeddate']) date = new Date(v['recordeddate']);
+
+          // Fetch actual event name from Firestore
+          let linkedEventName: string | null = null;
+          try {
+            const eventDoc = await runInInjectionContext(this.injector, () =>
+              getDoc(doc(this.firestore, path))
+            );
+            if (eventDoc.exists()) {
+              linkedEventName = eventDoc.data()['name'] || null;
+            }
+          } catch (e) {}
+
+          return {
+            type: 'video' as const,
+            eventName: v['title'] || 'Untitled Video',
+            date,
+            hasVideo: true,
+            videoUrl: v['videourl'],
+            videoTitle: v['title'],
+            videoType: v['type'],
+            docId: v['docId'] || null,
+            linkedEventName,   // <-- new field
+            extraVideos: [],
+          };
+        })
+      )
+    );
 
     // Merge and sort by date desc
     const allItems = [...eventItems, ...videoItems, ...unmatchedEventVideos];
@@ -1207,11 +1224,14 @@ onJourneyFilterChange() {
 
   openEditVideo(event: any, i: number) {
     this.editVideoIndex = i;
-    this.editVideoDocId = event.docId || '';
-    this.editVideoEventId = event.eventId
-      ? event.eventId.replace('event collection/', '')
-      : '';
-    this.editVideoRecordedDate = event.date || null;
+    this.editVideoForm = this.fb.group({
+      docId: [event.docId || ''],
+      title: [event.videoTitle || event.eventName || '', Validators.required],
+      recordedDate: [event.date || null],
+      type: [event.videoType || 'Event', Validators.required],
+      eventId: [event.eventId ? event.eventId.replace('event collection/', '') : ''],
+      videoUrl: [event.videoUrl || '', Validators.required],
+    });
     this.showEditVideoOverlay = true;
     this.fetchLiveEvents();
   }
@@ -1219,46 +1239,53 @@ onJourneyFilterChange() {
   closeEditVideo() {
     this.showEditVideoOverlay = false;
     this.editVideoIndex = null;
-    this.editVideoDocId = '';
-    this.editVideoEventId = '';
-    this.editVideoRecordedDate = null;
     this.editVideoSaving = false;
   }
 
   async saveEditVideo() {
-    if (!this.editVideoDocId) return;
+    this.editVideoForm.markAllAsTouched();
+    if (!this.editVideoForm.valid) return;
     this.editVideoSaving = true;
 
+    const val = this.editVideoForm.value;
+    const docId = val.docId;
+    if (!docId) return;
+
     try {
-      const eventRef = this.editVideoEventId
-        ? doc(this.firestore, 'event collection', this.editVideoEventId)
+      const eventRef = val.eventId
+        ? doc(this.firestore, 'event collection', val.eventId)
         : null;
 
-      await updateDoc(
-        doc(this.firestore, 'participant videos', this.editVideoDocId),
-        {
-          eventref: eventRef,
-          recordeddate: this.editVideoRecordedDate
-            ? Timestamp.fromDate(new Date(this.editVideoRecordedDate))
-            : null,
-        }
-      );
+      await updateDoc(doc(this.firestore, 'participant videos', docId), {
+        title: val.title,
+        recordeddate: val.recordedDate
+          ? Timestamp.fromDate(new Date(val.recordedDate))
+          : null,
+        type: val.type,
+        eventref: eventRef,
+        videourl: val.videoUrl,
+      });
 
-    this.ngZone.run(() => {
-      if (this.editVideoIndex !== null) {
-        const updated = [...this.logEvents];
-        (updated[this.editVideoIndex] as any)['eventId'] = this.editVideoEventId
-          ? `event collection/${this.editVideoEventId}`
-          : null;
-        updated[this.editVideoIndex].date = this.editVideoRecordedDate;
-        this.logEvents = updated;
-      }
-      this.closeEditVideo();
-      this.fetchRecords();
-      if (this.currentLogProfileId) {
-        this.loadEventLog(this.currentLogProfileId);
-      }
-    });
+      this.ngZone.run(() => {
+        if (this.editVideoIndex !== null) {
+          const updated = [...this.logEvents];
+          updated[this.editVideoIndex] = {
+            ...updated[this.editVideoIndex],
+            videoTitle: val.title,
+            eventName: val.title,
+            date: val.recordedDate ? new Date(val.recordedDate) : null,
+            videoType: val.type,
+            eventId: val.eventId ? `event collection/${val.eventId}` : null,
+            videoUrl: val.videoUrl,
+          };
+          this.logEvents = updated;
+        }
+        this.closeEditVideo();
+        this.fetchRecords();
+        if (this.currentLogProfileId) {
+          this.loadEventLog(this.currentLogProfileId);
+        }
+      });
     } catch (err) {
       console.error('Error updating video:', err);
       this.editVideoSaving = false;
@@ -1322,7 +1349,7 @@ onJourneyFilterChange() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
 
         if (rows.length < 2) {
           this.bulkErrorMessages = ['Excel file is empty or has no data rows.'];

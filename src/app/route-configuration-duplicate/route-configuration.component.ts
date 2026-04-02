@@ -63,20 +63,23 @@ export class RouteConfigurationComponent {
   private expandedData: RouteItem[] = [];
   isAllExpanded = false;
 
+  loggedinProfileRoles = {}
+
   constructor(
     public firestore: Firestore, 
     public dialog: MatDialog, 
     public guard: AuthguardService, 
     public router: Router
   ) {
-    // guard.getRoles().then(roles =>{
+    guard.getRoles().then(roles =>{
+      this.loggedinProfileRoles = roles
     //   if(roles["developer"]){
     //     this.loadData();
     //   }
     //   else{
     //     router.navigateByUrl("/")
     //   }
-    // })
+    })
     this.loadData();
   }
 
@@ -244,7 +247,8 @@ export class RouteConfigurationComponent {
   createRoute(){
     this.dialog.open(CreateroutedialogComponent,{
       data:{
-        fullData:this.originalData
+        fullData:this.originalData,
+        profileroles: this.loggedinProfileRoles
       },
       disableClose:true,
       width:'90%',
@@ -262,7 +266,8 @@ export class RouteConfigurationComponent {
     this.dialog.open(CreateroutedialogComponent,{
       data:{
         editData:editData,
-        fullData:this.originalData
+        fullData:this.originalData,
+        profileroles: this.loggedinProfileRoles
       },
       width:'90%',
       disableClose:true,

@@ -235,7 +235,7 @@
 .form-array-item {
   background-color: #f5f7fa;
   border-radius: 8px;
-  padding: 20px;
+  padding: 28px;
   border: 1px solid #e6e9ed;
   position: relative;
 }
@@ -256,11 +256,20 @@
 .form-array-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .array-field {
-  margin-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.array-field mat-form-field {
+  width: 100%;
+}
+
+.array-field textarea {
+  min-height: 100px !important;
+  resize: vertical;
 }
 
 .array-field h5 {
@@ -352,4 +361,86 @@ mat-error {
   .submit-button {
     width: 100%;
   }
+}
+.form-success-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.form-success-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 48px 40px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.form-success-icon {
+  width: 72px;
+  height: 72px;
+  background: rgba(233,30,99,0.08);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #E91E63;
+}
+
+.form-success-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.form-success-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #E91E63;
+  margin: 0;
+}
+
+.form-success-formname {
+  font-size: 18px;
+  font-weight: 600;
+  color: #222;
+  margin: 0;
+}
+
+.form-success-msg {
+  font-size: 14px;
+  color: #888;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.form-success-btn {
+  margin-top: 8px;
+  background: #E91E63;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.form-success-btn:hover {
+  background: #c2185b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(233,30,99,0.3);
 }

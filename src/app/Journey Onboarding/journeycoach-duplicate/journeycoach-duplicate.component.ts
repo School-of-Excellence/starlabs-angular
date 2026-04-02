@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
 import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take } from 'rxjs';
@@ -147,16 +147,24 @@ export interface DialogContext {
     MatTableModule
   ],
   templateUrl: './journeycoach-duplicate.component.html',
-  styleUrl: './journeycoach-duplicate.component.css'
+  styleUrl: './journeycoach-duplicate.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JourneycoachDuplicateComponent {
   selectedRows: any[] = [];
   Math = Math;
 
+  trackByKey(index: number, item: any) { return item.key; }
+  trackByIndex(index: number) { return index; }
+
   // Add these to your existing properties
   @ViewChild('calendarDialogTemplate') calendarDialogTemplate: TemplateRef<any>;
   @ViewChild('CURADialogTemplate') CURADialogTemplate: TemplateRef<any>;
   @ViewChild('modalTemplate') modalTemplate!: TemplateRef<any>;
+
+  isCalendarOpen = false;
+  isCURAOpen = false;
+  isModalOpen = false;
 
   selectedCalendarDate: Date = new Date();
   currentCalendarMonth: Date = new Date();
@@ -596,6 +604,22 @@ export class JourneycoachDuplicateComponent {
   selectedQueueIds: string[] = [];
   queueList: { id: string; name: string }[] = [];
   journeyTypeFilter: 'all' | 'ecosystem' | 'dfu' = 'all';
+  readonly arTotal = () =>
+    this.originalData['regularstatus'].count +
+    this.originalData['missedstatus'].count +
+    this.originalData['defaultedstatus'].count +
+    this.originalData['lockedstatus'].count +
+    this.originalData['fullypaidstatus'].count;
+
+  // Pre-convert keyvalue maps to arrays after data fetch, e.g.:
+  productCountList: { key: string, value: any[] }[] = [];
+  extendedLifeList: { key: string, value: number }[] = [];
+  totalATCList: { key: string, value: any }[] = [];
+  evolutionprogressList: { key: string, value: any }[] = [];
+  curaActiveTab: number = 0;
+  isAskAHDialogOpen = false;
+  askAHDialogTitle = '';
+  askAHDialogProfiles: any[] = [];
 
   constructor(
     public firestore: Firestore,
@@ -684,7 +708,7 @@ export class JourneycoachDuplicateComponent {
 
       this.fetchData();
       this.loadQueueList();
-
+      this.buildDisplayLists();
       this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -799,8 +823,14 @@ export class JourneycoachDuplicateComponent {
   // Function to check if all data is loaded 
   private checkAllDataLoaded(): void {
     const allLoaded = Object.values(this.loadingStates).every(state => state === true);
+    const loadedCount = Object.values(this.loadingStates).filter(s => s === true).length;
+    const total = Object.keys(this.loadingStates).length;
+
+    this.cdr.markForCheck();
+
     if (allLoaded) {
       this.isLoading = false;
+      this.cdr.markForCheck();
       this.cdr.detectChanges();
     }
   }
@@ -825,6 +855,23 @@ export class JourneycoachDuplicateComponent {
     // this.loadCustomerSupport();
     this.loadModes();
     this.getModes();
+  }
+
+  buildDisplayLists() {
+    this.productCountList = Object.entries(this.productCountMap)
+      .map(([key, value]) => ({ key, value: value as any[] }))
+      .sort((a, b) => b.value.length - a.value.length);
+
+    this.extendedLifeList = Object.entries(this.extendedLifeImpactMap)
+      .filter(([key]) => this.mapprofile[key] != null)
+      .map(([key, value]) => ({ key, value: value as number }))
+      .sort((a, b) => b.value - a.value);
+
+    this.totalATCList = Object.entries(this.totalATC)
+      .map(([key, value]) => ({ key, value }));
+
+    this.evolutionprogressList = Object.entries(this.evolutionprogressMap)
+      .map(([key, value]) => ({ key, value }));
   }
 
   loadQueueList(): void {
@@ -2904,6 +2951,7 @@ export class JourneycoachDuplicateComponent {
   getLoadingProgress(): number {
     const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
     const total = Object.keys(this.loadingStates).length;
+    this.cdr.markForCheck();
     return (loaded / total) * 100;
   }
 
@@ -2956,25 +3004,6 @@ export class JourneycoachDuplicateComponent {
     } else {
       alert("Error Marking, Contact Developer")
     }
-  }
-
-  // Function to open Calendar
-  openCalendarDialog() {
-    const dialogRef = this.dialog.open(this.calendarDialogTemplate, {
-      autoFocus: false,
-      panelClass: 'calendar-dialog-container'
-    });
-
-    this.selectedCalendarDate = new Date();
-    this.onCalendarDateSelected(this.selectedCalendarDate);
-  }
-
-  // Function to open Calendar
-  openCURADialog() {
-    const dialogRef = this.dialog.open(this.CURADialogTemplate, {
-      autoFocus: false,
-      panelClass: 'calendar-dialog-container'
-    });
   }
 
   //Function to switch to previous months in the calendar
@@ -4156,6 +4185,10 @@ export class JourneycoachDuplicateComponent {
       this.evolutionprogressMap = tempEvolutionprogressMap;
       this.processEvolutionProgressFromMap(tempEvolutionProgressProfileMap);
       this.buildHealthOverview();
+
+      this.cdr.markForCheck();
+      this.buildDisplayLists();
+      this.cdr.markForCheck(); 
     });
   }
 
@@ -4202,6 +4235,7 @@ export class JourneycoachDuplicateComponent {
     });
 
     this.evolutionProgressData = { keys, bands, totals };
+    this.cdr.markForCheck();
   }
 
   buildHealthOverview(): void {
@@ -4255,52 +4289,8 @@ export class JourneycoachDuplicateComponent {
 
     // Clear insights — no longer used
     this.healthInsights = [];
+    this.cdr.markForCheck();
   }
-
-  openDialog(key: string) {
-    const config = this.modesList.includes(key) ? this.dialogConfigs['modes'] : this.dialogConfigs[key];
-    if (config) {
-      switch (config.table.dataKey) {
-        case 'avgtoasv':
-          config.table.data = this.avgToASVList;
-          config.avg = this.currentAvgToASV;
-          break;
-        case 'avggsvtoasv':
-          config.table.data = this.avgGSVToASVList;
-          config.avg = this.currentAvgGSVToASV
-          break;
-        case 'avgassured':
-          config.table.data = this.avgAssuredList.map((doc) => ({ ...doc, name: this.mapprofile[doc['profileid']] ?? '-' }));
-          config.table.data.forEach((doc) => {
-          })
-          config.avg = this.avgAssured;
-          break;
-        case 'avgpurchased':
-          config.table.data = this.avgPurchaseList.map((doc) => ({ ...doc, name: this.mapprofile[doc['profileid']] ?? '-' }));
-          config.avg = this.avgPurchase;
-          break;
-        case 'modes':
-          config.title = key;
-          config.table.data = [];
-          if (this.modeMap[key]) {
-            config.table.data = this.modeMap[key].map((id) => ({ name: this.mapprofile[id] ?? '-' }));
-          }
-          break
-        default:
-          break;
-      }
-      config.table.data.sort((a, b) => {
-        const left = a['name']?.trim()?.split(' ')[0];
-        const right = b['name']?.trim()?.split(' ')[0];
-        return left?.localeCompare(right)
-      });
-      this.dialogConfig = config;
-      this.dialog.open(this.modalTemplate, config.dialog).afterClosed().toPromise().then(() => {
-        this.dialogConfig = null;
-      })
-    }
-  }
-
 
   // Function to open the cross over metrics dialog 
   openCrossoverMetricsDialog() {
@@ -4366,18 +4356,18 @@ export class JourneycoachDuplicateComponent {
       const endDateObj = new Date(this.filterEndDate);
       endDateObj.setHours(23, 59, 59, 999);
 
-      const [rawResult, askAHLoveLetterData] = await Promise.all([
-        this.fetchAELAndInterimData(startDateObj, endDateObj),
+      const [askAHLoveLetterData] = await Promise.all([
         this.fetchAskAHAndLoveLetterData(startDateObj, endDateObj)
       ]);
 
-      this.monthSummaries = rawResult.map(r => this.mapRawResultToMonthSummary(r));
+      // this.monthSummaries = rawResult.map(r => this.mapRawResultToMonthSummary(r));
       this.askAHLoveLetterSummary = askAHLoveLetterData;
-
+      this.cdr.markForCheck();
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       this.isFetchingData = false;
+      this.cdr.markForCheck();
     }
   }
 
@@ -5281,5 +5271,139 @@ export class JourneycoachDuplicateComponent {
   getJourneyStatusGrandTotal(): number {
     const matrixTotal = this.filteredJourneyStatusMatrix.reduce((a, j) => a + j.total, 0);
     return matrixTotal + (this.journeyTypeFilter === 'all' ? this.nullStatusProfiles.length : 0);
+  }
+
+  // ── Calendar ──
+  openCalendarDialog(): void {
+    this.selectedCalendarDate = new Date();
+    this.onCalendarDateSelected(this.selectedCalendarDate);
+    this.isCalendarOpen = true;
+    this.cdr.markForCheck();
+  }
+  closeCalendarModal(): void {
+    this.isCalendarOpen = false;
+    this.cdr.markForCheck();
+  }
+
+  // ── CURA ──
+  openCURADialog(): void {
+    this.curaActiveTab = 0;
+    this.isCURAOpen = true;
+    this.cdr.markForCheck();
+  }
+  closeCURAModal(): void {
+    this.isCURAOpen = false;
+    this.cdr.markForCheck();
+  }
+
+  // ── Generic modal (modes, avg days etc.) ──
+  openDialog(key: string): void {
+    const config = this.modesList.includes(key) ? this.dialogConfigs['modes'] : this.dialogConfigs[key];
+    if (!config) return;
+
+    // populate data (keep your existing switch block)
+    switch (config.table.dataKey) {
+      case 'avgtoasv': config.table.data = this.avgToASVList; config.avg = this.currentAvgToASV; break;
+      case 'avggsvtoasv': config.table.data = this.avgGSVToASVList; config.avg = this.currentAvgGSVToASV; break;
+      case 'avgassured': config.table.data = this.avgAssuredList.map(d => ({ ...d, name: this.mapprofile[d['profileid']] ?? '-' })); config.avg = this.avgAssured; break;
+      case 'avgpurchased': config.table.data = this.avgPurchaseList.map(d => ({ ...d, name: this.mapprofile[d['profileid']] ?? '-' })); config.avg = this.avgPurchase; break;
+      case 'modes': config.title = key; config.table.data = (this.modeMap[key] ?? []).map(id => ({ name: this.mapprofile[id] ?? '-' })); break;
+    }
+    config.table.data.sort((a, b) => (a['name'] ?? '').localeCompare(b['name'] ?? ''));
+
+    this.dialogConfig = config;
+    this.isModalOpen = true;
+    this.cdr.markForCheck();
+  }
+  closeModalOverlay(): void {
+    this.isModalOpen = false;
+    this.dialogConfig = null;
+    this.cdr.markForCheck();
+  }
+
+  openAskAHProfileDialog(docs: any[], flagType: string, title: string): void {
+    this.askAHDialogTitle = title;
+
+    if (flagType === 'any') {
+      // All flagged — liked, tagged, opportunity, or critical
+      this.askAHDialogProfiles = docs.filter(d =>
+        d['liked'] || d['tagged'] || d['opportunity'] || d['critical']
+      );
+    } else if (flagType === 'unflagged') {
+      this.askAHDialogProfiles = docs.filter(d =>
+        !d['liked'] && !d['tagged'] && !d['opportunity'] && !d['critical']
+      );
+    } else if (flagType === 'criticalOrTagged') {
+      this.askAHDialogProfiles = docs.filter(d => d['critical'] || d['tagged']);
+    } else {
+      // specific flag: 'liked' | 'tagged' | 'opportunity' | 'critical'
+      this.askAHDialogProfiles = docs.filter(d => d[flagType] === true);
+    }
+
+    this.isAskAHDialogOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  getCombinedAskAHDocs(): any[] {
+    if (!this.askAHLoveLetterSummary) return [];
+    return [
+      ...this.askAHLoveLetterSummary.askAH.docs,
+      ...this.askAHLoveLetterSummary.loveLetter.docs
+    ];
+  }
+
+  private exportToXlsx(rows: any[][], filename: string): void {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Export');
+    XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  exportDialogData(profiles: any[], title: string): void {
+    const rows = [['Name', 'Profile ID', 'Date', 'Changed Count']];
+    profiles.forEach(p => rows.push([p.profileName || p.profileId, p.profileId, p.createdDate || '', String(p.changedCount || '')]));
+    this.exportToXlsx(rows, title.replace(/[^a-zA-Z0-9]/g, '_'));
+  }
+
+  exportHealthDialogData(): void {
+    const keys = this.getHealthDialogKeys();
+    const rows = [['Name', 'Profile ID', ...keys, 'Total']];
+    this.healthDialogProfiles.forEach(p => rows.push([p.profileName, p.profileId, ...keys.map(k => String(p.areas[k] || 0)), String(p.total)]));
+    this.exportToXlsx(rows, `Health_${this.healthDialogTitle}`);
+  }
+
+  exportSubDialogData(): void {
+    const rows = [['Name', 'Profile ID', 'Journey', 'Status', 'Subscription End']];
+    this.subDialogDocs.forEach(d => rows.push([this.mapprofile[d['profileid']] || d['profileid'], d['profileid'], this.getSubJourneyName(d), d['journeystatus'] || '', this.getSubEndDate(d)]));
+    this.exportToXlsx(rows, `Subscription_${this.subDialogTitle}`);
+  }
+
+  exportJourneyStatusDialogData(): void {
+    const rows = [['Name', 'Profile ID', 'Status']];
+    this.journeyStatusDialogProfiles.forEach(p => rows.push([this.mapprofile[p['profileid']] || p['profileid'], p['profileid'], p['customerstatus'] || 'No status']));
+    this.exportToXlsx(rows, `JourneyStatus_${this.journeyStatusDialogTitle}`);
+  }
+
+  exportEpDialogData(): void {
+    const rows = [['Name', 'Profile ID', 'Percentage']];
+    this.epDialogProfiles.forEach(p => rows.push([p.profileName, p.profileId, `${p.pct}%`]));
+    this.exportToXlsx(rows, `EP_${this.epDialogTitle}`);
+  }
+
+  exportAskAHDialogData(): void {
+    const rows = [['Name', 'Profile ID', 'Source', 'Happy', 'Needs Attention', 'Opportunity', 'Critical']];
+    this.askAHDialogProfiles.forEach(p => rows.push([
+      this.mapprofile[p.profileid] || p.profileid, p.profileid,
+      p.source === 'ask AH' ? 'Ask AH' : 'Love Letter',
+      p.liked ? 'Yes' : '', p.tagged ? 'Yes' : '',
+      p.opportunity ? 'Yes' : '', p.critical ? 'Yes' : ''
+    ]));
+    this.exportToXlsx(rows, `AskAH_${this.askAHDialogTitle}`);
+  }
+
+  exportTagDialogData(): void {
+    const rows = [['Name', 'Profile ID']];
+    this.selectedTagProfiles.forEach(p => rows.push([p.name, p.profileId || '']));
+    this.exportToXlsx(rows, `Tag_${this.selectedTagName}`);
   }
 }

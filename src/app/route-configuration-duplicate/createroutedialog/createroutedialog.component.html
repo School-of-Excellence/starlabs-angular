@@ -117,7 +117,7 @@
         matInput
         [(ngModel)]="route"
         placeholder="/example-route"
-        [disabled]="enabled"
+        [disabled]="enabled || loggedProfileRoles['developer'] != true"
       />
     </mat-form-field>
 
@@ -190,6 +190,7 @@
             matInput
             [(ngModel)]="child.route"
             placeholder="/child-route"
+            [disabled]="loggedProfileRoles['developer'] != true"
           />
         </mat-form-field>
 
@@ -262,13 +263,13 @@
             <mat-option [value]="false">No</mat-option>
           </mat-select>
         </mat-form-field>
-        <button mat-icon-button color="warn" (click)="removeChildField(i)">
+        <button *ngIf="loggedProfileRoles['developer']" mat-icon-button color="warn" (click)="removeChildField(i)">
           <mat-icon>remove</mat-icon>
         </button>
       </div>
     </div>
 
-    <button mat-stroked-button color="primary" (click)="addChildField()">
+    <button *ngIf="loggedProfileRoles['developer']" mat-stroked-button color="primary" (click)="addChildField()">
       Add Sub Component
     </button>
   </div>
