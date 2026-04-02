@@ -164,6 +164,7 @@ export class AppointmentStudioComponent {
         var metaData = appointmentData
         metaData["type"] = "appointment"
         metaData["clientname"] = this.mapProfile[appointmentData["bookedby"].id]
+        metaData["docid"] = appointment.id
         metaData["bookingid"] = appointment.id
         metaData["appointmenttype"] = this.mapAppointment[appointmentData["appointment"].id]
         metaData["appointmentid"] = appointmentData["appointment"].id
@@ -422,7 +423,8 @@ export class AppointmentStudioComponent {
           apptData["type"] = "appointment"
           apptData["clientname"] = this.mapProfile[apptData["bookedby"].id]
           apptData['appointmenttype'] = this.mapAppointment[apptData["appointment"].id]
-          apptData['bookingid'] = apptData['docid']
+          apptData['docid'] = lastAppt.id
+          apptData['bookingid'] = lastAppt.id
           apptData["appointmentid"] = apptData["appointment"].id
           apptData["hostdata"] = hostData
           apptData["hostpath"] = hostID
@@ -460,6 +462,7 @@ export class AppointmentStudioComponent {
   }
 
   async updateStatus(appointmentData){
+    console.log(appointmentData)
     var response = this.dialog.open(MarkAppointmentStatusComponent, {
       data: appointmentData,
       disableClose: true,

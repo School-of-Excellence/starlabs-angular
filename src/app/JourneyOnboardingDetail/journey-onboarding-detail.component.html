@@ -1,0 +1,441 @@
+<div class="form-shell">
+
+  <div class="form-header">
+    <h2>Journey Onboarding Setup</h2>
+  </div>
+
+  <!-- ─── Stepper ─────────────────────────────────────────────────── -->
+  <div class="stepper-wrap" *ngIf="!submitted">
+    <div class="step-item"
+      *ngFor="let step of [
+        { n: 1, label: 'Journey Orientation' },
+        { n: 2, label: 'Time Compression' },
+        { n: 3, label: 'Onboarding Detail' }
+      ]"
+      [class.active]="currentSlide === step.n"
+      [class.done]="currentSlide > step.n"
+      (click)="goToSlide(step.n)">
+      <div class="step-circle">
+        <span *ngIf="currentSlide <= step.n">{{ step.n }}</span>
+        <span *ngIf="currentSlide > step.n">✓</span>
+      </div>
+      <div class="step-label">{{ step.label }}</div>
+    </div>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" autocomplete="off">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         SLIDE 1 — classify/journeyorientation
+    ══════════════════════════════════════════════════════════════════ -->
+    <div class="slide-card" *ngIf="currentSlide === 1 && !submitted">
+
+      <h3 class="slide-title">
+        Journey Orientation
+        <span class="collection-tag">classify / journeyorientation</span>
+      </h3>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Duration <span class="req">*</span></mat-label>
+        <input matInput formControlName="duration" placeholder="e.g. 30" />
+        <mat-hint>Stored as string</mat-hint>
+        <mat-error *ngIf="isInvalid('duration')">Duration is required</mat-error>
+      </mat-form-field>
+
+      <!-- introduction: array of maps { title, description } -->
+      <div class="section-label">
+        introduction
+        <span class="array-tag">array of maps</span>
+      </div>
+      <div formArrayName="introduction">
+        <div class="array-card"
+             *ngFor="let item of introductionItems.controls; let i = index"
+             [formGroupName]="i">
+          <div class="array-card-header">
+            <span class="array-index">#{{ i }}</span>
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeIntroItem(i)"
+                    *ngIf="introductionItems.length > 1">✕</button>
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>title</mat-label>
+            <input matInput formControlName="title" placeholder="Personalized Insights" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>description</mat-label>
+            <textarea matInput formControlName="description" rows="3"
+                      placeholder="Tailored content and exercises..."></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+      <button mat-stroked-button type="button" class="add-btn" (click)="addIntroItem()">
+        + Add Introduction Item
+      </button>
+
+      <div class="nav-row">
+        <span></span>
+        <button mat-raised-button color="primary" type="button" (click)="nextSlide()">
+          Next: Time Compression →
+        </button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         SLIDE 2 — classify/timecompression
+    ══════════════════════════════════════════════════════════════════ -->
+    <div class="slide-card" *ngIf="currentSlide === 2 && !submitted">
+
+      <h3 class="slide-title">
+        Time Compression
+        <span class="collection-tag">classify / timecompression</span>
+      </h3>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>intro <span class="req">*</span></mat-label>
+        <textarea matInput formControlName="tc_intro" rows="3"
+                  placeholder="Time compression is the outcome of ATC thinking..."></textarea>
+        <mat-error *ngIf="isInvalid('tc_intro')">Intro is required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>description</mat-label>
+        <textarea matInput formControlName="tc_description" rows="3"
+                  placeholder="Every choice, capability, and experience you develop..."></textarea>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>contentdescription</mat-label>
+        <textarea matInput formControlName="tc_contentdescription" rows="3"
+                  placeholder="Every choice, capability, and experience you develop influences..."></textarea>
+      </mat-form-field>
+
+      <!-- contenturl: array of Firestore references -->
+      <div class="section-label">
+        contenturl
+        <span class="array-tag">array of references</span>
+      </div>
+      <div formArrayName="contenturl">
+        <div class="array-card"
+             *ngFor="let cu of contentUrls.controls; let i = index"
+             [formGroupName]="i">
+          <div class="array-card-header">
+            <span class="array-index">#{{ i }}</span>
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeContentUrl(i)"
+                    *ngIf="contentUrls.length > 1">✕</button>
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Reference Path</mat-label>
+            <input matInput formControlName="path"
+                   placeholder="/content_urls/6jYa37LSRXPZNCdHILt5" />
+            <mat-hint>Firestore document reference path</mat-hint>
+          </mat-form-field>
+        </div>
+      </div>
+      <button mat-stroked-button type="button" class="add-btn" (click)="addContentUrl()">
+        + Add Content URL Reference
+      </button>
+
+      <div class="nav-row">
+        <button mat-stroked-button type="button" (click)="prevSlide()">← Back</button>
+        <button mat-raised-button color="primary" type="button" (click)="nextSlide()">
+          Next: Onboarding Detail →
+        </button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         SLIDE 3 — journeyonboardingdetail/{docid}
+    ══════════════════════════════════════════════════════════════════ -->
+    <div class="slide-card" *ngIf="currentSlide === 3 && !submitted">
+
+      <h3 class="slide-title">
+        Journey Onboarding Detail
+        <span class="collection-tag">journeyonboardingdetail / &#123;docid&#125;</span>
+      </h3>
+
+      <!-- ── docid ── -->
+      <div class="section-label">Document ID</div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>docid <span class="req">*</span></mat-label>
+        <input matInput formControlName="docid" placeholder="e.g. VvbrTX1m51qrsS9piOWK" />
+        <mat-error *ngIf="isInvalid('docid')">docid is required</mat-error>
+      </mat-form-field>
+
+      <!-- ── overviewvideo (ROOT level reference) ── -->
+      <div class="section-label">overviewvideo <span class="ref-tag">reference</span></div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>overviewvideo</mat-label>
+        <input matInput formControlName="overviewvideo"
+               placeholder="/content_urls/BgIBMTVY3GqEggGcvJ5c" />
+        <mat-hint>Firestore reference path (root-level field)</mat-hint>
+      </mat-form-field>
+
+      <!-- ── eventdescripition ── -->
+      <div class="section-label">eventdescripition <span class="map-tag">map</span></div>
+      <div formGroupName="eventdescripition">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>title <span class="req">*</span></mat-label>
+          <input matInput formControlName="title"
+                 placeholder="The uP! Live Event – A Transformative Experience" />
+          <mat-error *ngIf="isInvalid('eventdescripition.title')">Title is required</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>intro <span class="req">*</span></mat-label>
+          <textarea matInput formControlName="intro" rows="4"
+                    placeholder="The 6-day uP! Arena is an immersive program..."></textarea>
+          <mat-error *ngIf="isInvalid('eventdescripition.intro')">Intro is required</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>overview</mat-label>
+          <input matInput formControlName="overview"
+                 placeholder="SuPerior Capabilities Installed for Life:" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>overviewdescripition</mat-label>
+          <textarea matInput formControlName="overviewdescripition" rows="3"
+                    placeholder="Identify unique unconscious patterns..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>goalvideourl <span class="ref-tag">reference</span></mat-label>
+          <input matInput formControlName="goalvideourl"
+                 placeholder="/content_urls/TjifkTgbx1BD4eFucqLO" />
+          <mat-hint>Firestore reference path</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>introduction</mat-label>
+          <textarea matInput formControlName="introduction" rows="3"
+                    placeholder="Prepare YOURSELF for an Extraordinary Evolution..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>introductionvideo <span class="url-tag">url</span></mat-label>
+          <input matInput formControlName="introductionvideo"
+                 placeholder="https://firebasestorage.googleapis.com/..." />
+        </mat-form-field>
+      </div>
+
+      <!-- ── journeydetail ── -->
+      <div class="section-label">journeydetail <span class="map-tag">map</span></div>
+      <div formGroupName="journeydetail">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>intro</mat-label>
+          <textarea matInput formControlName="intro" rows="3"
+                    placeholder="This journey is your pathway..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>descripition</mat-label>
+          <textarea matInput formControlName="descripition" rows="3"
+                    placeholder="Each step is meticulously planned..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>imageurl <span class="url-tag">url</span></mat-label>
+          <input matInput formControlName="imageurl"
+                 placeholder="https://firebasestorage.googleapis.com/..." />
+        </mat-form-field>
+      </div>
+
+      <!-- ── journeypath ── -->
+      <div class="section-label">journeypath <span class="map-tag">map</span></div>
+      <div formGroupName="journeypath">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>intro</mat-label>
+          <textarea matInput formControlName="intro" rows="3"
+                    placeholder="Expect continuous growth..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>descripition</mat-label>
+          <textarea matInput formControlName="descripition" rows="3"
+                    placeholder="Expect continuous growth over the next few months..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>imageurl <span class="url-tag">url</span></mat-label>
+          <input matInput formControlName="imageurl"
+                 placeholder="https://firebasestorage.googleapis.com/..." />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>journeyref <span class="ref-tag">reference</span></mat-label>
+          <input matInput formControlName="journeyref"
+                 placeholder="/journey/YYsg9Lux3oaNjEC8jqex" />
+          <mat-hint>Firestore reference path</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <!-- ── otherdescripition ── -->
+      <div class="section-label">otherdescripition <span class="map-tag">map</span></div>
+      <div formGroupName="otherdescripition">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>title</mat-label>
+          <input matInput formControlName="title"
+                 placeholder="Ongoing Evolution – Your Next Cycles of Mastery" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>descripition</mat-label>
+          <textarea matInput formControlName="descripition" rows="3"
+                    placeholder="After the live event, your Evolution journey doesn't end..."></textarea>
+        </mat-form-field>
+      </div>
+
+      <!-- ── subscription ── -->
+      <div class="section-label">subscription <span class="map-tag">map</span></div>
+      <div formGroupName="subscription">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>descripition</mat-label>
+          <textarea matInput formControlName="descripition" rows="3"
+                    placeholder="The uP! Journey, designed by Antano & Harini..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>imageurl <span class="url-tag">url</span></mat-label>
+          <input matInput formControlName="imageurl"
+                 placeholder="https://firebasestorage.googleapis.com/..." />
+        </mat-form-field>
+      </div>
+
+      <!-- ── productincluded ── -->
+      <div class="section-label">
+        productincluded <span class="array-tag">array of maps</span>
+      </div>
+      <div formArrayName="productincluded">
+        <div class="array-card"
+             *ngFor="let prod of productincluded.controls; let i = index"
+             [formGroupName]="i">
+          <div class="array-card-header">
+            <span class="array-index">#{{ i }}</span>
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeProduct(i)"
+                    *ngIf="productincluded.length > 1">✕</button>
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>title</mat-label>
+            <input matInput formControlName="title"
+                   placeholder="One-On-One Diagnostics & Consultation" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>descripition</mat-label>
+            <textarea matInput formControlName="descripition" rows="3"
+                      placeholder="Personal sessions with EIS..."></textarea>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>type</mat-label>
+            <mat-select formControlName="type">
+              <mat-option *ngFor="let t of productTypeOptions" [value]="t">{{ t }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+      <button mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
+        + Add Product
+      </button>
+
+      <!-- ── queuedescripition ── -->
+      <div class="section-label">queuedescripition <span class="map-tag">map</span></div>
+      <div formGroupName="queuedescripition">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>descripition</mat-label>
+          <textarea matInput formControlName="descripition" rows="3"
+                    placeholder="Excellence Installation Specialists..."></textarea>
+        </mat-form-field>
+        <div class="nested-section-label">atcmodel <span class="map-tag">map</span></div>
+        <div formGroupName="atcmodel">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>title</mat-label>
+            <input matInput formControlName="title"
+                   placeholder="ADJUSTMENT X TIME = CONSEQUENCES" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>descripition</mat-label>
+            <textarea matInput formControlName="descripition" rows="3"
+                      placeholder="At the core of your journey lies the profound ATC Model..."></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- ── processdetails ── -->
+      <div class="section-label">processdetails <span class="map-tag">map</span></div>
+      <div formGroupName="processdetails">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>title</mat-label>
+          <input matInput formControlName="title"
+                 placeholder="Personalized uP! Diagnostics & Consultation" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>descripition</mat-label>
+          <textarea matInput formControlName="descripition" rows="3"
+                    placeholder="Your personalized journey is thoughtfully sequenced..."></textarea>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>processimage <span class="url-tag">url</span></mat-label>
+          <input matInput formControlName="processimage"
+                 placeholder="https://firebasestorage.googleapis.com/..." />
+        </mat-form-field>
+
+        <!-- step: array of maps -->
+        <div class="nested-section-label">step <span class="array-tag">array of maps</span></div>
+        <div formArrayName="step">
+          <div class="array-card"
+               *ngFor="let s of processSteps.controls; let i = index"
+               [formGroupName]="i">
+            <div class="array-card-header">
+              <span class="array-index">Step {{ i }}</span>
+              <button mat-icon-button type="button" color="warn"
+                      (click)="removeProcessStep(i)"
+                      *ngIf="processSteps.length > 1">✕</button>
+            </div>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>title</mat-label>
+              <input matInput formControlName="title" placeholder="Wellness Scaling Form" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>descripition</mat-label>
+              <textarea matInput formControlName="descripition" rows="3"
+                        placeholder="Complete the wellness scaling form..."></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>imageurl <span class="url-tag">url</span></mat-label>
+              <input matInput formControlName="imageurl"
+                     placeholder="https://firebasestorage.googleapis.com/..." />
+            </mat-form-field>
+          </div>
+        </div>
+        <button mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
+          + Add Step
+        </button>
+      </div>
+
+      <!-- ── screenorder ── -->
+      <div class="section-label">screenorder <span class="array-tag">array of strings</span></div>
+      <div class="tag-input-wrap">
+        <span class="tag-pill" *ngFor="let tag of screenorderTags; let i = index">
+          {{ tag }}
+          <span class="tag-remove" (click)="removeTag(i)">✕</span>
+        </span>
+        <input type="text"
+               [(ngModel)]="screenorderInput"
+               [ngModelOptions]="{standalone: true}"
+               (keydown)="onTagKeydown($event)"
+               placeholder="Type & press Enter" />
+      </div>
+
+      <div class="nav-row">
+        <button mat-stroked-button type="button" (click)="prevSlide()">← Back</button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="loading">
+          <span *ngIf="!loading">Save to Firestore ✓</span>
+          <span *ngIf="loading">Saving...</span>
+        </button>
+      </div>
+    </div>
+
+  </form>
+
+  <!-- ─── Success ───────────────────────────────────────────────────── -->
+  <div class="success-card" *ngIf="submitted">
+    <div class="success-icon">✓</div>
+    <h2>All 3 Collections Saved!</h2>
+    <p>
+      Data written to <strong>classify/journeyorientation</strong>,
+      <strong>classify/timecompression</strong>, and
+      <strong>journeyonboardingdetail/{{ form.value.docid }}</strong>.
+    </p>
+    <button mat-stroked-button type="button" (click)="resetForm()">Start New Entry</button>
+  </div>
+
+</div>
