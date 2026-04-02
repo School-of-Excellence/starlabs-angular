@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
 import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
-import { takeUntil, Subject, Subscription, take } from 'rxjs';
+import { takeUntil, Subject, Subscription, take, combineLatest } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, KeyValue } from '@angular/common';
 import { ScheduleDialogComponent } from '../schedule-dialog/schedule-dialog.component';
@@ -620,6 +620,8 @@ export class JourneycoachDuplicateComponent {
   isAskAHDialogOpen = false;
   askAHDialogTitle = '';
   askAHDialogProfiles: any[] = [];
+  askAHSourceFilter: 'all' | 'askAH' | 'loveLetter' = 'all';
+  askAHResolvedFilter: 'all' | 'resolved' | 'unresolved' = 'all';
 
   constructor(
     public firestore: Firestore,
@@ -4345,87 +4347,90 @@ export class JourneycoachDuplicateComponent {
     this.onMonthsCountChange(); // already calls loadInterimData
   }
 
-  private async loadInterimData(): Promise<void> {
+  private loadInterimData(): void {
     if (!this.filterStartDate || !this.filterEndDate) return;
     this.isFetchingData = true;
     this.monthSummaries = [];
     this.activeMonthIndex = 0;
-    try {
-      const startDateObj = new Date(this.filterStartDate);
-      startDateObj.setHours(0, 0, 0, 0);
-      const endDateObj = new Date(this.filterEndDate);
-      endDateObj.setHours(23, 59, 59, 999);
+    this.cdr.markForCheck();
 
-      const [askAHLoveLetterData] = await Promise.all([
-        this.fetchAskAHAndLoveLetterData(startDateObj, endDateObj)
-      ]);
+    const startDateObj = new Date(this.filterStartDate);
+    startDateObj.setHours(0, 0, 0, 0);
+    const endDateObj = new Date(this.filterEndDate);
+    endDateObj.setHours(23, 59, 59, 999);
 
-      // this.monthSummaries = rawResult.map(r => this.mapRawResultToMonthSummary(r));
-      this.askAHLoveLetterSummary = askAHLoveLetterData;
-      this.cdr.markForCheck();
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      this.isFetchingData = false;
-      this.cdr.markForCheck();
-    }
+    this.fetchAskAHAndLoveLetterData(startDateObj, endDateObj);
   }
 
-  private async fetchAskAHAndLoveLetterData(startDate: Date, endDate: Date): Promise<any> {
+  private fetchAskAHAndLoveLetterData(startDate: Date, endDate: Date): void {
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
 
-    const [askAHSnapshot, loveLetterSnapshot] = await Promise.all([
-      getDocs(query(
-        collection(this.firestore, 'ask AH'),
-        where('created', '>=', startTimestamp),
-        where('created', '<=', endTimestamp)
-      )).catch(() => null),
+    const askAHQuery = query(
+      collection(this.firestore, 'ask AH'),
+      where('created', '>=', startTimestamp),
+      where('created', '<=', endTimestamp)
+    );
 
-      getDocs(query(
-        collection(this.firestore, 'love letter'),
-        where('created', '>=', startTimestamp),
-        where('created', '<=', endTimestamp)
-      )).catch(() => null),
-    ]);
+    const loveLetterQuery = query(
+      collection(this.firestore, 'love letter'),
+      where('created', '>=', startTimestamp),
+      where('created', '<=', endTimestamp)
+    );
 
-    const askAHDocs = (askAHSnapshot?.docs ?? []).map(doc => ({
-      id: doc.id,
-      source: 'ask AH',
-      ...doc.data()
-    }));
+    this.subscriptions['askAH']?.unsubscribe();
+    this.subscriptions['askAH'] = combineLatest([
+      collectionData(askAHQuery, { idField: 'id' }),
+      collectionData(loveLetterQuery, { idField: 'id' })
+    ]).subscribe({
+      next: ([askAHRaw, loveLetterRaw]: [any[], any[]]) => {
+        const askAHDocs = askAHRaw.map(doc => ({ ...doc, source: 'ask AH' }));
+        const loveLetterDocs = loveLetterRaw.map(doc => ({ ...doc, source: 'love letter' }));
+        const allDocs = [...askAHDocs, ...loveLetterDocs];
 
-    const loveLetterDocs = (loveLetterSnapshot?.docs ?? []).map(doc => ({
-      id: doc.id,
-      source: 'love letter',
-      ...doc.data()
-    }));
+        this.askAHLoveLetterSummary = {
+          total: allDocs.length,
+          tagged: allDocs.filter(d => d['tagged'] === true).length,
+          opportunity: allDocs.filter(d => d['opportunity'] === true).length,
+          liked: allDocs.filter(d => d['liked'] === true).length,
+          critical: allDocs.filter(d => d['critical'] === true).length,
+          unflagged: allDocs.filter(d => !d['tagged'] && !d['opportunity'] && !d['liked'] && !d['critical']).length,
 
-    const allDocs = [...askAHDocs, ...loveLetterDocs];
+          resolvedTotal: allDocs.filter(d => d['resolved'] === true).length,
+          resolvedLiked: allDocs.filter(d => d['liked'] && d['resolved']).length,
+          resolvedTagged: allDocs.filter(d => d['tagged'] && d['resolved']).length,
+          resolvedOpportunity: allDocs.filter(d => d['opportunity'] && d['resolved']).length,
+          resolvedCritical: allDocs.filter(d => d['critical'] && d['resolved']).length,
 
-    return {
-      total: allDocs.length,
-      tagged: allDocs.filter(d => d['tagged'] === true).length,
-      opportunity: allDocs.filter(d => d['opportunity'] === true).length,
-      liked: allDocs.filter(d => d['liked'] === true).length,
-      critical: allDocs.filter(d => d['critical'] === true).length,
-      askAH: {
-        total: askAHDocs.length,
-        tagged: askAHDocs.filter(d => d['tagged'] === true).length,
-        opportunity: askAHDocs.filter(d => d['opportunity'] === true).length,
-        liked: askAHDocs.filter(d => d['liked'] === true).length,
-        critical: askAHDocs.filter(d => d['critical'] === true).length,
-        docs: askAHDocs
+          askAH: {
+            total: askAHDocs.length,
+            tagged: askAHDocs.filter(d => d['tagged'] === true).length,
+            opportunity: askAHDocs.filter(d => d['opportunity'] === true).length,
+            liked: askAHDocs.filter(d => d['liked'] === true).length,
+            critical: askAHDocs.filter(d => d['critical'] === true).length,
+            resolved: askAHDocs.filter(d => d['resolved'] === true).length,
+            docs: askAHDocs
+          },
+          loveLetter: {
+            total: loveLetterDocs.length,
+            tagged: loveLetterDocs.filter(d => d['tagged'] === true).length,
+            opportunity: loveLetterDocs.filter(d => d['opportunity'] === true).length,
+            liked: loveLetterDocs.filter(d => d['liked'] === true).length,
+            critical: loveLetterDocs.filter(d => d['critical'] === true).length,
+            resolved: loveLetterDocs.filter(d => d['resolved'] === true).length,
+            docs: loveLetterDocs
+          }
+        };
+
+        this.isFetchingData = false;
+        this.cdr.markForCheck();
       },
-      loveLetter: {
-        total: loveLetterDocs.length,
-        tagged: loveLetterDocs.filter(d => d['tagged'] === true).length,
-        opportunity: loveLetterDocs.filter(d => d['opportunity'] === true).length,
-        liked: loveLetterDocs.filter(d => d['liked'] === true).length,
-        critical: loveLetterDocs.filter(d => d['critical'] === true).length,
-        docs: loveLetterDocs
+      error: (err) => {
+        console.error('fetchAskAHAndLoveLetterData error:', err);
+        this.isFetchingData = false;
+        this.cdr.markForCheck();
       }
-    };
+    });
   }
 
   private updateDateRangeHint(): void {
@@ -5322,22 +5327,25 @@ export class JourneycoachDuplicateComponent {
   }
 
   openAskAHProfileDialog(docs: any[], flagType: string, title: string): void {
+    this.askAHSourceFilter = 'all';
+    this.askAHResolvedFilter = 'all';
     this.askAHDialogTitle = title;
 
-    if (flagType === 'any') {
-      // All flagged — liked, tagged, opportunity, or critical
-      this.askAHDialogProfiles = docs.filter(d =>
-        d['liked'] || d['tagged'] || d['opportunity'] || d['critical']
-      );
-    } else if (flagType === 'unflagged') {
-      this.askAHDialogProfiles = docs.filter(d =>
-        !d['liked'] && !d['tagged'] && !d['opportunity'] && !d['critical']
-      );
-    } else if (flagType === 'criticalOrTagged') {
-      this.askAHDialogProfiles = docs.filter(d => d['critical'] || d['tagged']);
-    } else {
-      // specific flag: 'liked' | 'tagged' | 'opportunity' | 'critical'
-      this.askAHDialogProfiles = docs.filter(d => d[flagType] === true);
+    switch (flagType) {
+      case 'liked': this.askAHDialogProfiles = docs.filter(d => d['liked']); break;
+      case 'tagged': this.askAHDialogProfiles = docs.filter(d => d['tagged']); break;
+      case 'opportunity': this.askAHDialogProfiles = docs.filter(d => d['opportunity']); break;
+      case 'critical': this.askAHDialogProfiles = docs.filter(d => d['critical']); break;
+      case 'unflagged': this.askAHDialogProfiles = docs.filter(d => !d['liked'] && !d['tagged'] && !d['opportunity'] && !d['critical']); break;
+      case 'criticalOrTagged': this.askAHDialogProfiles = docs.filter(d => d['critical'] || d['tagged']); break;
+      case 'any': this.askAHDialogProfiles = docs.filter(d => d['liked'] || d['tagged'] || d['opportunity'] || d['critical']); break;
+      // resolved variants — pre-filter then let resolved filter chip refine further
+      case 'likedResolved': this.askAHDialogProfiles = docs.filter(d => d['liked'] && d['resolved']); break;
+      case 'taggedResolved': this.askAHDialogProfiles = docs.filter(d => d['tagged'] && d['resolved']); break;
+      case 'opportunityResolved': this.askAHDialogProfiles = docs.filter(d => d['opportunity'] && d['resolved']); break;
+      case 'criticalResolved': this.askAHDialogProfiles = docs.filter(d => d['critical'] && d['resolved']); break;
+      case 'anyResolved': this.askAHDialogProfiles = docs.filter(d => d['resolved']); break;
+      default: this.askAHDialogProfiles = docs;
     }
 
     this.isAskAHDialogOpen = true;
@@ -5405,5 +5413,23 @@ export class JourneycoachDuplicateComponent {
     const rows = [['Name', 'Profile ID']];
     this.selectedTagProfiles.forEach(p => rows.push([p.name, p.profileId || '']));
     this.exportToXlsx(rows, `Tag_${this.selectedTagName}`);
+  }
+
+  getFilteredAskAHProfiles(): any[] {
+    let list = [...this.askAHDialogProfiles];
+
+    if (this.askAHSourceFilter === 'askAH') {
+      list = list.filter(p => p['source'] === 'ask AH');
+    } else if (this.askAHSourceFilter === 'loveLetter') {
+      list = list.filter(p => p['source'] !== 'ask AH');
+    }
+
+    if (this.askAHResolvedFilter === 'resolved') {
+      list = list.filter(p => p['resolved'] === true);
+    } else if (this.askAHResolvedFilter === 'unresolved') {
+      list = list.filter(p => !p['resolved']);
+    }
+
+    return list;
   }
 }
