@@ -1,4 +1,4 @@
-import { Component ,OnInit} from '@angular/core';
+import { Component, OnInit, Input } from '@angular/core';
 import { Firestore, collection, collectionData,query, where,getDoc,setDoc, getDocs,doc, updateDoc, deleteDoc } from '@angular/fire/firestore';
 import { Storage, ref as afRef, uploadBytes as afUploadBytes, getDownloadURL as afGetDownloadURL } from '@angular/fire/storage';
 import { v4 as uuidv4 } from 'uuid'; // for createId replacement
@@ -34,6 +34,8 @@ export class ParticipantEvolutionMappingComponent {
 
   loading:boolean = true;  
 
+  @Input() queueidInput: string = null;
+  @Input() stagenameInput: string = null;
   queueid:string = null
   queueToken:any = {}
   queueGenerationDoc:any = {}
@@ -97,9 +99,11 @@ export class ParticipantEvolutionMappingComponent {
 
   // getqueueid
   this.route.queryParams.subscribe(async snapshot => {
-    if (![null, undefined, ""].includes(snapshot['queueid'])) {
-      this.queueid = snapshot['queueid'];
-      this.incomingStageName = snapshot['stagename'];
+  const queueidValue = this.queueidInput ?? snapshot['queueid'];
+  const stagenameValue = this.stagenameInput ?? snapshot['stagename'];
+  if (![null, undefined, ""].includes(queueidValue)) {
+    this.queueid = queueidValue;
+    this.incomingStageName = stagenameValue;
 
   if (this.queueid) {
     const queueTokenQuery = query(

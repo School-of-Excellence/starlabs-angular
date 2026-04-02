@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit } from '@angular/core';
+import { Component, inject, Input, OnInit, Output, EventEmitter, ViewChildren, QueryList, ElementRef } from '@angular/core';
 import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -70,7 +70,9 @@ export interface FlippingQuestionValue {
   styleUrl: './formtemplate.component.css'
 })
 export class FormtemplateComponent {
-@Input() participantformtemplateid:any
+  @Input() participantformtemplateid:any
+  @Input() inlineFormId: string = null;
+  @Input() inlineQueueId: string = null;
   // clientform:any
   submittedClientForm
   showcontent : boolean = false
@@ -87,6 +89,12 @@ export class FormtemplateComponent {
   userProfile:any
   queueData:any
   participantQueueToken:any
+  // form submit 
+  submissionComplete: boolean = false;
+  submittedFormName: string = '';
+  
+  @Input() isInline: boolean = false;
+  @Output() formSubmitted = new EventEmitter<void>();
 
   constructor(
     private route : ActivatedRoute,
@@ -99,10 +107,14 @@ export class FormtemplateComponent {
     this.draftDocid = doc(collection(this.firestore,"temporary_forms")).id;
   }
 
+  closeTab(): void {
+    window.close();
+  }
+
   async ngOnInit() {
      // Get queue ID from route params
-    this.queueId = this.route.snapshot.queryParams['queueid'] ?? null;
-    this.formpatch  = ![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null,undefined].includes(this.participantformtemplateid) ? true : false)
+    this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
+    this.formpatch = ![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null,undefined].includes(this.participantformtemplateid) ? true : false)
     
     // Get user ID and roles in constructor
     await this.initializeUserData();
@@ -118,13 +130,14 @@ export class FormtemplateComponent {
     
     // console.log(this.formpatch);
     // this.queueId = this.route.snapshot.queryParams['queueid'] ?? null
-    this.patchformid = this.route.snapshot.queryParams['id']
+    this.patchformid = this.inlineFormId ?? this.route.snapshot.queryParams['id']
+    this.getFormsOption();
     this.profileid = this.route.snapshot.queryParams['profileid'] ?? null
     console.log(this.route.snapshot.queryParams['patchdata']);
     // console.log("queueid",this.queueId);
     console.log(this.route.snapshot.queryParams['id'], "---", this.participantformtemplateid?.formid)
 
-    const deliveryFormsId = this.route.snapshot.queryParams['id'] ?? this.participantformtemplateid.formid
+    const deliveryFormsId = this.inlineFormId ?? this.route.snapshot.queryParams['id'] ?? this.participantformtemplateid?.formid
     const deliveryFormCollectionDoc = doc(collection(this.firestore,'delivery forms'),deliveryFormsId)
     getDoc(deliveryFormCollectionDoc).then(async snap => {
       this.submittedClientForm = snap.data()
@@ -227,7 +240,7 @@ export class FormtemplateComponent {
       // console.log('modified : ',this.submittedClientForm)
     })
   }
-// url + (url.includes('?')?'&':'?') + 'ngsw-bypass';
+  // url + (url.includes('?')?'&':'?') + 'ngsw-bypass';
   private async initializeUserData() {
     try {
       this.currentUserId = await this.auth.getuid();
@@ -358,6 +371,22 @@ export class FormtemplateComponent {
   }
 
   async onSubmit(value: any) {
+    if (this.deliveryForm.invalid) {
+      this.deliveryForm.markAllAsTouched();
+      const firstInvalidControl = Object.keys(this.deliveryForm.controls).find(
+        key => this.deliveryForm.controls[key].invalid
+      );
+      if (firstInvalidControl) {
+        const el = document.querySelector(
+          `[formcontrolname="${firstInvalidControl}"], [ng-reflect-name="${firstInvalidControl}"]`
+        );
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          (el as HTMLElement).focus?.();
+        }
+      }
+      return;
+    }
     const previewRef = this.dialog.open(FormTemplatePreviewComponent, {
       width: '800px',
       maxWidth: '95vw',
@@ -406,6 +435,7 @@ export class FormtemplateComponent {
       this.submittedClientForm['date'] = new Date();
       this.submittedClientForm['docid'] = this.draftDocid;
       this.submittedClientForm["submittedin"] = "starlabs";
+      this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
 
       console.log(this.submittedClientForm);
 
@@ -413,7 +443,17 @@ export class FormtemplateComponent {
       await this.submitFormData(nextstage);
       
       loadingRef.close();
-      this.router.navigateByUrl("/");
+      if (this.queueId) {
+        this.submittedFormName = this.submittedClientForm['formname'];
+        this.submissionComplete = true;
+        if (this.isInline) {
+          setTimeout(() => {
+            this.formSubmitted.emit();
+          }, 1500);
+        }
+      } else {
+        this.router.navigateByUrl("/");
+      }
 
     } catch (error) {
       console.error('Error during form submission:', error);
@@ -663,7 +703,7 @@ export class FormtemplateComponent {
           this.submittedClientForm["editedby"] = roles.profile_ref.id;
           
           this.submittedClientForm['date'] = new Date();
-          this.submittedClientForm['formid'] = this.patchformid;
+          this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
           this.submittedClientForm["submittedin"] = "starlabs";
 
           console.log(this.submittedClientForm);
@@ -708,7 +748,7 @@ export class FormtemplateComponent {
       this.submittedClientForm['queueid'] = this.queueId;
       this.submittedClientForm['date'] = new Date();
       this.submittedClientForm['docid'] = this.draftDocid;
-      this.submittedClientForm['formid'] = this.patchformid;
+      this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
 
       console.log(this.submittedClientForm);
 
@@ -754,47 +794,42 @@ export class FormtemplateComponent {
       }
 
       // If drafts found, open dialog
-      if (draftforms.length !== 0) {
+        if (draftforms.length !== 0) {
+                const form = draftforms[0].data();
+                this.draftDocid = form['docid'];
+
+        const sortedDrafts = draftforms.sort((a, b) => {
+          const dateA = a.data()['date']?.toDate()?.getTime() ?? 0;
+          const dateB = b.data()['date']?.toDate()?.getTime() ?? 0;
+          return dateB - dateA;
+        });
+
         const dialogRef = this.dialog.open(FormOptionComponent, {
-          data: {
-            drafts: draftforms,
-            mapProfile: {}
-          },
-          autoFocus: false,
-          maxHeight: "90vh",
+          data: { drafts: [sortedDrafts[0]] },
           disableClose: true
         });
 
-        dialogRef.afterClosed().subscribe((selectedForm) => {
-          if (selectedForm != null) {
-            const form = selectedForm.doc.data();
-            this.draftDocid = form['docid'];
+        dialogRef.afterClosed().subscribe((result) => {
+          if (result && result.type === 'draft') {
+            const selectedDraft = result.doc.data();
+            this.draftDocid = selectedDraft['docid'];
 
-            // Process form array and populate form controls
             let h = 0;
-            for (let i = 0; i < form['formarray'].length; i++) {
-              const element = form['formarray'][i];
+            for (let i = 0; i < selectedDraft['formarray'].length; i++) {
+              const element = selectedDraft['formarray'][i];
               if (!['label', 'video', 'audio'].includes(element['type'])) {
                 element['formcontrol'] = `control${h}`;
                 h++;
-                console.log("flipping",element,element['flipping'])
-                // Handle different field types
                 if (!['array', 'date'].includes(element['type'])) {
-                  // Regular form controls
                   this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
-                  if(element['flipping'] === true){
-                    this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {}
+                  if (element['flipping'] === true) {
+                    this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {};
                   }
-                  
                 } else if (element['type'] === 'date') {
-                  // Date form controls
-                  const dateValue = (element['value'] !== undefined && element['value'] !== null) 
-                    ? element['value']?.toDate() 
-                    : null;
+                  const dateValue = (element['value'] !== undefined && element['value'] !== null)
+                    ? element['value']?.toDate() : null;
                   this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
-                  
                 } else if (element['type'] === 'array') {
-                  // Array form controls
                   this.processArrayFormControl(element);
                 }
               }

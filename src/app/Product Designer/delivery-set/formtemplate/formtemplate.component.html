@@ -33,7 +33,7 @@
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
           <div class="media-container">
-            <video controls class="media-player">
+            <video controls controlsList="nodownload" class="media-player">
               <source [src]="sanitizer.bypassSecurityTrustResourceUrl(form.options[0])" type="video/mp4">
               Your browser does not support the video tag or check the format should be "mp4".
             </video>
@@ -49,7 +49,7 @@
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
           <div class="media-container">
-            <audio controls class="media-player">
+            <audio controls controlsList="nodownload" class="media-player">
               <source [src]="sanitizer.bypassSecurityTrustResourceUrl(form.options[0])" type="audio/mpeg">
               Your browser does not support the audio tag or check the format should be "mpeg".
             </audio>
@@ -152,8 +152,11 @@
               [placeholder]="form.type == 'MultiSelect' ? 'Select options' : 'Select an option'">
               <mat-option *ngFor="let item of form.options" [value]="item">{{item}}</mat-option>
             </mat-select>
-            <mat-error *ngIf="deliveryForm.get(form.formcontrol)?.hasError('required') || deliveryForm.get(form.formcontrol)?.hasError('maxArrayLength'); else error">
-              Please make a selection - Maximum allowed selections: {{form.maxcount}}.
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol)?.hasError('required')">
+              Please make a selection.
+            </mat-error>
+            <mat-error *ngIf="deliveryForm.get(form.formcontrol)?.hasError('maxArrayLength')">
+              Maximum allowed selections: {{form.maxcount}}.
             </mat-error>
           </mat-form-field>
           <p *ngIf="!['',null,undefined].includes(form.fieldnotes)" class="field-notes">
@@ -388,8 +391,7 @@
                           [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                           (keyup)="autoSave(this.deliveryForm.value)"
                           [placeholder]="'Enter ' + obj.fieldname.toLowerCase()">
-                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required') || getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('email'); else error">
-                          {{getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required') ? "This field is required" : "Please enter a valid email address"}}
+                      <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required') || getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('email')">                          {{getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required') ? "This field is required" : "Please enter a valid email address"}}
                         </mat-error>
                       </mat-form-field>
                     </div>
@@ -409,7 +411,7 @@
                           placeholder="MM/DD/YYYY">
                         <mat-datepicker-toggle matSuffix [for]="j10"></mat-datepicker-toggle>
                         <mat-datepicker #j10></mat-datepicker>
-                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required'); else error">
+                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required')">
                           Please select a date
                         </mat-error>
                       </mat-form-field>
@@ -431,7 +433,7 @@
                           [placeholder]="obj.type == 'MultiSelect' ? 'Select options' : 'Select an option'">
                           <mat-option *ngFor="let item of obj.options" [value]="item">{{item}}</mat-option>
                         </mat-select>
-                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required'); else error">
+                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required')">
                           Please make a selection
                         </mat-error>
                       </mat-form-field>
@@ -450,7 +452,7 @@
                           [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                           (keyup)="autoSave(this.deliveryForm.value)"
                           placeholder="Enter your response"></textarea>
-                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required'); else error">
+                        <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required')">
                           This field is required
                         </mat-error>
                       </mat-form-field>
@@ -469,7 +471,7 @@
                         </span>
                       </mat-checkbox>
                       <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).touched && 
-                                       getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required'); else error">
+                                       getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required')">
                         This checkbox is required
                       </mat-error>
                     </div>
@@ -492,7 +494,7 @@
                           {{list}}
                         </mat-radio-button>
                       </mat-radio-group>
-                      <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).touched && getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required'); else error">
+                      <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).touched && getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required')">
                         Please select an option
                       </mat-error>
                     </div>
@@ -527,11 +529,7 @@
           </p>
         </ng-container>
       </div>
-      <ng-template #error>
-        <mat-error *ngIf="deliveryForm.get(form.formcontrol).errors">
-          {{deliveryForm.get(form.formcontrol).errors | json}}
-        </mat-error>
-      </ng-template>
+      <ng-template #error></ng-template>
     </form>
     
     <!-- Form submission buttons -->
@@ -558,15 +556,9 @@
     </div> -->
     <!-- Form submission buttons with improved styling -->
     <div class="form-actions">
-      <button *ngIf="!formpatch" 
-        mat-raised-button 
-        color="primary" 
-        type="button" 
-        [disabled]="deliveryForm.invalid" 
-        (click)="onSubmit(this.deliveryForm.value)" 
-        class="submit-button">
-        <mat-icon>visibility</mat-icon>
-        Preview & Submit
+      <button *ngIf="!formpatch"  mat-raised-button  color="primary"  type="button"  (click)="onSubmit(this.deliveryForm.value)" class="submit-button">
+          <mat-icon>visibility</mat-icon>
+          Preview & Submit
       </button>
       
       <!-- <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" 
