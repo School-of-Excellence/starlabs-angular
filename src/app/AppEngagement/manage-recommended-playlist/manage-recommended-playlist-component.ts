@@ -64,6 +64,10 @@ import { AuthguardService } from '../../authguard.service';
 export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
   mapPlaylist = {}
   mapPlaylistMeta = {}
+  mapEpisodes = {}
+  mapEpisodesMeta = {}
+  mapAudio = {}
+  mapAudioMeta = {}
   events: any[] = [];
   eventSearchText: string = '';
   selectedEvent: any = null
@@ -354,11 +358,25 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
           this.mapPlaylistMeta[element.id] = element.data();
         }
       }),
+      getDocs(collection(this.firestore, 'episodes')).then(episodeSnap => {
+        for (let i = 0; i < episodeSnap.docs.length; i++) {
+          const element = episodeSnap.docs[i];
+          this.mapEpisodes[element.id] = element.data()['title']
+          this.mapEpisodesMeta[element.id] = element.data();
+        }
+      }),
       getDocs(collection(this.firestore, 'solar voice playlist')).then(solarVoiceSnap => {
         for (let i = 0; i < solarVoiceSnap.docs.length; i++) {
           const element = solarVoiceSnap.docs[i];
           this.mapPlaylist[element.id] = element.data()['name']
           this.mapPlaylistMeta[element.id] = element.data();
+        }
+      }),
+      getDocs(collection(this.firestore, 'solar voice audios')).then(audiosSnap => {
+        for (let i = 0; i < audiosSnap.docs.length; i++) {
+          const element = audiosSnap.docs[i];
+          this.mapAudio[element.id] = element.data()['name']
+          this.mapAudioMeta[element.id] = element.data();
         }
       }),
       getDocs(collection(this.firestore, 'content_urls')).then(contentSnap => {
@@ -508,7 +526,6 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
     });
 
     const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-    // worksheet['!merges'] = merges;
     worksheet['!cols'] = [
       { wch: 25 },
       { wch: 18 },
@@ -548,66 +565,162 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
     metadata?: any;
   }[] = [];
   openContentPanel(
-    groupRow: any,
-    type: 'eiflix' | 'generalcontent' | 'solarvoice',
-    itemIndex: number,
-    status: 'all' | 'completed' | 'notcompleted'
-  ) {
+  groupRow: any,
+  type: 'eiflix' | 'generalcontent' | 'solarvoice',
+  itemIndex: number,
+  status: 'all' | 'completed' | 'notcompleted',
+  sequenceIndex?: number
+) {
+  const contentList: any[] = groupRow[type] || [];
+  const item = contentList[itemIndex];
+  const itemId = item?.id || item;
+  const itemName = this.mapPlaylist[itemId] || itemId;
 
-    const contentList: any[] = groupRow[type] || [];
-    const item = contentList[itemIndex];
-    const itemId = item?.id || item;
-    const itemName = this.mapPlaylist[itemId] || itemId;
-    const sequenceArray = this.mapPlaylistMeta[itemId]['sequence'] || itemId;
-    console.log(itemName,'consoleitemname');
-    console.log(itemId,'consoleitemid');
-    console.log(sequenceArray,'sequenceArray');
-    const completedField = type === 'generalcontent' ? 'completedcontent' : 'completedplaylist';
-    const matchingDocs = this.playlist.filter(
-      p =>
-        p['bufferdocref']?.id === groupRow['docid'] &&
-        p['type'] === type
-    );
+  const completedField = type === 'generalcontent' ? 'completedcontent' : 'completedplaylist';
+  const matchingDocs = this.playlist.filter(
+    p => p['bufferdocref']?.id === groupRow['docid'] && p['type'] === type
+  );
+
+  if (sequenceIndex !== undefined) {
+    const meta = this.mapPlaylistMeta[itemId];
+    const sequenceRefs: any[] = meta?.sequence || [];
+    const seqRef = sequenceRefs[sequenceIndex];
+    const seqId = seqRef?.id || seqRef;
+    const seqName =
+      type === 'solarvoice'
+        ? this.mapAudio[seqId] || seqId
+        : this.mapEpisodes[seqId] || seqId;
 
     let profiles = matchingDocs.map(doc => {
-      const completedIds: string[] = (doc[completedField] || []).map((ref: any) => ref?.id || ref);
-      let percentage: number | undefined = undefined;
-      if (type === 'eiflix' || type === 'solarvoice') {
-        const sequenceIds: string[] = (sequenceArray || []).map((ref: any) => ref?.id || ref);
-        const completedContentIds: string[] = (doc['completedcontent'] || []).map((ref: any) => ref?.id);
-        const totalSequence = sequenceIds.length;
-        if (totalSequence > 0) {
-          const matchedCount = sequenceIds.filter(id =>
-            completedContentIds.includes(id)
-          ).length;
-          percentage = Math.round((matchedCount / totalSequence) * 100);
-        }
-      }
+      const completedContentIds: string[] = (doc['completedcontent'] || []).map((r: any) => r?.id || r);
+      const completed = completedContentIds.includes(seqId);
       return {
         name: this.mapProfile[doc['profileid']] || doc['profileid'],
         profileid: doc['profileid'],
-        completed: completedIds.includes(itemId),
+        completed,
         playlistDoc: doc,
-        percentage,
+        percentage: undefined,
         metadata: this.mapProfileMeta[doc['profileid']] || null
       };
     });
+
     if (status === 'completed') {
       profiles = profiles.filter(p => p.completed);
     } else if (status === 'notcompleted') {
       profiles = profiles.filter(p => !p.completed);
     }
-    const statusLabel =
-      status === 'completed'
-        ? ' — Completed'
-        : status === 'notcompleted'
-        ? ' — Pending'
-        : '';
 
-    this.sidePanelTitle = `${itemName}${statusLabel}`;
+    const statusLabel =
+      status === 'completed' ? ' — Completed' :
+      status === 'notcompleted' ? ' — Pending' : '';
+
+    this.sidePanelTitle = `${itemName} › ${seqName}${statusLabel}`;
     this.sidePanelProfiles = profiles;
     this.sidePanelOpen = true;
+    return;
   }
+
+  const sequenceArray = this.mapPlaylistMeta[itemId]?.['sequence'] || [];
+
+  let profiles = matchingDocs.map(doc => {
+    const completedIds: string[] = (doc[completedField] || []).map((ref: any) => ref?.id || ref);
+    let percentage: number | undefined = undefined;
+
+    if (type === 'eiflix' || type === 'solarvoice') {
+      const sequenceIds: string[] = (sequenceArray || []).map((ref: any) => ref?.id || ref);
+      const completedContentIds: string[] = (doc['completedcontent'] || []).map((ref: any) => ref?.id);
+      const totalSequence = sequenceIds.length;
+      if (totalSequence > 0) {
+        const matchedCount = sequenceIds.filter(id => completedContentIds.includes(id)).length;
+        percentage = Math.round((matchedCount / totalSequence) * 100);
+      }
+    }
+
+    return {
+      name: this.mapProfile[doc['profileid']] || doc['profileid'],
+      profileid: doc['profileid'],
+      completed: (doc[completedField] || []).map((ref: any) => ref?.id || ref).includes(itemId),
+      playlistDoc: doc,
+      percentage,
+      metadata: this.mapProfileMeta[doc['profileid']] || null
+    };
+  });
+
+  if (status === 'completed') {
+    profiles = profiles.filter(p => p.completed);
+  } else if (status === 'notcompleted') {
+    profiles = profiles.filter(p => !p.completed);
+  }
+
+  const statusLabel =
+    status === 'completed' ? ' — Completed' :
+    status === 'notcompleted' ? ' — Pending' : '';
+
+  this.sidePanelTitle = `${itemName}${statusLabel}`;
+  this.sidePanelProfiles = profiles;
+  this.sidePanelOpen = true;
+}
+  // openContentPanel(
+  //   groupRow: any,
+  //   type: 'eiflix' | 'generalcontent' | 'solarvoice',
+  //   itemIndex: number,
+  //   status: 'all' | 'completed' | 'notcompleted'
+  // ) {
+
+  //   const contentList: any[] = groupRow[type] || [];
+  //   const item = contentList[itemIndex];
+  //   const itemId = item?.id || item;
+  //   const itemName = this.mapPlaylist[itemId] || itemId;
+  //   const sequenceArray = this.mapPlaylistMeta[itemId]['sequence'] || itemId;
+  //   console.log(itemName,'consoleitemname');
+  //   console.log(itemId,'consoleitemid');
+  //   console.log(sequenceArray,'sequenceArray');
+  //   const completedField = type === 'generalcontent' ? 'completedcontent' : 'completedplaylist';
+  //   const matchingDocs = this.playlist.filter(
+  //     p =>
+  //       p['bufferdocref']?.id === groupRow['docid'] &&
+  //       p['type'] === type
+  //   );
+
+  //   let profiles = matchingDocs.map(doc => {
+  //     const completedIds: string[] = (doc[completedField] || []).map((ref: any) => ref?.id || ref);
+  //     let percentage: number | undefined = undefined;
+  //     if (type === 'eiflix' || type === 'solarvoice') {
+  //       const sequenceIds: string[] = (sequenceArray || []).map((ref: any) => ref?.id || ref);
+  //       const completedContentIds: string[] = (doc['completedcontent'] || []).map((ref: any) => ref?.id);
+  //       const totalSequence = sequenceIds.length;
+  //       if (totalSequence > 0) {
+  //         const matchedCount = sequenceIds.filter(id =>
+  //           completedContentIds.includes(id)
+  //         ).length;
+  //         percentage = Math.round((matchedCount / totalSequence) * 100);
+  //       }
+  //     }
+  //     return {
+  //       name: this.mapProfile[doc['profileid']] || doc['profileid'],
+  //       profileid: doc['profileid'],
+  //       completed: completedIds.includes(itemId),
+  //       playlistDoc: doc,
+  //       percentage,
+  //       metadata: this.mapProfileMeta[doc['profileid']] || null
+  //     };
+  //   });
+  //   if (status === 'completed') {
+  //     profiles = profiles.filter(p => p.completed);
+  //   } else if (status === 'notcompleted') {
+  //     profiles = profiles.filter(p => !p.completed);
+  //   }
+  //   const statusLabel =
+  //     status === 'completed'
+  //       ? ' — Completed'
+  //       : status === 'notcompleted'
+  //       ? ' — Pending'
+  //       : '';
+
+  //   this.sidePanelTitle = `${itemName}${statusLabel}`;
+  //   this.sidePanelProfiles = profiles;
+  //   this.sidePanelOpen = true;
+  // }
   // openContentPanel(groupRow: any, type: 'eiflix' | 'generalcontent' | 'solarvoice', itemIndex: number, status: 'all' | 'completed' | 'notcompleted') {
   //   console.log('start conosle')
   //   console.log(groupRow)
@@ -647,12 +760,35 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
   closeSidePanel() {
     this.sidePanelOpen = false;
   }
+  // private buildGroupStats() {
+  //   for (const group of this.groupPlaylist) {
+  //     group._stats = {};
+  //     for (const type of ['eiflix', 'generalcontent', 'solarvoice']) {
+  //       const contentList: any[] = group[type] || [];
+  //       const completedField = type === 'generalcontent' ? 'completedcontent' : 'completedplaylist';
+  //       const matchingDocs = this.playlist.filter(
+  //         p => p['bufferdocref']?.id === group['docid'] && p['type'] === type
+  //       );
+  //       const total = matchingDocs.length;
+
+  //       group._stats[type] = contentList.map(item => {
+  //         const itemId = item?.id || item;
+  //         let completed = 0;
+  //         matchingDocs.forEach(d => {
+  //           const ids = (d[completedField] || []).map((r: any) => r?.id || r);
+  //           if (ids.includes(itemId)) completed++;
+  //         });
+  //         return { total, completed, notCompleted: total - completed };
+  //       });
+  //     }
+  //   }
+  // }
   private buildGroupStats() {
     for (const group of this.groupPlaylist) {
       group._stats = {};
+
       for (const type of ['eiflix', 'generalcontent', 'solarvoice']) {
         const contentList: any[] = group[type] || [];
-        const completedField = type === 'generalcontent' ? 'completedcontent' : 'completedplaylist';
         const matchingDocs = this.playlist.filter(
           p => p['bufferdocref']?.id === group['docid'] && p['type'] === type
         );
@@ -660,12 +796,34 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
 
         group._stats[type] = contentList.map(item => {
           const itemId = item?.id || item;
+          const completedField = type === 'generalcontent' ? 'completedcontent' : 'completedplaylist';
+
           let completed = 0;
           matchingDocs.forEach(d => {
             const ids = (d[completedField] || []).map((r: any) => r?.id || r);
             if (ids.includes(itemId)) completed++;
           });
-          return { total, completed, notCompleted: total - completed };
+
+          let sequenceStats: { id: string; completed: number; notCompleted: number }[] = [];
+          if (type === 'eiflix' || type === 'solarvoice') {
+            const meta = this.mapPlaylistMeta[itemId];
+            const sequenceRefs: any[] = meta?.sequence || [];
+            sequenceStats = sequenceRefs.map(seq => {
+              const seqId = seq?.id || seq;
+              let seqCompleted = 0;
+              matchingDocs.forEach(d => {
+                const completedContentIds = (d['completedcontent'] || []).map((r: any) => r?.id || r);
+                if (completedContentIds.includes(seqId)) seqCompleted++;
+              });
+              return {
+                id: seqId,
+                completed: seqCompleted,
+                notCompleted: total - seqCompleted
+              };
+            });
+          }
+
+          return { total, completed, notCompleted: total - completed, sequenceStats };
         });
       }
     }
@@ -1047,4 +1205,20 @@ async sendNotificationinBreakthrough(){
   //     console.error(err);
   //   }
   // }
+  get sortedSidePanelProfiles() {
+    return [...this.sidePanelProfiles].sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? -1 : 1;
+      }
+      
+      const pA = a.percentage ?? -1;
+      const pB = b.percentage ?? -1;
+      return pB - pA;
+    });
+  }
+  getProgressState(p: any): 'not-started' | 'in-progress' | 'completed' {
+    if (p.completed) return 'completed';
+    if (p.percentage !== undefined && p.percentage > 0) return 'in-progress';
+    return 'not-started';
+  }
 }
