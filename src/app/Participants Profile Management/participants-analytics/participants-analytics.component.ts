@@ -159,7 +159,9 @@ export class ParticipantsAnalyticsComponent {
 
   productMap = {};
 
-  queueventList: any[] = []
+  queueventList: any[] = [];
+  queueTokens: any[] = [];
+  queueTokenMap: { [key: string]: any } = [];
   mapfiltervalues = {}
 
   emailList: any[] = []
@@ -176,14 +178,15 @@ export class ParticipantsAnalyticsComponent {
   numberrange = ['age']
   range = ['subscriptionend', 'purchasedate', 'subscriptionstart', 'lastpaymentdate', 'lastsubscriptionstart', 'lastsubscriptionend', 'dateofbirth']
   arrayarray = ['purchase', 'consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags']
-  string = ['kyj', 'customersupport', 'testimonial', 'referred', 'directmailaddress', 'email', 'phonenumber']
+  string = ['kyj', 'testimonial', 'referred', 'directmailaddress', 'email', 'phonenumber'];
+  object = ['customersupport', 'customersupportcategory']
   number = ['atccount', 'totaladjustmentaware', 'totaladjustmentunaware']
   stringarray = ['atcmodel']
   arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'activejourney', 'financialstatus', 'customerstatus', 'lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
   stringmaparray = ['productevent', 'queueevent']
   numbermapnumber = ['productcount']
-  columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray,
-  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks']]
+  columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray,
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'], 'totalpurchasevalue', 'totalpaid', 'balance', 'emi', 'journey']
   filterText = null
   showSectionType = null
   savedfilterquery: any = []
@@ -192,13 +195,20 @@ export class ParticipantsAnalyticsComponent {
   selectedSavedFilterQueryLabel: string
 
   // form parameters
-  filterjourneylist: string
+  filterjourneylist: string;
+  filterparticipantmode: string;
+  filterevent: string;
+  filterqueue: string;
+  filterqueuestage: string;
+  filtercategorys: string;
   journeylist: any = []
 
   filterproductlist: string
   productlist: any[] = []
 
   filterprofiletags: string
+
+  customerSupportCategorys = []
 
   filtertier: string
   tierlist: any[] = []
@@ -227,6 +237,7 @@ export class ParticipantsAnalyticsComponent {
   workshopadmin = [];
 
   fullLoadStarted = false;
+  isModalOpen = false;
   unsubscribeFullSnapshots: (() => void)[] = [];
 
   pendingEmailsList = [];
@@ -330,26 +341,32 @@ export class ParticipantsAnalyticsComponent {
     this.filterdata.age = new numberElement
     this.filterdata.profiletags = [];
 
+    const categorys = new Set();
+
     // Parallel Firestore collections
     const [
       savedFiltersSnap,
       eventSnap,
       queueSnap,
+      queueTokenSnap,
       tierSnap,
       journeySnap,
       modesSnap,
       productsSnap,
       tagsSnap,
+      clientissueSnap,
       metadataSnap
     ] = await Promise.all([
       getDocs(collection(this.firestore, "searchquery")),
       getDocs(collection(this.firestore, "event collection")),
       getDocs(collection(this.firestore, "queue generation")),
+      getDocs(query(collection(this.firestore, "queue_token"), where('stagestatus', '==', 'Approved'), where('tokenstatus', '==', 'Active'))),
       getDocs(collection(this.firestore, "tier")),
       getDocs(collection(this.firestore, "journey")),
       getDocs(collection(this.firestore, "modes")),
       getDocs(collection(this.firestore, "products")),
       getDocs(collection(this.firestore, "participant tags")),
+      getDocs(collection(this.firestore, "clientissue")),
       getDocs(query(collection(this.firestore, "participant metadata"), orderBy('name')))
     ]);
 
@@ -370,6 +387,24 @@ export class ParticipantsAnalyticsComponent {
       element['ref'] = e.ref;
       this.mapfiltervalues[e.id] = element['queuename'];
       return element;
+    });
+
+    // Queue tokens
+    queueTokenSnap.docs.forEach(e => {
+      const element = e.data();
+      // if (element['stagestatus']?.toLowerCase() !== 'approved' && element['tokenstatus']?.toLowerCase() !== 'active') {
+      //   return
+      // }
+      const stage = element['currentstage'];
+      const queueId = element['queueref']?.id || '';
+      element['id'] = e.id;
+      if (!Object.hasOwn(this.queueTokenMap, queueId)) {
+        this.queueTokenMap[queueId] = {}
+      }
+      if (!Object.hasOwn(this.queueTokenMap[queueId], stage)) {
+        this.queueTokenMap[queueId][stage] = []
+      }
+      this.queueTokenMap[queueId][stage].push(element);
     });
 
 
@@ -408,6 +443,15 @@ export class ParticipantsAnalyticsComponent {
       this.mapfiltervalues[e.id] = element['name'];
     })
 
+    // clientissueSnap.docs.forEach((docSnap)=>{
+    //   const ticket = docSnap.data();
+    //   const category = ticket['category'];
+    //   if (category) {
+    //     categorys.add(category)
+    //   }
+    // });
+    // this.customerSupportCategorys = Array.from(categorys);
+
     // Participant metadata
     metadataSnap.docs.forEach(e => {
       const element = e.data();
@@ -421,9 +465,11 @@ export class ParticipantsAnalyticsComponent {
           }
         }
       }
+      Object.values(element['customersupport'] || {}).forEach((t) => categorys.add(t['category']));
       this.emailList.push(element['email'])
       this.dashboardEntireData.push(element)
     })
+    this.customerSupportCategorys = Array.from(categorys.values()).filter((c: any) => ![null, undefined, ''].includes(c));
     loadingref.close();
 
     this.onDataSearch()
@@ -636,6 +682,46 @@ export class ParticipantsAnalyticsComponent {
     }
   }
 
+  onParticipantMode() {
+    if (this.modesList != null) {
+      const filterValue = (this.filterparticipantmode != null && this.filterparticipantmode != '') ? this.filterparticipantmode.trim().toLowerCase() : ''
+      return this.modesList.filter(e => e.mode.trim().toLowerCase().indexOf(filterValue) === 0)
+    }
+    return []
+  }
+
+  onEventSearch() {
+    if (this.productEventList != null) {
+      const filterValue = (this.filterevent != null && this.filterevent != '') ? this.filterevent.trim().toLowerCase() : ''
+      return this.productEventList.filter(e => e.name.trim().toLowerCase().indexOf(filterValue) === 0)
+    }
+    return []
+  }
+
+  onQueueSearch() {
+    if (this.queueventList != null) {
+      const filterValue = (this.filterqueue != null && this.filterqueue != '') ? this.filterqueue.trim().toLowerCase() : ''
+      return this.queueventList.filter(e => e.queuename.trim().toLowerCase().indexOf(filterValue) === 0)
+    }
+    return []
+  }
+
+  onQueueStageSearch() {
+    if (this.queueTokens != null) {
+      const filterValue = (this.filterqueuestage != null && this.filterqueuestage != '') ? this.filterqueuestage.trim().toLowerCase() : ''
+      return this.queueTokens.filter(e => e.trim().toLowerCase().indexOf(filterValue) === 0)
+    }
+    return []
+  }
+
+  onCategorySearch() {
+    if (this.customerSupportCategorys != null) {
+      const filterValue = (this.filtercategorys != null && this.filtercategorys != '') ? this.filtercategorys.trim().toLowerCase() : ''
+      return this.customerSupportCategorys.filter(e => e.trim().toLowerCase().indexOf(filterValue) === 0)
+    }
+    return []
+  }
+
   onfilterproducts() {
     if (this.productlist != null) {
       const filterValue = (this.filterproductlist != null && this.filterproductlist != '') ? this.filterproductlist.trim().toLowerCase() : ''
@@ -664,6 +750,16 @@ export class ParticipantsAnalyticsComponent {
       const filterValue = (this.filtertier != null && this.filtertier != '') ? this.filtertier.trim().toLowerCase() : ''
       return this.tierlist.filter(e => e.tier.toLowerCase().indexOf(filterValue) === 0)
     } else return []
+  }
+
+  handleQueueSelection() {
+    const queue = this.filterdata['queueevent'];
+    let queueStages = [];
+    console.log(Object.hasOwn(this.queueTokenMap, queue))
+    if (queue && Object.hasOwn(this.queueTokenMap, queue)) {
+      queueStages = Object.keys(this.queueTokenMap[queue]);
+    }
+    this.queueTokens = queueStages;
   }
 
   returnFilterText(): void {
@@ -796,7 +892,6 @@ export class ParticipantsAnalyticsComponent {
   async onDataSearch() {
     let loadingref = this.loading
     let data = Object.assign({}, this.filterdata);
-    console.log('data : ',data)
 
     for (const key in data) {
       if (data[key] === null || data[key] === undefined) delete data[key]
@@ -818,6 +913,7 @@ export class ParticipantsAnalyticsComponent {
       for (const key in data) {
         if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products'].includes(key)) {
           if (this.arraystring.includes(key)) { [null, undefined].includes(e[key]) ? e[key] = 'none' : null }
+
           if (e[key] != undefined && e[key] != null) {
             if (this.string.includes(key)) {
               if (data[key].toLowerCase().replace(/\s+/g, '') === e[key].toLowerCase().replace(/\s+/g, '')) { booleanarray.push(true) }
@@ -842,10 +938,18 @@ export class ParticipantsAnalyticsComponent {
             } else if (this.range.includes(key)) {
               if (![null, undefined].includes(e[key])) {
                 // console.log('range', e[key], new Date(data[key]['start']),  new Date(data[key]['end']));
-                console.log('key : ' , e[key].toDate())
-                if (e[key].toDate() >= new Date(data[key]['start']) && e[key].toDate() <= new Date(data[key]['end'])) { booleanarray.push(true) }
-                else { booleanarray.push(false) }
-              } else { booleanarray.push(false) }
+                if (key === 'subscriptionend') {
+                  const date = e['customerstatus'] === 'active'
+                } else {
+                  if (e[key].toDate() >= new Date(data[key]['start']) && e[key].toDate() <= new Date(data[key]['end'])) {
+                    booleanarray.push(true)
+                  }
+                  else {
+                    booleanarray.push(false)
+                  }
+                }
+              }
+              else { booleanarray.push(false) }
             } else if (this.numberrange.includes(key)) {
               if (![null, undefined].includes(e[key])) {
                 if (e[key] >= data[key]['start'] && e[key] <= data[key]['end']) { booleanarray.push(true) }
@@ -853,7 +957,10 @@ export class ParticipantsAnalyticsComponent {
               } else { booleanarray.push(false) }
             } else if (this.stringmaparray.includes(key)) {
               if ([null, undefined].includes(this.filterdata['products'])) {
-                if ([].concat.apply([], Object.values(e[key])).includes(data[key])) { booleanarray.push(true) }
+                console.log([].concat.apply([], Object.keys(e[key])), data[key])
+                if ([].concat.apply([], Object.values(e[key])).includes(data[key])) {
+                  booleanarray.push(true)
+                }
                 else { booleanarray.push(false) }
               } else {
                 if (![null, undefined].includes(e[key])) {
@@ -864,10 +971,45 @@ export class ParticipantsAnalyticsComponent {
                 }
               }
             }
+          } else if (this.object.includes(key)) {
+            if (key === 'customersupport') {
+              const matches = Object.values(e['customersupport'] || {}).some((t) => t['status']?.toLowerCase() === data['customersupport']);
+              if (matches) {
+                booleanarray.push(true)
+              } else {
+                booleanarray.push(false)
+              }
+            } else if (key === 'customersupportcategory') {
+              const matches = Object.values(e['customersupport'] || {}).some((t) => {
+                console.log(t['category']?.toLowerCase() === data['customersupportcategory'])
+                return t['category']?.toLowerCase() === data['customersupportcategory']
+              });
+              if (matches) {
+                booleanarray.push(true)
+              } else {
+                booleanarray.push(false)
+              }
+            }
           } else {
             booleanarray.push(false)
           }
         }
+
+        if (key === 'queuestage' && ![null, undefined, ''].includes(data['queueevent']) && ![null, undefined, ''].includes(data['queuestage'])) {
+          const queue = data['queueevent'];
+          const stage = data['queuestage'];
+          if (this.queueTokenMap[queue] && this.queueTokenMap[queue][stage]) {
+            const matches = this.queueTokenMap[queue][stage]?.some((t) => e['profileid'] === t['profile_id']);
+            if (matches) {
+              booleanarray.push(true)
+            } else {
+              booleanarray.push(false)
+            }
+          } else {
+            booleanarray.push(false)
+          }
+        }
+
       }
 
       if (!booleanarray.includes(false)) {
@@ -882,7 +1024,7 @@ export class ParticipantsAnalyticsComponent {
       if (!booleanarray.includes(false)) {
         return e
       } else {
-        console.log(e)
+        // console.log(e)
         // console.log(booleanarray);
         // console.log(!booleanarray.includes(false));
       }
@@ -912,7 +1054,8 @@ export class ParticipantsAnalyticsComponent {
 
 
   saveSearchedFilter(value) {
-    // console.log(this.filterdata);
+    this.closeModal()
+
     let loadingref = this.loading
     let data = Object.assign({}, this.filterdata)
     for (const key in data) {
@@ -946,6 +1089,7 @@ export class ParticipantsAnalyticsComponent {
         data['createdby'] = this.loggedInProfileId
         setDoc(doc(this.firestore, "searchquery", data['docid']), data, { merge: true }).then(() => {
           console.log("successfully saved search querysubmitted ");
+          this.savedfilterquery.push(data)
           loadingref.close()
         })
       } else {
@@ -2004,8 +2148,8 @@ export class ParticipantsAnalyticsComponent {
           console.log('Dialog closed with result:', result);
         }
       });
-    } else if(type==='watsonstatus'){
-      let data = this.dashboardEntireData.filter(p =>['late' , 'banned' ,'discontinued'].includes(p?.customerstatus) && p?.customerstatus !== p.financialstatus)
+    } else if (type === 'watsonstatus') {
+      let data = this.dashboardEntireData.filter(p => ['late', 'banned', 'discontinued'].includes(p?.customerstatus) && p?.customerstatus !== p.financialstatus)
       const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
         width: '90vw',
         height: '80vh',
@@ -2031,21 +2175,21 @@ export class ParticipantsAnalyticsComponent {
   }
 
   // function to patch participant with no customer status
-  patchCustomerStatus(){ 
+  patchCustomerStatus() {
     this.onformreset();
     this.selection.clear();
-    const participants = this.dataSource.data.filter((p : any)=>[null , undefined , ''].includes(p?.customerstatus));
+    const participants = this.dataSource.data.filter((p: any) => [null, undefined, ''].includes(p?.customerstatus));
     this.selection.select(...participants);
     this.dataSource.data = participants;
   }
 
   // function to clear participant with no customer status active option
-  clearCustomerStatus(){
+  clearCustomerStatus() {
     this.selection.clear();
     this.onDataSearch();
   }
 
-  openWatsonCustomerStatus(){
+  openWatsonCustomerStatus() {
 
   }
 
@@ -2122,7 +2266,7 @@ export class ParticipantsAnalyticsComponent {
         unconsumed: this.filterByProducts.unconsumed,
         participants,
         productsFilteredData: Object.values(this.filterByProducts.participants),
-        rawProductsData : this.filterByProducts.rawProductsData
+        rawProductsData: this.filterByProducts.rawProductsData
       }
     }).afterClosed().subscribe((data) => {
       if (data) {
@@ -2522,6 +2666,37 @@ export class ParticipantsAnalyticsComponent {
     }
     data.participants = participants;
     this.filterByProducts = data;
+  }
+
+  openModal() {
+    this.isModalOpen = true;
+  }
+
+  closeModal() {
+    this.isModalOpen = false;
+  }
+
+  onBackdropClick(event: MouseEvent) {
+    if ((event.target as HTMLElement).classList.contains('backdrop')) {
+      this.closeModal();
+    }
+  }
+
+  clearField() {
+    this.filterdata['label'] = '';
+  }
+
+  calculateAge(d: any) {
+    const date = d?.toDate ? d.toDate() : d;
+    const currentDate: Date = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    if (!date?.toDateString) {
+      return ''
+    }
+    const age = (currentDate.getFullYear() - date.getFullYear()) - 1;
+    date.setFullYear(currentDate.getFullYear());
+    console.log(date, currentDate)
+    return date <= currentDate ? age + 1 : age;
   }
 
   // rawProductsData
