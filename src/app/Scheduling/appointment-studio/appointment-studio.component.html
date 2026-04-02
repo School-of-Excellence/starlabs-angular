@@ -56,18 +56,33 @@
               <p *ngFor="let host of appointment.meta.hostRole | keyvalue">
                 <strong>{{mapRoles[$any(host.key)]}}:</strong> <span *ngFor="let specialist of $any(host.value); let isLast = last">{{mapProfile[specialist.id]}}{{!isLast ? ", " : ""}}</span>
               </p>
+              <p>
+                <strong>Streaming Platform:</strong>
+                <label *ngIf="superRole; else platform">
+                  <label [class.zoomenable]="appointment.meta['platform'] == 'zoom'">Zoom </label>
+                  <mat-slide-toggle class="platformtoggle" [checked]="appointment.meta['platform'] == 'openvidu'" (change)="onPlatformChange($event.checked, appointment.meta)"></mat-slide-toggle>
+                  <label [class.openviduenable]="appointment.meta['platform'] == 'openvidu'">Openvidu</label>
+                </label>
+
+                <ng-template #platform>
+                  <label [ngClass]="appointment.meta['platform'] == 'zoom' ? 'zoomenable' : 'openviduenable'">
+                    {{appointment.meta['platform'] == 'zoom' ? "Zoom" : "OpenVidu"}}
+                  </label>
+                </ng-template>
+              </p>
             </div>
           </div>
 
           <div *ngIf="i == 0">
-            <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 15; else watingmessage">
+            <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 5; else watingmessage">
               <div>
                 <button class="zoomlaunchbtn" mat-button (click)="startMeeting(appointment)">Launch Meeting Now</button>
+                <button class="ms-4 journeyplanbtn" mat-button (click)="openJourneyPlan(appointment)">Open Journey Plan</button>
               </div>
             </div>
             <ng-template #watingmessage>
               <div class="zoomcontent">
-                The meeting will be enabled 15 minutes before the appointment start time.
+                The meeting will be enabled 5 minutes before the appointment start time.
               </div>
             </ng-template>
           </div>

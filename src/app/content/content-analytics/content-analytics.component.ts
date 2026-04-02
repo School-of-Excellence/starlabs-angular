@@ -1,18 +1,11 @@
-import { Component, ViewChild, OnDestroy } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { Subject } from 'rxjs';
+import { async, Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
-import {
-  collection,
-  Firestore,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  query,
-  where
-} from '@angular/fire/firestore';
+import { collection, collectionSnapshots, Firestore, getDocs, onSnapshot, orderBy, query, where } from '@angular/fire/firestore';
+import { log } from 'console';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -22,8 +15,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatOptionModule } from '@angular/material/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { UserAnalyticsDialogComponent } from './user-analytics-dialog/user-analytics-dialog.component';
 
 @Component({
   selector: 'app-content-analytics',
@@ -41,83 +35,299 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     MatIconModule,
     MatSelectModule,
     MatTabsModule,
-    MatProgressSpinnerModule
-  ],
-  templateUrl: './content-analytics.component.html',
+    MatDialogModule
+  ],  templateUrl: './content-analytics.component.html',
   styleUrl: './content-analytics.component.css'
 })
-export class ContentAnalyticsComponent implements OnDestroy {
+export class ContentAnalyticsComponent {
 
-  contentAnalytics: any[] = [];
-  mapProfile: { [key: string]: string } = {};
-  mapProfileNew: { [key: string]: string } = {};
-
+  contentAnalytics=[];
+  mapProfile = {}
+  mapProfileData = {}
+  //newuser
+  mapProfileNew = {}
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
-
-  displayedColumns: string[] = [
-    'logdate', 'profileid', 'from', 'videoname',
-    'platform_name', 'totalruntime', 'lastwatchedtime',
-    'totaltimespend', 'type', 'playlist', 'status'
-  ];
-
-  contentData = new MatTableDataSource<any>();
-
+  // displayedColumns: string[] = ['profileid','from','lastwatchedtime','logdate','totalruntime','totaltimespend','type','videoname'];
+  displayedColumns: string[] = ['logdate','profileid','from','videoname','platform_name','totalruntime','lastwatchedtime','totaltimespend','type','playlist','status'];
+  contentData = new MatTableDataSource();
   startDate: Date;
   endDate: Date;
-  mapPlaylist: { [key: string]: string } = {};
+  mapPlaylist ={}
 
   filterValue = {
-    name: null,
-    startdate: null,
-    enddate: null,
-    from: null,
-    videoname: [],
-    totaltimespend: null,
-    platform_name: null
-  };
+    name:null,
+    startdate:null,
+    enddate:null,
+    from:null,
+    videoname:[],
+    totaltimespend:null,
+    platform_name:null
+  }
 
-  videoNameList: string[] = [];
-  fromScreenList: string[] = [];
-  platformNameList: string[] = [];
-
+  videoNameList = []
+  fromScreenList = []
+  platformNameList = []
   private subscription = new Subject<void>();
-  private unsubscribeContentAnalytics: (() => void) | null = null;
-  uniqueuser: number | null = null;
-  uniqueUserContentConsumptionbyhours: string | null = null;
-  uniqueUserContentConsumptionbydays: string | null = null;
-  averageTimeSpendPerUser: string | null = null;
-  querydays: number | null = null;
-
-  isLoading = false;
-  hasFetched = false;
+  uniqueuser = 0
+  uniqueUserContentConsumptionbyhours:any = 0
+  uniqueUserContentConsumptionbydays:any = 0
+  averageTimeSpendPerUser:any = 0
+  querydays:any = null
+  unsubscribeContentAnalytics: any;
 
   seriesDataList: any[] = [];
+  journey: any[] = [];
+  journeyMap: any = {};
   tierData :any[] = [];
+  participantanalyticsdata :any[] = [];
   tiermap: any = {};
+  isInitialLoadDone = false;
+  tierLoading = false;
+  viewMode = 'participant';
+  tierCompletionMap: any = {};
+  tierParticipantSummary: any = {};
+  journeyWiseData: any = {};
 
+
+    allTierCompletionMap: any = {};
+    allTierParticipantSummary: any = {};
+    allTierStats: typeof this.tierStats = {};
+    allTierSearchQuery = '';
+    allTierViewMode: 'series' | 'participant' = 'participant';
+    allCardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
+    allTierLoading = false;
+  
   constructor(
     public firestore: Firestore,
-    private guard: AuthguardService
-  ) {
-    const today = new Date();
-    this.startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
-    this.endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-    this.guard.getProfileMap().then(e => {
-      this.mapProfile = e.map;
-    });
+    private guard : AuthguardService,
+    private dialog: MatDialog
+  ){
+    this.startDate = new Date(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate() -7));
+    this.endDate = new Date(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()));
+    this.guard.getParticipantMetaMap().then(e => {
+      this.mapProfile = e.map
+      this.mapProfileData = e.docdata
+    })
+    //newuser
     this.guard.getProfileMapNewUser().then(newuser => {
-      this.mapProfileNew = newuser.map;
-    });
-
+      this.mapProfileNew = newuser.map
+    })
+    this.filterData();
+    this.seriesData();
+    this.querydays = Math.round((Math.abs(new Date(this.endDate).getTime() - new Date(this.startDate).getTime()))/(1000*60*60*24))
   }
 
   ngOnInit(): void {
-    this.contentData.filterPredicate = this.customfilter();
-    this.filterData();
-    this.seriesData();
+    this.contentData.filterPredicate = this.customfilter()
+    this.getjourney();
+    // this.filterData();
   }
+  async getjourney(){
+    const journeySnap = await getDocs(collection(this.firestore,'journey'));
+    this.journey = [];
+    journeySnap.docs.forEach(element => {
+      this.journey.push({
+        id: element.id,
+        ...element.data()
+      });
+      this.journeyMap[element.id] = element.data();
+    });
+
+    console.log(this.journey,'journey dataaaa');
+
+    await this.journeyBasedanalytics();
+  }
+  openUserAnalyticsDialog(profile: any) {
+    this.dialog.open(UserAnalyticsDialogComponent, {
+      data: {
+        logs: profile.logs,
+        profileData: profile.profileData,
+        name: profile.name,
+        journeyMap:this.journeyMap
+      },
+      panelClass: 'uad-dialog-panel',
+      width: '1200px',
+      maxWidth: '95vw',
+      maxHeight: '90vh'
+    });
+  }
+  
+  async journeyBasedanalytics(){
+    const journeyWiseMap: any = {}
+    const profileLogsMap: any = {};
+ 
+    for (let i = 0; i < this.contentAnalytics.length; i++) {
+      const element = this.contentAnalytics[i];
+      const pid = element?.profileid;
+      if (!pid) continue;
+      if (!profileLogsMap[pid]) profileLogsMap[pid] = [];
+      profileLogsMap[pid].push(element);
+    }
+ 
+    const profileids = Object.keys(this.mapProfileData);
+    for (let i = 0; i < profileids.length; i++) {
+      const profileid = profileids[i];
+      const profile = this.mapProfileData[profileid];
+      if (!profile?.firebaseuserref) continue;
+      const journeyid = profile?.activejourney;
+      if (!journeyid) continue;
+      const journeyData = this.journeyMap[journeyid];
+      if (!journeyData) continue;
+      const journeyName = journeyData['journey'] || journeyid;
+      const profileName = this.mapProfile[profileid] || this.mapProfileNew[profileid] || profileid;
+ 
+      if (!journeyWiseMap[journeyid]) {
+        journeyWiseMap[journeyid] = {
+          journeyName: journeyName,
+          profile: [],
+          total: 0,
+          watching: 0,
+          notYet: 0
+        };
+      }
+ 
+      const userLogs = profileLogsMap[profileid] || [];
+      journeyWiseMap[journeyid].profile.push({
+        id: profileid,
+        name: profileName,
+        profileData: profile,
+        logs: userLogs,
+        watching: userLogs.length > 0
+      });
+      journeyWiseMap[journeyid].total++;
+      if (userLogs.length > 0) {
+        journeyWiseMap[journeyid].watching++;
+      }
+    }
+ 
+    const keys = Object.keys(journeyWiseMap);
+    for (let i = 0; i < keys.length; i++) {
+      journeyWiseMap[keys[i]].notYet = journeyWiseMap[keys[i]].total - journeyWiseMap[keys[i]].watching;
+    }
+ 
+    this.journeyWiseData = journeyWiseMap;
+ 
+    const firstKey = Object.keys(journeyWiseMap)[0];
+    if (firstKey && !this.selectedJourneyId) this.selectJourney(firstKey);
+ 
+    console.log(this.journeyWiseData, 'journeywiseconeoleee');
+  }
+ 
+  selectedJourneyId: string = '';
+  journeyFilter: 'all' | 'watching' | 'notyet' = 'all';
+  journeySearchQuery: string = '';
+ 
+  selectJourney(id: string) {
+    this.selectedJourneyId = id;
+    this.journeyFilter = 'all';
+    this.journeySearchQuery = '';
+  }
+ 
+  journeyProfileVisible(profile: any): boolean {
+    const matchesFilter =
+      this.journeyFilter === 'all' ||
+      (this.journeyFilter === 'watching' && profile.watching) ||
+      (this.journeyFilter === 'notyet' && !profile.watching);
+    const matchesSearch = !this.journeySearchQuery ||
+      profile.name?.toLowerCase().includes(this.journeySearchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  }
+ 
+  getVisibleCount(profiles: any[]): number {
+    return (profiles || []).filter(p => this.journeyProfileVisible(p)).length;
+  }
+ 
+  getWatchHrs(logs: any[]): number {
+    if (!logs?.length) return 0;
+    return logs.reduce((sum, l) => sum + (l.totaltimespend || 0), 0) / 3600;
+  }
+ 
+  getCompletion(logs: any[]): number {
+    if (!logs?.length) return 0;
+    const totalSpend   = logs.reduce((sum, l) => sum + (l.totaltimespend || 0), 0);
+    const totalRuntime = logs.reduce((sum, l) => sum + (l.totalruntime || 0), 0);
+    if (totalRuntime === 0) return 0;
+    return (totalSpend / totalRuntime) * 100;
+  }
+ 
+  getAvgPerDay(logs: any[]): number {
+    if (!logs?.length) return 0;
+    const dateSet = new Set<string>();
+    logs.forEach(l => {
+      const d = l.logdate?.toDate ? l.logdate.toDate() : new Date(l.logdate);
+      dateSet.add(d.toISOString().substring(0, 10));
+    });
+    return dateSet.size > 0 ? this.getWatchHrs(logs) / dateSet.size : 0;
+  }
+ 
+  getLastSeenDays(logs: any[]): number {
+    if (!logs?.length) return 999;
+    let latest = 0;
+    logs.forEach(l => {
+      const d = l.logdate?.toDate ? l.logdate.toDate() : new Date(l.logdate);
+      if (d.getTime() > latest) latest = d.getTime();
+    });
+    return Math.floor((Date.now() - latest) / (1000 * 60 * 60 * 24));
+  }
+
+  // async journeyBasedanalytics(){
+  //   const journeyWiseMap: any = {}
+  //   const watchingMap: any = {}
+  //   const profileLogsMap: any = {};
+
+  //   for (let i = 0; i < this.contentAnalytics.length; i++) {
+  //     const element = this.contentAnalytics[i];
+  //     const pid = element?.profileid;
+  //     if (!pid) continue;
+  //     if (!profileLogsMap[pid]) {
+  //       profileLogsMap[pid] = []
+  //     }
+  //     profileLogsMap[pid].push(element);
+  //   }
+    
+  //   const profileids =  Object.keys(this.mapProfileData)
+  //   for (let i = 0; i < profileids.length; i++) {
+  //     const profileid = profileids[i];
+  //     const profile = this.mapProfileData[profileid];
+  //     if (!profile?.firebaseuserref) continue;
+  //     const journeyid = profile?.activejourney;
+  //     if (!journeyid) continue;
+  //     const journeyData = this.journeyMap[journeyid];
+  //     if(!journeyData) continue;
+  //     const journeyName = journeyData['journey'] || journeyid;
+  //     const profileName = this.mapProfile[profileid] || this.mapProfileNew[profileid] || profileid;
+  //     if(!journeyWiseMap[journeyid]){
+  //       journeyWiseMap[journeyid] = {
+  //         journeyName:journeyName,
+  //         profile:[],
+  //         total:0,
+  //         watching:0,
+  //         notYet:0
+  //       }
+  //     }
+  //     const userLogs = profileLogsMap[profileid] || [];
+  //     journeyWiseMap[journeyid].profile.push({
+  //       id:profileid,
+  //       name:profileName,
+  //       profileData:profile,
+  //       logs:userLogs,
+  //       watching:userLogs.length > 0
+  //     })
+  //     journeyWiseMap[journeyid].total++;
+  //     if (userLogs.length > 0) {
+  //       journeyWiseMap[journeyid].watching++;
+  //     }
+  //   }
+  //   const keys = Object.keys(journeyWiseMap);
+  //   for (let i = 0; i < keys.length; i++) {
+  //     const element = journeyWiseMap[keys[i]];
+  //     element.notYet = element.total - element.watching;
+      
+  //   }
+  //   this.journeyWiseData = journeyWiseMap;
+  //   console.log(this.journeyWiseData,'journeywiseconeoleee')
+  // }
   async seriesData() {
     await getDocs(collection(this.firestore, 'series')).then((series) => {
       this.seriesDataList = []
@@ -156,273 +366,847 @@ export class ContentAnalyticsComponent implements OnDestroy {
   }
   mapTierToSeries() {
     const result: any = {};
-
     this.seriesDataList.forEach(series => {
       const tiers = series.tier || [];
-
       tiers.forEach((tierRef: any) => {
         const tierid = tierRef.id || tierRef;
-
         if (!result[tierid]) {
           result[tierid] = [];
         }
-
         result[tierid].push(series);
       });
     });
-
-    Object.keys(result).forEach(tierid => {
-      const tierName = this.tiermap[tierid]?.tier || tierid;
-
-      console.log(`\n🔹 ${tierName}`);
-
-      result[tierid].forEach((series: any) => {
-        console.log(`   - ${series.seriesName || series.id}`);
-      });
-    });
   }
-  filterData(): void {
-    if (this.unsubscribeContentAnalytics) {
-      this.unsubscribeContentAnalytics();
-      this.unsubscribeContentAnalytics = null;
+  getCompletedCount(seriesObj: any) {
+    return Object.values(seriesObj).filter(v => v === 'completed').length;
+  }
+
+  getTotalCount(seriesObj: any) {
+    return Object.keys(seriesObj).length;
+  }
+  
+  async participantContentAnalytics() {
+    this.allTierLoading = true;
+    const snap = await getDocs(collection(this.firestore, 'participant content analytics'));
+    this.participantanalyticsdata = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    this.buildAllTierFromParticipantAnalytics();
+  }
+  
+  buildAllTierFromParticipantAnalytics() {
+    const completedByProfile: { [pid: string]: Set<string> } = {};
+    for (const doc of this.participantanalyticsdata) {
+      const refs: any[] = doc['eiflixseries'] || [];
+      completedByProfile[doc.id] = new Set(refs.map((r: any) => r?.id ?? r).filter(Boolean));
     }
-    this.contentAnalytics = [];
-    this.fromScreenList = [];
-    this.videoNameList = [];
-    this.platformNameList = [];
-    this.resetMetrics();
-    this.isLoading = true;
-    this.hasFetched = false;
 
-    this.startDate = new Date(this.startDate.setHours(0, 0, 0, 0));
-    this.endDate = new Date(this.endDate.setHours(23, 59, 59, 999));
-
-    this.querydays = Math.round(
-      Math.abs(this.endDate.getTime() - this.startDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    const contentanalyticsRef = collection(this.firestore, 'content analytics');
-    const contentanalyticsQuery = query(
-      contentanalyticsRef,
-      where('logdate', '>', this.startDate),
-      where('logdate', '<', this.endDate),
-      orderBy('logdate', 'desc')
-    );
-
-    this.unsubscribeContentAnalytics = onSnapshot(
-      contentanalyticsQuery,
-      (snapshot) => {
-        if (!this.hasFetched) {
-          this.contentAnalytics = snapshot.docs.map(doc => {
-            const data = doc.data();
-            data['docid'] = doc.id;
-            data['live'] = false;
-            return data;
-          });
-          this.hasFetched = true;
-          this.isLoading = false;
-        } else {
-          snapshot.docChanges().forEach(change => {
-            const data = change.doc.data();
-            data['docid'] = change.doc.id;
-            data['live'] = (change.type === 'modified');
-
-            if (change.type === 'added') {
-              this.contentAnalytics.unshift(data);
-            } else if (change.type === 'modified') {
-              const idx = this.contentAnalytics.findIndex(e => e['docid'] === data['docid']);
-              if (idx !== -1) this.contentAnalytics[idx] = data;
-            } else if (change.type === 'removed') {
-              this.contentAnalytics = this.contentAnalytics.filter(e => e['docid'] !== data['docid']);
-            }
-          });
-        }
-        this.contentAnalytics.forEach(element => {
-          if (element['from'] && !this.fromScreenList.includes(element['from'])) {
-            this.fromScreenList.push(element['from']);
-          }
-          if (element['videoname'] && !this.videoNameList.includes(element['videoname'])) {
-            this.videoNameList.push(element['videoname']);
-          }
-          if (element['platform_name'] && !this.platformNameList.includes(element['platform_name'])) {
-            this.platformNameList.push(element['platform_name']);
-          }
-        });
-        this.contentData.data = [...this.contentAnalytics];
-        this.contentData.sort = this.sort;
-        this.contentData.paginator = this.paginator;
-        this.getUniqueUser();
-      },
-      (error) => {
-        console.error('Content analytics error:', error);
-        this.isLoading = false;
+    const eligibleByTier: { [tierid: string]: string[] } = {};
+    for (const pid in this.mapProfileData) {
+      const pd = this.mapProfileData[pid];
+      if (!pd?.firebaseuserref) continue;
+      for (const t of (pd.tier || [])) {
+        const tid = t.id || t;
+        (eligibleByTier[tid] ??= []).push(pid);
       }
-    );
+    }
+ 
+    const completionMap: any = {};
+    const participantSummary: any = {};
 
-    const solarvoiceplaylistRef = collection(this.firestore, 'solar voice playlist');
-    getDocs(solarvoiceplaylistRef).then(playlist => {
-      playlist.docs.forEach(doc => {
-        const element = doc.data();
-        this.mapPlaylist[element['id']] = element['name'];
+    for (const series of this.seriesDataList) {
+      const sid  = series.id;
+      const name = series.seriesName || sid;
+      for (const tierRef of (series.tier || [])) {
+        const tid  = tierRef.id || tierRef;
+        const pids = eligibleByTier[tid] || [];
+        if (!pids.length) continue;
+        completionMap[tid] ??= {};
+        completionMap[tid][name] ??= {};
+        for (const pid of pids) {
+          const pname = this.mapProfile[pid] || this.mapProfileNew[pid] || pid;
+          completionMap[tid][name][pname] =
+            (completedByProfile[pid] ?? new Set()).has(sid) ? 'completed' : 'pending';
+        }
+      }
+    }
+ 
+    for (const tid in completionMap) {
+      const seriesMap = completionMap[tid];
+      participantSummary[tid] ??= {};
+      for (const pid of (eligibleByTier[tid] || [])) {
+        const pname = this.mapProfile[pid] || this.mapProfileNew[pid] || pid;
+        let completed = 0;
+        for (const sname in seriesMap) {
+          if (seriesMap[sname][pname] === 'completed') completed++;
+        }
+        participantSummary[tid][pname] = { completed, total: Object.keys(seriesMap).length };
+      }
+    }
+ 
+    this.allTierCompletionMap      = completionMap;
+    this.allTierParticipantSummary = participantSummary;
+ 
+    this.allTierStats = {};
+    for (const tid in completionMap) {
+      const sm = completionMap[tid];
+      let seriesDone = 0, seriesCompleted = 0, seriesOnTrack = 0, seriesNotStarted = 0;
+      for (const sname in sm) {
+        const vals  = Object.values(sm[sname]) as string[];
+        const total = vals.length;
+        const comp  = vals.filter(v => v === 'completed').length;
+        if (comp === total && total > 0) { 
+          seriesCompleted++; seriesDone++; 
+        }
+        else if (comp > 0){ 
+          seriesOnTrack++;  seriesDone++; 
+        }
+        else { 
+          seriesNotStarted++;            
+        }
+      }
+      this.allTierStats[tid] ??= {} as any;
+      this.allTierStats[tid].series = { done: seriesDone, completed: seriesCompleted, onTrack: seriesOnTrack, notStarted: seriesNotStarted, total: Object.keys(sm).length };
+    }
+    for (const tid in participantSummary) {
+      const um = participantSummary[tid];
+      let profileDone = 0, profileCompleted = 0, profileOnTrack = 0, profileNotStarted = 0;
+      for (const uname in um) {
+        const u = um[uname];
+        if (u.completed === u.total && u.total > 0) { 
+          profileCompleted++; profileDone++; 
+        } else if (u.completed > 0){ 
+          profileOnTrack++;  profileDone++; 
+        }
+        else { 
+          profileNotStarted++;            
+        }
+      }
+      this.allTierStats[tid] ??= {} as any;
+      this.allTierStats[tid].participant = { done: profileDone, completed: profileCompleted, onTrack: profileOnTrack, notStarted: profileNotStarted, total: Object.keys(um).length };
+    }
+ 
+    this.allTierLoading = false;
+  }
+  openAllDrawer(tierId: string, context: string, filterPreset: string, mode: 'series' | 'participant') {
+    this._drawerItems = [];
+    this.drawerTierName = this.tiermap[tierId]?.tier || tierId;
+ 
+    if (mode === 'series') {
+      const sd = this.allTierCompletionMap[tierId] || {};
+      if (context === 'series' || context === 'all') {
+        const userStatusMap: { [n: string]: string } = {};
+        for (const sname in sd) {
+          for (const uname in sd[sname]) {
+            if (sd[sname][uname] === 'completed') userStatusMap[uname] = 'completed';
+            else userStatusMap[uname] ??= sd[sname][uname];
+          }
+        }
+        this._drawerItems = Object.entries(userStatusMap).map(([name, status]) => ({ name, status }));
+        this.drawerContextLabel = 'All Series';
+      } else {
+        this._drawerItems = Object.entries(sd[context] || {}).map(([name, status]) => ({ name, status: status as string }));
+        this.drawerContextLabel = context;
+      }
+    } else {
+      const pd = this.allTierParticipantSummary[tierId] || {};
+      const sd = this.allTierCompletionMap[tierId] || {};
+      if (context === 'all') {
+        this._drawerItems = Object.entries(pd).map(([name, val]: [string, any]) => ({
+          name,
+          status: val.completed === val.total && val.total > 0 ? 'completed' : 'pending',
+          seriesLabel: `${val.completed}/${val.total} series`
+        }));
+        this.drawerContextLabel = 'All Participants';
+      } else {
+        this._drawerItems = Object.entries(sd).map(([sname, users]: [string, any]) => ({
+          name: context,
+          status: users[context] || 'pending',
+          seriesLabel: sname
+        }));
+        this.drawerContextLabel = context;
+      }
+    }
+ 
+    if (filterPreset === 'completed')                          
+      this.drawerFilter = 'completed';
+    else if (filterPreset === 'ontrack' || filterPreset === 'notstarted') 
+      this.drawerFilter = 'pending';
+    else                                                       
+      this.drawerFilter = 'all';
+ 
+    this.drawerOpen = true;
+  }
+
+  checkSeriesCompletion() {
+    if (!this.contentAnalytics?.length || !this.seriesDataList?.length) return;
+    const seriesMap = new Map();
+    this.seriesDataList.forEach(series => {
+      if (!series.sequence) return;
+
+      seriesMap.set(series.id, {
+        ...series,
+        sequenceSet: new Set(series.sequence.map((s: any) => s.id))
       });
     });
+    const userSeriesMap = new Map();
+    for (const log of this.contentAnalytics) {
+      if (log.status !== 'complete') continue;
+
+      const { profileid, playlistid, videoid } = log;
+      if (!profileid || !playlistid || !videoid) continue;
+
+      if (!userSeriesMap.has(profileid)) {
+        userSeriesMap.set(profileid, new Map());
+      }
+      const playlistMap = userSeriesMap.get(profileid);
+      if (!playlistMap.has(playlistid)) {
+        playlistMap.set(playlistid, new Set());
+      }
+      playlistMap.get(playlistid).add(videoid);
+    }
+    const tierEligibleUsersMap: any = {};
+    for (const profileid in this.mapProfileData) {
+      const profileData = this.mapProfileData[profileid];
+      if (!profileData?.firebaseuserref) continue;
+
+      const tiers = profileData?.tier || [];
+
+      const profileName =
+        this.mapProfile[profileid] ||
+        this.mapProfileNew[profileid] ||
+        profileid;
+
+      for (const t of tiers) {
+        const tierid = t.id || t;
+
+        tierEligibleUsersMap[tierid] ??= [];
+        tierEligibleUsersMap[tierid].push(profileName);
+      }
+    }
+    const tierCompletionMap: any = {};
+
+    for (const [profileid, playlists] of userSeriesMap.entries()) {
+
+      const profileData = this.mapProfileData[profileid];
+      if (!profileData?.firebaseuserref) continue;
+
+      const profileName =
+        this.mapProfile[profileid] ||
+        this.mapProfileNew[profileid] ||
+        profileid;
+
+      for (const [playlistid, completedVideos] of playlists.entries()) {
+
+        const series = seriesMap.get(playlistid);
+        if (!series) continue;
+
+        let isCompleted = true;
+
+        for (const vid of series.sequenceSet) {
+          if (!completedVideos.has(vid)) {
+            isCompleted = false;
+            break;
+          }
+        }
+
+        if (!isCompleted) continue;
+
+        for (const tierRef of (series.tier || [])) {
+          const tierid = tierRef.id || tierRef;
+
+          const userTierList = (this.mapProfileData[profileid]?.tier || [])
+            .map((t: any) => t.id || t);
+
+          if (!userTierList.includes(tierid)) continue;
+
+          const seriesName = series.seriesName || series.id;
+
+          tierCompletionMap[tierid] ??= {};
+          tierCompletionMap[tierid][seriesName] ??= {};
+
+          tierCompletionMap[tierid][seriesName][profileName] = 'completed';
+        }
+      }
+    }
+    this.seriesDataList.forEach(series => {
+      const seriesName = series.seriesName || series.id;
+      const tiers = series.tier || [];
+      tiers.forEach((tierRef: any) => {
+        const tierid = tierRef.id || tierRef;
+        const eligibleUsers = tierEligibleUsersMap[tierid] || [];
+        if (eligibleUsers.length === 0) return;
+        tierCompletionMap[tierid] ??= {};
+        tierCompletionMap[tierid][seriesName] ??= {};
+        for (const user of eligibleUsers) {
+          if (!tierCompletionMap[tierid][seriesName][user]) {
+            tierCompletionMap[tierid][seriesName][user] = 'pending';
+          }
+        }
+      });
+    });
+    for (const tierId in tierCompletionMap) {
+      const seriesMapObj = tierCompletionMap[tierId];
+      const eligibleUsers = tierEligibleUsersMap[tierId] || [];
+
+      for (const seriesName in seriesMapObj) {
+        const usersObj = seriesMapObj[seriesName];
+
+        for (const user of eligibleUsers) {
+          if (!usersObj[user]) {
+            usersObj[user] = 'pending';
+          }
+        }
+      }
+    }
+    const tierParticipantSummary: any = {};
+
+    for (const tierId in tierCompletionMap) {
+
+      const seriesMapObj = tierCompletionMap[tierId];
+      const eligibleUsers = tierEligibleUsersMap[tierId] || [];
+
+      tierParticipantSummary[tierId] ??= {};
+
+      for (const user of eligibleUsers) {
+
+        let completedCount = 0;
+        let totalSeries = Object.keys(seriesMapObj).length;
+
+        for (const seriesName in seriesMapObj) {
+          if (seriesMapObj[seriesName][user] === 'completed') {
+            completedCount++;
+          }
+        }
+
+        tierParticipantSummary[tierId][user] = {
+          completed: completedCount,
+          total: totalSeries
+        };
+      }
+    }
+    this.tierCompletionMap = tierCompletionMap;
+    this.tierParticipantSummary = tierParticipantSummary;
+    this.computeTierStats();
+    console.log(this.tierCompletionMap, 'tierCompletionMap');
+    console.log(this.tierParticipantSummary, 'tierParticipantSummary');
   }
-  ngAfterViewInit(): void {
-    this.contentData.data = this.contentAnalytics;
-    this.contentData.sort = this.sort;
-    this.contentData.paginator = this.paginator;
+  tierStats: { [tierId: string]: {
+    series:      { done: number; completed: number; onTrack: number; notStarted: number; total: number };
+    participant: { done: number; completed: number; onTrack: number; notStarted: number; total: number };
+  }} = {};
+  
+  tierSearchQuery: string = '';
+  computeTierStats() {
+    this.tierStats = {}; 
+    for (const tierId in this.tierCompletionMap) {
+      const seriesMap = this.tierCompletionMap[tierId];
+      let done = 0, completed = 0, onTrack = 0, notStarted = 0;
+      for (const seriesName in seriesMap) {
+        const users = seriesMap[seriesName];
+        const total = Object.keys(users).length;
+        const comp  = Object.values(users).filter((v: any) => v === 'completed').length;
+  
+        if (comp === total && total > 0) { completed++; done++; }
+        else if (comp > 0)               { onTrack++;   done++; }
+        else                              { notStarted++;        }
+      }
+  
+      if (!this.tierStats[tierId]) this.tierStats[tierId] = {} as any;
+      this.tierStats[tierId].series = {
+        done, completed, onTrack, notStarted,
+        total: Object.keys(seriesMap).length
+      };
+    }
+  
+    for (const tierId in this.tierParticipantSummary) {
+      const users = this.tierParticipantSummary[tierId];
+      let done = 0, completed = 0, onTrack = 0, notStarted = 0;
+  
+      for (const userName in users) {
+        const u = users[userName];
+        if (u.completed === u.total && u.total > 0) { completed++; done++; }
+        else if (u.completed > 0)                    { onTrack++;   done++; }
+        else                                           { notStarted++;       }
+      }
+  
+      if (!this.tierStats[tierId]) this.tierStats[tierId] = {} as any;
+      this.tierStats[tierId].participant = {
+        done, completed, onTrack, notStarted,
+        total: Object.keys(users).length
+      };
+    }
   }
 
-  onClearFilterValue(): void {
+  onClearFilterValue(){
     this.filterValue = {
-      name: null,
-      startdate: null,
-      enddate: null,
-      from: null,
-      videoname: [],
-      totaltimespend: null,
-      platform_name: null
-    };
-    this.onFilter(this.filterValue);
+      name:null,
+      startdate:null,
+      enddate:null,
+      from:null,
+      videoname:[],
+      totaltimespend:null,
+      platform_name:null
+    }
+    this.onFilter(this.filterValue)
   }
 
-  convertDecimal(value: number): string {
+  ngAfterViewInit(){
+    this.contentData.data = this.contentAnalytics
+    this.contentData.sort = this.sort
+    this.contentData.paginator = this.paginator
+  }
+
+  convertDecimal(value:number){
     const minutes = Math.floor(value / 60);
     const remainingSeconds = value % 60;
-    return `${minutes} mins ${remainingSeconds} sec (${value})`;
+    return `${minutes} mins ${remainingSeconds} sec (${value})`
   }
 
-  convertDaysHoursMins(seconds: number): string {
+  convertDaysHoursMins(seconds:number){
     const days = Math.floor(seconds / (3600 * 24));
-    const rem1 = seconds % (3600 * 24);
-    const hours = Math.floor(rem1 / 3600);
-    const rem2 = rem1 % 3600;
-    const minutes = Math.floor(rem2 / 60);
-    const remainingSeconds = rem2 % 60;
-    return `${days} days ${hours} hours ${minutes} mins ${remainingSeconds} secs`;
+    const remainingSecondsAfterDays = seconds % (3600 * 24);
+
+    const hours = Math.floor(remainingSecondsAfterDays / 3600);
+    const remainingSecondsAfterHours = remainingSecondsAfterDays % 3600;
+
+    const minutes = Math.floor(remainingSecondsAfterHours / 60);
+    const remainingSeconds = remainingSecondsAfterHours % 60;
+
+    return `${days} days ${hours} hours ${minutes} mins ${remainingSeconds} secs`
   }
 
-  convertHoursMins(seconds: number): string {
+  convertHoursMins(seconds:number){
     const hours = Math.floor(seconds / 3600);
-    const rem = seconds % 3600;
-    const minutes = Math.floor(rem / 60);
-    const remainingSeconds = rem % 60;
-    return `${hours} hours ${minutes} mins ${remainingSeconds} secs`;
+    const remainingSecondsAfterHours = seconds % 3600;
+
+    const minutes = Math.floor(remainingSecondsAfterHours / 60);
+    const remainingSeconds = remainingSecondsAfterHours % 60;
+
+    return `${hours} hours ${minutes} mins ${remainingSeconds} secs`
   }
 
-  private resetMetrics(): void {
-    this.uniqueuser = null;
-    this.uniqueUserContentConsumptionbyhours = null;
-    this.uniqueUserContentConsumptionbydays = null;
-    this.averageTimeSpendPerUser = null;
-  }
+  filterData(){
+      if (!this.startDate || !this.endDate) return;
+
+      if (this.unsubscribeContentAnalytics) {
+        this.unsubscribeContentAnalytics();
+        this.unsubscribeContentAnalytics = null;
+      }
+
+      this.isInitialLoadDone = false;
+      this.tierLoading = true;
+      this.contentAnalytics = [];
+      this.tierCompletionMap = {};
+      this.tierParticipantSummary = {};
+      this.ngAfterViewInit();
+
+      this.startDate = new Date(new Date(this.startDate).setHours(0,0,0,0));
+      this.endDate   = new Date(new Date(this.endDate).setHours(23,59,59,999));
+
+      console.log(this.startDate, this.endDate);
+      const contentanalyticsRef = collection(this.firestore, "content analytics");
+      const contentanalyticsQuery = query(
+        contentanalyticsRef,
+        where('logdate', '>', this.startDate),
+        where('logdate', '<', this.endDate),
+        orderBy('logdate', 'desc')
+      );
+
+      this.unsubscribeContentAnalytics = onSnapshot(
+        contentanalyticsQuery,
+        (snapshot) => {
+          if (snapshot.metadata.fromCache) return;
+
+          this.contentAnalytics = [];
+          snapshot.docs.forEach(e => {
+            let element = e.data();
+            element["docid"] = e.id;
+            element['live'] = false;
+            this.contentAnalytics.push(element);
+          });
+
+          this.ngAfterViewInit();
+          this.getUniqueUser();
+
+          if (!this.isInitialLoadDone) {
+            this.isInitialLoadDone = true;
+            setTimeout(() => {
+              this.checkSeriesCompletion();
+              this.journeyBasedanalytics();
+              this.participantContentAnalytics();
+              this.tierLoading = false;
+            }, 0);
+          }
+
+          snapshot.docChanges().forEach(e => {
+            if (e.type === 'modified') {
+              const idx = this.contentAnalytics.findIndex(c => c['docid'] === e.doc.id);
+              if (idx > -1) this.contentAnalytics[idx]['live'] = true;
+            }
+          });
+
+          for (let i = 0; i < this.contentAnalytics.length; i++) {
+            const element = this.contentAnalytics[i];
+            if (!this.fromScreenList.includes(element['from'])) {
+              this.fromScreenList.push(element['from']);
+            }
+            if (!this.videoNameList.includes(element['videoname'])) {
+              this.videoNameList.push(element['videoname']);
+            }
+            if (element['platform_name'] != undefined) {
+              if (!this.platformNameList.includes(element['platform_name'])) {
+                this.platformNameList.push(element['platform_name']);
+              }
+            }
+          }
+
+          this.querydays = Math.round(
+            Math.abs(new Date(this.endDate).getTime() - new Date(this.startDate).getTime()) / (1000*60*60*24)
+          );
+        },
+        (error) => {
+          console.error("Content analytics error:", error);
+          this.tierLoading = false;
+        }
+      );
+
+      const solarvoiceplaylistRef = collection(this.firestore, "solar voice playlist");
+      getDocs(solarvoiceplaylistRef).then(playlist => {
+        for (let i = 0; i < playlist.docs.length; i++) {
+          const element = playlist.docs[i].data();
+          this.mapPlaylist[element['id']] = element['name'];
+        }
+      });
+    }
+  // filterData(){
+  //   if (this.unsubscribeContentAnalytics) {
+  //     this.unsubscribeContentAnalytics();
+  //     this.unsubscribeContentAnalytics = null;
+  //   }
+
+  //   this.isInitialLoadDone = false;
+  //   this.tierLoading = true;
+  //   // ref =>ref.where('logdate','>', this.startDate).where('logdate','<', this.endDate)
+  //   // console.log(this.subscription?.closed);
+  //   // if(this.subscription?.closed === false) this.subscription.unsubscribe()
+  //   this.contentAnalytics = []
+  //   this.ngAfterViewInit()
+  //   this.startDate = new Date(this.startDate.setHours(0,0,0,0))
+  //   this.endDate = new Date(this.endDate.setHours(23,59,59,999))
+  //   console.log(this.startDate,this.endDate);
+  //   const contentanalyticsRef = collection(this.firestore,"content analytics")
+  //   const contentanalyticsQuery = query(contentanalyticsRef,where('logdate','>', this.startDate),where('logdate','<', this.endDate),orderBy('logdate','desc'))
+    
+  //   this.unsubscribeContentAnalytics = onSnapshot(
+  //     contentanalyticsQuery,
+  //     (snapshot) => {
+  //       if (!this.isInitialLoadDone) {
+  //         this.contentAnalytics = [];
+  //       }
+  //       snapshot.docChanges().forEach(e => {
+  //         let element = e.doc.data();
+  //         element["docid"] = e.doc.id;
+  //         element['live'] = (e.type === 'modified');
+  //         this.contentAnalytics.push(element);
+  //       });
+        
+  //       this.ngAfterViewInit();
+  //       this.getUniqueUser();
+  //       if (!this.isInitialLoadDone && snapshot.metadata.fromCache === false) {
+  //         this.isInitialLoadDone = true;
+  //         setTimeout(() => {
+  //           this.checkSeriesCompletion();
+  //           this.tierLoading = false;
+  //         }, 0);
+  //       }
+  //       for (let i = 0; i < this.contentAnalytics.length; i++) {
+  //         const element = this.contentAnalytics[i];
+  //         if(!this.fromScreenList.includes(element['from'])){
+  //           this.fromScreenList.push(element['from']);
+  //         }
+  //         if(!this.videoNameList.includes(element['videoname'])){
+  //           this.videoNameList.push(element['videoname']);
+  //         }
+  //         if(element['platform_name'] != undefined){
+  //           if(!this.platformNameList.includes(element['platform_name'])){
+  //             this.platformNameList.push(element['platform_name']);
+  //           }
+  //         }
+  //       }
+        
+  //       this.querydays = Math.round((Math.abs(new Date(this.endDate).getTime() - new Date(this.startDate).getTime()))/(1000*60*60*24));
+  //     },
+  //     (error) => {
+  //       console.error("Content analytics error:", error);
+  //     }
+  //   );
+
+  //   const solarvoiceplaylistRef = collection(this.firestore,"solar voice playlist")
+  //   getDocs(solarvoiceplaylistRef).then(playlist=>{
+  //     for(let i = 0; i<playlist.docs.length;i++){
+  //       const element = playlist.docs[i].data();
+  //       this.mapPlaylist[element['id']] = element['name']
+  //     }
+  //   });
+  // }
 
   ngOnDestroy(): void {
-    if (this.unsubscribeContentAnalytics) {
-      this.unsubscribeContentAnalytics();
-    }
     this.subscription.next();
     this.subscription.complete();
   }
 
-  getUniqueUser(): void {
-    const uniqueUser: { [key: string]: number } = {};
-    const filtered = this.contentData.filteredData;
 
-    for (const element of filtered) {
-      uniqueUser[element['profileid']] = (uniqueUser[element['profileid']] || 0) + element['totaltimespend'];
+  applyNameFilter(event: Event) {
+    const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
+    this.contentData.filter = filterValue;
+  }
+
+  getUniqueUser(){
+    // this.uniqueuser = Array.from(new Map(this.contentAnalytics.map(e => [e.profileid,e])).values()).length;
+    let uniqueUser:{[key:string]:number} = {}
+    for (let i = 0; i < this.contentData.filteredData.length; i++) {
+      const element = this.contentData.filteredData[i];
+      uniqueUser[element['profileid']] = (uniqueUser[element['profileid']] || 0) + element['totaltimespend']
     }
-
-    this.uniqueuser = Object.keys(uniqueUser).length;
-
-    const totalconsumption = Object.values(uniqueUser).reduce((c, a) => c + a, 0);
-    this.uniqueUserContentConsumptionbydays = this.convertDaysHoursMins(totalconsumption);
-    this.uniqueUserContentConsumptionbyhours = this.convertHoursMins(totalconsumption);
-    this.averageTimeSpendPerUser = this.uniqueuser > 0
-      ? this.convertHoursMins(Math.round(totalconsumption / this.uniqueuser))
-      : '0 hours 0 mins 0 secs';
+    this.uniqueuser = Object.keys(uniqueUser).length
+    let totalconsumption = Object.values(uniqueUser).reduce((c,a) => {
+      return c + a
+    },0)
+    this.uniqueUserContentConsumptionbydays = this.convertDaysHoursMins(totalconsumption)
+    this.uniqueUserContentConsumptionbyhours = this.convertHoursMins(totalconsumption)
+    this.averageTimeSpendPerUser = this.convertHoursMins(Math.round(totalconsumption/this.uniqueuser))
   }
 
-  onFilter(value: any): void {
-    this.contentData.filter = JSON.stringify(value);
-    this.getUniqueUser();
+  onFilter(value:any){
+    this.contentData.filter = JSON.stringify(value)
   }
+  cardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
+  drawerOpen       = false;
+  drawerFilter: 'all' | 'completed' | 'pending' = 'all';
+  drawerTierName   = '';
+  drawerContextLabel = '';
+  private _drawerItems: { name: string; status: string; seriesLabel?: string }[] = [];
 
-  public customfilter(): (data: any, filter: string) => boolean {
-    return (data: any, filter: string): boolean => {
-      const e = data;
-      const value = JSON.parse(filter);
-      return (
-        (value['name'] != null
-          ? (this.mapProfile[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) ||
-            (this.mapProfileNew[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0)
-          : true) &&
-        (value['startdate'] != null && value['enddate'] != null
-          ? e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0, 0, 0, 0)) &&
-            e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23, 59, 59, 59))
-          : true) &&
-        (value['from'] != null ? e['from'] === value['from'] : true) &&
-        (value['videoname']?.length > 0 ? value['videoname'].includes(e['videoname']) : true) &&
-        (value['totaltimespend'] != null ? Math.ceil(e['totaltimespend'] / 60) > value['totaltimespend'] : true) &&
-        (value['platform_name'] != null
-          ? e['platform_name'] != null ? e['platform_name'] === value['platform_name'] : false
-          : true)
-      );
-    };
-  }
-
-  async exportCSV(): Promise<void> {
-    const data: any[] = [];
-    const cloned = this.contentData.filteredData.length > 0
-      ? [...this.contentData.filteredData]
-      : [...(this.contentData.data as any[])];
-
-    for (const element of cloned) {
-      if (element['videoname'] == null) {
-        console.log('videoname missing:', element);
+  openDrawer(tierId: string, context: string, filterPreset: string, mode: 'series' | 'participant') {
+    this._drawerItems = [];
+    this.drawerTierName = this.tiermap[tierId]?.tier || tierId;
+    if (mode === 'series') {
+      const seriesData = this.tierCompletionMap[tierId] || {};
+      if (context === 'series' || context === 'all') {
+        const userStatusMap: { [name: string]: string } = {};
+        for (const seriesName in seriesData) {
+          for (const userName in seriesData[seriesName]) {
+            if (seriesData[seriesName][userName] === 'completed') {
+              userStatusMap[userName] = 'completed';
+            } else if (!userStatusMap[userName]) {
+              userStatusMap[userName] = seriesData[seriesName][userName];
+            }
+          }
+        }
+        this._drawerItems = Object.entries(userStatusMap).map(([name, status]) => ({ name, status }));
+        this.drawerContextLabel = 'All Series';
+      } else {
+        const usersInSeries = seriesData[context] || {};
+        this._drawerItems = Object.entries(usersInSeries).map(([name, status]) => ({
+          name,
+          status: status as string
+        }));
+        this.drawerContextLabel = context;
       }
-      const istOffset = (5 * 60 + 30) * 60 * 1000;
-      const d = new Date(element['logdate'].toDate().getTime() + istOffset);
+
+    } else {
+      const participantData = this.tierParticipantSummary[tierId] || {};
+      const seriesData      = this.tierCompletionMap[tierId] || {};
+
+      if (context === 'all') {
+        this._drawerItems = Object.entries(participantData).map(([name, val]: [string, any]) => ({
+          name,
+          status: val.completed === val.total && val.total > 0 ? 'completed' : 'pending',
+          seriesLabel: `${val.completed}/${val.total} series`
+        }));
+        this.drawerContextLabel = 'All Participants';
+      } else {
+        this._drawerItems = Object.entries(seriesData).map(([seriesName, users]: [string, any]) => ({
+          name: context,
+          status: users[context] || 'pending',
+          seriesLabel: seriesName
+        }));
+        this.drawerContextLabel = context;
+      }
+    }
+    if (filterPreset === 'completed')  this.drawerFilter = 'completed';
+    else if (filterPreset === 'ontrack' || filterPreset === 'notstarted') this.drawerFilter = 'pending';
+    else this.drawerFilter = 'all';
+
+    this.drawerOpen = true;
+  }
+
+  closeDrawer() {
+    this.drawerOpen = false;
+  }
+
+  getFilteredDrawerItems() {
+    if (this.drawerFilter === 'all')       return this._drawerItems;
+    if (this.drawerFilter === 'completed') return this._drawerItems.filter(i => i.status === 'completed');
+    return this._drawerItems.filter(i => i.status !== 'completed');
+  }
+
+  getInitials(name: string): string {
+    if (!name) return '?';
+    const parts = name.trim().split(' ').filter(p => p.length > 0);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : parts[0].substring(0, 2).toUpperCase();
+  }
+
+  private avatarPalette = [
+    '#4a6fa5', '#3d7a5e', '#7a4fa5', '#a5754a',
+    '#5a7a3d', '#a54a6f', '#3d6a7a', '#7a6a3d'
+  ];
+
+  getAvatarColor(name: string): string {
+    if (!name) return '#4a6fa5';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return this.avatarPalette[Math.abs(hash) % this.avatarPalette.length];
+  }
+
+  getFullyCompletedSeriesCount(tierValue: any): number {
+    return Object.values(tierValue).filter((seriesObj: any) => {
+      const total = Object.keys(seriesObj).length;
+      return total > 0 && this.getCompletedCount(seriesObj) === total;
+    }).length;
+  }
+  getOnTrackSeriesCount(tierValue: any): number {
+    return Object.values(tierValue).filter((seriesObj: any) => {
+      const completed = this.getCompletedCount(seriesObj);
+      return completed > 0 && completed < Object.keys(seriesObj).length;
+    }).length;
+  }
+  getNotStartedSeriesCount(tierValue: any): number {
+    return Object.values(tierValue).filter((seriesObj: any) =>
+      this.getCompletedCount(seriesObj) === 0).length;
+  }
+  getDoneTierCount(tierValue: any): number {
+    return Object.values(tierValue).filter((seriesObj: any) =>
+      this.getCompletedCount(seriesObj) > 0).length;
+  }
+
+  getFullyCompletedParticipantCount(tierValue: any): number {
+    return Object.values(tierValue).filter((u: any) =>
+      u['completed'] > 0 && u['completed'] === u['total']).length;
+  }
+  getOnTrackParticipantCount(tierValue: any): number {
+    return Object.values(tierValue).filter((u: any) =>
+      u['completed'] > 0 && u['completed'] < u['total']).length;
+  }
+  getNotStartedParticipantCount(tierValue: any): number {
+    return Object.values(tierValue).filter((u: any) => u['completed'] === 0).length;
+  }
+  getDoneParticipantCount(tierValue: any): number {
+    return Object.values(tierValue).filter((u: any) => u['completed'] > 0).length;
+  }
+  //newuser
+  public customfilter():(data:any,filter:string)=> boolean{
+    let filterFunction = (data:any, filter:any):boolean => {
+      let e = data
+      let value = JSON.parse(filter);
+      return (![null,undefined].includes(value['name']) ? (
+      (this.mapProfile[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) ||
+      (this.mapProfileNew[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0)): true)&& 
+      (value['startdate'] != null && value['enddate'] != null ? (e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0,0,0,0)) && e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23,59,59,59))) : true) &&
+      (![null,undefined].includes(value['from']) ? (e['from'] === value['from']) : true) &&
+      (value['videoname'].length != 0 ? value['videoname'].includes(e['videoname']) : true) &&
+      (![null,undefined].includes(value['totaltimespend']) ? (Math.ceil(e['totaltimespend']/60) > value['totaltimespend']) : true) &&
+      (![null,undefined].includes(value['platform_name']) ? (e['platform_name'] != undefined ? e['platform_name'] === value['platform_name'] : false) : true)
+    }
+    return filterFunction;
+  }
+  // public customfilter():(data:any,filter:string)=> boolean{
+  //   let filterFunction = (data:any, filter:any):boolean => {
+  //     let e = data
+  //     let value = JSON.parse(filter);
+  //     return (![null,undefined].includes(value['name']) ? (this.mapProfile[e['profileid']].toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) : true) && 
+  //           (value['startdate'] != null && value['enddate'] != null ? (e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0,0,0,0)) && e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23,59,59,59))) : true) &&
+  //           (![null,undefined].includes(value['from']) ? (e['from'] === value['from']) : true) &&
+  //           (value['videoname'].length != 0 ? value['videoname'].includes(e['videoname']) : true) &&
+  //           (![null,undefined].includes(value['totaltimespend']) ? (Math.ceil(e['totaltimespend']/60) > value['totaltimespend']) : true) &&
+  //           (![null,undefined].includes(value['platform_name']) ? (e['platform_name'] != undefined ? e['platform_name'] === value['platform_name'] : false) : true)
+  //   }
+  //   return filterFunction;
+  // }
+
+  async exportCSV(){
+    // ['profileid','from','lastwatchedtime','logdate','totalruntime', 'totaltimespend' ,'type', 'videoname'];
+    var data = []
+    let clonedContentData = Object.assign([],this.contentData.filteredData.length != 0 ? this.contentData.filteredData : this.contentData.data)
+    // console.log("clonedContentData",clonedContentData);
+    
+    for (let i = 0; i < clonedContentData.length; i++) {
+      let element = clonedContentData[i]
+      if([null,undefined].includes(element['videoname'])){
+        console.log("videoname",element);
+        
+      }
       data.push({
-        logdate: d.toISOString().substring(0, 10),
-        logtime: d.toISOString().substring(11, 19),
-        name: this.mapProfile[element['profileid']] ?? this.mapProfileNew[element['profileid']],
-        from: element['from'],
-        videoname: element['videoname'] != null ? element['videoname'].replace(/,/g, ' ') : null,
-        'totalruntime(sec)': element['totalruntime'],
-        lastwatchedtime: element['lastwatchedtime'],
-        'totaltimespend(sec)': element['totaltimespend'],
-        platform: element['platform_name'] ?? 'A&H App'
-      });
+        "logdate":new Date(new Date(element['logdate'].toDate()).getTime() + (5 * 60 * 60 * 1000) + (30 * 60 * 1000)).toISOString().substring(0,10),
+        "logtime":new Date(new Date(element['logdate'].toDate()).getTime() + (5 * 60 * 60 * 1000) + (30 * 60 * 1000)).toISOString().substring(11,19),
+        "name":this.mapProfile[element['profileid']] ?? this.mapProfileNew[element['profileid']],
+        "from":element['from'],
+        "videoname" :![null,undefined].includes(element['videoname']) ? element['videoname'].replace(/,/g," ") : null,
+        "totalruntime(sec)":element['totalruntime'],
+        "lastwatchedtime":element['lastwatchedtime'],
+        // "lastwatchedtime(only mins)":element['lastwatchedtime'].slice(2,4),
+        "totaltimespend(sec)":element['totaltimespend'],
+        // "platform" : element['platform_name'] ?? null
+        "platform": element['platform_name'] ?? "A&H App" 
+        // type:element['type']
+      })
+        // element['name'] = this.mapProfile[element['profileid']]
+        // delete element['profileid']
+        // data.push(element)
     }
-    this.downloadFile(data, new Date().toDateString() + ' content analytics');
+    // console.log(JSON.stringify(data))
+    this.downloadFile(data, new Date().toDateString() + " " + "content analytics")
   }
 
-  downloadFile(data: any[], filename = 'data'): void {
-    if (data.length === 0) {
-      console.log('export data empty');
-      return;
+  downloadFile(data,filename = 'data') {
+    if(data.length != 0){
+      let csvData = this.ConvertToCSV(data,Object.keys(data[0]));
+      let blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
+      let dwldLink = document.createElement("a");
+      let url = URL.createObjectURL(blob);
+      let isSafariBrowser = navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1;
+      if (isSafariBrowser) { 
+        dwldLink.setAttribute("target", "_blank");
+      }
+      dwldLink.setAttribute("href", url);
+      dwldLink.setAttribute("download", filename + ".csv");
+      dwldLink.style.visibility = "hidden";
+      document.body.appendChild(dwldLink);
+      dwldLink.click();
+      document.body.removeChild(dwldLink);
+    }else{
+      console.log("export data empty");
     }
-    const csvData = this.ConvertToCSV(data, Object.keys(data[0]));
-    const blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const isSafari = navigator.userAgent.indexOf('Safari') !== -1 && navigator.userAgent.indexOf('Chrome') === -1;
-    if (isSafari) link.setAttribute('target', '_blank');
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename + '.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   }
 
-  ConvertToCSV(objArray: any[], headerList: string[]): string {
-    const array = typeof objArray !== 'object' ? JSON.parse(objArray) : objArray;
-    let str = 'Index,' + headerList.join(',') + '\r\n';
+  ConvertToCSV(objArray, headerList) {
+    let array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
+    let str = '';
+    let row = 'Index,';
+
+    for (let index in headerList) {
+      row += headerList[index] + ',';
+    }
+    row = row.slice(0, -1);
+    
+    str += row + '\r\n';
     for (let i = 0; i < array.length; i++) {
       let line = (i + 1) + '';
-      for (const head of headerList) {
+      for (let index in headerList) {
+        let head = headerList[index];
         line += ',' + array[i][head];
       }
       str += line + '\r\n';
@@ -430,7 +1214,8 @@ export class ContentAnalyticsComponent implements OnDestroy {
     return str;
   }
 
-  printLog(log: any): void {
-    console.log(log);
+  printLog(log){
+    console.log(log)
   }
+
 }

@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 
 export const routes: Routes = [
+  {path: 'onboarding', loadComponent: () => import('./JourneyOnboardingDetail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent)},
   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
   {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
   {path: 'routeconfiguration', loadComponent: () => import('./route-configuration-duplicate/route-configuration.component').then(m => m.RouteConfigurationComponent), canActivate:[authGuard]},
@@ -24,6 +25,8 @@ export const routes: Routes = [
   {path: 'participantpurchase/:pid', loadComponent: () => import('./Participants Profile Management/journey-product-purchase/journey-product-purchase.component').then(m => m.JourneyProductPurchaseComponent), canActivate:[authGuard]},
   {path: 'profilesummary/:profileid', loadComponent: () => import('./Participants Profile Management/profile-summary/profile-summary.component').then(m => m.ProfileSummaryComponent), canActivate: [authGuard]},
   {path: 'userprofile/:id', loadComponent: () => import('./Participants Profile Management/userprofile/userprofile.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
+  //userprofile_old
+  {path: 'userprofile_old', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
   {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
   {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
   {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
@@ -100,6 +103,7 @@ export const routes: Routes = [
   {path: 'view-participants-form', loadComponent: () => import('./Participants Profile Management/view-participants-form/view-participants-form.component').then(m => m.ViewParticipantsFormComponent), canActivate:[authGuard]},
   {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
   {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
+  {path: 'content-analytics-dashboard', loadComponent: () => import('./content/content-analytics-dashboard/content-analytics-dashboard.component').then(m => m.ContentAnalyticsDashboardComponent), canActivate:[authGuard]},
   {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
   {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard], children: [
     {path:'addseries', loadComponent: () => import('./content/series-dashboard/add-series/add-series.component').then(m => m.AddSeriesComponent), canActivate: [authGuard]},
@@ -200,7 +204,7 @@ export const routes: Routes = [
 
   // Customer Support
   { path: 'customersupportdashboard', loadComponent: () => import('./Customer Support/customer-support-dashboard/customer-support-dashboard.component').then(m => m.CustomerSupportDashboardComponent), canActivate: [authGuard] },
-  { path: 'customersupportdashboard/ticket/:ticketid/:ticketno', loadComponent: () => import('./Customer Support/customer-chat-screen/customer-chat-screen.component').then(m => m.CustomerChatScreenComponent), canActivate: [authGuard] },  
+  { path: 'customersupportdashboard/ticket/:ticketid/:ticketno', loadComponent: () => import('./Customer Support/customer-chat-screen/customer-chat-screen.component').then(m => m.CustomerChatScreenComponent), canActivate: [authGuard] },
   {path: 'customer-support-tickets', loadComponent: () => import('./Customer Support/customer-ticket-new/customer-ticket-new.component').then(m => m.CustomerTicketNewComponent), canActivate: [authGuard]},
   {path: 'customertickets', loadComponent: () => import('./Customer Support/customertickets/customertickets.component').then(m => m.CustomerticketsComponent), canActivate:[authGuard]},
 
@@ -263,8 +267,9 @@ export const routes: Routes = [
   {path: 'bigeventmentor', loadComponent: () => import('./New-Workshop/bigeventmentor/bigeventmentor.component').then(m => m.BigeventmentorComponent),canActivate:[authGuard]},
   // Evolution Mapping
   {path: 'evolutionmapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
+  {path: 'evolutionmappingnew', loadComponent: () => import('./EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component').then(m => m.EvolutionMappingNewComponent), canActivate:[authGuard]},
   {path: 'participantevolution', loadComponent: () => import('./EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component').then(m => m.ParticipantEvolutionMappingComponent), canActivate:[authGuard]},
-
+  {path: 'evolutionmappingv2', loadComponent: () => import('./EvolutionMapping/evolution-mapping-v2/evolution-mapping-v2.component').then(m => m.EvolutionMappingV2Component), canActivate:[authGuard]},
   // Taxonomy
   {path: 'updateprofiletaxonomy', loadComponent: () => import('./AppEngagement/taxonomy/update-adjustment-taxonomy/update-adjustment-taxonomy.component').then(m => m.UpdateAdjustmentTaxonomyComponent), canActivate:[authGuard]},
 
@@ -298,14 +303,19 @@ export const routes: Routes = [
   {path: 'ahcrm',loadComponent: () => import('./AppEngagement/ahcrm_home/participant-list/participant-list.component').then(m => m.ParticipantListComponent), canActivate: [authGuard] },
 
   {path: 'eventzonemanagement',loadComponent: () => import('./Zone Management/event-zone-management/event-zone-management.component').then(m => m.EventZoneManagementComponent), canActivate: [authGuard] },
-  
 
-  // ai generated atc view screen 
+
+  // ai generated atc view screen
   {path: 'viewaigeneratedatc', loadComponent: () => import('./view-ai-generated-atc/view-ai-generated-atc.component').then(m => m.ViewAiGeneratedAtcComponent), canActivate: [authGuard]},
 
   //Vadivel
   {path: 'appointment-dashboard', loadComponent: () => import('./appointment-dashboard/appointment-dashboard.component').then(m => m.AppointmentDashboardComponent), canActivate: [authGuard]},
 
+  //ecosystem
+  {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
+
+  //queue-web
+  {path: 'queue-web', loadComponent: () => import('./queue system/QueueWebVerison1/queue-web-version1.component').then(m => m.QueueWebVersion1Component), canActivate: [authGuard] },
 ];
 
 // import { Routes } from '@angular/router';
@@ -495,7 +505,7 @@ export const routes: Routes = [
 // export const routes: Routes = [
 //   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
 //   {path: 'login', component: LoginComponent },
-//   // {path: 'EISDashboard', component: MainDashboardComponent,canActivate:[authGuard]},  
+//   // {path: 'EISDashboard', component: MainDashboardComponent,canActivate:[authGuard]},
 //   {path: 'routeconfiguration', component: RouteConfigurationComponent,canActivate:[authGuard]},
 //   {path: 'addjourney', component: AddjourneyComponent,canActivate:[authGuard]},
 //   {path: 'addpackage', component: AddpackageComponent,canActivate:[authGuard]},
@@ -525,7 +535,7 @@ export const routes: Routes = [
 //     {path: 'edit-playlist', component: EditComponent , canActivate : [authGuard]},
 //     {path: 'add-playlist', component: SolarPlaylistComponent , canActivate : [authGuard]},
 //   ]},
- 
+
 //   {path: 'playlistads',component:PlaylistAdsComponent,canActivate:[authGuard]},
 //   {path: 'healthstories',component:HealthStoriesComponent,canActivate:[authGuard]},
 //   {path: 'ads',component:ClickAdsComponent,canActivate:[authGuard]},
@@ -574,7 +584,7 @@ export const routes: Routes = [
 //   {path: 'appointmentstudio', component: AppointmentStudioComponent, canActivate:[authGuard]},
 //   {path: 'openappointmentzoom/:id', component: AppointmentZoomViewComponent, canActivate:[authGuard]},
 //   {path: 'appointment-status-update', component: AppointmentStatusUpdateComponent, canActivate:[authGuard]},
-  
+
 
 //   {path: 'appactionpending', component: AppActionPendingComponent, canActivate: [authGuard]},
 //   {path: 'interimreportlog', component: InterimReportLogComponent, canActivate: [authGuard]},

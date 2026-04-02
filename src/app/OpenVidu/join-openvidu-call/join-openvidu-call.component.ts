@@ -14,7 +14,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-
+import { BackgroundProcessor } from "@livekit/track-processors";
+import { InstanceStatusService } from '../../instance-status.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -60,19 +61,23 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   roomDetail: RoomInfo | undefined | null;
   roomSubscription = new Subject<void>();
 
+  // Server Subscription
+  serverSubscription = new Subject<void>();
+
   // UI States
   loading = true;
   isSharing = false;
-  meetingRoomStatus: null | "connecting" | "connected" | "left" | "ended" = null
+  meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended" = "servercheck"
   // Fullscreen Enable
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
   
-
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
+
+  isVideoBlurred:boolean = false;
 
   constructor(
     public firestore: Firestore,
@@ -80,7 +85,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public httpClient: HttpClient,
     public guard: AuthguardService,
     public noiseCancellationService: NoiseCancellationService,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private infraService: InstanceStatusService
   ){}
 
   ngAfterViewInit(): void {
@@ -106,7 +112,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           if(data && data["active"]){
 
             // Prepare Call - Only when screen launched first time
-            if(this.roomDetail.title == "") this.prepareParticipant()
+            if(this.roomDetail.title == "") this.checkServer()
 
             this.roomDetail = {
               roomId: id,
@@ -521,6 +527,32 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   //   ).length;
   //   return 1 + remoteVideoCount;
   // }
+
+  async checkServer(){
+    this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
+      next: (serverData) => {
+        if (serverData) {
+          const masterStatus = serverData["master"]["state"]
+          const mediaNode = serverData["media"]["instanceStates"]["healthy"] || 0
+
+          if(masterStatus == "running" && mediaNode > 0){
+            this.prepareParticipant()
+            this.serverSubscription?.next()
+            this.serverSubscription?.complete()
+          }
+          else if(masterStatus == "running" || masterStatus == "starting"){
+            this.meetingRoomStatus = "serverstarting"
+          }
+          else {
+            this.meetingRoomStatus = "serverfailed"
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Infrastructure status error:', err);
+      }
+    });
+  }
 
   async prepareParticipant() {
     this.isRequesting = true;
@@ -965,6 +997,31 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  // Add this method after toggleCamera()
+  async toggleVideoBlur() {
+    this.isVideoBlurred = !this.isVideoBlurred;
+    
+    const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
+
+    if (!cameraPub || !cameraPub.videoTrack) return;
+
+    const videoTrack = cameraPub.videoTrack;
+    
+    if (this.isVideoBlurred) {
+      // Apply blur using CSS filter through processor
+      const blur = BackgroundProcessor({
+        mode: "background-blur",
+        blurRadius: 10
+      });
+      videoTrack.setProcessor(blur)
+    } else {
+      // Remove blur
+      await videoTrack.stopProcessor();
+    }
+
+    console.log(this.isVideoBlurred)
+  }
+
   // Take reference snapshot
   takeSnapshot() {
     console.log("Snapshot taken");
@@ -984,47 +1041,60 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
- * Enable microphone with RNNoise noise cancellation
- */
-async enableMicrophoneWithNoiseCancellation(room: Room) {
-  try {
-    console.log('🎙️ Attempting to enable microphone with RNNoise...');
-    
-    // Get raw microphone stream
-    const rawStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,      // Keep echo cancellation
-        noiseSuppression: false,     // Disable - RNNoise will handle this
+  * Enable microphone with RNNoise noise cancellation
+  */
+  async enableMicrophoneWithNoiseCancellation(room: Room) {
+    try {
+      console.log('🎙️ Attempting to enable microphone with RNNoise...');
+
+      // Get raw microphone stream
+      const rawStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,   // Keep — removes room echo / speaker feedback
+          noiseSuppression: false,  // Disable — RNNoise handles this entirely
+          
+          // ✅ FIX: Disable AGC.
+          //    autoGainControl: true was the primary cause of over-compression.
+          //    AGC continuously pumps/ducks the gain as it detects silence vs
+          //    speech. When your voice stops, AGC boosts the gain — then your
+          //    next word hits RNNoise at a clipped level, so RNNoise treats the
+          //    attack transient as noise and suppresses it. This made consonants
+          //    ("p", "t", "k") disappear and voice sound muffled/crushed.
+          //    With AGC off, input level is stable and RNNoise gets a clean,
+          //    consistent signal. Gain is restored via the output gain node
+          //    inside NoiseCancellationService (outputGain = 1.2).
+          autoGainControl: false,
+
+          sampleRate: 48000,        // RNNoise requires exactly 48kHz
+          channelCount: 1           // Mono — RNNoise is single-channel
+        }
+      });
+
+      // Apply RNNoise (gain staging is handled inside the service)
+      const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
+
+      // Publish clean audio to LiveKit
+      await room.localParticipant.publishTrack(cleanAudioTrack, {
+        source: Track.Source.Microphone,
+        name: 'microphone'
+      });
+
+      console.log('✅ Microphone enabled with RNNoise');
+
+    } catch (error) {
+      console.error('❌ RNNoise failed, falling back to WebRTC:', error);
+
+      // Fallback: let WebRTC handle noise suppression natively.
+      // AGC is acceptable here because there is no RNNoise model to saturate.
+      await room.localParticipant.setMicrophoneEnabled(true, {
+        echoCancellation: true,
+        noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 48000,           // RNNoise requires 48kHz
-        channelCount: 1              // Mono for voice
-      }
-    });
+        sampleRate: 48000,
+        channelCount: 1
+      });
 
-    // Apply RNNoise
-    const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
-
-    // Publish clean audio to LiveKit
-    await room.localParticipant.publishTrack(cleanAudioTrack, {
-      source: Track.Source.Microphone,
-      name: 'microphone'
-    });
-
-    console.log('✅ Microphone enabled with RNNoise');
-    
-  } catch (error) {
-    console.error('❌ RNNoise failed, falling back to WebRTC:', error);
-    
-    // Fallback to WebRTC noise suppression
-    await room.localParticipant.setMicrophoneEnabled(true, {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      sampleRate: 48000,
-      channelCount: 1
-    });
-    
-    console.log('✅ Microphone enabled with WebRTC noise suppression (fallback)');
+      console.log('✅ Microphone enabled with WebRTC noise suppression (fallback)');
+    }
   }
-}
 }
