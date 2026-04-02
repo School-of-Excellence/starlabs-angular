@@ -1041,24 +1041,36 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Enable microphone with RNNoise noise cancellation
-   */
+  * Enable microphone with RNNoise noise cancellation
+  */
   async enableMicrophoneWithNoiseCancellation(room: Room) {
     try {
       console.log('🎙️ Attempting to enable microphone with RNNoise...');
-      
+
       // Get raw microphone stream
       const rawStream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,      // Keep echo cancellation
-          noiseSuppression: false,     // Disable - RNNoise will handle this
-          autoGainControl: true,
-          sampleRate: 48000,           // RNNoise requires 48kHz
-          channelCount: 1              // Mono for voice
+          echoCancellation: true,   // Keep — removes room echo / speaker feedback
+          noiseSuppression: false,  // Disable — RNNoise handles this entirely
+          
+          // ✅ FIX: Disable AGC.
+          //    autoGainControl: true was the primary cause of over-compression.
+          //    AGC continuously pumps/ducks the gain as it detects silence vs
+          //    speech. When your voice stops, AGC boosts the gain — then your
+          //    next word hits RNNoise at a clipped level, so RNNoise treats the
+          //    attack transient as noise and suppresses it. This made consonants
+          //    ("p", "t", "k") disappear and voice sound muffled/crushed.
+          //    With AGC off, input level is stable and RNNoise gets a clean,
+          //    consistent signal. Gain is restored via the output gain node
+          //    inside NoiseCancellationService (outputGain = 1.2).
+          autoGainControl: false,
+
+          sampleRate: 48000,        // RNNoise requires exactly 48kHz
+          channelCount: 1           // Mono — RNNoise is single-channel
         }
       });
 
-      // Apply RNNoise
+      // Apply RNNoise (gain staging is handled inside the service)
       const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
 
       // Publish clean audio to LiveKit
@@ -1068,11 +1080,12 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       });
 
       console.log('✅ Microphone enabled with RNNoise');
-      
+
     } catch (error) {
       console.error('❌ RNNoise failed, falling back to WebRTC:', error);
-      
-      // Fallback to WebRTC noise suppression
+
+      // Fallback: let WebRTC handle noise suppression natively.
+      // AGC is acceptable here because there is no RNNoise model to saturate.
       await room.localParticipant.setMicrophoneEnabled(true, {
         echoCancellation: true,
         noiseSuppression: true,
@@ -1080,7 +1093,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         sampleRate: 48000,
         channelCount: 1
       });
-      
+
       console.log('✅ Microphone enabled with WebRTC noise suppression (fallback)');
     }
   }
