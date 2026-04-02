@@ -25,7 +25,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSortModule } from '@angular/material/sort';
 import { Subject, takeUntil } from 'rxjs';
-import { collectionData, limit, orderBy, query, where } from '@angular/fire/firestore';
+import { collectionData, limit, onSnapshot, orderBy, query, where } from '@angular/fire/firestore';
 import { Firestore } from '@angular/fire/firestore';
 import { collection, getDocs, Timestamp } from 'firebase/firestore';
 import { catchError, of, finalize } from 'rxjs';
@@ -47,8 +47,9 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import * as XLSX from 'xlsx';
 
 interface ParticipantContentMapInterface {
-  rank ?: number;
+  rank?: number;
   profileid: string;
+  live: boolean;
   totalWatchHours: number;
   activePlatforms: Set<string>;
   sessions: number;
@@ -64,7 +65,7 @@ interface ParticipantContentMapInterface {
 type participantType = 'superfan' | 'risingfan' | 'guest';
 
 interface ContentMapInterface {
-  rank ?: number;
+  rank?: number;
   contentid: string;
   contentname: string;
   platform: string;
@@ -198,6 +199,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   totalSuperFans = 0;
   totalRisingFans = 0;
   pickerOpen = false;
+  initialLoaded = false;
 
   // tabel columns
   participantTableColumns = ['rank', 'participant', 'type', 'mode', 'source', 'hours', 'days', 'completion', 'sessions', 'playlists']
@@ -554,6 +556,281 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     return null;
   }
 
+  // async fetchContentAnalytics() {
+  //   this.isLoading = true;
+  //   this.loadingStatus.contentanalytics = true;
+
+  //   const constrains: any = [orderBy('logdate', 'desc')];
+  //   if (this.startDate.value && this.endDate.value) {
+  //     const start = new Date(this.startDate.value);
+  //     const end = new Date(this.endDate.value);
+
+  //     start.setHours(0, 0, 0, 0);
+  //     end.setHours(23, 59, 59, 999);
+
+  //     constrains.push(where('logdate', '>=', Timestamp.fromDate(start)))
+  //     constrains.push(where('logdate', '<=', Timestamp.fromDate(end)))
+  //   }
+
+  //   const q = query(collection(this.firestore, 'content analytics'), ...constrains);
+
+  //   onSnapshot(q, (contentSnap) => {
+  //     if (!this.initialLoaded) {
+  //       this.initialLoaded = true;
+  //       const participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
+  //       const contentMap: { [key: string]: ContentMapInterface } = {};
+  //       const contentTypeMap: { [key: string]: ContentType } = {};
+  //       const participantTypeMap: Map<string, participantTypeCheck> = new Map();
+
+  //       let totalUniqueUsers = 0;
+  //       let totalUniueContents = 0;
+  //       let totalWatchHours = 0;
+  //       let totalSuperFans = 0;
+  //       let totalRisingFans = 0;
+
+  //       contentSnap.forEach((contSnap) => {
+  //         const content = contSnap.data();
+  //         const profileId = content['profileid'] || 'UnKnown';
+  //         const contentId = content['videoid'] || 'Unknown';
+  //         const contentname = content['videoname'] || 'Unknown';
+  //         const platform = content['platform_name'] || 'UnKnown';
+  //         const totalRunTime = content['totalruntime'] || 0;
+  //         const totalTimeSpend = content['totaltimespend'] || 0;
+  //         const playlistId = content['playlistid'] || '';
+  //         const logDate = this.formatDate(content['logdate']);
+  //         const dateKey = logDate?.toDateString();
+  //         const status = content['status']
+  //         const contentType = content['type'] || 'Unknown';
+
+  //         if (!logDate) {
+  //           return
+  //         }
+
+  //         if (!Object.hasOwn(participantContentMap, profileId)) {
+  //           participantContentMap[profileId] = {
+  //             profileid: profileId,
+  //             totalWatchHours: 0,
+  //             activePlatforms: new Set(),
+  //             watchedContentsMap: {},
+  //             playlist: new Set(),
+  //             completedPlayList: new Set(),
+  //             sessions: 0,
+  //             completedContents: new Set(),
+  //             days: 1,
+  //             live: false,
+  //             type: 'guest',
+  //             contents: {}
+  //           }
+  //           totalUniqueUsers++
+  //         }
+
+  //         if (!Object.hasOwn(contentMap, contentId)) {
+  //           contentMap[contentId] = {
+  //             contentid: contentId,
+  //             contentname: contentname,
+  //             platform: platform,
+  //             from: content['from'] || '',
+  //             playlistid: playlistId,
+  //             totalRunTime: totalRunTime,
+  //             type: content['type'] || '',
+  //             profileid: new Set(),
+  //             totalWatchHours: 0,
+  //             completedProfiles: new Set(),
+  //             rewatchedProfiles: new Set()
+
+  //           }
+  //           totalUniueContents++
+  //         }
+
+  //         if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
+  //           participantContentMap[profileId]['watchedContentsMap'][contentId] = {
+  //             completion: 0,
+  //             watchHours: 0
+  //           }
+  //         }
+
+  //         if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
+  //           participantContentMap[profileId].contents[dateKey] = [];
+  //         }
+
+  //         if (!Object.hasOwn(contentTypeMap, contentType)) {
+  //           contentTypeMap[contentType] = {
+  //             content: contentType,
+  //             profileid: new Set(),
+  //             completed: new Set(),
+  //             watchHours: 0
+  //           }
+  //         }
+
+  //         if (!participantTypeMap.has(profileId)) {
+  //           const log = new Date(logDate);
+  //           log.setDate(log.getDate() - 1)
+  //           participantTypeMap.set(profileId, {
+  //             next: log,
+  //             count: 1,
+  //             preDate: new Date(logDate),
+  //             watchHours: totalTimeSpend,
+  //             maxDates: [log.toDateString()],
+  //           });
+  //         } else {
+  //           if (logDate.toDateString() === participantTypeMap.get(profileId)?.next.toDateString()) {
+  //             const map = participantTypeMap.get(profileId);
+  //             const type = participantContentMap[profileId].type;
+  //             map.count++;
+  //             map.watchHours += totalTimeSpend;
+  //             map.next.setDate(logDate.getDate() - 1)
+  //             map.maxDates.push(map.next.toDateString());
+
+  //             participantTypeMap.set(profileId, map);
+
+  //             if (type !== 'superfan' && map.count >= 5 && map.watchHours >= 18000) {
+  //               participantContentMap[profileId].type = 'risingfan';
+  //             } else if (map.count >= 10 && map.watchHours >= 36000) {
+  //               participantContentMap[profileId].type = 'superfan';
+  //             }
+
+  //           } else if (logDate.toDateString() === participantTypeMap.get(profileId)?.preDate.toDateString()) {
+  //             const map = participantTypeMap.get(profileId);
+  //             map.watchHours += totalTimeSpend;
+  //             participantTypeMap.set(profileId, map);
+  //           } else {
+  //             const map = participantTypeMap.get(profileId);
+  //             participantContentMap[profileId].days = Math.max(participantContentMap[profileId]?.days, map.count)
+  //             const log = new Date(logDate);
+  //             log.setDate(log.getDate() - 1)
+  //             participantTypeMap.set(profileId, {
+  //               next: log,
+  //               count: 1,
+  //               preDate: new Date(logDate),
+  //               watchHours: totalTimeSpend,
+  //               maxDates: [log.toDateString()],
+  //             })
+  //           }
+  //         }
+
+  //         totalWatchHours += totalTimeSpend
+  //         participantContentMap[profileId].totalWatchHours += totalTimeSpend;
+  //         participantContentMap[profileId].contents[dateKey].push(content);
+  //         // participantContentMap[profileId].activePlatforms.add(contentType);
+  //         participantContentMap[profileId]['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
+  //         participantContentMap[profileId].sessions += 1
+
+  //         if (contentType !== 'Unknown') {
+  //           participantContentMap[profileId].activePlatforms.add(contentType);
+  //         }
+
+  //         if (status === "complete") {
+  //           participantContentMap[profileId].completedContents.add(contentId)
+  //           participantContentMap[profileId]['watchedContentsMap'][contentId].completion += 1;
+  //           contentTypeMap[contentType].completed.add(profileId);
+
+  //           if (contentMap[contentId].completedProfiles.has(profileId)) {
+  //             contentMap[contentId].rewatchedProfiles.add(profileId);
+  //           } else {
+  //             contentMap[contentId].completedProfiles.add(profileId);
+  //           }
+  //         }
+
+  //         contentMap[contentId].profileid.add(profileId);
+  //         contentMap[contentId].totalWatchHours += totalTimeSpend;
+
+  //         contentTypeMap[contentType].profileid.add(profileId);
+  //         contentTypeMap[contentType].watchHours += totalTimeSpend;
+
+  //       })
+
+  //       this.totalUniqueUsers = totalUniqueUsers
+  //       this.totalUniueContents = totalUniueContents;
+  //       this.totalWatchHours = totalWatchHours;
+  //       this.totalSuperFans = totalSuperFans;
+  //       this.totalRisingFans = totalRisingFans;
+
+  //       this.participantContentMap = participantContentMap;
+  //       this.contentMap = contentMap;
+  //       this.contentTypeMap = contentTypeMap;
+
+  //       const superFans: ParticipantContentMapInterface[] = [];
+  //       const raisingFans: ParticipantContentMapInterface[] = [];
+  //       const fans: ParticipantContentMapInterface[] = [];
+
+  //       Object.values(participantContentMap).forEach((p) => {
+  //         const data = { ...p, type: this.getParicipantType(p) };
+  //         if (data.type === 'superfan') {
+  //           superFans.push(data);
+  //         } else if (data.type === 'risingfan') {
+  //           raisingFans.push(data)
+  //         } else {
+  //           fans.push(data);
+  //         }
+  //       }
+  //       );
+  //       superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       const dataSource = [...superFans, ...raisingFans, ...fans];
+  //       // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
+  //       this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
+
+  //       const contentDataSoruce = Object.values(contentMap)
+  //       contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
+
+  //       this.ngAfterViewInit();
+  //       this.updateDaliyActiveUsersChart();
+  //       this.updateDailyWatchHoursChart();
+  //       this.loadingStatus.contentanalytics = false;
+  //       this.checkIsAllLoaded();
+  //     } else {
+  //       contentSnap.docChanges().forEach((content) => {
+  //         if (content.type === 'modified') {
+  //           console.log(content.doc.data())
+  //           const c = content.doc.data();
+  //           const profileid = c['profileid'];
+  //           const contentId = c['videoid'];
+  //           if (Object.hasOwn(this.participantContentMap, profileid)) {
+  //             this.participantContentMap[profileid].live = true;
+  //             this.participantContentMap[profileid].totalWatchHours += c['totaltimespend'];
+  //             this.participantContentMap[profileid].sessions += 1;
+
+  //             this.contentMap[contentId].totalWatchHours += c['totaltimespend'];
+  //           }
+  //         }
+  //       })
+
+  //       const superFans: ParticipantContentMapInterface[] = [];
+  //       const raisingFans: ParticipantContentMapInterface[] = [];
+  //       const fans: ParticipantContentMapInterface[] = [];
+
+  //       Object.values(this.participantContentMap).forEach((p) => {
+  //         const data = { ...p, type: this.getParicipantType(p) };
+  //         if (data.type === 'superfan') {
+  //           superFans.push(data);
+  //         } else if (data.type === 'risingfan') {
+  //           raisingFans.push(data)
+  //         } else {
+  //           fans.push(data);
+  //         }
+  //       }
+  //       );
+  //       superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       const dataSource = [...superFans, ...raisingFans, ...fans];
+  //       // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
+  //       this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
+
+  //       const contentDataSoruce = Object.values(this.contentMap)
+  //       contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //       this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
+
+  //       const data = Object.values(this.participantContentMap)
+  //       data.sort((a, b) => Number(a.live) - Number(b.live))
+  //       this.participantTableDataSource.data = data;
+  //       this.ngAfterViewInit();
+  //     }
+  //   })
+  // }
+
   async fetchContentAnalytics() {
     this.isLoading = true;
     this.loadingStatus.contentanalytics = true;
@@ -572,125 +849,94 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
     const q = query(collection(this.firestore, 'content analytics'), ...constrains);
 
-    const contentSnap = await getDocs(q);
-    const participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
-    const contentMap: { [key: string]: ContentMapInterface } = {};
-    const contentTypeMap: { [key: string]: ContentType } = {};
-    const participantTypeMap: Map<string, participantTypeCheck> = new Map();
+    // const contentSnap = await getDocs(q);
+    collectionData(q).pipe(takeUntil(this.destroy$)).subscribe((contentSnap) => {
+      const participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
+      const contentMap: { [key: string]: ContentMapInterface } = {};
+      const contentTypeMap: { [key: string]: ContentType } = {};
+      const participantTypeMap: Map<string, participantTypeCheck> = new Map();
 
-    let totalUniqueUsers = 0;
-    let totalUniueContents = 0;
-    let totalWatchHours = 0;
-    let totalSuperFans = 0;
-    let totalRisingFans = 0;
+      let totalUniqueUsers = 0;
+      let totalUniueContents = 0;
+      let totalWatchHours = 0;
+      let totalSuperFans = 0;
+      let totalRisingFans = 0;
 
-    contentSnap.forEach((contSnap) => {
-      const content = contSnap.data();
-      const profileId = content['profileid'] || 'UnKnown';
-      const contentId = content['videoid'] || 'Unknown';
-      const contentname = content['videoname'] || 'Unknown';
-      const platform = content['platform_name'] || 'UnKnown';
-      const totalRunTime = content['totalruntime'] || 0;
-      const totalTimeSpend = content['totaltimespend'] || 0;
-      const playlistId = content['playlistid'] || '';
-      const logDate = this.formatDate(content['logdate']);
-      const dateKey = logDate?.toDateString();
-      const status = content['status']
-      const contentType = content['type'] || 'Unknown';
+      contentSnap.forEach((content) => {
+        // const content = contSnap.data();
+        const profileId = content['profileid'] || 'UnKnown';
+        const contentId = content['videoid'] || 'Unknown';
+        const contentname = content['videoname'] || 'Unknown';
+        const platform = content['platform_name'] || 'UnKnown';
+        const totalRunTime = content['totalruntime'] || 0;
+        const totalTimeSpend = content['totaltimespend'] || 0;
+        const playlistId = content['playlistid'] || '';
+        const logDate = this.formatDate(content['logdate']);
+        const dateKey = logDate?.toDateString();
+        const status = content['status']
+        const contentType = content['type'] || 'Unknown';
 
-      if (!logDate) {
-        return
-      }
-
-      if (!Object.hasOwn(participantContentMap, profileId)) {
-        participantContentMap[profileId] = {
-          profileid: profileId,
-          totalWatchHours: 0,
-          activePlatforms: new Set(),
-          watchedContentsMap: {},
-          playlist: new Set(),
-          completedPlayList: new Set(),
-          sessions: 0,
-          completedContents: new Set(),
-          days: 1,
-          type: 'guest',
-          contents: {}
+        if (!logDate) {
+          return
         }
-        totalUniqueUsers++
-      }
 
-      if (!Object.hasOwn(contentMap, contentId)) {
-        contentMap[contentId] = {
-          contentid: contentId,
-          contentname: contentname,
-          platform: platform,
-          from: content['from'] || '',
-          playlistid: playlistId,
-          totalRunTime: totalRunTime,
-          type: content['type'] || '',
-          profileid: new Set(),
-          totalWatchHours: 0,
-          completedProfiles: new Set(),
-          rewatchedProfiles: new Set()
-
-        }
-        totalUniueContents++
-      }
-
-      if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
-        participantContentMap[profileId]['watchedContentsMap'][contentId] = {
-          completion: 0,
-          watchHours: 0
-        }
-      }
-
-      if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
-        participantContentMap[profileId].contents[dateKey] = [];
-      }
-
-      if (!Object.hasOwn(contentTypeMap, contentType)) {
-        contentTypeMap[contentType] = {
-          content: contentType,
-          profileid: new Set(),
-          completed: new Set(),
-          watchHours: 0
-        }
-      }
-
-      if (!participantTypeMap.has(profileId)) {
-        const log = new Date(logDate);
-        log.setDate(log.getDate() - 1)
-        participantTypeMap.set(profileId, {
-          next: log,
-          count: 1,
-          preDate: new Date(logDate),
-          watchHours: totalTimeSpend,
-          maxDates: [log.toDateString()],
-        });
-      } else {
-        if (logDate.toDateString() === participantTypeMap.get(profileId)?.next.toDateString()) {
-          const map = participantTypeMap.get(profileId);
-          const type = participantContentMap[profileId].type;
-          map.count++;
-          map.watchHours += totalTimeSpend;
-          map.next.setDate(logDate.getDate() - 1)
-          map.maxDates.push(map.next.toDateString());
-
-          participantTypeMap.set(profileId, map);
-
-          if (type !== 'superfan' && map.count >= 5 && map.watchHours >= 18000) {
-            participantContentMap[profileId].type = 'risingfan';
-          } else if (map.count >= 10 && map.watchHours >= 36000) {
-            participantContentMap[profileId].type = 'superfan';
+        if (!Object.hasOwn(participantContentMap, profileId)) {
+          participantContentMap[profileId] = {
+            profileid: profileId,
+            totalWatchHours: 0,
+            activePlatforms: new Set(),
+            watchedContentsMap: {},
+            playlist: new Set(),
+            completedPlayList: new Set(),
+            sessions: 0,
+            completedContents: new Set(),
+            days: 1,
+            live: false,
+            type: 'guest',
+            contents: {}
           }
+          totalUniqueUsers++
+        }
 
-        } else if (logDate.toDateString() === participantTypeMap.get(profileId)?.preDate.toDateString()) {
-          const map = participantTypeMap.get(profileId);
-          map.watchHours += totalTimeSpend;
-          participantTypeMap.set(profileId, map);
-        } else {
-          const map = participantTypeMap.get(profileId);
-          participantContentMap[profileId].days = Math.max(participantContentMap[profileId]?.days, map.count)
+        if (!Object.hasOwn(contentMap, contentId)) {
+          contentMap[contentId] = {
+            contentid: contentId,
+            contentname: contentname,
+            platform: platform,
+            from: content['from'] || '',
+            playlistid: playlistId,
+            totalRunTime: totalRunTime,
+            type: content['type'] || '',
+            profileid: new Set(),
+            totalWatchHours: 0,
+            completedProfiles: new Set(),
+            rewatchedProfiles: new Set()
+
+          }
+          totalUniueContents++
+        }
+
+        if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
+          participantContentMap[profileId]['watchedContentsMap'][contentId] = {
+            completion: 0,
+            watchHours: 0
+          }
+        }
+
+        if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
+          participantContentMap[profileId].contents[dateKey] = [];
+        }
+
+        if (!Object.hasOwn(contentTypeMap, contentType)) {
+          contentTypeMap[contentType] = {
+            content: contentType,
+            profileid: new Set(),
+            completed: new Set(),
+            watchHours: 0
+          }
+        }
+
+        if (!participantTypeMap.has(profileId)) {
           const log = new Date(logDate);
           log.setDate(log.getDate() - 1)
           participantTypeMap.set(profileId, {
@@ -699,83 +945,116 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
             preDate: new Date(logDate),
             watchHours: totalTimeSpend,
             maxDates: [log.toDateString()],
-          })
-        }
-      }
-
-      totalWatchHours += totalTimeSpend
-      participantContentMap[profileId].totalWatchHours += totalTimeSpend;
-      participantContentMap[profileId].contents[dateKey].push(content);
-      // participantContentMap[profileId].activePlatforms.add(contentType);
-      participantContentMap[profileId]['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
-      participantContentMap[profileId].sessions += 1
-
-      if (contentType !== 'Unknown') {
-        participantContentMap[profileId].activePlatforms.add(contentType);
-      }
-
-      if (status === "complete") {
-        participantContentMap[profileId].completedContents.add(contentId)
-        participantContentMap[profileId]['watchedContentsMap'][contentId].completion += 1;
-        contentTypeMap[contentType].completed.add(profileId);
-
-        if (contentMap[contentId].completedProfiles.has(profileId)) {
-          contentMap[contentId].rewatchedProfiles.add(profileId);
+          });
         } else {
-          contentMap[contentId].completedProfiles.add(profileId);
+          if (logDate.toDateString() === participantTypeMap.get(profileId)?.next.toDateString()) {
+            const map = participantTypeMap.get(profileId);
+            const type = participantContentMap[profileId].type;
+            map.count++;
+            map.watchHours += totalTimeSpend;
+            map.next.setDate(logDate.getDate() - 1)
+            map.maxDates.push(map.next.toDateString());
+
+            participantTypeMap.set(profileId, map);
+
+            if (type !== 'superfan' && map.count >= 5 && map.watchHours >= 18000) {
+              participantContentMap[profileId].type = 'risingfan';
+            } else if (map.count >= 10 && map.watchHours >= 36000) {
+              participantContentMap[profileId].type = 'superfan';
+            }
+
+          } else if (logDate.toDateString() === participantTypeMap.get(profileId)?.preDate.toDateString()) {
+            const map = participantTypeMap.get(profileId);
+            map.watchHours += totalTimeSpend;
+            participantTypeMap.set(profileId, map);
+          } else {
+            const map = participantTypeMap.get(profileId);
+            participantContentMap[profileId].days = Math.max(participantContentMap[profileId]?.days, map.count)
+            const log = new Date(logDate);
+            log.setDate(log.getDate() - 1)
+            participantTypeMap.set(profileId, {
+              next: log,
+              count: 1,
+              preDate: new Date(logDate),
+              watchHours: totalTimeSpend,
+              maxDates: [log.toDateString()],
+            })
+          }
+        }
+
+        totalWatchHours += totalTimeSpend
+        participantContentMap[profileId].totalWatchHours += totalTimeSpend;
+        participantContentMap[profileId].contents[dateKey].push(content);
+        // participantContentMap[profileId].activePlatforms.add(contentType);
+        participantContentMap[profileId]['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
+        participantContentMap[profileId].sessions += 1
+
+        if (contentType !== 'Unknown') {
+          participantContentMap[profileId].activePlatforms.add(contentType);
+        }
+
+        if (status === "complete") {
+          participantContentMap[profileId].completedContents.add(contentId)
+          participantContentMap[profileId]['watchedContentsMap'][contentId].completion += 1;
+          contentTypeMap[contentType].completed.add(profileId);
+
+          if (contentMap[contentId].completedProfiles.has(profileId)) {
+            contentMap[contentId].rewatchedProfiles.add(profileId);
+          } else {
+            contentMap[contentId].completedProfiles.add(profileId);
+          }
+        }
+
+        contentMap[contentId].profileid.add(profileId);
+        contentMap[contentId].totalWatchHours += totalTimeSpend;
+
+        contentTypeMap[contentType].profileid.add(profileId);
+        contentTypeMap[contentType].watchHours += totalTimeSpend;
+
+      })
+
+      this.totalUniqueUsers = totalUniqueUsers
+      this.totalUniueContents = totalUniueContents;
+      this.totalWatchHours = totalWatchHours;
+      this.totalSuperFans = totalSuperFans;
+      this.totalRisingFans = totalRisingFans;
+
+      this.participantContentMap = participantContentMap;
+      this.contentMap = contentMap;
+      this.contentTypeMap = contentTypeMap;
+
+      const superFans: ParticipantContentMapInterface[] = [];
+      const raisingFans: ParticipantContentMapInterface[] = [];
+      const fans: ParticipantContentMapInterface[] = [];
+
+      Object.values(participantContentMap).forEach((p) => {
+        const data = { ...p, type: this.getParicipantType(p) };
+        if (data.type === 'superfan') {
+          superFans.push(data);
+        } else if (data.type === 'risingfan') {
+          raisingFans.push(data)
+        } else {
+          fans.push(data);
         }
       }
+      );
+      superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+      raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+      fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+      const dataSource = [...superFans, ...raisingFans, ...fans];
+      // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
+      this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
 
-      contentMap[contentId].profileid.add(profileId);
-      contentMap[contentId].totalWatchHours += totalTimeSpend;
+      const contentDataSoruce = Object.values(contentMap)
+      contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+      this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
 
-      contentTypeMap[contentType].profileid.add(profileId);
-      contentTypeMap[contentType].watchHours += totalTimeSpend;
-
+      this.ngAfterViewInit();
+      this.updateDaliyActiveUsersChart();
+      this.updateDailyWatchHoursChart();
+      this.loadingStatus.contentanalytics = false;
+      this.checkIsAllLoaded()
     })
-
-    this.totalUniqueUsers = totalUniqueUsers
-    this.totalUniueContents = totalUniueContents;
-    this.totalWatchHours = totalWatchHours;
-    this.totalSuperFans = totalSuperFans;
-    this.totalRisingFans = totalRisingFans;
-
-    this.participantContentMap = participantContentMap;
-    this.contentMap = contentMap;
-    this.contentTypeMap = contentTypeMap;
-
-    const superFans: ParticipantContentMapInterface[] = [];
-    const raisingFans: ParticipantContentMapInterface[] = [];
-    const fans: ParticipantContentMapInterface[] = [];
-
-    Object.values(participantContentMap).forEach((p) => {
-      const data = { ...p, type: this.getParicipantType(p) };
-      if (data.type === 'superfan') {
-        superFans.push(data);
-      } else if (data.type === 'risingfan') {
-        raisingFans.push(data)
-      } else {
-        fans.push(data);
-      }
-    }
-    );
-    superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-    raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-    fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-    const dataSource = [...superFans, ...raisingFans, ...fans];
-    // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
-    this.participantTableDataSource.data = dataSource.map(( p, index)=>({...p , rank : index + 1}));
-
-    const contentDataSoruce = Object.values(contentMap)
-    contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-    this.contentTableDataSource.data = contentDataSoruce.map((c , index )=>({...c , rank : index + 1}));
-
-    this.ngAfterViewInit();
-    this.updateDaliyActiveUsersChart();
-    this.updateDailyWatchHoursChart();
-    this.loadingStatus.contentanalytics = false;
-    this.checkIsAllLoaded()
-
   }
 
   async fetchParticipantMetaData() {
@@ -1417,7 +1696,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
   participantCustomSorting = (item: ParticipantContentMapInterface, property: string): any => {
     switch (property) {
-       case 'rank':
+      case 'rank':
         return item?.rank
       case 'participant':
         return this.participantMetaDataMap[item.profileid]?.name || ''
