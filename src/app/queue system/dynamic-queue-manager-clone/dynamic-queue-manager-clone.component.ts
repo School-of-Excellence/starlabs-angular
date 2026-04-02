@@ -281,7 +281,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   newLinkData = { screenName: '', url: '', isInternal: false };
   editingLinkData = { screenName: '', url: '', isInternal: false };
 
-  selectedReminderFilter: 'overdue' | 'today' | 'upcoming' | 'all' = 'all';
+  selectedReminderFilter: 'overdue' | 'today' | 'upcoming' | 'all' | 'completed' = 'all';
   timeDropdownPosition = { top: '0px', right: '0px', left: 'auto' };
 
   activeReminderNotification: any = null;
@@ -4545,17 +4545,18 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (!this.selectedQueue) return;
 
     this.remindersSubscription = collectionData(
-      query(
-        collection(this.firestore, 'queuereminder'),
-        where('queueid', '==', this.selectedQueue.docid),
-        where('status', '==', 'pending')
-      ),
+    query(
+      collection(this.firestore, 'queuereminder'),
+      where('queueid', '==', this.selectedQueue.docid),
+      where('status', 'in', ['pending', 'completed'])
+    ),
       { idField: 'docid' }
     ).pipe(
       takeUntil(this.subscriptionHandle),
       takeUntil(this.liveQueueSubscription)
     ).subscribe((reminders: any[]) => {
       this.reminders = reminders;
+
     });
   }
 
@@ -4728,6 +4729,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return this.reminders.filter(r => {
+      if (r.status !== 'pending') return false;
       const reminderDate = r.date?.toDate();
       if (!reminderDate) return false;
       reminderDate.setHours(0, 0, 0, 0);
@@ -4739,6 +4741,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return this.reminders.filter(r => {
+      if (r.status !== 'pending') return false;
       const reminderDate = r.date?.toDate();
       if (!reminderDate) return false;
       reminderDate.setHours(0, 0, 0, 0);
@@ -4750,11 +4753,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return this.reminders.filter(r => {
+      if (r.status !== 'pending') return false;
       const reminderDate = r.date?.toDate();
       if (!reminderDate) return false;
       reminderDate.setHours(0, 0, 0, 0);
       return reminderDate > now;
     });
+  }
+
+  get completedReminders(): any[] {
+    return this.reminders.filter(r => r.status === 'completed');
   }
 
   get hasAnyReminders(): boolean {
@@ -4766,7 +4774,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.showReminderBanner = false;
   }
 
-  openReminderListModal(filter: 'overdue' | 'today' | 'upcoming' | 'all' = 'all') {
+  openReminderListModal(filter: 'overdue' | 'today' | 'upcoming' | 'all' | 'completed' = 'all') {
     this.selectedReminderFilter = filter;
     this.showReminderListModal = true;
   }
@@ -4784,8 +4792,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         return this.todayReminders;
       case 'upcoming':
         return this.upcomingReminders;
+      case 'completed':
+        return this.completedReminders;
       default:
-        return this.reminders;
+        return this.reminders.filter(r => r.status === 'pending');
     }
   }
 
