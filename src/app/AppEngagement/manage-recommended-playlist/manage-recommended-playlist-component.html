@@ -199,34 +199,116 @@
               <div class="rp-playlist-items">
                 <ng-container *ngIf="row.eiflix?.length">
                   <span class="rp-content-heading">EiFlix ({{row.eiflix?.length}})</span>
-                  <div class="rp-content-item-block" *ngFor="let name of row.eiflix; let j = index">
+                  <!-- <div class="rp-content-item-block" *ngFor="let name of row.eiflix; let j = index">
                     <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
                     <div class="rp-stats-chips">
                       <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'eiflix', j, 'all')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.total }}</span>
                       <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'eiflix', j, 'completed')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.completed }}</span>
                       <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'eiflix', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.notCompleted }}</span>
                     </div>
+                  </div> -->
+                  <div class="rp-content-item-block" *ngFor="let name of row.eiflix; let j = index">
+                    <div class="rp-item-row">
+                      <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
+                      <div class="rp-stats-chips">
+                        <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'eiflix', j, 'all')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.total }}</span>
+                        <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'eiflix', j, 'completed')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.completed }}</span>
+                        <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'eiflix', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.notCompleted }}</span>
+                      </div>
+                    </div>
+                    <!-- <div class="rp-sequence-list" *ngIf="mapPlaylistMeta[name.id]?.sequence?.length">
+                      <span class="rp-sequence-item" *ngFor="let seq of mapPlaylistMeta[name.id].sequence">
+                        {{ mapEpisodes[seq?.id || seq] || seq?.id || seq }}
+                      </span>
+                    </div> -->
+                  <div class="rp-sequence-list" *ngIf="mapPlaylistMeta[name.id]?.sequence?.length">
+                  <div class="rp-sequence-row" *ngFor="let seq of mapPlaylistMeta[name.id].sequence; let k = index">
+                    <span class="rp-sequence-item">
+                      {{ mapEpisodes[seq?.id]}}
+                    </span>
+                    <div class="rp-sequence-chips">
+                      <span class="rp-chip rp-chip-seq" matTooltip="Total"
+                        (click)="openContentPanel(row, 'eiflix', j, 'all', k)" style="cursor:pointer;">
+                        {{ row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.completed + row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.notCompleted }}
+                      </span>
+                      <span class="rp-chip rp-chip-yes" matTooltip="Completed"
+                        (click)="openContentPanel(row, 'eiflix', j, 'completed', k)" style="cursor:pointer;">
+                        {{ row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.completed }}
+                      </span>
+                      <span class="rp-chip rp-chip-no" matTooltip="Pending"
+                        (click)="openContentPanel(row, 'eiflix', j, 'notcompleted', k)" style="cursor:pointer;">
+                        {{ row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.notCompleted }}
+                      </span>
+                    </div>
+                  </div>
+                  </div>
                   </div>
                 </ng-container>
                 <ng-container *ngIf="row.generalcontent?.length">
                   <span class="rp-content-heading">General Content ({{row.generalcontent?.length}})</span>
-                  <div class="rp-content-item-block" *ngFor="let name of row.generalcontent; let j = index">
+                  <!-- <div class="rp-content-item-block" *ngFor="let name of row.generalcontent; let j = index">
                     <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
                     <div class="rp-stats-chips">
                       <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'generalcontent', j, 'all')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.total }}</span>
                       <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'generalcontent', j, 'completed')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.completed }}</span>
                       <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'generalcontent', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.notCompleted }}</span>
                     </div>
+                  </div> -->
+                  <div class="rp-content-item-block" *ngFor="let name of row.generalcontent; let j = index">
+                    <div class="rp-item-row">
+                      <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
+                      <div class="rp-stats-chips">
+                        <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'generalcontent', j, 'all')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.total }}</span>
+                        <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'generalcontent', j, 'completed')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.completed }}</span>
+                        <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'generalcontent', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.notCompleted }}</span>
+                      </div>
+                    </div>
                   </div>
                 </ng-container>
                 <ng-container *ngIf="row.solarvoice?.length">
                   <span class="rp-content-heading">Solar Voice ({{row.solarvoice?.length}})</span>
-                  <div class="rp-content-item-block" *ngFor="let name of row.solarvoice; let j = index">
+                  <!-- <div class="rp-content-item-block" *ngFor="let name of row.solarvoice; let j = index">
                     <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
                     <div class="rp-stats-chips">
                       <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'solarvoice', j, 'all')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.total }}</span>
                       <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'solarvoice', j, 'completed')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.completed }}</span>
                       <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.notCompleted }}</span>
+                    </div>
+                  </div> -->
+                  <div class="rp-content-item-block" *ngFor="let name of row.solarvoice; let j = index">
+                    <div class="rp-item-row">
+                      <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
+                      <div class="rp-stats-chips">
+                        <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'solarvoice', j, 'all')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.total }}</span>
+                        <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'solarvoice', j, 'completed')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.completed }}</span>
+                        <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.notCompleted }}</span>
+                      </div>
+                    </div>
+                    <!-- <div class="rp-sequence-list" *ngIf="mapPlaylistMeta[name.id]?.sequence?.length">
+                      <span class="rp-sequence-item" *ngFor="let seq of mapPlaylistMeta[name.id].sequence">
+                        {{ mapAudio[seq?.id || seq] || seq?.id || seq }}
+                      </span>
+                    </div> -->
+                    <div class="rp-sequence-list" *ngIf="mapPlaylistMeta[name.id]?.sequence?.length">
+                      <div class="rp-sequence-row" *ngFor="let seq of mapPlaylistMeta[name.id].sequence; let k = index">
+                        <span class="rp-sequence-item">
+                          {{ mapAudio[seq?.id]}}
+                        </span>
+                        <div class="rp-sequence-chips">
+                          <span class="rp-chip rp-chip-seq" matTooltip="Total"
+                            (click)="openContentPanel(row, 'solarvoice', j, 'all', k)" style="cursor:pointer;">
+                            {{ row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.completed + row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.notCompleted }}
+                          </span>
+                          <span class="rp-chip rp-chip-yes" matTooltip="Completed"
+                            (click)="openContentPanel(row, 'solarvoice', j, 'completed', k)" style="cursor:pointer;">
+                            {{ row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.completed }}
+                          </span>
+                          <span class="rp-chip rp-chip-no" matTooltip="Pending"
+                            (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted', k)" style="cursor:pointer;">
+                            {{ row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.notCompleted }}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </ng-container>
@@ -642,7 +724,7 @@
     </button>
   </div>
   <div class="rp-side-panel-count">{{ sidePanelProfiles.length }} profiles</div>
-  <div class="rp-side-panel-body">
+  <!-- <div class="rp-side-panel-body">
     <div class="rp-side-panel-item" *ngFor="let p of sidePanelProfiles">
       <span class="rp-cell-text">{{ p.name }}</span>
       <span *ngIf="p.percentage !== undefined" class="rp-chip">
@@ -656,6 +738,30 @@
       <mat-icon>person_off</mat-icon>
       <p>No profiles found</p>
     </div>
+  </div> -->
+    <div class="rp-side-panel-body">
+      <div class="rp-side-panel-item" *ngFor="let p of sortedSidePanelProfiles">
+        <span class="rp-cell-text">{{ p.name }}</span>
+        <div class="rp-side-panel-item-right">
+          <span *ngIf="p.percentage !== undefined"
+            class="rp-chip"
+            [class.rp-chip-not-started]="getProgressState(p) === 'not-started'"
+            [class.rp-chip-in-progress]="getProgressState(p) === 'in-progress'"
+            [class.rp-chip-yes]="getProgressState(p) === 'completed'">
+            {{ p.percentage }}%
+          </span>
+          <span class="rp-chip"
+            [class.rp-chip-not-started]="getProgressState(p) === 'not-started'"
+            [class.rp-chip-in-progress]="getProgressState(p) === 'in-progress'"
+            [class.rp-chip-yes]="getProgressState(p) === 'completed'">
+            {{ p.completed ? 'Completed' : (p.percentage > 0 ? 'In Progress' : 'Pending') }}
+          </span>
+        </div>
+      </div>
+      <div *ngIf="sidePanelProfiles.length === 0" class="rp-empty" style="padding:32px 0;">
+        <mat-icon>person_off</mat-icon>
+        <p>No profiles found</p>
+      </div>
+    </div>
   </div>
-</div>
 </div>

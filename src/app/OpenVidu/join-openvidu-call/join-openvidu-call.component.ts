@@ -694,10 +694,12 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
     this.localParticipant.set(videoTrack);
 
-    await room.localParticipant.setMicrophoneEnabled(true, {
-      noiseSuppression: true,
-      echoCancellation: true
-    });
+    await this.enableMicrophoneWithNoiseCancellation(room);
+
+    // await room.localParticipant.setMicrophoneEnabled(true, {
+    //   noiseSuppression: true,
+    //   echoCancellation: true
+    // });
 
       // Enable camera and microphone for publishing - Default
       /*
@@ -1036,5 +1038,50 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       remote => remote.trackPublication.kind === 'video'
     ).length;
     return 1 + remoteVideoCount;
+  }
+
+  /**
+   * Enable microphone with RNNoise noise cancellation
+   */
+  async enableMicrophoneWithNoiseCancellation(room: Room) {
+    try {
+      console.log('🎙️ Attempting to enable microphone with RNNoise...');
+      
+      // Get raw microphone stream
+      const rawStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,      // Keep echo cancellation
+          noiseSuppression: false,     // Disable - RNNoise will handle this
+          autoGainControl: true,
+          sampleRate: 48000,           // RNNoise requires 48kHz
+          channelCount: 1              // Mono for voice
+        }
+      });
+
+      // Apply RNNoise
+      const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
+
+      // Publish clean audio to LiveKit
+      await room.localParticipant.publishTrack(cleanAudioTrack, {
+        source: Track.Source.Microphone,
+        name: 'microphone'
+      });
+
+      console.log('✅ Microphone enabled with RNNoise');
+      
+    } catch (error) {
+      console.error('❌ RNNoise failed, falling back to WebRTC:', error);
+      
+      // Fallback to WebRTC noise suppression
+      await room.localParticipant.setMicrophoneEnabled(true, {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 1
+      });
+      
+      console.log('✅ Microphone enabled with WebRTC noise suppression (fallback)');
+    }
   }
 }
