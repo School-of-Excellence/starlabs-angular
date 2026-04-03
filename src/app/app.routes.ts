@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 
 export const routes: Routes = [
-  {path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.JourneyOnboardingFormComponent)},
+  {path: 'journeydashboard', loadComponent: () => import('./journey-dashboard/journey-dashboard.component').then(m => m.JourneyDashboardComponent)},
   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
   {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
   {path: 'routeconfiguration', loadComponent: () => import('./route-configuration-duplicate/route-configuration.component').then(m => m.RouteConfigurationComponent), canActivate:[authGuard]},
