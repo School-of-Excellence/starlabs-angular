@@ -580,19 +580,24 @@
                 {{ c.status || 'NOT INITIATED' }}
               </span>
               <!-- Tentative Date -->
-              <span *ngIf="(c?.status === null || c?.status === 'initiated') && c?.tentativestart" class="card-date">
+              <span *ngIf="(
+            (c?.status === null || c?.status === 'initiated') && c?.tentativestart
+          ) 
+         " class="card-date">
                 Tentative Start:
                 {{ c?.tentativestart?.toDate() | date:'dd MMM yyyy' }}
               </span>
               <div *ngIf="
     c?.status === 'completed' ||
     c?.status === 'submitted' ||
-    (c?.status === 'ongoing' && (
+    (c?.status === 'ongoing' 
+    && (
       c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Welcome Call') ||
       c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Diagnostics') ||
       c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Implementation') ||
       c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Implementation')
-    ))
+    )
+  )
   " class="detail-row" (click)="toggleExpand(c, i)">
                 <span>
                   <span class="detail-label">
@@ -660,7 +665,9 @@
                         : (appointment?.cancelled
                         ? 'Cancelled'
                         : appointment?.attended
-                        && 'Completed'
+                        ? 'Completed'
+                        : (!appointment?.attended)
+                        && 'Scheduled'
                         )
                         }}
                       </div>
