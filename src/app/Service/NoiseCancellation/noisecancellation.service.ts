@@ -156,6 +156,7 @@ export class NoiseCancellationService {
     this.outputAnalyser.smoothingTimeConstant = 0.5;
 
     // ✅ FIX 2: Removed stereo merger - use mono output directly
+    const merger = this.audioContext.createChannelMerger(2);
     const destination = this.audioContext.createMediaStreamDestination();
 
     // Connect audio graph
@@ -164,14 +165,20 @@ export class NoiseCancellationService {
     this.inputAnalyser.connect(this.rnnoiseNode);
     this.rnnoiseNode.connect(outputGain);
     outputGain.connect(this.outputAnalyser);
-    this.outputAnalyser.connect(destination); // Direct mono connection
+    // this.outputAnalyser.connect(destination); // Direct mono connection
+
+    // ✅ Split mono to stereo (left and right)
+    this.outputAnalyser.connect(merger, 0, 0); // mono → left channel
+    this.outputAnalyser.connect(merger, 0, 1); // mono → right channel
+    merger.connect(destination);
 
     const processedTrack = destination.stream.getAudioTracks()[0];
     const localAudioTrack = new LocalAudioTrack(processedTrack, undefined, true);
     localAudioTrack.source = Track.Source.Microphone;
     this.isRnnoiseActive = true;
 
-    console.log('✅ RNNoise enabled - Gain:', outputGain.gain.value, 'Mono output');
+    console.log('✅ RNNoise enabled - Gain:', outputGain.gain.value, 'Stereo output');
+//                                                                  
 
     return localAudioTrack;
   }
