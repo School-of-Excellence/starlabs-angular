@@ -6,122 +6,212 @@ import { LocalAudioTrack, Track } from 'livekit-client';
   providedIn: 'root'
 })
 export class NoiseCancellationService {
+  // private audioContext: AudioContext | null = null;
+  // private rnnoiseNode: RnnoiseWorkletNode | null = null;
+  // private stream: MediaStream | null = null;
+
   private audioContext: AudioContext | null = null;
   private rnnoiseNode: RnnoiseWorkletNode | null = null;
   private stream: MediaStream | null = null;
+  private originalStream: MediaStream | null = null;
 
-  // Exposed so the metric overlay (Issue 2) can tap into these later
+  // // Exposed for metric overlay (Issue 2)
+  // inputAnalyser: AnalyserNode | null = null;
+  // outputAnalyser: AnalyserNode | null = null;
+  // isRnnoiseActive = false;
+
   inputAnalyser: AnalyserNode | null = null;
   outputAnalyser: AnalyserNode | null = null;
-
-  // Whether RNNoise is active or we fell back to WebRTC
   isRnnoiseActive = false;
 
-  async getCleanAudioTrack(inputStream: MediaStream): Promise<LocalAudioTrack> {
+  // async getCleanAudioTrack(inputStream: MediaStream): Promise<LocalAudioTrack> {
 
-    // ✅ FIX 1: Use 'interactive' latency hint.
-    //    Default 'balanced' adds ~40ms of extra buffering which
-    //    worsens perceived compression and causes A/V drift.
+  //   this.audioContext = new AudioContext({
+  //     sampleRate: 48000,
+  //     latencyHint: 'interactive'
+  //   });
+
+  //   await this.audioContext.audioWorklet.addModule('/assets/wns/rnnoise/workletProcessor.js');
+
+  //   const wasmBinary = await loadRnnoise({
+  //     url: '/assets/wns/rnnoise.wasm',
+  //     simdUrl: '/assets/wns/rnnoise_simd.wasm'
+  //   });
+
+  //   this.stream = inputStream;
+
+  //   // ─────────────────────────────────────────────────────────────────────
+  //   // Audio graph:
+  //   //
+  //   //  mic source (48kHz, echoCancellation handled by getUserMedia BEFORE
+  //   //              this point — see enableMicrophoneWithNoiseCancellation)
+  //   //      │
+  //   //  inputGain (1.0)
+  //   //  inputAnalyser           ← metric tap (Issue 2)
+  //   //      │
+  //   //  RnnoiseWorkletNode
+  //   //      │
+  //   //  outputGain (2.0)        ← compensates for RNNoise amplitude drop
+  //   //  outputAnalyser          ← metric tap (Issue 2)
+  //   //      │
+  //   //  channelMerger (1→2)     ← guarantees both speakers on all platforms
+  //   //      │
+  //   //  destination (MediaStream) → LiveKit publishTrack
+  //   // ─────────────────────────────────────────────────────────────────────
+
+  //   const source = this.audioContext.createMediaStreamSource(this.stream);
+
+  //   const inputGain = this.audioContext.createGain();
+  //   inputGain.gain.value = 1.0;
+
+  //   this.inputAnalyser = this.audioContext.createAnalyser();
+  //   this.inputAnalyser.fftSize = 256;
+  //   this.inputAnalyser.smoothingTimeConstant = 0.5;
+
+  //   this.rnnoiseNode = new RnnoiseWorkletNode(this.audioContext, {
+  //     wasmBinary: wasmBinary,
+  //     maxChannels: 1
+  //   });
+
+  //   const outputGain = this.audioContext.createGain();
+  //   outputGain.gain.value = 2.0;
+
+  //   this.outputAnalyser = this.audioContext.createAnalyser();
+  //   this.outputAnalyser.fftSize = 256;
+  //   this.outputAnalyser.smoothingTimeConstant = 0.5;
+
+  //   const merger = this.audioContext.createChannelMerger(2);
+  //   const destination = this.audioContext.createMediaStreamDestination();
+
+  //   source.connect(inputGain);
+  //   inputGain.connect(this.inputAnalyser);
+  //   this.inputAnalyser.connect(this.rnnoiseNode);
+  //   this.rnnoiseNode.connect(outputGain);
+  //   outputGain.connect(this.outputAnalyser);
+  //   this.outputAnalyser.connect(merger, 0, 0); // mono → left
+  //   this.outputAnalyser.connect(merger, 0, 1); // mono → right
+  //   merger.connect(destination);
+
+  //   const processedTrack = destination.stream.getAudioTracks()[0];
+  //   const localAudioTrack = new LocalAudioTrack(processedTrack, undefined, true);
+  //   localAudioTrack.source = Track.Source.Microphone;
+  //   this.isRnnoiseActive = true;
+
+  //   return localAudioTrack;
+  // }
+
+  // async cleanup() {
+  //   this.rnnoiseNode?.destroy();
+  //   this.rnnoiseNode?.disconnect();
+  //   this.stream?.getTracks().forEach(track => track.stop());
+  //   await this.audioContext?.close();
+
+  //   this.audioContext = null;
+  //   this.rnnoiseNode = null;
+  //   this.stream = null;
+  //   this.inputAnalyser = null;
+  //   this.outputAnalyser = null;
+  //   this.isRnnoiseActive = false;
+  // }
+
+  async getCleanAudioTrack(inputStream: MediaStream): Promise<LocalAudioTrack> {
+    // ✅ Store original stream to stop it later
+    this.originalStream = inputStream;
+
     this.audioContext = new AudioContext({
       sampleRate: 48000,
       latencyHint: 'interactive'
     });
 
-    // Load worklet processor
     await this.audioContext.audioWorklet.addModule('/assets/wns/rnnoise/workletProcessor.js');
 
-    // Load WASM binary
     const wasmBinary = await loadRnnoise({
       url: '/assets/wns/rnnoise.wasm',
       simdUrl: '/assets/wns/rnnoise_simd.wasm'
     });
 
-    this.stream = inputStream;
+    // Audio graph (FIXED):
+    // mic source → inputGain → inputAnalyser → RNNoise → outputGain (1.3x) → outputAnalyser → destination
 
-    // ─────────────────────────────────────────────
-    // Audio graph:
-    //
-    //  mic source
-    //      │
-    //  inputGain (0.8)      ← ✅ FIX 2: attenuate slightly before RNNoise
-    //      │                   so hot mic signals don't saturate the model
-    //  inputAnalyser        ← for metric overlay (Issue 2)
-    //      │
-    //  RnnoiseWorkletNode
-    //      │
-    //  outputGain (1.2)     ← ✅ FIX 3: restore natural speech dynamics
-    //      │                   after RNNoise normalizes the signal down
-    //  outputAnalyser       ← for metric overlay (Issue 2)
-    //      │
-    //  destination (MediaStream)
-    // ─────────────────────────────────────────────
+    const source = this.audioContext.createMediaStreamSource(inputStream);
 
-    const source = this.audioContext.createMediaStreamSource(this.stream);
-
-    // ✅ FIX 2: Input gain — gently attenuate before RNNoise.
-    //    At 1.0 (no gain) a hot mic can push RNNoise into treating
-    //    the top of your speech waveform as noise and suppressing it.
-    //    0.8 gives the model comfortable headroom.
     const inputGain = this.audioContext.createGain();
-    inputGain.gain.value = 0.8;
+    inputGain.gain.value = 1.0;
 
-    // Analyser for raw-mic level (used by metric overlay)
     this.inputAnalyser = this.audioContext.createAnalyser();
     this.inputAnalyser.fftSize = 256;
     this.inputAnalyser.smoothingTimeConstant = 0.5;
 
-    // Create RNNoise worklet node
     this.rnnoiseNode = new RnnoiseWorkletNode(this.audioContext, {
       wasmBinary: wasmBinary,
       maxChannels: 1
     });
 
-    // ✅ FIX 3: Output gain — compensate for RNNoise's normalized output.
-    //    RNNoise outputs at a conservative level; boosting by 1.2
-    //    brings speech back to a natural loudness without clipping.
-    //    Adjust between 1.0–1.4 to taste.
+    // ✅ FIX 1: Reduced gain from 2.0 to 1.3 to prevent distortion
     const outputGain = this.audioContext.createGain();
-    outputGain.gain.value = 1.2;
+    outputGain.gain.value = 1.3; // Was 2.0
 
-    // Analyser for clean-mic level (used by metric overlay)
     this.outputAnalyser = this.audioContext.createAnalyser();
     this.outputAnalyser.fftSize = 256;
     this.outputAnalyser.smoothingTimeConstant = 0.5;
 
+    // ✅ FIX 2: Removed stereo merger - use mono output directly
+    const merger = this.audioContext.createChannelMerger(2);
     const destination = this.audioContext.createMediaStreamDestination();
 
-    // Wire up the graph
+    // Connect audio graph
     source.connect(inputGain);
     inputGain.connect(this.inputAnalyser);
     this.inputAnalyser.connect(this.rnnoiseNode);
     this.rnnoiseNode.connect(outputGain);
     outputGain.connect(this.outputAnalyser);
-    this.outputAnalyser.connect(destination);
+    // this.outputAnalyser.connect(destination); // Direct mono connection
+
+    // ✅ Split mono to stereo (left and right)
+    this.outputAnalyser.connect(merger, 0, 0); // mono → left channel
+    this.outputAnalyser.connect(merger, 0, 1); // mono → right channel
+    merger.connect(destination);
 
     const processedTrack = destination.stream.getAudioTracks()[0];
-    const localAudioTrack = new LocalAudioTrack(
-      processedTrack,
-      undefined,
-      true
-    );
-
+    const localAudioTrack = new LocalAudioTrack(processedTrack, undefined, true);
     localAudioTrack.source = Track.Source.Microphone;
     this.isRnnoiseActive = true;
+
+    console.log('✅ RNNoise enabled - Gain:', outputGain.gain.value, 'Stereo output');
+//                                                                  
 
     return localAudioTrack;
   }
 
   async cleanup() {
+    console.log('🧹 Cleaning up RNNoise...');
+    
+    // ✅ FIX 3: Stop original stream to prevent echo
+    if (this.originalStream) {
+      this.originalStream.getTracks().forEach(track => {
+        track.stop();
+        console.log('Stopped original track:', track.kind);
+      });
+      this.originalStream = null;
+    }
+
     this.rnnoiseNode?.destroy();
     this.rnnoiseNode?.disconnect();
-    this.stream?.getTracks().forEach(track => track.stop());
+    
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.stream = null;
+    }
+    
     await this.audioContext?.close();
 
     this.audioContext = null;
     this.rnnoiseNode = null;
-    this.stream = null;
     this.inputAnalyser = null;
     this.outputAnalyser = null;
     this.isRnnoiseActive = false;
+    
+    console.log('✅ RNNoise cleanup complete');
   }
 }
+
