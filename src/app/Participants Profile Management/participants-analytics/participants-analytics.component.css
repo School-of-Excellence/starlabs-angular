@@ -150,3 +150,64 @@ tr:hover .tag-history-btn { opacity: 1; }
   border-color: #fca5a5;
   color: #dc2626;
 }
+
+/* Backdrop */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.55);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal Card */
+.modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 0.5px solid #d0d0d0;
+  width: 100%;
+  max-width: 460px;
+  padding: 2rem;
+  animation: slideIn 0.2s ease;
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Header */
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+
+  h2 {
+    font-size: 18px;
+    font-weight: 500;
+    color: #111;
+    margin: 0;
+  }
+
+  p {
+    font-size: 13px;
+    color: #666;
+    margin: 4px 0 0;
+  }
+}
+
+/* Form Field */
+.full-width {
+  width: 100%;
+}
+
+/* Footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 1.5rem;
+}

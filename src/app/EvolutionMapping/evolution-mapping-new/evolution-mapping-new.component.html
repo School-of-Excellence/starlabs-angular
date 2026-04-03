@@ -357,6 +357,9 @@
                 <div class="video-type-badge" *ngIf="event['videoType'] && event['videoType'] !== 'Event'">
                   {{ event['videoType'] }}
                 </div>
+                <div class="video-type-badge linked-event-badge" *ngIf="event['linkedEventName']">
+                  Event: {{ event['linkedEventName'] }}
+                </div>
               </div>
               <div class="event-card-action">
                 <!-- Primary watch button -->
@@ -452,44 +455,92 @@
 
   <!-- Edit Video Overlay -->
   <div class="overlay-backdrop" *ngIf="showEditVideoOverlay" (click)="closeEditVideo()">
-    <div class="note-panel" (click)="$event.stopPropagation()">
-      <div class="note-header">
-        <h3>Edit Video Details</h3>
+    <div class="add-video-panel" (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <div class="add-video-header">
+        <h2 class="add-video-title">Edit Video</h2>
         <button mat-icon-button (click)="closeEditVideo()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
-      <div class="note-body">
-        <!-- Live Event -->
+
+      <!-- Body -->
+      <div class="add-video-body" [formGroup]="editVideoForm">
+
+        <!-- Title -->
         <div class="form-group">
-          <label class="form-label">Live Event</label>
-          <mat-form-field appearance="outline" style="width:100%">
-            <mat-select [(ngModel)]="editVideoEventId">
-              <mat-option value="">None</mat-option>
-              <mat-option *ngFor="let e of liveEvents" [value]="e.id">
-                {{ e.name }}
-              </mat-option>
-            </mat-select>
+          <label class="form-label">Title</label>
+          <mat-form-field appearance="outline" class="full-width">
+            <input matInput formControlName="title" placeholder="Enter video title">
+            <mat-error *ngIf="editVideoForm.get('title')?.touched && editVideoForm.get('title')?.hasError('required')">
+              Title is required
+            </mat-error>
           </mat-form-field>
         </div>
+
         <!-- Recorded Date -->
         <div class="form-group">
           <label class="form-label">Recorded Date</label>
-          <mat-form-field appearance="outline" style="width:100%">
+          <mat-form-field appearance="outline" class="full-width">
             <input matInput [matDatepicker]="editDatePicker"
-                  [(ngModel)]="editVideoRecordedDate"
+                  formControlName="recordedDate"
                   placeholder="Select date">
             <mat-datepicker-toggle matSuffix [for]="editDatePicker"></mat-datepicker-toggle>
             <mat-datepicker #editDatePicker></mat-datepicker>
           </mat-form-field>
         </div>
+
+        <!-- Type -->
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-select formControlName="type">
+              <mat-option value="Event">Event</mat-option>
+              <mat-option value="Interview">Interview</mat-option>
+              <mat-option value="Testimonial">Testimonial</mat-option>
+            </mat-select>
+            <mat-error *ngIf="editVideoForm.get('type')?.touched && editVideoForm.get('type')?.hasError('required')">
+              Type is required
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Live Event -->
+        <div class="form-group">
+          <label class="form-label">Live Event</label>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-select formControlName="eventId">
+              <mat-option value="">None</mat-option>
+              <mat-option *ngFor="let e of liveEvents" [value]="e.id">
+                {{ e.name }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>Optional — link to a live event if related</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <!-- Video URL -->
+        <div class="form-group">
+          <label class="form-label">Video URL</label>
+          <mat-form-field appearance="outline" class="full-width">
+            <input matInput formControlName="videoUrl" placeholder="Enter video URL">
+            <mat-error *ngIf="editVideoForm.get('videoUrl')?.touched && editVideoForm.get('videoUrl')?.hasError('required')">
+              Video URL is required
+            </mat-error>
+          </mat-form-field>
+        </div>
+
       </div>
-      <div class="note-footer">
+
+      <!-- Footer -->
+      <div class="add-video-footer">
         <button mat-stroked-button (click)="closeEditVideo()">Cancel</button>
         <button class="save-video-btn" (click)="saveEditVideo()" [disabled]="editVideoSaving">
           {{ editVideoSaving ? 'Saving...' : 'Save' }}
         </button>
       </div>
+
     </div>
   </div>
   <!-- Add Video Overlay -->
