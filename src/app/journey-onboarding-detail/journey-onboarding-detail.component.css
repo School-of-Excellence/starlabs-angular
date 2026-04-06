@@ -146,7 +146,23 @@
   font-size: 10px; font-weight: 700; color: #3f51b5;
   background: #e8eaf6; padding: 2px 8px; border-radius: 10px;
 }
-.add-btn { width: 100%; margin-bottom: 10px; border-style: dashed !important; font-size: 12px !important; }
+.section-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* pushes button right */
+  margin-bottom: 10px;
+}
+
+.add-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+  margin-left: auto;
+}
 
 /* ─── Image Upload Box ────────────────────────────────────────── */
 .img-upload-box {
@@ -342,4 +358,27 @@
 .update-btn:disabled {
   background-color: #93c5fd;
   cursor: not-allowed;
+}
+
+.drag-list {
+  margin-top: -20px;
+  margin-bottom: 15px;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 40px;
+}
+
+.drag-item {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #f5f7ff;
+  border-radius: 6px;
+  cursor: move;
+  font-size: 13px;
+  border: 1px solid #e0e7ff;
+}
+
+.drag-item:hover {
+  background: #e0e7ff;
 }
