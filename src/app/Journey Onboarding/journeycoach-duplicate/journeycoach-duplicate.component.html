@@ -360,7 +360,7 @@
         <div style="font-size:10px;color:var(--text-secondary);font-weight:600;margin-top:2px">Total Ended</div>
       </div>
     </div>
-    <div class="scroll-box">
+    <div class="scroll-box" style="max-height:320px">
       <table class="tbl">
         <thead>
           <tr>
@@ -446,15 +446,15 @@
   </div>
 
   <!-- MODES -->
-  <div class="card">
+  <div class="card" style="display:flex;flex-direction:column">
     <div class="card-h">
       <span class="card-t">Modes</span>
       <a class="card-link" (click)="navigateToModeDashboard()" style="cursor:pointer">Dashboard <mat-icon style="font-size:14px">arrow_forward</mat-icon></a>
     </div>
-    <div class="modes-grid">
+    <div class="modes-grid scroll-box" style="flex:1;max-height:460px">
       <div class="mode-item" *ngFor="let mode of modesList" (click)="openDialog(mode)">
-        <span>{{mode}}</span>
-        <span class="mode-badge" style="background:var(--primary)">{{modeMap[mode]?.length ?? 0}}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px">{{mode}}</span>
+        <span class="mode-badge" [style.background]="(modeMap[mode]?.length ?? 0) > 0 ? 'var(--primary)' : 'var(--text-muted)'">{{modeMap[mode]?.length ?? 0}}</span>
       </div>
     </div>
   </div>
@@ -516,39 +516,52 @@
             </div>
           </div>
           <table class="tbl">
-            <thead><tr><th>Flag</th><th class="c">Ask AH</th><th class="c">Love Letter</th><th class="c">Combined</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Flag</th>
+                <th class="c">Ask AH</th>
+                <th class="c">Love Letter</th>
+                <th class="c">Combined</th>
+                <th class="c" style="background:#ede9fe;color:#5b21b6;border-radius:6px 6px 0 0">Resolved</th>
+              </tr>
+            </thead>
             <tbody>
               <tr>
                 <td><span style="color:var(--success);font-weight:600">● Happy</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'liked','Ask AH · Happy')">{{ askAHLoveLetterSummary.askAH.liked }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" style="color:var(--success)" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'liked','Love Letter · Happy')">{{ askAHLoveLetterSummary.loveLetter.liked }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Happy · Combined')">{{ askAHLoveLetterSummary.liked }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'likedResolved','Happy · Resolved')">{{ askAHLoveLetterSummary.resolvedLiked || 0 }}</span></td>
               </tr>
               <tr>
                 <td><span style="color:var(--warning);font-weight:600">△ Needs Attention</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'tagged','Ask AH · Needs Attention')">{{ askAHLoveLetterSummary.askAH.tagged }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'tagged','Love Letter · Needs Attention')">{{ askAHLoveLetterSummary.loveLetter.tagged }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" style="color:var(--warning)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'tagged','Needs Attention · Combined')">{{ askAHLoveLetterSummary.tagged }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'taggedResolved','Needs Attention · Resolved')">{{ askAHLoveLetterSummary.resolvedTagged || 0 }}</span></td>
               </tr>
               <tr>
                 <td><span style="color:var(--primary);font-weight:600">● Opportunity</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'opportunity','Ask AH · Opportunity')">{{ askAHLoveLetterSummary.askAH.opportunity }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'opportunity','Love Letter · Opportunity')">{{ askAHLoveLetterSummary.loveLetter.opportunity }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunity','Opportunity · Combined')">{{ askAHLoveLetterSummary.opportunity }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunityResolved','Opportunity · Resolved')">{{ askAHLoveLetterSummary.resolvedOpportunity || 0 }}</span></td>
               </tr>
               <tr>
                 <td><span style="color:var(--danger);font-weight:600">● Critical</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'critical','Ask AH · Critical')">{{ askAHLoveLetterSummary.askAH.critical }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'critical','Love Letter · Critical')">{{ askAHLoveLetterSummary.loveLetter.critical }}</span></td>
                 <td class="c"><span class="jcd-clickable-num" style="color:var(--danger)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'critical','Critical · Combined')">{{ askAHLoveLetterSummary.critical }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalResolved','Critical · Resolved')">{{ askAHLoveLetterSummary.resolvedCritical || 0 }}</span></td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
                 <td><strong>Total Flagged</strong></td>
-                <td class="c"><strong (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH · All Flagged')" class="jcd-clickable-num">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</strong></td>
-                <td class="c"><strong (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter · All Flagged')" class="jcd-clickable-num">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</strong></td>
-                <td class="c"><strong (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'any','All Flagged · Combined')" class="jcd-clickable-num">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</strong></td>
+                <td class="c"><strong class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH · All Flagged')">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</strong></td>
+                <td class="c"><strong class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter · All Flagged')">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</strong></td>
+                <td class="c"><strong class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'any','All Flagged · Combined')">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</strong></td>
+                <td class="c" style="background:#f5f3ff"><strong class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'anyResolved','All Resolved')">{{ askAHLoveLetterSummary.resolvedTotal || 0 }}</strong></td>
               </tr>
             </tfoot>
           </table>
@@ -1235,37 +1248,68 @@
 
 <!-- ══════ ASK AH / LOVE LETTER PROFILES DIALOG ══════ -->
 <div class="overlay" [class.open]="isAskAHDialogOpen" (click)="isAskAHDialogOpen=false">
-  <div class="dialog" style="max-width:560px" (click)="$event.stopPropagation()">
+  <div class="dialog" style="max-width:600px" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
     <div class="dlg-hd">
       <div class="dlg-hd-left">
         <div class="dlg-av nc" style="background:#fce7f3;color:#be185d">AH</div>
         <div>
           <div class="dlg-title">{{ askAHDialogTitle }}</div>
-          <div class="dlg-sub">{{ askAHDialogProfiles.length }} profiles</div>
+          <div class="dlg-sub">{{ getFilteredAskAHProfiles().length }} profiles</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportAskAHDialogData()">
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportAskAHDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="isAskAHDialogOpen=false">✕</button></div>
+        </button>
+        <button class="close-btn" (click)="isAskAHDialogOpen=false">✕</button>
+      </div>
     </div>
+
+    <!-- Filters -->
+    <div class="ah-filter-bar">
+      <div class="ah-filter-group">
+        <span class="ah-filter-label">Source</span>
+        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHSourceFilter==='all'" (click)="askAHSourceFilter='all'">All</button>
+        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHSourceFilter==='askAH'" (click)="askAHSourceFilter='askAH'">Ask AH</button>
+        <button class="ah-filter-chip ah-filter-chip--love" [class.ah-filter-chip--active]="askAHSourceFilter==='loveLetter'" (click)="askAHSourceFilter='loveLetter'">Love Letter</button>
+      </div>
+      <div class="ah-filter-sep"></div>
+      <div class="ah-filter-group">
+        <span class="ah-filter-label">Resolved</span>
+        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHResolvedFilter==='all'" (click)="askAHResolvedFilter='all'">All</button>
+        <button class="ah-filter-chip ah-filter-chip--resolved" [class.ah-filter-chip--active]="askAHResolvedFilter==='resolved'" (click)="askAHResolvedFilter='resolved'">Resolved</button>
+        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHResolvedFilter==='unresolved'" (click)="askAHResolvedFilter='unresolved'">Unresolved</button>
+      </div>
+    </div>
+
+    <!-- Profile list -->
     <div class="dlg-body">
-      <div *ngIf="askAHDialogProfiles.length === 0" class="jcd-cura-empty">No profiles found</div>
-      <div class="participant-row" *ngFor="let p of askAHDialogProfiles" (click)="navigatetoprofile(p.profileid)">
+      <div *ngIf="getFilteredAskAHProfiles().length === 0" class="jcd-cura-empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.25"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p>No profiles match the selected filters</p>
+      </div>
+      <div class="participant-row" *ngFor="let p of getFilteredAskAHProfiles()" (click)="navigatetoprofile(p.profileid)">
         <div class="par-av nc" style="background:#fce7f3;color:#be185d">{{ getInitials(mapprofile[p.profileid] || p.profileid) }}</div>
         <div style="flex:1;min-width:0">
           <div class="par-name">{{ mapprofile[p.profileid] || p.profileid }}</div>
-          <div class="par-id" style="display:flex;align-items:center;gap:6px;margin-top:2px">
-            <span>{{ p.source === 'ask AH' ? 'Ask AH' : 'Love Letter' }}</span>
-            <span *ngIf="p.liked" style="padding:1px 7px;background:var(--success-light);color:#065f46;border-radius:8px;font-size:10px;font-weight:700">Happy</span>
-            <span *ngIf="p.tagged" style="padding:1px 7px;background:var(--warning-light);color:#92400e;border-radius:8px;font-size:10px;font-weight:700">Needs Attention</span>
-            <span *ngIf="p.opportunity" style="padding:1px 7px;background:var(--primary-light);color:#1e40af;border-radius:8px;font-size:10px;font-weight:700">Opportunity</span>
-            <span *ngIf="p.critical" style="padding:1px 7px;background:var(--danger-light);color:#991b1b;border-radius:8px;font-size:10px;font-weight:700">Critical</span>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:3px">
+            <span class="ah-source-badge" [class.ah-source-badge--love]="p.source !== 'ask AH'">
+              {{ p.source === 'ask AH' ? 'Ask AH' : 'Love Letter' }}
+            </span>
+            <span *ngIf="p.liked" class="ah-flag-badge ah-flag-badge--happy">Happy</span>
+            <span *ngIf="p.tagged" class="ah-flag-badge ah-flag-badge--tagged">Needs Attention</span>
+            <span *ngIf="p.opportunity" class="ah-flag-badge ah-flag-badge--opportunity">Opportunity</span>
+            <span *ngIf="p.critical" class="ah-flag-badge ah-flag-badge--critical">Critical</span>
+            <span *ngIf="p.resolved" class="ah-flag-badge ah-flag-badge--resolved">✓ Resolved</span>
           </div>
         </div>
         <span class="par-arrow">›</span>
       </div>
     </div>
+
   </div>
 </div>
 

@@ -54,7 +54,7 @@
   .main { padding: 20px 28px; width: 100%; }
   .row { display: grid; gap: 14px; margin-bottom: 14px; }
   .row-top { grid-template-columns: repeat(5, 1fr); }
-  .row-mid { grid-template-columns: 240px 1fr 1fr 280px; }
+  .row-mid { grid-template-columns: 320px 1fr 1fr 260px; align-items: start; }
   .row-bot { grid-template-columns: 1fr 1fr; }
   .row-extra { grid-template-columns: 1fr 1fr 1fr; }
 
@@ -239,11 +239,21 @@
   .pill:hover:not(.active) { background: var(--bg); }
 
   /* ── Modes ── */
-  .modes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .modes-grid { display: flex; flex-direction: column; gap: 3px; }
   .mode-item {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 10px; border-radius: var(--radius-xs); background: var(--bg);
-    font-size: 11px; font-weight: 500; transition: all 0.15s; cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: var(--radius-xs);
+    background: var(--bg);
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.15s;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mode-item:hover { background: #e2e8f0; transform: translateX(2px); }
   .mode-badge {
@@ -3293,3 +3303,125 @@ mat-dialog-actions,
   color: #fff;
   border-color: var(--primary);
 }
+
+/* Mode badge — compact */
+:host .mode-badge {
+  min-width: 26px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  border-radius: 10px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Customer status card — constrain width */
+:host .row-mid > div:nth-child(3) .scroll-box {
+  max-height: 380px;
+}
+
+/* Subscription card — constrain table */
+:host .row-mid > div:nth-child(2) .scroll-box {
+  max-height: 340px;
+}
+
+/* Journey Engagement — prevent label wrapping */
+:host .row-mid > div:first-child .card > div > span:first-child,
+:host .row-mid > div:first-child .card > div > div > span:first-child {
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════
+   ASK AH DIALOG — filter bar + badges
+══════════════════════════════════════════════════ */
+
+:host .ah-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+:host .ah-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+:host .ah-filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-right: 4px;
+}
+
+:host .ah-filter-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+:host .ah-filter-chip {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+:host .ah-filter-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+:host .ah-filter-chip--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff !important;
+}
+:host .ah-filter-chip--love:hover { border-color: #be185d; color: #be185d; }
+:host .ah-filter-chip--love.ah-filter-chip--active { background: #be185d; border-color: #be185d; color: #fff !important; }
+:host .ah-filter-chip--resolved:hover { border-color: #5b21b6; color: #5b21b6; }
+:host .ah-filter-chip--resolved.ah-filter-chip--active { background: #5b21b6; border-color: #5b21b6; color: #fff !important; }
+
+/* Source badge */
+:host .ah-source-badge {
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+:host .ah-source-badge--love {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+/* Flag badges */
+:host .ah-flag-badge {
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+:host .ah-flag-badge--happy     { background: var(--success-light); color: #065f46; }
+:host .ah-flag-badge--tagged    { background: var(--warning-light); color: #92400e; }
+:host .ah-flag-badge--opportunity { background: var(--primary-light); color: #1e40af; }
+:host .ah-flag-badge--critical  { background: var(--danger-light); color: #991b1b; }
+:host .ah-flag-badge--resolved  { background: #ede9fe; color: #5b21b6; }
