@@ -190,6 +190,25 @@
                     <mat-error *ngIf="queueform.controls['lastregistrationdate'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
+
+                <!-- Queue Welcome Message Section -->
+                <div class="form-section-heading">Queue Welcome Message</div>
+                
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Title</mat-label>
+                    <textarea matInput rows="2" class="custom-textarea" formControlName="queuewelcometitle"></textarea>
+                    <mat-error *ngIf="queueform.controls['queuewelcometitle'].invalid || showErrorMessages">Required</mat-error>
+                  </mat-form-field>
+                </div>
+                
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Description</mat-label>
+                    <textarea matInput rows="2" class="custom-textarea" formControlName="queuewelcomedescription"></textarea>
+                    <mat-error *ngIf="queueform.controls['queuewelcomedescription'].invalid || showErrorMessages">Required</mat-error>
+                  </mat-form-field>
+                </div>
       
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">

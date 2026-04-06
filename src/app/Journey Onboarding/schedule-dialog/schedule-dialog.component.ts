@@ -633,7 +633,8 @@ export class ScheduleDialogComponent {
               {
                 onboardingscheduled: new Date(selectedSlot.start),
                 onboardedby: hostRef,
-                appointmentid: newDocRef.id  
+                appointmentid: newDocRef.id, 
+                orientationstatus: "scheduled"
               }
             );
           }
