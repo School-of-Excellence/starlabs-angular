@@ -132,6 +132,8 @@ export class QueueCreationV3Component {
       venue: [null, { validators: [Validators.required], updateOn: "change" }],
       packageeligibility: [[],],
       lastregistrationdate: [null, { validators: [Validators.required], updateOn: "change" }],
+      queuewelcometitle: [null, { validators: [Validators.required], updateOn: "change" }],
+      queuewelcomedescription: [null, { validators: [Validators.required], updateOn: "change" }],
       queuedmessage: [null, { validators: [Validators.required], updateOn: "change" }],
       waitingmessage: [null, { validators: [Validators.required], updateOn: "change" }],
       queuevariation: this.formbuilder.array([]),
@@ -162,6 +164,8 @@ export class QueueCreationV3Component {
         queueenddate: data.queueenddate.toDate(),
         venue: data.venue ?? null,
         lastregistrationdate: ![null, undefined].includes(data.lastregistrationdate) ? data.lastregistrationdate.toDate() : null,
+        queuewelcometitle: data.queuewelcomemessage?.title ?? null,
+        queuewelcomedescription: data.queuewelcomemessage?.description ?? null,
         queuetargetcapacity: data.queuetargetcapacity ?? null,
         queuedmessage: data.queuedmessage ?? null,
         waitingmessage: data.waitingmessage ?? null,
@@ -851,6 +855,11 @@ addNextStage(mainIndex: number) {
         eventStartDate.setHours(5, 30, 0, 0)
         var eventEndDate = new Date(value.queueenddate)
         eventEndDate.setHours(23, 59, 59, 0)
+
+        var queuewelcomemessage = {
+          title: [null, undefined, ""].includes(value.queuewelcometitle) ? null : value.queuewelcometitle,
+          description: [null, undefined, ""].includes(value.queuewelcomedescription) ? null : value.queuewelcomedescription
+        }
         var metadata = {
           queuename: value.queuename,
           queueadmin: value.queueadmin,
@@ -861,6 +870,7 @@ addNextStage(mainIndex: number) {
           queuewelcometemplate: value.queuewelcometemplate,
           stages: value.stages,
           packageeligibility: value.packageeligibility,
+          queuewelcomemessage,
           // isahrequired : value.isahrequired,
           // ahperson : value.ahperson,
           // ischangeworkreq: value.ischangeworkreq,
@@ -1159,7 +1169,11 @@ addNextStage(mainIndex: number) {
         this.queueform.get('queueenddate').valid && this.queueform.get('venue').valid &&
         this.queueform.get('description').valid && this.queueform.get('introdescription').valid && this.queueform.get('queuetargetcapacity').valid &&
         this.queueform.get('totalcapacity').valid && this.queueform.get('queuewelcometemplate').valid &&
-        this.queueform.get('queuedmessage').valid && this.queueform.get('lastregistrationdate').valid && this.queueform.get('queuedmessage').valid && this.queueform.get('waitingmessage').valid
+        this.queueform.get('queuedmessage').valid && this.queueform.get('lastregistrationdate').valid && 
+        this.queueform.get('queuedmessage').valid && 
+        this.queueform.get('waitingmessage').valid && 
+        this.queueform.get('queuewelcometitle').valid && 
+        this.queueform.get('queuewelcomedescription').valid 
       ) {
         this.stepper.next();
       }
