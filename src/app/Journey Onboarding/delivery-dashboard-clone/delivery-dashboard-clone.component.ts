@@ -760,7 +760,7 @@ export class DeliveryDashboardCloneComponent {
             3: this.productData.nextMonth || [],
             4: this.productData.onBoarded || [],
             6: this.productData.upcomingDIAppointments || [],
-            7: this.productData.report || [],
+            7: this.productData.reports || [],
             8: this.productData.celebrationCall || []
         };
 
@@ -870,7 +870,7 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
         }
-
+        console.log("filter product data");
         // Filter Report Data
         await this.FilterReportData(product, productId);
 
@@ -902,145 +902,11 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    async filterPastMonthData(product: string, productId: string) {
-        this.pastMonth = (this.groupedFiltered?.[productId] || [])
-            .filter((p: any) => {
-                const status = p.status?.toLowerCase();
-                const isValidStatus = !status || status === 'initiated';
-                const hasTentativeStart = !!p.tentativestart;
-                const isPastMonth = p.tentativestart
-                    ? this.isDateInPastMonth(p.tentativestart.toDate())
-                    : false;
-                // const appointment = p?.docid
-                //   ? this.appointmentMap.get(p.docid)
-                //   : null;
-                // const notAttended = appointment?.attended === false;
-
-                return (
-                    isValidStatus &&
-                    hasTentativeStart && isPastMonth
-                );
-            })
-            .map(p => {
-                const appointment = p?.docid
-                    ? this.appointmentMap.get(p.docid)
-                    : null;
-                return {
-                    ...p,
-                    participantproductid: appointment?.participantproductid || null,
-                    appointmentstart: appointment?.starttime || null,
-                    appointmentend: appointment?.endtime || null
-                };
-            });
-    }
-    async filterOnBoardedData(product: string, productId: string) {
-        this.onBoarded = await Promise.all(
-            Object.values(this.funnelData?.[productId].ongoing || {})
-                .flat()
-                .filter(p => {
-                    if (!p?.docid) return false;
-
-                    const appointments = Array.from(this.appointmentMap.values())
-                        .filter(app => app.participantproductid === p.docid);
-
-                    if (!appointments.length) return false;
-
-                    return appointments.some(app => {
-                        const typeName = app.appointmentTypeName?.toLowerCase() || "";
-                        return (
-                            typeName === `${product.toLowerCase()} welcome call` &&
-                            app.cancelled === false
-                        );
-                    });
-                })
-                .map(async (p) => {
-                    const appointments = Array.from(this.appointmentMap.values())
-                        .filter(app => app.participantproductid === p.docid);
-
-                    const validAppointment = appointments.find(app => {
-                        const typeName = app.appointmentTypeName?.toLowerCase() || "";
-                        return (
-                            typeName === `${product.toLowerCase()} welcome call` &&
-                            app.cancelled === false
-                        );
-                    });
-
-                    const participantAppointmentAll = await this.getAllAppointments(productId, p.docid);
-
-                    return {
-                        ...p,
-                        participantproductid: validAppointment?.participantproductid || null,
-                        appointmentstatus: validAppointment?.appointmentstatus || null,
-                        appointmentType: validAppointment?.appointmentTypeName || null,
-                        starttime: validAppointment?.starttime || null,
-                        endtime: validAppointment?.endtime || null,
-                        allappointments: participantAppointmentAll || []
-                    };
-                })
-        );
-    }
-
-    async FilterUpcomingDIAppointments(product: string, productId: string) {
-
-        this.upcomingDIAppointments = await Promise.all(
-            Object.values(this.funnelData?.[productId].ongoing || {})
-                .flat()
-                .filter(p => {
-                    if (!p?.docid) return false;
-
-                    const appointments = Array.from(this.appointmentMap.values())
-                        .filter(app => app.participantproductid === p.docid);
-
-                    if (!appointments.length) return false;
-
-                    return appointments.some(app => {
-                        const typeName = app.appointmentTypeName?.toLowerCase() || "";
-                        return (
-                            (typeName === `${product.toLowerCase()} implementation` ||
-                                typeName === `${product.toLowerCase()} diagnostics`) &&
-                            app.cancelled === false
-                        );
-                    });
-                })
-                .map(async (p) => {
-                    const appointments = Array.from(this.appointmentMap.values())
-                        .filter(app => app.participantproductid === p.docid);
-
-                    const validAppointment = appointments.find(app => {
-                        const typeName = app.appointmentTypeName?.toLowerCase() || "";
-                        return (
-                            (typeName === `${product.toLowerCase()} implementation` ||
-                                typeName === `${product.toLowerCase()} diagnostics`) &&
-                            app.cancelled === false
-                        );
-                    });
-
-                    const participantAppointmentAll = await this.getAllAppointments(productId, p.docid);
-
-                    return {
-                        ...p,
-                        participantproductid: validAppointment?.participantproductid || null,
-                        appointmentType: validAppointment?.appointmentTypeName || null,
-                        appointmentstatus: validAppointment?.appointmentstatus || null,
-                        starttime: validAppointment?.starttime || null,
-                        endtime: validAppointment?.endtime || null,
-                        allappointments: participantAppointmentAll || []
-                    };
-                })
-        );
-    }
-
     async FilterReportData(product: string, productId: string) {
         // Filter Report 
         const participantSnap = await runInInjectionContext(this.injector, () =>
             getDocs(
-                query(
-                    collection(this.firestore, 'participantsproduct'),
-                    where(
-                        'productref',
-                        '==',
-                        doc(this.firestore, 'products', productId)
-                    )
+                query(collection(this.firestore, 'participantsproduct'), where('productref','==', doc(this.firestore, 'products', productId))
                 )
             )
         );
@@ -1050,20 +916,12 @@ export class DeliveryDashboardCloneComponent {
         for (let i = 0; i < participantProductIds.length; i += 10) {
             const chunk = participantProductIds.slice(i, i + 10);
             const formsSnap = await runInInjectionContext(this.injector, () =>
-                getDocs(
-                    query(
-                        collection(this.firestore, 'formsByClient'),
-                        where('participantproductid', 'in', chunk)
-                    )
-                )
+                getDocs(query(collection(this.firestore, 'formsByClient'), where('participantproductid', 'in', chunk)))
             );
             const formResults = await Promise.all(
                 formsSnap.docs.map(async (d) => {
                     const data = d.data() as any;
-                    const participantAppointmentAll = await this.getAllAppointments(
-                        productId,
-                        data.participantproductid
-                    );
+                    const participantAppointmentAll = await this.getAllAppointments(productId, data.participantproductid);
                     return {
                         ...data,
                         status: data?.date ? 'submitted' : 'pending',
@@ -1079,10 +937,7 @@ export class DeliveryDashboardCloneComponent {
 
         const reportIds = new Set(
             this.productData.reports
-                .filter(([key]) => key !== 'reports')
-                .flatMap(([, arr]: any) =>
-                    arr.map((item: any) => item?.participantproductid)
-                )
+                .filter(([key]) => key !== 'reports').flatMap(([, arr]: any) => arr.map((item: any) => item?.participantproductid))
         );
 
         Object.keys(this.productData).forEach((key) => {
@@ -1113,23 +968,10 @@ export class DeliveryDashboardCloneComponent {
         return `${productName} ${stage}`;
     }
 
-    async resolveAppointmentType(app: any) {
-        if (app.appointmentTypeName) {
-            return app.appointmentTypeName;
-        }
-
-        try {
-            const appointmentRef = app.appointment;
-            const appointmentSnap = await getDoc(appointmentRef);
-
-            if (!appointmentSnap.exists()) return null;
-            const appointmentData: any = appointmentSnap.data();
-            const typename = appointmentData?.appointmenttype;
-            return typename || null;
-        } catch (err) {
-            console.error('Error resolving appointment type:', err);
-            return null;
-        }
+    resolveAppointmentType(appointment: any) {
+        const id = appointment?.appointment.id;
+        const match = this.mappedAppointmentTypes.find(x => x.id === id);
+        return match?.appointmenttype;
     }
 
     async getAllAppointments(productId: string, participantId: string) {
@@ -1148,8 +990,6 @@ export class DeliveryDashboardCloneComponent {
         const enrichedAppointments = await Promise.all(promises);
         return enrichedAppointments;
     }
-
-
 
     async fetchDFUProductData() {
 
@@ -2212,6 +2052,9 @@ export class DeliveryDashboardCloneComponent {
     appointmentMap = new Map();
     allAppointments = [];
     typeNameMap = new Map();
+    appointmentTypes$: any;
+    appointmentTypes: any[] = [];
+    mappedAppointmentTypes: any[] = [];
 
 
     async filterAppointmentsByType() {
@@ -2575,6 +2418,22 @@ export class DeliveryDashboardCloneComponent {
                 this.applyProductFilter();
                 this.journeyFlowLoading = false;
                 this.cdr.detectChanges();
+            });
+
+            this.appointmentTypes$ = collectionData(
+                collection(this.firestore, 'appointmenttype'),
+                { idField: 'id' }
+            );
+
+            this.appointmentTypes$.subscribe((data: any[]) => {
+                this.appointmentTypes = data;
+
+                this.mappedAppointmentTypes = data.map(item => ({
+                    id: item.id,
+                    appointmenttype: item.appointmenttype
+                }));
+
+                console.log(this.mappedAppointmentTypes);
             });
         } catch (error) {
             console.error("Error loading appointments:", error);
