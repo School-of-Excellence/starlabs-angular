@@ -1,9 +1,14 @@
 class VadGateProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    // THE GATE CONTROLS
-    this.threshold = 0.002; // Volume threshold to trigger the gate (Adjust if needed)
-    this.holdTime = 40;     // How many frames to keep the mic open after you stop talking (prevents clipping the end of words)
+    // 1. RAISE THIS THRESHOLD. 
+    // If it was 0.002, try jumping to 0.01, 0.02, or even 0.03.
+    this.threshold = 0.02; 
+    
+    // 2. LOWER THE HOLD TIME.
+    // Make the gate snap shut faster when you stop talking.
+    this.holdTime = 15; // Changed from 40
+    
     this.holdCounter = 0;
   }
 
