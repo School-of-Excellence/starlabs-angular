@@ -24,15 +24,42 @@
 
             </div>
             <div class="date-filter">
-                <mat-form-field appearance="outline">
-                    <mat-label>Select Date Range</mat-label>
-                    <mat-date-range-input [rangePicker]="rangePicker">
-                        <input matStartDate [formControl]="startDate" placeholder="Start date">
-                        <input matEndDate [formControl]="endDate" placeholder="End date">
-                    </mat-date-range-input>
-                    <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
-                    <mat-date-range-picker #rangePicker></mat-date-range-picker>
-                </mat-form-field>
+                <div>
+                    <!-- <mat-form-field appearance="outline">
+                        <mat-label>Select Date Range</mat-label>
+                        <mat-date-range-input [rangePicker]="rangePicker">
+                            <input matStartDate [formControl]="startDate" placeholder="Start date">
+                            <input matEndDate [formControl]="endDate" placeholder="End date">
+                        </mat-date-range-input>
+                        <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+                        <mat-date-range-picker #rangePicker></mat-date-range-picker>
+                    </mat-form-field> -->
+                    <!-- HTML Template -->
+                    <!-- HTML Template -->
+                    <div class="range-field" (click)="rangePicker.open()">
+                        <svg class="cal-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.2" />
+                            <path d="M1 6h14" stroke="currentColor" stroke-width="1.2" />
+                            <path d="M5 1v2M11 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                        </svg>
+                        <div class="date-inputs">
+                            <input [value]="startDate.value | date:'M/d/yyyy'" placeholder="Start date" readonly>
+                            <span class="sep">→</span>
+                            <input [value]="endDate.value | date:'M/d/yyyy'" placeholder="End date" readonly>
+                        </div>
+                        <!-- <button class="clear-btn" [class.show]="startDate.value" (click)="clearDates($event)">
+                            <mat-icon>close</mat-icon>
+                        </button> -->
+
+                        <!-- Mat picker hidden but functional -->
+                        <mat-date-range-input [rangePicker]="rangePicker"
+                            style="position:absolute; width:0; height:0; overflow:hidden; opacity:0;">
+                            <input matStartDate [formControl]="startDate">
+                            <input matEndDate [formControl]="endDate">
+                        </mat-date-range-input>
+                        <mat-date-range-picker #rangePicker></mat-date-range-picker>
+                    </div>
+                </div>
                 <div class="date-badge" (click)="applyDateRangeFilter()">
                     <button mat-button><span class="date-text">Apply</span></button>
                 </div>
@@ -50,9 +77,9 @@
         </div>
 
         <div class="kpi-grid">
-            <div class="kpi-card">
+            <div class="kpi-card" (click)="openCards('uniqueusers')">
                 <div class="kpi-label">Unique Users</div>
-                <div class="kpi-value" style="color:#93C5FD" (click)="openCards('uniqueusers')">{{totalUniqueUsers}}
+                <div class="kpi-value" style="color:#93C5FD">{{totalUniqueUsers}}
                 </div>
             </div>
             <div class="kpi-card">
@@ -67,24 +94,24 @@
                 <div class="kpi-label">Unique Videos</div>
                 <div class="kpi-value" style="color:#FCD34D">{{totalUniueContents}}</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" (click)="openCards('superfans')">
                 <div class="kpi-label">SuperFans</div>
-                <div class="kpi-value" style="color:#FCA5A5" (click)="openCards('superfans')">{{getSuperFans()?.length}}
+                <div class="kpi-value" style="color:#FCA5A5">{{getSuperFans()?.length}}
                 </div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" (click)="openCards('atrisk')">
                 <div class="kpi-label">At Risk</div>
-                <div class="kpi-value" style="color:#FCA5A5" (click)="openCards('atrisk')">
+                <div class="kpi-value" style="color:#FCA5A5">
                     {{getAtRiskParticipants()?.length}}</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" (click)="openCards('risingfans')">
                 <div class="kpi-label">Rising Fans</div>
-                <div class="kpi-value" style="color:#C4B5FD" (click)="openCards('risingfans')">
+                <div class="kpi-value" style="color:#C4B5FD">
                     {{getRaisingFans()?.length}}</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Avg / User</div>
-                <div class="kpi-value" style="color:#6EE7B7">{{(totalWatchHours / totalUniqueUsers)?.toFixed(1)}}h
+                <div class="kpi-value" style="color:#6EE7B7">{{(convertToHours(totalWatchHours) / totalUniqueUsers)?.toFixed(1)}}h
                 </div>
             </div>
         </div>
@@ -124,17 +151,34 @@
             <div class="divider-line"></div>
         </div>
 
+        <div class="participant-filter">
+            <!-- <mat-form-field appearance="outline" class="white-field">
+                <mat-label>Search Participant</mat-label>
+
+                <input matInput #participantSearch (input)="filterParticipants(participantSearch.value)"
+                    autocomplete="off">
+            </mat-form-field> -->
+            <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 16 16" fill="none">
+                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3" />
+                    <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                </svg>
+                <input class="search-input" type="text" placeholder="Search" autocomplete="off" #participantSearch
+                    (input)="filterParticipantTabel(participantSearch.value)" />
+            </div>
+        </div>
+
         <div class="table-card">
             <div class="table-scroll">
-                <table mat-table [dataSource]="participantTableDataSource" matSort="participantsort"
+                <table mat-table [dataSource]="participantTableDataSource" matSort #participantsort="matSort"
                     class="participant-mat-table">
 
                     <!-- Rank Column -->
                     <ng-container matColumnDef="rank">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Rank</th>
-                        <td mat-cell *matCellDef="let pageSizeOptions; let i = index">
+                        <td mat-cell *matCellDef="let pageSizeOptions; let i = index;let p">
                             <span class="mono rank-label">
-                                #{{ i + 1 }}
+                                #{{ p?.rank }}
                             </span>
                         </td>
                     </ng-container>
@@ -244,12 +288,12 @@
                     </ng-container>
 
                     <!-- Modes Playlists Column -->
-                    <ng-container matColumnDef="modesplaylists">
+                    <!-- <ng-container matColumnDef="modesplaylists">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Modes Playlists</th>
                         <td mat-cell *matCellDef="let u">
                             <span class="mono sessions-val">0/0</span>
                         </td>
-                    </ng-container>
+                    </ng-container> -->
 
                     <!-- Header & Row definitions -->
                     <tr mat-header-row *matHeaderRowDef="participantTableColumns; sticky: true"></tr>
@@ -469,8 +513,24 @@
 
         <!-- ── PLAYLIST JOURNEY HEALTH ── -->
         <div class="section-divider">
-            <span class="divider-label">Playlist Journey Health</span>
+            <span class="divider-label">Playlist</span>
             <div class="divider-line"></div>
+        </div>
+
+        <div class="participant-filter">
+            <!-- <mat-form-field appearance="outline" class="white-field">
+                <mat-label>Search Playlist</mat-label>
+                <input matInput #playlistSearch (input)="filterPlayListTabel(playlistSearch.value)" autocomplete="off">
+
+            </mat-form-field> -->
+            <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 16 16" fill="none">
+                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3" />
+                    <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                </svg>
+                <input class="search-input" type="text" placeholder="Search" autocomplete="off" #playlistSearch
+                    (input)="filterPlayListTabel(playlistSearch.value)" />
+            </div>
         </div>
 
         <div class="table-card">
@@ -483,7 +543,7 @@
             </div>
 
             <div class="table-scroll">
-                <table mat-table [dataSource]="playListTableDateSource" matSort="playlistsort"
+                <table mat-table [dataSource]="playListTableDateSource" matSort #playlistsort="matSort"
                     class="playlist-mat-table">
 
                     <!-- Title Column -->
@@ -574,6 +634,22 @@
             <div class="divider-line"></div>
         </div>
 
+        <div class="participant-filter">
+            <!-- <mat-form-field appearance="outline" class="white-field">
+                <mat-label>Search Content</mat-label>
+                <input matInput #contentSearch (input)="filterContentTabel(contentSearch.value)" autocomplete="off">
+
+            </mat-form-field> -->
+            <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 16 16" fill="none">
+                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3" />
+                    <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                </svg>
+                <input class="search-input" type="text" placeholder="Search" autocomplete="off" #contentSearch
+                    (input)="filterContentTabel(contentSearch.value)" />
+            </div>
+        </div>
+
         <div class="card card-flush">
             <div class="card-header">
                 <div>
@@ -583,14 +659,14 @@
             <div class="table-scroll">
                 <div class="table-card">
                     <div class="table-scroll">
-                        <table mat-table [dataSource]="contentTableDataSource" matSort="contentsort"
+                        <table mat-table [dataSource]="contentTableDataSource" matSort #contentsort="matSort"
                             class="content-mat-table">
 
                             <ng-container matColumnDef="rank">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header>S.No</th>
-                                <td mat-cell *matCellDef="let i = index">
+                                <td mat-cell *matCellDef="let i = index; let p">
                                     <div class="video-title-cell">
-                                        #{{i+1}}
+                                        #{{p?.rank}}
                                     </div>
                                 </td>
                             </ng-container>
@@ -696,43 +772,43 @@
                 </div>
             </div>
 
-    </div><!-- /dash-main -->
+        </div><!-- /dash-main -->
 
-</div><!-- /dashboard-root -->
+    </div><!-- /dashboard-root -->
 
-<div class="side-panel">
-    <div class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
-    <div class="rp-side-panel" [class.rp-side-panel-open]="sidePanelOpen">
-        <div class="rp-side-panel-header">
-            <h3 class="rp-side-panel-title">{{ sidePanelTitle }}</h3>
-            <!-- <button mat-icon-button class="close-button" (click)="sendWatti()">
+    <div class="side-panel">
+        <div class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+        <div class="rp-side-panel" [class.rp-side-panel-open]="sidePanelOpen">
+            <div class="rp-side-panel-header">
+                <h3 class="rp-side-panel-title">{{ sidePanelTitle }}</h3>
+                <!-- <button mat-icon-button class="close-button" (click)="sendWatti()">
         <i class="fa-brands fa-whatsapp"></i>
     </button>
     <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
         <mat-icon>notifications_active</mat-icon>
     </button> -->
-            <div style="display:flex;gap:15px;align-items:center;">
-                <button mat-stroked-button (click)="exportPanelData()">Export</button>
-                <button mat-icon-button class="close-button" (click)="closeSidePanel()">
-                    <mat-icon>close</mat-icon>
-                </button>
+                <div style="display:flex;gap:15px;align-items:center;">
+                    <button mat-stroked-button (click)="exportPanelData()">Export</button>
+                    <button mat-icon-button class="close-button" (click)="closeSidePanel()">
+                        <mat-icon>close</mat-icon>
+                    </button>
+                </div>
             </div>
-        </div>
-        <div class="rp-side-panel-count">{{ sidePanelProfiles.length }} profiles</div>
-        <div class="rp-side-panel-body">
-            <div class="rp-side-panel-item" *ngFor="let p of sidePanelProfiles">
-                <span class="rp-cell-text">{{ p?.name }}</span>
-                <!-- <span *ngIf="p.percentage !== undefined" class="rp-chip">
+            <div class="rp-side-panel-count">{{ sidePanelProfiles.length }} profiles</div>
+            <div class="rp-side-panel-body">
+                <div class="rp-side-panel-item" *ngFor="let p of sidePanelProfiles">
+                    <span class="rp-cell-text">{{ p?.name }}</span>
+                    <!-- <span *ngIf="p.percentage !== undefined" class="rp-chip">
         {{ p.percentage }}%
       </span> -->
-                <!-- <span class="rp-chip" [class.rp-chip-yes]="p.completed" [class.rp-chip-no]="!p.completed">
+                    <!-- <span class="rp-chip" [class.rp-chip-yes]="p.completed" [class.rp-chip-no]="!p.completed">
         {{ p.completed ? 'Completed' : 'Pending' }}
       </span> -->
-            </div>
-            <div *ngIf="sidePanelProfiles.length === 0" class="rp-empty" style="padding:32px 0;">
-                <mat-icon>person_off</mat-icon>
-                <p>No profiles found</p>
+                </div>
+                <div *ngIf="sidePanelProfiles.length === 0" class="rp-empty" style="padding:32px 0;">
+                    <mat-icon>person_off</mat-icon>
+                    <p>No profiles found</p>
+                </div>
             </div>
         </div>
     </div>
-</div>

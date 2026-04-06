@@ -332,6 +332,7 @@ mat-paginator {
 .timeline-item {
   display: flex;
   gap: 0;
+  margin-bottom: 12px;
 }
 
 .timeline-left {
@@ -690,6 +691,8 @@ mat-paginator {
   background: #f5f3ff;
   border-left: 3px solid #7c6af5;
 }
+
+
 .watch-btn {
   background: #22c55e;
   color: #ffffff;
@@ -735,6 +738,7 @@ mat-paginator {
   padding: 2px 8px;
   border-radius: 4px;
   margin-top: 4px;
+  margin-right: 6px;
 }
 
 .timeline-dot.dot-video {

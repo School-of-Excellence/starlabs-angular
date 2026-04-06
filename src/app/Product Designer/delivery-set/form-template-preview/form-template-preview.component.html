@@ -31,11 +31,11 @@
         <div *ngIf="isFormArray(field.value)" class="preview-field-value">
           <div *ngFor="let arrayItem of field.value; let i = index" class="preview-array-item">
             <div class="preview-array-header">Item {{i + 1}}</div>
-            <div *ngFor="let key of getObjectKeys(arrayItem)" class="preview-array-field">
-              <ng-container *ngIf="arrayItem[key] !== null && arrayItem[key] !== undefined && arrayItem[key] !== false && arrayItem[key] !== ''">
-                <!-- <div class="preview-array-field-name">{{key}}</div> -->
+            <div *ngFor="let subField of field.array; let k = index" class="preview-array-field">
+              <ng-container *ngIf="arrayItem['arraycontrol' + k] !== null && arrayItem['arraycontrol' + k] !== undefined && arrayItem['arraycontrol' + k] !== false && arrayItem['arraycontrol' + k] !== ''">
+                <div class="preview-array-field-name">{{subField.fieldname}}</div>
                 <div class="preview-array-field-value">
-                  {{isDateValue(arrayItem[key]) ? formatDate(arrayItem[key]) : arrayItem[key]}}
+                  {{isDateValue(arrayItem['arraycontrol' + k]) ? formatDate(arrayItem['arraycontrol' + k]) : arrayItem['arraycontrol' + k]}}
                 </div>
               </ng-container>
             </div>

@@ -995,8 +995,8 @@ export class WatiInputComponent {
     const archiveDoc = this.buildArchiveDoc(archiveid, 'created');
 
     await setDoc(doc(this.firestore, 'wati archive', archiveid), archiveDoc)
-      .then(() => this.dialogRef.close('success'))
-      .catch(() => this.dialogRef.close('failed'));
+      .then(() => this.dialogRef.close({ status: 'success', archiveid: archiveid }))
+      .catch(() => this.dialogRef.close({ status: 'failed' }));
   }
 
   async addtoQueueFunction() {

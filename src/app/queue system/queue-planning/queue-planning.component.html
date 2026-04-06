@@ -744,6 +744,20 @@
 
         <!-- Date and Time Fields (for both modes) -->
         <div class="datetime-row">
+          <mat-form-field appearance="outline" class="slot-field">
+            <mat-label>Title</mat-label>
+            <input matInput type="text" [(ngModel)]="editingDateEntry.title">
+          </mat-form-field>
+        </div>
+
+        <div class="datetime-row">
+          <mat-form-field appearance="outline" class="slot-field">
+            <mat-label>Description</mat-label>
+            <textarea matInput type="text" [(ngModel)]="editingDateEntry.description"></textarea>
+          </mat-form-field>
+        </div>
+        
+        <div class="datetime-row">
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>Start Date</mat-label>
             <input matInput [matDatepicker]="startPicker" [(ngModel)]="editingDateEntry.startdate">
