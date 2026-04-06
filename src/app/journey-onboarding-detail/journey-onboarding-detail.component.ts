@@ -1,25 +1,15 @@
-import {
-  Component, OnInit, ChangeDetectionStrategy,
-  ChangeDetectorRef, inject
-} from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  ReactiveFormsModule, FormsModule, FormBuilder,
-  FormGroup, FormArray, Validators
-} from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatInputModule }     from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule }    from '@angular/material/button';
 import { MatSelectModule }    from '@angular/material/select';
 import { MatIconModule }      from '@angular/material/icon';
 import { MatTableModule }     from '@angular/material/table';
-import {
-  Firestore, doc, setDoc, collection, getDoc,
-  collectionData, getDocs, DocumentReference
-} from '@angular/fire/firestore';
-import {
-  Storage, ref as storageRef, uploadBytes, getDownloadURL
-} from '@angular/fire/storage';
+import { Firestore, doc, setDoc, collection, getDoc, collectionData, getDocs, DocumentReference } from '@angular/fire/firestore';
+import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { Storage, ref as storageRef, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { catchError } from 'rxjs/operators';
 import { Auth, user } from '@angular/fire/auth';
 import { authState } from '@angular/fire/auth';
@@ -66,7 +56,7 @@ function generateDocId(): string {
   imports: [
     CommonModule, ReactiveFormsModule, FormsModule,
     MatInputModule, MatFormFieldModule, MatButtonModule,
-    MatSelectModule, MatIconModule, MatTableModule,
+    MatSelectModule, MatIconModule, MatTableModule, DragDropModule
   ],
   templateUrl: './journey-onboarding-detail.component.html',
   styleUrls: ['./journey-onboarding-detail.component.css'],
@@ -196,6 +186,28 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.journeyOptionsLoading = false;
       this.cdr.markForCheck();
     }
+  }
+
+  drop(event: CdkDragDrop<string[]>, field: string) {
+    const list = [...this.appLockedForm.value[field]];
+    moveItemInArray(list, event.previousIndex, event.currentIndex);
+    this.appLockedForm.patchValue({
+      [field]: list
+    });
+    this.cdr.markForCheck();
+    this.saveAppLocked();
+  }
+
+  getSolarVoiceName(id: string): string {
+    return this.solarVoiceOptions.find(x => x.id === id)?.name || id;
+  }
+
+  getContentTitle(id: string): string {
+    return this.contentUrlOptions.find(x => x.id === id)?.title || id;
+  }
+
+  getSeriesName(id: string): string {
+    return this.seriesOptions.find(x => x.id === id)?.name || id;
   }
 
   private async loadSeries() {
