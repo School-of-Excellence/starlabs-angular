@@ -1056,6 +1056,7 @@ export class AuthguardService {
         updateDoc(Ref, {
           onboardingscheduled: null,
           onreschedule: true,
+          orientationstatus: "appointmentcancelled"
         })
       }
 

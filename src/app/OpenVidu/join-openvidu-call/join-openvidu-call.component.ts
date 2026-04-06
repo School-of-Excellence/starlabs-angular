@@ -79,6 +79,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   isVideoBlurred:boolean = false;
 
+  private previewStream: MediaStream | null = null;
+
   constructor(
     public firestore: Firestore,
     public route: ActivatedRoute,
@@ -556,39 +558,37 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   async prepareParticipant() {
     this.isRequesting = true;
-    this.meetingRoomStatus = null
-
+    this.meetingRoomStatus = null;
+ 
     try {
-      // Try to request permission
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-      // Stop immediately to just preview
-      // stream.getTracks().forEach(t => t.stop());
-
+ 
+      // Store the full stream so joinCall() can stop the audio track later
+      this.previewStream = stream;
+ 
+      // Only use video for the preview tile — audio is not played back
       const videoTrack = new LocalVideoTrack(stream.getVideoTracks()[0]);
       this.localParticipant.set(videoTrack);
-
+ 
       this.cameraStatus = 'granted';
       this.micStatus = 'granted';
       this.isRequesting = false;
       return true;
     } catch (err: any) {
-      console.error("Permission error:", err);
-
-      const isHardBlock = err.name === 'NotAllowedError' && err.message?.includes("Permission dismissed") === false;
-
+      console.error('Permission error:', err);
+ 
+      const isHardBlock =
+        err.name === 'NotAllowedError' &&
+        err.message?.includes('Permission dismissed') === false;
+ 
       if (isHardBlock) {
-        // HARD BLOCK → Chrome/Safari won't prompt again
         this.cameraStatus = 'denied';
         this.micStatus = 'denied';
-
-        this.isRequesting = false;
-        return false;
+      } else {
+        this.cameraStatus = 'prompt';
+        this.micStatus = 'prompt';
       }
-
-      // SOFT BLOCK or dismissed popup
-      this.cameraStatus = 'prompt';
-      this.micStatus = 'prompt';
+ 
       this.isRequesting = false;
       return false;
     }
@@ -1040,48 +1040,135 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return 1 + remoteVideoCount;
   }
 
+  // /**
+  // * Enable microphone with RNNoise noise cancellation
+  // */
+  // async enableMicrophoneWithNoiseCancellation(room: Room) {
+  //   try {
+  //     console.log('🎙️ Enabling microphone with RNNoise...');
+ 
+  //     // ✅ Stop the preview audio track before opening the RNNoise stream.
+  //     // If the preview audio track is still running when we open a second
+  //     // getUserMedia call, both captures are active simultaneously and their
+  //     // AEC contexts are independent — causing echo on both sides.
+  //     if (this.previewStream) {
+  //       this.previewStream.getAudioTracks().forEach(t => t.stop());
+  //     }
+ 
+  //     // Open a fresh mic stream. echoCancellation is the browser's native AEC
+  //     // — it runs at the OS driver level, before any Web Audio processing.
+  //     // This is the correct layer to handle echo. RNNoise then handles
+  //     // background noise on top of an already echo-cancelled signal.
+  //     const rawStream = await navigator.mediaDevices.getUserMedia({
+  //       audio: {
+  //         echoCancellation: true,   // ← native AEC at OS level, handles echo
+  //         noiseSuppression: false,  // ← RNNoise handles this instead
+  //         autoGainControl: false,   // ← disabled; outputGain in service handles level
+  //         sampleRate: 48000,
+  //         channelCount: 1
+  //       }
+  //     });
+ 
+  //     const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
+ 
+  //     await room.localParticipant.publishTrack(cleanAudioTrack, {
+  //       source: Track.Source.Microphone,
+  //       name: 'microphone'
+  //     });
+ 
+  //     console.log('✅ Microphone enabled with RNNoise');
+ 
+  //   } catch (error) {
+  //     console.error('❌ RNNoise failed, falling back to WebRTC:', error);
+ 
+  //     // Fallback: stop preview audio track here too before re-opening mic
+  //     if (this.previewStream) {
+  //       this.previewStream.getAudioTracks().forEach(t => t.stop());
+  //     }
+ 
+  //     await room.localParticipant.setMicrophoneEnabled(true, {
+  //       echoCancellation: true,
+  //       noiseSuppression: true,
+  //       autoGainControl: true,
+  //       sampleRate: 48000,
+  //       channelCount: 1
+  //     });
+ 
+  //     console.log('✅ Microphone enabled with WebRTC fallback');
+  //   }
+  // }
+
   /**
-   * Enable microphone with RNNoise noise cancellation
-   */
-  async enableMicrophoneWithNoiseCancellation(room: Room) {
-    try {
-      console.log('🎙️ Attempting to enable microphone with RNNoise...');
-      
-      // Get raw microphone stream
-      const rawStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,      // Keep echo cancellation
-          noiseSuppression: false,     // Disable - RNNoise will handle this
-          autoGainControl: true,
-          sampleRate: 48000,           // RNNoise requires 48kHz
-          channelCount: 1              // Mono for voice
-        }
+ * Enable microphone with RNNoise noise cancellation
+ */
+async enableMicrophoneWithNoiseCancellation(room: Room) {
+  try {
+    console.log('🎙️ Enabling microphone with RNNoise...');
+
+    // ✅ Stop preview audio track to prevent double capture
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => {
+        t.stop();
+        console.log('Stopped preview audio track');
       });
+    }
 
-      // Apply RNNoise
-      const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
-
-      // Publish clean audio to LiveKit
-      await room.localParticipant.publishTrack(cleanAudioTrack, {
-        source: Track.Source.Microphone,
-        name: 'microphone'
-      });
-
-      console.log('✅ Microphone enabled with RNNoise');
-      
-    } catch (error) {
-      console.error('❌ RNNoise failed, falling back to WebRTC:', error);
-      
-      // Fallback to WebRTC noise suppression
-      await room.localParticipant.setMicrophoneEnabled(true, {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
+    // ✅ FIX: Enable autoGainControl to help with volume levels
+    const rawStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,   // OS-level echo cancellation
+        noiseSuppression: false,  // RNNoise handles this
+        autoGainControl: true,    // ← CHANGED from false - helps with volume
         sampleRate: 48000,
         channelCount: 1
-      });
-      
-      console.log('✅ Microphone enabled with WebRTC noise suppression (fallback)');
+      }
+    });
+
+    console.log('Raw stream obtained:', rawStream.getAudioTracks()[0].getSettings());
+
+    const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
+
+    await room.localParticipant.publishTrack(cleanAudioTrack, {
+      source: Track.Source.Microphone,
+      name: 'microphone'
+    });
+
+    console.log('✅ Microphone enabled with RNNoise');
+
+  } catch (error) {
+    console.error('❌ RNNoise failed, falling back to WebRTC:', error);
+
+    // Fallback: stop preview audio
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => t.stop());
     }
+
+    await room.localParticipant.setMicrophoneEnabled(true, {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1
+    });
+    this.debugAudioLevels();
+
+    console.log('✅ Microphone enabled with WebRTC fallback');
   }
+}
+
+// Add to your component to debug audio levels
+debugAudioLevels() {
+  const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
+  if (micPub?.audioTrack) {
+    const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
+    console.log('📊 Audio Track Settings:', {
+      sampleRate: settings.sampleRate,
+      channelCount: settings.channelCount,
+      echoCancellation: settings.echoCancellation,
+      noiseSuppression: settings.noiseSuppression,
+      autoGainControl: settings.autoGainControl
+    });
+  }
+}
+ 
 }
