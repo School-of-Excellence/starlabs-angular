@@ -86,8 +86,8 @@
               (click)="openImage(mapProfiles[row['id']]?.photo, row['name']); $event.stopPropagation()">
             <div class="participant-info">
               <span class="participant-name">{{ row['name'] }}</span>
-              <span class="participant-mobile" *ngIf="mapProfiles[row['id']]?.mobile">
-                {{ mapProfiles[row['id']]?.mobile }}
+              <span class="participant-mobile" *ngIf="mapProfiles[row['id']]?.email">
+                {{ mapProfiles[row['id']]?.email }}
               </span>
             </div>
           </div>
@@ -98,7 +98,7 @@
       <ng-container matColumnDef="activejourney">
         <th mat-header-cell *matHeaderCellDef>
           <div class="journey-header">
-            LAST/ACTIVE JOURNEY
+            ACTIVE/LAST COMPLETED JOURNEY
             <button class="journey-type-filter-btn" 
                     (click)="toggleJourneyTypeFilter(); $event.stopPropagation()"
                     [title]="'Filter: ' + (journeyTypeFilter === 'all' ? 'All' : journeyTypeFilter === 'active' ? 'Active Only' : 'Last Completed Only')"
@@ -309,9 +309,20 @@
           <h2 class="log-participant-name">{{ logParticipantName }}</h2>
           <span class="log-subtitle">Evolution Log · {{ logEventCount }} events attended</span>
         </div>
-        <button mat-icon-button (click)="closeLog()">
-          <mat-icon>close</mat-icon>
-        </button>
+        <div class="log-header-actions">
+          <mat-form-field appearance="outline" class="log-event-filter" *ngIf="logEventFilterOptions.length > 0">
+            <mat-label>Filter by Event</mat-label>
+            <mat-select [(ngModel)]="selectedLogEventFilter" (ngModelChange)="applyLogEventFilter()">
+              <mat-option value="all">All</mat-option>
+              <mat-option *ngFor="let opt of logEventFilterOptions" [value]="opt.id">
+                {{ opt.name }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button mat-icon-button (click)="closeLog()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
       </div>
 
       <div class="loading-spinner" *ngIf="logLoading">
@@ -319,10 +330,12 @@
       </div>
 
       <div class="log-timeline" *ngIf="!logLoading">
-        <div *ngIf="logEvents.length === 0" class="no-events">No events attended.</div>
+        <div *ngIf="filteredLogEvents.length === 0" class="no-events">
+          {{ logEvents.length === 0 ? 'No events attended.' : 'No results for selected filter.' }}
+        </div>
 
         <div class="timeline-item"
-            *ngFor="let event of logEvents; let i = index; let last = last"
+            *ngFor="let event of filteredLogEvents; let i = index; let last = last"
             draggable="true"
             (dragstart)="onCardDragStart($event, i)"
             (dragover)="onCardDragOver($event, i)"

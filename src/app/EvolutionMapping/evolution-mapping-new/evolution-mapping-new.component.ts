@@ -83,6 +83,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     eventId?: string;
     videoType?: string;
     docId?: string;
+    linkedEventName?: string | null;
     extraVideos?: { videoUrl: string; videoTitle: string; docId: string; videoType: string }[];
   }[] = [];
   dragCardIndex: number | null = null;
@@ -172,6 +173,10 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   videoFilterSearchCtrl = new FormControl('');
   filteredVideoFilterOptions: { id: string; name: string }[] = [];
   private pendingLogEventIndex: number | null = null;
+  // LOG FILTER
+  logEventFilterOptions: { id: string; name: string }[] = [];
+  selectedLogEventFilter: string = 'all';
+  filteredLogEvents: typeof this.logEvents = [];
 
   
   constructor(
@@ -314,19 +319,28 @@ onJourneyFilterChange() {
 
     const chunks = this.chunkArray(profileIds, 30);
     const snaps = await Promise.all(
-      chunks.map((chunk) => getDocs(query( collection(this.firestore, 'participant videos'), where('profileid', 'in', chunk), where('delete', '==', false), orderBy('recordeddate', 'desc') )) ) );
-    // Group by profileid 
-    const latestByProfile: { [profileid: string]: any } = {};
+      chunks.map((chunk) => getDocs(query(
+        collection(this.firestore, 'participant videos'),
+        where('profileid', 'in', chunk),
+        where('delete', '==', false),
+        orderBy('recordeddate', 'desc')
+      )))
+    );
+
+    // Group ALL videos by profileid first
+    const allByProfile: { [profileid: string]: any[] } = {};
     snaps.forEach((snap) => {
       snap.docs.forEach((d) => {
         const profileid = d.data()['profileid'];
         const type = d.data()['type'];
 
         if (profileid) {
-          // Keep latest for last video column
-          if (!latestByProfile[profileid]) {
-            latestByProfile[profileid] = d.data();
+          // Collect all for sorting
+          if (!allByProfile[profileid]) {
+            allByProfile[profileid] = [];
           }
+          allByProfile[profileid].push({ ...d.data(), docId: d.id });
+
           // Count by type
           if (!this.mapVideoCount[profileid]) {
             this.mapVideoCount[profileid] = { events: 0, interviews: 0, testimonials: 0 };
@@ -342,24 +356,37 @@ onJourneyFilterChange() {
       });
     });
 
-    // Fetch event names for those that have eventref
+    // For each profileid, pick the latest video by recordeddate
     await Promise.all(
-      Object.entries(latestByProfile).map(async ([profileid, data]) => {
-        let eventName = data['title'] || '—';
+      Object.entries(allByProfile).map(async ([profileid, videos]) => {
+        // Sort descending by recordeddate, nulls last
+        videos.sort((a, b) => {
+          const dateA = a['recordeddate']?.toDate?.() ?? (a['recordeddate'] ? new Date(a['recordeddate']) : null);
+          const dateB = b['recordeddate']?.toDate?.() ?? (b['recordeddate'] ? new Date(b['recordeddate']) : null);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;  // nulls go last
+          if (!dateB) return -1;
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        const latest = videos[0];
+        let eventName = latest['title'] || '—';
         let date: Date | null = null;
 
-        if (data['eventref']?.path) {
+        // Try to get event name from eventref
+        if (latest['eventref']?.path) {
           try {
             const eventDoc = await runInInjectionContext(
-              this.injector, () => getDoc(data['eventref'])
+              this.injector, () => getDoc(latest['eventref'])
             );
             if (eventDoc.exists()) {
-              eventName = eventDoc.data()['name'] || data['title'] || '—';
+              eventName = eventDoc.data()['name'] || latest['title'] || '—';
             }
           } catch (e) {}
         }
 
-        const rawDate = data['recordeddate'] || null;
+        // Parse date
+        const rawDate = latest['recordeddate'] || null;
         if (rawDate?.toDate) date = rawDate.toDate();
         else if (rawDate) date = new Date(rawDate);
 
@@ -420,6 +447,8 @@ onJourneyFilterChange() {
         profileDataMap[d.id] = {
           photo: resolvedPhoto || profileImg,
           mobile: (d.data()['countrycode'] || '') + (d.data()['number'] || ''),
+          email: d.data()['email'] || '',
+
         };
       });
     });
@@ -755,6 +784,9 @@ onJourneyFilterChange() {
     this.logParticipantName = row['name'];
     this.logEventCount = this.mapEventCount[row.id] || 0;
     this.logEvents = [];
+    this.filteredLogEvents = [];
+    this.logEventFilterOptions = [];
+    this.selectedLogEventFilter = 'all';
     this.showLogOverlay = true;
     const profileid = this.mapProfiles[row.id]?.['profileid'] || null;
     this.currentLogProfileId = profileid;
@@ -927,6 +959,17 @@ onJourneyFilterChange() {
 
     this.ngZone.run(() => {
       this.logEvents = allItems;
+      this.filteredLogEvents = [...allItems];
+      this.selectedLogEventFilter = 'all';
+
+      // Build filter options from attended event cards only
+      this.logEventFilterOptions = allItems
+        .filter((e) => e.type === 'event' && (e as any).eventId)
+        .map((e) => ({
+          id: (e as any).eventId,
+          name: e.eventName,
+        }));
+
       this.logLoading = false;
     });
   }
@@ -1031,6 +1074,16 @@ onJourneyFilterChange() {
     window.open(url, '_blank');
   }
 
+  applyLogEventFilter() {
+    if (this.selectedLogEventFilter === 'all') {
+      this.filteredLogEvents = [...this.logEvents];
+    } else {
+      this.filteredLogEvents = this.logEvents.filter((e) => {
+        const eventId = (e as any).eventId || null;
+        return eventId === this.selectedLogEventFilter;
+      });
+    }
+  }
 
   // ADD VIDEO FORM
   get entriesArray(): FormArray {
@@ -1129,7 +1182,6 @@ onJourneyFilterChange() {
   }
 
   async fetchLiveEvents() {
-    if (this.liveEvents.length > 0) return;
     const snap = await getDocs(
       query(collection(this.firestore, 'event collection'), orderBy('name', 'asc'))
     );
