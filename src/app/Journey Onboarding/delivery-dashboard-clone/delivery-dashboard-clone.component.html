@@ -584,24 +584,26 @@
                 Tentative Start:
                 {{ c?.tentativestart?.toDate() | date:'dd MMM yyyy' }}
               </span>
-              <div *ngIf="c?.status === 'completed' || c?.status === 'ongoing' || c?.status === 'submitted'"
-                class="detail-row" (click)="toggleExpand(c, i)">
+              <div *ngIf="
+    c?.status === 'completed' ||
+    c?.status === 'submitted' ||
+    (c?.status === 'ongoing' && (
+      c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Welcome Call') ||
+      c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Diagnostics') ||
+      c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Implementation') ||
+      c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Implementation')
+    ))
+  " class="detail-row" (click)="toggleExpand(c, i)">
                 <span>
                   <span class="detail-label">
                     {{
-                    c?.status === 'completed'
+                    (c?.status === 'completed'
                     ? 'Completed: '
                     : c?.status === 'submitted'
                     ? 'Form Submitted: '
-                    : c?.status === 'ongoing' && c?.appointmentType === `${mapProductName[c.productref.id]} Welcome
-                    Call`
+                    : c?.appointmentTypeName === (mapProductName[c.productref.id] + ' Welcome Call')
                     ? 'Welcome Call: '
-                    : c?.status === 'ongoing' && c?.appointmentType === `${mapProductName[c.productref.id]} Diagnostics`
-                    ? 'D&I: '
-                    : c?.status === 'ongoing' && c?.appointmentType === `${mapProductName[c.productref.id]}
-                    Implementation`
-                    ? 'D&I: '
-                    : ''
+                    : 'D&I: ')
                     }}
                   </span>
                   <span class="detail-val">
@@ -619,16 +621,15 @@
                     mapProductName[c.productref.id] + ' Welcome Call',
                     mapProductName[c.productref.id] + ' Diagnostics',
                     mapProductName[c.productref.id] + ' Implementation'
-                    ].includes(c?.appointmentType)
+                    ].includes(c?.appointmentTypeName)
                     )
                     ? (c.starttime.toDate() | date:'dd MMM yyyy')
-
-                    : '—'
+                    : ''
                     }}
                   </span>
                 </span>
-                <span *ngIf="(c?.status === 'ongoing' || c?.status === 'completed')" class="chevron"
-                  [class.open]="c._expanded">
+                <span *ngIf="((c?.status === 'ongoing' || c?.status === 'completed') && c?.allappointments.length > 0)"
+                  class="chevron" [class.open]="c._expanded">
                 </span>
               </div>
               <!-- Expandable Section -->
@@ -655,14 +656,12 @@
                       <div class="status-badge" [ngClass]="getStatusClass(appointment)">
                         {{
                         stage === "Post Session Check-in"
-                        ? 'Completed'
+                        ? 'Submitted'
                         : (appointment?.cancelled
                         ? 'Cancelled'
                         : appointment?.attended
-                        ? 'Completed'
-                        : appointment?.starttime && !appointment?.endtime
-                        ? 'Scheduled'
-                        : 'Scheduled')
+                        && 'Completed'
+                        )
                         }}
                       </div>
                     </ng-container>

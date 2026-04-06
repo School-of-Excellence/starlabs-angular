@@ -183,9 +183,9 @@
 
 /* Launch Meeting Button */
 .zoomlaunchbtn {
-  background: linear-gradient(135deg, #28a745, #20c997);
-  color: white;
-  border: none;
+  background: linear-gradient(135deg, #28a745, #20c997) !important;
+  color: white !important;
+  border: none !important;
   padding: 12px 30px;
   border-radius: 25px;
   font-size: 1rem;
@@ -206,6 +206,21 @@
 .zoomlaunchbtn:active {
   transform: translateY(0);
   box-shadow: 0 2px 10px rgba(40, 167, 69, 0.3);
+}
+
+.journeyplanbtn{
+  background: transparent !important;
+  color: #28a745 !important;
+  border: linear-gradient(135deg, #28a745, #20c997) !important;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
 }
 
 /* Next Appointments */

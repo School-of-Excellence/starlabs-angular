@@ -1,5 +1,4 @@
-<div class="mainscreen">
-
+<div class="mainscreen" (click)="showEventFilterDropdown = false; showVideoFilterDropdown = false">
   <!-- Page Header -->
   <div class="page-header">
     <h1 class="page-title">Evolution Mapping</h1>
@@ -30,7 +29,7 @@
     <div class="filters-left">
       <mat-form-field appearance="outline" class="participant-filter">
         <mat-label>Filter Participants</mat-label>
-        <mat-select multiple [(ngModel)]="selectedParticipants" (openedChange)="onDropdownClose($event)">
+        <mat-select multiple [(ngModel)]="selectedParticipants" (ngModelChange)="onParticipantFilterChange()">
           <mat-option>
             <ngx-mat-select-search
               [formControl]="participantFilterCtrl"
@@ -43,15 +42,27 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
+
+      <mat-form-field appearance="outline" class="journey-filter">
+        <mat-label>All Journeys</mat-label>
+        <mat-select multiple [(ngModel)]="selectedJourneyFilters"  (ngModelChange)="onJourneyFilterChange()">
+          <mat-option>
+            <ngx-mat-select-search
+              [formControl]="journeyFilterCtrl"
+              placeholderLabel="Search journeys..."
+              noEntriesFoundLabel="No journey found">
+            </ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let j of filteredJourneys" [value]="j.id">
+            {{ j.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
       <button mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
 
-    <select class="journey-select" [(ngModel)]="selectedJourneyFilter" (ngModelChange)="onJourneyFilterChange()">
-      <option value="">All Journeys</option>
-      <option *ngFor="let j of journeyOptions" [value]="j.id">
-        {{ j.name }}
-      </option>
-    </select>
+
 
     <button class="add-video-btn" (click)="openAddVideo()">
       + Add Video
@@ -85,28 +96,50 @@
 
       <!-- Active Journey -->
       <ng-container matColumnDef="activejourney">
-        <th mat-header-cell *matHeaderCellDef>LAST/ACTIVE JOURNEY</th>
+        <th mat-header-cell *matHeaderCellDef>
+          <div class="journey-header">
+            LAST/ACTIVE JOURNEY
+            <button class="journey-type-filter-btn" 
+                    (click)="toggleJourneyTypeFilter(); $event.stopPropagation()"
+                    [title]="'Filter: ' + (journeyTypeFilter === 'all' ? 'All' : journeyTypeFilter === 'active' ? 'Active Only' : 'Last Completed Only')"
+                    [class.journey-filter-active]="journeyTypeFilter !== 'all'">
+              <mat-icon>filter_list</mat-icon>
+              <span *ngIf="journeyTypeFilter !== 'all'" class="journey-filter-label">
+                {{ getJourneyTypeFilterLabel() }}
+              </span>
+            </button>
+          </div>
+        </th>
         <td mat-cell *matCellDef="let row">
-        <span class="journey-badge journey-active" title="Active Journey"
-            *ngIf="row['activejourney'] && mapJourneys[row['activejourney']]">
-            <span class="badge-dot"></span>
-            {{ mapJourneys[row['activejourney']] }}
-        </span>
-        <span class="journey-badge journey-last" title="Last Completed Journey"
-            *ngIf="!row['activejourney'] && row['lastcompletedjourney'] && mapJourneys[row['lastcompletedjourney']]">
-            <span class="badge-dot"></span>
-            {{ mapJourneys[row['lastcompletedjourney']] }}
-        </span>
-        <span class="journey-none"
-            *ngIf="(!row['activejourney'] || !mapJourneys[row['activejourney']]) && (!row['lastcompletedjourney'] || !mapJourneys[row['lastcompletedjourney']])">
-            —
-        </span>
+          <span class="journey-badge journey-active" title="Active Journey"
+              *ngIf="(journeyTypeFilter === 'all' || journeyTypeFilter === 'active') && row['activejourney'] && mapJourneys[row['activejourney']]">
+              <span class="badge-dot"></span>
+              {{ mapJourneys[row['activejourney']] }}
+          </span>
+          <span class="journey-badge journey-last" title="Last Completed Journey"
+              *ngIf="(journeyTypeFilter === 'all' || journeyTypeFilter === 'last') && !row['activejourney'] && row['lastcompletedjourney'] && mapJourneys[row['lastcompletedjourney']]">
+              <span class="badge-dot"></span>
+              {{ mapJourneys[row['lastcompletedjourney']] }}
+          </span>
+          <span class="journey-none"
+              *ngIf="(!row['activejourney'] || !mapJourneys[row['activejourney']]) && (!row['lastcompletedjourney'] || !mapJourneys[row['lastcompletedjourney']])">
+              —
+          </span>
         </td>
       </ng-container>
 
       <!-- Events Attended -->
       <ng-container matColumnDef="eventsattended">
-        <th mat-header-cell *matHeaderCellDef>EVENTS ATTENDED</th>
+        <th mat-header-cell *matHeaderCellDef>
+          <div class="column-header-with-filter">
+            EVENTS ATTENDED
+            <button class="col-filter-btn"
+                    [class.col-filter-active]="selectedEventFilters.length > 0"
+                    (click)="openEventFilterDropdown($event)">
+              <mat-icon>filter_list</mat-icon>
+            </button>
+          </div>
+        </th>
         <td mat-cell *matCellDef="let row">
           <span class="events-count">{{ mapEventCount[row['id']] || 0 }} attended</span>
         </td>
@@ -114,7 +147,16 @@
 
       <!-- Video Count -->
       <ng-container matColumnDef="videocount">
-        <th mat-header-cell *matHeaderCellDef>VIDEOS</th>
+        <th mat-header-cell *matHeaderCellDef>
+          <div class="column-header-with-filter">
+            VIDEOS
+            <button class="col-filter-btn"
+                    [class.col-filter-active]="selectedVideoFilters.length > 0"
+                    (click)="openVideoFilterDropdown($event)">
+              <mat-icon>filter_list</mat-icon>
+            </button>
+          </div>
+        </th>
         <td mat-cell *matCellDef="let row">
           <div class="video-dots-row" *ngIf="mapVideoCount[mapProfiles[row['id']]?.['profileid']]; else noVideos">
             <span class="video-dot dot-event"
@@ -189,418 +231,512 @@
 
 </div>
 
-<!-- Evolution Log Overlay -->
-<div class="log-overlay-wrap" *ngIf="showLogOverlay">
-  <div class="log-panel">
-
-    <!-- Header -->
-    <div class="log-header">
-      <div>
-        <h2 class="log-participant-name">{{ logParticipantName }}</h2>
-        <span class="log-subtitle">Evolution Log · {{ logEventCount }} events attended</span>
-      </div>
-      <button mat-icon-button (click)="closeLog()">
-        <mat-icon>close</mat-icon>
+  <!-- Video Filter Dropdown -->
+  <div class="col-filter-dropdown" *ngIf="showVideoFilterDropdown" [style.top.px]="videoFilterDropdownTop" [style.left.px]="videoFilterDropdownLeft" (click)="$event.stopPropagation()">
+    <div class="col-filter-header">
+      <span>Filter by Video Event</span>
+      <button class="col-filter-clear"
+              *ngIf="selectedVideoFilters.length > 0"
+              (click)="selectedVideoFilters = []; fetchRecords()">
+        Clear
       </button>
     </div>
 
-    <div class="loading-spinner" *ngIf="logLoading">
-      <mat-spinner diameter="36"></mat-spinner>
+    <!-- Search input -->
+    <div class="col-filter-search">
+      <input class="col-filter-search-input"
+            [formControl]="videoFilterSearchCtrl"
+            placeholder="Search events..."
+            (click)="$event.stopPropagation()">
     </div>
 
-    <div class="log-timeline" *ngIf="!logLoading">
-      <div *ngIf="logEvents.length === 0" class="no-events">No events attended.</div>
-
-      <div class="timeline-item"
-           *ngFor="let event of logEvents; let i = index; let last = last"
-           draggable="true"
-           (dragstart)="onCardDragStart($event, i)"
-           (dragover)="onCardDragOver($event, i)"
-           (drop)="onCardDrop($event, i)"
-           (dragend)="onCardDragEnd()"
-           [class.drag-over]="dragOverIndex === i">
-
-        <div class="timeline-left">
-          <div class="timeline-dot"
-               [class.dot-first]="i === 0"
-               [class.dot-last]="last && logEvents.length > 1"
-               [class.dot-video]="event.type === 'video'">
-          </div>
-          <div class="timeline-line" *ngIf="!last"></div>
-        </div>
-
-        <div class="event-card" [class.card-dragging]="dragCardIndex === i" [class.card-type-event]="event.type === 'event'">
-          <div class="event-card-header">
-            <div class="card-drag-handle">
-              <mat-icon>drag_indicator</mat-icon>
-            </div>
-            <div class="event-card-content">
-              <div class="event-name">
-                {{ event.eventName }}
-                <span class="event-month" *ngIf="event.date">
-                  · {{ event.date | date: 'MMM yyyy' }}
-                </span>
-              </div>
-              <div class="event-date" *ngIf="event.date">
-                {{ event.date | date: 'MMM d, y' }}
-              </div>
-              <div class="video-type-badge" *ngIf="event['videoType'] && event['videoType'] !== 'Event'">
-                {{ event['videoType'] }}
-              </div>
-            </div>
-            <div class="event-card-action">
-              <div class="watch-btn-wrap" *ngIf="event.hasVideo && event.videoUrl">
-                <button class="watch-btn" (click)="activeWatchIndex = (activeWatchIndex === i ? null : i); $event.stopPropagation()">
-                  ▶ Watch
-                </button>
-                <div class="watch-choice-popup" *ngIf="activeWatchIndex === i">
-                  <button class="watch-choice-item" (click)="openVideoPlayer(event.videoUrl, event.eventName); activeWatchIndex = null">
-                    <mat-icon>play_circle</mat-icon>
-                    Watch here
-                  </button>
-                  <button class="watch-choice-item" (click)="openVideoInNewTab(event.videoUrl); activeWatchIndex = null">
-                    <mat-icon>open_in_new</mat-icon>
-                    New tab
-                  </button>
-                </div>
-              </div>
-              <!-- Edit button for cards that have a video -->
-              <button class="add-video-icon-btn" *ngIf="event.hasVideo && event.docId"
-                      title="Edit video details"
-                      (click)="openEditVideo(event, i)">
-                <mat-icon>edit</mat-icon>
-              </button>
-              <!-- Pencil icon for events without video -->
-              <button class="add-video-icon-btn" *ngIf="event.type === 'event' && !event.hasVideo"
-                      title="Add video"
-                      (click)="openAddVideoForEvent(event)">
-                <mat-icon>edit</mat-icon>
-              </button>
-            </div>
-          </div>
-        </div>
+    <div class="col-filter-list">
+      <div class="col-filter-item" *ngFor="let event of filteredVideoFilterOptions">
+        <label class="col-filter-label">
+          <input type="checkbox"
+                [checked]="selectedVideoFilters.includes(event.id)"
+                (change)="onVideoFilterChange(event.id, $event)">
+          <span class="col-filter-name">{{ event.name }}</span>
+        </label>
       </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- Video Player Overlay -->
-<div class="video-overlay-backdrop" *ngIf="showVideoOverlay" (click)="closeVideoOverlay()">
-  <div class="video-overlay-panel" (click)="$event.stopPropagation()">
-    <div class="video-overlay-header">
-      <span class="video-overlay-title">{{ overlayVideoTitle }}</span>
-      <button class="video-overlay-close" (click)="closeVideoOverlay()">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-    <div class="video-overlay-player">
-      <app-video-player 
-        *ngIf="showVideoPlayer"
-        [videoUrl]="overlayVideoUrl">
-      </app-video-player>
     </div>
   </div>
-</div>
 
-<!-- Image Preview Overlay -->
-<div class="overlay-backdrop" *ngIf="showImageOverlay" (click)="closeImage()">
-  <div class="image-preview-panel" (click)="$event.stopPropagation()">
-    <button class="image-close-btn" (click)="closeImage()">
-      <mat-icon>close</mat-icon>
-    </button>
-    <img class="preview-image" [src]="previewImageUrl" [alt]="previewImageName">
-    <div class="preview-name">{{ previewImageName }}</div>
-  </div>
-</div>
-
-<!-- Edit Video Overlay -->
-<div class="overlay-backdrop" *ngIf="showEditVideoOverlay" (click)="closeEditVideo()">
-  <div class="note-panel" (click)="$event.stopPropagation()">
-    <div class="note-header">
-      <h3>Edit Video Details</h3>
-      <button mat-icon-button (click)="closeEditVideo()">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-    <div class="note-body">
-      <!-- Live Event -->
-      <div class="form-group">
-        <label class="form-label">Live Event</label>
-        <mat-form-field appearance="outline" style="width:100%">
-          <mat-select [(ngModel)]="editVideoEventId">
-            <mat-option value="">None</mat-option>
-            <mat-option *ngFor="let e of liveEvents" [value]="e.id">
-              {{ e.name }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-      </div>
-      <!-- Recorded Date -->
-      <div class="form-group">
-        <label class="form-label">Recorded Date</label>
-        <mat-form-field appearance="outline" style="width:100%">
-          <input matInput [matDatepicker]="editDatePicker"
-                 [(ngModel)]="editVideoRecordedDate"
-                 placeholder="Select date">
-          <mat-datepicker-toggle matSuffix [for]="editDatePicker"></mat-datepicker-toggle>
-          <mat-datepicker #editDatePicker></mat-datepicker>
-        </mat-form-field>
-      </div>
-    </div>
-    <div class="note-footer">
-      <button mat-stroked-button (click)="closeEditVideo()">Cancel</button>
-      <button class="save-video-btn" (click)="saveEditVideo()" [disabled]="editVideoSaving">
-        {{ editVideoSaving ? 'Saving...' : 'Save' }}
-      </button>
-    </div>
-  </div>
-</div>
-<!-- Add Video Overlay -->
-<div class="overlay-backdrop" *ngIf="showAddVideoOverlay" (click)="closeAddVideo()">
-  <div class="add-video-panel" (click)="$event.stopPropagation()">
-
-    <!-- Header -->
-    <div class="add-video-header">
-      <h2 class="add-video-title">Add Video</h2>
-      <button mat-icon-button (click)="closeAddVideo()">
-        <mat-icon>close</mat-icon>
+  <!-- Event Filter Dropdown -->
+  <div class="col-filter-dropdown" *ngIf="showEventFilterDropdown" [style.top.px]="eventFilterDropdownTop" [style.left.px]="eventFilterDropdownLeft" (click)="$event.stopPropagation()">
+    <div class="col-filter-header">
+      <span>Filter by Event</span>
+      <button class="col-filter-clear"
+              *ngIf="selectedEventFilters.length > 0"
+              (click)="selectedEventFilters = []; fetchRecords()">
+        Clear
       </button>
     </div>
 
-    <!-- Tab Switcher -->
-    <div class="tab-switcher">
-      <button class="tab-btn" [class.tab-active]="activeTab === 'manual'"
-              (click)="switchTab('manual')">
-        Manual Entry
-      </button>
-      <button class="tab-btn" [class.tab-active]="activeTab === 'bulk'"
-              (click)="switchTab('bulk')">
-        Bulk Import
-      </button>
+    <!-- Search input -->
+    <div class="col-filter-search">
+      <input class="col-filter-search-input"
+            [formControl]="eventFilterSearchCtrl"
+            placeholder="Search events..."
+            (click)="$event.stopPropagation()">
     </div>
 
-    <!-- MANUAL TAB -->
-    <ng-container *ngIf="activeTab === 'manual'">
-      <div class="add-video-body" [formGroup]="addVideoForm">
-
-        <!-- Participant -->
-        <div class="form-group">
-          <label class="form-label">Participant</label>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-select formControlName="participantId">
-              <mat-option>
-                <ngx-mat-select-search
-                  [formControl]="addVideoParticipantCtrl"
-                  placeholderLabel="Search participant..."
-                  noEntriesFoundLabel="No participant found">
-                </ngx-mat-select-search>
-              </mat-option>
-              <mat-option *ngFor="let p of addVideoFilteredParticipants" [value]="p.id">
-                {{ p.name }}
-              </mat-option>
-            </mat-select>
-            <mat-error *ngIf="addVideoForm.get('participantId')?.touched && addVideoForm.get('participantId')?.hasError('required')">
-              Participant is required
-            </mat-error>
-          </mat-form-field>
-        </div>
-
-        <!-- Video Entries -->
-        <div class="video-entries-label">
-          <label class="form-label">Video Entries</label>
-          <button class="add-entry-btn" (click)="addVideoEntry()">+ Add Entry</button>
-        </div>
-
-        <div class="video-entry" *ngFor="let entry of entriesArray.controls; let i = index" [formGroup]="$any(entry)">
-          <div class="entry-header">
-            <span class="entry-number">Entry {{ i + 1 }}</span>
-            <button class="remove-entry-btn" (click)="removeVideoEntry(i)" *ngIf="entriesArray.length > 1">
-              <mat-icon>close</mat-icon>
-            </button>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Title</label>
-            <mat-form-field appearance="outline" class="full-width">
-              <input matInput formControlName="title" placeholder="Enter video title">
-              <mat-error *ngIf="entry.get('title')?.touched && entry.get('title')?.hasError('required')">
-                Title is required
-              </mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Recorded Date</label>
-            <mat-form-field appearance="outline" class="full-width">
-              <input matInput [matDatepicker]="recordedDatePicker" formControlName="recordedDate" placeholder="Select date">
-              <mat-datepicker-toggle matSuffix [for]="recordedDatePicker"></mat-datepicker-toggle>
-              <mat-datepicker #recordedDatePicker></mat-datepicker>
-            </mat-form-field>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Type</label>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-select formControlName="type" (selectionChange)="onEntryTypeChange($any(entry))">
-                <mat-option value="Event">Event</mat-option>
-                <mat-option value="Interview">Interview</mat-option>
-                <mat-option value="Testimonial">Testimonial</mat-option>
-              </mat-select>
-              <mat-error *ngIf="entry.get('type')?.touched && entry.get('type')?.hasError('required')">
-                Type is required
-              </mat-error>
-            </mat-form-field>
-          </div>
-
-          <div class="form-group" *ngIf="entry.get('type')?.value">
-            <label class="form-label">Live Event</label>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-select formControlName="eventId">
-                <mat-option *ngFor="let e of liveEvents" [value]="e.id">{{ e.name }}</mat-option>
-              </mat-select>
-              <mat-hint *ngIf="entry.get('type')?.value === 'Interview' || entry.get('type')?.value === 'Testimonial'">
-                Optional — link to a live event if related
-              </mat-hint>
-            </mat-form-field>
-          </div>
-
-          <div class="form-group" *ngIf="entry.get('type')?.value">
-            <label class="form-label">Video URL</label>
-            <mat-form-field appearance="outline" class="full-width">
-              <input matInput formControlName="videoUrl" placeholder="Enter video URL">
-              <mat-error *ngIf="entry.get('videoUrl')?.touched && entry.get('videoUrl')?.hasError('required')">
-                Video URL is required
-              </mat-error>
-            </mat-form-field>
-          </div>
-        </div>
-      </div>
-
-      <div class="add-video-footer">
-        <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
-        <button class="save-video-btn" (click)="saveVideo()">Save</button>
-      </div>
-    </ng-container>
-
-    <!-- BULK IMPORT TAB -->
-    <ng-container *ngIf="activeTab === 'bulk'">
-      <div class="add-video-body">
-
-        <!-- Actions row -->
-        <div class="bulk-actions-row">
-          <button class="download-sample-btn" (click)="downloadSampleExcel()">
-            <mat-icon>download</mat-icon>
-            Download Sample Excel
-          </button>
-          <label class="upload-excel-btn">
-            <mat-icon>upload_file</mat-icon>
-            {{ bulkImportFile ? bulkImportFile.name : 'Choose Excel File' }}
-            <input type="file" accept=".xlsx,.xls,.csv" (change)="onBulkFileSelected($event)" hidden>
-          </label>
-        </div>
-
-        <!-- Loading -->
-        <div class="loading-spinner" *ngIf="bulkImportLoading">
-          <mat-spinner diameter="36"></mat-spinner>
-          <p style="margin-top:12px; color:#6b7280; font-size:13px;">Parsing file...</p>
-        </div>
-
-        <!-- Preview Table -->
-        <div class="bulk-preview-wrap" *ngIf="bulkImportProcessed && !bulkImportLoading">
-          <div class="bulk-preview-summary">
-            <span class="bulk-valid-count">
-              {{ getBulkValidCount() }} valid rows
-            </span>
-            <span class="bulk-error-count" *ngIf="getBulkErrorCount() > 0">
-              {{ getBulkErrorCount() }} rows with errors
-            </span>
-          </div>
-
-          <div class="bulk-table-wrap">
-            <table class="bulk-preview-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Email</th>
-                  <th>Participant</th>
-                  <th>Title</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Event</th>
-                  <th>Video URL</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let row of bulkPreviewRows; let i = index"
-                    [class.bulk-row-error]="row.status === 'error'"
-                    [class.bulk-row-valid]="row.status === 'valid'">
-                  <td>{{ i + 1 }}</td>
-                  <td>{{ row.email }}</td>
-                  <td>{{ row.participantName || '—' }}</td>
-                  <td>{{ row.title }}</td>
-                  <td>{{ row.recordedDate }}</td>
-                  <td>{{ row.type }}</td>
-                  <td>{{ row.eventName || '—' }}</td>
-                  <td class="bulk-url-cell">{{ row.videoUrl }}</td>
-                  <td>
-                    <span class="bulk-status-badge" [class.status-valid]="row.status === 'valid'"
-                          [class.status-error]="row.status === 'error'">
-                      {{ row.status === 'valid' ? 'Valid' : 'Error' }}
-                    </span>
-                    <div class="bulk-row-errors" *ngIf="row.errors.length > 0">
-                      <span *ngFor="let err of row.errors" class="bulk-row-error-text">{{ err }}</span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Empty state -->
-        <div class="bulk-empty" *ngIf="!bulkImportProcessed && !bulkImportLoading">
-          <mat-icon style="font-size:48px; width:48px; height:48px; color:#d1d5db;">upload_file</mat-icon>
-          <p>Upload an Excel file to preview data before importing</p>
-          <p style="font-size:12px; color:#9ca3af;">Columns: Email · Title · Recorded Date · Type · Event Name · Video URL</p>
-        </div>
-
-      </div>
-
-      <div class="add-video-footer">
-        <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
-        <button class="save-video-btn"
-                (click)="saveBulkImport()"
-                [disabled]="bulkImportSaving || !bulkImportProcessed || getBulkValidCount() === 0">
-          {{ bulkImportSaving ? 'Importing...' : 'Import Valid Rows (' + getBulkValidCount() + ')' }}
+    <div class="col-filter-list">
+      <div class="col-filter-item" *ngFor="let event of filteredEventFilterOptions">
+        <label class="col-filter-label">
+          <input type="checkbox"
+                [checked]="selectedEventFilters.includes(event.id)"
+                (change)="onEventFilterChange(event.id, $event)">
+          <span class="col-filter-name">{{ event.name }}</span>
+        </label>
+        <button class="col-filter-copy"
+                [style.color]="copiedEventId === event.id ? '#16a34a' : ''"
+                (click)="copyToClipboard(event.name, event.id)"
+                [title]="copiedEventId === event.id ? 'Copied!' : 'Copy event name'">
+          <mat-icon>{{ copiedEventId === event.id ? 'check' : 'content_copy' }}</mat-icon>
         </button>
       </div>
-    </ng-container>
-
-  </div>
-</div>
-
-<!-- Bulk Error Dialog -->
-<div class="overlay-backdrop" *ngIf="showBulkErrorDialog" (click)="closeBulkErrorDialog()">
-  <div class="error-dialog-panel" (click)="$event.stopPropagation()">
-    <div class="note-header">
-      <h3>⚠️ Import Errors Found</h3>
-      <button mat-icon-button (click)="closeBulkErrorDialog()">
-        <mat-icon>close</mat-icon>
-      </button>
     </div>
-    <div class="error-dialog-body">
-      <p class="error-dialog-subtitle">The following issues were found. Valid rows can still be imported.</p>
-      <div class="error-list">
-        <div class="error-item" *ngFor="let err of bulkErrorMessages">
-          <mat-icon class="error-icon">error_outline</mat-icon>
-          <span>{{ err }}</span>
+  </div>
+
+  <!-- Evolution Log Overlay -->
+  <div class="log-overlay-wrap" *ngIf="showLogOverlay">
+    <div class="log-panel">
+
+      <!-- Header -->
+      <div class="log-header">
+        <div>
+          <h2 class="log-participant-name">{{ logParticipantName }}</h2>
+          <span class="log-subtitle">Evolution Log · {{ logEventCount }} events attended</span>
+        </div>
+        <button mat-icon-button (click)="closeLog()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="loading-spinner" *ngIf="logLoading">
+        <mat-spinner diameter="36"></mat-spinner>
+      </div>
+
+      <div class="log-timeline" *ngIf="!logLoading">
+        <div *ngIf="logEvents.length === 0" class="no-events">No events attended.</div>
+
+        <div class="timeline-item"
+            *ngFor="let event of logEvents; let i = index; let last = last"
+            draggable="true"
+            (dragstart)="onCardDragStart($event, i)"
+            (dragover)="onCardDragOver($event, i)"
+            (drop)="onCardDrop($event, i)"
+            (dragend)="onCardDragEnd()"
+            [class.drag-over]="dragOverIndex === i">
+
+          <div class="timeline-left">
+            <div class="timeline-dot"
+                [class.dot-first]="i === 0"
+                [class.dot-last]="last && logEvents.length > 1"
+                [class.dot-video]="event.type === 'video'">
+            </div>
+            <div class="timeline-line" *ngIf="!last"></div>
+          </div>
+
+          <div class="event-card" [class.card-dragging]="dragCardIndex === i" [class.card-type-event]="event.type === 'event'">
+            <div class="event-card-header">
+              <div class="card-drag-handle">
+                <mat-icon>drag_indicator</mat-icon>
+              </div>
+              <div class="event-card-content">
+                <div class="event-name">
+                  {{ event.eventName }}
+                  <span class="event-month" *ngIf="event.date">
+                    · {{ event.date | date: 'MMM yyyy' }}
+                  </span>
+                </div>
+                <div class="event-date" *ngIf="event.date">
+                  {{ event.date | date: 'MMM d, y' }}
+                </div>
+                <div class="video-type-badge" *ngIf="event['videoType'] && event['videoType'] !== 'Event'">
+                  {{ event['videoType'] }}
+                </div>
+              </div>
+              <div class="event-card-action">
+                <!-- Primary watch button -->
+                <div class="watch-btn-wrap" *ngIf="event.hasVideo && event.videoUrl">
+                    <button class="watch-btn" 
+                        [title]="event.videoTitle || event.eventName"
+                        (click)="activeWatchIndex = (activeWatchIndex === 'p_'+i ? null : 'p_'+i); $event.stopPropagation()">
+                      ▶ Watch {{ event['extraVideos']?.length > 0 ? '1' : '' }}
+                    </button>
+                  <div class="watch-choice-popup" *ngIf="activeWatchIndex === 'p_'+i">
+                    <button class="watch-choice-item" (click)="openVideoPlayer(event.videoUrl, event.eventName); activeWatchIndex = null">
+                      <mat-icon>play_circle</mat-icon>
+                      Watch here
+                    </button>
+                    <button class="watch-choice-item" (click)="openVideoInNewTab(event.videoUrl); activeWatchIndex = null">
+                      <mat-icon>open_in_new</mat-icon>
+                      New tab
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Extra watch buttons -->
+                <ng-container *ngIf="event['extraVideos']?.length > 0">
+                  <div class="watch-btn-wrap" *ngFor="let extra of event['extraVideos']; let vi = index">
+                    <button class="watch-btn watch-btn-extra"
+                            [title]="extra.videoTitle || 'Video ' + (vi + 2)"
+                            (click)="activeWatchIndex = (activeWatchIndex === 'e_'+i+'_'+vi ? null : 'e_'+i+'_'+vi); $event.stopPropagation()">
+                      ▶ Watch {{ vi + 2 }}
+                    </button>
+                    <div class="watch-choice-popup" *ngIf="activeWatchIndex === 'e_'+i+'_'+vi">
+                      <button class="watch-choice-item" (click)="openVideoPlayer(extra.videoUrl, extra.videoTitle); activeWatchIndex = null">
+                        <mat-icon>play_circle</mat-icon>
+                        Watch here
+                      </button>
+                      <button class="watch-choice-item" (click)="openVideoInNewTab(extra.videoUrl); activeWatchIndex = null">
+                        <mat-icon>open_in_new</mat-icon>
+                        New tab
+                      </button>
+                    </div>
+                  </div>
+                </ng-container>
+
+                <!-- Edit button -->
+                <button class="add-video-icon-btn" *ngIf="event.hasVideo && event.docId"
+                        title="Edit video details"
+                        (click)="openEditVideo(event, i)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+
+                <!-- Add video button for events without video -->
+                <button class="add-video-icon-btn" *ngIf="event.type === 'event' && !event.hasVideo"
+                        title="Add video"
+                        (click)="openAddVideoForEvent(event)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="note-footer">
-      <button class="save-video-btn" (click)="closeBulkErrorDialog()">Got it</button>
+
     </div>
   </div>
-</div>
+
+  <!-- Video Player Overlay -->
+  <div class="video-overlay-backdrop" *ngIf="showVideoOverlay" (click)="closeVideoOverlay()">
+    <div class="video-overlay-panel" (click)="$event.stopPropagation()">
+      <div class="video-overlay-header">
+        <span class="video-overlay-title">{{ overlayVideoTitle }}</span>
+        <button class="video-overlay-close" (click)="closeVideoOverlay()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="video-overlay-player">
+        <app-video-player 
+          *ngIf="showVideoPlayer"
+          [videoUrl]="overlayVideoUrl">
+        </app-video-player>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Preview Overlay -->
+  <div class="overlay-backdrop" *ngIf="showImageOverlay" (click)="closeImage()">
+    <div class="image-preview-panel" (click)="$event.stopPropagation()">
+      <button class="image-close-btn" (click)="closeImage()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <img class="preview-image" [src]="previewImageUrl" [alt]="previewImageName">
+      <div class="preview-name">{{ previewImageName }}</div>
+    </div>
+  </div>
+
+  <!-- Edit Video Overlay -->
+  <div class="overlay-backdrop" *ngIf="showEditVideoOverlay" (click)="closeEditVideo()">
+    <div class="note-panel" (click)="$event.stopPropagation()">
+      <div class="note-header">
+        <h3>Edit Video Details</h3>
+        <button mat-icon-button (click)="closeEditVideo()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="note-body">
+        <!-- Live Event -->
+        <div class="form-group">
+          <label class="form-label">Live Event</label>
+          <mat-form-field appearance="outline" style="width:100%">
+            <mat-select [(ngModel)]="editVideoEventId">
+              <mat-option value="">None</mat-option>
+              <mat-option *ngFor="let e of liveEvents" [value]="e.id">
+                {{ e.name }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <!-- Recorded Date -->
+        <div class="form-group">
+          <label class="form-label">Recorded Date</label>
+          <mat-form-field appearance="outline" style="width:100%">
+            <input matInput [matDatepicker]="editDatePicker"
+                  [(ngModel)]="editVideoRecordedDate"
+                  placeholder="Select date">
+            <mat-datepicker-toggle matSuffix [for]="editDatePicker"></mat-datepicker-toggle>
+            <mat-datepicker #editDatePicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+      </div>
+      <div class="note-footer">
+        <button mat-stroked-button (click)="closeEditVideo()">Cancel</button>
+        <button class="save-video-btn" (click)="saveEditVideo()" [disabled]="editVideoSaving">
+          {{ editVideoSaving ? 'Saving...' : 'Save' }}
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Add Video Overlay -->
+  <div class="overlay-backdrop" *ngIf="showAddVideoOverlay" (click)="closeAddVideo()">
+    <div class="add-video-panel" (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <div class="add-video-header">
+        <h2 class="add-video-title">Add Video</h2>
+        <button mat-icon-button (click)="closeAddVideo()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="tab-switcher">
+        <button class="tab-btn" [class.tab-active]="activeTab === 'manual'"
+                (click)="switchTab('manual')">
+          Manual Entry
+        </button>
+        <button class="tab-btn" [class.tab-active]="activeTab === 'bulk'"
+                (click)="switchTab('bulk')">
+          Bulk Import
+        </button>
+      </div>
+
+      <!-- MANUAL TAB -->
+      <ng-container *ngIf="activeTab === 'manual'">
+        <div class="add-video-body" [formGroup]="addVideoForm">
+
+          <!-- Participant -->
+          <div class="form-group">
+            <label class="form-label">Participant</label>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-select formControlName="participantId">
+                <mat-option>
+                  <ngx-mat-select-search
+                    [formControl]="addVideoParticipantCtrl"
+                    placeholderLabel="Search participant..."
+                    noEntriesFoundLabel="No participant found">
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let p of addVideoFilteredParticipants" [value]="p.id">
+                  {{ p.name }}
+                </mat-option>
+              </mat-select>
+              <mat-error *ngIf="addVideoForm.get('participantId')?.touched && addVideoForm.get('participantId')?.hasError('required')">
+                Participant is required
+              </mat-error>
+            </mat-form-field>
+          </div>
+
+          <!-- Video Entries -->
+          <div class="video-entries-label">
+            <label class="form-label">Video Entries</label>
+            <button class="add-entry-btn" (click)="addVideoEntry()">+ Add Entry</button>
+          </div>
+
+          <div class="video-entry" *ngFor="let entry of entriesArray.controls; let i = index" [formGroup]="$any(entry)">
+            <div class="entry-header">
+              <span class="entry-number">Entry {{ i + 1 }}</span>
+              <button class="remove-entry-btn" (click)="removeVideoEntry(i)" *ngIf="entriesArray.length > 1">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Title</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput formControlName="title" placeholder="Enter video title">
+                <mat-error *ngIf="entry.get('title')?.touched && entry.get('title')?.hasError('required')">
+                  Title is required
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Recorded Date</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput [matDatepicker]="recordedDatePicker" formControlName="recordedDate" placeholder="Select date">
+                <mat-datepicker-toggle matSuffix [for]="recordedDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #recordedDatePicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Type</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-select formControlName="type" (selectionChange)="onEntryTypeChange($any(entry))">
+                  <mat-option value="Event">Event</mat-option>
+                  <mat-option value="Interview">Interview</mat-option>
+                  <mat-option value="Testimonial">Testimonial</mat-option>
+                </mat-select>
+                <mat-error *ngIf="entry.get('type')?.touched && entry.get('type')?.hasError('required')">
+                  Type is required
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <div class="form-group" *ngIf="entry.get('type')?.value">
+              <label class="form-label">Live Event</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-select formControlName="eventId">
+                  <mat-option *ngFor="let e of liveEvents" [value]="e.id">{{ e.name }}</mat-option>
+                </mat-select>
+                <mat-hint *ngIf="entry.get('type')?.value === 'Interview' || entry.get('type')?.value === 'Testimonial'">
+                  Optional — link to a live event if related
+                </mat-hint>
+              </mat-form-field>
+            </div>
+
+            <div class="form-group" *ngIf="entry.get('type')?.value">
+              <label class="form-label">Video URL</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput formControlName="videoUrl" placeholder="Enter video URL">
+                <mat-error *ngIf="entry.get('videoUrl')?.touched && entry.get('videoUrl')?.hasError('required')">
+                  Video URL is required
+                </mat-error>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+
+        <div class="add-video-footer">
+          <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
+          <button class="save-video-btn" (click)="saveVideo()">Save</button>
+        </div>
+      </ng-container>
+
+      <!-- BULK IMPORT TAB -->
+      <ng-container *ngIf="activeTab === 'bulk'">
+        <div class="add-video-body">
+
+          <!-- Actions row -->
+          <div class="bulk-actions-row">
+            <button class="download-sample-btn" (click)="downloadSampleExcel()">
+              <mat-icon>download</mat-icon>
+              Download Sample Excel
+            </button>
+            <label class="upload-excel-btn">
+              <mat-icon>upload_file</mat-icon>
+              {{ bulkImportFile ? bulkImportFile.name : 'Choose Excel File' }}
+              <input type="file" accept=".xlsx,.xls,.csv" (change)="onBulkFileSelected($event)" hidden>
+            </label>
+          </div>
+
+          <!-- Loading -->
+          <div class="loading-spinner" *ngIf="bulkImportLoading">
+            <mat-spinner diameter="36"></mat-spinner>
+            <p style="margin-top:12px; color:#6b7280; font-size:13px;">Parsing file...</p>
+          </div>
+
+          <!-- Preview Table -->
+          <div class="bulk-preview-wrap" *ngIf="bulkImportProcessed && !bulkImportLoading">
+            <div class="bulk-preview-summary">
+              <span class="bulk-valid-count">
+                {{ getBulkValidCount() }} valid rows
+              </span>
+              <span class="bulk-error-count" *ngIf="getBulkErrorCount() > 0">
+                {{ getBulkErrorCount() }} rows with errors
+              </span>
+            </div>
+
+            <div class="bulk-table-wrap">
+              <table class="bulk-preview-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Email</th>
+                    <th>Participant</th>
+                    <th>Title</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Event</th>
+                    <th>Video URL</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of bulkPreviewRows; let i = index"
+                      [class.bulk-row-error]="row.status === 'error'"
+                      [class.bulk-row-valid]="row.status === 'valid'">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ row.email }}</td>
+                    <td>{{ row.participantName || '—' }}</td>
+                    <td>{{ row.title }}</td>
+                    <td>{{ row.recordedDate }}</td>
+                    <td>{{ row.type }}</td>
+                    <td>{{ row.eventName || '—' }}</td>
+                    <td class="bulk-url-cell">{{ row.videoUrl }}</td>
+                    <td>
+                      <span class="bulk-status-badge" [class.status-valid]="row.status === 'valid'"
+                            [class.status-error]="row.status === 'error'">
+                        {{ row.status === 'valid' ? 'Valid' : 'Error' }}
+                      </span>
+                      <div class="bulk-row-errors" *ngIf="row.errors.length > 0">
+                        <span *ngFor="let err of row.errors" class="bulk-row-error-text">{{ err }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div class="bulk-empty" *ngIf="!bulkImportProcessed && !bulkImportLoading">
+            <mat-icon style="font-size:48px; width:48px; height:48px; color:#d1d5db;">upload_file</mat-icon>
+            <p>Upload an Excel file to preview data before importing</p>
+            <p style="font-size:12px; color:#9ca3af;">Columns: Email · Title · Recorded Date · Type · Event Name · Video URL</p>
+          </div>
+
+        </div>
+
+        <div class="add-video-footer">
+          <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
+          <button class="save-video-btn"
+                  (click)="saveBulkImport()"
+                  [disabled]="bulkImportSaving || !bulkImportProcessed || getBulkValidCount() === 0">
+            {{ bulkImportSaving ? 'Importing...' : 'Import Valid Rows (' + getBulkValidCount() + ')' }}
+          </button>
+        </div>
+      </ng-container>
+
+    </div>
+  </div>
+
+  <!-- Bulk Error Dialog -->
+  <div class="overlay-backdrop" *ngIf="showBulkErrorDialog" (click)="closeBulkErrorDialog()">
+    <div class="error-dialog-panel" (click)="$event.stopPropagation()">
+      <div class="note-header">
+        <h3>⚠️ Import Errors Found</h3>
+        <button mat-icon-button (click)="closeBulkErrorDialog()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="error-dialog-body">
+        <p class="error-dialog-subtitle">The following issues were found. Valid rows can still be imported.</p>
+        <div class="error-list">
+          <div class="error-item" *ngFor="let err of bulkErrorMessages">
+            <mat-icon class="error-icon">error_outline</mat-icon>
+            <span>{{ err }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="note-footer">
+        <button class="save-video-btn" (click)="closeBulkErrorDialog()">Got it</button>
+      </div>
+    </div>
+  </div>
