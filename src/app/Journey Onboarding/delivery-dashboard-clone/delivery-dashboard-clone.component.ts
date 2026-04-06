@@ -906,7 +906,7 @@ export class DeliveryDashboardCloneComponent {
         // Filter Report 
         const participantSnap = await runInInjectionContext(this.injector, () =>
             getDocs(
-                query(collection(this.firestore, 'participantsproduct'), where('productref','==', doc(this.firestore, 'products', productId))
+                query(collection(this.firestore, 'participantsproduct'), where('productref', '==', doc(this.firestore, 'products', productId))
                 )
             )
         );
@@ -956,7 +956,7 @@ export class DeliveryDashboardCloneComponent {
         );
     }
 
-    getStatusClass(app: any): string {
+    getStyleStatusClass(app: any): string {
         if (app?.cancelled) return 'status-cancelled';
         if (app?.attended) return 'status-completed';
         if (app?.starttime) return 'status-scheduled';
@@ -2547,6 +2547,68 @@ export class DeliveryDashboardCloneComponent {
     // Abishek Vimal
 
     // Search Participant data
+    showAllAppointmentDetails(c: any) {
+        const status = c?.status;
+        const productName = this.mapProductName?.[c?.productref?.id];
+
+        const isCompletedorSubmitted =
+            status === 'completed' || status === 'submitted';
+        const isOngoingWithValidAppointment =
+            status === 'ongoing' &&
+            (
+                c?.appointmentTypeName === `${productName} Welcome Call` ||
+                c?.appointmentTypeName === `${productName} Diagnostics` ||
+                c?.appointmentTypeName === `${productName} Implementation`
+            );
+
+        return isCompletedorSubmitted || isOngoingWithValidAppointment;
+    }
+
+    showActiveStage(c: any) {
+        const { status, appointmentTypeName } = c;
+
+        if (status === 'completed') return 'Completed: ';
+        else if (status === 'submitted') return 'Form Submitted: ';
+        else if (appointmentTypeName === this.mapProductName[c.productref.id] + ' Welcome Call') return 'Welcome Call: ';
+        else return 'D&I';
+    }
+
+    showParticipantActiveDate(c: any): string {
+        const { status, starttime, statusdate, appointmentTypeName } = c;
+        const productName = this.mapProductName?.[c?.productref?.id];
+        const validAppointments = [
+            `${productName} Welcome Call`,
+            `${productName} Diagnostics`,
+            `${productName} Implementation`
+        ];
+
+        if (status === 'submitted') return this.formatDate(starttime);
+        if (statusdate?.completed) return this.formatDate(statusdate?.completed);
+        if (status === 'ongoing' &&
+            starttime &&
+            validAppointments.includes(appointmentTypeName)) {
+            return this.formatDate(starttime);
+        }
+        return '';
+    }
+
+    getAppointmentDate(stage: string, c: any, appointment: any) {
+        const { attended, starttime, endtime } = appointment;
+
+        if (stage === 'Post Session Check-in') return this.formatDate(c?.date);
+        else if (attended && endtime) return this.formatDate(endtime);
+        return this.formatDate(starttime);
+    }
+
+    getAppointmentStatus(stage: string, appointment: any) {
+        const { attended } = appointment;
+
+        if (stage === 'Post Session Check-in') return 'Submitted';
+        else if (attended) return 'Completed';
+        else if (!attended) return 'Scheduled';
+        else return 'Cancelled';
+    }
+
     searchParticipant(event: any) {
         this.searchText = event.target.value;
         this.updateFilteredCards();
@@ -4057,6 +4119,16 @@ export class DeliveryDashboardCloneComponent {
 
     toggleTableView() {
         this.showTable = !this.showTable;
+    }
+    formatDate(timestamp: any): string {
+        const date = timestamp?.toDate?.();
+        return date
+            ? new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            }).format(date)
+            : '';
     }
     toggleExpand(c: any, index: number) {
         c._expanded = !c._expanded;
