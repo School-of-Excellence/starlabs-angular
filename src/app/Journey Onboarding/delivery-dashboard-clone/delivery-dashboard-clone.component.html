@@ -594,13 +594,12 @@
                     {{ showParticipantActiveDate(c) }}
                   </span>
                 </span>
-                <span
-                  class="chevron" [class.open]="c._expanded">
+                <span class="chevron" [class.open]="c._expanded">
                 </span>
               </div>
 
               <!-- Expandable Section -->
-              <div class="expand-section" *ngIf="filteredCardsMap[i]?.length > 0" [class.expanded]="c._expanded"
+              <div class="expand-section" [class.expanded]="c._expanded"
                 [class.collapsed]="!c._expanded">
                 <hr class="divider">
                 <ng-container>
@@ -611,7 +610,7 @@
                           {{ stage }}
                         </div>
                         <div class="stage-date text-muted">
-                         {{ getAppointmentDate(stage, c, appointment) }}
+                          {{ getAppointmentDate(stage, c, appointment) }}
                         </div>
                       </div>
                       <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">

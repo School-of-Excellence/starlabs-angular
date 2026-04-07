@@ -689,9 +689,6 @@ export class DeliveryDashboardCloneComponent {
             }
         }
 
-        console.log("groupedAll", groupedAll, "groupedFiltered", groupedFiltered);
-
-
         // Avg times: use funnel data directly
         for (const productId of Object.keys(funnelData)) {
             let initToStartTotal = 0, initToStartCount = 0;
@@ -740,7 +737,6 @@ export class DeliveryDashboardCloneComponent {
         this.funnelData = funnelData;
         this.avgInitToStart = avgInitToStart;
         this.avgStartToComplete = avgStartToComplete;
-        console.log("funnel data", this.funnelData, funnelData);
     }
 
     getConversionRate(cardId: string): number {
@@ -811,7 +807,7 @@ export class DeliveryDashboardCloneComponent {
                     const date = tentativestart.toDate();
                     const itemMonth = date.getMonth();
                     const itemYear = date.getFullYear();
-                    this.handleMonthCategory(itemMonth, itemYear, data);
+                    this.handleMonthCategory(itemMonth, itemYear, data, null);
                 }
             }
         };
@@ -831,12 +827,16 @@ export class DeliveryDashboardCloneComponent {
 
             if (attendedAppointments.length === 0) {
                 if (!data.tentativestart) {
-                    this.productData.totalEligible.push(data);
+                    const mergedData = {
+                        ...data,
+                        allappointments: appointments
+                    }
+                    this.productData.totalEligible.push(mergedData);
                 } else {
                     const date = data.tentativestart.toDate();
                     const itemMonth = date.getMonth();
                     const itemYear = date.getFullYear();
-                    this.handleMonthCategory(itemMonth, itemYear, data);
+                    this.handleMonthCategory(itemMonth, itemYear, data, appointments);
                 }
             }
             else if (attendedAppointments.length > 0) {
@@ -888,26 +888,33 @@ export class DeliveryDashboardCloneComponent {
             const allappointments = await this.getAllAppointments(productId, data.docid);
             data.allappointments = allappointments;
         }
+        console.log("all data", this.productData);
     }
 
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any) {
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any) {
+        let mergedData;
+        if (allappointments !== null && allappointments?.length > 0) {
+            mergedData = { ...data, allappointments: allappointments }
+        } else {
+            mergedData = data;
+        }
 
         if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
-            this.productData.thisMonth.push(data);
+            this.productData.thisMonth.push(mergedData);
         }
         else if (
             (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
         ) {
-            this.productData.pastMonth.push(data);
+            this.productData.pastMonth.push(mergedData);
         }
         else if (
             (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
         ) {
-            this.productData.nextMonth.push(data);
+            this.productData.nextMonth.push(mergedData);
         }
-        else this.productData.totalEligible.push(data);
+        else this.productData.totalEligible.push(mergedData);
     }
 
     async FilterReportData(product: string, productId: string) {
