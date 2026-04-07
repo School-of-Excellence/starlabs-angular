@@ -119,7 +119,6 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
     initiatedToday: { data: [], count: 0 },
 
   };
-  productsSubscription!: Subscription;
 
   awaitingPendingCount = 0;
   initiatedClearedCount = 0;
@@ -389,51 +388,29 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
     let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
     const todayString = new Date().toDateString();
 
-    const products$ = collectionData(
-      query(
-        collection(this.firestore, "participantsproduct"),
-        where("statusdate.initiated", "<=", enddate)
-      ),
-      { idField: 'id' }
-    );
-
-    this.productsSubscription = products$.subscribe((products: any[]) => {
+    getDocs(query(collection(this.firestore, "participantsproduct"), where("statusdate.initiated", "<=", enddate))).then((products) => {
       let tempArray1 = [];
       let tempArray2 = [];
-
-      if (products.length !== 0) {
-        for (let index = 0; index < products.length; index++) {
-          const productdata = products[index];
-
-          if (
-            productdata['status'] === 'initiated' &&
-            productdata["deliverymode"] === "Priority Mode"
-          ) {
+      if (products.docs.length != 0) {
+        for (let index = 0; index < products.docs.length; index++) {
+          const productdata = products.docs[index].data();
+          if (productdata['status'] === 'initiated' && productdata["deliverymode"] === "Priority Mode") {
             const statusDateInitiated = productdata['statusdate']?.['initiated'];
-
             productdata['initiatedtime'] = statusDateInitiated;
-
             const initiatedDate = statusDateInitiated.toDate();
             initiatedDate.setHours(0, 0, 0, 0);
 
             if (initiatedDate.toDateString() === todayString) {
               tempArray1.push(productdata);
             }
-
-            productdata['waitingperiod'] = this.calculateWaitingPeriod(
-              statusDateInitiated.toDate()
-            );
-
-            const journeyId =
-              this.mapMetaData[productdata['profileid']]?.['activejourney'];
-
+            productdata['waitingperiod'] = this.calculateWaitingPeriod(statusDateInitiated.toDate());
+            const journeyId = this.mapMetaData[productdata['profileid']]?.['activejourney'];
             const journeyname = this.mapjourneyname[journeyId] || 'N/A';
             productdata['journey'] = journeyname;
-
             tempArray2.push(productdata);
           }
 
-          if (index + 1 === products.length) {
+          if (index + 1 == products.docs.length) {
             this.originalData['initiatedToday'].data = tempArray1;
             this.originalData['initiatedToday'].count = tempArray1.length;
 
@@ -448,7 +425,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
         this.loadingStates.modes = true;
         this.checkAllDataLoaded();
       }
-    });
+    })
   }
 
   loadJourneyProductData() {
@@ -563,245 +540,6 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
       this.checkAllDataLoaded();
     }
   }
-
-  // async filterAppointmentsByType() {
-  //   try {
-  //     const appointments = await getDocs(query(collection(this.firestore, "appointments"),where("attended", "==", true),where("cancelled", "==", false)));
-  //     console.log('Total appointments found:', appointments.docs.length);
-  //     if (appointments.docs.length === 0) {
-  //       console.log('No appointments found matching the query');
-  //       this.loadingStates.appointments = true;
-  //       this.checkAllDataLoaded();
-  //       return;
-  //     }
-  //     const appointmentTypeRefs = new Map();
-  //     appointments.docs.forEach(doc => {
-  //       const ref = doc.data()['appointment'];
-  //       if (ref) {
-  //         appointmentTypeRefs.set(ref.path, ref);
-  //       }
-  //     });
-  //     const appointmentTypePromises = Array.from(appointmentTypeRefs.values()).map(ref =>
-  //       getDoc(ref).catch(error => {
-  //         console.error('Error fetching appointment type:', error);
-  //         return null;
-  //       })
-  //     );
-  //     const appointmentTypeDocs = await Promise.all(appointmentTypePromises);
-  //     const typeNameMap = new Map();
-  //     Array.from(appointmentTypeRefs.keys()).forEach((path, index) => {
-  //       const doc = appointmentTypeDocs[index];
-  //       if (doc?.exists()) {
-  //         typeNameMap.set(path, doc.data()['appointmenttype'] || '');
-  //       }
-  //     });
-
-  //     const categoryMap = {
-  //       'Welcome To WiSH': 'welcomeCall',
-
-  //       'EI Celebration Call': 'clarityCall',
-  //       'WiSH Experience Call': 'clarityCall',
-  //       'EI Starter Pack Clarity Call': 'clarityCall',
-
-  //       'A&H Light Diagnostics': 'diagnostics',
-  //       'EI Starter Pack Diagnostics': 'diagnostics',
-  //       'WiSH Diagnostics': 'diagnostics',
-  //       'Critical Support Diagnostics': 'diagnostics',
-  //       'EI Diagnostics': 'diagnostics',
-
-  //       'EI Implementation': 'implementation',
-  //       'WiSH Implementation': 'implementation',
-  //       'Critical Support Implementation': 'implementation',
-  //       'A&H Light Implementation': 'implementation',
-  //       'EI Starter Pack Implementation': 'implementation',
-  //       'Breakthrough Implementation': 'implementation',
-  //       'A&H Review Implementation': 'implementation',
-  //       'A&H Motherhood Implementation': 'implementation',
-
-  //       'WiSH Review': 'midReviewDiagnostics',
-  //       'A&H Light Mid Review': 'midReviewDiagnostics',
-  //       'EI Review': 'midReviewDiagnostics',
-  //       'Critical Support Mid Review': 'midReviewDiagnostics',
-
-  //       'WiSH Final Review Call': 'implementationPhase2'
-  //     };
-  //     const categorizedData = {
-  //       welcomeCall: [],
-  //       clarityCall: [],
-  //       diagnostics: [],
-  //       implementation: [],
-  //       midReviewDiagnostics: [],
-  //       implementationPhase2: []
-  //     };
-  //     appointments.docs.forEach(doc => {
-  //       const appointmentData = doc.data();
-  //       appointmentData['docid'] = doc.id;
-
-  //       const appointmentTypeRef = appointmentData['appointment'];
-  //       if (appointmentTypeRef) {
-  //         const appointmentTypeName = typeNameMap.get(appointmentTypeRef.path);
-  //         if (appointmentTypeName) {
-  //           appointmentData['appointmentTypeName'] = appointmentTypeName;
-  //           const category = categoryMap[appointmentTypeName];
-  //           if (category) {
-  //             categorizedData[category].push(appointmentData);
-  //             if (category === 'midReviewDiagnostics') {
-  //               console.log('debuggg', appointmentData);
-  //             }
-  //           }
-  //         }
-  //       }
-  //     });
-  //     Object.keys(categorizedData).forEach(key => {
-  //       console.log(`debuggg33 ${key}`, categorizedData[key]);
-  //       this.originalData[key].data = categorizedData[key];
-  //       this.originalData[key].count = categorizedData[key].length;
-  //     });
-  //     console.log('Filtered appointments:', this.originalData);
-  //     this.loadingStates.appointments = true;
-  //     this.checkAllDataLoaded();
-
-  //   } catch (error) {
-  //     console.error('Error loading appointments:', error);
-  //     this.loadingStates.appointments = true;
-  //     this.checkAllDataLoaded();
-  //   }
-  // }
-
-  // async filterAppointmentsByType() {
-  //   try {
-  //     const appointmentsSnap = await getDocs(query(collection(this.firestore, "appointments"),where("attended", "==", true),where("cancelled", "==", false)));
-  //     if (appointmentsSnap.empty) {
-  //       this.loadingStates.appointments = true;
-  //       this.checkAllDataLoaded();
-  //       return;
-  //     }
-
-  //     const productIds = appointmentsSnap.docs
-  //       .map(doc => doc.data()["productid"])
-  //       .filter((id: string) => !!id);
-
-  //     if (productIds.length === 0) {
-  //       console.log("No product IDs found in appointments");
-  //       this.loadingStates.appointments = true;
-  //       this.checkAllDataLoaded();
-  //       return;
-  //     }
-
-  //     const productQuery = query(collection(this.firestore, "participantsproduct"),where("status", "in", ["initiated", "ongoing"]));
-  //     const productSnap = await getDocs(productQuery);
-  //     const validProductIds = productSnap.docs.map(d => d.data()["productid"]);
-  //     // console.log("Valid product IDs (initiated/ongoing):", validProductIds);
-  //     let filteredAppointments = appointmentsSnap.docs.filter(doc => {
-  //       const productId = doc.data()["productid"];
-  //       return validProductIds.includes(productId);
-  //     });
-  //     if (filteredAppointments.length === 0) {
-  //       this.loadingStates.appointments = true;
-  //       this.checkAllDataLoaded();
-  //       return;
-  //     }
-  //     const appointmentTypeRefs = new Map();
-  //     filteredAppointments.forEach(doc => {
-  //       const ref = doc.data()["appointment"];
-  //       if (ref) appointmentTypeRefs.set(ref.path, ref);
-  //     });
-  //     const appointmentTypePromises = Array.from(appointmentTypeRefs.values()).map(ref =>
-  //       getDoc(ref).catch(error => {
-  //         console.error("Error fetching appointment type:", error);
-  //         return null;
-  //       })
-  //     );
-  //     const appointmentTypeDocs = await Promise.all(appointmentTypePromises);
-  //     const typeNameMap = new Map();
-  //     Array.from(appointmentTypeRefs.keys()).forEach((path, index) => {
-  //       const doc = appointmentTypeDocs[index];
-  //       if (doc?.exists()) typeNameMap.set(path, doc.data()["appointmenttype"] || "");
-  //     });
-  //     if (this.selectedProduct !== "All Products Overview") {
-  //       const productKeywordsMap: any = {
-  //         "WISH": ["WiSH"],
-  //         "A&H LIGHT": ["A&H Light"],
-  //         "EI Solution": ["EI Solution", "EI Celebration"],
-  //         "EI Starter Pack": ["EI Starter Pack"],
-  //         "Critical Support": ["Critical Support"]
-  //       };
-
-  //       const selectedKeywords = productKeywordsMap[this.selectedProduct] || [];
-
-  //       filteredAppointments = filteredAppointments.filter(doc => {
-  //         const appointmentRef = doc.data()["appointment"];
-  //         if (!appointmentRef) return false;
-  //         const appointmentTypeName = typeNameMap.get(appointmentRef.path) || "";
-  //         return selectedKeywords.some(keyword => appointmentTypeName.includes(keyword));
-  //       });
-  //     }
-  //     const categoryMap = {
-  //       "Welcome To WiSH": "welcomeCall",
-
-  //       "WiSH Experience Call": "clarityCall",
-  //       "EI Starter Pack Clarity Call": "clarityCall",
-
-  //       "A&H Light Diagnostics": "diagnostics",
-  //       "EI Starter Pack Diagnostics": "diagnostics",
-  //       "WiSH Diagnostics": "diagnostics",
-  //       "Critical Support Diagnostics": "diagnostics",
-  //       "EI Diagnostics": "diagnostics",
-
-  //       "EI Implementation": "implementation",
-  //       "WiSH Implementation": "implementation",
-  //       "Critical Support Implementation": "implementation",
-  //       "A&H Light Implementation": "implementation",
-  //       "EI Starter Pack Implementation": "implementation",
-
-  //       "WiSH Review": "midReviewDiagnostics",
-  //       "A&H Light Mid Review": "midReviewDiagnostics",
-  //       "EI Review": "midReviewDiagnostics",
-  //       "Critical Support Mid Review": "midReviewDiagnostics",
-
-  //       "WiSH Final Review Call": "implementationPhase2",
-
-  //       "EI Celebration Call": "completed",
-  //       "WiSH Celebration Call": "completed"
-  //     };
-
-  //     const categorizedData = {
-  //       welcomeCall: [],
-  //       clarityCall: [],
-  //       diagnostics: [],
-  //       implementation: [],
-  //       midReviewDiagnostics: [],
-  //       implementationPhase2: [],
-  //       completed: []
-  //     };
-
-  //     filteredAppointments.forEach(doc => {
-  //       const appointmentData = doc.data();
-  //       appointmentData["docid"] = doc.id;
-  //       const appointmentTypeRef = appointmentData["appointment"];
-  //       if (appointmentTypeRef) {
-  //         const appointmentTypeName = typeNameMap.get(appointmentTypeRef.path);
-  //         if (appointmentTypeName) {
-  //           appointmentData["appointmentTypeName"] = appointmentTypeName;
-  //           const category = categoryMap[appointmentTypeName];
-  //           if (category) categorizedData[category].push(appointmentData);
-  //         }
-  //       }
-  //     });
-  //     Object.keys(categorizedData).forEach(key => {
-  //       this.originalData[key].data = categorizedData[key];
-  //       this.originalData[key].count = categorizedData[key].length;
-  //     });
-
-  //     this.loadingStates.appointments = true;
-  //     this.checkAllDataLoaded();
-
-  //   } catch (error) {
-  //     console.error("Error loading appointments:", error);
-  //     this.loadingStates.appointments = true;
-  //     this.checkAllDataLoaded();
-  //   }
-  // }
 
   async filterAppointmentsByType() {
     try {

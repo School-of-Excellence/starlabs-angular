@@ -689,6 +689,8 @@ export class DeliveryDashboardCloneComponent {
             }
         }
 
+        console.log("groupedAll", groupedAll, "groupedFiltered", groupedFiltered);
+
 
         // Avg times: use funnel data directly
         for (const productId of Object.keys(funnelData)) {
@@ -738,6 +740,7 @@ export class DeliveryDashboardCloneComponent {
         this.funnelData = funnelData;
         this.avgInitToStart = avgInitToStart;
         this.avgStartToComplete = avgStartToComplete;
+        console.log("funnel data", this.funnelData, funnelData);
     }
 
     getConversionRate(cardId: string): number {
@@ -904,6 +907,7 @@ export class DeliveryDashboardCloneComponent {
         ) {
             this.productData.nextMonth.push(data);
         }
+        else this.productData.totalEligible.push(data);
     }
 
     async FilterReportData(product: string, productId: string) {
