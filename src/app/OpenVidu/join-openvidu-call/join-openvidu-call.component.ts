@@ -1111,83 +1111,112 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
  * Enable microphone with RNNoise noise cancellation
  */
   async enableMicrophoneWithNoiseCancellation(room: Room) {
-    try {
-      console.log('🎙️ Enabling microphone with DeepFilterNet3 (Zoom Standard)...');
+  try {
+    console.log('🎙️ Enabling microphone with Amazon Voice Focus...');
 
-      // Stop preview audio track to prevent double capture
-      if (this.previewStream) {
-        this.previewStream.getAudioTracks().forEach(t => {
-          t.stop();
-          console.log('Stopped preview audio track');
-        });
-      }
-
-      // Get raw mic access.
-      // CRITICAL: noiseSuppression MUST be false so the browser doesn't fight the AI.
-      const rawStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,   // Keep OS-level echo cancellation active
-          noiseSuppression: false,  // DeepFilterNet handles the noise now
-          autoGainControl: true,    // Helps with volume normalization
-          sampleRate: 48000,        // DeepFilterNet strictly requires 48kHz
-          channelCount: 1           // Mono is best for speech processing
-        }
+    // Stop preview audio track to prevent double capture
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => {
+        t.stop();
+        console.log('Stopped preview audio track');
       });
+    }
 
-      console.log('Raw stream obtained:', rawStream.getAudioTracks()[0].getSettings());
-
-      // --- NEW: Process through DeepFilterNet ---
-      const cleanStream = await this.audiofilterservice.applyZoomNoiseCancellation(rawStream);
-      
-      // Extract the processed track from the stream
-      const cleanAudioTrack = cleanStream.getAudioTracks()[0];
-      // ------------------------------------------
-
-      // Publish the AI-cleaned track to OpenVidu / LiveKit
-      await room.localParticipant.publishTrack(cleanAudioTrack, {
-        source: Track.Source.Microphone,
-        name: 'microphone'
-      });
-
-      console.log('✅ Microphone enabled with DeepFilterNet3 AI');
-
-    } catch (error) {
-      console.error('❌ DeepFilterNet3 failed, falling back to standard WebRTC:', error);
-
-      // Fallback: stop preview audio
-      if (this.previewStream) {
-        this.previewStream.getAudioTracks().forEach(t => t.stop());
-      }
-
-      // If the WASM fails to load, gracefully fall back to the browser's native suppression
-      await room.localParticipant.setMicrophoneEnabled(true, {
+    // Step 1 — Get raw mic stream
+    const rawStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
         echoCancellation: true,
-        noiseSuppression: true, // Turn this back on for the fallback!
+        noiseSuppression: false,  // Voice Focus handles this
         autoGainControl: true,
         sampleRate: 48000,
         channelCount: 1
-      });
-      
-      if (this.debugAudioLevels) this.debugAudioLevels();
+      }
+    });
 
-      console.log('✅ Microphone enabled with WebRTC native fallback');
-    }
-  }
+    console.log(
+      'Raw stream obtained:',
+      rawStream.getAudioTracks()[0].getSettings()
+    );
 
-  // Add to your component to debug audio levels
-  debugAudioLevels() {
-    const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
-    if (micPub?.audioTrack) {
-      const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
-      console.log('📊 Audio Track Settings:', {
-        sampleRate: settings.sampleRate,
-        channelCount: settings.channelCount,
-        echoCancellation: settings.echoCancellation,
-        noiseSuppression: settings.noiseSuppression,
-        autoGainControl: settings.autoGainControl
-      });
+    // Step 2 — Init Voice Focus
+    const supported = await this.audiofilterservice.init();
+
+    let cleanAudioTrack: MediaStreamTrack;
+
+    if (supported) {
+      // Step 3a — Apply Voice Focus
+      const cleanStream = await this.audiofilterservice
+        .processStream(rawStream);
+
+      cleanAudioTrack = cleanStream.getAudioTracks()[0];
+      console.log('✅ Amazon Voice Focus active');
+
+    } 
+    // else {
+    //   // Step 3b — Fallback to DeepFilterNet or raw
+    //   console.warn('⚠️ Voice Focus not supported, trying DeepFilterNet...');
+
+    //   try {
+    //     const deepFilterStream = await this.audiofilterservice
+    //       .applyZoomNoiseCancellation(rawStream);
+    //     cleanAudioTrack = deepFilterStream.getAudioTracks()[0];
+    //     console.log('✅ DeepFilterNet fallback active');
+
+    //   } catch (dfErr) {
+    //     console.warn('⚠️ DeepFilterNet also failed, using raw stream');
+    //     cleanAudioTrack = rawStream.getAudioTracks()[0];
+    //   }
+    // }
+
+    // Step 4 — Publish clean track to LiveKit room
+    await room.localParticipant.publishTrack(cleanAudioTrack, {
+      source: Track.Source.Microphone,
+      name: 'microphone'
+    });
+
+    if (this.debugAudioLevels) this.debugAudioLevels();
+
+    console.log('✅ Microphone published with noise cancellation');
+
+  } catch (error) {
+    console.error('❌ All noise cancellation failed, using native fallback:', error);
+
+    // Stop preview audio
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => t.stop());
     }
+
+    // Native browser fallback — always works
+    await room.localParticipant.setMicrophoneEnabled(true, {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1
+    });
+
+    if (this.debugAudioLevels) this.debugAudioLevels();
+    console.log('✅ Microphone enabled with WebRTC native fallback');
   }
+}
+
+// Keep your existing debugAudioLevels as-is
+debugAudioLevels() {
+  const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
+  if (micPub?.audioTrack) {
+    const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
+    console.log('📊 Audio Track Settings:', {
+      sampleRate: settings.sampleRate,
+      channelCount: settings.channelCount,
+      echoCancellation: settings.echoCancellation,
+      noiseSuppression: settings.noiseSuppression,
+      autoGainControl: settings.autoGainControl,
+      voiceFocusActive: this.audiofilterservice.isActive()
+    });
+  }
+}
+
+  
 
   /**
  *remove a participant from the room
