@@ -5,7 +5,7 @@ import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesRes
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import * as RecordRTC from 'recordrtc';
-import { DomSanitizer } from '@angular/platform-browser'; 
+import { DomSanitizer } from '@angular/platform-browser';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
@@ -55,7 +55,7 @@ const generateId = (firestore: Firestore, collectionName: string) => doc(collect
     MatProgressBarModule,
     MarkdownModule
   ],
-  
+
   templateUrl: './prescribe-atc.component.html',
   styleUrl: './prescribe-atc.component.css'
 })
@@ -78,7 +78,7 @@ export class PrescribeATCComponent {
   transcriber:boolean = false
   eis:boolean = false
   mentor:boolean = false
-  
+
   // Meta data
   loggedinUser;
   loggedinProfileid;
@@ -210,11 +210,11 @@ export class PrescribeATCComponent {
   directiveAssignmentRef : any = {}
   directiveMentor:any [] = []
   adjustmentAwarenessDetail:any = {}
-  
+
   //network status
   isonline:boolean
   pageloadedatfirsttime:boolean = false
-  
+
   // Draft
   draftStatus = {
     message: "No Draft Created!",
@@ -259,18 +259,18 @@ export class PrescribeATCComponent {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
       console.log(data);
-      
+
       this.queryparam = data
       if (!data['aigenerated']) {
         this.participantProfileid = data['profileid']
         this.marathonId = data['marathonid']
         this.assignmentId = data['assignmentid']
-        this.participantAssignmentId = data['participantassignmentid']      
+        this.participantAssignmentId = data['participantassignmentid']
       }
       // this.participantProfileid = data['profileid']
       // this.marathonId = data['marathonid']
       // this.assignmentId = data['assignmentid']
-      // this.participantAssignmentId = data['participantassignmentid']      
+      // this.participantAssignmentId = data['participantassignmentid']
     });
     this.date = datepipe.transform(new Date(), "yyyy-MM-dd")
     guardservice.getuid().then(uid=>{
@@ -372,7 +372,7 @@ export class PrescribeATCComponent {
   areasstring: any = null;
   summarystring: any = null;
   proceduresLoaded = false;
-  
+
   private extractATCJson(input: string): any | null {
     let searchFrom = 0;
 
@@ -410,7 +410,7 @@ export class PrescribeATCComponent {
     return null;
   }
 
-  async ngOnInit(){ 
+  async ngOnInit(){
     this.route.queryParams.subscribe(async params => {
       if (!params['aigenerated'] || !params['docid']) return;
       const docid = params['docid'];
@@ -467,7 +467,7 @@ export class PrescribeATCComponent {
       //   console.error('Failed to parse ATC JSON:', e, 'String was:', jsonString.substring(0, 100));
       //   return;
       // }
-        
+
         const firstBrace = output.indexOf('{');
         this.summarystring = firstBrace > 0 ? output.substring(0, firstBrace).trim() : null;
         const parsedJson = this.extractATCJson(output);
@@ -567,18 +567,18 @@ export class PrescribeATCComponent {
 
   async setupData(){
     try {
-      
-
       // Fetch Products
       collectionData(query(collection(this.firestore,"products"), orderBy("atcmodel")), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(products=>{
-        this.productAvailable = products.filter(e => (e["atcmodel"] ?? "").trim().length != 0)
-        this.productLists = Array.from(new Map(this.productAvailable.map(item => [item["atcmodel"], item])).values());
-        console.log("Products Loaded", this.productLists)
-        for (let i = 0; i < this.productAvailable.length; i++) {
-          this.mapProductidtoatcmodel[this.productAvailable[i]['id']] = this.productAvailable[i]['atcmodel']
+        for (let i = 0; i < products.length; i++) {
+          const productAvailable = products[i]
+          this.mapProductidtoatcmodel[productAvailable['id']] = productAvailable['atcmodel']
         }
       })
-      
+      collectionData(query(collection(this.firestore,"atc model"), orderBy("atcmodel")), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(products=>{
+        this.productAvailable = products.filter(e => (e["atcmodel"] ?? "").trim().length != 0)
+        this.productLists = Array.from(new Map(this.productAvailable.map(item => [item["atcmodel"], item])).values());
+      })
+
       // Fetch User Roles
       collectionData(query(collection(this.firestore, 'users_roles'), orderBy('name')), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(userRoles=>{
         var usersWithRoles = []
@@ -668,7 +668,7 @@ export class PrescribeATCComponent {
             this.bigActivityAdditional.push(activityData)
           }
         }
-        
+
         // Author Property
         this.bigActivityAuthor.forEach(activity=>{
           this.authorMap[activity["docid"]] = []
@@ -696,7 +696,7 @@ export class PrescribeATCComponent {
           })
         }
         console.log("Ongoing Queue", this.ongoingQueue, queueref)
-        
+
       });
     } catch (error) {
       console.log(error)
@@ -812,7 +812,7 @@ export class PrescribeATCComponent {
     }
     if(this.ongoingQueue != null){
       console.log(this.ongoingQueue);
-      
+
       // var atcstudio = ["diagnostics", "consultation", "ah", "validation"]
       var atcWidget = ["addunvalidatedatc", "addvalidatedatc"]
       var atcActivityStage = []
@@ -863,7 +863,7 @@ export class PrescribeATCComponent {
                   };
                   this.data.push(assignmentData);
                   console.log(this.data);
-                  
+
                 });
               }
               // display clips
@@ -924,14 +924,14 @@ export class PrescribeATCComponent {
               console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
               this.onObserverSelect()
               console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
-              
+
             }
             else{
               this.tokendata = null
             }
           })
 
-          
+
         }
         else{
           this.liveassignmentid = null
@@ -952,7 +952,7 @@ export class PrescribeATCComponent {
     this.getATCoptions()
   }
 
-  
+
 
   async getATCoptions(){
     console.log("ATC Draft")
@@ -1042,7 +1042,7 @@ export class PrescribeATCComponent {
                   message: "ATC Draft Imported but failed to load audio. " + JSON.stringify(error),
                   code: -1
                 }
-                return; 
+                return;
               }
             }
 
@@ -1062,22 +1062,22 @@ export class PrescribeATCComponent {
   async loadAudioFromURLs(audioURLs: string[]) {
     this.audioBlobURL = [];
     this.audioBlob = [];
-    
+
     const loadPromises = audioURLs.map(async (url, index) => {
       try {
         console.log(`Loading audio ${index + 1}/${audioURLs.length}:`, url);
         const response = await fetch(url);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
         }
-        
+
         const blob = await response.blob();
-        
+
         this.audioBlob.push(blob);
-        this.audioBlobURL.push(url); 
+        this.audioBlobURL.push(url);
         console.log(this.audioBlobURL, 'this.audioBlobURL');
-        
+
         console.log(`Audio ${index + 1} loaded successfully`);
         return blob;
       } catch (error) {
@@ -1087,39 +1087,39 @@ export class PrescribeATCComponent {
         return null;
       }
     });
-    
+
     const results = await Promise.all(loadPromises);
     const successfulLoads = results.filter(result => result !== null).length;
     console.log(`Audio files loaded: ${successfulLoads}/${audioURLs.length}`);
-    
+
     // Filter out failed loads
     this.audioBlob = this.audioBlob.filter(blob => blob !== null);
     this.audioBlobURL = this.audioBlobURL.filter(url => url !== null);
   }
 
-  // Load Note Images from URLs 
+  // Load Note Images from URLs
   async loadNoteImagesFromURLs(imageURLs: string[]) {
     this.selectedNoteImages = [];
     this.previewNoteImages = [];
-    
-    
+
+
     const loadPromises = imageURLs.map(async (url, index) => {
       try {
         console.log(`Loading note image ${index + 1}/${imageURLs.length}:`, url);
         const response = await fetch(url);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
         }
-        
+
         const blob = await response.blob();
-        
-      
-        this.previewNoteImages.push(url); 
-        
+
+
+        this.previewNoteImages.push(url);
+
         const file = new File([blob], `image_${index}.jpg`, { type: blob.type });
         this.selectedNoteImages.push(file);
-        
+
         console.log(`Note Image ${index + 1} loaded successfully`);
         return blob;
       } catch (error) {
@@ -1127,7 +1127,7 @@ export class PrescribeATCComponent {
         return null;
       }
     });
-  
+
     const results = await Promise.all(loadPromises);
     const successfulLoads = results.filter(result => result !== null).length;
     console.log(`Note images loaded: ${successfulLoads}/${imageURLs.length}`);
@@ -1137,22 +1137,22 @@ export class PrescribeATCComponent {
   async loadATCImagesFromURLs(imageURLs: string[]) {
     this.selectedATCImages = [];
     this.previewATCImages = [];
-    
+
     const loadPromises = imageURLs.map(async (url, index) => {
       try {
         console.log(`Loading ATC image ${index + 1}/${imageURLs.length}:`, url);
         const response = await fetch(url);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
         }
-        
+
         const blob = await response.blob();
         this.previewATCImages.push(url);
-        
+
         const file = new File([blob], `atc_image_${index}.jpg`, { type: blob.type });
         this.selectedATCImages.push(file);
-        
+
         console.log(`ATC Image ${index + 1} loaded successfully`);
         return blob;
       } catch (error) {
@@ -1160,13 +1160,13 @@ export class PrescribeATCComponent {
         return null;
       }
     });
-    
+
     const results = await Promise.all(loadPromises);
     const successfulLoads = results.filter(result => result !== null).length;
     console.log(`ATC images loaded: ${successfulLoads}/${imageURLs.length}`);
   }
 
-  
+
 
   compareFnc(c1:any, c2:any): boolean {
     return c1 && c2 ? c1.value === c2.value : c1 === c2;
@@ -1213,40 +1213,40 @@ export class PrescribeATCComponent {
     if (this.audioBlob.length === 0) {
       return this.existingAudioURLs || [];
     }
-    
+
     console.log(this.audioBlob, 'this.audioBlob');
     this.uploadProgress.audio = 0;
-    
+
     const allURLs: string[] = [];
     let uploadedCount = 0;
     let skippedCount = 0;
-    
+
     for (let index = 0; index < this.audioBlob.length; index++) {
       const blob = this.audioBlob[index];
-      
+
       // Check if this audio already has a URL
       if (this.existingAudioURLs[index]) {
         console.log(`Audio ${index} already uploaded, skipping:`, this.existingAudioURLs[index]);
         allURLs.push(this.existingAudioURLs[index]);
         skippedCount++;
-        
+
         // Update progress for skipped files
         this.uploadProgress.audio = Math.round(((skippedCount + uploadedCount) / this.audioBlob.length) * 100);
         continue;
       }
-      
+
       // Upload new audio
       var audioID = this.audioBlobURL[index].split('/');
       console.log(index, audioID);
-      
+
       const storageRef = ref(
-        this.storage, 
+        this.storage,
         "ATC_Audio_Notes/" + this.loggedinProfileid + '/' + "Audio - " + (index+1).toString() + " " + audioID[audioID.length-1]
       );
-      
+
       try {
         const uploadTask = uploadBytesResumable(storageRef, blob);
-        
+
         const downloadURL = await new Promise<string>((resolve, reject) => {
           uploadTask.on('state_changed',
             (snapshot) => {
@@ -1267,56 +1267,56 @@ export class PrescribeATCComponent {
             }
           );
         });
-        
+
         allURLs.push(downloadURL);
         this.existingAudioURLs[index] = downloadURL; // Store for future saves
         uploadedCount++;
-        
+
       } catch (error) {
         console.error(`Error uploading audio ${index}:`, error);
         throw error;
       }
     }
-    
+
     this.uploadProgress.audio = 100;
     return allURLs;
   }
-  
-  // Upload notes images 
+
+  // Upload notes images
   async uploadNotesImageToStorage(): Promise<string[]> {
     if (this.selectedNoteImages.length === 0) {
       return this.existingNoteImageURLs || [];
     }
-    
+
     this.uploadProgress.noteImages = 0;
-    
+
     const allURLs: (string | null)[] = [];
     let uploadedCount = 0;
     let skippedCount = 0;
-    
+
     for (let index = 0; index < this.selectedNoteImages.length; index++) {
       const imageFile = this.selectedNoteImages[index];
-      
+
       // Check if this image already has a URL
       if (this.existingNoteImageURLs[index]) {
         console.log(`Note image ${index} already uploaded, skipping:`, this.existingNoteImageURLs[index]);
         allURLs.push(this.existingNoteImageURLs[index]);
         skippedCount++;
-        
+
         // Update progress for skipped files
         this.uploadProgress.noteImages = Math.round(((skippedCount + uploadedCount) / this.selectedNoteImages.length) * 100);
         continue;
       }
-      
+
       // Upload new image
       const imageRef = ref(
-        this.storage, 
+        this.storage,
         "Uploaded ATC/" + imageFile.name + imageFile.lastModified + imageFile.size
       );
-      
+
       try {
         const uploadTask = uploadBytesResumable(imageRef, imageFile);
-        
+
         const imageURL = await new Promise<string | null>((resolve, reject) => {
           uploadTask.on('state_changed',
             (snapshot) => {
@@ -1337,58 +1337,58 @@ export class PrescribeATCComponent {
             }
           );
         });
-        
+
         allURLs.push(imageURL);
         if (imageURL) {
           this.existingNoteImageURLs[index] = imageURL; // Store for future saves
         }
         uploadedCount++;
-        
+
       } catch (err) {
         console.log(err);
         allURLs.push(null);
       }
     }
-  
+
     this.uploadProgress.noteImages = 100;
     return allURLs.filter(url => url !== null) as string[];
   }
-  
-  // Upload ATC images 
+
+  // Upload ATC images
   async uploadATCImageToStorage(): Promise<string[]> {
     if (this.selectedATCImages.length === 0) {
       return this.existingATCImageURLs || [];
     }
-    
+
     this.uploadProgress.atcImages = 0;
-    
+
     const allURLs: (string | null)[] = [];
     let uploadedCount = 0;
     let skippedCount = 0;
-    
+
     for (let index = 0; index < this.selectedATCImages.length; index++) {
       const imageFile = this.selectedATCImages[index];
-      
+
       // Check if this image already has a URL
       if (this.existingATCImageURLs[index]) {
         console.log(`ATC image ${index} already uploaded, skipping:`, this.existingATCImageURLs[index]);
         allURLs.push(this.existingATCImageURLs[index]);
         skippedCount++;
-        
+
         // Update progress for skipped files
         this.uploadProgress.atcImages = Math.round(((skippedCount + uploadedCount) / this.selectedATCImages.length) * 100);
         continue;
       }
-      
+
       // Upload new image
       const storageRef = ref(
-        this.storage, 
+        this.storage,
         "Online ATC Images/" + imageFile.name + imageFile.lastModified + imageFile.size
       );
-      
+
       try {
         const uploadTask = uploadBytesResumable(storageRef, imageFile);
-        
+
         const imageURL = await new Promise<string | null>((resolve, reject) => {
           uploadTask.on('state_changed',
             (snapshot) => {
@@ -1409,24 +1409,24 @@ export class PrescribeATCComponent {
             }
           );
         });
-        
+
         allURLs.push(imageURL);
         if (imageURL) {
           this.existingATCImageURLs[index] = imageURL; // Store for future saves
         }
         uploadedCount++;
-        
+
       } catch (err) {
         console.log(err);
         allURLs.push(null);
       }
     }
-    
+
     this.uploadProgress.atcImages = 100;
     return allURLs.filter(url => url !== null) as string[];
   }
-  
-  
+
+
   async autoSave() {
     this.filteredSpecialist = "";
     try {
@@ -1436,7 +1436,7 @@ export class PrescribeATCComponent {
           message: "Saving to Draft...",
           code: 0
         };
-        
+
         console.log(this.date);
         var authorprofileid = [];
         Object.values<any>(this.authorMap ?? {}).forEach(value => {
@@ -1445,15 +1445,15 @@ export class PrescribeATCComponent {
             authorprofileid = [...authorprofileid, ...id];
           }
         });
-        
+
         if (authorprofileid.length == 0) authorprofileid = [this.loggedinProfileid];
-        
+
         const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
           this.uploadAudioToStorage(),
           this.uploadNotesImageToStorage(),
           this.uploadATCImageToStorage()
         ]);
-        
+
         var data = {
           date: this.datepipe.transform(this.date, "yyyy-MM-dd"),
           product: this.product,
@@ -1480,28 +1480,28 @@ export class PrescribeATCComponent {
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
         };
-      
+
         this.draftUrls = audioURLs;
         this.audiolist = audioURLs;
         this.imagelist = noteImageURLs;
         this.atcImageURL = atcImageURLs;
-        
+
         // Update existing URLs for next save
         this.existingAudioURLs = audioURLs;
         this.existingNoteImageURLs = noteImageURLs;
         this.existingATCImageURLs = atcImageURLs;
-        
+
         console.log("Data with audio URLs:", data);
-        
+
         await setDoc(doc(this.firestore, 'temporary_ATC', this.autoSaveID), data);
-        
+
         this.draftStatus = {
           message: "ATC and Audio Saved to Draft.",
           code: 1
         };
         this.lastDraftSavedOn = new Date();
         this.uploadProgress.isUploading = false;
-        
+
       }
     } catch (error) {
       console.error("Error in autoSave:", error);
@@ -1512,9 +1512,9 @@ export class PrescribeATCComponent {
       this.uploadProgress.isUploading = false;
     }
   }
-  
- 
-  
+
+
+
 
   drop(event: CdkDragDrop<string[]>) {
     moveItemInArray(this.transcript, event.previousIndex, event.currentIndex);
@@ -1573,7 +1573,7 @@ export class PrescribeATCComponent {
     this.transcript[i].procedure.splice(j, 1)
     this.autoSave()
   }
-  
+
   importNoteImages(event){
     const input = event.target as HTMLInputElement;
     const files = input.files;
@@ -1609,7 +1609,7 @@ export class PrescribeATCComponent {
   importATCImages(event){
     const input = event.target as HTMLInputElement;
     const files = input.files;
-   
+
     this.selectedATCImages = Array.from(files)
     this.previewATCImages = []
     let loadedCount = 0;
@@ -1693,7 +1693,7 @@ export class PrescribeATCComponent {
     // Auto-save after recording is processed
     this.autoSave();
   }
-  
+
   // Process Error.
   errorCallback(error) {
     this.recording = false;
@@ -1721,7 +1721,7 @@ export class PrescribeATCComponent {
   //     this.audioBlob.splice(index, 1)
   //     this.audioBlobURL.splice(index, 1)
   //     console.log(this.audioBlobURL, 'this.audioBlobURL');
-      
+
   //     // this.cleanTemporaryaudio()
   //     this.autoSave();
   //   }
@@ -1734,7 +1734,7 @@ async removeAudio(index: number) {
       // Check if this audio has been uploaded to storage
       if (this.existingAudioURLs[index]) {
         const audioURL = this.existingAudioURLs[index];
-        
+
         // Delete from Firebase Storage
         try {
           const audioRef = ref(this.storage, audioURL);
@@ -1745,22 +1745,22 @@ async removeAudio(index: number) {
           // Continue with removal even if storage deletion fails
         }
       }
-      
+
       // Remove from local arrays
       this.audioBlob.splice(index, 1);
       this.audioBlobURL.splice(index, 1);
       this.existingAudioURLs.splice(index, 1);
-      
+
       // Also remove from audiolist if it exists
       if (this.audiolist && this.audiolist[index]) {
         this.audiolist.splice(index, 1);
       }
-      
+
       console.log(this.audioBlobURL, 'this.audioBlobURL');
-      
+
       // Save the updated state
       await this.autoSave();
-      
+
     } catch (error) {
       console.error('Error removing audio:', error);
       alert('Failed to remove audio. Please try again.');
@@ -1774,7 +1774,7 @@ async removeNoteImage(index: number) {
     try {
       if (this.existingNoteImageURLs[index]) {
         const imageURL = this.existingNoteImageURLs[index];
-        
+
         // Delete from Firebase Storage
         try {
           const imageRef = ref(this.storage, imageURL);
@@ -1787,15 +1787,15 @@ async removeNoteImage(index: number) {
       this.selectedNoteImages.splice(index, 1);
       this.previewNoteImages.splice(index, 1);
       this.existingNoteImageURLs.splice(index, 1);
-      
+
       // Also remove from imagelist if it exists
       if (this.imagelist && this.imagelist[index]) {
         this.imagelist.splice(index, 1);
       }
-      
+
       console.log(this.selectedNoteImages, 'selectedNoteImages');
       await this.autoSave();
-      
+
     } catch (error) {
       console.error('Error removing note image:', error);
       alert('Failed to remove image. Please try again.');
@@ -1809,7 +1809,7 @@ async removeATCImage(index: number) {
     try {
       if (this.existingATCImageURLs[index]) {
         const imageURL = this.existingATCImageURLs[index];
-        
+
         // Delete from Firebase Storage
         try {
           const imageRef = ref(this.storage, imageURL);
@@ -1819,20 +1819,20 @@ async removeATCImage(index: number) {
           console.error(`Error deleting ATC image ${index} from storage:`, deleteError);
         }
       }
-      
+
       this.selectedATCImages.splice(index, 1);
       this.previewATCImages.splice(index, 1);
       this.existingATCImageURLs.splice(index, 1);
-      
+
       // Also remove from atcImageURL if it exists
       if (this.atcImageURL && this.atcImageURL[index]) {
         this.atcImageURL.splice(index, 1);
       }
-      
+
       console.log(this.selectedATCImages, 'selectedATCImages');
-      
+
       await this.autoSave();
-      
+
     } catch (error) {
       console.error('Error removing ATC image:', error);
       alert('Failed to remove ATC image. Please try again.');
@@ -1842,7 +1842,7 @@ async removeATCImage(index: number) {
 
   async submit(){
     this.alphaid = generateId(this.firestore, 'atc_alpha');
-    
+
     if(this.date == null || this.date == undefined){
       alert("Enter the Date of Prescription")
     }
@@ -1872,7 +1872,7 @@ async removeATCImage(index: number) {
       for (let i = 0; i < this.atcAssignment.length; i++) {
         const directive = this.atcAssignment[i];
         if(
-          ((directive.directive ?? "").trim().length == 0 && directive.assignedto.length != 0) || 
+          ((directive.directive ?? "").trim().length == 0 && directive.assignedto.length != 0) ||
           ((directive.directive ?? "").trim().length != 0 && directive.assignedto.length == 0) ||
           (((directive.directive ?? "").trim().length == 0 || directive.assignedto.length == 0) && directive.assignedto.length != 0) ||
           (((directive.directive ?? "").trim().length != 0 || directive.assignedto.length != 0) && directive.assignedto.length == 0)
@@ -1881,12 +1881,12 @@ async removeATCImage(index: number) {
           break
         }
       }
-  
+
       if(!assignmentChecked){
         alert("While adding directives, Fill the directive and assign specialist.")
         return
       }
-  
+
       var procedureCount = 0
       var mandatoryProcedure = 0
       for (let i = 0; i < this.transcript.length; i++) {
@@ -1909,7 +1909,7 @@ async removeATCImage(index: number) {
             procedureCount = procedureCount + 1
             mandatoryProcedure = mandatoryProcedure + (this.transcript[i].procedure[j].mandatory ? 1 : 0)
           }
-  
+
           if(i == this.transcript.length-1 && j == this.transcript[i].procedure.length-1){
             console.log("Total Procedure ", procedureCount)
             console.log("Mandatory Procedure ", mandatoryProcedure)
@@ -1925,7 +1925,7 @@ async removeATCImage(index: number) {
       }
     }
   }
-  
+
   async uploadATC(){
     var firebaseBatch = writeBatch(this.firestore);
     var selectedProfile = this.mapProfile[this.participantProfileid]["name"]
@@ -1948,7 +1948,7 @@ async removeATCImage(index: number) {
         this.loadingref = this.loadingDialog
         this.alphaSubscription?.unsubscribe()
         this.toValidateSubscription?.unsubscribe()
-        
+
         // Upload ATC Image
         // var atcImageURL = []
         // for (let a = 0; a < this.selectedATCImages.length; a++) {
@@ -1960,7 +1960,7 @@ async removeATCImage(index: number) {
         // }
         // console.log(atcImageURL)
         var atclevelBigActivity = {}
-        
+
         // Author
         var authorref = []
         Object.keys(this.authorMap).forEach(e =>{
@@ -1978,7 +1978,7 @@ async removeATCImage(index: number) {
         authorref = Array.from(new Set(authorref))
         authorref = authorref.map(e => doc(this.firestore, e))
         console.log(authorref)
-        
+
         // Observer
         var observerref = []
         Object.keys(this.observerMap).forEach(e =>{
@@ -1991,7 +1991,7 @@ async removeATCImage(index: number) {
         observerref = Array.from(new Set(observerref))
         observerref = observerref.map(e => doc(this.firestore, e))
         console.log(observerref)
-        
+
         // Mentor
         var mentroref = []
         Object.keys(this.mentorMap).forEach(e =>{
@@ -2004,13 +2004,13 @@ async removeATCImage(index: number) {
         mentroref = Array.from(new Set(mentroref))
         mentroref = mentroref.map(e => doc(this.firestore, e))
         console.log(mentroref)
-  
+
         var validatorref = []
         for (let k = 0; k < this.validator.length; k++) {
-          validatorref.push(doc(this.firestore, this.validator[k]))                
+          validatorref.push(doc(this.firestore, this.validator[k]))
         }
         console.log(validatorref)
-        
+
         // Write on ATC Alpha
         var mentoringID = (this.mentornotes ?? "").trim().length != 0 ? generateId(this.firestore, 'pick_for_mentoring') : null;
         var notesID = generateId(this.firestore, 'atc_notes');
@@ -2035,7 +2035,7 @@ async removeATCImage(index: number) {
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? ''
         }
-        
+
         if(this.assignmentInitiated){
           alphaData['directiveassignmentref'] = this.directiveAssignmentRef
           alphaData['mentor'] = this.directiveMentor
@@ -2059,7 +2059,7 @@ async removeATCImage(index: number) {
           alphaData['participantassignmentid'] = this.participantAssignmentId
           alphaData['bigassignment'] = true;
           collectionName = 'atc_to_validate'
-          
+
           //Big Assignment
           console.log(this.participantAssignmentId);
           firebaseBatch.update(doc(this.firestore, 'big participants assignments',this.participantAssignmentId),{
@@ -2070,7 +2070,7 @@ async removeATCImage(index: number) {
           collectionName = this.validationnotrequired ? "atc_alpha" : "atc_to_validate"
         }
         console.log(alphaData)
-        
+
         // Write Alpha Level
         firebaseBatch.set(doc(this.firestore, collectionName, this.alphaid), alphaData);
         if (this.queryparam?.['aigenerated'] && this.queryparam?.['docid']) {
@@ -2094,7 +2094,7 @@ async removeATCImage(index: number) {
               })
             }
             adjustmentAgent = Array.from(new Set(adjustmentAgent))
-            
+
             var adjustmentData = {
               name : this.transcript[i].adjustment,
               potentialyears : this.transcript[i].potentialyears,
@@ -2104,10 +2104,10 @@ async removeATCImage(index: number) {
               isdelete : false,
               implementationagent : adjustmentAgent
             }
-            
+
             // Write Adjustment Level
             firebaseBatch.set(doc(collection(doc(this.firestore, collectionName, this.alphaid), "corrections"), adjId), adjustmentData);
-            
+
             for (let j = 0; j < this.transcript[i].procedure.length; j++) {
               var procedureID = adjId + " - " + (j+1).toString()
               var assignref = []
@@ -2122,7 +2122,7 @@ async removeATCImage(index: number) {
               })
               assignref = Array.from(new Set(assignref))
               assignref = assignref.map(e => doc(this.firestore, e))
-              
+
               console.log(assignlevel)
               console.log(this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestore, this.transcript[i].procedure[j].recommended_to) : null)
               console.log(assignref.length != 0 ? assignref : null)
@@ -2140,13 +2140,13 @@ async removeATCImage(index: number) {
                 product : this.product,
                 bigactivity: procedurelevelBigActivity
               }
-              
+
               // Write Procedure Level
               firebaseBatch.set(doc(collection(doc(collection(doc(this.firestore, collectionName, this.alphaid), "corrections"), adjId), "procedures"), procedureID), procedureData);
-            }            
+            }
           }
         }
-        
+
         // Commit Batch
         await firebaseBatch.commit()
         atc_alpha_ref: doc(this.firestore, 'atc_alpha', this.alphaid)
@@ -2157,7 +2157,7 @@ async removeATCImage(index: number) {
         else{
           // var audiolist = []
           // var imagelist = []
-          
+
           // // Upload audio files
           // for (let i = 0; i < this.audioBlob.length; i++) {
           //   var audioID = this.audioBlobURL[i].split('/')
@@ -2172,7 +2172,7 @@ async removeATCImage(index: number) {
           //     console.log(err);
           //   }
           // }
-          
+
           // // Upload image files
           // for (let a = 0; a < this.selectedNoteImages.length; a++) {
           //   const imageFile = this.selectedNoteImages[a];
@@ -2185,7 +2185,7 @@ async removeATCImage(index: number) {
           //     console.log(err);
           //   }
           // }
-          
+
           // Call uploadATCnotes after all uploads are complete
           this.uploadATCnotes(notesID, mentoringID, this.audiolist, this.imagelist, authorref);
         }
@@ -2193,15 +2193,15 @@ async removeATCImage(index: number) {
       }
     })
   }
-  
+
   async uploadATCnotes(notesID: string, mentoringID: string, audiobrief: string[], imagenotes: string[], atcAuthorRef: DocumentReference[]){
     var firebaseBatch = writeBatch(this.firestore);
-    
+
     if(this.arenamode && this.liveassignmentid != null){
       // Close Live Assignment
       firebaseBatch.update(doc(this.firestore, "live assignment", this.liveassignmentid), {changeworkbrief: audiobrief});
     }
-    
+
     for (let i = 0; i < this.atcAssignment.length; i++) {
       const assignment = this.atcAssignment[i];
       if((assignment.directive ?? "").trim().length != 0 && assignment.assignedto.length != 0){
@@ -2220,7 +2220,7 @@ async removeATCImage(index: number) {
         firebaseBatch.set(doc(this.firestore, "atc assignment", docid), assignmentData);
       }
     }
-    
+
     if((this.mentornotes ?? "").trim().length != 0){
       var authorref = []
       Object.keys(this.authorMap).forEach(e =>{
@@ -2241,7 +2241,7 @@ async removeATCImage(index: number) {
       // Save Mentor Notes
       firebaseBatch.set(doc(this.firestore, "pick_for_mentoring", mentoringID), mentorData);
     }
-    
+
     var notesData = {
       created: serverTimestamp(),
       lastupdatedby: this.loggedinProfileid,
@@ -2257,7 +2257,7 @@ async removeATCImage(index: number) {
     await firebaseBatch.commit()
     this.uploadCompleted()
   }
-  
+
   async uploadCompleted(){
     this.loadingref?.close()
     this.loading = false
@@ -2265,7 +2265,7 @@ async removeATCImage(index: number) {
     updateDoc(doc(this.firestore, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
       console.log(err)
     })
-    
+
     if(!this.arenamode){
       window.scrollTo({
         top : 0,
@@ -2290,11 +2290,11 @@ async removeATCImage(index: number) {
           }
         ]
       }];
-      
+
       Object.keys(this.observerMap).forEach(key=>{
         this.observerMap[key] = []
       })
-      
+
       this.notesWritten = false;
       this.consultationSummary = null;
       this.casenotes = null;
@@ -2311,7 +2311,7 @@ async removeATCImage(index: number) {
         {directive: null, assignedto: [], activity: null}
       ]
     }
-    
+
     if(this.assignmentInitiated){
       await updateDoc(this.directiveAssignmentRef, {
         status:'submitted'
@@ -2324,15 +2324,15 @@ async removeATCImage(index: number) {
         console.log("error on submitting assignment ref");
       })
     }
-    
+
     if(this.arenamode){
       alert("ATC submitted successfully. You can move participant directly to the next stage.")
       this.moveToStudio()
       window.close()
     }
-    
+
     var bar = this.snackbar.open('The ATC has been submitted successfully. You can view the prescribed ATC in View Screen', 'View ATC', {
-      duration: 10000,  
+      duration: 10000,
     });
     bar.afterDismissed().subscribe(d=>{
       if(d.dismissedByAction){
@@ -2340,24 +2340,24 @@ async removeATCImage(index: number) {
       }
     })
   }
-  
-  async closeStudio(stagename: string, previousstage: boolean){   
-    console.log(stagename, previousstage) 
+
+  async closeStudio(stagename: string, previousstage: boolean){
+    console.log(stagename, previousstage)
     var loading = this.matDialog.open(LoadingProgressComponent, {
       data:{
         msg: "Completing Studio..."
       }
     })
-    
+
     await updateDoc(doc(this.firestore, "queue studio pairing", this.tokendata["studioid"]), {
       status: null,
     })
-    
+
     await updateDoc(doc(this.firestore, "live assignment", this.tokendata["liveassignmentid"]), {
       status: "completed",
       updated: serverTimestamp()
     })
-    
+
     var tokendata = {
       previousstage: this.tokendata["currentstage"],
       logdate: serverTimestamp(),
@@ -2373,10 +2373,10 @@ async removeATCImage(index: number) {
       arenaid: null,
       liveassignmentid: null,
     }
-    
+
     if(stagename != null){
       var stageIndex = this.ongoingQueue["stages"].findIndex(e => e == stagename)
-      tokendata["currentstage"] = this.ongoingQueue["stages"][stageIndex] ?? this.ongoingQueue["stages"][0] 
+      tokendata["currentstage"] = this.ongoingQueue["stages"][stageIndex] ?? this.ongoingQueue["stages"][0]
     }
     else{
       var lastStage:boolean
@@ -2403,12 +2403,12 @@ async removeATCImage(index: number) {
     await this.moveQueueStage(log)
     loading.close()
   }
-  
+
   async moveQueueStage(log: any){
     await updateDoc(doc(this.firestore, "queue_token", log["docid"]), log).catch(err=>{
       console.log(err);
     });
-    
+
     var logdocid = generateId(this.firestore, 'queue stage log');
     log["logdocid"] = logdocid;
     log["movedby"] = this.loggedinProfileid;
@@ -2419,12 +2419,12 @@ async removeATCImage(index: number) {
     console.log("Token", log)
     window.location.reload()
   }
-  
+
   onEditATC(collection: string, id: string){
     var url = '/editATC/'+ id +"/" + collection
     window.open(url.toString(), '_blank')
   }
-  
+
   moveToStudio(){
     this.router.navigateByUrl("/dynamicstudio")
   }

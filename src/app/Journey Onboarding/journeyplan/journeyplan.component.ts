@@ -5,7 +5,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { collection, collectionData, collectionSnapshots, doc, Firestore, getDoc, getDocs, getFirestore, orderBy, query, setDoc, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, Firestore, getDoc, getDocs, getFirestore, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
 import { CommonModule, Location } from '@angular/common';
 import { getApp } from '@angular/fire/app';
@@ -16,6 +16,10 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { DragDropModule } from '@angular/cdk/drag-drop';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatCardModule } from '@angular/material/card';
+import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 @Component({
   selector: 'app-journeyplan',
@@ -28,7 +32,10 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
     DragDropModule,
     MatButtonModule,
     MatIconModule,
-
+    MatDividerModule,
+    MatCardModule,
+    MatSelectModule,
+    MatCheckboxModule
   ],
   templateUrl: './journeyplan.component.html',
   styleUrl: './journeyplan.component.css'
@@ -37,7 +44,7 @@ export class JourneyplanComponent {
 
   loading = false
   profileRoles = {}
-  mapProductDeliveryType = {}
+  // mapProductDeliveryType = {}
   mapProductDelivery = {}
   packageList = []
   productList = []
@@ -54,12 +61,19 @@ export class JourneyplanComponent {
   profileid
   profileData: unknown;
   watsonScheduleList = []
-  currentMonth: any;
   endMonth: number;
   currentYear: number;
   cumulativeTotals: any = [];
   private subscription = new Subject<void>();
   watsonDatabase;
+  watsonLoading = false
+
+  monthlyPlanData = []
+  solarVoicePlaylist = []
+  eiFlixSeriesList = []
+  generalContentList = []
+  upcomingWorkshop = {}
+
   constructor(
     private firestore: Firestore,
     private route: ActivatedRoute,
@@ -75,15 +89,13 @@ export class JourneyplanComponent {
       this.profileid = clientpid;
       console.log(clientpid, 'clientpid');
 
-      // console.log(this.route.snapshot.params.pid);
-      // console.log(this.participantjourneyid, 'participantjourneyid');
-      await getDoc(doc(this.firestore, "profile_data", clientpid)).then(client => {
-        this.clientdata = client?.data() ?? {}
-      });
-      getDoc(doc(this.firestore, "participant metadata", clientpid)).then(snap => {
-        this.totalpaid = parseInt(snap.data()['pp_totalpaid'])
+      await getDoc(doc(this.firestore, "participant metadata", clientpid)).then(snap => {
+        this.clientdata = snap.data()
+        this.totalpaid = parseInt(this.clientdata['pp_totalpaid'])
       });
       await this.participantProducts();
+      this.initializeMonthlyPlan();
+      this.watsonParticipantSchedule();
     });
   }
 
@@ -104,29 +116,276 @@ export class JourneyplanComponent {
     getDocs(query(collection(this.firestore, "package"), orderBy("package"))).then(packages => {
       this.packageList = packages.docs.map(e => e.data())
     });
-    getDocs(collection(this.firestore, "productToDeliverySequence")).then(productdelivery => {
-      for (let i = 0; i < productdelivery.docs.length; i++) {
-        const product = productdelivery.docs[i];
-        const data = product.data()
-        this.mapProductDeliveryType[data["product"].id] = (data["deliveryoptions"] ?? []).map(e => e["deliverytype"])
-      }
-      // console.log(this.mapProductDeliveryType)
+
+    getDocs(query(collection(this.firestore, "solar voice playlist"), orderBy("name"))).then(list => {
+      this.solarVoicePlaylist = list.docs.map(e => e.data())
     });
 
-    this.watsonParticipantSchedule();
-    this.currentMonth = new Date().getMonth();
+    getDocs(query(collection(this.firestore, "series"), orderBy("seriesName"))).then(list => {
+      this.eiFlixSeriesList = list.docs.map(e => e.data())
+    });
+
+    getDocs(query(collection(this.firestore, "content_urls"), orderBy("title"))).then(list => {
+      this.generalContentList = list.docs.map(e => e.data())
+    });
+
+    var monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    getDocs(query(collection(this.firestore, "workshopconfiguration"), where("detailpage.workshopStartDate", ">=", monthStart))).then(list => {
+      for (let i = 0; i < list.docs.length; i++) {
+        const element = list.docs[i];
+        const data = element.data()
+
+        const date = data["detailpage.workshopStartDate"].toDate();
+        const monthName = date.toLocaleString('default', { month: 'long' });
+        const year = date.getFullYear();
+
+        var monthIndex = `${monthName} ${year}`
+        this.upcomingWorkshop[monthIndex] = this.upcomingWorkshop[monthIndex] ?? []
+        this.upcomingWorkshop[monthIndex].push(data)
+      }
+    });
+
+    // getDocs(collection(this.firestore, "productToDeliverySequence")).then(productdelivery => {
+    //   for (let i = 0; i < productdelivery.docs.length; i++) {
+    //     const product = productdelivery.docs[i];
+    //     const data = product.data()
+    //     this.mapProductDeliveryType[data["product"].id] = (data["deliveryoptions"] ?? []).map(e => e["deliverytype"])
+    //   }
+    // });
   }
 
-  formatDate(date: any): string {
-    if (!date) return '';
-    // Convert to yyyy-MM-dd format required by input[type="date"]
-    const d = new Date(date);
-    return d.toISOString().split('T')[0];
+  async initializeMonthlyPlan() {
+    const currentDate = new Date();
+    this.monthlyPlanData = [];
+
+    for (let i = 0; i < 6; i++) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
+      const monthName = date.toLocaleString('default', { month: 'long' });
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const monthIndex = month.toString().padStart(2, '0');
+      const docId = `${this.clientdata['profileid']}_${monthIndex}_${year}`;
+
+      this.monthlyPlanData.push({
+        display: `${monthName} ${year}`,
+        month,
+        year,
+        docId,
+        monthstartdate: date,
+        expanded: false,
+        data: {
+          solarvoice: [],   // [{ playlistref, preferredday, preferredtime }]
+          eiflix: [],
+          generalcontent: [],
+          workshop: [],
+          products: []
+        }
+      });
+    }
+
+    await this.loadExistingMonthlyPlans();
   }
 
-  updateDate(event: any, row): void {
-    const value = event.target.value;
-    row.tentativestart = value ? new Date(value) : null;
+  async loadExistingMonthlyPlans() {
+    for (const month of this.monthlyPlanData) {
+      const docSnap = await getDoc(doc(this.firestore, 'participantplanning', month.docId));
+      if (!docSnap.exists()) continue;
+
+      const d = docSnap.data();
+
+      // Each stored entry has a single `playlist` doc reference. Group entries that share
+      // the same preferredday + preferredtime back into a single UI row with a playlist array.
+      const groupFlatEntries = (entries: any[]) => {
+        const map = new Map<string, any>();
+        for (const e of (entries ?? [])) {
+          const playlistId: string | null = e.playlist?.id ?? null;
+          const day = e.preferredday ?? 'all';
+          const time = e.preferredtime ?? 'all';
+          const key = `${day}__${time}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              playlist: playlistId ? [playlistId] : [],
+              preferredday: day,
+              preferredtime: time,
+              allTime: time === 'all',
+              completedcontent: e.completedcontent ?? [],
+              completedplaylist: e.completedplaylist ?? [],
+            });
+          } else {
+            const row = map.get(key);
+            if (playlistId && !row.playlist.includes(playlistId)) {
+              row.playlist.push(playlistId);
+            }
+          }
+        }
+        return Array.from(map.values());
+      };
+
+      month.data.solarvoice = groupFlatEntries(d['solarvoice']);
+      month.data.eiflix = groupFlatEntries(d['eiflix']);
+      month.data.generalcontent = groupFlatEntries(d['generalcontent']);
+
+      month.data.workshop = (d['workshop'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean);
+      month.data.products = (d['products'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean);
+    }
+  }
+
+  addPlaylistRow(month: any, category: string) {
+    month.data[category].push({
+      playlist: [],
+      preferredday: 'all',
+      preferredtime: 'all',
+      allTime: true,
+    });
+  }
+
+  removePlaylistRow(month: any, category: string, index: number) {
+    month.data[category].splice(index, 1);
+  }
+
+  toggleRowAllTime(row: any) {
+    row.preferredtime = row.allTime ? 'all' : '';
+  }
+
+  validateMonthlyPlan(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+    const categories = [
+      { key: 'solarvoice', label: 'Solar Voice' },
+      { key: 'eiflix', label: 'EiFlix' },
+      { key: 'generalcontent', label: 'General Content' }
+    ];
+
+    for (const month of this.monthlyPlanData) {
+      for (const cat of categories) {
+        const rows = month.data[cat.key] as any[];
+        rows.forEach((row, idx) => {
+          const rowLabel = `${month.display} → ${cat.label} (row ${idx + 1})`;
+
+          if (!row.playlist || row.playlist.length === 0) {
+            errors.push(`${rowLabel}: No playlist selected.`);
+          }
+          if (!row.preferredday) {
+            errors.push(`${rowLabel}: Preferred day not selected.`);
+          }
+          if (!row.allTime) {
+            if ((row.preferredtime ?? "").trim().length == 0) {
+              errors.push(`${rowLabel}: Time slot is empty.`);
+            } else if (!timeRegex.test(row.preferredtime)) {
+              errors.push(`${rowLabel}: Time "${row.preferredtime}" is not valid HH:MM format.`);
+            }
+          }
+        });
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  toggleMonth(index: number) {
+    this.monthlyPlanData[index].expanded = !this.monthlyPlanData[index].expanded;
+  }
+
+  async submitMonthlyPlan() {
+    const loading = this.dialog.open(LoadingProgressComponent, {
+      disableClose: true,
+      data: { msg: 'Saving Monthly Plan...' }
+    });
+
+    try {
+      const batch = writeBatch(this.firestore);
+
+      for (const month of this.monthlyPlanData) {
+        const docRef = doc(this.firestore, 'participantplanning', month.docId);
+
+        // --- Products: filter productData by tentativestart matching this month ---
+        const matchedProducts = this.productData.data.filter(p => {
+          if (!p['tentativestart']) return false;
+          const d = new Date(p['tentativestart']);
+          return d.getMonth() + 1 === month.month && d.getFullYear() === month.year;
+        });
+
+        const productRefs = matchedProducts.filter(p => p['docid']).map(p => doc(this.firestore, 'products', p['productref']));
+
+        // --- Category arrays ---
+        // Each playlist ID in a row becomes its own flat entry with a single doc reference.
+        // Rows with multiple playlist IDs are expanded so every entry has exactly one `playlist` ref.
+        const buildCategoryArray = (rows: any[], collectionName: string) =>
+          rows
+            .filter(r => (r.playlist || []).length > 0)
+            .flatMap(r =>
+              (r.playlist as string[]).map(id => ({
+                playlist: doc(this.firestore, collectionName, id),
+                preferredday: r.preferredday ?? 'all',
+                preferredtime: r.allTime ? 'all' : r.preferredtime,
+                completedcontent: r.completedcontent ?? [],
+                completedplaylist: r.completedplaylist ?? [],
+              }))
+            );
+
+        const solarvoice = buildCategoryArray(month.data.solarvoice, 'solar voice playlist');
+        const eiflix = buildCategoryArray(month.data.eiflix, 'series');
+        const generalcontent = buildCategoryArray(month.data.generalcontent, 'content_urls');
+
+        const workshopRefs = (month.data.workshop ?? []).filter(Boolean).map((id: string) => doc(this.firestore, 'workshopconfiguration', id));
+
+        // --- Empty check: delete doc if nothing is planned ---
+        const isEmpty = solarvoice.length === 0 && eiflix.length === 0 && generalcontent.length === 0 && workshopRefs.length === 0 && productRefs.length === 0;
+
+        if (isEmpty) {
+          batch.delete(docRef);
+        } else {
+          batch.set(docRef, {
+            profileid: this.clientdata['profileid'],
+            monthstartdate: month.monthstartdate,
+            solarvoice,
+            eiflix,
+            generalcontent,
+            workshop: workshopRefs,
+            products: productRefs,
+            lasteditedon: new Date(),
+            lasteditedby: this.profileRoles["profile_ref"].id
+          });
+        }
+      }
+
+      await batch.commit();
+      loading.close();
+    } catch (err) {
+      console.error(err);
+      loading.close();
+    }
+  }
+
+  isProductInMonth(tentativestart: any, month: number, year: number): boolean {
+    if (!tentativestart) return false;
+    const d = new Date(tentativestart);
+    return d.getMonth() + 1 === month && d.getFullYear() === year;
+  }
+
+  hasProductInMonth(month: number, year: number): boolean {
+    return this.productData.data.some(p => this.isProductInMonth(p['tentativestart'], month, year));
+  }
+
+  async updateParticipantPlan() {
+    console.log(this.monthlyPlanData)
+    console.log(this.productData.data)
+
+    const { valid, errors } = this.validateMonthlyPlan();
+    if (!valid) {
+      alert(errors.join('\n'));
+      return;
+    }
+    
+    if (valid && this.validateFields(this.productData.data)) {
+      if(confirm("Sure, do you want to update this plan?")){
+        await this.submitMonthlyPlan();
+        await this.updateProducts();
+      }
+    }
   }
 
   drop(event: CdkDragDrop<string[]>) {
@@ -151,57 +410,28 @@ export class JourneyplanComponent {
   */
 
   async participantProducts() {
-    getDoc(doc(this.firestore, "participantdeliverysequence", this.clientdata["profileid"])).then(sequence => {
-      if (sequence.exists()) {
-        var products = sequence.data()["products"] ?? []
-        for (let i = 0; i < products.length; i++) {
-          const element = products[i];
-          this.mapProductDelivery[element["participantproductid"]] = element["delivery"] ?? []
-        }
-      }
-    });
-    collectionData(query(collection(this.firestore, "participantsproduct"), where("profileid", "==", this.clientdata["profileid"]), orderBy('sequenceorder', 'asc'))).pipe(takeUntil(this.subscription)).subscribe(deliveryproduct => {
+    getDocs(query(collection(this.firestore, "participantsproduct"), where("profileid", "==", this.clientdata["profileid"]), orderBy('sequenceorder', 'asc'))).then(deliveryproduct => {
       var productList = []
-      var cumulativeMinimumPayment = 0;
-      for (let i = 0; i < deliveryproduct.length; i++) {
-        const productDoc = deliveryproduct[i];
-        if (!['cancelled', 'completed'].includes(productDoc['status'])) {
-
+      for (let i = 0; i < deliveryproduct.docs.length; i++) {
+        const productDoc = deliveryproduct.docs[i].data();
+        // if (productDoc['status'] == null) {
           const productData = productDoc;
           productData["minimumpayment"] = [null, undefined].includes(productData["minimumpayment"]) ? this.mapProduct[productData["productref"]?.id]?.minimumrequiredamount : productData["minimumpayment"]
-          const currentPayment = typeof productData["minimumpayment"] === "number" ? productData["minimumpayment"] : parseInt(productData["minimumpayment"] ?? "0");
-          // cumulativeMinimumPayment += currentPayment;
-          
-          // if (cumulativeMinimumPayment <= this.totalpaid) {
-          //   productData['remainingamount'] = 0; 
-          // } else {
-          //   productData['remainingamount'] = cumulativeMinimumPayment - this.totalpaid; 
-          // }
           console.log("productData", productData);
 
-          productData['remainingamount'] = productData["minimumpayment"] - this.totalpaid
+          const balanceAmount = productData["minimumpayment"] - this.totalpaid
+          productData['remainingamount'] = balanceAmount > 0 ? 0 : balanceAmount
           productData["productref"] = productData["productref"]?.id
           productData["packageref"] = productData["packageref"]?.id
           productData['subscriptionstart'] = productData['subscriptionstart']?.toDate() ?? null
           productData['subscriptionend'] = productData['subscriptionend']?.toDate() ?? null
           productData['tentativestart'] = productData['tentativestart']?.toDate() ?? null
-
-          // if (productData["minimumpayment"] == null) { // Check for both null and undefined
-          //   const minimumRequiredAmount = this.mapProduct[productData["productref"]?.id]?.minimumrequiredamount;
-          //   productData["minimumpayment"] = minimumRequiredAmount !== undefined ? minimumRequiredAmount : null;
-          // }
-          var statuskey = Object.keys(productData["statusdate"] ?? {})
-          for (let j = 0; j < statuskey.length; j++) {
-            const key = statuskey[j];
-            productData["statusdate"][key] = productData["statusdate"][key].toDate()
-          }
           productList.push(productData);
-        }
+        // }
       }
-      productList.sort((a, b) => a["sequenceorder"] - b["sequenceorder"])
-      this.productData.data = productList;
+      this.productData.data = productList.filter(e => e["status"] == null);
+      this.participantProductList = productList
       this.loading = false;
-
     });
   }
 
@@ -218,144 +448,107 @@ export class JourneyplanComponent {
           break;
         }
       }
-      if (product["status"] == "initiated" && (this.mapProductDelivery[product["docid"]] ?? []).length == 0 && (product["deliverytype"] == null || product["deliverytype"] == undefined)) {
-        value = false
-        alert("Select Delivery Type for Initiated Product")
-        break;
-      }
+      // if (product["status"] == "initiated" && (this.mapProductDelivery[product["docid"]] ?? []).length == 0 && (product["deliverytype"] == null || product["deliverytype"] == undefined)) {
+      //   value = false
+      //   alert("Select Delivery Type for Initiated Product")
+      //   break;
+      // }
     }
     return value
   }
 
   async updateProducts() {
     var productSequence = []
-    // var cumulativeMinimumPayment = 0;
     console.log("product data", this.productData.data);
     
     this.productData.data.forEach(e => {
       console.log("date", new Date(e['tentativestart']));
-      
       productSequence.push(Object.assign({}, e))
     })
 
-    if (this.validateFields(productSequence)) {
-      var loading = this.dialog.open(LoadingProgressComponent, {
-        disableClose: true,
-        data: {
-          msg: "Updating Detail....."
-        }
-      })
-      var totalwrite = 0
-      var productDataList = []
-      for (let i = 0; i < productSequence.length; i++) {
-        const product = productSequence[i];
-
-        var statusdate = product["statusdate"] ?? {}
-        if (product["status"] != null) {
-          if (statusdate[product["status"]] == null || statusdate[product["status"]] == undefined) {
-            statusdate[product["status"]] = new Date()
-          }
-        }
-        product["docid"] = (product["docid"] == null) ? doc(collection(this.firestore, 'participantsproduct')).id : product["docid"]
-        var productData = {
-          docid: product["docid"],
-          profileid: this.clientdata["profileid"],
-          productref: doc(this.firestore, "products", product["productref"]),
-          packageref: doc(this.firestore, "package", product["packageref"]) ?? null,
-          minimumpayment: product['minimumpayment'] ?? null,
-          subscriptionstart: product["subscriptionstart"] ?? null,
-          subscriptionend: product['subscriptionend'] ?? null,
-          tentativestart: [null, undefined, ""].includes(product['tentativestart']) ? null : new Date(product['tentativestart']),
-          status: product['status'] ?? null,
-          statusdate: statusdate,
-          sequenceorder: i,
-          unlimited: this.mapProduct[product["productref"]]["unlimited"] ?? false
-        }
-        if (product["status"] == "initiated" && (product["delivery"] ?? []).length == 0) {
-          productData["deliverytype"] = product['deliverytype'] ?? null
-        }
-        productDataList.push(productData)
+    var loading = this.dialog.open(LoadingProgressComponent, {
+      disableClose: true,
+      data: {
+        msg: "Updating Detail....."
       }
-      console.log(productSequence)
-      await this.guard.updateDeliverySequence(this.clientdata["profileid"], productSequence).catch(err => {
+    })
+    var nonStartedProduct = this.participantProductList.filter(e => e["status"] != null)
+    var firebaseBatch = writeBatch(this.firestore)
+    for (let i = 0; i < productSequence.length; i++) {
+      const product = productSequence[i];
+      const participantProductDoc = doc(this.firestore, "participantsproduct", product["docid"])
+      var productData = {
+        profileid: this.clientdata["profileid"],
+        productref: doc(this.firestore, "products", product["productref"]),
+        packageref: doc(this.firestore, "package", product["packageref"]) ?? null,
+        minimumpayment: product['minimumpayment'] ?? null,
+        tentativestart: [null, undefined, ""].includes(product['tentativestart']) ? null : new Date(product['tentativestart']),
+        sequenceorder: nonStartedProduct.length + i,
+        // subscriptionstart: product["subscriptionstart"] ?? null,
+        // subscriptionend: product['subscriptionend'] ?? null,
+        // status: product['status'] ?? null,
+        // statusdate: statusdate,
+        // unlimited: this.mapProduct[product["productref"]]["unlimited"] ?? false
+      }
+      firebaseBatch.update(participantProductDoc, productData)
+    }
+    await firebaseBatch.commit().then(async () =>{
+      await this.guard.updateDeliverySequence(this.clientdata["profileid"], [...nonStartedProduct, ...productSequence]).catch(err => {
         console.log(err)
       })
-      console.log(productDataList)
-      for (let i = 0; i < productDataList.length; i++) {
-        const productData = productDataList[i];
-        setDoc(doc(this.firestore, "participantsproduct", productData["docid"]), productData, { merge: true }).then(async () => {
-          totalwrite += 1
-          if (totalwrite == productDataList.length) {
-            loading.close()
-            this.location.back()
-          }
-        }).catch(err => {
-          loading.close()
-          console.log(err)
-        })
-      }
-      // update minimum payment to participantjpurneyproduct
-      console.log(this.participantjourneyid, 'this.participantjourneyid');
+      this.location.back()
+    }).catch(err =>{
+      console.log(err)
+    })
+    console.log(productSequence)
+    loading.close()
 
-      // if(![null,undefined].includes(this.participantjourneyid)){
-      // console.log(this.participantjourneyid, 'partcreatestudioconversationicipantjourneyid');
-      var participantProductList = []
-      // var totalpaid
-      await getDocs(query(collection(this.firestore, "participantsproduct"), where('profileid', '==', this.clientdata["profileid"]))).then(products => {
-        products.docs.forEach(e => {
-          participantProductList.push(e.data())
-        })
+    /*
+    // update minimum payment to participantjpurneyproduct
+    console.log(this.participantjourneyid, 'this.participantjourneyid');
+
+    // if(![null,undefined].includes(this.participantjourneyid)){
+    // console.log(this.participantjourneyid, 'partcreatestudioconversationicipantjourneyid');
+    var participantProductList = []
+    // var totalpaid
+    await getDocs(query(collection(this.firestore, "participantsproduct"), where('profileid', '==', this.clientdata["profileid"]))).then(products => {
+      products.docs.forEach(e => {
+        participantProductList.push(e.data())
       })
-      // await this.firestore.collection('participantdashboard').doc(this.clientdata["profileid"]).get().toPromise().then(snap => {
-      //   totalpaid = parseInt(snap.data()['pp_totalpaid'])
-      // })
-      // var profileProduct = participantProductList.filter(product => product["profileid"] == this.clientdata["profileid"]).sort((a, b) => a["sequenceorder"] - b["sequenceorder"])
-      // var minimumpayment = 0
-      // for (let b = 0; b < profileProduct.length; b++) {
-      //   const product = profileProduct[b];
-      //   if(product["status"] == "completed"){
-      //     minimumpayment += typeof product["minimumpayment"] == "number" ? product["minimumpayment"] : parseInt(product["minimumpayment"] ?? "0")
-      //   }
-      //   else if(product["status"] == null){
-      //     minimumpayment += typeof product["minimumpayment"] == "number" ? product["minimumpayment"] : parseInt(product["minimumpayment"] ?? "0")
-      //     break;
-      //   }
-      // }
-      // console.log(minimumpayment, 'minimumpayment');
-      var profileProduct = participantProductList.filter(product => product["profileid"] == this.clientdata["profileid"]).sort((a, b) => a["sequenceorder"] - b["sequenceorder"]);
+    })
+    var profileProduct = participantProductList.filter(product => product["profileid"] == this.clientdata["profileid"]).sort((a, b) => a["sequenceorder"] - b["sequenceorder"]);
 
-      var minimumpayment = 0;
-      for (let b = 0; b < profileProduct.length; b++) {
-        const product = profileProduct[b];
-        if (product["status"] == null) {
-          minimumpayment = typeof product["minimumpayment"] == "number"
-            ? product["minimumpayment"]
-            : parseInt(product["minimumpayment"] ?? "0");
-          break; // Stop after finding the first product with null status
-        }
+    var minimumpayment = 0;
+    for (let b = 0; b < profileProduct.length; b++) {
+      const product = profileProduct[b];
+      if (product["status"] == null) {
+        minimumpayment = typeof product["minimumpayment"] == "number"
+          ? product["minimumpayment"]
+          : parseInt(product["minimumpayment"] ?? "0");
+        break; // Stop after finding the first product with null status
       }
-
-      console.log(minimumpayment, 'minimumpayment');
-      await updateDoc(doc(this.firestore, "participant metadata", this.profileid), {
-        minimumpayment: minimumpayment
-      }).then(() => {
-        alert("Journey plan updated Successfully")
-      })
-      // }
     }
+
+    console.log(minimumpayment, 'minimumpayment');
+    await updateDoc(doc(this.firestore, "participant metadata", this.profileid), {
+      minimumpayment: minimumpayment
+    }).then(() => {
+      alert("Journey plan updated Successfully")
+    })
+    // }
+    */
   }
 
   async watsonParticipantSchedule() {
-    this.currentMonth = new Date().getMonth();
+    this.watsonLoading = true
     this.currentYear = new Date().getFullYear();
-    this.guard.initializeWatson().then(async () => {
-      this.profileid = this.route.snapshot.params['pid'].split('&')[0]
-      await getDoc(doc(this.firestore, "profile_data", this.profileid)).then(profile => {
+    await this.guard.initializeWatson().then(async () => {
+      await getDoc(doc(this.firestore, "profile_data", this.profileid)).then(async profile => {
         this.profileData = profile.data()
         // console.log(this.profileData, 'profileData');
-        this.guard.initializeWatson().then(() => {
+        // this.guard.initializeWatson().then(() => {
           this.watsonDatabase = getFirestore(getApp("watson"))
-          getDocs(collection(this.watsonDatabase, "Participants")).then(async participant => {
+          await getDocs(query(collection(this.watsonDatabase, "Participants"), where("email", "==", this.profileData["email"]))).then(async participant => {
             var participantid = null
             for (let i = 0; i < participant.docs.length; i++) {
               const doc = participant.docs[i];
@@ -373,7 +566,7 @@ export class JourneyplanComponent {
             else {
               console.log("working.....");
 
-              getDocs(query(collection(this.watsonDatabase, "Payment Schedule"), where('participantid', '==', participantid), orderBy('date', 'asc'))).then((schedule) => {
+              await getDocs(query(collection(this.watsonDatabase, "Payment Schedule"), where('participantid', '==', participantid), orderBy('date', 'asc'))).then((schedule) => {
                 // this.watsonScheduleList = schedule.docs.map((e) => e.data()).filter((e) => e['schedulemodified'] != true);
                 this.watsonScheduleList = schedule.docs.map((e) => e.data()).filter((e) => e['schedulemodified'] != true);
                 let runningTotal = 0;
@@ -387,9 +580,10 @@ export class JourneyplanComponent {
               });
             }
           })
-        })
+        // })
       })
     })
+    this.watsonLoading = false
   }
 
 

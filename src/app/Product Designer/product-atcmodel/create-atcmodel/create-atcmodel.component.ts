@@ -43,9 +43,10 @@ export class CreateAtcmodelComponent {
     this.form = this.fb.group({
       atcmodel:[null,[Validators.required]],
       evolutiontype:[null,[Validators.required]],
-      description:[null,[Validators.required]],
+      description:[null,[]],
       category:[[],],
       videourl:[[],],
+      directive:[null,[]],
       docid: [doc(collection(this.firestore, 'atc model')).id]
     })
     const contentCollection = collection(this.firestore, 'content_urls')
@@ -60,11 +61,11 @@ export class CreateAtcmodelComponent {
     if(this.data.type === 'edit'){
       this.form.patchValue(this.data.doc)
     }
-    
+
   }
 
   ngOnInit() {
-   
+
   }
 
   async onSubmit(){
@@ -78,6 +79,6 @@ export class CreateAtcmodelComponent {
       }
     }
   }
-    
+
 
 }

@@ -343,6 +343,199 @@
         </ng-container>
       </div>
     </mat-tab>
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- INSERT this entire block immediately BEFORE <mat-tab label="Journey Based"> -->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+
+    <mat-tab label="Tier Based (All)">
+      <div class="tier-header">
+        <div class="tier-header-left">
+          <span class="tier-title">Tier Based Content Measuring (All Time)</span>
+          <span class="tier-subtitle">Completion based on participant content analytics — not date-range filtered</span>
+        </div>
+        <div class="tier-header-right">
+          <div class="tier-toggle-group">
+            <button class="tier-toggle-btn" [class.active]="allTierViewMode === 'series'"      (click)="allTierViewMode = 'series'">Series</button>
+            <button class="tier-toggle-btn" [class.active]="allTierViewMode === 'participant'" (click)="allTierViewMode = 'participant'">Participants</button>
+          </div>
+          <div class="tier-search-wrap">
+            <mat-icon class="tier-search-icon">search</mat-icon>
+            <input class="tier-search-input" placeholder="Search tiers..." [(ngModel)]="allTierSearchQuery">
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="allTierLoading" class="tier-loading-wrap">
+        <div class="tier-spinner"></div>
+        <span class="tier-loading-text">Fetching tier data...</span>
+      </div>
+
+      <!-- Series view -->
+      <div *ngIf="!allTierLoading && allTierViewMode === 'series'" class="tier-grid">
+        <ng-container *ngFor="let tier of allTierCompletionMap | keyvalue">
+          <ng-container *ngIf="!allTierSearchQuery || tiermap[$any(tier.key)]?.tier?.toLowerCase()?.includes(allTierSearchQuery.toLowerCase())">
+            <div class="tier-card">
+              <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
+              <div class="tier-summary-row">
+                <div class="tier-stat">
+                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'done', 'series')">
+                    {{ allTierStats[$any(tier.key)]?.series?.completed }}/{{ allTierStats[$any(tier.key)]?.series?.total }}
+                  </span>
+                  <span class="tier-stat-label">DONE</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'completed', 'series')">
+                    {{ allTierStats[$any(tier.key)]?.series?.completed }}
+                  </span>
+                  <span class="tier-stat-label">COMPLETED</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'ontrack', 'series')">
+                    {{ allTierStats[$any(tier.key)]?.series?.onTrack }}
+                  </span>
+                  <span class="tier-stat-label">ON TRACK</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'notstarted', 'series')">
+                    {{ allTierStats[$any(tier.key)]?.series?.notStarted }}
+                  </span>
+                  <span class="tier-stat-label">NOT STARTED</span>
+                </div>
+              </div>
+              <div class="card-view-toggle">
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'series'"
+                  (click)="allCardViewMode[$any(tier.key)] = 'series'">Series</button>
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="allCardViewMode[$any(tier.key)] === 'participant'"
+                  (click)="allCardViewMode[$any(tier.key)] = 'participant'">Participants</button>
+              </div>
+              <!-- Series list -->
+              <div class="series-list" *ngIf="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'series'">
+                <div class="series-row" *ngFor="let s of tier.value | keyvalue"
+                  style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(s.key), 'all', 'series')">
+                  <div class="series-icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                    </svg>
+                  </div>
+                  <span class="series-name">{{ s.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="getCompletedCount(s.value) === getTotalCount(s.value)"
+                    [class.yellow]="getCompletedCount(s.value) > 0 && getCompletedCount(s.value) < getTotalCount(s.value)"
+                    [class.red]="getCompletedCount(s.value) === 0">
+                    {{ getCompletedCount(s.value) }}/{{ getTotalCount(s.value) }}
+                  </span>
+                  <div class="series-bar-wrap">
+                    <div class="series-bar"
+                      [class.bar-green]="getCompletedCount(s.value) === getTotalCount(s.value)"
+                      [class.bar-yellow]="getCompletedCount(s.value) > 0 && getCompletedCount(s.value) < getTotalCount(s.value)"
+                      [class.bar-red]="getCompletedCount(s.value) === 0"
+                      [style.width.%]="getTotalCount(s.value) > 0 ? (getCompletedCount(s.value) / getTotalCount(s.value) * 100) : 0">
+                    </div>
+                    <span class="series-pct">{{ getTotalCount(s.value) > 0 ? ((getCompletedCount(s.value) / getTotalCount(s.value) * 100) | number:'1.0-0') : 0 }}%</span>
+                  </div>
+                </div>
+              </div>
+              <!-- Participant list -->
+              <div class="series-list" *ngIf="allCardViewMode[$any(tier.key)] === 'participant'">
+                <div class="series-row"
+                  *ngFor="let user of allTierParticipantSummary[$any(tier.key)] | keyvalue"
+                  style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
+                  <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
+                  <span class="series-name">{{ user.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="user.value['completed'] === user.value['total']"
+                    [class.yellow]="user.value['completed'] > 0 && user.value['completed'] < user.value['total']"
+                    [class.red]="user.value['completed'] === 0">
+                    {{ user.value['completed'] }}/{{ user.value['total'] }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+
+      <!-- Participant view -->
+      <div *ngIf="!allTierLoading && allTierViewMode === 'participant'" class="tier-grid">
+        <ng-container *ngFor="let tier of allTierParticipantSummary | keyvalue">
+          <ng-container *ngIf="!allTierSearchQuery || tiermap[$any(tier.key)]?.tier?.toLowerCase()?.includes(allTierSearchQuery.toLowerCase())">
+            <div class="tier-card">
+              <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
+              <div class="tier-summary-row">
+                <div class="tier-stat">
+                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'done', 'participant')">
+                    {{ allTierStats[$any(tier.key)]?.participant?.completed }}/{{ allTierStats[$any(tier.key)]?.participant?.total }}
+                  </span>
+                  <span class="tier-stat-label">DONE</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'completed', 'participant')">
+                    {{ allTierStats[$any(tier.key)]?.participant?.completed }}
+                  </span>
+                  <span class="tier-stat-label">COMPLETED</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'ontrack', 'participant')">
+                    {{ allTierStats[$any(tier.key)]?.participant?.onTrack }}
+                  </span>
+                  <span class="tier-stat-label">ON TRACK</span>
+                </div>
+                <div class="tier-stat">
+                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'notstarted', 'participant')">
+                    {{ allTierStats[$any(tier.key)]?.participant?.notStarted }}
+                  </span>
+                  <span class="tier-stat-label">NOT STARTED</span>
+                </div>
+              </div>
+              <div class="card-view-toggle">
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="allCardViewMode[$any(tier.key)] === 'series'"
+                  (click)="allCardViewMode[$any(tier.key)] = 'series'">Series</button>
+                <button class="card-tab-btn"
+                  [class.active-card-tab]="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'participant'"
+                  (click)="allCardViewMode[$any(tier.key)] = 'participant'">Participants</button>
+              </div>
+              <!-- Participant list -->
+              <div class="series-list" *ngIf="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'participant'">
+                <div class="series-row"
+                  *ngFor="let user of tier.value | keyvalue"
+                  style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
+                  <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
+                  <span class="series-name">{{ user.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="user.value['completed'] === user.value['total']"
+                    [class.yellow]="user.value['completed'] > 0 && user.value['completed'] < user.value['total']"
+                    [class.red]="user.value['completed'] === 0">
+                    {{ user.value['completed'] }}/{{ user.value['total'] }}
+                  </span>
+                </div>
+              </div>
+              <!-- Series list -->
+              <div class="series-list" *ngIf="allCardViewMode[$any(tier.key)] === 'series'">
+                <div class="series-row"
+                  *ngFor="let s of allTierCompletionMap[$any(tier.key)] | keyvalue"
+                  style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(s.key), 'all', 'series')">
+                  <div class="series-icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                    </svg>
+                  </div>
+                  <span class="series-name">{{ s.key }}</span>
+                  <span class="series-fraction"
+                    [class.green]="getCompletedCount(s.value) === getTotalCount(s.value)"
+                    [class.yellow]="getCompletedCount(s.value) > 0 && getCompletedCount(s.value) < getTotalCount(s.value)"
+                    [class.red]="getCompletedCount(s.value) === 0">
+                    {{ getCompletedCount(s.value) }}/{{ getTotalCount(s.value) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+    </mat-tab>
     <mat-tab label="Journey Based">
       <div *ngIf="tierLoading" class="tier-loading-wrap">
         <div class="tier-spinner"></div>

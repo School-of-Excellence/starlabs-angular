@@ -14,6 +14,7 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 @Component({
   selector: 'app-series-dashboard',
@@ -26,13 +27,14 @@ import { FormsModule } from '@angular/forms';
     MatButtonModule,
     MatSnackBarModule,
     MatSelectModule,
-    FormsModule
+    FormsModule,
+    MatTooltipModule
   ],
   templateUrl: './series-dashboard.component.html',
   styleUrls: ['../../content-upload-version2/content-upload-shared.css'],
 })
 export class SeriesDashboardComponent {
-  displayedColumns: string[] = ['Series Name','type', 'Copy', 'Edit', 'Delete'];
+  displayedColumns: string[] = ['Series Name','type', 'Copy', 'Copyeiflix', 'Edit', 'Delete'];
   dataSource = new MatTableDataSource();
   tierfilter: string = 'all';
 
@@ -114,10 +116,10 @@ export class SeriesDashboardComponent {
     this.snackBar.open(message,action,{ duration: 2000})
   }
 
-  copyToClipboard(data){
-    console.log('copied')
+  copyToClipboard(data, site) {
+    console.log('copied');
     this.openSnackBar(`${data.seriesName} copied! Ready to share 🚀`, "OK");
-    var url = "https://breakthroughs.app/eiflix/" + data["id"]
-    this.clipboard.copy(url)
+    const url = `https://${site}/eiflix/${data.id}`;
+    this.clipboard.copy(url);
   }
 }

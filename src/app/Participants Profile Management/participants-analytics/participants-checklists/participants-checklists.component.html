@@ -20,6 +20,8 @@
               <td *ngFor="let column of columns" class="table-cell">
                 <span *ngIf="column.key === 'name'">{{row[column.key]}}</span>
                 <span *ngIf="['activejourney','lastcompletedjourney', 'higherorderpurchase'].includes(column.key)">{{mapjourney[row[column.key]]}}</span>
+                <span *ngIf="column.key === 'customerstatus'">{{row[column.key]}}</span>
+                <span *ngIf="column.key === 'financialstatus'">{{row[column.key]}}</span>
               </td>
             </tr>
           </tbody>

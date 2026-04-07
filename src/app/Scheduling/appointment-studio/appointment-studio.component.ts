@@ -164,6 +164,7 @@ export class AppointmentStudioComponent {
         var metaData = appointmentData
         metaData["type"] = "appointment"
         metaData["clientname"] = this.mapProfile[appointmentData["bookedby"].id]
+        metaData["docid"] = appointment.id
         metaData["bookingid"] = appointment.id
         metaData["appointmenttype"] = this.mapAppointment[appointmentData["appointment"].id]
         metaData["appointmentid"] = appointmentData["appointment"].id
@@ -243,7 +244,7 @@ export class AppointmentStudioComponent {
         // Skip if Cancelled or Marked Attended
         if(appointmentData["cancelled"] || appointmentData["attended"]) continue
 
-        if(eligibleProduct.includes(appointmentData["productid"]) || (this.superRole && appointmentData["onboarding"])){
+        if(eligibleProduct.includes(appointmentData["productid"]) || (this.superRole && appointmentData["journeycoach"])){
           var hostData = []
           var hostNames = []
           var hostID = []
@@ -296,6 +297,9 @@ export class AppointmentStudioComponent {
             }
             else if(appointmentData["onboarding"]){
               upcomingModel.push("Onboarding")
+            }
+            else if(appointmentData["journeycoach"]){
+              upcomingModel.push("Journey Coach")
             }
           }
         }
@@ -419,7 +423,8 @@ export class AppointmentStudioComponent {
           apptData["type"] = "appointment"
           apptData["clientname"] = this.mapProfile[apptData["bookedby"].id]
           apptData['appointmenttype'] = this.mapAppointment[apptData["appointment"].id]
-          apptData['bookingid'] = apptData['docid']
+          apptData['docid'] = lastAppt.id
+          apptData['bookingid'] = lastAppt.id
           apptData["appointmentid"] = apptData["appointment"].id
           apptData["hostdata"] = hostData
           apptData["hostpath"] = hostID
@@ -457,6 +462,7 @@ export class AppointmentStudioComponent {
   }
 
   async updateStatus(appointmentData){
+    console.log(appointmentData)
     var response = this.dialog.open(MarkAppointmentStatusComponent, {
       data: appointmentData,
       disableClose: true,
@@ -762,6 +768,13 @@ export class AppointmentStudioComponent {
     updateDoc(doc(this.firestore, "appointments", appointmentData["docid"]), {
       platform: enableOpenVidu ? "openvidu" : "zoom"
     })
+  }
+
+  openJourneyPlan(appointment){
+    console.log(appointment)
+    const profileid = appointment.meta["bookedby"].id
+    const url = this.router.createUrlTree(['/journeysupport', profileid]).toString();
+    window.open(url, '_blank');
   }
 
 }

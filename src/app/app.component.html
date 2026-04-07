@@ -86,7 +86,7 @@
             <mat-icon>person</mat-icon>
             <span>{{profileData['name']}}'s Profile</span>
           </a>
-          <a *ngIf="guard.loggedinRoles['developer']" mat-menu-item [routerLink]="'/routeconfiguration'">
+          <a *ngIf="guard.loggedinRoles['rolemanager'] || guard.loggedinRoles['developer']" mat-menu-item [routerLink]="'/routeconfiguration'">
             <mat-icon>developer_mode</mat-icon>
             Developers Settings
           </a>
