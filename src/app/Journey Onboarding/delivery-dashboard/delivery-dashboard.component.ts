@@ -119,6 +119,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
     initiatedToday: { data: [], count: 0 },
 
   };
+  productsSubscription!: Subscription;
 
   awaitingPendingCount = 0;
   initiatedClearedCount = 0;
@@ -388,29 +389,51 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
     let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
     const todayString = new Date().toDateString();
 
-    getDocs(query(collection(this.firestore, "participantsproduct"), where("statusdate.initiated", "<=", enddate))).then((products) => {
+    const products$ = collectionData(
+      query(
+        collection(this.firestore, "participantsproduct"),
+        where("statusdate.initiated", "<=", enddate)
+      ),
+      { idField: 'id' }
+    );
+
+    this.productsSubscription = products$.subscribe((products: any[]) => {
       let tempArray1 = [];
       let tempArray2 = [];
-      if (products.docs.length != 0) {
-        for (let index = 0; index < products.docs.length; index++) {
-          const productdata = products.docs[index].data();
-          if (productdata['status'] === 'initiated' && productdata["deliverymode"] === "Priority Mode") {
+
+      if (products.length !== 0) {
+        for (let index = 0; index < products.length; index++) {
+          const productdata = products[index];
+
+          if (
+            productdata['status'] === 'initiated' &&
+            productdata["deliverymode"] === "Priority Mode"
+          ) {
             const statusDateInitiated = productdata['statusdate']?.['initiated'];
+
             productdata['initiatedtime'] = statusDateInitiated;
+
             const initiatedDate = statusDateInitiated.toDate();
             initiatedDate.setHours(0, 0, 0, 0);
 
             if (initiatedDate.toDateString() === todayString) {
               tempArray1.push(productdata);
             }
-            productdata['waitingperiod'] = this.calculateWaitingPeriod(statusDateInitiated.toDate());
-            const journeyId = this.mapMetaData[productdata['profileid']]?.['activejourney'];
+
+            productdata['waitingperiod'] = this.calculateWaitingPeriod(
+              statusDateInitiated.toDate()
+            );
+
+            const journeyId =
+              this.mapMetaData[productdata['profileid']]?.['activejourney'];
+
             const journeyname = this.mapjourneyname[journeyId] || 'N/A';
             productdata['journey'] = journeyname;
+
             tempArray2.push(productdata);
           }
 
-          if (index + 1 == products.docs.length) {
+          if (index + 1 === products.length) {
             this.originalData['initiatedToday'].data = tempArray1;
             this.originalData['initiatedToday'].count = tempArray1.length;
 
@@ -425,7 +448,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
         this.loadingStates.modes = true;
         this.checkAllDataLoaded();
       }
-    })
+    });
   }
 
   loadJourneyProductData() {

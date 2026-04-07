@@ -580,17 +580,12 @@
               </div>
 
               <!-- Status -->
-              <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0">
+              <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
                 {{ c.status || 'NOT INITIATED' }}
               </span>
 
-              <!-- Tentative Date -->
-              <span *ngIf="((c?.status === null || c?.status === 'initiated') && c?.tentativestart)" class="card-date">
-                Tentative Start: {{ c?.tentativestart?.toDate() | date:'dd MMM yyyy' }}
-              </span>
-
               <!-- Active Appointment Detail -->
-              <div *ngIf="showAllAppointmentDetails(c)" class="detail-row" (click)="toggleExpand(c, i)">
+              <div class="detail-row" (click)="toggleExpand(c, i)">
                 <span>
                   <span class="detail-label">
                     {{ showActiveStage(c) }}
@@ -599,7 +594,7 @@
                     {{ showParticipantActiveDate(c) }}
                   </span>
                 </span>
-                <span *ngIf="((c?.status === 'ongoing' || c?.status === 'completed') && c?.allappointments.length > 0)"
+                <span
                   class="chevron" [class.open]="c._expanded">
                 </span>
               </div>
