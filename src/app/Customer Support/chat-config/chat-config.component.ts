@@ -1,9 +1,9 @@
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, Inject, inject } from '@angular/core';
 import { Firestore,doc,collection,collectionData, getDocs ,DocumentReference,getDoc, setDoc} from '@angular/fire/firestore';
 import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
@@ -31,6 +31,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
+    MatDialogModule,
     DragDropModule,
     MatSlideToggleModule,
     MatDividerModule,
@@ -92,7 +93,8 @@ export class ChatConfigComponent {
     private dialog: MatDialog,
     private datePipe: DatePipe,
     public authguard: AuthguardService,
-    public dialogRef: MatDialogRef<ChatConfigComponent>
+    public dialogRef: MatDialogRef<ChatConfigComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: any,
   ) {
 
     this.configurationform = this.formbuilder.group({
