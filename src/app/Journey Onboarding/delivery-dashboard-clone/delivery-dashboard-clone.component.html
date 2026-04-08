@@ -563,7 +563,9 @@
         </div>
 
         <div class="col-body">
-          <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
+          <ng-container 
+          *ngIf="filteredCardsMap[i]?.length > 0; else noData"
+          >
             <div class="card" *ngFor="let c of filteredCardsMap[i]" [class.card-expanded]="c._expanded">
 
               <!-- Visible Card -->
@@ -571,10 +573,6 @@
                 <div class="card-info">
                   <div class="card-name">
                     {{ mapMetaData[c.profileid]?.name }}
-                  </div>
-                  <div class="card-product">
-                    {{ c?.productid ? mapProductName?.[c?.productid] :
-                    mapProductName?.[c?.productref?.id] }}
                   </div>
                 </div>
               </div>
@@ -609,13 +607,19 @@
                         <div class="detail-stage-label text-muted">
                           {{ stage }}
                         </div>
-                        <div class="stage-date text-muted">
-                          {{ getAppointmentDate(stage, c, appointment) }}
+                        <div class="">
+                          <span class="detail-val">Start: </span>
+                          <span class="detail-val">{{ formatDateTime(c?.appointmentstart) }}</span>
+                        </div>
+                        <div class="">
+                           <span class="detail-val">End: </span>
+                          <span class="detail-val">{{ formatDateTime(c?.appointmentend) }}</span>
                         </div>
                       </div>
                       <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
                         {{ getAppointmentStatus(stage, appointment) }}
                       </div>
+                    
                     </ng-container>
                     <ng-container *ngIf="!getAppointmentByStage(stage, c?.allappointments)">
                       <div>

@@ -2593,15 +2593,16 @@ export class DeliveryDashboardCloneComponent {
         const { status, appointmentTypeName, tentativestart } = c;
 
         if ((status === null || status === 'initiated') && tentativestart) return 'Tentative Start: '
-        if (status === 'completed') return 'Completed: ';
+        else if (status === 'completed') return 'Completed: ';
         else if (status === 'submitted') return 'Form Submitted: ';
         else if (appointmentTypeName === this.mapProductName[c.productref.id] + ' Welcome Call') return 'Welcome Call: ';
-        else if (appointmentTypeName === this.mapProductName[c.productref.id] + ' Diagnostics' || appointmentTypeName === this.mapProductName[c.productref.id] + ' Implementation') return 'D&I: ';
+        else if (appointmentTypeName === this.mapProductName[c.productref.id] + ' Diagnostics') return 'Diagnostics: ';
+        else if (appointmentTypeName === this.mapProductName[c.productref.id] + ' Implementation') return 'Implementation: ';
         else return '';
     }
 
     showParticipantActiveDate(c: any): string {
-        const { status, starttime, statusdate, appointmentTypeName, tentativestart } = c;
+        const { status, starttime, statusdate, appointmentTypeName, tentativestart, appointmentstart, appointmentend, attended } = c;
         const productName = this.mapProductName?.[c?.productref?.id];
         const validAppointments = [
             `${productName} Welcome Call`,
@@ -2610,22 +2611,29 @@ export class DeliveryDashboardCloneComponent {
         ];
 
         if (status === null || status === 'initiated') return this.formatDate(tentativestart);
-        if (status === 'submitted') return this.formatDate(starttime);
-        if (statusdate?.completed) return this.formatDate(statusdate?.completed);
-        if (status === 'ongoing' &&
-            starttime &&
+        else if (status === 'submitted') return this.formatDateTime(starttime);
+        else if (statusdate?.completed) return this.formatDateTime(statusdate?.completed);
+        else if (status === 'ongoing' &&
+            !attended &&
+            appointmentstart &&
             validAppointments.includes(appointmentTypeName)) {
-            return this.formatDate(starttime);
+            return this.formatDateTime(appointmentstart);
         }
-        return '';
+        else if (status === 'ongoing' &&
+            attended &&
+            appointmentend &&
+            validAppointments.includes(appointmentTypeName)) {
+            return this.formatDateTime(appointmentend);
+        }
+        else return '';
     }
 
     getAppointmentDate(stage: string, c: any, appointment: any) {
         const { attended, starttime, endtime } = appointment;
 
-        if (stage === 'Post Session Check-in') return this.formatDate(c?.date);
-        else if (attended && endtime) return this.formatDate(endtime);
-        return this.formatDate(starttime);
+        if (stage === 'Post Session Check-in') return this.formatDateTime(c?.date);
+        else if (attended && endtime) return this.formatDateTime(endtime);
+        else return this.formatDateTime(starttime);
     }
 
     getAppointmentStatus(stage: string, appointment: any) {
@@ -4161,8 +4169,8 @@ export class DeliveryDashboardCloneComponent {
     toggleTableView() {
         this.showTable = !this.showTable;
     }
-    
-    formatDate(timestamp: any): string {
+
+    formatDateTime(timestamp: any): string {
         const date = timestamp?.toDate?.();
         return date
             ? new Intl.DateTimeFormat('en-GB', {
@@ -4172,6 +4180,16 @@ export class DeliveryDashboardCloneComponent {
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: true
+            }).format(date)
+            : '';
+    }
+    formatDate(timestamp: any): string {
+        const date = timestamp?.toDate?.();
+        return date
+            ? new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
             }).format(date)
             : '';
     }
