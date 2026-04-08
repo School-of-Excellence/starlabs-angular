@@ -83,7 +83,7 @@
                 <td>
                   <div class="field-amount-wrap">
                     <span class="rupee-sym">₹</span>
-                    <input type="number" [(ngModel)]="row.remainingamount" placeholder="0">
+                    <input type="number" [value]="(row['minimumpayment'] - this.totalpaid) >= 0 ? 0 : row['minimumpayment'] - this.totalpaid" placeholder="0">
                   </div>
                 </td>
                 <td>
