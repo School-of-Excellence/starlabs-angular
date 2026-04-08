@@ -16,6 +16,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
+import { MatDividerModule } from '@angular/material/divider';
+import { DeepAudioFilterService } from '../../Service/NoiseCancellation/deep-audio-filter.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -40,6 +42,7 @@ type RoomInfo = {
     CommonModule,
     MatIconModule,
     MatMenuModule,
+    MatDividerModule
   ],
   templateUrl: './join-openvidu-call.component.html',
   styleUrl: './join-openvidu-call.component.css'
@@ -88,7 +91,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public guard: AuthguardService,
     public noiseCancellationService: NoiseCancellationService,
     public dialog: MatDialog,
-    private infraService: InstanceStatusService
+    private infraService: InstanceStatusService,
+    private audiofilterservice : DeepAudioFilterService
   ){}
 
   ngAfterViewInit(): void {
@@ -529,6 +533,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   //   ).length;
   //   return 1 + remoteVideoCount;
   // }
+
+  isHost(): boolean {
+    if (!this.roomDetail || !this.loggedinProfileid) return false;
+    return this.roomDetail.hosts?.includes(this.loggedinProfileid) || false;
+  }
 
   async checkServer(){
     this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
@@ -1101,11 +1110,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   /**
  * Enable microphone with RNNoise noise cancellation
  */
-async enableMicrophoneWithNoiseCancellation(room: Room) {
+  async enableMicrophoneWithNoiseCancellation(room: Room) {
   try {
-    console.log('🎙️ Enabling microphone with RNNoise...');
+    console.log('🎙️ Enabling microphone with Amazon Voice Focus...');
 
-    // ✅ Stop preview audio track to prevent double capture
+    // Stop preview audio track to prevent double capture
     if (this.previewStream) {
       this.previewStream.getAudioTracks().forEach(t => {
         t.stop();
@@ -1113,36 +1122,71 @@ async enableMicrophoneWithNoiseCancellation(room: Room) {
       });
     }
 
-    // ✅ FIX: Enable autoGainControl to help with volume levels
+    // Step 1 — Get raw mic stream
     const rawStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: true,   // OS-level echo cancellation
-        noiseSuppression: false,  // RNNoise handles this
-        autoGainControl: true,    // ← CHANGED from false - helps with volume
+        echoCancellation: true,
+        noiseSuppression: false,  // Voice Focus handles this
+        autoGainControl: true,
         sampleRate: 48000,
         channelCount: 1
       }
     });
 
-    console.log('Raw stream obtained:', rawStream.getAudioTracks()[0].getSettings());
+    console.log(
+      'Raw stream obtained:',
+      rawStream.getAudioTracks()[0].getSettings()
+    );
 
-    const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
+    // Step 2 — Init Voice Focus
+    const supported = await this.audiofilterservice.init();
 
+    let cleanAudioTrack: MediaStreamTrack;
+
+    if (supported) {
+      // Step 3a — Apply Voice Focus
+      const cleanStream = await this.audiofilterservice
+        .processStream(rawStream);
+
+      cleanAudioTrack = cleanStream.getAudioTracks()[0];
+      console.log('✅ Amazon Voice Focus active');
+
+    } 
+    // else {
+    //   // Step 3b — Fallback to DeepFilterNet or raw
+    //   console.warn('⚠️ Voice Focus not supported, trying DeepFilterNet...');
+
+    //   try {
+    //     const deepFilterStream = await this.audiofilterservice
+    //       .applyZoomNoiseCancellation(rawStream);
+    //     cleanAudioTrack = deepFilterStream.getAudioTracks()[0];
+    //     console.log('✅ DeepFilterNet fallback active');
+
+    //   } catch (dfErr) {
+    //     console.warn('⚠️ DeepFilterNet also failed, using raw stream');
+    //     cleanAudioTrack = rawStream.getAudioTracks()[0];
+    //   }
+    // }
+
+    // Step 4 — Publish clean track to LiveKit room
     await room.localParticipant.publishTrack(cleanAudioTrack, {
       source: Track.Source.Microphone,
       name: 'microphone'
     });
 
-    console.log('✅ Microphone enabled with RNNoise');
+    if (this.debugAudioLevels) this.debugAudioLevels();
+
+    console.log('✅ Microphone published with noise cancellation');
 
   } catch (error) {
-    console.error('❌ RNNoise failed, falling back to WebRTC:', error);
+    console.error('❌ All noise cancellation failed, using native fallback:', error);
 
-    // Fallback: stop preview audio
+    // Stop preview audio
     if (this.previewStream) {
       this.previewStream.getAudioTracks().forEach(t => t.stop());
     }
 
+    // Native browser fallback — always works
     await room.localParticipant.setMicrophoneEnabled(true, {
       echoCancellation: true,
       noiseSuppression: true,
@@ -1150,13 +1194,13 @@ async enableMicrophoneWithNoiseCancellation(room: Room) {
       sampleRate: 48000,
       channelCount: 1
     });
-    this.debugAudioLevels();
 
-    console.log('✅ Microphone enabled with WebRTC fallback');
+    if (this.debugAudioLevels) this.debugAudioLevels();
+    console.log('✅ Microphone enabled with WebRTC native fallback');
   }
 }
 
-// Add to your component to debug audio levels
+// Keep your existing debugAudioLevels as-is
 debugAudioLevels() {
   const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
   if (micPub?.audioTrack) {
@@ -1166,9 +1210,104 @@ debugAudioLevels() {
       channelCount: settings.channelCount,
       echoCancellation: settings.echoCancellation,
       noiseSuppression: settings.noiseSuppression,
-      autoGainControl: settings.autoGainControl
+      autoGainControl: settings.autoGainControl,
+      voiceFocusActive: this.audiofilterservice.isActive()
     });
   }
 }
+
+  
+
+  /**
+ *remove a participant from the room
+ */
+async removePanticipant(participantIdentity: string, participantName: string) {
+  if (!this.isHost()) {
+    alert('Only hosts can remove participants');
+    return;
+  }
+
+  const confirmed = confirm(`Are you sure you want to remove ${participantName} from the call?`);
+  if (!confirmed) return;
+
+  try {
+    const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/kickParticipant`;
+
+    const response = await firstValueFrom(
+      this.httpClient.post<{ success: boolean; message: string }>(
+        url,
+        {
+          roomName: this.roomDetail.roomId,
+          participantIdentity: participantIdentity,
+          requesterId: this.loggedinProfileid
+        }
+      )
+    );
+
+    console.log('Participant kicked successfully:', response.message);
+    
+  } catch (error: any) {
+    console.error('Failed to kick participant:', error);
+    
+    let errorMessage = 'Failed to remove participant. Please try again.';
+    if (error.status === 403) {
+      errorMessage = 'Only hosts can remove participants';
+    } else if (error.status === 404) {
+      errorMessage = 'Room not found';
+    } else if (error.error?.message) {
+      errorMessage = error.error.message;
+    }
+    
+    alert(errorMessage);
+  }
+}
+
+  /**
+   * Mute/unmute a participant's audio
+   */
+  async toggleParticipantMute(participantIdentity: string, participantName: string, currentlyMuted: boolean) {
+    if (!this.isHost()) {
+      alert('Only hosts can mute/unmute participants');
+      return;
+    }
+
+    const action = currentlyMuted ? 'unmute' : 'mute';
+    const confirmed = confirm(`Are you sure you want to ${action} ${participantName}?`);
+    if (!confirmed) return;
+
+    try {
+      
+      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/muteParticipant`;
+
+      const response = await firstValueFrom(
+        this.httpClient.post<{ success: boolean; message: string }>(
+          url,
+          {
+            roomName: this.roomDetail.roomId,
+            participantIdentity: participantIdentity,
+            trackType: 'audio',
+            muted: !currentlyMuted,
+            requesterId: this.loggedinProfileid
+          }
+        )
+      );
+
+      console.log(`Participant ${action}d:`, response.message);
+      
+    } catch (error: any) {
+      console.error(`Failed to ${action} participant:`, error);
+      
+      let errorMessage = `Failed to ${action} participant. Please try again.`;
+      if (error.status === 403) {
+        errorMessage = 'Only hosts can mute/unmute participants';
+      } else if (error.status === 404) {
+        errorMessage = 'Room not found';
+      } else if (error.error?.message) {
+        errorMessage = error.error.message;
+      }
+      
+      alert(errorMessage);
+    }
+  }
  
 }
