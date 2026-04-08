@@ -728,3 +728,201 @@ table {
   border-color: #a8d5b5;
   color: #1a5c35;
 }
+
+
+/* Letter section */
+
+.love-letter-section {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  width: 100%;
+  padding: 10px 16px;
+  flex-shrink: 0;  
+}
+
+.askah-letter-section {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  width: 100%;
+  padding: 10px 16px;
+  flex-shrink: 0;  
+}
+
+.total-letter,
+.letter-happy,
+.attention,
+.letter-opportunity,
+.letter-critical {
+  background: #ffffff;
+  border: 1px solid #e8e8e4;
+  border-radius: 16px;
+  padding: 0 20px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.total-letter::before,
+.letter-happy::before,
+.attention::before,
+.letter-opportunity::before,
+.letter-critical::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  border-radius: 0 0 4px 4px;
+}
+
+.total-letter::before      { background: #1a1a18; }
+.letter-happy::before      { background: #2a6e4e; }
+.attention::before         { background: #c96a1a; }
+.letter-opportunity::before { background: #185FA5; }
+.letter-critical::before   { background: #A32D2D; }
+
+
+.letter__header,
+.happy__header,
+.attention__header,
+.opportunity_header,
+.critical_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+
+.letter__icon,
+.attention__icon,
+.opportunity_icon,
+.happy_icon,
+.critical_icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.letter__icon mat-icon,
+.attention__icon mat-icon,
+.opportunity_icon mat-icon,
+.critical_icon mat-icon,
+.happy_icon mat-icon,
+.happy__header mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+}
+
+.total-letter .letter__icon      { background: #f0f0ec; }
+.total-letter .letter__icon mat-icon { color: #1a1a18; }
+
+.letter-happy .happy__header mat-icon { color: #2a6e4e; }
+
+.attention .attention__icon      { background: #fef3e8; }
+.attention .attention__icon mat-icon { color: #c96a1a; }
+
+.letter-opportunity .opportunity_icon { background: #e6f1fb; }
+.letter-opportunity .opportunity_icon mat-icon { color: #185FA5; }
+
+.letter-critical .critical_icon  { background: #fcebeb; }
+.letter-critical .critical_icon mat-icon { color: #A32D2D; }
+
+
+.letter__info,
+.happy__info,
+.attention__info,
+.opportunity,
+.critical-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+
+.letter__label,
+.happy__label,
+.attention_label,
+.opportunity_label,
+.critical_label,
+.happy__header{
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8a82;
+}
+
+
+.letter_value {
+  font-size: 23px;
+  font-weight: 600;
+  color: #1a1a18;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+
+.total-letter.active,
+.letter-happy.active,
+.attention.active,
+.letter-opportunity.active,
+.letter-critical.active {
+  border-width: 2px;
+}
+
+.total-letter.active::before,
+.letter-happy.active::before,
+.attention.active::before,
+.letter-opportunity.active::before,
+.letter-critical.active::before {
+  display: none;
+}
+
+.total-letter.active      { border-color: #1a1a18; background: #e8e8e4; }
+.letter-happy.active      { border-color: #2a6e4e; background: #d4ece0; }
+.attention.active         { border-color: #c96a1a; background: #fde8cc; }
+.letter-opportunity.active { border-color: #185FA5; background: #e6f1fb; }
+.letter-critical.active   { border-color: #A32D2D; background: #fcebeb; }
+
+.total-letter.active .letter__icon        { background: rgba(26,26,24,0.12); }
+.letter-happy.active .happy__header mat-icon { color: #1a5c35; }
+.attention.active .attention__icon        { background: rgba(201,106,26,0.12); }
+.letter-opportunity.active .opportunity_icon { background: rgba(24,95,165,0.12); }
+.letter-critical.active .critical_icon    { background: rgba(163,45,45,0.12); }
+
+.total-letter.active .letter__icon mat-icon    { color: #1a1a18; }
+.attention.active .attention__icon mat-icon    { color: #c96a1a; }
+.letter-opportunity.active .opportunity_icon mat-icon { color: #185FA5; }
+.letter-critical.active .critical_icon mat-icon  { color: #A32D2D; }
+
+.total-letter.active .letter__label      { color: #1a1a18; }
+.letter-happy.active .happy__label       { color: #2a6e4e; }
+.attention.active .attention_label       { color: #c96a1a; }
+.letter-opportunity.active .opportunity_label { color: #185FA5; }
+.letter-critical.active .critical_label  { color: #A32D2D; }
+
+.total-letter.active .letter_value       { color: #1a1a18; }
+.letter-happy.active .letter_value       { color: #1a5c35; }
+.attention.active .letter_value          { color: #7a3b10; }
+.letter-opportunity.active .letter_value { color: #0C447C; }
+.letter-critical.active .letter_value    { color: #791F1F; }
+
+@media (max-width: 640px) {
+  .love-letter-section { grid-template-columns: 1fr; }
+}

@@ -388,6 +388,7 @@
                       [ngClass]="sortColumn == 'active' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Active</th>
                     <th style="width: 20vw;">Ticket</th>
                     <th style="width: 15vw;">Notes</th>
+                    <th style="width: 10vw;">Severity</th>
                     <th style="width: 8vw;" (click)="sortcolumn('chatstatus')"
                       [ngClass]="sortColumn == 'chatstatus' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Chat
                       Status</th>
@@ -403,11 +404,11 @@
                 </tbody>
                 <tbody class="table-body">
                   <tr *ngFor="let element of paginatedData; let idx = index" [ngClass]="{
-      'flagrow': element['flag'], 
-      'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom']),
-      'status-open': element.status?.status.toLowerCase() == 'open',
-      'status-closed': element.status?.status.toLowerCase() == 'closed'
-    }">
+                        'flagrow': element['flag'], 
+                        'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom']),
+                        'status-open': element.status?.status.toLowerCase() == 'open',
+                        'status-closed': element.status?.status.toLowerCase() == 'closed'
+                      }">
                     <td style="width: 5vw;" (click)="messageIssue($event,element, false)">{{element.issueno}}</td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{
                       element.reporteddate.toDate() | date: 'MMM d,y HH:mm'}}</td>
@@ -427,11 +428,17 @@
                     <td style="width: 15vw;" (click)="messageIssue($event,element, false)">
                       <div class="list">
                         <span *ngFor="let notes of element.notes; let i = index">
-                          <ng-container *ngIf="i === element.notes.length - 1">
+                          <ng-container *ngIf="i === 0">
                             {{ notes.remarks.substring(0,35) }}
                           </ng-container>
                         </span>
                       </div>
+                    </td>
+                    <!-- jagan -->
+                    <td style="width: 10vw;">
+                      <span *ngIf="element['flag'] == true && element['flagdata']?.severity">
+                        {{ element['flagdata'].severity }}
+                      </span>
                     </td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element, false)"> {{ ![null,
                       undefined,""].includes(element['chatstatus']) ?
@@ -528,6 +535,7 @@
                     </th>
                     <th style="width: 20vw;">Ticket</th>
                     <th style="width: 15vw;">Notes</th>
+                    <th style="width: 10vw;">severity</th>
                     <th style="width: 8vw;" (click)="sortcolumn('happinessindex')"
                       [ngClass]="sortColumn == 'happinessindex' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
                       Happiness Index</th>
@@ -570,6 +578,11 @@
                           </ng-container>
                         </span>
                       </div>
+                    </td>
+                    <td style="width: 10vw;">
+                      <span *ngIf="element['flag'] == true && element['flagdata']?.severity">
+                        {{ element['flagdata'].severity }}
+                      </span>
                     </td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{[null,
                       undefined,""].includes(element.happinessindex)? 'Unrated' : element.happinessindex}}</td>
