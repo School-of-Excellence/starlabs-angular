@@ -96,17 +96,6 @@
               <mat-icon matSuffix>verified</mat-icon>
             </mat-form-field>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Server</mat-label>
-              <mat-select [(value)]="selectedServerName" (selectionChange)="onFilterChange()">
-                <mat-option value="">All Servers</mat-option>
-                <mat-option *ngFor="let server of serverNames" [value]="server">
-                  {{server}}
-                </mat-option>
-              </mat-select>
-              <mat-icon matSuffix>dns</mat-icon>
-            </mat-form-field>
-
             <button mat-mini-fab (click)="clearFilters()" matTooltip="Clear Filters">
               <mat-icon>refresh</mat-icon>
             </button>
@@ -178,24 +167,6 @@
               <td mat-cell *matCellDef="let template" class="category-cell">
                 <div class="category-info">
                   <mat-chip color="primary" selected class="category-chip">{{template.subcategory}}</mat-chip>
-                </div>
-              </td>
-            </ng-container>
-
-            <!-- Server Name Column -->
-            <ng-container matColumnDef="servername">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header class="category-header">
-                <div class="header-content">
-                  <mat-icon>dns</mat-icon>
-                  Server
-                </div>
-              </th>
-              <td mat-cell *matCellDef="let template" class="category-cell">
-                <div class="category-info">
-                  <mat-chip color="accent" selected class="category-chip" *ngIf="template.servername">
-                    {{template.servername}}
-                  </mat-chip>
-                  <span *ngIf="!template.servername" class="no-server-label">—</span>
                 </div>
               </td>
             </ng-container>
@@ -391,7 +362,6 @@
           <div class="template-info">
             <p><strong>Subject:</strong> {{previewTemplate.subject}}</p>
             <p><strong>Category:</strong> {{previewTemplate.category}} / {{previewTemplate.subcategory}}</p>
-            <p *ngIf="previewTemplate.servername"><strong>Server:</strong> {{previewTemplate.servername}}</p>
             <p><strong>Status:</strong>
               <mat-chip [color]="getStatusColor(previewTemplate)" selected>
                 {{getStatusText(previewTemplate)}}
@@ -526,16 +496,6 @@
             </mat-select>
             <mat-icon matSuffix>label</mat-icon>
             <mat-error *ngIf="subCategory?.hasError('required')">Sub-category is required</mat-error>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="form-field">
-            <mat-label>Server Name *</mat-label>
-            <mat-select formControlName="serverName">
-              <mat-option value="">Select Server</mat-option>
-              <mat-option *ngFor="let server of serverNames" [value]="server">{{server}}</mat-option>
-            </mat-select>
-            <mat-icon matSuffix>dns</mat-icon>
-            <mat-error *ngIf="serverName?.hasError('required')">Server name is required</mat-error>
           </mat-form-field>
 
           <button mat-fab color="primary" type="button" (click)="refreshForm()" matTooltip="Refresh Form"

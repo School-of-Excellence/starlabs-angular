@@ -30,11 +30,6 @@
                 "glob": "apple-app-site-association",
                 "input": "src/.well-known",
                 "output": "/.well-known"
-              },
-              {
-                "glob": "**/*",
-                "input": "node_modules/@ai-coustics/aic-sdk/dist/assets",
-                "output": "/assets/aic/"
               }
             ],
             "styles": [

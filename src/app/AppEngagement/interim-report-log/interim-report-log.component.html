@@ -3,147 +3,50 @@
     <h2 class="heading">Participant Form Tracker</h2>
   </div>
 
-  
-    <!-- Filters - only for Ask A&H and Love Letter -->
-            <ng-template #filtersTemplate>
-              <div class="filters-row" *ngIf="activeTab < 2">
-                <mat-form-field appearance="outline">
-                  <mat-label>Select Date Range</mat-label>
-                  <mat-date-range-input [rangePicker]="rangePicker">
-                    <input matStartDate [formControl]="startDate" placeholder="Start date">
-                    <input matEndDate [formControl]="endDate" placeholder="End date">
-                  </mat-date-range-input>
-                  <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
-                  <mat-date-range-picker #rangePicker></mat-date-range-picker>
-                </mat-form-field>
+  <!-- Filters - only for Ask A&H and Love Letter -->
+  <div class="filters-row" *ngIf="activeTab < 2">
+    <mat-form-field appearance="outline">
+      <mat-label>Select Date Range</mat-label>
+      <mat-date-range-input [rangePicker]="rangePicker">
+        <input matStartDate [formControl]="startDate" placeholder="Start date">
+        <input matEndDate [formControl]="endDate" placeholder="End date">
+      </mat-date-range-input>
+      <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+      <mat-date-range-picker #rangePicker></mat-date-range-picker>
+    </mat-form-field>
 
-                <mat-form-field appearance="outline">
-                  <mat-label>Participant</mat-label>
-                  <mat-select [(value)]="selectedParticipant">
-                    <mat-option>
-                      <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search participant..."
-                        noEntriesFoundLabel="No participant found">
-                      </ngx-mat-select-search>
-                    </mat-option>
-                    <mat-option>-- None --</mat-option>
-                    <mat-option *ngFor="let p of filteredParticipants" [value]="p">{{ p.name }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Participant</mat-label>
+      <mat-select [(value)]="selectedParticipant">
+        <mat-option>
+          <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search participant..."
+            noEntriesFoundLabel="No participant found">
+          </ngx-mat-select-search>
+        </mat-option>
+        <mat-option>-- None --</mat-option>
+        <mat-option *ngFor="let p of filteredParticipants" [value]="p">{{ p.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
 
-                <button mat-raised-button color="primary" (click)="applyFilters()">Apply</button>
-                <button mat-stroked-button (click)="clearFilters()">Clear</button>
-              </div>
-            </ng-template>
-    
+    <button mat-raised-button color="primary" (click)="applyFilters()">Apply</button>
+    <button mat-stroked-button (click)="clearFilters()">Clear</button>
+  </div>
 
-      <!-- Metrics shown template -->
-      <ng-template #metricsshownTemplate>
-
-        <!-- Total -->
-        <div class="total-letter" (click)="filterLetterDataWithBoxClick('totalletters')"[class.active]="selectedFilterTypes.length === 0">
-          <div class="letter__header">
-            <div class="letter__icon">
-              <mat-icon>description</mat-icon></div>
-            <div class="letter__info">
-              <span class="letter__label">Total</span>
-            <span class="letter_value">{{totalLetters}}</span>
-            </div>
-        </div>
-       </div>
-
-        <!-- Happy-->
-        <div class="letter-happy" (click)="filterLetterDataWithBoxClick('happy')"[class.active]="selectedFilterTypes.includes('happy')">
-          <div class="happy__header">
-            <div class="happy_icon">
-            <mat-icon>sentiment_very_satisfied</mat-icon></div>
-          <div class="happy__info">
-            <span class="happy__label">Happy</span>
-            <span class="letter_value">{{totalHappy}}</span>
-          </div>
-        </div>
-        </div>
-
-
-        <!-- Needs Attention -->
-        <div class="attention" (click)="filterLetterDataWithBoxClick('attention')"[class.active]="selectedFilterTypes.includes('attention')">
-          <div class="attention__header">
-            <div class="attention__icon">
-              <mat-icon>info</mat-icon></div>
-            <div class="attention__info">
-              <span class="attention_label">Needs Attention</span>
-              <span class="letter_value">{{totalNeedsAttention}}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Opportunity -->
-        <div class="letter-opportunity" (click)="filterLetterDataWithBoxClick('opportunity')"[class.active]="selectedFilterTypes.includes('opportunity')">
-          <div class="opportunity_header">
-            <div class="opportunity_icon">
-              <mat-icon>lock_open</mat-icon></div>
-            <div class="opportunity">
-              <span class="opportunity_label">Opportunity</span>
-              <span class="letter_value">{{totalOpportunity}}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Critical -->
-        <div class="letter-critical" (click)="filterLetterDataWithBoxClick ('critical')"[class.active]="selectedFilterTypes.includes ('critical')">
-          <div class="critical_header">
-            <div class="critical_icon">
-              <mat-icon>error</mat-icon></div>
-            <div class="critical-info">
-              <span class="critical_label">Critical</span>
-              <span class="letter_value">{{totalCritical}}</span>
-            </div>
-          </div>
-        </div>
-        
-      </ng-template>
-
-
+  <!-- Action buttons - only for Ask A&H and Love Letter -->
+  <div class="table-actions" *ngIf="activeTab < 2 && selectedRecords.length > 0">
+    <button mat-raised-button color="accent" (click)="viewMerged()">
+      View Merged ({{ selectedRecords.length }})
+    </button>
+  </div>
 
   <!-- Tabs -->
-   <!-- Ask A&H -->
   <mat-tab-group (selectedTabChange)="onTabChange($event)">
     <mat-tab label="Ask A&H">
-
-      <section class="askah-letter-section">
-        <ng-container *ngTemplateOutlet="metricsshownTemplate"></ng-container>
-      </section>
-
-      <ng-container *ngTemplateOutlet="filtersTemplate"></ng-container>
-
-      <div class="table-actions" *ngIf="selectedRecords.length > 0">
-        <button mat-raised-button color="accent" (click)="viewMerged()">
-          View Merged ({{ selectedRecords.length }})
-        </button>
-      </div>
-
       <ng-container *ngTemplateOutlet="formTableTemplate"></ng-container>
     </mat-tab>
-
-
-  <!-- Love Letter  -->
-  <mat-tab label="Love Letter">
-
-    <section class="love-letter-section">
-      <ng-container *ngTemplateOutlet="metricsshownTemplate"></ng-container>
-    </section>
-
-    <ng-container *ngTemplateOutlet="filtersTemplate"></ng-container>
-
-    <div class="table-actions" *ngIf="selectedRecords.length > 0">
-      <button mat-raised-button color="accent" (click)="viewMerged()">
-        View Merged ({{ selectedRecords.length }})
-      </button>
-    </div>
-
-    <ng-container *ngTemplateOutlet="formTableTemplate"></ng-container>
-  </mat-tab>
-
-    <!-- Interim Report -->
+    <mat-tab label="Love Letter">
+      <ng-container *ngTemplateOutlet="formTableTemplate"></ng-container>
+    </mat-tab>
     <mat-tab label="Interim Report Log">
       <div class="body mat-elevation-z2">
         <div class="actionbox">
@@ -156,7 +59,7 @@
                   <mat-icon>description</mat-icon>
                 </div>
                 <div class="report__info">
-                  <span class="report__label">Total Report</span>
+                  <span class="report__label">Total Reports</span>
                   <span class="report__value">{{totalReports}}</span>
                 </div>
               </div>
@@ -298,7 +201,6 @@
       </div>
     </mat-tab>
   </mat-tab-group>
-
 
   <!-- Shared Form Table Template -->
   <ng-template #formTableTemplate>

@@ -5,55 +5,22 @@
 
 <div *ngIf="!loading" class="mainscreen">
 
-  <!-- ============================================================
-       SCREEN TITLE — 2 line layout
-       Line 1: Journey Support | clientdata['name']
-       Line 2: active product chips  +  Customer & Finance status
-  ============================================================ -->
+  <!-- SCREEN TITLE -->
   <div class="screen-title-block">
-
-    <div class="title-row-1">
-      <h2 class="screen-title">Journey Support</h2>
-      <div class="title-v-divider"></div>
-      <p class="screen-client">{{ clientdata['name'] }}</p>
-    </div>
-
-    <div class="title-row-2">
-      <div class="active-chips-row">
-        <ng-container *ngIf="(clientdata['activeproduct'] || []).length > 0; else noActive">
-          <span class="active-label">Active Products:</span>
-          <span class="active-chip" *ngFor="let product of clientdata['activeproduct']">
-            <mat-icon class="active-chip-icon">verified</mat-icon>
-            {{ (mapProduct[product] || {})['product'] }}
-          </span>
-        </ng-container>
-        <ng-template #noActive>
-          <span class="no-active-chip">No Active Product</span>
-        </ng-template>
-      </div>
-
-      <div class="status-tags">
-        <span class="status-tag"
-          [ngClass]="{
-            'stag-active':       clientdata['customerstatus'] === 'active',
-            'stag-inactive':     clientdata['customerstatus'] === 'inactive',
-            'stag-discontinued': clientdata['customerstatus'] === 'discontinued'
-          }">
-          <span class="stag-label">Customer Status:</span>
-          {{ clientdata['customerstatus'] | titlecase }}
+    <h2 class="screen-title">Journey Support</h2>
+    <p class="screen-client">{{ clientdata['name'] }}</p>
+    <div class="active-chips-row">
+      <ng-container *ngIf="(clientdata['activeproduct'] || []).length > 0; else noActive">
+        <span class="active-label">Active Products:</span>
+        <span class="active-chip" *ngFor="let product of clientdata['activeproduct']">
+          <mat-icon class="active-chip-icon">verified</mat-icon>
+          {{ (mapProduct[product] || {})['product'] }}
         </span>
-        <span class="status-tag"
-          [ngClass]="{
-            'stag-regular': clientdata['financestatus'] === 'regular',
-            'stag-default': clientdata['financestatus'] === 'default',
-            'stag-locked':  clientdata['financestatus'] === 'locked'
-          }">
-          <span class="stag-label">Finance Status:</span>
-          {{ clientdata['financestatus'] | titlecase }}
-        </span>
-      </div>
+      </ng-container>
+      <ng-template #noActive>
+        <span class="no-active-chip">No Active Product</span>
+      </ng-template>
     </div>
-
   </div>
 
   <!-- SECTION 1: Unconsumed Products + EMI side by side -->
@@ -119,20 +86,15 @@
                     <input type="number" [value]="(row['minimumpayment'] - this.totalpaid) >= 0 ? 0 : row['minimumpayment'] - this.totalpaid" placeholder="0">
                   </div>
                 </td>
-                <!-- Tentative Start: month selector using monthlyPlanData
-                     value = m.monthstartdate (always day 1 of month, set in TS)
-                     [(ngModel)]="row.tentativestart" binding unchanged -->
                 <td>
-                  <div class="field-select-wrap tentative-month-select">
-                    <select [(ngModel)]="row.tentativestart"
-                      [compareWith]="compareDates">
-                      <option [ngValue]="null">— Not set —</option>
-                      <option *ngFor="let m of monthlyPlanData" [ngValue]="m.monthstartdate">
-                        {{ m.display }}
-                      </option>
-                    </select>
-                    <div class="field-caret"></div>
-                  </div>
+                  <input *ngIf="![null,undefined,''].includes(row.tentativestart)"
+                    type="date" class="field-date"
+                    [(ngModel)]="row.tentativestart"
+                    [ngModel]="row.tentativestart | date:'yyyy-MM-dd'">
+                  <input *ngIf="[null,undefined,''].includes(row.tentativestart)"
+                    type="date" class="field-date"
+                    [(ngModel)]="row.tentativestart"
+                    [ngModelOptions]="{updateOn:'blur'}">
                 </td>
               </tr>
             </tbody>
@@ -143,12 +105,12 @@
       <!-- Divider -->
       <div class="panel-vdivider"></div>
 
-      <!-- Right: EMI Panel — unchanged -->
+      <!-- Right: EMI Panel -->
       <div class="emi-panel">
         <ng-container *ngIf="watsonScheduleList.length > 0; else noSchedules">
-          <div class="emi-heading">
-            EMI Payment Schedule
-          </div>
+					<div class="emi-heading">
+						EMI Payment Schedule
+					</div>
           <div class="emi-stats-row">
             <div class="emi-stat">
               <span class="emi-stat-label">Total Months</span>
@@ -200,7 +162,7 @@
     </div>
   </div>
 
-  <!-- SECTION 2: Content Monthly Plan — unchanged -->
+  <!-- SECTION 2: Content Monthly Plan -->
   <div class="section-card">
     <div class="section-label-bar">
       <mat-icon class="section-bar-icon">calendar_month</mat-icon>
@@ -405,95 +367,7 @@
     </div>
   </div>
 
-  <!-- ============================================================
-       SECTION 3: PLAN SUMMARY — confirmation timeline
-       Loops monthlyPlanData, reuses isProductInMonth(),
-       mapProduct, month.data.* — all existing variables
-  ============================================================ -->
-  <div class="section-card">
-    <div class="section-label-bar">
-      <mat-icon class="section-bar-icon">checklist</mat-icon>
-      <span>Plan Summary — Confirm Before Saving</span>
-    </div>
-
-    <div class="confirm-timeline">
-      <div *ngFor="let month of monthlyPlanData; let i = index" class="confirm-row">
-
-        <!-- Dot + vertical line -->
-        <div class="confirm-line-col">
-          <div class="confirm-dot"
-            [class.confirm-dot-filled]="hasProductInMonth(month.month, month.year) ||
-              month.data.solarvoice.length > 0 ||
-              month.data.eiflix.length > 0 ||
-              month.data.generalcontent.length > 0 ||
-              month.data.workshop.length > 0">
-          </div>
-          <div class="confirm-vline" *ngIf="i < monthlyPlanData.length - 1"></div>
-        </div>
-
-        <!-- Month content -->
-        <div class="confirm-content">
-          <div class="confirm-month-name">
-            {{ month.display }}
-            <span class="confirm-current-tag" *ngIf="i === 0">Current</span>
-          </div>
-          <div class="confirm-chips">
-
-            <!-- Product chips -->
-            <ng-container *ngFor="let row of productData.data">
-              <span class="confirm-chip chip-prod"
-                *ngIf="row.tentativestart && isProductInMonth(row.tentativestart, month.month, month.year)">
-                <mat-icon class="confirm-chip-icon">shopping_bag</mat-icon>
-                {{ (mapProduct[row.productref] || {})['product'] }}
-              </span>
-            </ng-container>
-
-            <!-- Solar Voice chips -->
-            <span class="confirm-chip chip-sv"
-              *ngFor="let row of month.data.solarvoice">
-              <mat-icon class="confirm-chip-icon">record_voice_over</mat-icon>
-              Solar Voice · {{ row.preferredday }} · {{ row.allTime ? 'All Time' : row.preferredtime }}
-            </span>
-
-            <!-- EiFlix chips -->
-            <span class="confirm-chip chip-ef"
-              *ngFor="let row of month.data.eiflix">
-              <mat-icon class="confirm-chip-icon">movie</mat-icon>
-              EiFlix · {{ row.preferredday }} · {{ row.allTime ? 'All Time' : row.preferredtime }}
-            </span>
-
-            <!-- General Content chips -->
-            <span class="confirm-chip chip-gc"
-              *ngFor="let row of month.data.generalcontent">
-              <mat-icon class="confirm-chip-icon">library_books</mat-icon>
-              General Content · {{ row.preferredday }} · {{ row.allTime ? 'All Time' : row.preferredtime }}
-            </span>
-
-            <!-- Workshop chips -->
-            <span class="confirm-chip chip-ws"
-              *ngFor="let wid of month.data.workshop">
-              <mat-icon class="confirm-chip-icon">event</mat-icon>
-              Workshop
-            </span>
-
-            <!-- Nothing planned -->
-            <span class="confirm-chip chip-empty"
-              *ngIf="!hasProductInMonth(month.month, month.year) &&
-                month.data.solarvoice.length === 0 &&
-                month.data.eiflix.length === 0 &&
-                month.data.generalcontent.length === 0 &&
-                month.data.workshop.length === 0">
-              No plan yet
-            </span>
-
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- SINGLE BOTTOM BUTTON — unchanged -->
+  <!-- SINGLE BOTTOM BUTTON -->
   <div class="bottom-action-bar">
     <button mat-raised-button class="btn-update-plan" (click)="updateParticipantPlan()">
       <mat-icon>save</mat-icon>

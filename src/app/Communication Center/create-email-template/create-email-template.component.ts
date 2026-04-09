@@ -61,7 +61,6 @@ interface EmailTemplate {
   templatelayout: string;
   templatemodel: Object;
   attachments?: TemplateAttachment[];
-  servername?: string;
 }
 
 @Component({
@@ -157,7 +156,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   // New properties for template management with Mat Table Data Source
   existingTemplates: EmailTemplate[] = [];
   dataSource = new MatTableDataSource<EmailTemplate>([]);
-  displayedColumns: string[] = ['templatename', 'category', 'subcategory', 'servername', 'status', 'validated', 'date', 'actions'];
+  displayedColumns: string[] = ['templatename', 'category', 'subcategory', 'status', 'validated', 'date', 'actions'];
   isCheckingName = false;
   isCheckingAlias = false;
   currentEditingTemplate: EmailTemplate | null = null;
@@ -172,12 +171,9 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   selectedSubCategory = '';
   selectedStatus = '';
   selectedValidation = '';
-  selectedServerName = '';
   newItemName = '';
   isCategoriesLoading = false;
   isTemplatesLoading = false;
-  isServerNamesLoading = false;
-  serverNames: string[] = [];
 
   showFilters = false;
   manageDialogOpen = false;
@@ -253,7 +249,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       ],
       category: ['', Validators.required],
       subCategory: ['', Validators.required],
-      serverName: ['', Validators.required],
       subject: ['', Validators.required],
       body: ['', Validators.required],
       notes: ['']
@@ -290,7 +285,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   }
 
   get isLoading(): boolean {
-    return this.isCategoriesLoading || this.isTemplatesLoading || this.isServerNamesLoading;
+    return this.isCategoriesLoading || this.isTemplatesLoading;
   }
 
   ngOnInit(): void {
@@ -298,7 +293,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       this.mapprofileuid = data.mapUserId || {};
     });
     this.loadCategoriesAndSubCategories();
-    this.loadServerNames();
     this.loadExistingTemplates();
   }
 
@@ -331,8 +325,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
           return item.category?.toLowerCase() || '';
         case 'subcategory':
           return item.subcategory?.toLowerCase() || '';
-        case 'servername':
-          return item.servername?.toLowerCase() || '';
         case 'status':
           return item.templatestatus?.toLowerCase() || '';
         case 'validated':
@@ -387,10 +379,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
         if (data.templatevalidated !== isValidated) {
           return false;
         }
-      }
-
-      if (filterObject.selectedServerName && data.servername !== filterObject.selectedServerName) {
-        return false;
       }
 
       return true;
@@ -479,8 +467,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       selectedCategory: this.selectedCategory,
       selectedSubCategory: this.selectedSubCategory,
       selectedStatus: this.selectedStatus,
-      selectedValidation: this.selectedValidation,
-      selectedServerName: this.selectedServerName
+      selectedValidation: this.selectedValidation
     });
 
     this.dataSource.filter = filterValue;
@@ -511,7 +498,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     this.selectedSubCategory = '';
     this.selectedStatus = '';
     this.selectedValidation = '';
-    this.selectedServerName = '';
     this.applyFilters();
   }
 
@@ -563,22 +549,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       this.templateForm.get('category')?.enable();
       this.templateForm.get('subCategory')?.enable();
       this.isCategoriesLoading = false;
-      this.cdr.detectChanges();
-    }
-  }
-
-  async loadServerNames(): Promise<void> {
-    this.isServerNamesLoading = true;
-    this.templateForm.get('serverName')?.disable();
-    try {
-      const serverDoc = doc(collection(this.firestore, 'classify'), 'postmarkserver');
-      const serverSnapshot = await getDoc(serverDoc);
-      this.serverNames = serverSnapshot.data()?.['servername'] || [];
-    } catch (error) {
-      console.error('Error loading server names from Firestore:', error);
-    } finally {
-      this.templateForm.get('serverName')?.enable();
-      this.isServerNamesLoading = false;
       this.cdr.detectChanges();
     }
   }
@@ -640,7 +610,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       templateAlias: template.templatealias,
       category: template.category,
       subCategory: template.subcategory,
-      serverName: template.servername || '',
       subject: template.subject,
       body: template.htmlbody,
       notes: template.notes,
@@ -1109,7 +1078,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
             templatealias: formData.templateAlias,
             category: formData.category,
             subcategory: formData.subCategory,
-            servername: formData.serverName,
             subject: formData.subject,
             notes: formData.notes || '',
             textbody: textContent,
@@ -1133,7 +1101,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
             templatealias: formData.templateAlias,
             category: formData.category,
             subcategory: formData.subCategory,
-            servername: formData.serverName,
             subject: formData.subject,
             notes: formData.notes || '',
             createdby: this.authguard.uid,
@@ -1417,6 +1384,5 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   get category() { return this.templateForm.get('category'); }
   get subCategory() { return this.templateForm.get('subCategory'); }
   get subject() { return this.templateForm.get('subject'); }
-  get serverName() { return this.templateForm.get('serverName'); }
   get body() { return this.templateForm.get('body'); }
 }

@@ -249,12 +249,6 @@ export class JourneyplanComponent {
     row.preferredtime = row.allTime ? 'all' : '';
   }
 
-  compareDates(a: any, b: any): boolean {
-    if (!a || !b) return a === b;
-    return new Date(a).getFullYear() === new Date(b).getFullYear()
-      && new Date(a).getMonth() === new Date(b).getMonth();
-  }
-
   validateMonthlyPlan(): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
     const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
