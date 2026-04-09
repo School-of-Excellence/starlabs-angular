@@ -76,10 +76,19 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   notesRecord: any = null;
   notesText = '';
 
+  totalLetters = 0;
+  totalHappy = 0;
+  totalNeedsAttention = 0;
+  totalOpportunity=0;
+  totalCritical = 0;
+
   totalReports = 0;
   totalReportsCompleted = 0;
   totalReportsOngoing = 0;
   totalReportsNotStarted = 0;
+
+  allLetters: any[] = [];       
+  filteredLetters: any[] = []; 
 
   // ==========================================
   // ASK A&H / LOVE LETTER
@@ -117,6 +126,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   showOverlay = false;
   overlayMode: 'individual' | 'merged' = 'merged';
   selectedFilterType : 'total' | 'completed' | 'ongoing' | 'notstarted' = 'total';
+  selectedFilterTypes: string[] = [];
   overlayTitle = '';
   overlayRecords: any[] = [];
   overlayLoading = false;
@@ -341,6 +351,14 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
 
     getDocs(q).then((snap) => {
       this.records = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      this.allLetters = [...this.records];
+      this.totalLetters = this.allLetters.length;
+      this.totalHappy = this.allLetters.filter(item => item.liked === true).length;
+      this.totalNeedsAttention = this.allLetters.filter(item => item.tagged === true).length;
+      this.totalOpportunity = this.allLetters.filter(item => item.opportunity === true).length;
+      this.totalCritical = this.allLetters.filter(item => item.critical === true).length;
+
       this.lastDoc = snap.docs[snap.docs.length - 1] || null;
       this.pageCache.set(this.currentPage, snap.docs as any);
 
@@ -356,6 +374,67 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       this.loading = false;
     });
   }
+
+    filterLetterDataWithBoxClick(
+      type: 'totalletters' | 'happy' | 'attention' | 'opportunity' | 'critical'
+    ) {
+      if (type === 'totalletters') {
+        this.selectedFilterTypes = [];
+        this.records = [...this.allLetters];
+        return;
+      }
+
+      const index = this.selectedFilterTypes.indexOf(type);
+      if (index === -1) {
+        this.selectedFilterTypes.push(type);
+      } else {
+        this.selectedFilterTypes.splice(index, 1);
+      }
+
+      if (this.selectedFilterTypes.length === 0) {
+        this.records = [...this.allLetters];
+        return;
+      }
+
+      const show = new Set<string>();
+
+      this.records = this.allLetters.filter((item) => {
+        if (show.has(item.id)) return false;
+
+        this.records = this.allLetters.filter((item) => {
+          if (this.selectedFilterTypes.includes('happy') && item.liked === true)
+            return true;
+          if (this.selectedFilterTypes.includes('attention') && item.tagged === true)
+            return true;
+          if (this.selectedFilterTypes.includes('opportunity') && item.opportunity === true)
+            return true;
+          if (this.selectedFilterTypes.includes('critical') && item.critical === true)
+            return true;
+          return false;
+
+        });
+        return true;
+      });
+
+      this.records = this.allLetters.filter((item) => {
+        const match =
+          (!this.selectedFilterTypes.includes('happy') || item.liked === true) &&
+          (!this.selectedFilterTypes.includes('attention') || item.tagged === true) &&
+          (!this.selectedFilterTypes.includes('opportunity') || item.opportunity === true) &&
+          (!this.selectedFilterTypes.includes('critical') || item.critical === true);
+
+        if (!match) return false;
+
+        const key = `${item.id}-${item.liked}-${item.tagged}-${item.opportunity}-${item.critical}`;
+        if (show.has(key)) return false;
+
+        show.add(key);
+        return true;
+
+      });
+    }
+
+
 
   fetchAskAH() { this.resetPagination(); this.fetchRecords(); }
   fetchLoveLetter() { this.resetPagination(); this.fetchRecords(); }
@@ -512,6 +591,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     const docRef = doc(this.firestore, collectionName, row.id);
 
     if (newValue) {
+      this.totalHappy++;
       row.likedetails = { user: this.loggedInProfileId, time: new Date() };
       updateDoc(docRef, {
         liked: true,
@@ -521,6 +601,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         }
       });
     } else {
+      this.totalHappy--;
       row.likedetails = null;
       updateDoc(docRef, {
         liked: false,
@@ -537,6 +618,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     const docRef = doc(this.firestore, collectionName, row.id);
 
     if (newValue) {
+      this.totalNeedsAttention++;
       row.tagdetails = { user: this.loggedInProfileId, time: new Date() };
       updateDoc(docRef, {
         tagged: true,
@@ -546,6 +628,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         }
       });
     } else {
+      this.totalNeedsAttention--;
       row.tagdetails = null;
       updateDoc(docRef, {
         tagged: false,
@@ -587,6 +670,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     const docRef = doc(this.firestore, collectionName, row.id);
 
     if (newValue) {
+      this.totalCritical++;
       row.criticaldetails = { user: this.loggedInProfileId, time: new Date() };
       updateDoc(docRef, {
         critical: true,
@@ -596,6 +680,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         }
       });
     } else {
+      this.totalCritical--;
       row.criticaldetails = null;
       updateDoc(docRef, {
         critical: false,
@@ -612,6 +697,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     const docRef = doc(this.firestore, collectionName, row.id);
 
     if (newValue) {
+      this.totalOpportunity++;
       row.opportunitydetails = { user: this.loggedInProfileId, time: new Date() };
       updateDoc(docRef, {
         opportunity: true,
@@ -621,6 +707,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         }
       });
     } else {
+      this.totalOpportunity--;
       row.opportunitydetails = null;
       updateDoc(docRef, {
         opportunity: false,

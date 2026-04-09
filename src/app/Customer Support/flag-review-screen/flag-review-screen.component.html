@@ -33,6 +33,7 @@
                 </div>
             </div>
             <button mat-raised-button class="flagbtn" color="primary" [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger" (click)="updateFlag()">{{[null, undefined, false].includes(currentIssueData['flag']) ? 'Flag' : 'Unflag'}}</button>
+            <td style="width: 10vw;">
             <div class="flagnegligence" *ngIf="enableFlag"> 
                 <mat-form-field appearance="outline">
                     <mat-label>Severity</mat-label>
