@@ -536,7 +536,7 @@
         </div>
 
         <button class="clear-tab" [class.active]="!selectedProductLabel" (click)="clearStats()">
-          Clear Stats
+          Clear Stat
         </button>
 
         <!-- Product Selector -->
@@ -608,12 +608,12 @@
                           {{ stage }}
                         </div>
                         <div class="">
-                          <span class="detail-val">Start: </span>
-                          <span class="detail-val">{{ formatDateTime(c?.appointmentstart) }}</span>
+                          <span class="detail-stage-label">Start: </span>
+                          <span class="detail-stage-label">{{ formatDateTime(c?.appointmentstart) }}</span>
                         </div>
                         <div class="">
-                           <span class="detail-val">End: </span>
-                          <span class="detail-val">{{ formatDateTime(c?.appointmentend) }}</span>
+                           <span class="detail-stage-label">End: </span>
+                          <span class="detail-stage-label">{{ formatDateTime(c?.appointmentend) }}</span>
                         </div>
                       </div>
                       <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
@@ -678,15 +678,6 @@
         </tbody>
       </table>
     </div>
-
-    <!-- ✅ LOADING OVERLAY FOR THIS SECTION ONLY -->
-    <div class="flow-loading-overlay" *ngIf="journeyFlowLoading">
-      <div class="flow-loading-container">
-        <div class="flow-loading-spinner"></div>
-        <span class="flow-loading-text">Loading journey data for {{ displayMonth }}...</span>
-      </div>
-    </div>
-
   </div>
 
   <!-- ========== PARTICIPANT MANAGEMENT (NEW DESIGN) ========== -->
