@@ -124,9 +124,16 @@ export class EmailInputComponent {
   showValidationResults = false;
   isValidatingEmails = false;
   isSheetValid = false;
+  isUploadingEmailAttachment = false;
+
+  /** Whether localStorage has saved variable configs for the current template */
+  hasSavedVariables = false;
 
   categoryCollectionSnapShot: DocumentReference;
   uploadedFile: File | null = null;
+
+  /** Editable attachments list — initialized from template, user can add/remove before sending */
+  emailAttachments: any[] = [];
 
   selectedTabIndex = 0;
 
@@ -205,7 +212,6 @@ export class EmailInputComponent {
         this.tempTemplateArray.push(t);
       });
       this.filteredTemplates = [...this.templateArray];
-      // Reset visible count on fresh load
       this.visibleTemplateCount = 12;
     });
   }
@@ -236,16 +242,10 @@ export class EmailInputComponent {
 
   // ─── Template grid pagination ────────────────────────────────────────────────
 
-  /**
-   * Return the LAST `visibleTemplateCount` templates from filteredTemplates.
-   * When searching, show all matching results (no limit).
-   */
   getVisibleTemplates(): any[] {
     if (this.templateSearchQuery.trim()) {
-      // Show all search results
       return this.filteredTemplates;
     }
-    // Show last N (most recently added)
     return this.filteredTemplates.slice(-this.visibleTemplateCount);
   }
 
@@ -336,7 +336,9 @@ export class EmailInputComponent {
     this.selectedTemplate = { ...template, templatedocid: template['docid'] };
     this.bufferDoc.subject = template.subject || '';
     this.bufferDoc.body = template.htmlbody || '';
+    this.emailAttachments = template.attachments ? [...template.attachments] : [];
     this.initVariableConfigs(template.htmlbody || '');
+    this.loadSavedVariables();
     this.showPreview = true;
     this.selectedTabIndex = 2;
   }
@@ -358,6 +360,7 @@ export class EmailInputComponent {
     this.bufferDoc.templateid = queuedEmail.templateid || '';
     this.bufferDoc.postmarktemplateid = queuedEmail.postmarktemplateid || '';
     this.bufferDoc.profileid = queuedEmail.profileid || [];
+    this.emailAttachments = queuedEmail.attachments ? [...queuedEmail.attachments] : [];
     this.initVariableConfigs(queuedEmail.body || '');
     this.showPreview = true;
     this.selectedTabIndex = 2;
@@ -623,6 +626,9 @@ export class EmailInputComponent {
       fileUrl: this.fileUploadUrl,
       datamodel: this.buildDataModel(),
       from: this.fromemail,
+      servername: this.selectedTemplate['servername'] || '',
+      attachments: this.emailAttachments,
+      postmarkAttachments: this.buildPostmarkAttachments(),
     });
   }
 
@@ -736,5 +742,229 @@ export class EmailInputComponent {
     if (!this.isVariablesConfigured()) return 'Please configure all template variables';
     if (buttonType === 'queue' && this.isQueuedEmailSelected()) return 'Cannot queue an already queued email';
     return '';
+  }
+
+  // ─── Variable localStorage persistence ─────────────────────────────────────
+
+  private getVariableStorageKey(): string {
+    const templateId = this.selectedTemplate['docid'] || this.selectedTemplate['templatealias'] || '';
+    return `email_var_config_${templateId}`;
+  }
+
+  /** Save current variable configs to localStorage */
+  saveVariablesToLocal(): void {
+    const key = this.getVariableStorageKey();
+    if (!key || key === 'email_var_config_') {
+      this.snackBar.open('No template selected', 'Close', { duration: 2000 });
+      return;
+    }
+    try {
+      const data = JSON.stringify(this.variableConfigs);
+      localStorage.setItem(key, data);
+      this.hasSavedVariables = true;
+      this.snackBar.open('Variable values saved locally', 'Close', { duration: 2000 });
+    } catch (e) {
+      console.error('Error saving variables to localStorage:', e);
+      this.snackBar.open('Failed to save variables', 'Close', { duration: 3000 });
+    }
+  }
+
+  /** Load saved variable configs from localStorage and merge into current configs */
+  loadSavedVariables(): void {
+    const key = this.getVariableStorageKey();
+    if (!key || key === 'email_var_config_') {
+      this.hasSavedVariables = false;
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(key);
+      if (!stored) {
+        this.hasSavedVariables = false;
+        return;
+      }
+      const savedConfigs: { [k: string]: VariableConfig } = JSON.parse(stored);
+      this.hasSavedVariables = true;
+
+      // Merge saved configs into current (only for variables that exist in the template)
+      const tpl = this.selectedTemplate['htmlbody'] || '';
+      const currentVars = this.extractVariables(tpl);
+      const hashVars = this.getHashPrefixedVariables(tpl);
+
+      currentVars.forEach(v => {
+        if (savedConfigs[v]) {
+          this.variableConfigs[v] = {
+            ...savedConfigs[v],
+            isMulti: hashVars.has(v),
+          };
+        }
+      });
+
+      this.snackBar.open('Saved variable values restored', 'Close', { duration: 2000 });
+    } catch (e) {
+      console.error('Error loading variables from localStorage:', e);
+      this.hasSavedVariables = false;
+    }
+  }
+
+  /** Delete saved variable configs from localStorage */
+  deleteSavedVariables(): void {
+    const key = this.getVariableStorageKey();
+    if (!key || key === 'email_var_config_') return;
+
+    if (!confirm('Delete saved variable values for this template?')) return;
+
+    try {
+      localStorage.removeItem(key);
+      this.hasSavedVariables = false;
+      // Reset configs to empty
+      this.initVariableConfigs(this.selectedTemplate['htmlbody'] || '');
+      this.snackBar.open('Saved variable values deleted', 'Close', { duration: 2000 });
+    } catch (e) {
+      console.error('Error deleting saved variables:', e);
+    }
+  }
+
+  /** Check if saved variables exist without loading them */
+  checkSavedVariablesExist(): boolean {
+    const key = this.getVariableStorageKey();
+    if (!key || key === 'email_var_config_') return false;
+    return localStorage.getItem(key) !== null;
+  }
+
+  // ─── Attachment & Server helpers ──────────────────────────────────────────────
+
+  getTemplateAttachments(): any[] {
+    return this.emailAttachments || [];
+  }
+
+  /**
+   * Build Postmark-compatible attachments array.
+   * Postmark expects: { Name, Content (base64), ContentType, ContentID? }
+   * Since files are in Firebase Storage (URLs), we pass the URL and metadata
+   * so the Cloud Function can fetch & base64-encode them before calling Postmark.
+   */
+  buildPostmarkAttachments(): any[] {
+    return this.emailAttachments.map(att => ({
+      Name: att.name,
+      ContentType: att.type || 'application/octet-stream',
+      ContentUrl: att.url,
+      ContentSize: att.size || 0,
+    }));
+  }
+
+  /** Add a new attachment via file picker */
+  onEmailAttachmentSelected(event: any): void {
+    const files: FileList = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB — Postmark limit
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      if (file.size > MAX_SIZE) {
+        this.snackBar.open(`"${file.name}" exceeds 10MB limit`, 'Close', { duration: 3000 });
+        continue;
+      }
+
+      if (this.emailAttachments.some(a => a.name === file.name)) {
+        this.snackBar.open(`"${file.name}" is already attached`, 'Close', { duration: 3000 });
+        continue;
+      }
+
+      this.uploadEmailAttachment(file);
+    }
+
+    event.target.value = '';
+  }
+
+  async uploadEmailAttachment(file: File): Promise<void> {
+    this.isUploadingEmailAttachment = true;
+    try {
+      const storage = getStorage();
+      const timestamp = Date.now();
+      const storageRef = ref(storage, `email-attachments/${timestamp}_${file.name}`);
+      const snap = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snap.ref);
+
+      const attachment = {
+        name: file.name,
+        url: downloadURL,
+        size: file.size,
+        type: file.type || this.getMimeFromExtension(file.name),
+        uploadedAt: timestamp,
+        isNew: true, // marks it as user-added (not from template)
+      };
+
+      this.emailAttachments = [...this.emailAttachments, attachment];
+      this.snackBar.open(`"${file.name}" attached`, 'Close', { duration: 2000 });
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      this.snackBar.open(`Failed to upload "${file.name}"`, 'Close', { duration: 3000 });
+    } finally {
+      this.isUploadingEmailAttachment = false;
+    }
+  }
+
+  removeEmailAttachment(index: number): void {
+    const att = this.emailAttachments[index];
+    const label = att.isNew ? 'Remove' : 'Remove template attachment';
+    if (confirm(`${label} "${att.name}"?`)) {
+      this.emailAttachments = this.emailAttachments.filter((_, i) => i !== index);
+      this.snackBar.open(`"${att.name}" removed`, 'Close', { duration: 2000 });
+    }
+  }
+
+  private getMimeFromExtension(fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const mimeMap: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'csv': 'text/csv',
+      'txt': 'text/plain',
+      'zip': 'application/zip',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+    };
+    return mimeMap[ext] || 'application/octet-stream';
+  }
+
+  getAttachmentIcon(type: string): string {
+    if (!type) return 'attach_file';
+    if (type.includes('pdf')) return 'picture_as_pdf';
+    if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return 'table_chart';
+    if (type.includes('word') || type.includes('document')) return 'description';
+    if (type.includes('presentation') || type.includes('powerpoint')) return 'slideshow';
+    if (type.includes('image')) return 'image';
+    if (type.includes('zip') || type.includes('rar')) return 'folder_zip';
+    if (type.includes('text')) return 'text_snippet';
+    return 'attach_file';
+  }
+
+  getAttachmentColor(type: string): string {
+    if (!type) return '#757575';
+    if (type.includes('pdf')) return '#e53935';
+    if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return '#43a047';
+    if (type.includes('word') || type.includes('document')) return '#1e88e5';
+    if (type.includes('presentation') || type.includes('powerpoint')) return '#fb8c00';
+    if (type.includes('image')) return '#8e24aa';
+    if (type.includes('zip') || type.includes('rar')) return '#6d4c41';
+    return '#757575';
+  }
+
+  formatFileSize(bytes: number): string {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 }

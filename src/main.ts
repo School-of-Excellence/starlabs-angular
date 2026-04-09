@@ -10,6 +10,12 @@ import { provideServiceWorker } from '@angular/service-worker';
 const app = initializeApp(environment.firebase);
 const firestore = getFirestore(app);
 
+(window as any).process = {
+  env: { DEBUG: undefined },
+  version: '',
+  nextTick: (fn: any) => setTimeout(fn, 0),
+};
+
 bootstrapApplication(AppComponent, {
   ...appConfig,
   providers: [

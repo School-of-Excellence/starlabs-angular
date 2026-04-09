@@ -135,7 +135,7 @@
             </div>
           </div>
 
-          <!-- Template grid — last 12 (or visibleTemplateCount) -->
+          <!-- Template grid -->
           <div class="template-grid" *ngIf="filteredTemplates.length > 0">
             <div class="template-card"
               *ngFor="let t of getVisibleTemplates(); let i = index"
@@ -149,6 +149,26 @@
                 <div class="tc-index">{{i + 1}}</div>
                 <span class="tc-name">{{t.templatename}}</span>
                 <span class="tc-badge">{{t.category}}</span>
+              </div>
+
+              <!-- Server name badge row -->
+              <div class="tc-server-row" *ngIf="t.servername">
+                <div class="tc-server-badge">
+                  <mat-icon>dns</mat-icon>
+                  {{t.servername}}
+                </div>
+                <div class="tc-attachment-indicator" *ngIf="t.attachments?.length">
+                  <mat-icon>attach_file</mat-icon>
+                  {{t.attachments.length}}
+                </div>
+              </div>
+
+              <!-- Show attachment indicator even without servername -->
+              <div class="tc-server-row" *ngIf="!t.servername && t.attachments?.length">
+                <div class="tc-attachment-indicator">
+                  <mat-icon>attach_file</mat-icon>
+                  {{t.attachments.length}} file{{t.attachments.length !== 1 ? 's' : ''}}
+                </div>
               </div>
 
               <div class="tc-preview" [innerHTML]="sanitizeHTML(t.htmlbody)"></div>
@@ -270,6 +290,11 @@
               <span class="preview-source-tag">
                 {{isQueuedEmailSelected() ? 'Queued' : 'Template'}}
               </span>
+              <!-- Server name highlight in preview bar -->
+              <span class="preview-server-tag" *ngIf="selectedTemplate['servername']">
+                <mat-icon>dns</mat-icon>
+                {{selectedTemplate['servername']}}
+              </span>
             </div>
 
             <div class="preview-bar-right">
@@ -372,6 +397,65 @@
             </div>
           </div>
 
+          <!-- ═══ Editable Attachments Panel (above variables) ═══ -->
+          <div class="preview-attachments-panel">
+            <div class="pap-header">
+              <div class="pap-header-left">
+                <mat-icon>attach_file</mat-icon>
+                <span>Attachments ({{getTemplateAttachments().length}})</span>
+              </div>
+              <div class="pap-header-right">
+                <button class="pap-add-btn" (click)="emailAttachmentInput.click()"
+                  [disabled]="isUploadingEmailAttachment">
+                  <mat-spinner diameter="14" *ngIf="isUploadingEmailAttachment"></mat-spinner>
+                  <mat-icon *ngIf="!isUploadingEmailAttachment">add</mat-icon>
+                  {{isUploadingEmailAttachment ? 'Uploading…' : 'Add File'}}
+                </button>
+                <input type="file" #emailAttachmentInput
+                  (change)="onEmailAttachmentSelected($event)"
+                  multiple
+                  accept=".pdf,.xls,.xlsx,.doc,.docx,.ppt,.pptx,.csv,.txt,.zip,.jpg,.jpeg,.png,.gif,.webp"
+                  style="display: none;">
+              </div>
+            </div>
+
+            <!-- Attachment list -->
+            <div class="pap-list" *ngIf="getTemplateAttachments().length > 0">
+              <div class="pap-item-editable" *ngFor="let att of getTemplateAttachments(); let i = index">
+                <div class="pap-icon" [style.color]="getAttachmentColor(att.type)">
+                  <mat-icon>{{getAttachmentIcon(att.type)}}</mat-icon>
+                </div>
+                <div class="pap-details">
+                  <span class="pap-name">{{att.name}}</span>
+                  <span class="pap-size">
+                    {{formatFileSize(att.size)}}
+                    <span class="pap-source-tag" *ngIf="!att.isNew">template</span>
+                    <span class="pap-source-tag new" *ngIf="att.isNew">added</span>
+                  </span>
+                </div>
+                <div class="pap-actions">
+                  <a [href]="att.url" target="_blank" rel="noopener" class="pap-action-btn" matTooltip="Download">
+                    <mat-icon>download</mat-icon>
+                  </a>
+                  <button class="pap-action-btn remove" matTooltip="Remove" (click)="removeEmailAttachment(i)">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div class="pap-empty" *ngIf="getTemplateAttachments().length === 0">
+              <mat-icon>attachment</mat-icon>
+              <span>No attachments — click "Add File" to attach</span>
+            </div>
+
+            <div class="pap-hint">
+              <mat-icon>info_outline</mat-icon>
+              Max 10MB per file. Files will be sent as Postmark attachments with the email.
+            </div>
+          </div>
+
           <!-- Variable chips summary -->
           <div class="variable-chip-row"
             *ngIf="extractVariables(selectedTemplate['htmlbody']).length > 0">
@@ -398,16 +482,46 @@
         <div class="vph-left">
           <mat-icon>tune</mat-icon>
           Variable Configuration
-        </div>
-        <div class="config-progress">
-          <span class="cp-text">
-            {{configuredCount()}} / {{extractVariables(selectedTemplate['htmlbody']).length}} configured
+          <span class="vph-saved-badge" *ngIf="hasSavedVariables">
+            <mat-icon>bookmark</mat-icon>
+            saved
           </span>
-          <div class="cp-bar">
-            <div class="cp-fill"
-              [style.width.%]="extractVariables(selectedTemplate['htmlbody']).length
-                ? (configuredCount() / extractVariables(selectedTemplate['htmlbody']).length) * 100
-                : 0">
+        </div>
+
+        <div class="vph-right">
+          <!-- Save variables button -->
+          <button class="vph-btn save" (click)="saveVariablesToLocal()"
+            matTooltip="Save variable values locally for this template">
+            <mat-icon>save</mat-icon>
+            Save
+          </button>
+
+          <!-- Load saved variables button -->
+          <button class="vph-btn load" (click)="loadSavedVariables()"
+            *ngIf="hasSavedVariables"
+            matTooltip="Reload saved variable values">
+            <mat-icon>refresh</mat-icon>
+            Reload
+          </button>
+
+          <!-- Delete saved variables button -->
+          <button class="vph-btn delete" (click)="deleteSavedVariables()"
+            *ngIf="hasSavedVariables"
+            matTooltip="Delete saved variable values for this template">
+            <mat-icon>delete_outline</mat-icon>
+            Clear Saved
+          </button>
+
+          <div class="config-progress">
+            <span class="cp-text">
+              {{configuredCount()}} / {{extractVariables(selectedTemplate['htmlbody']).length}} configured
+            </span>
+            <div class="cp-bar">
+              <div class="cp-fill"
+                [style.width.%]="extractVariables(selectedTemplate['htmlbody']).length
+                  ? (configuredCount() / extractVariables(selectedTemplate['htmlbody']).length) * 100
+                  : 0">
+              </div>
             </div>
           </div>
         </div>
@@ -418,7 +532,6 @@
           *ngFor="let variable of extractVariables(selectedTemplate['htmlbody'])"
           [class.configured]="isVariableConfigured(variable)">
 
-          <!-- Variable name + status -->
           <div class="vr-name">
             <div class="vr-tag">
               <mat-icon class="vr-tag-icon">code</mat-icon>
@@ -429,7 +542,6 @@
             <mat-icon class="vrs-icon pending" *ngIf="!isVariableConfigured(variable)">pending</mat-icon>
           </div>
 
-          <!-- Source toggle buttons -->
           <div class="vr-source-selector">
             <button class="src-btn" [class.active]="ensureConfig(variable).source === 'static'"
               (click)="setVariableSource(variable, 'static')">
@@ -445,10 +557,8 @@
             </button>
           </div>
 
-          <!-- Input area -->
           <div class="vr-input-area" *ngIf="ensureConfig(variable).source">
 
-            <!-- STATIC -->
             <div *ngIf="ensureConfig(variable).source === 'static'">
               <mat-form-field appearance="outline" class="chip-ff">
                 <mat-chip-grid #chipGrid>
@@ -473,7 +583,6 @@
               </div>
             </div>
 
-            <!-- ANALYTICS / METADATA -->
             <div *ngIf="ensureConfig(variable).source === 'analytics'">
               <mat-form-field appearance="outline" class="analytics-ff">
                 <mat-label>Metadata field</mat-label>
@@ -484,7 +593,6 @@
               </mat-form-field>
             </div>
 
-            <!-- SHEET -->
             <div *ngIf="ensureConfig(variable).source === 'sheet'">
               <div *ngIf="!uploadedFile" class="sheet-upload-zone">
                 <input type="file" class="file-input" (change)="onFileSelected($event)" accept=".xlsx,.xls,.csv">
@@ -515,12 +623,12 @@
               </div>
             </div>
 
-          </div><!-- /vr-input-area -->
+          </div>
 
-        </div><!-- /var-row -->
-      </div><!-- /var-list -->
+        </div>
+      </div>
 
-    </div><!-- /var-panel -->
+    </div>
 
     <!-- ══════════════ ACTION BAR ══════════════ -->
     <div class="action-bar">
@@ -556,7 +664,7 @@
       </div>
     </div>
 
-  </div><!-- /email-composer-container -->
+  </div>
 
   <!-- ══════════════ TEST EMAIL MODAL ══════════════ -->
   <div class="modal-backdrop" *ngIf="showTestEmailDialog" (click)="onCloseTestEmailDialog()">
