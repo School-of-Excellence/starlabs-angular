@@ -778,6 +778,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if(!confirmed) return
 
     // Leave the room by calling 'disconnect' method over the Room object
+    this.audiofilterservice.destroy();
     await this.room()?.disconnect();
     this.room()?.removeAllListeners();
 
@@ -1138,7 +1139,7 @@ async enableMicrophoneWithNoiseCancellation(room: Room) {
 
     // Step 2 — Initialize ai-coustics via your service
     // Pass the key from your environment file
-    await this.audiofilterservice.init(environment.aiCousticsKey);
+    await this.audiofilterservice.init();
 
     // Step 3 — Process the stream
     const cleanStream = await this.audiofilterservice.processStream(rawStream);
