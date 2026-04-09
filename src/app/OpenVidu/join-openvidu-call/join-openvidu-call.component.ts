@@ -16,7 +16,7 @@ import { LoadingProgressComponent } from '../../loading-progress/loading-progres
 import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
-import { DeepAudioFilterService } from '../../Service/NoiseCancellation/deep-audio-filter.service';
+import { DeepAudioFilterService } from '../../Service/Deep Audio Filter/deep-audio-filter.service';
 // ── [DF3] DeepFilterNet3 noise cancellation service (ONNX · AudioWorklet · no API key needed)
 // Replaces Amazon Voice Focus as the active filter. VoiceFocus import + service kept intact below
 // so it can be re-enabled by swapping the method body back.
