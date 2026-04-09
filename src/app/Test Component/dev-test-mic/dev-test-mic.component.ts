@@ -1,8 +1,8 @@
 import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DeepFilter3Service } from '../../Service/NoiseCancellation/deepfilter3.service';
-import { KoalaFilterService } from '../../Service/NoiseCancellation/koala-filter.service';
+import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
+import { KoalaFilterService } from '../../Service/PicoVoice Koala/koala-filter.service';
 
 type Status =
   | 'idle' | 'loading' | 'live' | 'live-error'

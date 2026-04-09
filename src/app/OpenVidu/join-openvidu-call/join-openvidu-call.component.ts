@@ -20,7 +20,7 @@ import { DeepAudioFilterService } from '../../Service/NoiseCancellation/deep-aud
 // ── [DF3] DeepFilterNet3 noise cancellation service (ONNX · AudioWorklet · no API key needed)
 // Replaces Amazon Voice Focus as the active filter. VoiceFocus import + service kept intact below
 // so it can be re-enabled by swapping the method body back.
-import { DeepFilter3Service } from '../../Service/NoiseCancellation/deepfilter3.service';
+import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
