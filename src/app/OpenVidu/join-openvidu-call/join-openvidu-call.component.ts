@@ -18,6 +18,7 @@ import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
 import { DeepAudioFilterService } from '../../Service/NoiseCancellation/deep-audio-filter.service';
+import { AiCousticsService } from '../../Service/NoiseCancellation/ai-coustics.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -92,7 +93,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public noiseCancellationService: NoiseCancellationService,
     public dialog: MatDialog,
     private infraService: InstanceStatusService,
-    private audiofilterservice : DeepAudioFilterService
+    private audiofilterservice : AiCousticsService
   ){}
 
   ngAfterViewInit(): void {
@@ -1110,9 +1111,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   /**
  * Enable microphone with RNNoise noise cancellation
  */
-  async enableMicrophoneWithNoiseCancellation(room: Room) {
+  
+
+async enableMicrophoneWithNoiseCancellation(room: Room) {
   try {
-    console.log('🎙️ Enabling microphone with Amazon Voice Focus...');
+    console.log('🎙️ Enabling microphone with ai-coustics (Quail)...');
 
     // Stop preview audio track to prevent double capture
     if (this.previewStream) {
@@ -1122,97 +1125,41 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       });
     }
 
-    // Step 1 — Get raw mic stream
+    // Step 1 — Get raw mic stream (Official Recommendation: 16kHz for efficiency)
     const rawStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
-        noiseSuppression: false,  // Voice Focus handles this
+        noiseSuppression: false, // ai-coustics handles this
         autoGainControl: true,
-        sampleRate: 48000,
+        sampleRate: 16000, 
         channelCount: 1
       }
     });
 
-    console.log(
-      'Raw stream obtained:',
-      rawStream.getAudioTracks()[0].getSettings()
-    );
+    // Step 2 — Initialize ai-coustics via your service
+    // Pass the key from your environment file
+    await this.audiofilterservice.init(environment.aiCousticsKey);
 
-    // Step 2 — Init Voice Focus
-    const supported = await this.audiofilterservice.init();
+    // Step 3 — Process the stream
+    const cleanStream = await this.audiofilterservice.processStream(rawStream);
+    const cleanAudioTrack = cleanStream.getAudioTracks()[0];
 
-    let cleanAudioTrack: MediaStreamTrack;
-
-    if (supported) {
-      // Step 3a — Apply Voice Focus
-      const cleanStream = await this.audiofilterservice
-        .processStream(rawStream);
-
-      cleanAudioTrack = cleanStream.getAudioTracks()[0];
-      console.log('✅ Amazon Voice Focus active');
-
-    } 
-    // else {
-    //   // Step 3b — Fallback to DeepFilterNet or raw
-    //   console.warn('⚠️ Voice Focus not supported, trying DeepFilterNet...');
-
-    //   try {
-    //     const deepFilterStream = await this.audiofilterservice
-    //       .applyZoomNoiseCancellation(rawStream);
-    //     cleanAudioTrack = deepFilterStream.getAudioTracks()[0];
-    //     console.log('✅ DeepFilterNet fallback active');
-
-    //   } catch (dfErr) {
-    //     console.warn('⚠️ DeepFilterNet also failed, using raw stream');
-    //     cleanAudioTrack = rawStream.getAudioTracks()[0];
-    //   }
-    // }
-
-    // Step 4 — Publish clean track to LiveKit room
+    // Step 4 — Publish to LiveKit Room
+    // LiveKit treats this as a 'custom track'
     await room.localParticipant.publishTrack(cleanAudioTrack, {
       source: Track.Source.Microphone,
-      name: 'microphone'
+      name: 'ai-enhanced-mic',
+      dtx: true // Voice Activity Detection (saves bandwidth)
     });
 
-    if (this.debugAudioLevels) this.debugAudioLevels();
-
-    console.log('✅ Microphone published with noise cancellation');
+    console.log('✅ ai-coustics active and published to LiveKit');
 
   } catch (error) {
-    console.error('❌ All noise cancellation failed, using native fallback:', error);
-
-    // Stop preview audio
-    if (this.previewStream) {
-      this.previewStream.getAudioTracks().forEach(t => t.stop());
-    }
-
-    // Native browser fallback — always works
-    await room.localParticipant.setMicrophoneEnabled(true, {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      sampleRate: 48000,
-      channelCount: 1
-    });
-
-    if (this.debugAudioLevels) this.debugAudioLevels();
-    console.log('✅ Microphone enabled with WebRTC native fallback');
-  }
-}
-
-// Keep your existing debugAudioLevels as-is
-debugAudioLevels() {
-  const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
-  if (micPub?.audioTrack) {
-    const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
-    console.log('📊 Audio Track Settings:', {
-      sampleRate: settings.sampleRate,
-      channelCount: settings.channelCount,
-      echoCancellation: settings.echoCancellation,
-      noiseSuppression: settings.noiseSuppression,
-      autoGainControl: settings.autoGainControl,
-      voiceFocusActive: this.audiofilterservice.isActive()
-    });
+    console.error('❌ ai-coustics integration failed:', error);
+    
+    // Fallback to Native LiveKit Microphone
+    await room.localParticipant.setMicrophoneEnabled(true);
+    console.log('✅ Microphone enabled with standard fallback');
   }
 }
 

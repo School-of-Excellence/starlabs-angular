@@ -35,6 +35,11 @@
                 "glob": "**/*",
                 "input": "node_modules/@sapphi-red/web-noise-suppressor/dist",
                 "output": "/assets/wns"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/@ai-coustics/aic-sdk/dist/assets",
+                "output": "/assets/aic/"
               }
             ],
             "styles": [

@@ -11,6 +11,7 @@
   },
   "private": true,
   "dependencies": {
+    "@ai-coustics/aic-sdk": "^0.15.1",
     "@angular/animations": "^19.2.14",
     "@angular/cdk": "^19.2.19",
     "@angular/common": "^19.2.14",
