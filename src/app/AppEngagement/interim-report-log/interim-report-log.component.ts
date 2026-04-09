@@ -399,29 +399,11 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       const show = new Set<string>();
 
       this.records = this.allLetters.filter((item) => {
-        if (show.has(item.id)) return false;
-
-        this.records = this.allLetters.filter((item) => {
-          if (this.selectedFilterTypes.includes('happy') && item.liked === true)
-            return true;
-          if (this.selectedFilterTypes.includes('attention') && item.tagged === true)
-            return true;
-          if (this.selectedFilterTypes.includes('opportunity') && item.opportunity === true)
-            return true;
-          if (this.selectedFilterTypes.includes('critical') && item.critical === true)
-            return true;
-          return false;
-
-        });
-        return true;
-      });
-
-      this.records = this.allLetters.filter((item) => {
         const match =
-          (!this.selectedFilterTypes.includes('happy') || item.liked === true) &&
-          (!this.selectedFilterTypes.includes('attention') || item.tagged === true) &&
-          (!this.selectedFilterTypes.includes('opportunity') || item.opportunity === true) &&
-          (!this.selectedFilterTypes.includes('critical') || item.critical === true);
+          (this.selectedFilterTypes.includes('happy') && item.liked === true) ||
+          (this.selectedFilterTypes.includes('attention') && item.tagged === true) ||
+          (this.selectedFilterTypes.includes('opportunity') && item.opportunity === true) ||
+          (this.selectedFilterTypes.includes('critical') && item.critical === true);
 
         if (!match) return false;
 
@@ -434,7 +416,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       });
     }
 
-
+  
 
   fetchAskAH() { this.resetPagination(); this.fetchRecords(); }
   fetchLoveLetter() { this.resetPagination(); this.fetchRecords(); }
@@ -445,6 +427,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   onTabChange(event: MatTabChangeEvent) {
     this.activeTab = event.index;
     this.selectedRecords = [];
+    this.selectedFilterTypes = [];
 
     switch (event.index) {
       case 0: this.fetchAskAH(); break;
@@ -575,14 +558,14 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       this.fetchRecords();
     }
   }
-
+  
   private resetPagination() {
     this.currentPage = 0;
     this.lastDoc = null;
     this.pageCache.clear();
     this.totalRecords = 0;
   }
-
+  
   toggleLike(row: any) {
     const newValue = !row.liked;
     row.liked = newValue;
