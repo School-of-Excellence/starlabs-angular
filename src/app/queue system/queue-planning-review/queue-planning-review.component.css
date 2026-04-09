@@ -20,8 +20,9 @@
 .header-section {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 30px;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .queue-select {
@@ -30,6 +31,7 @@
 
 .overall-segment {
   max-width: 400px;
+  margin-right: 18px;
 }
 
 /* NEW: Overall Counts Section */
@@ -2764,16 +2766,15 @@
   color: white;
 }
 
-/* ── ATTENTION BANNER ──────────────── */
-
-/* ── TABLE ──────────────────────────── */
 .slot-planner .table-wrapper {
   margin: 0 24px 32px;
   background: var(--white);
   border-radius: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: none;
   border: 1px solid #d0d0d0;
+  max-height: calc(80vh - 250px);
 }
 
 .main-table {
@@ -2984,7 +2985,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background-color: #e8f0ff;   /* brighter blue tint */
+  background-color: #e8f0ff;  
   border-left: 6px solid #3b82f6;
  color: #1f2937; 
 }
@@ -3429,4 +3430,298 @@
 .toggle-switch input:checked + .toggle-slider {
   background: rgba(255, 255, 255, 0.35);
 }
+.participant-phone {
+  font-size: 12px;
+  color: #555;
+  font-weight: normal;
+  margin-left: 8px;
+}
+.slot-planner-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 0 0;
+  border-bottom: 2px solid #e0e0e0;
+}
 
+.tab-btn {
+  padding: 8px 24px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: #234C58;
+}
+
+.tab-btn.active-tab {
+  color: #234C58;
+  border-bottom: 3px solid #234C58;
+  font-weight: 700;
+}
+
+.badge-nonconf {
+  background-color: #fff3e0;
+  color: #e65100;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.segment-split-cell {
+  padding: 0 !important;
+  background: #f9f9f9;
+}
+
+.segment-split-container {
+  padding: 0;
+}
+
+.segment-split-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  /* Use fixed layout so columns can be forced to match parent */
+  table-layout: fixed;
+}
+
+.segment-split-table th {
+  background: #e8edf2;
+  padding: 7px 12px;
+  font-weight: 600;
+  color: #444;
+  font-size: 11px;
+  border: 1px solid #d0d0d0;
+  text-align: left;
+}
+
+.segment-split-table th:nth-child(n+2),
+.segment-split-table td:nth-child(n+2) {
+  text-align: center;
+}
+
+.segment-split-table th:first-child,
+.segment-split-table td:first-child {
+  text-align: left;
+}
+
+.segment-split-table td {
+  padding: 7px 12px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+}
+
+.segment-split-table tr:last-child td {
+  border-bottom: 1px solid #d0d0d0;
+}
+/* Split layout when panel is open */
+.slot-planner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.slot-planner.with-panel {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  grid-template-rows: auto auto auto auto 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+.slot-planner.with-panel .top-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.slot-planner.with-panel .scoreboard {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.slot-planner.with-panel .controls-bar {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+.slot-planner.with-panel .slot-planner-tabs {
+  grid-column: 1;
+  grid-row: 4;
+}
+
+.slot-planner.with-panel .table-wrapper {
+  grid-column: 1;
+  grid-row: 5;
+  overflow-y: auto;
+  max-height: calc(80vh - 250px);
+}
+
+/* Queue Tab Inner Panel */
+.queue-tab-panel {
+  grid-column: 2;
+  grid-row: 4 / 6;
+  border-left: 2px solid #e0e0e0;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  max-height: calc(80vh - 150px);
+}
+
+.queue-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.queue-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #234C58;
+}
+
+.queue-panel-segment {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+}
+
+.queue-panel-actions-top {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.queue-panel-comm-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.queue-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+/* Interim Filter Wrapper */
+.interim-filter-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+}
+
+/* Interim Date Picker Dropdown */
+.interim-date-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  background: white;
+  border: 2px solid #234C58;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.interim-date-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 14px;
+  color: #234C58;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.interim-date-field {
+  width: 100%;
+}
+
+.interim-date-picker-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.interim-date-picker-actions button {
+  min-width: 80px;
+}
+
+/* Interim Report Filter Button */
+.interim-filter-btn {
+  height: 56px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+  border-radius: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border: 1px solid rgba(0,0,0,0.38) !important;
+  color: rgba(0,0,0,0.87) !important;
+  background: white !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+}
+
+.interim-date-picker-panel {
+  display: contents;
+  margin-left: 16px;
+}
+
+.interim-filter-btn:hover:not(:disabled) {
+  background: #e8f0f2 !important;
+}
+
+.interim-date-picker-panel mat-form-field {
+  margin-left: 16px;
+}
+
+.interim-filter-btn.interim-active {
+  background: #234C58 !important;
+  color: white !important;
+  border-color: #234C58 !important;
+  box-shadow: 0 2px 8px rgba(35, 76, 88, 0.4);
+}
+
+.interim-filter-btn.interim-active:hover:not(:disabled) {
+  background: #1a3840 !important;
+}
+
+.interim-filter-btn mat-icon {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.interim-filter-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

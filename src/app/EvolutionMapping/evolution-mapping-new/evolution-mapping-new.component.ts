@@ -175,8 +175,14 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   private pendingLogEventIndex: number | null = null;
   // LOG FILTER
   logEventFilterOptions: { id: string; name: string }[] = [];
-  selectedLogEventFilter: string = 'all';
+  selectedLogEventFilter: string[] = [];
   filteredLogEvents: typeof this.logEvents = [];
+  logEventFilterCtrl = new FormControl('');
+  filteredLogEventOptions: { id: string; name: string }[] = [];
+  private logEventFilterSub: Subscription | null = null;
+  showJourneyTypeDropdown = false;
+  journeyFilterDropdownTop = 0;
+  journeyFilterDropdownLeft = 0;
 
   
   constructor(
@@ -210,7 +216,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.participantSearchSub?.unsubscribe();
     this.addVideoSearchSub?.unsubscribe();
     this.eventFilterSearchSub?.unsubscribe();  
-    this.videoFilterSearchSub?.unsubscribe();  
+    this.videoFilterSearchSub?.unsubscribe();
+    this.logEventFilterSub?.unsubscribe();
+  
   }
 
   // Fetch participants for filter dropdown
@@ -277,15 +285,30 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       .map(([id]) => id);
   }
 
-  onParticipantFilterChange() {
-  this.resetPagination();
-  this.fetchRecords();
-}
+  getJourneyTypeFilteredIds(): string[] {
+    if (this.journeyTypeFilter === 'all') return [];
 
-onJourneyFilterChange() {
-  this.resetPagination();
-  this.fetchRecords();
-}
+    return Object.entries(this.mapProfiles)
+      .filter(([, profile]: [string, any]) => {
+        if (this.journeyTypeFilter === 'active') {
+          return !!profile['activejourney'];
+        } else if (this.journeyTypeFilter === 'last') {
+          return !profile['activejourney'] && !!profile['lastcompletedjourney'];
+        }
+        return true;
+      })
+      .map(([id]) => id);
+  }
+
+  onParticipantFilterChange() {
+    this.resetPagination();
+    this.fetchRecords();
+  }
+
+  onJourneyFilterChange() {
+    this.resetPagination();
+    this.fetchRecords();
+  }
   // Fetch event counts
   async fetchEventCounts(records: any[]) {
     const profileIds = records.map((r) => r['profileid']).filter(Boolean);
@@ -482,14 +505,23 @@ onJourneyFilterChange() {
     this.fetchRecords();
   }
 
-  toggleJourneyTypeFilter() {
-    if (this.journeyTypeFilter === 'all') {
-      this.journeyTypeFilter = 'active';
-    } else if (this.journeyTypeFilter === 'active') {
-      this.journeyTypeFilter = 'last';
-    } else {
-      this.journeyTypeFilter = 'all';
-    }
+  openJourneyTypeDropdown(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    const btn = target.closest('button') ?? target;
+    const rect = btn.getBoundingClientRect();
+    this.journeyFilterDropdownTop = rect.bottom + 8;
+    this.journeyFilterDropdownLeft = rect.left;
+    this.showJourneyTypeDropdown = !this.showJourneyTypeDropdown;
+    this.showEventFilterDropdown = false;
+    this.showVideoFilterDropdown = false;
+    event.stopPropagation();
+  }
+
+  setJourneyTypeFilter(type: 'all' | 'active' | 'last') {
+    this.journeyTypeFilter = type;
+    this.showJourneyTypeDropdown = false;
+    this.resetPagination();
+    this.fetchRecords();
   }
 
   onEventFilterChange(eventId: string, event: any) {
@@ -577,6 +609,8 @@ onJourneyFilterChange() {
     this.selectedJourneyFilters = [];
     this.selectedEventFilters = [];
     this.selectedVideoFilters = [];
+    this.journeyTypeFilter = 'all';
+    this.showJourneyTypeDropdown = false;          
     this.eventFilterSearchCtrl.setValue('');   
     this.videoFilterSearchCtrl.setValue('');   
     this.showEventFilterDropdown = false;
@@ -644,12 +678,20 @@ onJourneyFilterChange() {
 
     let selectedIds = this.selectedParticipants.map((p) => p.id);
 
-    // Apply journey filter
+    // Apply journey name filter
     if (this.selectedJourneyFilters.length) {
       const journeyIds = this.getJourneyFilteredIds();
       selectedIds = selectedIds.length > 0
         ? selectedIds.filter(id => journeyIds.includes(id))
         : journeyIds;
+    }
+
+    // Apply journey TYPE filter (active / last)
+    if (this.journeyTypeFilter !== 'all') {
+      const typeIds = this.getJourneyTypeFilteredIds();
+      selectedIds = selectedIds.length > 0
+        ? selectedIds.filter(id => typeIds.includes(id))
+        : typeIds;
     }
 
     // Apply event filter
@@ -671,8 +713,8 @@ onJourneyFilterChange() {
     const noFilters = !this.selectedParticipants.length &&
                     !this.selectedJourneyFilters.length &&
                     !this.selectedEventFilters.length &&
-                    !this.selectedVideoFilters.length;
-
+                    !this.selectedVideoFilters.length&&
+                    this.journeyTypeFilter === 'all';
     if (noFilters) {
       this.executeSingleQuery(this.buildBaseQuery(undefined, startAfterDoc));
       return;
@@ -786,7 +828,7 @@ onJourneyFilterChange() {
     this.logEvents = [];
     this.filteredLogEvents = [];
     this.logEventFilterOptions = [];
-    this.selectedLogEventFilter = 'all';
+    this.selectedLogEventFilter = [];
     this.showLogOverlay = true;
     const profileid = this.mapProfiles[row.id]?.['profileid'] || null;
     this.currentLogProfileId = profileid;
@@ -958,19 +1000,35 @@ onJourneyFilterChange() {
     }
 
     this.ngZone.run(() => {
-      this.logEvents = allItems;
-      this.filteredLogEvents = [...allItems];
-      this.selectedLogEventFilter = 'all';
+    this.logEvents = allItems;
+    this.filteredLogEvents = [...allItems];
+    this.selectedLogEventFilter = [];
 
-      // Build filter options from attended event cards only
-      this.logEventFilterOptions = allItems
-        .filter((e) => e.type === 'event' && (e as any).eventId)
-        .map((e) => ({
-          id: (e as any).eventId,
-          name: e.eventName,
-        }));
+    // Build filter options from attended event cards only
+    this.logEventFilterOptions = allItems
+      .filter((e) => e.type === 'event' && (e as any).eventId)
+      .map((e) => ({
+        id: (e as any).eventId,
+        name: e.eventName,
+      }));
 
-      this.logLoading = false;
+    // Initialize search
+    this.filteredLogEventOptions = [...this.logEventFilterOptions];
+    this.logEventFilterCtrl.setValue('');
+
+    // Subscribe to search input
+    this.logEventFilterSub?.unsubscribe();
+    this.logEventFilterSub = this.logEventFilterCtrl.valueChanges.pipe(
+      debounceTime(200),
+      distinctUntilChanged()
+    ).subscribe((search) => {
+      const lower = (search || '').toLowerCase();
+      this.filteredLogEventOptions = this.logEventFilterOptions.filter(o =>
+        o.name.toLowerCase().includes(lower)
+      );
+    });
+
+    this.logLoading = false;
     });
   }
 
@@ -1075,14 +1133,23 @@ onJourneyFilterChange() {
   }
 
   applyLogEventFilter() {
-    if (this.selectedLogEventFilter === 'all') {
+    if (!this.selectedLogEventFilter.length) {
       this.filteredLogEvents = [...this.logEvents];
     } else {
       this.filteredLogEvents = this.logEvents.filter((e) => {
         const eventId = (e as any).eventId || null;
-        return eventId === this.selectedLogEventFilter;
+        return eventId && this.selectedLogEventFilter.includes(eventId);
       });
     }
+  }
+
+  removeLogEventFilter(id: string) {
+    this.selectedLogEventFilter = this.selectedLogEventFilter.filter(f => f !== id);
+    this.applyLogEventFilter();
+  }
+
+  getLogEventName(id: string): string {
+    return this.logEventFilterOptions.find(o => o.id === id)?.name || id;
   }
 
   // ADD VIDEO FORM
