@@ -143,7 +143,7 @@
   </div>
 
   <!-- ── Comparison Report ── -->
-  <div class="section report-section" *ngIf="df3Metrics && koalaMetrics">
+  <div class="section report-section" *ngIf="df3Metrics">
     <div class="section-title">
       <span class="section-icon">📊</span>
       Comparison Report
@@ -177,43 +177,44 @@
         </table>
       </div>
 
-      <!-- VS divider -->
-      <div class="vs-col">
-        <div class="vs-badge">VS</div>
-      </div>
+      <!-- VS divider + Koala metrics (only when Koala was active) -->
+      <ng-container *ngIf="koalaMetrics">
+        <div class="vs-col">
+          <div class="vs-badge">VS</div>
+        </div>
 
-      <!-- Koala metrics -->
-      <div class="metrics-col">
-        <div class="metrics-header koala-header">🔵 Koala (Picovoice)</div>
-        <table class="metrics-table">
-          <tbody>
-            <tr><td class="ml">Init Time</td><td class="mv">{{ koalaMetrics.initTimeMs }} ms</td></tr>
-            <tr><td class="ml">Capture Setup</td><td class="mv">{{ koalaMetrics.setupMs }} ms</td></tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr><td class="ml">Raw Energy</td><td class="mv">{{ koalaMetrics.rawEnergyDb }} dBFS</td></tr>
-            <tr><td class="ml">Clean Energy</td><td class="mv">{{ koalaMetrics.cleanEnergyDb }} dBFS</td></tr>
-            <tr>
-              <td class="ml">Noise Reduction</td>
-              <td class="mv">
-                <span class="nr-value" [class.nr-positive]="koalaMetrics.noiseReductionDb > 0" [class.nr-negative]="koalaMetrics.noiseReductionDb <= 0">
-                  {{ koalaMetrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ koalaMetrics.noiseReductionDb }} dB
-                </span>
-              </td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr><td class="ml">Sample Rate</td><td class="mv">{{ koalaMetrics.sampleRate }} Hz</td></tr>
-            <tr><td class="ml">Config</td><td class="mv">{{ koalaMetrics.extraInfo }}</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <div class="metrics-col">
+          <div class="metrics-header koala-header">🔵 Koala (Picovoice)</div>
+          <table class="metrics-table">
+            <tbody>
+              <tr><td class="ml">Init Time</td><td class="mv">{{ koalaMetrics.initTimeMs }} ms</td></tr>
+              <tr><td class="ml">Capture Setup</td><td class="mv">{{ koalaMetrics.setupMs }} ms</td></tr>
+              <tr><td class="ml separator" colspan="2"></td></tr>
+              <tr><td class="ml">Raw Energy</td><td class="mv">{{ koalaMetrics.rawEnergyDb }} dBFS</td></tr>
+              <tr><td class="ml">Clean Energy</td><td class="mv">{{ koalaMetrics.cleanEnergyDb }} dBFS</td></tr>
+              <tr>
+                <td class="ml">Noise Reduction</td>
+                <td class="mv">
+                  <span class="nr-value" [class.nr-positive]="koalaMetrics.noiseReductionDb > 0" [class.nr-negative]="koalaMetrics.noiseReductionDb <= 0">
+                    {{ koalaMetrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ koalaMetrics.noiseReductionDb }} dB
+                  </span>
+                </td>
+              </tr>
+              <tr><td class="ml separator" colspan="2"></td></tr>
+              <tr><td class="ml">Sample Rate</td><td class="mv">{{ koalaMetrics.sampleRate }} Hz</td></tr>
+              <tr><td class="ml">Config</td><td class="mv">{{ koalaMetrics.extraInfo }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
     </div>
 
-    <!-- Winner banner -->
-    <div class="winner-banner">
+    <!-- Winner banner (only when both filters ran) -->
+    <div class="winner-banner" *ngIf="koalaMetrics">
       <span class="winner-label">📈 Higher Noise Reduction:</span>
       <span class="winner-name">
-        {{ df3Metrics.noiseReductionDb >= koalaMetrics.noiseReductionDb ? '🟢 DeepFilterNet3' : '🔵 Koala' }}
-        ({{ (df3Metrics.noiseReductionDb >= koalaMetrics.noiseReductionDb ? df3Metrics.noiseReductionDb : koalaMetrics.noiseReductionDb) }} dB)
+        {{ df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? '🟢 DeepFilterNet3' : '🔵 Koala' }}
+        ({{ (df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? df3Metrics!.noiseReductionDb : koalaMetrics.noiseReductionDb) }} dB)
       </span>
     </div>
 

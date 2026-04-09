@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Angular Dev Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 4200
+    },
+    {
+      "name": "Angular Dev Server — DevTest Mic",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--", "--open=/devtestmic"],
+      "port": 4200
+    },
+    {
+      "name": "Angular Dev Server + API Proxy",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--", "--proxy-config", "proxy.json"],
+      "port": 4200
+    },
+    {
+      "name": "Firebase Emulator (Hosting)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["firebase", "emulators:start", "--only", "hosting"],
+      "port": 5000
+    },
+    {
+      "name": "SSR Node Server (requires build)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/atctranscription/server/server.mjs"],
+      "port": 4000
+    }
+  ]
+}

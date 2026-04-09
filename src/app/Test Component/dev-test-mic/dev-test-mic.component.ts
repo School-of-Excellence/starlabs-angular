@@ -34,7 +34,7 @@ export class DevTestMicComponent implements OnDestroy {
   isLive = false;
 
   // ── Filter settings ───────────────────────────────────────────────────────
-  suppressionLevel = 80;          // DeepFilterNet3
+  suppressionLevel = 50;          // DeepFilterNet3 (package default; 80 is too aggressive for speech)
   accessKey = '';                 // Picovoice Koala
   liveFilter: 'df3' | 'koala' = 'df3'; // which filter for Live Preview
 
@@ -99,8 +99,12 @@ export class DevTestMicComponent implements OnDestroy {
       : 'Loading Koala model (~3.8 MB) from GitHub…';
 
     try {
+      // Keep browser echo cancellation ON for live preview — without it the
+      // Audio element playing through speakers feeds directly back into the mic,
+      // creating a feedback loop / echo that never stops. EC is safe here because
+      // DF3 handles the actual noise; we just need the browser to prevent mic↔speaker loop.
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
       });
     } catch {
       this.status = 'live-error';
@@ -153,12 +157,16 @@ export class DevTestMicComponent implements OnDestroy {
   }
 
   stopLivePreview(): void {
+    // Mute + pause audio element FIRST to immediately break any speaker→mic feedback loop
     if (this.liveAudioEl) {
+      this.liveAudioEl.muted = true;
       this.liveAudioEl.pause();
       this.liveAudioEl.srcObject = null;
       this.liveAudioEl = null;
     }
+    // Stop mic tracks next (destroys the audio source)
     this.micStream?.getTracks().forEach(t => t.stop());
+    // Destroy service last (drains queue, closes AudioContext, terminates worker)
     this.df3.destroy();
     this.koala.stopCapture();
     this.koala.stopLivePlayback();
@@ -173,14 +181,10 @@ export class DevTestMicComponent implements OnDestroy {
   // ─── A/B/C Recording ─────────────────────────────────────────────────────
 
   async startABCRecording(): Promise<void> {
-    if (!this.accessKey.trim()) {
-      this.status = 'error';
-      this.statusMessage = 'Enter your Picovoice access key before recording.';
-      return;
-    }
+    const hasKoala = !!this.accessKey.trim();
 
     this.status = 'loading';
-    this.statusMessage = 'Initialising both filters…';
+    this.statusMessage = hasKoala ? 'Initialising both filters…' : 'Initialising DeepFilterNet3 (Koala skipped — no access key)…';
     this.resetResults();
 
     // 1. Get mic
@@ -204,22 +208,25 @@ export class DevTestMicComponent implements OnDestroy {
       return;
     }
 
-    // 3. Init Koala
-    this.statusMessage = 'Loading Koala model (~3.8 MB) from GitHub…';
-    const koalaOk = await this.koala.init(this.accessKey.trim());
-    if (!koalaOk) {
-      this.status = 'error';
-      this.statusMessage = 'Koala init failed. Check your access key.';
-      this.micStream.getTracks().forEach(t => t.stop());
-      this.df3.destroy();
-      return;
+    // 3. Init Koala (optional — skipped if no access key)
+    let koalaOk = false;
+    if (hasKoala) {
+      this.statusMessage = 'Loading Koala model (~3.8 MB) from GitHub…';
+      koalaOk = await this.koala.init(this.accessKey.trim());
+      if (!koalaOk) {
+        this.status = 'error';
+        this.statusMessage = 'Koala init failed. Check your access key.';
+        this.micStream.getTracks().forEach(t => t.stop());
+        this.df3.destroy();
+        return;
+      }
     }
 
     // 4. Wire DF3 audio graph
     this.df3Stream = await this.df3.processStream(this.micStream);
 
-    // 5. Wire Koala capture (same mic stream — browser allows multiple captures)
-    this.koala.startCapture(this.micStream);
+    // 5. Wire Koala capture if available
+    if (koalaOk) { this.koala.startCapture(this.micStream); }
 
     // 6. Attach DF3 energy analysers
     this.setupAnalysers();
@@ -243,16 +250,18 @@ export class DevTestMicComponent implements OnDestroy {
     // 8. Start everything
     this.recordingStartTime = Date.now();
     this.startEnergySampling();
-    this.koala.startRecordingCapture();
+    if (koalaOk) { this.koala.startRecordingCapture(); }
 
     this.rawRecorder.start(100);
     this.df3Recorder.start(100);
 
     this.status = 'recording';
-    this.statusMessage = 'Recording both filters simultaneously… click Stop when done.';
+    this.statusMessage = koalaOk
+      ? 'Recording Raw + DF3 + Koala simultaneously… click Stop when done.'
+      : 'Recording Raw + DF3 simultaneously (Koala skipped)… click Stop when done.';
 
     await Promise.all([rawDone, df3Done]);
-    this.finalizeRecording(mimeType);
+    this.finalizeRecording(mimeType, koalaOk);
   }
 
   stopABCRecording(): void {
@@ -262,10 +271,10 @@ export class DevTestMicComponent implements OnDestroy {
     this.micStream?.getTracks().forEach(t => t.stop());
     this.stopEnergySampling();
     this.status = 'processing';
-    this.statusMessage = 'Finalising all three recordings…';
+    this.statusMessage = 'Finalising recordings…';
   }
 
-  private finalizeRecording(mimeType: string): void {
+  private finalizeRecording(mimeType: string, koalaOk: boolean): void {
     const duration = parseFloat(((Date.now() - this.recordingStartTime) / 1000).toFixed(1));
 
     // Raw player
@@ -274,8 +283,10 @@ export class DevTestMicComponent implements OnDestroy {
     // DF3 player
     this.df3Url = URL.createObjectURL(new Blob(this.df3Chunks, { type: mimeType }));
 
-    // Koala player (WAV encoded from PCM frames)
-    this.koalaUrl = URL.createObjectURL(this.koala.getRecordedWav());
+    // Koala player (only if Koala was active)
+    this.koalaUrl = koalaOk
+      ? URL.createObjectURL(this.koala.getRecordedWav())
+      : null;
 
     // DF3 metrics
     const rawAvg = this.mean(this.rawSamples);
@@ -291,30 +302,33 @@ export class DevTestMicComponent implements OnDestroy {
       extraInfo: `Suppression level: ${this.suppressionLevel}/100`
     };
 
-    // Koala metrics
-    const koalaRaw = this.koala.getRawEnergyDb();
-    const koalaClean = this.koala.getCleanEnergyDb();
-    this.koalaMetrics = {
-      filterName: 'Koala (Picovoice)',
-      initTimeMs: this.koala.initTimeMs,
-      setupMs: this.koala.captureSetupMs,
-      rawEnergyDb: koalaRaw,
-      cleanEnergyDb: koalaClean,
-      noiseReductionDb: parseFloat((koalaRaw - koalaClean).toFixed(1)),
-      sampleRate: this.koala.sampleRate,
-      extraInfo: `Model delay: ${this.koala.delaySampleMs} ms`
-    };
+    // Koala metrics (only if Koala was active)
+    if (koalaOk) {
+      const koalaRaw = this.koala.getRawEnergyDb();
+      const koalaClean = this.koala.getCleanEnergyDb();
+      this.koalaMetrics = {
+        filterName: 'Koala (Picovoice)',
+        initTimeMs: this.koala.initTimeMs,
+        setupMs: this.koala.captureSetupMs,
+        rawEnergyDb: koalaRaw,
+        cleanEnergyDb: koalaClean,
+        noiseReductionDb: parseFloat((koalaRaw - koalaClean).toFixed(1)),
+        sampleRate: this.koala.sampleRate,
+        extraInfo: `Model delay: ${this.koala.delaySampleMs} ms`
+      };
+    }
 
     // Cleanup
     this.teardownAnalysers();
     this.df3.destroy();
-    this.koala.stopCapture();
-    this.koala.destroy();
+    if (koalaOk) { this.koala.stopCapture(); this.koala.destroy(); }
     this.micStream = null;
     this.df3Stream = null;
 
     this.status = 'done';
-    this.statusMessage = `Done! ${duration}s recorded. Compare three players and download your report.`;
+    this.statusMessage = koalaOk
+      ? `Done! ${duration}s recorded. Compare three players and download your report.`
+      : `Done! ${duration}s recorded. Raw vs DeepFilterNet3 comparison ready.`;
   }
 
   // ─── Energy measurement (DF3 via AnalyserNode) ───────────────────────────
@@ -365,20 +379,14 @@ export class DevTestMicComponent implements OnDestroy {
   // ─── Report download ──────────────────────────────────────────────────────
 
   downloadReport(): void {
-    if (!this.df3Metrics || !this.koalaMetrics) return;
+    if (!this.df3Metrics) return;
 
-    const report = {
+    const report: Record<string, unknown> = {
       testedAt: new Date().toISOString(),
       browser: navigator.userAgent,
       results: {
-        deepFilterNet3: {
-          ...this.df3Metrics,
-          package: 'deepfilternet3-noise-filter@1.2.1'
-        },
-        koala: {
-          ...this.koalaMetrics,
-          package: '@picovoice/koala-web@3.0.0'
-        }
+        deepFilterNet3: { ...this.df3Metrics, package: 'deepfilternet3-noise-filter@1.1.4' },
+        ...(this.koalaMetrics ? { koala: { ...this.koalaMetrics, package: '@picovoice/koala-web@3.0.0' } } : {})
       },
       winner: this.pickWinner(),
       notes: this.userNotes.trim()
@@ -395,7 +403,8 @@ export class DevTestMicComponent implements OnDestroy {
   }
 
   private pickWinner(): string {
-    if (!this.df3Metrics || !this.koalaMetrics) return 'unknown';
+    if (!this.df3Metrics) return 'unknown';
+    if (!this.koalaMetrics) return 'DeepFilterNet3 (only filter tested)';
     return this.df3Metrics.noiseReductionDb >= this.koalaMetrics.noiseReductionDb
       ? 'DeepFilterNet3' : 'Koala (Picovoice)';
   }

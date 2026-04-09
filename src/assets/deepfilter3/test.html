@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DeepFilterNet3 Worker Test</title>
+  <style>
+    body { font-family: monospace; background: #111; color: #eee; padding: 2rem; max-width: 800px; }
+    h1 { color: #7cf; }
+    .step { margin: 0.5rem 0; padding: 0.5rem 1rem; border-radius: 4px; background: #222; }
+    .ok   { border-left: 4px solid #4f4; color: #4f4; }
+    .err  { border-left: 4px solid #f44; color: #f88; }
+    .wait { border-left: 4px solid #fa0; color: #fa0; }
+    button { margin: 1rem 0; padding: 0.75rem 2rem; font-size: 1rem; background: #1a6; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    #time { font-size: 0.85rem; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>🔬 DeepFilterNet3 — Worker + WASM Test</h1>
+  <p>This page tests if the Web Worker can load the WASM binary and initialize the model without <code>RuntimeError: unreachable</code>.</p>
+  <button id="btn" onclick="runTest()">▶ Run Test</button>
+  <div id="log"></div>
+
+  <script>
+    const base = window.location.origin + '/assets/deepfilter3';
+    let startTime;
+
+    function log(msg, type = 'wait') {
+      const div = document.createElement('div');
+      div.className = `step ${type}`;
+      const elapsed = startTime ? ` (+${Math.round(performance.now() - startTime)}ms)` : '';
+      div.textContent = msg + elapsed;
+      document.getElementById('log').appendChild(div);
+    }
+
+    async function runTest() {
+      document.getElementById('btn').disabled = true;
+      document.getElementById('log').innerHTML = '';
+      startTime = performance.now();
+
+      // Step 1: Fetch WASM
+      log('⏳ Fetching WASM binary (~8.8 MB)…');
+      let wasmBytes, modelBytes;
+      try {
+        const r = await fetch(`${base}/pkg/df_bg.wasm`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        wasmBytes = await r.arrayBuffer();
+        log(`✅ WASM fetched — ${(wasmBytes.byteLength / 1e6).toFixed(1)} MB`, 'ok');
+      } catch (e) {
+        log(`❌ WASM fetch failed: ${e}`, 'err');
+        document.getElementById('btn').disabled = false;
+        return;
+      }
+
+      // Step 2: Fetch model
+      log('⏳ Fetching model tar.gz (~7.6 MB)…');
+      try {
+        const r = await fetch(`${base}/models/DeepFilterNet3_onnx.tar.gz`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        modelBytes = await r.arrayBuffer();
+        log(`✅ Model fetched — ${(modelBytes.byteLength / 1e6).toFixed(1)} MB`, 'ok');
+      } catch (e) {
+        log(`❌ Model fetch failed: ${e}`, 'err');
+        document.getElementById('btn').disabled = false;
+        return;
+      }
+
+      // Step 3: Spin up Worker
+      log('⏳ Starting Web Worker…');
+      let worker;
+      try {
+        worker = new Worker(`${base}/df-worker.js`);
+        log('✅ Worker created', 'ok');
+      } catch (e) {
+        log(`❌ Worker creation failed: ${e}`, 'err');
+        document.getElementById('btn').disabled = false;
+        return;
+      }
+
+      // Step 4: Init WASM in Worker
+      log('⏳ Sending WASM + model to Worker (initializing DeepFilterNet3)…');
+      try {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout after 60s')), 60000);
+
+          worker.onmessage = (e) => {
+            if (e.data.type === 'ready') {
+              clearTimeout(timeout);
+              resolve(e.data);
+            } else if (e.data.type === 'error') {
+              clearTimeout(timeout);
+              reject(new Error(e.data.message));
+            } else if (e.data.type === 'debug') {
+              log(`  🔍 ${e.data.step}${e.data.handle ? ' handle='+e.data.handle : ''}${e.data.frameLength ? ' frameLength='+e.data.frameLength : ''}`, 'wait');
+            }
+          };
+          worker.onerror = (err) => {
+            clearTimeout(timeout);
+            reject(new Error(err.message || String(err)));
+          };
+
+          worker.postMessage(
+            { type: 'init', wasmBytes, modelBytes, suppressionLevel: 80 },
+            [wasmBytes, modelBytes]
+          );
+        }).then((data) => {
+          log(`✅ Worker ready! frameLength = ${data.frameLength}`, 'ok');
+        });
+      } catch (e) {
+        log(`❌ Worker init failed: ${e}`, 'err');
+        worker.terminate();
+        document.getElementById('btn').disabled = false;
+        return;
+      }
+
+      // Step 5: Process a test frame
+      log('⏳ Testing audio frame processing…');
+      try {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout after 5s')), 5000);
+
+          const origOnMessage = worker.onmessage;
+          worker.onmessage = (e) => {
+            if (e.data.type === 'processed') {
+              clearTimeout(timeout);
+              resolve(e.data.outputFrame);
+            }
+          };
+
+          const testFrame = new Float32Array(480); // silence
+          worker.postMessage({ type: 'process', inputFrame: testFrame }, [testFrame.buffer]);
+        }).then((outputFrame) => {
+          log(`✅ Frame processed — output length: ${outputFrame.length} samples`, 'ok');
+        });
+      } catch (e) {
+        log(`❌ Frame processing failed: ${e}`, 'err');
+        worker.terminate();
+        document.getElementById('btn').disabled = false;
+        return;
+      }
+
+      worker.terminate();
+
+      const totalMs = Math.round(performance.now() - startTime);
+      log(`🎉 ALL TESTS PASSED — Total: ${totalMs}ms. No RuntimeError: unreachable!`, 'ok');
+      document.getElementById('btn').disabled = false;
+    }
+  </script>
+</body>
+</html>
