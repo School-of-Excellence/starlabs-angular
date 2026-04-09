@@ -17,8 +17,8 @@ import { LoadingProgressComponent } from '../../loading-progress/loading-progres
 import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
-import { DeepAudioFilterService } from '../../Service/NoiseCancellation/deep-audio-filter.service';
-import { AiCousticsService } from '../../Service/NoiseCancellation/ai-coustics.service';
+import { DeepAudioFilterService } from '../../Service/Deep Audio Filter/deep-audio-filter.service';
+import { AiCousticsService } from '../../Service/AI Coustics/ai-coustics.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
