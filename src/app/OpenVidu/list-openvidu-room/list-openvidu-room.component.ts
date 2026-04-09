@@ -191,11 +191,12 @@ export class ListOpenviduRoomComponent {
       where("attended", "==", false),
     );
 
-    collectionData(liveQuery).pipe(takeUntil(this.subscription)).subscribe(data => {
+    collectionData(liveQuery, {"idField": "docid"}).pipe(takeUntil(this.subscription)).subscribe(data => {
       var profileIDtoMap = []
       var upcomingAppointment = []
       for (let i = 0; i < data.length; i++) {
-        const appointmentData = data[i];
+        var appointmentData = data[i];
+        appointmentData["bookingid"] = appointmentData["docid"]
 
         // Skip if Cancelled or Marked Attended
         if(appointmentData["cancelled"] || appointmentData["attended"]) continue

@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject } from '@angular/core';
+import { Component, OnInit, Inject, ViewChildren, QueryList, ElementRef } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { CommonModule, formatDate } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -30,10 +30,11 @@ export class FormTemplatePreviewComponent {
     // Filter out fields with values to display
     this.previewData = formArray
       .filter(field => !['label', 'video', 'audio'].includes(field.type))
-      .map((field, index) => ({
+      .map((field) => ({
         fieldname: field.fieldname,
         type: field.type,
-        value: formValues[`control${index}`] || null
+        array: field.array || null,
+        value: formValues[field.formcontrol] || null
       }))
       .filter(field => field.value !== null && field.value !== undefined && (field.type === 'Checkbox' ? field.value === true : field.value !== ''));
   }

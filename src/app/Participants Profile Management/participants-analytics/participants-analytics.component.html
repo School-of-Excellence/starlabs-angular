@@ -12,6 +12,8 @@
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingEmailsList.length" matBadgePosition="after" class="ms-2" (click)="sendEmailToSelectedParicipant()"> Queued Emails </button>
     <mat-menu #Checklists="matMenu">
       <button mat-menu-item (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
+      <button mat-menu-item (click)="patchCustomerStatus()">Customer Status</button>
+      <button mat-menu-item (click)="navigateTochecklists('watsonstatus')">Watson Status</button>
     </mat-menu>
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">
@@ -118,8 +120,11 @@
           <mat-form-field appearance="outline">
             <mat-label>Participant Mode</mat-label>
             <mat-select [(ngModel)]="filterdata['participantmode']" name="participantmode" (selectionChange)="returnFilterText()" multiple>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterparticipantmode" name="filterparticipantmode" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
               <mat-option [value]="'none'">None</mat-option>
-              <mat-option *ngFor="let option of modesList" [value]="option.mode">
+              <mat-option *ngFor="let option of onParticipantMode()" [value]="option.mode">
                 {{option.mode}}
               </mat-option>
             </mat-select>
@@ -248,7 +253,10 @@
           <mat-form-field class="ml-2 mr-2" appearance="outline">
             <mat-label>Select Event</mat-label>
             <mat-select [(ngModel)]="filterdata['productevent']" name="productevent" (ngModelChange)="returnFilterText()" aria-label="select event">
-              <mat-option *ngFor="let option of productEventList" [value]="option.id">
+               <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterevent" name="filterevent" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onEventSearch()" [value]="option.id">
                 {{option.name}}
               </mat-option>
             </mat-select>
@@ -263,9 +271,23 @@
           </mat-form-field> -->
           <mat-form-field class="ml-2 mr-2" appearance="outline">
             <mat-label>Select QueueEvent</mat-label>
-            <mat-select [(ngModel)]="filterdata['queueevent']" name="queueevent" (ngModelChange)="returnFilterText()" aria-label="select QueueEvent">
-              <mat-option *ngFor="let option of queueventList" [value]="option.id">
+            <mat-select [(ngModel)]="filterdata['queueevent']" name="queueevent" (ngModelChange)="returnFilterText()" (selectionChange)="handleQueueSelection()" aria-label="select QueueEvent">
+               <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterqueue" name="filterqueue" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onQueueSearch()" [value]="option.id">
                 {{option.queuename}}
+              </mat-option>
+            </mat-select>	
+          </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2 mr-2" appearance="outline" *ngIf="filterdata['queueevent']">
+            <mat-label>Select Queue Stage</mat-label>
+            <mat-select [(ngModel)]="filterdata['queuestage']" name="queuestage" (ngModelChange)="returnFilterText()" aria-label="select QueueStage">
+               <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filterqueuestage" name="filterqueuestage" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let stage of onQueueStageSearch()" [value]="stage">
+                {{ stage }}
               </mat-option>
             </mat-select>	
           </mat-form-field>&nbsp;&nbsp;
@@ -337,6 +359,17 @@
               </mat-option>
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
+          <mat-form-field class="ml-2" appearance="outline">
+            <mat-label>Customer Support Category</mat-label>
+            <mat-select [(ngModel)]="filterdata['customersupportcategory']" name="customersupportcategory" (selectionChange)="returnFilterText()">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filtercategorys" name="filtercategorys" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let option of onCategorySearch()" [value]="option.toLowerCase()">
+                {{option}}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Tier</mat-label>
             <mat-select [(ngModel)]="filterdata['tier']" name="tier" (selectionChange)="returnFilterText()" multiple>
@@ -348,10 +381,10 @@
               </mat-option>
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
-          <mat-form-field appearance="outline">
+          <!-- <mat-form-field appearance="outline">
             <mat-label>Search Label</mat-label>
             <input type="text" matInput [(ngModel)]="filterdata['label']" name="label">
-          </mat-form-field>&nbsp;&nbsp;
+          </mat-form-field>&nbsp;&nbsp; -->
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Registered User</mat-label>
             <mat-select [(ngModel)]="filterdata['registereduser']" name="registereduser" multiple (selectionChange)="returnFilterText()">
@@ -398,7 +431,7 @@
         </div>
         <div class="d-flex justify-content-center" style="margin-bottom:10px;">
           <button mat-stroked-button type="button" (click)="onDataSearch();" [disabled]="searchValidation()">Search</button>&nbsp;&nbsp;
-          <button mat-stroked-button type="button" (click)="saveSearchedFilter(filterdata);">Save Search</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" (click)="openModal();">Save Search</button>&nbsp;&nbsp;
           <button mat-stroked-button type="button" (click)="onformreset();">Reset</button>&nbsp;&nbsp;
         </div>
       </div>
@@ -441,19 +474,24 @@
   </section>
 
   <section>
-    <div class="d-flex flex-row">
-      <span  style="margin-top: 30px;">
-        <h3>Total: {{ dataSource.data.length }}</h3>
-      </span>&nbsp;&nbsp;&nbsp;&nbsp;
-      <span>
-        <mat-form-field appearance="fill" style="min-width: 300px;">
-        <mat-label>Filter</mat-label>
-        <input matInput (keyup)="applyFilter($event)" #input>
-      </mat-form-field>
-      </span>&nbsp;&nbsp;&nbsp;&nbsp;
-      <span style="margin-top: 40px;">
-        Selected Participants - {{this.selection.selected.length}}
-      </span>
+    <div style="display:flex; justify-content: space-between; align-items: center;">
+      <div class="d-flex flex-row">
+        <span style="margin-top: 30px;">
+          <h3>Total: {{ dataSource.data.length }}</h3>
+        </span>&nbsp;&nbsp;&nbsp;&nbsp;
+        <span>
+          <mat-form-field appearance="fill" style="min-width: 300px;">
+            <mat-label>Filter</mat-label>
+            <input matInput (keyup)="applyFilter($event)" #input>
+          </mat-form-field>
+        </span>&nbsp;&nbsp;&nbsp;&nbsp;
+        <span style="margin-top: 40px;">
+          Selected Participants - {{this.selection.selected.length}}
+        </span>
+      </div>
+      <!-- <div>
+        <button mat-stroked-button (click)="clearCustomerStatus()">Clear CustomerStatus</button>
+      </div> -->
     </div>
     <div>
       <table #Table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>
@@ -481,11 +519,10 @@
             <span *ngIf="column === 'productcount'">Filter Count / Total Count</span> 
           </th>
           <td [ngClass]="{'remarks-column': column === 'remarks'}" mat-cell *matCellDef="let element">
-            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','dateofbirth','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags'].includes(column)">{{element[column]}}</span>
-            <span *ngIf="['consumedproducts', 'unconsumedproducts', 'activeproduct', 'profiletags', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'purchase'].includes(column)">
+            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth'].includes(column)">{{element[column]}}</span>
+            <span *ngIf="['consumedproducts', 'unconsumedproducts', 'activeproduct', 'profiletags', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier'].includes(column)">
               <ng-container *ngIf="element[column]">
-                <!-- Check if it is an array -->
-                <!-- <ng-container *ngIf="element[column] instanceof Array; else handleNonArray"> -->
+               
                 <span *ngFor="let value of element[column]; let i = index">
                   {{ mapfiltervalues[value] || value }}
                   <span *ngIf="i < element[column].length - 1">, </span>
@@ -493,7 +530,7 @@
               </ng-container>
             </span>
             
-            <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate'):null)}}</span>
+            <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate' , 'dateofbirth'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate') : null)}}</span>
             <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
@@ -549,6 +586,15 @@
                 <mat-icon>edit</mat-icon>
               </button>
             </span>
+            <!-- total purchase -->
+            <!-- <span *ngIf="column === 'totalpurchasevalue'">{{element['pp_totalpurchasevalue']}}</span>
+            <span *ngIf="column === 'totalpaid'">{{element['pp_totalpaid']}}</span>
+            <span *ngIf="column === 'balance'">{{element['pp_totalpurchasevalue'] - element['pp_totalpaid']}}</span> -->
+
+            <!-- journey -->
+            <span *ngIf="column === 'journey'">{{element['customerstatus'] === 'active' ? mapfiltervalues[element['activejourney']] : element['customerstatus'] === 'non active' ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
+            <!-- age -->
+             <span *ngIf="column === 'age'">{{calculateAge(element['dateofbirth'])}}</span>
           </td>
         </ng-container>
 
@@ -611,3 +657,44 @@
     </div>
   </div>
 </main>
+
+<div class="backdrop" *ngIf="isModalOpen" (click)="onBackdropClick($event)">
+
+  <div class="modal-card">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <div>
+        <h2>Filter Records</h2>
+        <p>Narrow results by label</p>
+      </div>
+      <button mat-icon-button (click)="closeModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Form Field -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Search Label</mat-label>
+      <input
+        type="text"
+        matInput
+        [(ngModel)]="filterdata['label']"
+        name="label"
+        placeholder="e.g. Invoice, Report..."
+      />
+      <mat-icon matSuffix>search</mat-icon>
+      <mat-hint>Type to filter by label name</mat-hint>
+    </mat-form-field>
+
+    <!-- Footer Actions -->
+    <div class="modal-footer">
+      <button mat-stroked-button (click)="clearField()">Clear</button>
+      <button mat-flat-button color="primary" (click)="saveSearchedFilter(filterdata);">
+        Save Filter
+      </button>
+    </div>
+
+  </div>
+
+</div>

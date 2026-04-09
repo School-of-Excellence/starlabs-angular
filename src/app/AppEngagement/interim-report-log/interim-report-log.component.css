@@ -163,6 +163,27 @@ table {
   padding-right: 0;
 }
 
+.mat-column-opportunity {
+  width: 160px;
+  max-width: 160px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mat-column-critical {
+  width: 160px;
+  max-width: 160px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mat-column-resolved {
+  width: 160px;
+  max-width: 160px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .mat-column-notes {
   flex: 1;
   min-width: 200px;
@@ -687,6 +708,25 @@ table {
 .action-btn--email:hover {
   background: #fde3c4;
   border-color: #f5c08a;
+}
+
+.sos-resolved {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border2);
+  color: var(--text3);
+  background: transparent;
+  transition: all .15s;
+  line-height: 1;
+}
+
+.sos-resolved-active {
+  background: #eaf5ef;
+  border-color: #a8d5b5;
+  color: #1a5c35;
 }
 
 
