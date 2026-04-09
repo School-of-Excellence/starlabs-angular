@@ -109,6 +109,11 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   timeCompressionSaving = false;
   timeCompressionSaved  = false;
 
+  // ── Product bottom sheet ───────────────────────────────────────
+  productSheetOpen = false;
+  activeProductType: 'queue' | 'event' | 'others' | null = null;
+  productSheetTitle = '';
+
   // ── Detail form ───────────────────────────────────────────────
   detailForm!: FormGroup;
   detailLoading   = false;
@@ -119,7 +124,20 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   solarVoiceOptions: any[] = [];
   seriesOptions: any[] = [];
   appLockedForm!: FormGroup;
-
+  previewData: any = {};
+  currentPage = 1;
+  detailTabIndex = 0;
+  readonly detailTabs = [
+    { label: 'Intro',            screen: 'intro' },
+    { label: 'Journey Overview', screen: 'journeyOverview' },
+    { label: 'Journey Desc.',    screen: 'journeyDescripition' },
+    { label: 'Subscription',     screen: 'subscription' },
+    { label: 'Experience',       screen: 'journeyExperience' },
+    { label: 'Product Overview', screen: 'productOverview' },
+    { label: 'AEL Selection',    screen: 'aelSelection' },
+    { label: 'Onboarding',       screen: 'onboarding' },
+    { label: 'Congratulations',  screen: 'congratulations' },
+  ];
   screenorderTags: string[] = [
     'intro', 'journeyOverview', 'journeyDescripition', 'subscription',
     'journeyExperience', 'productOverview', 'aelSelection', 'onboarding', 'congratulations',
@@ -144,7 +162,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.loadAppLockedData();
     this.buildAppLockedForm();
     this.loadOrientationData();
-    this.loadTimeCompressionData()
+    this.loadTimeCompressionData();
     this.currentUserName$.subscribe(name => {
       this.currentUserName = name;
     });
@@ -198,6 +216,104 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.saveAppLocked();
   }
 
+
+  openProductSheet(type: string, cardTitle: string): void {
+    this.activeProductType = type as 'queue' | 'event' | 'others';
+    this.productSheetTitle = cardTitle || type;
+    this.productSheetOpen = true;
+    if (type === 'queue') {
+      this.detailTabIndex = 7;
+    } else if (type === 'event') {
+      this.detailTabIndex = 0;
+    } else if (type === 'others') {
+      this.detailTabIndex = 6;
+    }
+    this.cdr.markForCheck();
+  }
+
+  closeProductSheet(): void {
+    this.productSheetOpen = false;
+    this.activeProductType = null;
+    this.detailTabIndex = 4;
+    this.currentScreen = 'intro';
+    this.cdr.markForCheck();
+  }
+
+  nextDetailTab(): void {
+    if (this.detailTabIndex < this.detailTabs.length - 1) {
+      this.detailTabIndex++;
+      this.currentScreen = this.detailTabs[this.detailTabIndex].screen;
+      this.productSheetOpen = false;
+      this.activeProductType = null;
+      this.cdr.markForCheck();
+    }
+  }
+
+  prevDetailTab(): void {
+    if (this.detailTabIndex > 0) {
+      this.detailTabIndex--;
+      this.currentScreen = this.detailTabs[this.detailTabIndex].screen;
+      this.productSheetOpen = false;
+      this.activeProductType = null;
+      this.cdr.markForCheck();
+    }
+  }
+
+  isTabFilled(tabIndex: number): boolean {
+    const v = this.detailForm?.value;
+    if (!v) return false;
+    switch (tabIndex) {
+      case 0: return !!(v.eventdescripition?.title && v.eventdescripition?.intro);
+      case 1: return !!(v.subscription?.descripition);
+      case 2: return !!(v.journeydetail?.intro || v.journeydetail?.descripition);
+      case 3: return !!(v.subscription?.imageurl || this.imagePreviews['subscription_imageurl']);
+      case 4: return (v.productincluded ?? []).some((p: any) => p.title);
+      case 5: return !!(v.journeypath?.intro || v.journeypath?.imageurl);
+      case 6: return !!(v.otherdescripition?.title);
+      case 7: return !!(v.queuedescripition?.descripition);
+      case 8: return false; // no content
+      default: return false;
+    }
+  }
+
+  currentIndex = 0;
+  get currentScreen(): string {
+    return this.screenorderTags[this.currentIndex];
+  }
+
+
+  set currentScreen(screen: string) {
+    const idx = this.screenorderTags.indexOf(screen);
+    if (idx !== -1) this.currentIndex = idx;
+  }
+
+
+  buildPreview(v: any) {
+    this.previewData = {
+      intro: {
+        name: this.getJourneyName(v.journeyrefDocId),
+        intro: v.eventdescripition?.intro || '',
+        video: v.eventdescripition?.introductionvideo
+      },
+
+      journeyOverview: {
+        title: this.getJourneyName(v.journeyrefDocId),
+        overviewVideo: v.overviewvideo,
+        goalVideo: v.eventdescripition?.goalvideourl
+      },
+
+      journeyDescripition: v.journeydetail,
+
+      subscription: v.subscription,
+
+      journeyExperience: v.productincluded || [],
+
+      productOverview: v.journeypath
+    };
+
+    this.cdr.markForCheck();
+  }
+
   getSolarVoiceName(id: string): string {
     return this.solarVoiceOptions.find(x => x.id === id)?.name || id;
   }
@@ -208,6 +324,24 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
   getSeriesName(id: string): string {
     return this.seriesOptions.find(x => x.id === id)?.name || id;
+  }
+
+  nextPage() {
+    if (this.currentIndex < this.detailForm.value.screenorder.length - 1) {
+      this.currentIndex++;
+    }
+  }
+
+  prevPage() {
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+    }
+  }
+
+  getJourneyName(id: string): string {
+    if (!id) return '';
+
+    return this.journeyOptions.find(j => j.id === id)?.label || id;
   }
 
   private async loadSeries() {
@@ -356,6 +490,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   // ─────────────────────────────────────────────────────────────
   openModal(modal: ModalType): void {
     if (modal === 'detail') {
+      this.detailTabIndex = 0;
       this.isEditMode      = false;
       this.buildDetailForm();
       this.detailSubmitted = false;
@@ -375,6 +510,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.detailSubmitted = false;
     this.imagePreviews   = {};
     this.pendingFiles    = {};
+    this.detailTabIndex = 0;
     this.selectedRefs    = {};
     this.activeModal     = 'detail';
     this.cdr.markForCheck();
@@ -401,17 +537,48 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  // editRow(row: JourneyOnboardingRow, index: number): void {
+  //   this.editingIndex    = index;
+  //   this.isEditMode      = true;   // journey dropdown becomes read-only
+  //   this.detailSubmitted = false;
+  //   this.imagePreviews   = {};
+  //   this.pendingFiles    = {};
+  //   this.selectedRefs    = {};
+  //   this.buildDetailForm(row.raw);
+  //   this.activeModal     = 'detail';
+  //   this.cdr.markForCheck();
+  //   this.journeySelected = true;
+  // }
   editRow(row: JourneyOnboardingRow, index: number): void {
     this.editingIndex    = index;
-    this.isEditMode      = true;   // journey dropdown becomes read-only
+    this.isEditMode      = true;
     this.detailSubmitted = false;
     this.imagePreviews   = {};
     this.pendingFiles    = {};
     this.selectedRefs    = {};
+    this.detailTabIndex = 0;
+    this.currentIndex    = 0;
     this.buildDetailForm(row.raw);
+
+    // ── Restore image previews from saved URLs so preview renders them ──
+    const raw = row.raw;
+    if (raw?.eventdescripition?.introductionvideo)
+      this.imagePreviews['introductionvideo'] = raw.eventdescripition.introductionvideo;
+    if (raw?.journeydetail?.imageurl)
+      this.imagePreviews['journeydetail_imageurl'] = raw.journeydetail.imageurl;
+    if (raw?.journeypath?.imageurl)
+      this.imagePreviews['journeypath_imageurl'] = raw.journeypath.imageurl;
+    if (raw?.subscription?.imageurl)
+      this.imagePreviews['subscription_imageurl'] = raw.subscription.imageurl;
+    if (raw?.queuedescripition?.processimage)
+      this.imagePreviews['processimage'] = raw.queuedescripition.processimage;
+    (raw?.queuedescripition?.processdetails?.step ?? []).forEach((s: any, i: number) => {
+      if (s?.imageurl) this.imagePreviews[`step_imageurl_${i}`] = s.imageurl;
+    });
+
     this.activeModal     = 'detail';
-    this.cdr.markForCheck();
     this.journeySelected = true;
+    this.cdr.markForCheck();
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -452,32 +619,33 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         journeyDocId = rawRef.id;
       }
     }
-    if (p.overviewvideo) {
-      const id = typeof p.overviewvideo === 'string'
-        ? p.overviewvideo.replace('content_urls/', '')
-        : p.overviewvideo?.id;
+    // if (p.overviewvideo) {
+    //   const id = typeof p.overviewvideo === 'string'
+    //     ? p.overviewvideo.replace('content_urls/', '')
+    //     : p.overviewvideo?.id;
 
-      this.detailForm.patchValue({
-        overviewvideoDocId: id
-      });
+    //   this.detailForm.patchValue({
+    //     overviewvideoDocId: id
+    //   });
 
-      this.selectedRefs['overviewvideo'] =
-        this.contentUrlOptions.find(o => o.id === id) ?? null;
-    }
+    //   this.selectedRefs['overviewvideo'] =
+    //     this.contentUrlOptions.find(o => o.id === id) ?? null;
+    // }
 
-    if (p.goalvideourl) {
-      const id = typeof p.goalvideourl === 'string'
-        ? p.goalvideourl.replace('content_urls/', '')
-        : p.goalvideourl?.id;
+    // if (p.goalvideourl) {
+    //   const id = typeof p.goalvideourl === 'string'
+    //     ? p.goalvideourl.replace('content_urls/', '')
+    //     : p.goalvideourl?.id;
 
-      (this.detailForm.get('eventdescripition') as FormGroup)
-        .patchValue({
-          goalvideourlDocId: id
-        });
+    //   (this.detailForm.get('eventdescripition') as FormGroup)
+    //     .patchValue({
+    //       goalvideourlDocId: id
+    //     });
 
-      this.selectedRefs['goalvideourl'] =
-        this.contentUrlOptions.find(o => o.id === id) ?? null;
-    }
+    //   this.selectedRefs['goalvideourl'] =
+    //     this.contentUrlOptions.find(o => o.id === id) ?? null;
+    // }
+
 
     this.detailForm = this.fb.group({
       // ── Internal / display fields ──────────────────────────────
@@ -494,8 +662,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         overviewdescripition: [p.eventdescripition?.overviewdescripition ?? ''],
         goalvideourlDocId:    [''],
         goalvideourl:         [''],
-        introduction:         [p.eventdescripition?.introduction         ?? ''],
-        introductionvideo:    [p.eventdescripition?.introductionvideo    ?? ''],
+        introduction:         [p.introduction         ?? ''],
+        introductionvideo:    [p.introductionvideo    ?? ''],
       }),
       overviewvideo: [p.overviewvideo ?? ''],
       journeydetail: this.fb.group({
@@ -527,15 +695,41 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         }),
       }),
       processdetails: this.fb.group({
-        title:        [p.processdetails?.title        ?? ''],
-        descripition: [p.processdetails?.descripition ?? ''],
-        processimage: [p.processdetails?.processimage ?? ''],
+        title:        [p.queuedescripition?.processdetails?.title        ?? ''],
+        descripition: [p.queuedescripition?.processdetails?.descripition ?? ''],
+        processimage: [p.queuedescripition?.processimage                 ?? ''],
         step: this.fb.array(
-          (p.processdetails?.step ?? [{}]).map((x: any) => this.newProcessStep(x))
+          (p.queuedescripition?.processdetails?.step ?? [{}]).map((x: any) => this.newProcessStep(x))
         ),
       }),
     });
+    // ── Patch reference fields AFTER form is built ──────────────
+    if (p.overviewvideo) {
+      const id = typeof p.overviewvideo === 'string'
+        ? p.overviewvideo.replace('content_urls/', '')
+        : p.overviewvideo?.id ?? '';
+      if (id) {
+        this.detailForm.patchValue({ overviewvideoDocId: id });
+        this.selectedRefs['overviewvideo'] =
+          this.contentUrlOptions.find(o => o.id === id) ?? null;
+      }
+    }
 
+    if (p.eventdescripition?.goalvideourl || p.goalvideourl) {
+      const raw = p.eventdescripition?.goalvideourl ?? p.goalvideourl;
+      const id = typeof raw === 'string'
+        ? raw.replace('content_urls/', '')
+        : raw?.id ?? '';
+      if (id) {
+        (this.detailForm.get('eventdescripition') as FormGroup)
+          .patchValue({ goalvideourlDocId: id });
+        this.selectedRefs['goalvideourl'] =
+          this.contentUrlOptions.find(o => o.id === id) ?? null;
+      }
+    }
+    this.detailForm.valueChanges.subscribe(v => {
+      this.buildPreview(v);
+    });
     if (prefill?.screenorder) this.screenorderTags = [...prefill.screenorder];
   }
 
@@ -835,8 +1029,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true,
       });
-
       const payload: any = {
+
         docid:        v.docid,
         lastUpdated: now,      // ← "Last time updated" column
         updatedBy:   this.currentUserName,  // ← "Updated by" column
@@ -890,7 +1084,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         },
       };
 
-      await setDoc(doc(this.firestore, 'journeyonboardingdetail', v.docid), payload, { merge: true });
+      await setDoc(doc(this.firestore, 'journeyonboardingdetail', v.docid), payload, { merge: true ,});
       this.detailSubmitted = true;
       this.editingIndex    = null;
       this.pendingFiles    = {};
@@ -902,6 +1096,12 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.detailLoading = false;
       this.cdr.markForCheck();
     }
+  }
+
+  isVideoUrl(url: string): boolean {
+    if (!url) return false;
+    // covers blob previews and Firebase Storage URLs with video extensions
+    return /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url) || url.startsWith('blob:');
   }
 
   async fixUpdatedBy(): Promise<void> {
