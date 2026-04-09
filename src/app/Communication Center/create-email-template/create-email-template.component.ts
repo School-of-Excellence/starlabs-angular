@@ -32,6 +32,14 @@ import { AuthguardService } from '../../authguard.service';
 import { TemplateCreatorComponent } from "../template-creator/template-creator.component";
 import { MatExpansionModule } from "@angular/material/expansion";
 
+interface TemplateAttachment {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+  uploadedAt: number;
+}
+
 interface EmailTemplate {
   docid: string;
   templatename: string;
@@ -52,6 +60,8 @@ interface EmailTemplate {
   postmarkstatus: string;
   templatelayout: string;
   templatemodel: Object;
+  attachments?: TemplateAttachment[];
+  servername?: string;
 }
 
 @Component({
@@ -81,7 +91,7 @@ interface EmailTemplate {
     MatDialogModule,
     MatSnackBarModule,
     MatExpansionModule
-],
+  ],
   templateUrl: './create-email-template.component.html',
   styleUrls: ['./create-email-template.component.css'],
   animations: [
@@ -110,9 +120,8 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   buttonForm: FormGroup;
   imageForm: FormGroup;
   imageEditForm: FormGroup;
-  categories = [];
-  subCategories = [];
-  isLoading = false;
+  categories: string[] = [];
+  subCategories: string[] = [];
   isMobilePreview = false;
   showButtonForm = false;
   showImageForm = false;
@@ -122,15 +131,39 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   editingImageElement: HTMLImageElement | null = null;
   originalImageData: any = null;
 
+  // Attachment properties
+  templateAttachments: TemplateAttachment[] = [];
+  isUploadingAttachment = false;
+  attachmentUploadProgress = 0;
+  readonly MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+  readonly ALLOWED_ATTACHMENT_TYPES = [
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/csv',
+    'text/plain',
+    'application/zip',
+    'application/x-rar-compressed',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ];
+
   // New properties for template management with Mat Table Data Source
   existingTemplates: EmailTemplate[] = [];
   dataSource = new MatTableDataSource<EmailTemplate>([]);
-  displayedColumns: string[] = ['templatename', 'category', 'subcategory', 'status', 'validated', 'date', 'actions'];
+  displayedColumns: string[] = ['templatename', 'category', 'subcategory', 'servername', 'status', 'validated', 'date', 'actions'];
   isCheckingName = false;
   isCheckingAlias = false;
   currentEditingTemplate: EmailTemplate | null = null;
   isEditMode = false;
   viewMode: 'create' | 'list' | 'preview' = 'list';
+  manageType: 'categories' | 'subcategories' = 'categories';
   previewTemplate: EmailTemplate | null = null;
 
   // Filter properties
@@ -139,7 +172,20 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   selectedSubCategory = '';
   selectedStatus = '';
   selectedValidation = '';
+  selectedServerName = '';
+  newItemName = '';
+  isCategoriesLoading = false;
+  isTemplatesLoading = false;
+  isServerNamesLoading = false;
+  serverNames: string[] = [];
+
   showFilters = false;
+  manageDialogOpen = false;
+  isSaving = false;
+
+  // Cached SafeHtml to prevent NG0100 from getPreviewContent()
+  private _cachedPreviewHtml: SafeHtml | null = null;
+  private _cachedPreviewSource: string = '';
 
   // Pagination properties
   totalResults = 0;
@@ -187,10 +233,15 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     toolbarPosition: 'top',
     toolbarHiddenButtons: []
   };
-  mapprofileuid = {};
+  mapprofileuid: Record<string, any> = {};
   private destroy$ = new Subject<void>();
 
-  constructor(private fb: FormBuilder, private authguard: AuthguardService, private cdr:ChangeDetectorRef, private sanitizer: DomSanitizer) {
+  constructor(
+    private fb: FormBuilder,
+    private authguard: AuthguardService,
+    private cdr: ChangeDetectorRef,
+    private sanitizer: DomSanitizer
+  ) {
     this.templateForm = this.fb.group({
       templateName: ['',
         [Validators.required, Validators.pattern(/^[a-zA-Z0-9\s._-]+$/)],
@@ -202,6 +253,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       ],
       category: ['', Validators.required],
       subCategory: ['', Validators.required],
+      serverName: ['', Validators.required],
       subject: ['', Validators.required],
       body: ['', Validators.required],
       notes: ['']
@@ -237,84 +289,108 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     this.dataSource.filterPredicate = this.createFilter();
   }
 
+  get isLoading(): boolean {
+    return this.isCategoriesLoading || this.isTemplatesLoading || this.isServerNamesLoading;
+  }
+
   ngOnInit(): void {
     this.authguard.getProfileMap().then((data) => {
-      this.mapprofileuid = data.mapUserId;
-    })
+      this.mapprofileuid = data.mapUserId || {};
+    });
     this.loadCategoriesAndSubCategories();
+    this.loadServerNames();
     this.loadExistingTemplates();
   }
 
-  
-
   ngAfterViewInit(): void {
-    // Connect paginator and sort to the data source
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
+    // Defer to avoid NG0100 — paginator/sort may not exist yet if isLoading is true
+    setTimeout(() => {
+      if (this.paginator) {
+        this.dataSource.paginator = this.paginator;
+      }
+      if (this.sort) {
+        this.dataSource.sort = this.sort;
+        this.setupSorting();
+      }
+    });
+  }
 
-    // Set up custom sorting for date field
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private setupSorting(): void {
     this.dataSource.sortingDataAccessor = (item: EmailTemplate, property: string) => {
       switch (property) {
         case 'date':
           return item.date?.toDate ? item.date.toDate().getTime() : 0;
         case 'templatename':
-          return item.templatename.toLowerCase();
+          return item.templatename?.toLowerCase() || '';
         case 'category':
-          return item.category.toLowerCase();
+          return item.category?.toLowerCase() || '';
         case 'subcategory':
-          return item.subcategory.toLowerCase();
+          return item.subcategory?.toLowerCase() || '';
+        case 'servername':
+          return item.servername?.toLowerCase() || '';
         case 'status':
-          return item.templatestatus.toLowerCase();
+          return item.templatestatus?.toLowerCase() || '';
         case 'validated':
           return item.templatevalidated ? 1 : 0;
         default:
-          return item[property as keyof EmailTemplate] as string;
+          return (item as any)[property] || '';
       }
     };
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next
-    this.destroy$.complete()
+  private reconnectTableBindings(): void {
+    // Called after data loads to ensure paginator/sort are connected
+    setTimeout(() => {
+      if (this.paginator && this.dataSource.paginator !== this.paginator) {
+        this.dataSource.paginator = this.paginator;
+      }
+      if (this.sort && this.dataSource.sort !== this.sort) {
+        this.dataSource.sort = this.sort;
+        this.setupSorting();
+      }
+    });
   }
 
   // Custom filter function for complex filtering
   createFilter(): (data: EmailTemplate, filter: string) => boolean {
     return (data: EmailTemplate, filter: string): boolean => {
-      // Parse the filter object
       const filterObject = JSON.parse(filter);
 
-      // Search term filter
       if (filterObject.searchTerm) {
         const searchLower = filterObject.searchTerm.toLowerCase();
-        const searchMatch = data.templatename.toLowerCase().includes(searchLower) ||
-          data.templatealias.toLowerCase().includes(searchLower) ||
-          data.subject.toLowerCase().includes(searchLower) ||
+        const searchMatch = (data.templatename || '').toLowerCase().includes(searchLower) ||
+          (data.templatealias || '').toLowerCase().includes(searchLower) ||
+          (data.subject || '').toLowerCase().includes(searchLower) ||
           (data.notes && data.notes.toLowerCase().includes(searchLower));
         if (!searchMatch) return false;
       }
 
-      // Category filter
       if (filterObject.selectedCategory && data.category !== filterObject.selectedCategory) {
         return false;
       }
 
-      // Sub-category filter
       if (filterObject.selectedSubCategory && data.subcategory !== filterObject.selectedSubCategory) {
         return false;
       }
 
-      // Status filter
       if (filterObject.selectedStatus && data.templatestatus !== filterObject.selectedStatus) {
         return false;
       }
 
-      // Validation filter
       if (filterObject.selectedValidation) {
         const isValidated = filterObject.selectedValidation === 'validated';
         if (data.templatevalidated !== isValidated) {
           return false;
         }
+      }
+
+      if (filterObject.selectedServerName && data.servername !== filterObject.selectedServerName) {
+        return false;
       }
 
       return true;
@@ -396,33 +472,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     }
   }
 
-  async loadExistingTemplates(): Promise<void> {
-    this.isLoading = true;
-    try {
-      const templatesRef = collection(this.firestore, 'email templates');
-      const querySnapshot = await getDocs(query(templatesRef,orderBy('date','desc')));
-
-      this.existingTemplates = querySnapshot.docs.map(doc => ({
-        docid: doc.id,
-        ...doc.data()
-      } as EmailTemplate));
-
-      // Update the data source
-      this.dataSource.data = this.existingTemplates;
-      this.totalResults = this.existingTemplates.length;
-
-      // Apply current filters
-      this.applyFilters();
-
-      console.log('Loaded templates:', this.existingTemplates);
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      this.showSnackBar('Error loading templates');
-    } finally {
-      this.isLoading = false;
-    }
-  }
-
   // Filter methods
   applyFilters(): void {
     const filterValue = JSON.stringify({
@@ -430,17 +479,16 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       selectedCategory: this.selectedCategory,
       selectedSubCategory: this.selectedSubCategory,
       selectedStatus: this.selectedStatus,
-      selectedValidation: this.selectedValidation
+      selectedValidation: this.selectedValidation,
+      selectedServerName: this.selectedServerName
     });
 
     this.dataSource.filter = filterValue;
 
-    // Reset to first page when filtering
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
     }
 
-    // Update total results count
     this.totalResults = this.dataSource.filteredData.length;
   }
 
@@ -449,7 +497,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   }
 
   onCategoryFilterChange(): void {
-    this.selectedSubCategory = ''; // Reset subcategory when category changes
+    this.selectedSubCategory = '';
     this.applyFilters();
   }
 
@@ -463,6 +511,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     this.selectedSubCategory = '';
     this.selectedStatus = '';
     this.selectedValidation = '';
+    this.selectedServerName = '';
     this.applyFilters();
   }
 
@@ -474,26 +523,22 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     if (!this.selectedCategory) {
       return this.subCategories;
     }
-    // You might want to implement category-specific subcategories here
     return this.subCategories;
   }
 
   getUniqueStatuses(): string[] {
     const statuses = [...new Set(this.existingTemplates.map(t => t.templatestatus))];
-    return statuses.filter(status => status); // Remove empty values
+    return statuses.filter(status => status);
   }
 
-  // Get current page data for display
   getCurrentPageData(): EmailTemplate[] {
     return this.dataSource.filteredData;
   }
 
-  // Get total filtered results count
   getFilteredResultsCount(): number {
     return this.dataSource.filteredData.length;
   }
 
-  // Get current page info
   getPageInfo(): string {
     if (!this.paginator) return '';
 
@@ -504,21 +549,59 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   }
 
   async loadCategoriesAndSubCategories(): Promise<void> {
-    this.isLoading = true;
+    this.isCategoriesLoading = true;
+    this.templateForm.get('category')?.disable();
+    this.templateForm.get('subCategory')?.disable();
     try {
       const categoriesCollection = doc(collection(this.firestore, 'email validators'), 'templateCategories');
       const categoriesSnapshot = await getDoc(categoriesCollection);
-
       this.categories = categoriesSnapshot.data()?.['categories'] || [];
       this.subCategories = categoriesSnapshot.data()?.['subcategories'] || [];
-
-      console.log('Categories loaded:', this.categories);
-      console.log('Subcategories loaded:', this.subCategories);
-
     } catch (error) {
       console.error('Error loading categories and subcategories from Firestore:', error);
     } finally {
-      this.isLoading = false;
+      this.templateForm.get('category')?.enable();
+      this.templateForm.get('subCategory')?.enable();
+      this.isCategoriesLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async loadServerNames(): Promise<void> {
+    this.isServerNamesLoading = true;
+    this.templateForm.get('serverName')?.disable();
+    try {
+      const serverDoc = doc(collection(this.firestore, 'classify'), 'postmarkserver');
+      const serverSnapshot = await getDoc(serverDoc);
+      this.serverNames = serverSnapshot.data()?.['servername'] || [];
+    } catch (error) {
+      console.error('Error loading server names from Firestore:', error);
+    } finally {
+      this.templateForm.get('serverName')?.enable();
+      this.isServerNamesLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async loadExistingTemplates(): Promise<void> {
+    this.isTemplatesLoading = true;
+    try {
+      const templatesRef = collection(this.firestore, 'email templates');
+      const querySnapshot = await getDocs(query(templatesRef, orderBy('date', 'desc')));
+      this.existingTemplates = querySnapshot.docs.map(doc => ({
+        docid: doc.id,
+        ...doc.data()
+      } as EmailTemplate));
+      this.dataSource.data = this.existingTemplates;
+      this.totalResults = this.existingTemplates.length;
+      this.applyFilters();
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      this.showSnackBar('Error loading templates');
+    } finally {
+      this.isTemplatesLoading = false;
+      this.cdr.detectChanges();
+      this.reconnectTableBindings();
     }
   }
 
@@ -538,6 +621,9 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   switchToPreviewView(template: EmailTemplate): void {
     this.viewMode = 'preview';
     this.previewTemplate = template;
+    // Pre-cache the preview HTML
+    this._cachedPreviewSource = '';
+    this._cachedPreviewHtml = null;
   }
 
   // Template management methods
@@ -546,12 +632,15 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     this.currentEditingTemplate = template;
     this.viewMode = 'create';
 
-    // Populate form with template data
+    // Load existing attachments
+    this.templateAttachments = template.attachments ? [...template.attachments] : [];
+
     this.templateForm.patchValue({
       templateName: template.templatename,
       templateAlias: template.templatealias,
       category: template.category,
       subCategory: template.subcategory,
+      serverName: template.servername || '',
       subject: template.subject,
       body: template.htmlbody,
       notes: template.notes,
@@ -592,7 +681,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   }
 
   async duplicateTemplate(template: EmailTemplate): Promise<void> {
-    const newTemplate = {
+    const newTemplate: any = {
       ...template,
       templatename: template.templatename + ' (Copy)',
       templatealias: template.templatealias + '_copy_' + Date.now(),
@@ -602,7 +691,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       postmarkstatus: 'pending',
       active: false,
       createdby: this.authguard.uid,
-      templatemodel : template.templatemodel,
+      templatemodel: template.templatemodel,
       date: serverTimestamp()
     };
 
@@ -652,33 +741,26 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     event.stopPropagation();
 
     const target = event.target as HTMLElement;
-    console.log('Clicked element:', target);
 
-    // Check if clicked element is an image or contains an image
     let imgElement: HTMLImageElement | null = null;
 
     if (target.tagName === 'IMG') {
       imgElement = target as HTMLImageElement;
     } else {
-      // Look for image within clicked element
       imgElement = target.querySelector('img');
     }
 
     if (imgElement) {
-      console.log('Found image element:', imgElement);
       this.startImageEdit(imgElement);
     }
   }
 
   startImageEdit(imgElement: HTMLImageElement): void {
-    // Hide other forms
     this.showButtonForm = false;
     this.showImageForm = false;
 
-    // Store reference to the image being edited
     this.editingImageElement = imgElement;
 
-    // Extract current properties from the image element
     const computedStyle = window.getComputedStyle(imgElement);
     const currentWidth = imgElement.getAttribute('data-width') ||
       imgElement.style.width ||
@@ -689,7 +771,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     const currentAlignment = imgElement.getAttribute('data-alignment') || 'center';
     const currentResponsive = imgElement.getAttribute('data-responsive') === 'true';
 
-    // Store original data for reset functionality
     this.originalImageData = {
       url: imgElement.src,
       alt: imgElement.alt,
@@ -699,9 +780,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       isResponsive: currentResponsive
     };
 
-    console.log('Editing image with data:', this.originalImageData);
-
-    // Populate the edit form
     this.imageEditForm.patchValue({
       imageUrl: imgElement.src,
       imageAlt: imgElement.alt,
@@ -711,16 +789,13 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       isResponsive: this.originalImageData.isResponsive
     });
 
-    // Show the edit form
     this.showImageEditForm = true;
   }
 
   updateImageInline(): void {
     if (this.imageEditForm.valid && this.editingImageElement) {
       const formValues = this.imageEditForm.value;
-      console.log('Updating image with values:', formValues);
 
-      // Build new styles
       let imageStyle = 'border-radius: 8px; margin: 20px 0; display: block; max-width: 100%; cursor: pointer;';
       let containerStyle = '';
 
@@ -735,7 +810,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
         }
       }
 
-      // Set alignment
       switch (formValues.imageAlignment) {
         case 'center':
           containerStyle = 'text-align: center;';
@@ -748,7 +822,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
           break;
       }
 
-      // Update the image element directly
       this.editingImageElement.src = formValues.imageUrl;
       this.editingImageElement.alt = formValues.imageAlt;
       this.editingImageElement.style.cssText = imageStyle;
@@ -757,13 +830,11 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
       this.editingImageElement.setAttribute('data-alignment', formValues.imageAlignment);
       this.editingImageElement.setAttribute('data-responsive', formValues.isResponsive.toString());
 
-      // Update container alignment if it exists
       const container = this.editingImageElement.closest('.email-image-container') as HTMLElement;
       if (container) {
         container.style.cssText = containerStyle + ' ' + container.style.cssText.replace(/text-align:[^;]*;?/g, '');
       }
 
-      // Update the form control with the modified content
       const editorElement = document.querySelector('.angular-editor-textarea');
       if (editorElement) {
         this.templateForm.patchValue({
@@ -771,7 +842,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
         });
       }
 
-      console.log('Image updated successfully');
       this.cancelImageEdit();
     }
   }
@@ -881,7 +951,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     const file = event.target.files[0];
     if (file) {
       this.selectedFile = file;
-      console.log('File selected:', file.name);
     }
   }
 
@@ -904,7 +973,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
         imageUrl: downloadURL
       });
 
-      console.log('Image uploaded successfully:', downloadURL);
       this.showSnackBar('Image uploaded successfully!');
 
     } catch (error) {
@@ -942,7 +1010,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
         containerStyle = 'text-align: left;';
       }
 
-      // Create image with proper data attributes and click handling
       const imageHtml = `<div style="${containerStyle}" class="email-image-container" data-image-editable="true">
         <img src="${formValues.imageUrl}" 
              alt="${formValues.imageAlt}" 
@@ -961,8 +1028,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
 
       this.showImageForm = false;
       this.selectedFile = null;
-
-      console.log('Image inserted with click handling');
     }
   }
 
@@ -988,13 +1053,25 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     }
   }
 
+  /**
+   * Cached version of getPreviewContent to prevent NG0100.
+   * Only creates a new SafeHtml when the source string actually changes.
+   */
   getPreviewContent(): SafeHtml {
+    let source = '';
+
     if (this.viewMode === 'preview' && this.previewTemplate) {
-      return this.sanitizer.bypassSecurityTrustHtml(this.previewTemplate.htmlbody);
+      source = this.previewTemplate.htmlbody || '';
+    } else {
+      source = this.templateForm.get('body')?.value || '';
     }
-    
-    const content = this.templateForm.get('body')?.value || '';
-    return this.sanitizer.bypassSecurityTrustHtml(content);
+
+    if (source !== this._cachedPreviewSource) {
+      this._cachedPreviewSource = source;
+      this._cachedPreviewHtml = this.sanitizer.bypassSecurityTrustHtml(source);
+    }
+
+    return this._cachedPreviewHtml!;
   }
 
   getPreviewSubject(): string {
@@ -1018,42 +1095,47 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
 
     if (this.templateForm.valid && check) {
       try {
-        var oParser = new DOMParser();
-        var oDOM = oParser.parseFromString(this.templateForm.value.body, "text/html");
-        var textContent = oDOM.body.innerText;
+        // Use getRawValue() to include disabled controls (category/subCategory)
+        const formData = this.templateForm.getRawValue();
+
+        const oParser = new DOMParser();
+        const oDOM = oParser.parseFromString(formData.body, "text/html");
+        const textContent = oDOM.body.innerText;
 
         if (this.isEditMode && this.currentEditingTemplate) {
           const templateDoc = doc(this.firestore, 'email templates', this.currentEditingTemplate.docid);
-          const updateData = {
-            templatename: this.templateForm.value.templateName,
-            templatealias: this.templateForm.value.templateAlias,
-            category: this.templateForm.value.category,
-            subcategory: this.templateForm.value.subCategory,
-            subject: this.templateForm.value.subject,
-            notes: this.templateForm.value.notes || '',
+          const updateData: any = {
+            templatename: formData.templateName,
+            templatealias: formData.templateAlias,
+            category: formData.category,
+            subcategory: formData.subCategory,
+            servername: formData.serverName,
+            subject: formData.subject,
+            notes: formData.notes || '',
             textbody: textContent,
-            htmlbody: this.templateForm.value.body,
+            htmlbody: formData.body,
             updatedBy: this.authguard.uid,
             updatedDate: serverTimestamp(),
             templatestatus: 'updated',
             templatevalidated: false,
-            templatemodel: this.extractVariables(this.templateForm.value.body)
+            templatemodel: this.extractVariables(formData.body),
+            attachments: this.templateAttachments
           };
 
           await updateDoc(templateDoc, updateData);
           this.showSnackBar('Template updated successfully!');
 
         } else {
-          // Create new template
           const emailTemplatesDocRef = doc(collection(this.firestore, 'email templates'));
 
           const templateData = {
-            templatename: this.templateForm.value.templateName,
-            templatealias: this.templateForm.value.templateAlias,
-            category: this.templateForm.value.category,
-            subcategory: this.templateForm.value.subCategory,
-            subject: this.templateForm.value.subject,
-            notes: this.templateForm.value.notes || '',
+            templatename: formData.templateName,
+            templatealias: formData.templateAlias,
+            category: formData.category,
+            subcategory: formData.subCategory,
+            servername: formData.serverName,
+            subject: formData.subject,
+            notes: formData.notes || '',
             createdby: this.authguard.uid,
             date: serverTimestamp(),
             active: false,
@@ -1063,10 +1145,11 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
             templatevalidated: false,
             templatetype: 'Standard',
             templatestatus: 'created',
-            htmlbody: this.templateForm.value.body,
+            htmlbody: formData.body,
             postmarkstatus: 'pending',
             templatelayout: "",
-            templatemodel: this.extractVariables(this.templateForm.value.body)
+            templatemodel: this.extractVariables(formData.body),
+            attachments: this.templateAttachments
           };
 
           await setDoc(emailTemplatesDocRef, templateData);
@@ -1087,37 +1170,20 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     }
   }
 
-  // extractVariables(template: string){
-
-  //   const regex = /{{(.*?)}}/g;
-  //   const matches = template.match(regex) || [];
-
-  //   const variables = [];
-
-  //   matches.forEach(match => {
-  //     const key = match.replace(/{{|}}/g, '').trim();
-  //     variables.push(key); // you can assign default values here if needed
-  //   });
-
-  //   return variables;
-  // }
-
-  extractVariables(template: string) {
+  extractVariables(template: string): string[] {
     const regex = /{{(.*?)}}/g;
-
-    // Force TS to treat as string[]
     const matches: string[] = template.match(regex) || [];
-
-    const variables = [];
+    const variables: string[] = [];
 
     matches.forEach(match => {
       const key = match?.replace(/{{|}}/g, '').trim();
-      variables.push(key); // you can assign default values here if needed
+      if (key) {
+        variables.push(key);
+      }
     });
 
     return variables;
   }
-
 
   onReset(): void {
     this.templateForm.reset();
@@ -1126,16 +1192,223 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
     this.showButtonForm = false;
     this.showImageForm = false;
     this.showImageEditForm = false;
+    this.templateAttachments = [];
+    // Clear cached preview
+    this._cachedPreviewSource = '';
+    this._cachedPreviewHtml = null;
   }
 
   refreshForm(): void {
     this.onReset();
-    console.log('Form refreshed');
   }
 
   onEditorContentChange(content: any): void {
     this.templateForm.patchValue({ body: content }, { emitEvent: false });
-    this.cdr.detectChanges();
+    // Invalidate preview cache
+    this._cachedPreviewSource = '';
+    this._cachedPreviewHtml = null;
+  }
+
+  // =============================================
+  // File Attachment Management
+  // =============================================
+
+  onAttachmentSelected(event: any): void {
+    const files: FileList = event.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      if (file.size > this.MAX_ATTACHMENT_SIZE) {
+        this.showSnackBar(`"${file.name}" exceeds 10MB limit.`);
+        continue;
+      }
+
+      if (!this.ALLOWED_ATTACHMENT_TYPES.includes(file.type) && file.type !== '') {
+        this.showSnackBar(`"${file.name}" — file type not supported.`);
+        continue;
+      }
+
+      // Check for duplicate names
+      if (this.templateAttachments.some(a => a.name === file.name)) {
+        this.showSnackBar(`"${file.name}" is already attached.`);
+        continue;
+      }
+
+      this.uploadAttachment(file);
+    }
+
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
+  }
+
+  async uploadAttachment(file: File): Promise<void> {
+    this.isUploadingAttachment = true;
+    try {
+      const timestamp = new Date().getTime();
+      const fileName = `email-attachments/${timestamp}_${file.name}`;
+      const storageRef = ref(this.storage, fileName);
+
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      const attachment: TemplateAttachment = {
+        name: file.name,
+        url: downloadURL,
+        size: file.size,
+        type: file.type || this.getMimeFromExtension(file.name),
+        uploadedAt: timestamp
+      };
+
+      this.templateAttachments = [...this.templateAttachments, attachment];
+      this.showSnackBar(`"${file.name}" attached successfully`);
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      this.showSnackBar(`Failed to upload "${file.name}". Please try again.`);
+    } finally {
+      this.isUploadingAttachment = false;
+    }
+  }
+
+  removeAttachment(index: number): void {
+    const attachment = this.templateAttachments[index];
+    if (confirm(`Remove "${attachment.name}"?`)) {
+      this.templateAttachments = this.templateAttachments.filter((_, i) => i !== index);
+      this.showSnackBar(`"${attachment.name}" removed`);
+    }
+  }
+
+  getAttachmentIcon(type: string): string {
+    if (type.includes('pdf')) return 'picture_as_pdf';
+    if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return 'table_chart';
+    if (type.includes('word') || type.includes('document')) return 'description';
+    if (type.includes('presentation') || type.includes('powerpoint')) return 'slideshow';
+    if (type.includes('image')) return 'image';
+    if (type.includes('zip') || type.includes('rar')) return 'folder_zip';
+    if (type.includes('text')) return 'text_snippet';
+    return 'attach_file';
+  }
+
+  getAttachmentColor(type: string): string {
+    if (type.includes('pdf')) return '#e53935';
+    if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return '#43a047';
+    if (type.includes('word') || type.includes('document')) return '#1e88e5';
+    if (type.includes('presentation') || type.includes('powerpoint')) return '#fb8c00';
+    if (type.includes('image')) return '#8e24aa';
+    if (type.includes('zip') || type.includes('rar')) return '#6d4c41';
+    return '#757575';
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  private getMimeFromExtension(fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const mimeMap: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'csv': 'text/csv',
+      'txt': 'text/plain',
+      'zip': 'application/zip',
+      'rar': 'application/x-rar-compressed',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp'
+    };
+    return mimeMap[ext] || 'application/octet-stream';
+  }
+
+  // =============================================
+  // Category / Sub-Category Management
+  // =============================================
+
+  openManageDialog(type: 'categories' | 'subcategories', event: Event): void {
+    event.stopPropagation();
+    this.manageType = type;
+    this.newItemName = '';
+    this.manageDialogOpen = true;
+  }
+
+  closeManageDialog(): void {
+    this.manageDialogOpen = false;
+    this.newItemName = '';
+  }
+
+  getManageList(): string[] {
+    return this.manageType === 'categories' ? this.categories : this.subCategories;
+  }
+
+  async addItem(): Promise<void> {
+    const name = this.newItemName.trim();
+    if (!name) return;
+
+    const list = this.getManageList();
+    if (list.includes(name)) {
+      this.showSnackBar(`"${name}" already exists.`);
+      return;
+    }
+
+    this.isSaving = true;
+    try {
+      const updatedList = [...list, name];
+      await this.updateCategoryFirestore(updatedList);
+
+      if (this.manageType === 'categories') {
+        this.categories = updatedList;
+      } else {
+        this.subCategories = updatedList;
+      }
+      this.newItemName = '';
+      this.showSnackBar(`${this.manageType === 'categories' ? 'Category' : 'Sub-Category'} added successfully`);
+    } catch (error) {
+      console.error(`Error adding ${this.manageType}:`, error);
+      this.showSnackBar('Failed to add. Please try again.');
+    } finally {
+      this.isSaving = false;
+    }
+  }
+
+  async removeItem(item: string): Promise<void> {
+    if (!confirm(`Remove "${item}"?`)) return;
+
+    this.isSaving = true;
+    try {
+      const list = this.getManageList();
+      const updatedList = list.filter(i => i !== item);
+      await this.updateCategoryFirestore(updatedList);
+
+      if (this.manageType === 'categories') {
+        this.categories = updatedList;
+      } else {
+        this.subCategories = updatedList;
+      }
+      this.showSnackBar(`${this.manageType === 'categories' ? 'Category' : 'Sub-Category'} removed successfully`);
+    } catch (error) {
+      console.error(`Error removing ${this.manageType}:`, error);
+      this.showSnackBar('Failed to remove. Please try again.');
+    } finally {
+      this.isSaving = false;
+    }
+  }
+
+  private async updateCategoryFirestore(updatedList: string[]): Promise<void> {
+    const docRef = doc(collection(this.firestore, 'email validators'), 'templateCategories');
+    await updateDoc(docRef, {
+      [this.manageType]: updatedList
+    });
   }
 
   // Getter methods for easy access to form controls
@@ -1144,5 +1417,6 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   get category() { return this.templateForm.get('category'); }
   get subCategory() { return this.templateForm.get('subCategory'); }
   get subject() { return this.templateForm.get('subject'); }
+  get serverName() { return this.templateForm.get('serverName'); }
   get body() { return this.templateForm.get('body'); }
 }

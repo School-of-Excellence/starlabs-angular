@@ -293,11 +293,249 @@
 
 </div>
 
+  <!-- Preview + Detail Modal Layout -->
+<div class="detail-layout" [class.detail-layout--open]="activeModal === 'detail'">
+
+  <!-- LEFT: Mobile Preview -->
+  <div class="preview-page">
+    <div class="preview-empty" *ngIf="!journeySelected && !isEditMode">
+      <mat-icon>phone_iphone</mat-icon>
+      <p>Select a journey to see the preview</p>
+    </div>
+
+    <div class="mobile-frame" *ngIf="journeySelected || isEditMode">
+      <div class="mobile-screen">
+
+        <!-- 1: intro -->
+        <ng-container *ngIf="currentScreen === 'intro'">
+          <div class="screen-hero" style="position:absolute;inset:0;height:100%">
+            <video
+              *ngIf="isVideoUrl(imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value)"
+              class="screen-hero__media"
+              [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value"
+              autoplay muted loop playsinline>
+            </video>
+            <img
+              *ngIf="!isVideoUrl(imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value)"
+              class="screen-hero__media"
+              [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value" />
+            <div class="screen-hero__overlay">
+              <h2 class="screen-title" style="color:#000">{{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }}</h2>
+              <p class="screen-body" style="color:#000">{{ detailForm.get('eventdescripition.introduction')?.value }}</p>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- 2: journeyOverview -->
+        <ng-container *ngIf="currentScreen === 'journeyOverview'">
+          <div class="screen-pad">
+            <h2 class="screen-title">{{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }} Journey</h2>
+            <div class="screen-video-placeholder">
+              <mat-icon>play_circle_filled</mat-icon>
+              <span>{{ selectedRefs['overviewvideo']?.title || 'Overview Video' }}</span>
+            </div>
+            <p class="screen-body-sm">{{ detailForm.get('subscription.descripition')?.value }}</p>
+          </div>
+        </ng-container>
+
+        <!-- 3: journeyDescripition -->
+        <ng-container *ngIf="currentScreen === 'journeyDescripition'">
+          <div class="screen-pad">
+            <h2 class="screen-title" style="color:#C6168D">
+              What Awaits You on the {{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }} Journey
+            </h2>
+            <p class="screen-body-sm">{{ detailForm.get('journeydetail.intro')?.value }}</p>
+            <img *ngIf="detailForm.get('journeydetail.imageurl')?.value || imagePreviews['journeydetail_imageurl']"
+                [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
+                class="screen-img" />
+            <p class="screen-body-sm">{{ detailForm.get('journeydetail.descripition')?.value }}</p>
+          </div>
+        </ng-container>
+
+        <!-- 4: subscription -->
+        <ng-container *ngIf="currentScreen === 'subscription'">
+          <div class="screen-pad">
+            <p style="color:#C6168D;font-size:13px;font-weight:500;margin-bottom:2px">Explore Your Journey</p>
+            <p style="color:#C6168D;font-size:15px;font-weight:700;margin-bottom:12px">Subscription and Products</p>
+            <div style="background:rgba(198,22,141,0.1);border-radius:8px;padding:12px">
+              <img *ngIf="detailForm.get('subscription.imageurl')?.value || imagePreviews['subscription_imageurl']"
+                  [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
+                  class="screen-img" />
+              <h2 class="screen-title">{{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }} Journey</h2>
+              <p class="screen-body-sm">{{ detailForm.get('subscription.descripition')?.value }}</p>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- 5: journeyExperience -->
+        <ng-container *ngIf="currentScreen === 'journeyExperience'">
+          <div class="screen-pad" style="height:100%;overflow-y:auto">
+            <p style="color:#C6168D;font-size:11px;font-weight:500;margin-bottom:4px">What's Included in</p>
+            <p style="color:#C6168D;font-size:13px;font-weight:700;margin-bottom:12px">Your Journey to Experience</p>
+            <div *ngFor="let prod of productincluded.controls; let i = index"
+                (click)="openProductSheet(prod.get('type')?.value, prod.get('title')?.value)"
+                style="cursor:pointer;margin-bottom:10px;background:#e3f7fd;border-radius:8px;padding:10px 12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div style="flex:1">
+                  <h4 style="font-size:12px;font-weight:700;color:#000;margin:0 0 4px">
+                    {{ prod.get('title')?.value || 'Product title' }}
+                  </h4>
+                  <p style="font-size:10px;color:#C6168D;margin:0">
+                    {{ prod.get('descripition')?.value }}
+                  </p>
+                </div>
+                <div style="width:20px;height:20px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <mat-icon style="font-size:10px;width:10px;height:10px;color:#00AEEF;line-height:1">arrow_forward_ios</mat-icon>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- 6: productOverview -->
+        <ng-container *ngIf="currentScreen === 'productOverview'">
+          <div class="screen-pad">
+            <h2 class="screen-title" style="color:#C6168D">What Lies Ahead</h2>
+            <img *ngIf="detailForm.get('journeypath.imageurl')?.value || imagePreviews['journeypath_imageurl']"
+                [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
+                class="screen-img" />
+            <p class="screen-body-sm">{{ detailForm.get('journeypath.intro')?.value }}</p>
+            <p class="screen-body-sm">{{ detailForm.get('journeypath.descripition')?.value }}</p>
+          </div>
+        </ng-container>
+
+        <!-- 7: aelSelection — Others bottom sheet preview -->
+        <ng-container *ngIf="currentScreen === 'aelSelection'">
+          <div style="position:relative;height:100%;overflow:hidden">
+
+            <!-- background dimmed -->
+            <div class="screen-pad" style="opacity:0.25;position:absolute;inset:0">
+              <p style="color:#C6168D;font-size:11px;font-weight:500">Select</p>
+              <p style="color:#C6168D;font-size:13px;font-weight:700">Your Goals</p>
+              <div *ngFor="let prod of productincluded.controls"
+                  style="background:#e3f7fd;border-radius:6px;padding:7px 9px;margin-bottom:6px">
+                <p style="font-size:10px;font-weight:700;color:#000;margin:0">
+                  {{ prod.get('title')?.value || 'Product' }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Others bottom sheet — contained inside the phone -->
+            <div style="position:absolute;bottom:0;left:0;right:0;height:72%;background:#fff;border-radius:12px 12px 0 0;box-shadow:0 -2px 8px rgba(0,0,0,0.12);display:flex;flex-direction:column;overflow:hidden">
+              <div style="width:28px;height:3px;background:#ddd;border-radius:2px;margin:7px auto 0;flex-shrink:0"></div>
+              <div style="flex:1;overflow-y:auto;padding:8px 10px 6px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+                  <p style="font-size:11px;font-weight:700;color:#C6168D;margin:0;flex:1;line-height:1.4;padding-right:6px">
+                    {{ detailForm.get('otherdescripition.title')?.value || 'Title will appear here' }}
+                  </p>
+                  <div style="width:16px;height:16px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"
+                      (click)="currentScreen = 'journeyExperience'; detailTabIndex = 4">
+                    <mat-icon style="font-size:8px;width:8px;height:8px;color:#fff;line-height:1">close</mat-icon>
+                  </div>
+                </div>
+                <p style="font-size:9px;color:#333;line-height:1.6;margin:0">
+                  {{ detailForm.get('otherdescripition.descripition')?.value || 'Description will appear here' }}
+                </p>
+              </div>
+              <div style="padding:6px 10px 10px;flex-shrink:0">
+                <div style="background:#00AEEF;border-radius:7px;padding:7px;text-align:center;font-size:10px;font-weight:600;color:#fff;cursor:pointer"
+                    (click)="currentScreen = 'journeyExperience'; detailTabIndex = 4">
+                  Back
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </ng-container>
+
+        <!-- 8: onboarding -->
+        <ng-container *ngIf="currentScreen === 'onboarding'">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:8px">
+            <mat-icon style="font-size:36px;height:36px;width:36px;color:#C6168D">event</mat-icon>
+            <p style="font-size:13px;font-weight:600;color:#C6168D;margin:0">Onboarding</p>
+            <p style="font-size:11px;font-weight:600;color:#C6168D;margin:0">Call Booking</p>
+          </div>
+        </ng-container>
+
+        <!-- 9: congratulations -->
+        <ng-container *ngIf="currentScreen === 'congratulations'">
+          <div class="screen-pad" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center">
+            <mat-icon style="font-size:48px;height:48px;width:48px;color:#C6168D">celebration</mat-icon>
+            <h2 class="screen-title" style="margin-top:12px">Congratulations!</h2>
+            <p class="screen-body-sm" style="margin-top:8px">Your onboarding call is scheduled.</p>
+            <p class="screen-body-sm" style="margin-top:6px;font-size:10px;color:#888">
+              Dive into EIFLiX videos to prepare for the transformations ahead.
+            </p>
+          </div>
+        </ng-container>
+
+        <!-- bottom sheet — only shown when on journeyExperience screen -->
+        <div class="product-sheet"
+            [class.product-sheet--open]="productSheetOpen && currentScreen === 'journeyExperience'">
+          <div class="product-sheet__handle"></div>
+          <div class="product-sheet__scroll">
+            <div class="product-sheet__header">
+              <span class="product-sheet__title">{{ productSheetTitle }}</span>
+              <button class="product-sheet__close" (click)="closeProductSheet()">✕</button>
+            </div>
+
+            <!-- QUEUE -->
+            <ng-container *ngIf="activeProductType === 'queue'">
+              <p class="ps-text">{{ detailForm.get('queuedescripition.descripition')?.value || '—' }}</p>
+              <p class="ps-section-label">The Process</p>
+              <img *ngIf="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
+                  [src]="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
+                  class="ps-img" />
+              <div *ngIf="!imagePreviews['processimage'] && !detailForm.get('processdetails.processimage')?.value"
+                  class="ps-img-placeholder">process image</div>
+              <div *ngFor="let s of processSteps.controls; let i = index" class="ps-step">
+                <div class="ps-step__num">{{ i + 1 }}</div>
+                <div>
+                  <div class="ps-step__title">{{ s.get('title')?.value || 'Step ' + (i+1) }}</div>
+                  <div class="ps-step__desc">{{ s.get('descripition')?.value }}</div>
+                </div>
+              </div>
+              <p class="ps-section-label">ATC Model</p>
+              <div class="ps-atc-box">
+                <p class="ps-atc-title">{{ detailForm.get('queuedescripition.atcmodel.title')?.value || '—' }}</p>
+              </div>
+              <p class="ps-text">{{ detailForm.get('queuedescripition.atcmodel.descripition')?.value }}</p>
+            </ng-container>
+
+            <!-- EVENT -->
+            <ng-container *ngIf="activeProductType === 'event'">
+              <p class="ps-title">{{ detailForm.get('eventdescripition.title')?.value || '—' }}</p>
+              <p class="ps-text">{{ detailForm.get('eventdescripition.intro')?.value }}</p>
+              <p class="ps-section-label">{{ detailForm.get('eventdescripition.overview')?.value }}</p>
+              <p class="ps-text">{{ detailForm.get('eventdescripition.overviewdescripition')?.value }}</p>
+            </ng-container>
+
+            <!-- OTHERS -->
+            <ng-container *ngIf="activeProductType === 'others'">
+              <p class="ps-title">{{ detailForm.get('otherdescripition.title')?.value || '—' }}</p>
+              <p class="ps-text">{{ detailForm.get('otherdescripition.descripition')?.value }}</p>
+            </ng-container>
+
+          </div>
+          <div class="product-sheet__footer">
+            <button class="ps-back-btn" (click)="closeProductSheet()">Back</button>
+          </div>
+        </div>
+
+      </div>
+
+  <!-- RIGHT: Detail Modal Panel -->
+  <div class="modal-panel modal-panel--wide" [class.modal-panel--open]="activeModal === 'detail'">
+    <!-- ... all existing modal content unchanged ... -->
+  </div>
+
+</div>
 
 <!-- ══════════════════════════════════════════════════════
      JOURNEY ONBOARDING DETAIL MODAL
 ══════════════════════════════════════════════════════════ -->
 <div class="modal-panel modal-panel--wide" [class.modal-panel--open]="activeModal === 'detail'">
+
   <div class="modal-header">
     <div class="modal-title-group">
       <h2>{{ editingIndex !== null ? 'Edit' : 'Add' }} Journey Onboarding Detail</h2>
@@ -317,373 +555,545 @@
     <ng-container *ngIf="!detailSubmitted">
       <form [formGroup]="detailForm" autocomplete="off">
 
-        <!-- ══════════════════════════════════════════════════
-             FIELD 1: journeyref — journey collection dropdown
-             • New entry  → editable mat-select (required)
-             • Edit mode  → disabled mat-select (visible, greyed)
-        ══════════════════════════════════════════════════════ -->
+        <!-- Journey selector — always visible at top -->
         <div class="field-section-label">
-          journeyref
-          <span class="ref-tag">reference → journey</span>
+          journeyref <span class="ref-tag">reference → journey</span>
           <span *ngIf="isEditMode" class="locked-badge">
             <mat-icon style="font-size:12px;height:12px;width:12px;line-height:1;vertical-align:middle">lock</mat-icon>
             locked
           </span>
         </div>
-
         <div class="loading-hint" *ngIf="journeyOptionsLoading">
           <span class="spinner"></span> Loading journey collection…
         </div>
-
-        <!-- Single field replacing both *ngIf blocks -->
         <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Select Journey <span class="req" *ngIf="!isEditMode">*</span></mat-label>
-        <mat-select formControlName="journeyrefDocId"
-                    (selectionChange)="onJourneyRefSelect($event.value)">
-          <mat-option value="">— None —</mat-option>
-          <mat-option *ngFor="let j of isEditMode ? journeyOptions : availableJourneyOptions" [value]="j.id">
-            {{ j.label }}
-          </mat-option>
-        </mat-select>
-        <mat-hint *ngIf="isEditMode">Journey cannot be changed once saved</mat-hint>
-        <mat-error *ngIf="isInvalid(detailForm, 'journeyrefDocId')">Please select a journey</mat-error>
-        </mat-form-field>
-
-        <!-- ══════════════════════════════════════════════════
-             overviewvideo — content_urls reference dropdown
-        ══════════════════════════════════════════════════════ -->
-        <ng-container *ngIf="journeySelected || isEditMode">
-        <div class="field-section-label">overviewvideo <span class="ref-tag">reference → content_urls</span></div>
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Select overview video</mat-label>
-          <mat-select formControlName="overviewvideoDocId"
-                      (selectionChange)="onSingleRefSelect($event.value, 'overviewvideo')">
+          <mat-label>Select Journey <span class="req" *ngIf="!isEditMode">*</span></mat-label>
+          <mat-select formControlName="journeyrefDocId"
+                      (selectionChange)="onJourneyRefSelect($event.value)">
             <mat-option value="">— None —</mat-option>
-            <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
-              <span class="cu-option-wrap">
-                <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
-                {{ opt.title }}
-              </span>
+            <mat-option *ngFor="let j of isEditMode ? journeyOptions : availableJourneyOptions" [value]="j.id">
+              {{ j.label }}
             </mat-option>
           </mat-select>
+          <mat-hint *ngIf="isEditMode">Journey cannot be changed once saved</mat-hint>
+          <mat-error *ngIf="isInvalid(detailForm, 'journeyrefDocId')">Please select a journey</mat-error>
         </mat-form-field>
-        <div class="cu-preview" *ngIf="selectedRefs['overviewvideo']">
-          <img *ngIf="selectedRefs['overviewvideo']?.thumbnailUrl"
-               [src]="selectedRefs['overviewvideo']?.thumbnailUrl" class="cu-preview__thumb" />
-          <div class="cu-preview__body">
-            <span class="cu-preview__title">{{ selectedRefs['overviewvideo']?.title }}</span>
-            <span class="cu-preview__path">content_urls / {{ selectedRefs['overviewvideo']?.id }}</span>
+
+        <ng-container *ngIf="journeySelected || isEditMode">
+
+          <!-- Tab bar -->
+          <div class="detail-tab-bar">
+            <button *ngFor="let tab of detailTabs; let i = index"
+                    class="detail-tab"
+                    [class.detail-tab--active]="detailTabIndex === i"
+                    (click)="detailTabIndex = i; currentScreen = tab.screen; productSheetOpen = false; activeProductType = null">
+              <span class="detail-tab__dot" [class.detail-tab__dot--filled]="isTabFilled(i)">{{ i + 1 }}</span>
+              <span class="detail-tab__label">{{ tab.label }}</span>
+            </button>
           </div>
-        </div>
 
-        <!-- eventdescripition -->
-        <div class="field-section-label">eventdescripition <span class="map-tag">map</span></div>
-        <div formGroupName="eventdescripition">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>title <span class="req">*</span></mat-label>
-            <input matInput formControlName="title" placeholder="The uP! Live Event…" />
-            <mat-error *ngIf="isInvalid(detailForm, 'eventdescripition.title')">Required</mat-error>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>intro <span class="req">*</span></mat-label>
-            <textarea matInput formControlName="intro" rows="3"
-                      placeholder="The 6-day uP! Arena…"></textarea>
-            <mat-error *ngIf="isInvalid(detailForm, 'eventdescripition.intro')">Required</mat-error>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>overview</mat-label>
-            <input matInput formControlName="overview" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>overviewdescripition</mat-label>
-            <textarea matInput formControlName="overviewdescripition" rows="2"></textarea>
-          </mat-form-field>
-
-          <!-- goalvideourl -->
-          <div class="nested-ref-label">goalvideourl <span class="ref-tag">reference → content_urls</span></div>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Select goal video</mat-label>
-            <mat-select formControlName="goalvideourlDocId"
-                        (selectionChange)="onSingleRefSelect($event.value, 'goalvideourl')">
-              <mat-option value="">— None —</mat-option>
-              <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
-                <span class="cu-option-wrap">
-                  <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
-                  {{ opt.title }}
-                </span>
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
-          <div class="cu-preview" *ngIf="selectedRefs['goalvideourl']">
-            <img *ngIf="selectedRefs['goalvideourl']?.thumbnailUrl"
-                 [src]="selectedRefs['goalvideourl']?.thumbnailUrl" class="cu-preview__thumb" />
-            <div class="cu-preview__body">
-              <span class="cu-preview__title">{{ selectedRefs['goalvideourl']?.title }}</span>
-              <span class="cu-preview__path">content_urls / {{ selectedRefs['goalvideourl']?.id }}</span>
+          <!-- ══════════════════════════════════════════════
+              TAB 0 — INTRO
+              Flutter screen: introduction()
+              Shows: introductionvideo (bg), journey name,
+                      introduction text, overviewvideo ref
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 0">
+            <!-- introductionvideo -->
+            <div class="field-section-label">
+              introductionvideo <span class="url-tag">file upload</span>
             </div>
-          </div>
-
-          <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
-            <mat-label>introduction</mat-label>
-            <textarea matInput formControlName="introduction" rows="2"></textarea>
-          </mat-form-field>
-
-          <!-- introductionvideo — file upload -->
-          <div class="nested-ref-label">introductionvideo <span class="url-tag">file upload</span></div>
-          <div class="img-upload-box" (click)="triggerFileInput('introductionvideo')">
-            <ng-container *ngIf="!imagePreviews['introductionvideo'] && !detailForm.get('eventdescripition.introductionvideo')?.value">
-              <mat-icon class="upload-icon">cloud_upload</mat-icon>
-              <span class="upload-label">Click to upload image / video</span>
-            </ng-container>
-            <ng-container *ngIf="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value">
-              <img class="img-preview"
-                   [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value"
-                   alt="preview" />
-              <button class="img-clear-btn" type="button"
-                      (click)="clearImage($event, 'introductionvideo', 'eventdescripition.introductionvideo')">✕</button>
-            </ng-container>
-          </div>
-          <input type="file" accept="image/*,video/*" class="hidden-file-input"
-                 [id]="'file-introductionvideo'"
-                 (change)="onFileChange($event, 'introductionvideo', 'eventdescripition.introductionvideo')" />
-        </div>
-
-        <!-- journeydetail -->
-        <div class="field-section-label">journeydetail <span class="map-tag">map</span></div>
-        <div formGroupName="journeydetail">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>intro</mat-label>
-            <textarea matInput formControlName="intro" rows="2"></textarea>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>descripition</mat-label>
-            <textarea matInput formControlName="descripition" rows="2"></textarea>
-          </mat-form-field>
-          <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-          <div class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
-            <ng-container *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value">
-              <mat-icon class="upload-icon">cloud_upload</mat-icon>
-              <span class="upload-label">Click to upload image</span>
-            </ng-container>
-            <ng-container *ngIf="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value">
-              <img class="img-preview"
-                   [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
-                   alt="preview" />
-              <button class="img-clear-btn" type="button"
-                      (click)="clearImage($event, 'journeydetail_imageurl', 'journeydetail.imageurl')">✕</button>
-            </ng-container>
-          </div>
-          <input type="file" accept="image/*" class="hidden-file-input"
-                 [id]="'file-journeydetail_imageurl'"
-                 (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
-        </div>
-
-        <!-- journeypath -->
-        <div class="field-section-label">journeypath <span class="map-tag">map</span></div>
-        <div formGroupName="journeypath">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>intro</mat-label>
-            <textarea matInput formControlName="intro" rows="2"></textarea>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>descripition</mat-label>
-            <textarea matInput formControlName="descripition" rows="2"></textarea>
-          </mat-form-field>
-          <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-          <div class="img-upload-box" (click)="triggerFileInput('journeypath_imageurl')">
-            <ng-container *ngIf="!imagePreviews['journeypath_imageurl'] && !detailForm.get('journeypath.imageurl')?.value">
-              <mat-icon class="upload-icon">cloud_upload</mat-icon>
-              <span class="upload-label">Click to upload image</span>
-            </ng-container>
-            <ng-container *ngIf="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value">
-              <img class="img-preview"
-                   [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
-                   alt="preview" />
-              <button class="img-clear-btn" type="button"
-                      (click)="clearImage($event, 'journeypath_imageurl', 'journeypath.imageurl')">✕</button>
-            </ng-container>
-          </div>
-          <input type="file" accept="image/*" class="hidden-file-input"
-                 [id]="'file-journeypath_imageurl'"
-                 (change)="onFileChange($event, 'journeypath_imageurl', 'journeypath.imageurl')" />
-        </div>
-
-        <!-- otherdescripition -->
-        <div class="field-section-label">otherdescripition <span class="map-tag">map</span></div>
-        <div formGroupName="otherdescripition">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>title</mat-label>
-            <input matInput formControlName="title" placeholder="Ongoing Evolution…" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>descripition</mat-label>
-            <textarea matInput formControlName="descripition" rows="2"></textarea>
-          </mat-form-field>
-        </div>
-
-        <!-- subscription -->
-        <div class="field-section-label">subscription <span class="map-tag">map</span></div>
-        <div formGroupName="subscription">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>descripition</mat-label>
-            <textarea matInput formControlName="descripition" rows="2"></textarea>
-          </mat-form-field>
-          <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-          <div class="img-upload-box" (click)="triggerFileInput('subscription_imageurl')">
-            <ng-container *ngIf="!imagePreviews['subscription_imageurl'] && !detailForm.get('subscription.imageurl')?.value">
-              <mat-icon class="upload-icon">cloud_upload</mat-icon>
-              <span class="upload-label">Click to upload image</span>
-            </ng-container>
-            <ng-container *ngIf="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value">
-              <img class="img-preview"
-                   [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
-                   alt="preview" />
-              <button class="img-clear-btn" type="button"
-                      (click)="clearImage($event, 'subscription_imageurl', 'subscription.imageurl')">✕</button>
-            </ng-container>
-          </div>
-          <input type="file" accept="image/*" class="hidden-file-input"
-                 [id]="'file-subscription_imageurl'"
-                 (change)="onFileChange($event, 'subscription_imageurl', 'subscription.imageurl')" />
-        </div>
-
-        <!-- productincluded -->
-        <div class="field-section-label">
-          productincluded <span class="arr-badge">array of maps</span>
-        </div>
-        <div formArrayName="productincluded">
-          <div class="array-card"
-               *ngFor="let prod of productincluded.controls; let i = index"
-               [formGroupName]="i">
-            <div class="array-card-header">
-              <span class="array-index">#{{ i }}</span>
-              <button mat-icon-button type="button" color="warn"
-                      (click)="removeProduct(i)" *ngIf="productincluded.length > 1">
-                <mat-icon>close</mat-icon>
-              </button>
+            <div class="img-upload-box" (click)="triggerFileInput('introductionvideo')">
+              <ng-container *ngIf="!imagePreviews['introductionvideo'] && !detailForm.get('eventdescripition.introductionvideo')?.value">
+                <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                <span class="upload-label">Click to upload background video / image</span>
+              </ng-container>
+              <ng-container *ngIf="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value">
+                <img class="img-preview"
+                    [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value"
+                    alt="preview" />
+                <button class="img-clear-btn" type="button"
+                        (click)="clearImage($event, 'introductionvideo', 'eventdescripition.introductionvideo')">✕</button>
+              </ng-container>
             </div>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>title</mat-label>
-              <input matInput formControlName="title" />
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>descripition</mat-label>
-              <textarea matInput formControlName="descripition" rows="2"></textarea>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>type</mat-label>
-              <mat-select formControlName="type">
-                <mat-option *ngFor="let t of productTypeOptions" [value]="t">{{ t }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-        </div>
-        <button mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
-          + Add Product
-        </button>
+            <input type="file" accept="image/*,video/*" class="hidden-file-input"
+                  [id]="'file-introductionvideo'"
+                  (change)="onFileChange($event, 'introductionvideo', 'eventdescripition.introductionvideo')" />
 
-        <!-- queuedescripition -->
-        <div class="field-section-label">queuedescripition <span class="map-tag">map</span></div>
-        <div formGroupName="queuedescripition">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>descripition</mat-label>
-            <textarea matInput formControlName="descripition" rows="2"></textarea>
-          </mat-form-field>
-          <div class="nested-label">atcmodel <span class="map-tag">map</span></div>
-          <div formGroupName="atcmodel">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>title</mat-label>
-              <input matInput formControlName="title" placeholder="ADJUSTMENT X TIME = CONSEQUENCES" />
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>descripition</mat-label>
-              <textarea matInput formControlName="descripition" rows="2"></textarea>
-            </mat-form-field>
-          </div>
-        </div>
+            <!-- eventdescripition -->
+            <div class="field-section-label">
+              eventdescripition <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="eventdescripition">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>introduction <span class="req">*</span></mat-label>
+                <textarea matInput formControlName="introduction" rows="3"
+                          placeholder="Welcome text shown below the video on the intro screen…"></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>title <span class="req">*</span></mat-label>
+                <input matInput formControlName="title" placeholder="The uP! Live Event…" />
+                <mat-error *ngIf="isInvalid(detailForm, 'eventdescripition.title')">Required</mat-error>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>intro <span class="req">*</span></mat-label>
+                <textarea matInput formControlName="intro" rows="3"
+                          placeholder="The 6-day uP! Arena…"></textarea>
+                <mat-error *ngIf="isInvalid(detailForm, 'eventdescripition.intro')">Required</mat-error>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>overview</mat-label>
+                <input matInput formControlName="overview" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>overviewdescripition</mat-label>
+                <textarea matInput formControlName="overviewdescripition" rows="2"></textarea>
+              </mat-form-field>
 
-        <!-- processdetails -->
-        <div class="field-section-label">processdetails <span class="map-tag">map</span></div>
-        <div formGroupName="processdetails">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>title</mat-label>
-            <input matInput formControlName="title" placeholder="Personalized uP! Diagnostics…" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>descripition</mat-label>
-            <textarea matInput formControlName="descripition" rows="2"></textarea>
-          </mat-form-field>
-          <div class="nested-ref-label">processimage <span class="url-tag">file upload</span></div>
-          <div class="img-upload-box" (click)="triggerFileInput('processimage')">
-            <ng-container *ngIf="!imagePreviews['processimage'] && !detailForm.get('processdetails.processimage')?.value">
-              <mat-icon class="upload-icon">cloud_upload</mat-icon>
-              <span class="upload-label">Click to upload image</span>
-            </ng-container>
-            <ng-container *ngIf="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value">
-              <img class="img-preview"
-                   [src]="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
-                   alt="preview" />
-              <button class="img-clear-btn" type="button"
-                      (click)="clearImage($event, 'processimage', 'processdetails.processimage')">✕</button>
-            </ng-container>
-          </div>
-          <input type="file" accept="image/*" class="hidden-file-input"
-                 [id]="'file-processimage'"
-                 (change)="onFileChange($event, 'processimage', 'processdetails.processimage')" />
-
-          <div class="nested-label" style="margin-top:10px">step <span class="arr-badge">array of maps</span></div>
-          <div formArrayName="step">
-            <div class="array-card"
-                 *ngFor="let s of processSteps.controls; let i = index"
-                 [formGroupName]="i">
-              <div class="array-card-header">
-                <span class="array-index">Step {{ i + 1 }}</span>
-                <button mat-icon-button type="button" color="warn"
-                        (click)="removeProcessStep(i)" *ngIf="processSteps.length > 1">
-                  <mat-icon>close</mat-icon>
-                </button>
+              <!-- goalvideourl -->
+              <div class="nested-ref-label">
+                goalvideourl <span class="ref-tag">reference → content_urls</span>
               </div>
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>title</mat-label>
-                <input matInput formControlName="title" placeholder="Wellness Scaling Form" />
+                <mat-label>Select goal video</mat-label>
+                <mat-select formControlName="goalvideourlDocId"
+                            (selectionChange)="onSingleRefSelect($event.value, 'goalvideourl')">
+                  <mat-option value="">— None —</mat-option>
+                  <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
+                    <span class="cu-option-wrap">
+                      <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
+                      {{ opt.title }}
+                    </span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <div class="cu-preview" *ngIf="selectedRefs['goalvideourl']">
+                <img *ngIf="selectedRefs['goalvideourl']?.thumbnailUrl"
+                    [src]="selectedRefs['goalvideourl']?.thumbnailUrl" class="cu-preview__thumb" />
+                <div class="cu-preview__body">
+                  <span class="cu-preview__title">{{ selectedRefs['goalvideourl']?.title }}</span>
+                  <span class="cu-preview__path">content_urls / {{ selectedRefs['goalvideourl']?.id }}</span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 1 — JOURNEY OVERVIEW
+              Flutter screen: overview()
+              Shows: journey name, overviewvideo, subscription.descripition
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 1">
+            <p class="tab-hint">
+              This screen shows the <strong>overview video</strong> selected in Tab 1
+              and the <strong>subscription description</strong> below it.
+            </p>
+
+            <!-- overviewvideo -->
+            <div class="field-section-label">
+              overviewvideo <span class="ref-tag">reference → content_urls</span>
+            </div>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Select overview video</mat-label>
+              <mat-select formControlName="overviewvideoDocId"
+                          (selectionChange)="onSingleRefSelect($event.value, 'overviewvideo')">
+                <mat-option value="">— None —</mat-option>
+                <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
+                  <span class="cu-option-wrap">
+                    <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
+                    {{ opt.title }}
+                  </span>
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div class="cu-preview" *ngIf="selectedRefs['overviewvideo']">
+              <img *ngIf="selectedRefs['overviewvideo']?.thumbnailUrl"
+                  [src]="selectedRefs['overviewvideo']?.thumbnailUrl" class="cu-preview__thumb" />
+              <div class="cu-preview__body">
+                <span class="cu-preview__title">{{ selectedRefs['overviewvideo']?.title }}</span>
+                <span class="cu-preview__path">content_urls / {{ selectedRefs['overviewvideo']?.id }}</span>
+              </div>
+            </div>
+
+            <div class="field-section-label">
+              subscription → descripition <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="subscription">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>descripition</mat-label>
+                <textarea matInput formControlName="descripition" rows="3"
+                          placeholder="Shown below the overview video on the Journey Overview screen…"></textarea>
+              </mat-form-field>
+            </div>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 2 — JOURNEY DESCRIPTION
+              Flutter screen: uPJourney()
+              Shows: journeydetail.intro, journeydetail.imageurl,
+                      journeydetail.descripition
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 2">
+
+            <div class="field-section-label">
+              journeydetail <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="journeydetail">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>intro</mat-label>
+                <textarea matInput formControlName="intro" rows="3"
+                          placeholder="First text block shown on the What Awaits You screen…"></textarea>
+              </mat-form-field>
+
+              <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
+              <div class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
+                <ng-container *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value">
+                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                  <span class="upload-label">Click to upload image</span>
+                </ng-container>
+                <ng-container *ngIf="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value">
+                  <img class="img-preview"
+                      [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
+                      alt="preview" />
+                  <button class="img-clear-btn" type="button"
+                          (click)="clearImage($event, 'journeydetail_imageurl', 'journeydetail.imageurl')">✕</button>
+                </ng-container>
+              </div>
+              <input type="file" accept="image/*" class="hidden-file-input"
+                    [id]="'file-journeydetail_imageurl'"
+                    (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
+
+              <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
+                <mat-label>descripition</mat-label>
+                <textarea matInput formControlName="descripition" rows="3"
+                          placeholder="Second text block shown below the image…"></textarea>
+              </mat-form-field>
+            </div>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 3 — SUBSCRIPTION
+              Flutter screen: subscription()
+              Shows: subscription.imageurl, journey name,
+                      subscription.descripition, duration, expiry
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 3">
+            <p class="tab-hint">
+              The card on this screen shows the image, journey name, description, and the participant's
+              subscription duration and expiry date (pulled from their record automatically).
+            </p>
+
+            <div class="field-section-label">
+              subscription <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="subscription">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>descripition</mat-label>
+                <textarea matInput formControlName="descripition" rows="3"></textarea>
+              </mat-form-field>
+
+              <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
+              <div class="img-upload-box" (click)="triggerFileInput('subscription_imageurl')">
+                <ng-container *ngIf="!imagePreviews['subscription_imageurl'] && !detailForm.get('subscription.imageurl')?.value">
+                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                  <span class="upload-label">Click to upload image</span>
+                </ng-container>
+                <ng-container *ngIf="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value">
+                  <img class="img-preview"
+                      [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
+                      alt="preview" />
+                  <button class="img-clear-btn" type="button"
+                          (click)="clearImage($event, 'subscription_imageurl', 'subscription.imageurl')">✕</button>
+                </ng-container>
+              </div>
+              <input type="file" accept="image/*" class="hidden-file-input"
+                    [id]="'file-subscription_imageurl'"
+                    (change)="onFileChange($event, 'subscription_imageurl', 'subscription.imageurl')" />
+            </div>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 4 — JOURNEY EXPERIENCE
+              Flutter screen: journeyExperience()
+              Each card is tappable:
+                type=queue   → queueBottomSheet()
+                type=event   → appointmentBottomSheet()
+                type=others  → otherBottomSheet()
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 4">
+            <p class="tab-hint">
+              Each card below appears as a tappable tile on the Experience screen.
+              <strong>type = queue</strong> opens the Queue bottom sheet (Tab 8 data) ·
+              <strong>type = event</strong> opens the Event bottom sheet (Tab 1 eventdescripition) ·
+              <strong>type = others</strong> opens the Other bottom sheet (Tab 7 otherdescripition).
+            </p>
+
+            <div class="field-section-label">
+              productincluded <span class="arr-badge">array of maps</span>
+            </div>
+            <div formArrayName="productincluded">
+              <div class="array-card"
+                  *ngFor="let prod of productincluded.controls; let i = index"
+                  [formGroupName]="i">
+                <div class="array-card-header">
+                  <span class="array-index">#{{ i }}</span>
+                  <button mat-icon-button type="button" color="warn"
+                          (click)="removeProduct(i)" *ngIf="productincluded.length > 1">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>title</mat-label>
+                  <input matInput formControlName="title" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>descripition</mat-label>
+                  <textarea matInput formControlName="descripition" rows="2"></textarea>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>type</mat-label>
+                  <mat-select formControlName="type">
+                    <mat-option value="queue">queue — opens Queue bottom sheet</mat-option>
+                    <mat-option value="event">event — opens Event bottom sheet</mat-option>
+                    <mat-option value="others">others — opens Other bottom sheet</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
+            <button mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
+              + Add Product
+            </button>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 5 — PRODUCT OVERVIEW
+              Flutter screen: whatLiesAhead()
+              Shows: journeypath.imageurl,
+                      journeydetail.intro, journeydetail.descripition
+              Note: text is reused from journeydetail (Tab 2)
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 5">
+            <p class="tab-hint">
+              The text on this screen reuses <strong>journeydetail.intro</strong> and
+              <strong>journeydetail.descripition</strong> from Tab 2.
+              Only the image is unique to this screen.
+            </p>
+
+            <div class="field-section-label">
+              journeypath <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="journeypath">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>intro</mat-label>
+                <textarea matInput formControlName="intro" rows="2"></textarea>
               </mat-form-field>
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>descripition</mat-label>
                 <textarea matInput formControlName="descripition" rows="2"></textarea>
               </mat-form-field>
+
               <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-              <div class="img-upload-box" (click)="triggerFileInput('step_imageurl_' + i)">
-                <ng-container *ngIf="!imagePreviews['step_imageurl_' + i] && !s.get('imageurl')?.value">
+              <div class="img-upload-box" (click)="triggerFileInput('journeypath_imageurl')">
+                <ng-container *ngIf="!imagePreviews['journeypath_imageurl'] && !detailForm.get('journeypath.imageurl')?.value">
                   <mat-icon class="upload-icon">cloud_upload</mat-icon>
                   <span class="upload-label">Click to upload image</span>
                 </ng-container>
-                <ng-container *ngIf="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value">
+                <ng-container *ngIf="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value">
                   <img class="img-preview"
-                       [src]="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value"
-                       alt="preview" />
+                      [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
+                      alt="preview" />
                   <button class="img-clear-btn" type="button"
-                          (click)="clearStepImage($event, i)">✕</button>
+                          (click)="clearImage($event, 'journeypath_imageurl', 'journeypath.imageurl')">✕</button>
                 </ng-container>
               </div>
               <input type="file" accept="image/*" class="hidden-file-input"
-                     [id]="'file-step_imageurl_' + i"
-                     (change)="onStepFileChange($event, i)" />
+                    [id]="'file-journeypath_imageurl'"
+                    (change)="onFileChange($event, 'journeypath_imageurl', 'journeypath.imageurl')" />
             </div>
-          </div>
-          <button mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
-            + Add Step
-          </button>
-        </div>
+          </ng-container>
 
-        <!-- screenorder -->
-        <div class="field-section-label">
-          screenorder <span class="arr-badge">array of strings</span>
-        </div>
-        <div class="tag-input-wrap readonly">
-          <span class="tag-pill" *ngFor="let tag of screenorderTags">
-            {{ tag }}
-          </span>
-        </div>
+          <!-- ══════════════════════════════════════════════
+              TAB 6 — AEL SELECTION
+              Flutter screen: goals() → FillParticipantAEL widget
+              Also powers: otherBottomSheet() via otherdescripition
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 6">
+            <p class="tab-hint">
+              These fields also power the <strong>Others bottom sheet</strong> when a product
+              with type = "others" is tapped on the Experience screen.
+            </p>
+
+            <div class="field-section-label">
+              otherdescripition <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="otherdescripition">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>title</mat-label>
+                <input matInput formControlName="title" placeholder="Ongoing Evolution…" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>descripition</mat-label>
+                <textarea matInput formControlName="descripition" rows="3"></textarea>
+              </mat-form-field>
+            </div>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 7 — ONBOARDING CALL BOOKING
+              Flutter screen: callBooking()
+              Also powers: queueBottomSheet() when type=queue
+              Fields: queuedescripition, processdetails, steps
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 7">
+            <p class="tab-hint">
+              This data powers both the <strong>Onboarding Call Booking</strong> screen and
+              the <strong>Queue bottom sheet</strong> (tapped from Experience when type = "queue").
+            </p>
+
+            <div class="field-section-label">
+              queuedescripition <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="queuedescripition">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>descripition</mat-label>
+                <textarea matInput formControlName="descripition" rows="3"
+                          placeholder="Shown at top of the queue bottom sheet…"></textarea>
+              </mat-form-field>
+
+              <div class="nested-label">atcmodel <span class="map-tag">map</span></div>
+              <div formGroupName="atcmodel">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>title</mat-label>
+                  <input matInput formControlName="title" placeholder="ADJUSTMENT X TIME = CONSEQUENCES" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>descripition</mat-label>
+                  <textarea matInput formControlName="descripition" rows="2"></textarea>
+                </mat-form-field>
+              </div>
+            </div>
+
+            <div class="field-section-label">
+              processdetails <span class="map-tag">map</span>
+            </div>
+            <div formGroupName="processdetails">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>title</mat-label>
+                <input matInput formControlName="title" placeholder="Personalized uP! Diagnostics…" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>descripition</mat-label>
+                <textarea matInput formControlName="descripition" rows="2"></textarea>
+              </mat-form-field>
+
+              <div class="nested-ref-label">
+                processimage <span class="url-tag">file upload</span>
+              </div>
+              <div class="img-upload-box" (click)="triggerFileInput('processimage')">
+                <ng-container *ngIf="!imagePreviews['processimage'] && !detailForm.get('processdetails.processimage')?.value">
+                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                  <span class="upload-label">Click to upload process image</span>
+                </ng-container>
+                <ng-container *ngIf="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value">
+                  <img class="img-preview"
+                      [src]="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
+                      alt="preview" />
+                  <button class="img-clear-btn" type="button"
+                          (click)="clearImage($event, 'processimage', 'processdetails.processimage')">✕</button>
+                </ng-container>
+              </div>
+              <input type="file" accept="image/*" class="hidden-file-input"
+                    [id]="'file-processimage'"
+                    (change)="onFileChange($event, 'processimage', 'processdetails.processimage')" />
+
+              <div class="nested-label" style="margin-top:10px">
+                step <span class="arr-badge">array of maps</span>
+              </div>
+              <div formArrayName="step">
+                <div class="array-card"
+                    *ngFor="let s of processSteps.controls; let i = index"
+                    [formGroupName]="i">
+                  <div class="array-card-header">
+                    <span class="array-index">Step {{ i + 1 }}</span>
+                    <button mat-icon-button type="button" color="warn"
+                            (click)="removeProcessStep(i)" *ngIf="processSteps.length > 1">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>title</mat-label>
+                    <input matInput formControlName="title" placeholder="Wellness Scaling Form" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>descripition</mat-label>
+                    <textarea matInput formControlName="descripition" rows="2"></textarea>
+                  </mat-form-field>
+
+                  <div class="nested-ref-label">
+                    imageurl <span class="url-tag">file upload</span>
+                  </div>
+                  <div class="img-upload-box" (click)="triggerFileInput('step_imageurl_' + i)">
+                    <ng-container *ngIf="!imagePreviews['step_imageurl_' + i] && !s.get('imageurl')?.value">
+                      <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                      <span class="upload-label">Click to upload step image</span>
+                    </ng-container>
+                    <ng-container *ngIf="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value">
+                      <img class="img-preview"
+                          [src]="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value"
+                          alt="preview" />
+                      <button class="img-clear-btn" type="button"
+                              (click)="clearStepImage($event, i)">✕</button>
+                    </ng-container>
+                  </div>
+                  <input type="file" accept="image/*" class="hidden-file-input"
+                        [id]="'file-step_imageurl_' + i"
+                        (change)="onStepFileChange($event, i)" />
+                </div>
+              </div>
+              <button mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
+                + Add Step
+              </button>
+            </div>
+          </ng-container>
+
+          <!-- ══════════════════════════════════════════════
+              TAB 8 — CONGRATULATIONS
+              Flutter screen: congratulations()
+              No editable fields — auto-generated screen
+          ══════════════════════════════════════════════════ -->
+          <ng-container *ngIf="detailTabIndex === 8">
+            <div style="text-align:center;padding:32px 16px;color:#888">
+              <mat-icon style="font-size:40px;height:40px;width:40px">celebration</mat-icon>
+              <p style="margin-top:12px;font-size:14px;font-weight:500;color:#333">
+                Congratulations screen
+              </p>
+              <p style="margin-top:8px;font-size:13px">
+                This screen is generated automatically after the onboarding call is booked.
+                It shows a Lottie animation and the scheduled appointment time. No editable content.
+              </p>
+            </div>
+
+            <div class="field-section-label" style="margin-top:8px">
+              screenorder <span class="arr-badge">array of strings</span> — read only
+            </div>
+            <div class="tag-input-wrap readonly">
+              <span class="tag-pill" *ngFor="let tag of screenorderTags">{{ tag }}</span>
+            </div>
+          </ng-container>
+
+          <!-- Prev / Next navigation -->
+          <div class="detail-tab-nav">
+            <button mat-stroked-button type="button"
+                    (click)="prevDetailTab()" [disabled]="detailTabIndex === 0">
+              ← Previous
+            </button>
+            <span class="tab-counter">{{ detailTabIndex + 1 }} / {{ detailTabs.length }}</span>
+            <button mat-stroked-button type="button"
+                    (click)="nextDetailTab()" [disabled]="detailTabIndex === detailTabs.length - 1">
+              Next →
+            </button>
+          </div>
+
         </ng-container>
       </form>
     </ng-container>
