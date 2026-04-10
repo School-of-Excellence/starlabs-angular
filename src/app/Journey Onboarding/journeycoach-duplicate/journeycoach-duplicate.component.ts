@@ -222,6 +222,7 @@ export class JourneycoachDuplicateComponent {
   startDate;
   endDate;
   monthyear;
+  daysInput: number | null = null;
 
   // Object declarations 
   mapjourneyname: any = {};
@@ -404,7 +405,10 @@ export class JourneycoachDuplicateComponent {
   assuredSalesSplit = {
     new: 0,
     upgrades: 0,
-    addons: 0
+    addons: 0,
+    newEMI: 0,
+    upgradesEMI: 0,
+    addonsEMI: 0
   }
 
   // String declarations
@@ -415,6 +419,7 @@ export class JourneycoachDuplicateComponent {
   selectedDateFilter = null;
 
   salesLeadsColumns: any = [];
+  upgradeSalesColumns: any = [];
   subscriptionColumns: any = [];
   customerStatusColumns: any = [];
   notAssuredColumns: any = [];
@@ -757,35 +762,21 @@ export class JourneycoachDuplicateComponent {
 
   // Function to toggle date of today and last 7 days 
   onDateFilterClick(filterType: string): void {
-    if (this.selectedDateFilter === filterType) {
-      this.selectedDateFilter = null;
-    } else {
-      this.selectedDateFilter = filterType;
-    }
+    this.selectedDateFilter = filterType;
 
     const now = new Date();
     let startDate: Date;
     let endDate: Date = new Date(now);
 
     switch (filterType) {
-      case 'today':
-        // Today: start and end are both today
+        case 'days':
+       const days = this.daysInput || 1;
         startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - (days - 1));
         startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(now);
         endDate.setHours(23, 59, 59, 999);
         this.pickerMode = null;
-        break;
-
-      case 'last7days':
-        // Last 7 days: from 7 days ago to today
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 6); // -6 because today counts as day 1
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        this.pickerMode = null;
-        break;
-
-      default:
         break;
     }
 
@@ -798,7 +789,11 @@ export class JourneycoachDuplicateComponent {
       this.toggleDate();
     }
   }
-
+  onDaysChange() {
+  if (this.daysInput > 60) {
+    this.daysInput = 60;
+  }
+}
   // move to next month 
   forwardMonth() {
     let year = parseInt(this.monthyear.split('-')[0]);
@@ -906,13 +901,35 @@ export class JourneycoachDuplicateComponent {
       { key: 'waitingperiod', header: 'Waiting Period', width: '5%', type: 'number' },
       { key: 'journey', header: 'Journey', width: '7%', type: 'mapped', mapData: this.mapjourneyname },
       { key: 'totalpurchasevalue', header: 'Purchase Value', width: '7%', type: 'currency', prefix: '₹' },
-      { key: 'installmentamount', header: 'Payment Plan', width: '7%', type: 'currency', prefix: '₹' },
+      { key: 'installmentamount', header: 'payment plan', width: '7%', type: 'currency', prefix: '₹' },
       { key: 'presalespersonname', header: 'Pre-Sales Perosn', width: '10%', type: 'text' },
       { key: 'salespersonname', header: 'Sales Person', width: '5%', type: 'text' },
       { key: 'notes', header: 'Sales Notes', width: '35%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 }
     ]
+
+    //For upgrade sale payment plan details 
+
+    this.upgradeSalesColumns = [
+      { key: 'name', header: 'Name', width: '10%', type: 'text' },
+      { key: 'phonenumber', header: 'Mobile', width: '5%', type: 'number' },
+      { key: 'email', header: 'EMail', width: '5%', type: 'text' },
+      { key: 'journeytype', header: 'Type', width: '5%', type: 'text' },
+      { key: 'purchasedate', header: 'Purchase Date', width: '10%', type: 'date', format: 'dd-MMM-yyyy' },
+      { key: 'waitingperiod', header: 'Waiting Period', width: '5%', type: 'number' },
+      { key: 'journey', header: 'Journey', width: '7%', type: 'mapped', mapData: this.mapjourneyname },
+      { key: 'totalpurchasevalue', header: 'Purchase Value', width: '7%', type: 'currency', prefix: '₹' },
+      { key: 'preinstallmentamount', header: 'Previous Payment Plan', width: '7%', type: 'currency', prefix: '₹' },
+      { key: 'installmentamount', header: 'Current payment plan', width: '7%', type: 'currency', prefix: '₹' },
+      { key: 'installmentdiff', header: 'payment plan diff', width: '7%', type: 'currency', prefix: '₹' },
+      { key: 'presalespersonname', header: 'Pre-Sales Perosn', width: '10%', type: 'text' },
+      { key: 'salespersonname', header: 'Sales Person', width: '5%', type: 'text' },
+      { key: 'notes', header: 'Sales Notes', width: '35%', type: 'text', substringStart: 0, substringEnd: 50 },
+      { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
+      { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 }
+    ]
+
 
     this.subscriptionColumns = [
       { key: 'name', header: 'Name', width: '15%', type: 'text' },
@@ -1113,7 +1130,7 @@ export class JourneycoachDuplicateComponent {
       },
       grossUpgradeSales: {
         title: 'Gross Upgrade Sales',
-        columns: this.salesLeadsColumns,
+        columns: this.upgradeSalesColumns,
         data: [],
         dataKey: 'grossupgradesale',
         filters: ['search', 'purchasedate', 'journey', 'assured', 'status']
@@ -1134,7 +1151,7 @@ export class JourneycoachDuplicateComponent {
       },
       assuredUpgradeSales: {
         title: 'Assured Upgrade Sales',
-        columns: this.salesLeadsColumns,
+        columns: this.upgradeSalesColumns,
         data: [],
         dataKey: 'assuredupgradesale',
         filters: ['search', 'purchasedate', 'journey']
@@ -1364,6 +1381,18 @@ export class JourneycoachDuplicateComponent {
       { key: 'daysdiff', header: 'Days', type: 'number' },
     ]
 
+    const onboardingScheduledColumns: ColumnConfig[] = [
+      { key: 'name', header: 'Name', type: 'text' },
+      { key: 'journeyref', header: 'Journey', type: 'custom', mapper: (ref) => this.mapjourneyname[ref?.['id']] ?? '-' },
+      { key: 'onboardingscheduled', header: 'Scheduled Date', type: 'text' },
+    ]
+
+    const coachingScheduledColumns: ColumnConfig[] = [
+      { key: 'name', header: 'Name', type: 'text' },
+      { key: 'journeyref', header: 'Journey', type: 'custom', mapper: (ref) => this.mapjourneyname[ref?.['id']] ?? '-' },
+      { key: 'coachingScheduled', header: 'Scheduled Date', type: 'text' },
+    ]
+    
     const modesColumns: ColumnConfig[] = [
       { key: 'name', header: 'Name', type: 'text' },
     ];
@@ -1407,6 +1436,24 @@ export class JourneycoachDuplicateComponent {
           columns: avgPurchasedColumns,
           data: [],
           dataKey: 'avgpurchased',
+        }
+      },
+      onboardingScheduled: {
+        title: 'Onboarding Call Scheduled',
+        dialog: { width: '70%' },
+        table: {
+          columns: onboardingScheduledColumns,
+          data: [],
+          dataKey: 'onboardingScheduled',
+        }
+      },
+      coachingScheduled: {
+        title: 'Journey coaching Call Scheduled',
+        dialog: { width: '70%' },
+        table: {
+          columns:coachingScheduledColumns,
+          data: [],
+          dataKey: 'coachingScheduled',
         }
       },
       modes: {
@@ -1469,6 +1516,10 @@ export class JourneycoachDuplicateComponent {
         let assuredUpgrade = 0;
         let assuredAddons = 0;
 
+        let assuredNewEMI = 0;
+        let assuredUpgradeEMI = 0;
+        let assuredAddonEMI = 0;
+
         let tempContinuitySales = [];
         let tempUpgradeSales = [];
         let tempReferralSales = [];
@@ -1509,9 +1560,44 @@ export class JourneycoachDuplicateComponent {
                     } else {
                       tempUpgradeSales.push(salesLeadsData);
                     }
+
+                     const toEMI = salesLeadsData['installmentamount'] || 0;
+                    const upgradeFromDocId = salesLeadsData['upgradefromdocid']?.id ?? salesLeadsData['upgradefromdocid'];
+
+                    if (![null, undefined, ''].includes(upgradeFromDocId)) {
+                      try {
+                        const fromDocSnap = await getDoc(doc(this.firestore, 'salesleads', upgradeFromDocId));
+                        if (fromDocSnap.exists()) {
+                          const fromEMI = fromDocSnap.data()['installmentamount'] || 0;
+                          const emiDiff = toEMI - fromEMI;
+
+                          salesLeadsData['preinstallmentamount'] = fromEMI;
+                          salesLeadsData['installmentamount'] = toEMI;
+                          salesLeadsData['installmentdiff'] = emiDiff;
+                          grossUpgradeEMI += emiDiff;
+                        } else {
+                          salesLeadsData['preinstallmentamount'] = 0;
+                          salesLeadsData['installmentamount'] = toEMI;
+                          salesLeadsData['installmentdiff'] = toEMI;
+                          grossUpgradeEMI += toEMI;
+                        }
+                      } catch (error) {
+                        console.log("Error in sales", error);
+                        salesLeadsData['preinstallmentamount'] = 0;
+                        salesLeadsData['installmentamount'] = toEMI;
+                        salesLeadsData['installmentdiff'] = toEMI;
+                        grossUpgradeEMI += toEMI;
+                      }
+                    } else {
+                      salesLeadsData['preinstallmentamount'] = 0;
+                      salesLeadsData['installmentamount'] = toEMI;
+                      salesLeadsData['installmentdiff'] = toEMI;
+                      grossUpgradeEMI += toEMI;
+                    }
+
                     grossUpgradeData.push(salesLeadsData);
                     grossUpgrade++;
-                   
+
                   } else if (salesLeadsData['journeytype'] == 'addons') {
                     grossAddons++;
                     grossAddonData.push(salesLeadsData);
@@ -1528,12 +1614,15 @@ export class JourneycoachDuplicateComponent {
                   if (salesLeadsData['journeytype'] == 'new') {
                     assuredNewData.push(assuredSaleData);
                     assuredNew++;
+                    assuredNewEMI += assuredSaleData['installmentamount'] || 0;
                   } else if (salesLeadsData['journeytype'] == 'upgrade') {
                     assuredUpgradeData.push(assuredSaleData);
                     assuredUpgrade++;
+                    assuredUpgradeEMI += assuredSaleData['installmentdiff'] || 0;
                   } else if (salesLeadsData['journeytype'] == 'addons') {
                     assuredAddonData.push(assuredSaleData);
                     assuredAddons++;
+                    assuredAddonEMI += assuredSaleData['installmentamount'] || 0;
                   }
                 }
               }
@@ -1588,7 +1677,19 @@ export class JourneycoachDuplicateComponent {
               this.loveFactor = this.totalCURASales / this.totalMTSSales;
 
               this.totalGrossValue = grossData.reduce((sum, sale) => sum + (sale['totalpurchasevalue'] || 0), 0);
-              this.totalGrossEMI = grossData.reduce((sum, sale) => sum + (sale['installmentamount'] || 0), 0);
+              this.totalGrossEMI = grossData
+                .filter(sale =>
+                  ![null, undefined, ''].includes(sale['status']) &&
+                  sale['status']?.toLowerCase() == 'approved' &&
+                  ['new', 'upgrade', 'addons'].includes(sale['journeytype'])
+                )
+                .reduce((sum, sale) => {
+                  if (sale['journeytype'] == 'upgrade') {
+                    return sum + (sale['installmentdiff'] || 0);
+                  } else {
+                    return sum + (sale['installmentamount'] || 0);
+                  }
+                }, 0);
               let avg1 = grossData.reduce((sum, entry) => {
                 const daysDiff = Math.abs(this.calculateDaysAgo(entry['purchasedate']?.toDate(), new Date()));
                 avgToASVList.push({ ...entry, daysdiff: daysDiff, currentdate: new Date().toString() })
@@ -1609,7 +1710,17 @@ export class JourneycoachDuplicateComponent {
               this.originalData['assuredsale'].data = assuredData;
               this.originalData['assuredsale'].count = assuredData.length;
               this.totalAssuredValue = assuredData.reduce((sum, sale) => sum + (sale['totalpurchasevalue'] || 0), 0);
-              this.totalAssuredEMI = assuredData.reduce((sum, sale) => sum + (sale['installmentamount'] || 0), 0);
+              this.totalAssuredEMI = assuredData
+                .filter(sale =>
+                  ['new', 'upgrade', 'addons'].includes(sale['journeytype'])
+                )
+                .reduce((sum, sale) => {
+                  if (sale['journeytype'] == 'upgrade') {
+                    return sum + (sale['installmentdiff'] || 0);
+                  } else {
+                    return sum + (sale['installmentamount'] || 0);
+                  }
+                }, 0);
               let avg2 = assuredData.reduce((sum, entry) => {
                 const daysDiff = Math.abs(this.calculateDaysAgo(entry['purchasedate']?.toDate(), entry['paymentplanassureddate']?.toDate()))
                 avgGSVToASVList.push({ ...entry, daysdiff: daysDiff })
@@ -1621,7 +1732,11 @@ export class JourneycoachDuplicateComponent {
               this.assuredSalesSplit = {
                 new: assuredNew,
                 upgrades: assuredUpgrade,
-                addons: assuredAddons
+                addons: assuredAddons,
+                newEMI: assuredNewEMI,
+                upgradesEMI: assuredUpgradeEMI,
+                addonsEMI: assuredAddonEMI
+
               }
 
               const cancelledValues = await Promise.all(
@@ -5322,6 +5437,29 @@ export class JourneycoachDuplicateComponent {
       case 'avggsvtoasv': config.table.data = this.avgGSVToASVList; config.avg = this.currentAvgGSVToASV; break;
       case 'avgassured': config.table.data = this.avgAssuredList.map(d => ({ ...d, name: this.mapprofile[d['profileid']] ?? '-' })); config.avg = this.avgAssured; break;
       case 'avgpurchased': config.table.data = this.avgPurchaseList.map(d => ({ ...d, name: this.mapprofile[d['profileid']] ?? '-' })); config.avg = this.avgPurchase; break;
+      case 'onboardingScheduled':const scheduledData = this.getAllScheduledTableData();config.table.data = scheduledData.map(row => ({
+            ...row,
+            name: this.mapprofile[row['profileid']] ?? '-',
+            onboardingscheduled: row['onboardingscheduled']
+              ? row['onboardingscheduled'].toDate().toLocaleDateString() : '-',
+          }));
+          break;
+
+      case 'coachingScheduled':config.table.data = this.appointmentsData.filter(e =>[null, undefined].includes(e['onboarding']) &&e['cancelled'] == false &&e['attended'] == false
+          )
+          .map(row => {
+            const profileId = row['bookedby']?.id;
+            const journeyId = this.mapMetaData[profileId]?.['activejourney'];
+            return {
+              ...row,
+              name: this.mapprofile[profileId] ?? '-',
+              journeyref: journeyId ? { id: journeyId } : null,
+              coachingScheduled: row['starttime']
+                ? row['starttime'].toDate().toLocaleDateString()
+                : '-',
+            };
+          });
+          break;
       case 'modes': config.title = key; config.table.data = (this.modeMap[key] ?? []).map(id => ({ name: this.mapprofile[id] ?? '-' })); break;
     }
     config.table.data.sort((a, b) => (a['name'] ?? '').localeCompare(b['name'] ?? ''));
