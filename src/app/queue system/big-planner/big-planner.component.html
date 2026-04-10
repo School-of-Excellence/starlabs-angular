@@ -95,6 +95,16 @@
               <div class="role-form-container">
                 <div *ngFor="let pair of newStudioPairing; let i = index" class="role-form-row">
                   <div class="role-form-fields">
+                    <mat-form-field appearance="outline" *ngIf="i == 0">
+                      <mat-label>ATC Model</mat-label>
+                      <mat-select [(ngModel)]="atcModel" multiple [disabled]="!showAtcModel()">
+                        <!-- <mat-option [value]="null">None</mat-option> -->
+                        <mat-option *ngFor="let list of filterAtcModels()" [value]="list.atcmodel"
+                          [disabled]="this.disabledAtcModels.includes(list.atcmodel)">
+                          {{list.atcmodel}}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
 
                     <mat-form-field appearance="outline">
                       <mat-label>Activity</mat-label>
@@ -108,9 +118,9 @@
                       </mat-select>
                     </mat-form-field>
                     
-                    <mat-form-field appearance="outline">
+                    <mat-form-field appearance="outline" >
                       <mat-label>Participant</mat-label>
-                      <mat-select [(ngModel)]="pair.profileid">
+                      <mat-select [(ngModel)]="pair.profileid" (selectionChange)="filterAtcModels()" >
                         <mat-option>
                           <ngx-mat-select-search [(ngModel)]="filterText" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
                         </mat-option>
@@ -120,15 +130,6 @@
                       </mat-select>
                     </mat-form-field>
     
-                    <mat-form-field appearance="outline">
-                      <mat-label>ATC Model</mat-label>
-                      <mat-select [(ngModel)]="pair.atcmodel" multiple>
-                        <mat-option [value]="null">None</mat-option>
-                        <mat-option *ngFor="let list of productList" [value]="list.atcmodel">
-                          {{list.atcmodel}}
-                        </mat-option>
-                      </mat-select>
-                    </mat-form-field>
                   </div>
     
                   <div class="role-form-actions">

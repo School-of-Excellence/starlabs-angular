@@ -75,7 +75,9 @@ export class BigPlannerComponent {
   viewOnly = true
   private unsubscribe$ = new Subject<void>();
   // Create Studio
-  newStudioPairing = []
+  newStudioPairing = [];
+  atcModel: Array<any> = [];
+  disabledAtcModels: Array<any> = [];
 
   // big Activity Property
   bigActivitySubcription: Subscription
@@ -132,7 +134,7 @@ export class BigPlannerComponent {
 
   // Events
   selectedEvent: string = null;
-  filterEvent : string = '';
+  filterEvent: string = '';
   eventList: any[] = [];
 
   cohortparticipantsList = [];
@@ -171,50 +173,50 @@ export class BigPlannerComponent {
         this.deleteOption = true
       } else { this.deleteOption = false }
       // if (roleData["ah"] || roleData["admin"] || roleData["mentor"] || roleData["developer"]) {
-        await getDocs(query(collection(this.firestore, 'queue generation'), orderBy("queueenddate", "desc"))).then(async queueData => {
-          for (let i = 0; i < queueData.docs.length; i++) {
-            const queue = queueData.docs[i].data();
-            this.queuelist.push(queue)
-          }
-          this.route.queryParams.subscribe(data => {
-            var queueid = data["queueid"]
-            this.selectedQueue = this.queuelist.find(e => e["docid"] == queueid) ?? null
-            if (this.selectedQueue != null) this.onQueueSelect();
-            if (this.selectedQueue != null) {
+      await getDocs(query(collection(this.firestore, 'queue generation'), orderBy("queueenddate", "desc"))).then(async queueData => {
+        for (let i = 0; i < queueData.docs.length; i++) {
+          const queue = queueData.docs[i].data();
+          this.queuelist.push(queue)
+        }
+        this.route.queryParams.subscribe(data => {
+          var queueid = data["queueid"]
+          this.selectedQueue = this.queuelist.find(e => e["docid"] == queueid) ?? null
+          if (this.selectedQueue != null) this.onQueueSelect();
+          if (this.selectedQueue != null) {
 
-              this.selectedEvent = this.selectedQueue['eventid'];
+            this.selectedEvent = this.selectedQueue['eventid'];
 
-              const eventRef = doc(this.firestore, 'event collection',this.selectedEvent);
-              collectionData(query(collection(this.firestore, 'big cohorts'),where('eventref','==',eventRef),where('status','==','active'))).subscribe((cohort)=>{
-                let list = [];
-                let participantsList = [];
-                console.log('cohorts found :',cohort.length);
-                
-                if(cohort.length > 0){
-                  for (let i = 0; i < cohort.length; i++) {
-                    const cohortData = cohort[i];
-                    list.push(cohortData);
-                    if (Array.isArray(cohortData['participantidlist'])) {
-                      participantsList.push(...cohortData['participantidlist']);
-                    }
+            const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+            collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
+              let list = [];
+              let participantsList = [];
+              console.log('cohorts found :', cohort.length);
+
+              if (cohort.length > 0) {
+                for (let i = 0; i < cohort.length; i++) {
+                  const cohortData = cohort[i];
+                  list.push(cohortData);
+                  if (Array.isArray(cohortData['participantidlist'])) {
+                    participantsList.push(...cohortData['participantidlist']);
                   }
-                  this.eventCohorts = list;
-                  this.cohortparticipantsList = participantsList;
-                }else{
-                  this.guard.openSnackBar('No Cohorts found', 'OK',600);
                 }
-                console.log('totalParticipants',participantsList.length);
-              });              
-            };
-          })
-          loading.close()
+                this.eventCohorts = list;
+                this.cohortparticipantsList = participantsList;
+              } else {
+                this.guard.openSnackBar('No Cohorts found', 'OK', 600);
+              }
+              console.log('totalParticipants', participantsList.length);
+            });
+          };
         })
+        loading.close()
+      })
       // }
     })
   }
 
   ngOnInit(): void {
-    
+
     collectionData(collection(this.firestore, 'profile_data'), { idField: 'docid' }).pipe(takeUntil(this.unsubscribe$)).subscribe(profiles => {
       this.allProfilesMap.clear();
       profiles.forEach((p: any) => {
@@ -224,7 +226,7 @@ export class BigPlannerComponent {
       });
     });
 
-    getDocs(query(collection(this.firestore, 'event collection'),orderBy('end_date','desc'))).then(event => {
+    getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc'))).then(event => {
       for (let i = 0; i < event.docs.length; i++) {
         const element = event.docs[i].data();
         element['docid'] = event.docs[i].id;
@@ -251,19 +253,19 @@ export class BigPlannerComponent {
 
   }
 
-  async eventSelected(){
+  async eventSelected() {
     const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
-    await updateDoc(queueRef,{
-      eventid:this.selectedEvent
-    }).then(()=>{
+    await updateDoc(queueRef, {
+      eventid: this.selectedEvent
+    }).then(() => {
       console.log('Event Updated In Queue');
-      this.guard.openSnackBar('Event Updated in Queue', 'OK',600);
-      
-      const eventRef = doc(this.firestore, 'event collection',this.selectedEvent);
-      collectionData(query(collection(this.firestore, 'big cohorts'),where('eventref','==',eventRef),where('status','==','active'))).subscribe((cohort)=>{
+      this.guard.openSnackBar('Event Updated in Queue', 'OK', 600);
+
+      const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+      collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
         let list = [];
         let participantsList = [];
-        if(cohort.length > 0){
+        if (cohort.length > 0) {
           for (let i = 0; i < cohort.length; i++) {
             const cohortData = cohort[i];
             list.push(cohortData);
@@ -273,18 +275,18 @@ export class BigPlannerComponent {
           }
           this.eventCohorts = list;
           this.cohortparticipantsList = participantsList;
-        }else{
-          this.guard.openSnackBar('No Cohorts found', 'OK',600);
+        } else {
+          this.guard.openSnackBar('No Cohorts found', 'OK', 600);
         }
       });
 
-    }).catch((error)=>{
-      console.log('Error While Updating Event',error,'ok');
-      this.guard.openSnackBar('Error While Updating Event', 'OK',600);
+    }).catch((error) => {
+      console.log('Error While Updating Event', error, 'ok');
+      this.guard.openSnackBar('Error While Updating Event', 'OK', 600);
     });
   }
 
-  filterEvents(){
+  filterEvents() {
     return this.eventList.filter(e => e["name"].toLowerCase().includes(this.filterEvent.toLowerCase()))
   }
 
@@ -330,7 +332,7 @@ export class BigPlannerComponent {
     //   return true;
     // });
 
-    const arenaEventsSnap = await getDocs(query(collection(this.firestore, 'arena events'),where('docid', 'in', this.selectedQueue['arenaeventidlist'])));
+    const arenaEventsSnap = await getDocs(query(collection(this.firestore, 'arena events'), where('docid', 'in', this.selectedQueue['arenaeventidlist'])));
     const productIds = arenaEventsSnap.docs.map(doc => doc.data()?.['productref']?.id).filter(Boolean);
     const seenAtcModels = new Set<string>();
 
@@ -342,7 +344,7 @@ export class BigPlannerComponent {
       return true;
     });
 
-    collectionData(query(collection(this.firestore, 'biginvitation'),where('eventref','==',doc(this.firestore, 'queue generation', this.selectedQueue['docid'])))).pipe(takeUntil(this.unsubscribe$)).subscribe((list: any[]) => {
+    collectionData(query(collection(this.firestore, 'biginvitation'), where('eventref', '==', doc(this.firestore, 'queue generation', this.selectedQueue['docid'])))).pipe(takeUntil(this.unsubscribe$)).subscribe((list: any[]) => {
 
       this.bigInvitationList = list;
 
@@ -350,7 +352,7 @@ export class BigPlannerComponent {
 
       const invitedProfiles = profileIds.map(id => this.allProfilesMap.get(id)).filter(Boolean);
 
-      invitedProfiles.sort((a, b) =>(a.name || '').localeCompare(b.name || ''));
+      invitedProfiles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
       this.invitedParticipant = invitedProfiles;
       this.waitingParticipant = invitedProfiles.filter(p => p.waitinglist === true);
@@ -419,17 +421,18 @@ export class BigPlannerComponent {
       this.filteredStudioPairingList = new MatTableDataSource(this.studioPairingList);
       this.filteredStudioPairingList.paginator = this.paginator;
       var profileCount = {}
-      var localMap = {}
+      var localMap = {};
       var studioin = 0
       var checkin = 0
       for (let i = 0; i < this.studioPairingList.length; i++) {
         const studio = this.studioPairingList[i];
+        const participantsActivityMap = studio['participantsactivity'] || {};
         if (studio["studioin"]) studioin += 1
         if (studio["checkin"]) checkin += 1
-        var participants = studio["participants"] ?? []
+        var participants = studio["participants"] ?? [];
         participants.forEach(id => {
-          profileCount[id] = profileCount[id] ?? []
-          if (studio["studioin"]) profileCount[id].push(studio)
+          profileCount[id] = profileCount[id] ?? [];
+          if (studio["studioin"]) profileCount[id].push(studio);
         })
         var studioActivity = Object.values(studio["participantsactivity"]).sort((a, b) => a.toString().localeCompare(b.toString())).join(",");
         (stageActivityParse[studioActivity] ?? []).forEach(stage => {
@@ -441,6 +444,7 @@ export class BigPlannerComponent {
       this.profileStudioCount = profileCount
       this.stageStudioMap = localMap
       this.sortStudioAssignment();
+      this.filterStudios()
       // let studioInCount:any[] = Object.values(this.profileStudioCount).flat()
       // console.log("studioin count" ,studioInCount.filter((e:any) => e['studioin'] && e['checkin']).length,checkin);
       // console.log("live count" ,studioInCount.filter(e => e['studioin'] && e['checkin'] && e['status'] == 'live').length,checkin);
@@ -571,18 +575,74 @@ export class BigPlannerComponent {
 
   filterInvitedParticipant(index) {
     let filteredParticipants = [];
-    
-    let filteredCohorts = this.eventCohorts.filter((e)=>e['bigactivity'] == this.newStudioPairing[index]['activity']);
-    
+
+    let filteredCohorts = this.eventCohorts.filter((e) => e['bigactivity'] == this.newStudioPairing[index]['activity']);
+
     filteredCohorts.forEach(cohort => {
       if (Array.isArray(cohort['participantidlist'])) {
         filteredParticipants.push(...cohort['participantidlist']);
       }
     });
-    
+
+    // if (this.atcModel.length > 0) {
+    //   filteredParticipants = filteredParticipants.filter((id) => {
+    //     const key = `${id}-${this.newStudioPairing[index]['activity']}`;
+    //     let match1 = false;
+    //     let match2 = false;
+
+    //     if(Object.hasOwn(this.mapParticipantToStuido, key)){
+    //       match1 = this.mapParticipantToStuido[key]?.some((atcmodel : string)=>{
+    //         return this.atcModel.includes(atcmodel);
+    //       });
+    //     }
+
+    //     match2 = this.newStudioPairing.some((data , i)=>{
+    //       if(i !== index){
+    //         const dataKey = `${data.profileid}-${data.activity}`;
+    //         return key === dataKey
+    //       }
+    //       return false;
+    //     });
+
+    //     return !(match1 || match2)
+    //   })
+    // }
+
     let returnData = filteredParticipants.filter(e => this.mapProfile[e].toLowerCase().includes(this.filterText.toLowerCase()));
-    
-    return returnData.map((e)=>this.mapProfileData[e]);
+
+    return returnData.map((e) => this.mapProfileData[e]);
+  }
+
+  filterAtcModels() {
+
+    let disabledList = [];
+    for (let studio of this.studioPairingList) {
+      const participants = studio['participants'] || [];
+      const activityMap = studio['participantsactivity'] || {};
+      const studioAtcModel = studio['atcmodel'] || [];
+      if (participants.length === this.newStudioPairing.length) {
+        const doesMatch = this.newStudioPairing.every((pair) => {
+          const profile = pair.profileid;
+          const activity = pair.activity;
+          if (activityMap[profile] && activityMap[profile] === activity) {
+            return true;
+          }
+          return false;
+        });
+        if (doesMatch) {
+          disabledList.push(...studioAtcModel);
+        }
+      }
+    }
+
+    this.disabledAtcModels = disabledList;
+    return this.productList;
+  }
+
+  showAtcModel() {
+    return this.newStudioPairing.every((pair) => {
+      return pair.activity && pair.profileid;
+    })
   }
 
   filterTokenParticipant() {
@@ -590,37 +650,43 @@ export class BigPlannerComponent {
   }
 
   filterActivityfunction() {
-    return this.bigActivityList.filter(e =>
+    const data = this.bigActivityList.filter(e =>
       e["activity"].toLowerCase().includes(this.filterActivity.toLowerCase())
     );
+
+    data.sort((a, b) => a["activity"].localeCompare(b["activity"]));
+    return data
   }
 
   addPair() {
     this.newStudioPairing.push({
       profileid: null,
       activity: null,
-      atcmodel: null
-    })
+    });
+    this.atcModel = [];
+    this.disabledAtcModels = [];
   }
 
   removePair(index) {
     // console.log(index)
-    this.newStudioPairing.splice(index, 1)
+    this.newStudioPairing.splice(index, 1);
+    this.atcModel = [];
+    this.disabledAtcModels = [];
   }
 
   async createStudioPairing() {
     let validation = true;
     const participants: string[] = [];
     const participantsactivity: any = {};
-    let atcmodel: any = null;
+    let atcmodel: any = this.atcModel || [];
 
     // 1️⃣ Validation + data preparation
     for (const element of this.newStudioPairing) {
 
-      // atcmodel handling
-      if (element?.atcmodel && !element.atcmodel.includes?.(null)) {
-        atcmodel = element.atcmodel;
-      }
+      // // atcmodel handling
+      // if (element?.atcmodel && !element.atcmodel.includes?.(null)) {
+      //   atcmodel = element.atcmodel;
+      // }
 
       // required fields check
       if (element?.profileid && element?.activity) {
