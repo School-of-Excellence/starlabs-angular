@@ -692,6 +692,16 @@ mat-paginator {
   border-left: 3px solid #7c6af5;
 }
 
+.log-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-event-filter {
+  width: 200px;
+  font-size: 13px;
+}
 
 .watch-btn {
   background: #22c55e;
@@ -1552,4 +1562,124 @@ mat-paginator {
 
 .col-filter-search-input::placeholder {
   color: #9ca3af;
+}
+.log-filter-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px 8px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.log-filter-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.log-event-filter {
+  width: 280px;
+  font-size: 13px;
+}
+
+.log-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.log-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  padding: 2px 8px 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.chip-remove {
+  background: none;
+  border: none;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.chip-remove:hover {
+  color: #1e3a8a;
+}
+
+.log-filter-clear {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.log-filter-clear:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+.journey-type-dropdown {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  z-index: 9999;
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.journey-type-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  transition: background 0.1s;
+}
+
+.journey-type-option:hover {
+  background: #f9fafb;
+}
+
+.journey-type-option.option-active {
+  background: #eef2ff;
+  color: #6366f1;
+}
+
+.journey-type-option mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  visibility: hidden;
+}
+
+.journey-type-option.option-active mat-icon {
+  visibility: visible;
+  color: #6366f1;
+}
+
+.journey-filter-wrap {
+  position: relative;
 }

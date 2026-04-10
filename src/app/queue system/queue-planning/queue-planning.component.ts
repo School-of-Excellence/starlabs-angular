@@ -114,6 +114,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
 
   mapStageSlotBookedSlots = {}
   queueList = [];
+  liveQueueList = [];
   queueVariationList = [];
   segmentList = [];
   cohortsList = [];
@@ -256,6 +257,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
           id: doc.id,
           ...doc.data()
         })).sort((a, b) => b['queuestartdate'] - a['queuestartdate']);
+        this.liveQueueList = this.queueList.filter(e => e['queuestartdate'].toDate() <= new Date() && e['queueenddate'].toDate() >= new Date());
       }).then(() => {
         this.loading = false;
       });

@@ -35,7 +35,7 @@ gh api --method DELETE "/repos/{owner}/{repo}/actions/artifacts/$ARTIFACT_ID"
 
 echo ""
 echo "📦 Installing dependencies..."
-npm i
+npm i --legacy-peer-deps
 
 echo ""
 echo "🎉 Setup complete!"
