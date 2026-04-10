@@ -3428,7 +3428,10 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   }
 
   async sendNotification() {
-    const selectedParticipants = this.getActiveParticipantsList().filter(p => p.selected);
+    const selectedParticipants = this.getActiveParticipantsList()
+      .filter(p => p.selected)
+      .map(p => this.mapProfileData[p.profile_id])
+      .filter(p => p != null);
 
     if (selectedParticipants.length === 0) {
       alert('Please select at least one participant');
@@ -3483,7 +3486,10 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   }
 
   async sendWhatsApp() {
-    const selectedParticipants = this.getActiveParticipantsList().filter(p => p.selected);
+    const selectedParticipants = this.getActiveParticipantsList()
+      .filter(p => p.selected)
+      .map(p => this.mapProfileData[p.profile_id])
+      .filter(p => p != null);
 
     if (selectedParticipants.length === 0) {
       alert('Please select at least one participant');
@@ -3531,21 +3537,17 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   }
 
   async sendEmail() {
-    const selectedParticipants = this.getActiveParticipantsList().filter(p => p.selected);
+    const selectedParticipants = this.getActiveParticipantsList()
+      .filter(p => p.selected)
+      .map(p => this.mapProfileData[p.profile_id])
+      .filter(p => p != null);
 
+      console.log("slecyec", selectedParticipants);
+      
     if (selectedParticipants.length === 0) {
       alert('Please select at least one participant');
       return;
     }
-
-    const mappedParticipants = selectedParticipants.map(p => {
-    const profileId = p.profile_id || p.profileid;
-    return {
-      profileid: profileId || null,
-      email: this.getParticipantEmail(profileId) || null,
-      name: this.getProfileName(profileId) || null
-    };
-  }).filter(p => p.profileid != null); // remove any without profileid
 
     let dialogRef = this.dialog.open(EmailInputComponent, {
       data: selectedParticipants,
