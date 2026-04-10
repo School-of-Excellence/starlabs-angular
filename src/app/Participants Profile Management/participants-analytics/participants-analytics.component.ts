@@ -21,7 +21,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthguardService } from '../../authguard.service';
 import { runInInjectionContext, Injector } from '@angular/core';
 import { MatTooltip } from '@angular/material/tooltip';
-import { FormsModule, NgForm } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, FormsModule, NgForm, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -125,7 +125,8 @@ interface userRoles {
     MatProgressBarModule,
     RouterModule,
     MatSlideToggleModule,
-    MatBadgeModule
+    MatBadgeModule,
+    ReactiveFormsModule
   ],
   templateUrl: './participants-analytics.component.html',
   styleUrl: './participants-analytics.component.css',
@@ -152,6 +153,9 @@ export class ParticipantsAnalyticsComponent {
   filteredDataWithoutProductFilter = new Set();
   //filter 
   filterdata: any
+  filterForm!: FormGroup;
+  filterunconsumedproductlist: string = '';
+
 
   //db data saving to variable
   productEventList: any[] = []
@@ -167,6 +171,7 @@ export class ParticipantsAnalyticsComponent {
   emailList: any[] = []
   mapParticipantData = {}
   mapParticipantName = {}
+  participantProductMap: { [key: string]: any } = {};
 
   modesList: any[] = []
   showTagHistory = false;
@@ -186,7 +191,7 @@ export class ParticipantsAnalyticsComponent {
   stringmaparray = ['productevent', 'queueevent']
   numbermapnumber = ['productcount']
   columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray,
-  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'], 'totalpurchasevalue', 'totalpaid', 'balance', 'emi', 'journey']
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'], 'totalpurchasevalue', 'totalpaid', 'balance', 'emi', 'journey', 'consumedproductcount', 'unconsumedproductcount']
   filterText = null
   showSectionType = null
   savedfilterquery: any = []
@@ -275,7 +280,7 @@ export class ParticipantsAnalyticsComponent {
     return this.dialog.open(LoadingProgressComponent, { data: { msg: 'Processing Please Wait ...' }, disableClose: true });
   }
 
-  constructor(private http: HttpClient, private injector: Injector) {
+  constructor(private http: HttpClient, private injector: Injector, private fb: FormBuilder,) {
     // get profileid
     this.authguard.getRoles().then(async roles => {
       this.loggedInProfileId = roles['profile_ref'].id
@@ -290,6 +295,11 @@ export class ParticipantsAnalyticsComponent {
 
 
   async ngOnInit() {
+    this.filterForm = this.fb.group({
+      consumedProducts: this.fb.array([]),
+      unconsumedProducts: this.fb.array([])
+    });
+
     // timer
     this.startInactivityTimer();
     this.bindActivityEvents();
@@ -307,6 +317,56 @@ export class ParticipantsAnalyticsComponent {
     } catch (error) {
       console.error('Error wrkadmin', error);
     }
+  }
+
+  get consumedProducts(): FormArray {
+    return this.filterForm.get('consumedProducts') as FormArray;
+  }
+  // Unconsumed Products FormArray
+  get unconsumedProducts(): FormArray {
+    return this.filterForm.get('unconsumedProducts') as FormArray;
+  }
+
+  // function to remove consumed product
+  removeConsumedProduct(index: number): void {
+    this.consumedProducts.removeAt(index);
+  }
+
+  // function to remove unconsumed product
+  removeUnconsumedProduct(index: number): void {
+    this.unconsumedProducts.removeAt(index);
+  }
+
+  createConsumedProductGroup(): FormGroup {
+    return this.fb.group({
+      productId: ['',],
+      count: [0, Validators.required],
+      comparison: ['equalto', Validators.required]
+    });
+  }
+
+  addConsumedProduct(): void {
+    this.consumedProducts.push(this.createConsumedProductGroup());
+  }
+
+  createUnconsumedProductGroup(): FormGroup {
+    return this.fb.group({
+      productId: ['',],
+      count: [0, Validators.required],
+      comparison: ['equalto', Validators.required]
+    });
+  }
+
+  addUnconsumedProduct(): void {
+    this.unconsumedProducts.push(this.createUnconsumedProductGroup());
+  }
+
+
+  onfilterunconsumedproducts() {
+    if (this.productlist != null) {
+      const filterValue = (this.filterunconsumedproductlist != null && this.filterunconsumedproductlist != '') ? this.filterunconsumedproductlist.trim().toLowerCase() : ''
+      return this.productlist.filter(e => e.product.trim().toLowerCase().indexOf(filterValue) === 0)
+    } else return []
   }
 
   fetchQueuedEmails() {
@@ -354,7 +414,7 @@ export class ParticipantsAnalyticsComponent {
       modesSnap,
       productsSnap,
       tagsSnap,
-      clientissueSnap,
+      participantProductSnap,
       metadataSnap
     ] = await Promise.all([
       getDocs(collection(this.firestore, "searchquery")),
@@ -366,7 +426,7 @@ export class ParticipantsAnalyticsComponent {
       getDocs(collection(this.firestore, "modes")),
       getDocs(collection(this.firestore, "products")),
       getDocs(collection(this.firestore, "participant tags")),
-      getDocs(collection(this.firestore, "clientissue")),
+      getDocs(collection(this.firestore, "participantsproduct")),
       getDocs(query(collection(this.firestore, "participant metadata"), orderBy('name')))
     ]);
 
@@ -374,11 +434,15 @@ export class ParticipantsAnalyticsComponent {
     this.savedfilterquery = savedFiltersSnap.docs.map(d => d.data());
 
     // Event collection
-    this.productEventList = eventSnap.docs.map(e => ({
-      ...e.data(),
-      id: e.id,
-      ref: e.ref
-    }));
+    this.productEventList = eventSnap.docs.map(e => {
+      const element = e.data();
+      this.mapfiltervalues[e.id] = element['name'];
+      return ({
+        ...e.data(),
+        id: e.id,
+        ref: e.ref
+      })
+    });
 
     // Queue generation
     this.queueventList = queueSnap.docs.map(e => {
@@ -443,14 +507,40 @@ export class ParticipantsAnalyticsComponent {
       this.mapfiltervalues[e.id] = element['name'];
     })
 
-    // clientissueSnap.docs.forEach((docSnap)=>{
-    //   const ticket = docSnap.data();
-    //   const category = ticket['category'];
-    //   if (category) {
-    //     categorys.add(category)
-    //   }
-    // });
-    // this.customerSupportCategorys = Array.from(categorys);
+    // participant products
+    const participantProductMap = {}
+    participantProductSnap.docs.forEach((productSnap) => {
+      const data = productSnap.data();
+      const profileid = data['profileid'];
+      const status = data['status'];
+      const product = data['productref'].id;
+
+      if (![null, 'completed'].includes(status)) {
+        return
+      }
+
+      if (!Object.hasOwn(participantProductMap, profileid)) {
+        participantProductMap[profileid] = {};
+      }
+      if (!Object.hasOwn(participantProductMap[profileid], product)) {
+        participantProductMap[profileid][product] = {
+          consumedCount: 0,
+          consumedDocuments: [],
+          unConsumedCount: 0,
+          unConsumedDocuments: [],
+        }
+      }
+
+      if (status === 'completed') {
+        participantProductMap[profileid][product].consumedCount++;
+        participantProductMap[profileid][product].consumedDocuments.push(data)
+      } else if (status == null) {
+        participantProductMap[profileid][product].unConsumedCount++;
+        participantProductMap[profileid][product].unConsumedDocuments.push(data)
+      }
+    });
+
+    this.participantProductMap = participantProductMap;
 
     // Participant metadata
     metadataSnap.docs.forEach(e => {
@@ -468,6 +558,10 @@ export class ParticipantsAnalyticsComponent {
       Object.values(element['customersupport'] || {}).forEach((t) => categorys.add(t['category']));
       this.emailList.push(element['email'])
       this.dashboardEntireData.push(element)
+
+      if (element['name'] === 'Aishwarya Nikhil Shinde') {
+        console.log(element)
+      }
     })
     this.customerSupportCategorys = Array.from(categorys.values()).filter((c: any) => ![null, undefined, ''].includes(c));
     loadingref.close();
@@ -477,6 +571,18 @@ export class ParticipantsAnalyticsComponent {
 
     // Map Playlist - small collections, still done after the main load
     await this.loadMapPlaylist();
+  }
+
+  getProductForParticipant(profileId: string, key: string) {
+    return Object.entries(this.participantProductMap[profileId] || {}).map((d) => ({ key: d[0], count: d[1][key] }));
+  }
+
+  getEventsForProduct(eventId: string[]) {
+    return eventId.map((e) => this.mapfiltervalues[e]).join(', ')
+  }
+
+  getQueueForProduct(queueId: string[]) {
+    return queueId.map((e) => this.mapfiltervalues[e]).join(', ')
   }
 
   private async loadMapPlaylist() {
@@ -678,14 +784,14 @@ export class ParticipantsAnalyticsComponent {
   onfilterjourneylist() {
     if (this.journeylist != null) {
       const filterValue = (this.filterjourneylist != null && this.filterjourneylist != '') ? this.filterjourneylist.trim().toLowerCase() : ''
-      return this.journeylist.filter(e => e.journey.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.journeylist.filter(e => e.journey.trim().toLowerCase().includes(filterValue))
     }
   }
 
   onParticipantMode() {
     if (this.modesList != null) {
       const filterValue = (this.filterparticipantmode != null && this.filterparticipantmode != '') ? this.filterparticipantmode.trim().toLowerCase() : ''
-      return this.modesList.filter(e => e.mode.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.modesList.filter(e => e.mode.trim().toLowerCase().includes(filterValue))
     }
     return []
   }
@@ -693,7 +799,7 @@ export class ParticipantsAnalyticsComponent {
   onEventSearch() {
     if (this.productEventList != null) {
       const filterValue = (this.filterevent != null && this.filterevent != '') ? this.filterevent.trim().toLowerCase() : ''
-      return this.productEventList.filter(e => e.name.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.productEventList.filter(e => e.name.trim().toLowerCase().includes(filterValue))
     }
     return []
   }
@@ -701,7 +807,7 @@ export class ParticipantsAnalyticsComponent {
   onQueueSearch() {
     if (this.queueventList != null) {
       const filterValue = (this.filterqueue != null && this.filterqueue != '') ? this.filterqueue.trim().toLowerCase() : ''
-      return this.queueventList.filter(e => e.queuename.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.queueventList.filter(e => e.queuename.trim().toLowerCase().includes(filterValue))
     }
     return []
   }
@@ -709,7 +815,7 @@ export class ParticipantsAnalyticsComponent {
   onQueueStageSearch() {
     if (this.queueTokens != null) {
       const filterValue = (this.filterqueuestage != null && this.filterqueuestage != '') ? this.filterqueuestage.trim().toLowerCase() : ''
-      return this.queueTokens.filter(e => e.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.queueTokens.filter(e => e.trim().toLowerCase().includes(filterValue))
     }
     return []
   }
@@ -717,7 +823,7 @@ export class ParticipantsAnalyticsComponent {
   onCategorySearch() {
     if (this.customerSupportCategorys != null) {
       const filterValue = (this.filtercategorys != null && this.filtercategorys != '') ? this.filtercategorys.trim().toLowerCase() : ''
-      return this.customerSupportCategorys.filter(e => e.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.customerSupportCategorys.filter(e => e.trim().toLowerCase().includes(filterValue))
     }
     return []
   }
@@ -725,7 +831,7 @@ export class ParticipantsAnalyticsComponent {
   onfilterproducts() {
     if (this.productlist != null) {
       const filterValue = (this.filterproductlist != null && this.filterproductlist != '') ? this.filterproductlist.trim().toLowerCase() : ''
-      return this.productlist.filter(e => e.product.trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.productlist.filter(e => e.product.trim().toLowerCase().includes(filterValue))
     } else return []
   }
 
@@ -733,7 +839,7 @@ export class ParticipantsAnalyticsComponent {
   onfiltertags() {
     if (this.tagList != null) {
       const filterValue = (this.filterTagList != null && this.filterTagList != '') ? this.filterTagList.trim().toLowerCase() : ''
-      return this.tagList.filter(e => this.mapfiltervalues[e].trim().toLowerCase().indexOf(filterValue) === 0)
+      return this.tagList.filter(e => this.mapfiltervalues[e].trim().toLowerCase().includes(filterValue))
     } else return []
   }
 
@@ -892,7 +998,6 @@ export class ParticipantsAnalyticsComponent {
   async onDataSearch() {
     let loadingref = this.loading
     let data = Object.assign({}, this.filterdata);
-
     for (const key in data) {
       if (data[key] === null || data[key] === undefined) delete data[key]
       else if (this.range.includes(key)) {
@@ -911,7 +1016,7 @@ export class ParticipantsAnalyticsComponent {
     this.filtereddashboarddata = this.cloneddashboarddata.filter(e => {
       let booleanarray = []
       for (const key in data) {
-        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products'].includes(key)) {
+        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend'].includes(key)) {
           if (this.arraystring.includes(key)) { [null, undefined].includes(e[key]) ? e[key] = 'none' : null }
 
           if (e[key] != undefined && e[key] != null) {
@@ -937,16 +1042,11 @@ export class ParticipantsAnalyticsComponent {
               else { booleanarray.push(false) }
             } else if (this.range.includes(key)) {
               if (![null, undefined].includes(e[key])) {
-                // console.log('range', e[key], new Date(data[key]['start']),  new Date(data[key]['end']));
-                if (key === 'subscriptionend') {
-                  const date = e['customerstatus'] === 'active'
-                } else {
-                  if (e[key].toDate() >= new Date(data[key]['start']) && e[key].toDate() <= new Date(data[key]['end'])) {
-                    booleanarray.push(true)
-                  }
-                  else {
-                    booleanarray.push(false)
-                  }
+                if (e[key]?.toDate() >= new Date(data[key]['start']) && e[key]?.toDate() <= new Date(data[key]['end'])) {
+                  booleanarray.push(true)
+                }
+                else {
+                  booleanarray.push(false)
                 }
               }
               else { booleanarray.push(false) }
@@ -957,7 +1057,7 @@ export class ParticipantsAnalyticsComponent {
               } else { booleanarray.push(false) }
             } else if (this.stringmaparray.includes(key)) {
               if ([null, undefined].includes(this.filterdata['products'])) {
-                console.log([].concat.apply([], Object.keys(e[key])), data[key])
+                // console.log([].concat.apply([], Object.keys(e[key])), data[key])
                 if ([].concat.apply([], Object.values(e[key])).includes(data[key])) {
                   booleanarray.push(true)
                 }
@@ -993,7 +1093,21 @@ export class ParticipantsAnalyticsComponent {
           } else {
             booleanarray.push(false)
           }
+        } 
+        if (key === 'subscriptionend') {
+          const dateKey = e['customerstatus'] === 'active' ? 'subscriptionend' : ['discontinued' , 'non active'].includes(e['customerstatus'] ) ? 'lastsubscriptionend' : null;
+          if ([null, undefined, ''].includes(dateKey) || [null, undefined, ''].includes(e[dateKey])) {
+            booleanarray.push(false)
+          } else {
+            if (e[dateKey]?.toDate() >= new Date(data[key]['start']) && e[dateKey]?.toDate() <= new Date(data[key]['end'])) {
+              booleanarray.push(true)
+            }
+            else {
+              booleanarray.push(false)
+            }
+          }
         }
+
 
         if (key === 'queuestage' && ![null, undefined, ''].includes(data['queueevent']) && ![null, undefined, ''].includes(data['queuestage'])) {
           const queue = data['queueevent'];
@@ -1016,10 +1130,57 @@ export class ParticipantsAnalyticsComponent {
         filteredDataWithoutProductFilter.add(e['profileid'])
       }
 
-      if ((this.filterByProducts.consumed.length > 0 || this.filterByProducts.unconsumed.length > 0)
-        && (!Object.hasOwn(this.filterByProducts.participants, e['profileid']))) {
-        booleanarray.push(false);
+      // if ((this.filterByProducts.consumed.length > 0 || this.filterByProducts.unconsumed.length > 0)
+      //   && (!Object.hasOwn(this.filterByProducts.participants, e['profileid']))) {
+      //   booleanarray.push(false);
+      // }
+
+      const consumed = this.consumedProducts.value.filter((p: any) => p.productId !== '' && p.productId !== null);
+      const unconsumed = this.unconsumedProducts.value.filter((p: any) => p.productId !== '' && p.productId !== null);
+      let matchesConsumed = consumed.length === 0;
+      let matchesUnconsumed = unconsumed.length === 0;
+
+      // Check consumed filters (only if consumed filters exist)
+      if (consumed.length > 0) {
+        matchesConsumed = consumed.every(filter => {
+          const productData = this.participantProductMap[e['profileid']] ? this.participantProductMap[e['profileid']][filter.productId] : null;
+          if (!productData) return false;
+
+          if (filter.comparison === 'equalto') {
+            return productData.consumedCount == filter.count;
+          } else if (filter.comparison === 'groreqto') {
+            return productData.consumedCount >= filter.count;
+          } else if (filter.comparison === 'lsoreqto') {
+            return productData.consumedCount <= filter.count;
+          }
+          return productData.consumedCount == filter.count;
+        });
       }
+
+      // Check unconsumed filters (only if unconsumed filters exist)
+      if (unconsumed.length > 0) {
+        matchesUnconsumed = unconsumed.every(filter => {
+          const productData = this.participantProductMap[e['profileid']] ? this.participantProductMap[e['profileid']][filter.productId] : null;
+          if (!productData) return false;
+
+          if (filter.comparison === 'equalto') {
+            return productData.unConsumedCount == filter.count;
+          } else if (filter.comparison === 'groreqto') {
+            return productData.unConsumedCount >= filter.count;
+          } else if (filter.comparison === 'lsoreqto') {
+            return productData.unConsumedCount <= filter.count;
+          }
+
+          return productData.unConsumedCount == filter.count;
+        });
+      }
+
+      if ((matchesConsumed && matchesUnconsumed)) {
+        booleanarray.push(true)
+      } else {
+        booleanarray.push(false)
+      }
+
 
       if (!booleanarray.includes(false)) {
         return e
@@ -1081,10 +1242,8 @@ export class ParticipantsAnalyticsComponent {
         if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
       }
     }
-    // console.log(data);
     if (Object.keys(data).length >= 2) {
       if (confirm("are you sure you want to submit")) {
-        // console.log(data);
         data['docid'] = data['docid'] ?? doc(collection(this.firestore, "searchquery")).id
         data['createdby'] = this.loggedInProfileId
         setDoc(doc(this.firestore, "searchquery", data['docid']), data, { merge: true }).then(() => {
@@ -1115,13 +1274,34 @@ export class ParticipantsAnalyticsComponent {
       rawProductsData: []
     };
     this.selection.clear();
+    this.consumedProducts.clear()
+    this.unconsumedProducts.clear();
     this.onDataSearch();
   }
 
   onColumnNameSelect(value) {
-    // console.log(value);
-    this.displayedColumns = ['select', 'name', ...value]
+    this.displayedColumns = ['select', 'name', ...value,];
   }
+
+  // getColumnForTableHeader(columnKey: string) {
+  //   const [type, productId, comparison, count] = columnKey.split('-');
+  //   return `${type}( ${this.mapfiltervalues[productId]} )` || 'N/A';
+  // }
+
+  // getProductCountForParticipant(columnKey: string, profileId: string) {
+  //   const [type, productId, comparison, count] = columnKey.split('-');
+  //   const participant = this.participantProductMap[profileId];
+  //   if (!participant) {
+  //     return ''
+  //   }
+  //   const product = participant[productId];
+  //   if (!product) return ''
+  //   if (type === 'consumed') {
+  //     return participant[productId].consumedCount;
+  //   } else {
+  //     return participant[productId].unConsumedCount;
+  //   }
+  // }
 
   returnTableColumns() {
     var columns = this.columnsDisplayed
@@ -1131,7 +1311,6 @@ export class ParticipantsAnalyticsComponent {
   //remarks
 
   addremarks(profile) {
-    // console.log(profile);
     let mapprofileremarks = {}
     var dialogRef = this.dialog.open(AddRemarksComponent, {
       data: {},
@@ -1140,7 +1319,6 @@ export class ParticipantsAnalyticsComponent {
 
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value => {
       if (value != null) {
-        // console.log(value);
         for (let i = 0; i < profile.length; i++) {
           const element = profile[i];
           mapprofileremarks[element['profileid']] = element
@@ -1153,7 +1331,6 @@ export class ParticipantsAnalyticsComponent {
         for (const key in mapprofileremarks) {
           if (Object.prototype.hasOwnProperty.call(mapprofileremarks, key)) {
             const element = mapprofileremarks[key];
-            // console.log(element['remarks']);
             if (element['remarks'] == undefined) {
               element['remarks'] = [remarks]
             } else {
@@ -1169,7 +1346,6 @@ export class ParticipantsAnalyticsComponent {
   }
 
   editremarks(profile) {
-    // console.log(profile);
     if (profile != undefined) {
       profile.forEach(map => {
         const dialogRef = this.dialog.open(RemarkDialogComponent, {
@@ -1180,7 +1356,6 @@ export class ParticipantsAnalyticsComponent {
         let mapprofileremarks = {};
         dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(newRemarks => {
           newRemarks = newRemarks.filter(element => element.note.trim() !== "")
-          // console.log(newRemarks);
           if (newRemarks != null) {
             for (let i = 0; i < profile.length; i++) {
               const element = profile[i];
@@ -1213,7 +1388,6 @@ export class ParticipantsAnalyticsComponent {
   }
 
   createRecommendedPlaylistToSelectedParticipant() {//map recommended playlist to selected participant to buffer collection
-    // console.log(this.selection.selected);
     let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
       data: {
         participantlist: this.selection.selected,
@@ -1223,7 +1397,6 @@ export class ParticipantsAnalyticsComponent {
       disableClose: true
     })
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
-      // console.log(result);
       if (result != null && result != undefined) {
         let docid = doc(collection(this.firestore, "buffermix archive")).id
         result['docid'] = docid
@@ -1290,7 +1463,6 @@ export class ParticipantsAnalyticsComponent {
 
   updateEmailValidator() {
     let listofprofileid = this.selection.selected.map(e => e.profileid)
-    // console.log(listofprofileid);
     setDoc(doc(this.firestore, "email validators", "validators"), {
       profilelist: listofprofileid
     }, { merge: true }).then(() => {
@@ -1381,7 +1553,6 @@ export class ParticipantsAnalyticsComponent {
     });
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value => {
       if (value != null) {
-        console.log(value);
         value.data.forEach((profile: any) => {
           const collRef = collection(this.firestore, "participantjourneyproduct")
           const q = query(collRef, where('profileid', '==', profile.profileid), where('subscriptionend', '==', profile.subscriptionend))
@@ -1831,6 +2002,9 @@ export class ParticipantsAnalyticsComponent {
     // Get filtered data from MatTableDataSource
     const rawData = selected ? this.dataSource.data : (this.dataSource.filteredData ?? this.dataSource.data);
 
+    const consumedColumns = this.consumedProducts.value.filter((p: any) => p.productId !== '' && p.productId !== null).map((p) => (`consumedcount-${p.productId}-${p.comparison}-${p.count}`));
+    const unconsumedColumns = this.unconsumedProducts.value.filter((p: any) => p.productId !== '' && p.productId !== null).map((p) => (`unconsumedcount-${p.productId}-${p.comparison}-${p.count}`));
+    const columns = [...this.displayedColumns, ...consumedColumns, ...unconsumedColumns];
     // Create formatted data for export
     const formattedData = [];
     for (let element of rawData) {
@@ -1841,7 +2015,7 @@ export class ParticipantsAnalyticsComponent {
       const formattedRow: any = {};
 
       // Process each column according to your display logic
-      this.displayedColumns.forEach(column => {
+      columns.forEach(column => {
         if (column === 'select') {
           // Skip checkbox column
           return;
@@ -1972,6 +2146,17 @@ export class ParticipantsAnalyticsComponent {
         else if (column === 'kyj') {
           formattedRow[column] = element[column];
         }
+        else if (column.startsWith('consumedcount') || column.startsWith('unconsumedcount')) {
+          const [type, productId, comparison, count] = column.split('-');
+          const participant = this.participantProductMap[element['profileid']] || '';
+          const header = `${type}( ${this.mapfiltervalues[productId]} )` || 'N/A';
+
+          if (type === 'consumed') {
+            formattedRow[header] = participant[productId].consumedCount;
+          } else {
+            formattedRow[header] = participant[productId].unConsumedCount;
+          }
+        }
         // Default case for other columns
         else {
           formattedRow[column] = element[column];
@@ -2041,7 +2226,6 @@ export class ParticipantsAnalyticsComponent {
       })
       let headers = []
       let data = []
-      // console.log(filterdata);
       if (filterdata.length != 0) {
         for (const key in filterdata[0]) {
           { headers.push(key) }
@@ -2065,6 +2249,26 @@ export class ParticipantsAnalyticsComponent {
   }
 
   // import
+
+  handleImportClick() {
+    const sampleDownload = confirm('Do you want to download sample Import Excel');
+    if (sampleDownload) {
+      const data = [
+        { name: 'John Doe', email: 'john@example.com' },
+        { name: 'Jane Smith', email: 'jane@example.com' },
+        { name: 'surya', email: 'surya.thiruvengadam@soexcellence.com' }
+      ];
+
+      const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
+
+      const workbook: XLSX.WorkBook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample');
+
+      XLSX.writeFile(workbook, 'sample_format.xlsx');
+      return
+    }
+    this.inputFile.nativeElement.click();
+  }
   onChange(evt: Event) {
     const target = evt.target as HTMLInputElement;
     const file = target.files?.[0];
@@ -2122,11 +2326,14 @@ export class ParticipantsAnalyticsComponent {
     reader.readAsArrayBuffer(file);
   }
 
+  downloadSmapleImportFile() {
+
+  }
+
   // checklists
   navigateTochecklists(type) {
     if (type === 'higherorderpurchase') {
       let higherorderpurchaseData = this.dashboardEntireData.filter(e => e['activejourney'] != null && e['activejourney'] != e['higherorderpurchase'])
-      console.log(higherorderpurchaseData);
       const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
         width: '90vw',
         height: '80vh',
