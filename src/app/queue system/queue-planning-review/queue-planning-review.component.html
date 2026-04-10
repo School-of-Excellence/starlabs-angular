@@ -21,7 +21,7 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      
+
 
       <!-- <mat-form-field appearance="outline" class="filter-field overall-segment" *ngIf="this.selectedQueue != null">
         <mat-label>Filter by Segment</mat-label>
@@ -55,10 +55,56 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-    
+
+      <!-- Interim Report Filter -->
+      <ng-container *ngIf="selectedQueue != null">
+
+        <div class="interim-filter-inline">
+          <!-- Icon + Label -->
+          <button mat-stroked-button class="interim-filter-btn"
+            [class.interim-active]="interimDataLoaded"
+            [disabled]="interimReportLoading"
+            (click)="showInterimDatePicker = !showInterimDatePicker">
+            <mat-icon>assignment_turned_in</mat-icon>
+            <span *ngIf="!interimDataLoaded">Interim Filter</span>
+            <span *ngIf="interimDataLoaded">
+              {{ interimReportStartDate | date:'dd MMM' }} – {{ interimReportEndDate | date:'dd MMM yy' }}
+            </span>
+            <mat-spinner *ngIf="interimReportLoading" diameter="14"
+              style="display:inline-block; margin-left:4px;">
+            </mat-spinner>
+          </button>
+
+          <!-- Inline date picker (toggles) -->
+          <div class="interim-date-inline" *ngIf="showInterimDatePicker">
+            <mat-form-field appearance="outline" class="interim-date-field">
+              <mat-date-range-input [rangePicker]="interimPicker">
+                <input matStartDate placeholder="Start" [(ngModel)]="interimReportStartDate">
+                <input matEndDate placeholder="End" [(ngModel)]="interimReportEndDate">
+              </mat-date-range-input>
+              <mat-datepicker-toggle matIconSuffix [for]="interimPicker"></mat-datepicker-toggle>
+              <mat-date-range-picker #interimPicker></mat-date-range-picker>
+            </mat-form-field>
+            <button mat-raised-button color="primary" class="interim-apply-btn"
+              [disabled]="!interimReportStartDate || !interimReportEndDate || interimReportLoading"
+              (click)="applyInterimReportFilter()">
+              {{ interimDataLoaded ? 'Update' : 'Apply' }}
+            </button>
+          </div>
+
+          <!-- Reset button (only when data loaded) -->
+          <button mat-icon-button class="interim-reset-btn" *ngIf="interimDataLoaded"
+            matTooltip="Reset Interim Filter"
+            (click)="resetInterimReportFilter()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+      </ng-container>
+
 
     <!-- NEW: Overall Counts Section -->
-    <div class="overall-counts-section" *ngIf="selectedQueue && !loading">
+    <div class="overall-counts-section" [class.with-interim-cards]="interimDataLoaded" *ngIf="selectedQueue && !loading">
       <div>
         <div [class]="`overall-count-card queue-tokens-card ${nonSegmentParticipant() > 0 ? 'error':''}`"
           (click)="openOverallQueueTokensPanel()">
@@ -91,6 +137,33 @@
           (click)="exportOverallSegmentParticipants(); $event.stopPropagation()">
           <mat-icon>file_download</mat-icon>
         </button>
+      </div>
+
+      <!-- Interim Cards on Main Screen -->
+      <div class="overall-count-card interim-completed-card"
+        *ngIf="interimDataLoaded"
+        [class.interim-card-active]="activeInterimCard === 'completed'"
+        (click)="toggleInterimCard('completed')">
+        <div class="count-icon">
+          <mat-icon>check_circle</mat-icon>
+        </div>
+        <div class="count-details">
+          <span class="count-label">Interim Completed</span>
+          <span class="count-value">{{ interimCompletedCount }}</span>
+        </div>
+      </div>
+
+      <div class="overall-count-card interim-not-completed-card"
+        *ngIf="interimDataLoaded"
+        [class.interim-card-active]="activeInterimCard === 'not-completed'"
+        (click)="toggleInterimCard('not-completed')">
+        <div class="count-icon">
+          <mat-icon>pending</mat-icon>
+        </div>
+        <div class="count-details">
+          <span class="count-label">Interim Pending</span>
+          <span class="count-value">{{ interimNotCompletedCount }}</span>
+        </div>
       </div>
     </div>
 
@@ -601,6 +674,10 @@
                     <mat-icon *ngIf="participant.isNonSegmentParticipant" class="non-segment-icon">person_off</mat-icon>
                   </div>
                   <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                  <span class="participant-phone"
+                    *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid)">
+                    📞 {{ getParticipantPhoneNumber(participant.profile_id || participant.profileid) }}
+                  </span>
                   <mat-chip *ngIf="participant.hasInvalidSlot" class="invalid-chip">
                     Invalid Slot
                   </mat-chip>
@@ -720,15 +797,10 @@
     </div>
   </div>
 </div>
-
 <ng-template #slotplanner>
-  <div class="slot-planner" *ngIf="selectedStage">
+  <div class="slot-planner" *ngIf="selectedStage" [class.with-panel]="showQueueTabPanel">
     <div class="top-bar">
       <h1>Slot Planner <span>— {{selectedStage}}</span></h1>
-      <!-- <div class="top-bar-right">
-        <div class="date-range">📅 11 – 13 Feb 2026</div>
-        <div class="live-pulse"><span class="pulse-dot"></span> Live</div>
-      </div> -->
      <button mat-dialog-close mat-icon-button class="close-btn">
       <mat-icon>close</mat-icon>
     </button>
@@ -767,14 +839,14 @@
 
     <!-- Toggle in top right corner -->
     <div class="scoreboard-toggle">
-      <span class="toggle-label" [class.active-label]="showFromToday">From Today</span>
-      <label class="toggle-switch">
-        <input type="checkbox" [checked]="!showFromToday" (change)="showFromToday = !showFromToday">
-        <span class="toggle-slider"></span>
-      </label>
-      <span class="toggle-label" [class.active-label]="!showFromToday">Overall</span>
+        <span class="toggle-label" [class.active-label]="showFromToday">From Today</span>
+        <label class="toggle-switch">
+          <input type="checkbox" [checked]="!showFromToday" (change)="showFromToday = !showFromToday">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label" [class.active-label]="!showFromToday">Overall</span>
+      </div>
     </div>
-  </div>
     <div class="controls-bar">
       <!-- <button class="ctrl-btn" [class.active]="selectedDates.length === 0" (click)="selectAllDays()">All Days</button> -->
       <!-- <button class="ctrl-btn">11 Feb</button>
@@ -819,20 +891,38 @@
         <mat-date-range-picker #picker (closed)="onSlotPlannerDateFilter()">
         </mat-date-range-picker>
       </mat-form-field>
-      <mat-form-field appearance="fill" style="min-width: 180px;">
-        <mat-label>Filter by Segment</mat-label>
-        <mat-select [(ngModel)]="slotPlannerSegmentFilter" multiple>
-        <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['docid'] || segment['id']">
-          {{ segment['segmentname'] }}
-        </mat-option>
-        </mat-select>
-      </mat-form-field>
       <div class="ctrl-spacer"></div>
+      <div class="interim-toggle-btns" *ngIf="interimDataLoaded">
+        <button class="interim-toggle-btn interim-done-btn"
+          [class.interim-btn-active]="activeInterimCard === 'completed'"
+          (click)="toggleInterimCard('completed')">
+          <mat-icon>check_circle</mat-icon>
+          Done ({{ interimCompletedCount }})
+        </button>
+        <button class="interim-toggle-btn interim-pending-btn"
+          [class.interim-btn-active]="activeInterimCard === 'not-completed'"
+          (click)="toggleInterimCard('not-completed')">
+          <mat-icon>pending</mat-icon>
+          Pending ({{ interimNotCompletedCount }})
+        </button>
+      </div>
       <button class="export-btn" (click)="exportParticipantsDetailsForStage()">📊 Export</button>
       <button class="expand-toggle" (click)="expandAllRow? expandedAllRows() : collapseAllRows()">{{expandAllRow ?
         'Expand All':'Collapse All Participants'}}</button>
     </div>
-    <div class="table-wrapper">
+    <div class="slot-planner-tabs">
+      <button class="tab-btn"
+        [class.active-tab]="activeSlotPlannerTab === 'appointment'"
+        (click)="activeSlotPlannerTab = 'appointment'">
+        Appointment
+      </button>
+      <button class="tab-btn"
+        [class.active-tab]="activeSlotPlannerTab === 'queue'"
+        (click)="activeSlotPlannerTab = 'queue'; expandedQueueRows = []">
+        Queue
+      </button>
+    </div>
+    <div class="table-wrapper" *ngIf="activeSlotPlannerTab === 'appointment'">
       <table class="main-table">
         <thead>
           <tr>
@@ -885,94 +975,28 @@
   
             <!-- Participant Panel -->
             <tr class="participant-panel" [class.open]="slot.expanded" *ngIf="slot.expanded && slot.showExpand">
-              <td colspan="5">
-                <div class="participant-inner" [@slideDown]="slot.expanded ? 'expanded' : 'collapsed'">
-  
-                  <!-- BIG Participants -->
-                  <!-- <div class="p-section" *ngIf="slot.participants.big?.length > 0">
-                            <div class="p-section-header">
-                              ⭐ BIG Participants ({{ slot.participants.big.length }})
-                            </div>
-                            <div class="p-card" *ngFor="let p of slot.participants.big">
-                              <div class="p-avatar big-av">{{ getInitials(p.name) }}</div>
-                              <div>
-                                <div class="p-name">{{ p.name }}</div>
-                                <div class="p-detail">{{ p.variation }}</div>
-                              </div>
-                              <span class="p-segment-tag" [ngClass]="getSegmentClass(p.segment)">
-                                {{ getSegmentLabel(p.segment) }}
-                              </span>
-                            </div>
-                          </div> -->
-  
-                  <!-- Next Cycle -->
-                  <div class="p-section">
-                    <div *ngFor="let segment of getConfirmedParticipants(slot , selectedStage);">
-                      <div *ngIf="segment.participants?.length > 0 ">
-                        <div class="p-section-header">
-                          {{segment?.segmentName ?? ''}} ({{ segment?.participants?.length }})
-                        </div>
-                        <div class="participant-names">
-                          <div class="p-card" *ngFor="let participant of segment.participants; let i = index;">
-                            <div>
-                              <div class="p-name">
-                                <span style="font-weight: normal;">{{i + 1}} {{')'}} </span>
-                                <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
-                                <span 
-                                  *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid) as phone"
-                                  style="font-weight: normal; color: #030303; font-size: 0.95em; margin-left: 8px;">
-                                  📞 {{ phone }}
-                                </span>
-                              </div>
-                            </div>
+              <td colspan="6">
+                <div class="appt-participant-panel" [@slideDown]="slot.expanded ? 'expanded' : 'collapsed'">
+                  <ng-container *ngFor="let segment of getConfirmedParticipants(slot, selectedStage)">
+                    <div class="appt-segment-block" *ngIf="segment.participants?.length > 0">
+                      <div class="appt-segment-header">
+                        <span class="appt-segment-name">{{ segment?.segmentName ?? '' }}</span>
+                        <span class="appt-segment-count">{{ segment?.participants?.length }}</span>
+                      </div>
+                      <div class="appt-participant-grid">
+                        <div class="appt-participant-item" *ngFor="let participant of segment.participants; let i = index">
+                          <span class="appt-participant-num">{{ i + 1 }}</span>
+                          <div class="appt-participant-info">
+                            <span class="appt-participant-name">{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                            <span class="appt-participant-phone"
+                              *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid) as phone">
+                              <mat-icon>phone</mat-icon> {{ phone }}
+                            </span>
                           </div>
                         </div>
                       </div>
-                      <!-- <ng-template #noNext>
-                                <div class="empty-msg">No Next Cycle participants</div>
-                              </ng-template> -->
                     </div>
-                  </div>
-  
-                  <!-- Standard -->
-                  <!-- <div class="p-section">
-                            <div class="p-section-header">
-                              ✓ Standard ({{ slot.participants.standard.length }})
-                            </div>
-                            <div *ngIf="slot.participants.standard.length > 0; else noStandard">
-                              <div class="p-card" *ngFor="let p of slot.participants.standard">
-                                <div class="p-avatar confirmed-av">{{ getInitials(p.name) }}</div>
-                                <div>
-                                  <div class="p-name">{{ p.name }}</div>
-                                  <div class="p-detail">{{ p.variation }}</div>
-                                </div>
-                                <span class="p-segment-tag" [ngClass]="getSegmentClass(p.segment)">
-                                  {{ getSegmentLabel(p.segment) }}
-                                </span>
-                              </div>
-                            </div>
-                            <ng-template #noStandard>
-                              <div class="empty-msg">No Standard participants</div>
-                            </ng-template>
-                          </div> -->
-  
-                  <!-- Actions -->
-                  <!-- <div class="p-actions-wrapper">
-                            <div class="p-actions">
-                              <button class="p-action-btn btn-notify" (click)="$event.stopPropagation()">
-                                🔔 Send Notification
-                              </button>
-                              <button class="p-action-btn btn-whatsapp" (click)="$event.stopPropagation()">
-                                💬 WhatsApp ({{ slot.booked }})
-                              </button>
-                              <button class="p-action-btn btn-email" (click)="$event.stopPropagation()">
-                                ✉ Email All
-                              </button>
-                              <button class="p-action-btn btn-download" (click)="$event.stopPropagation()">
-                                ⬇ Export
-                              </button>
-                            </div>
-                          </div> -->
+                  </ng-container>
                 </div>
               </td>
             </tr>
@@ -994,6 +1018,243 @@
           </tr>
       </tbody>
      </table>
+    </div>
+    <!-- QUEUE TAB -->
+    <div class="table-wrapper" *ngIf="activeSlotPlannerTab === 'queue'">
+      <table class="main-table">
+        <thead>
+          <tr>
+            <th style="width:40px;"></th>
+            <th>Slot Date & Time</th>
+            <th style="text-align:center">Confirmed</th>
+            <th style="text-align:center">Non-Confirmed</th>
+            <th style="text-align:center">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let dayGroup of getSlotsGroupForStage()">
+
+            <!-- Day Header -->
+            <tr class="day-row">
+              <td colspan="5">
+                {{ getDayLabel(dayGroup.date) }}
+              </td>
+            </tr>
+
+            <!-- Slot Rows -->
+            <ng-container *ngFor="let slot of dayGroup.slots">
+
+              <!-- Main Row -->
+              <tr class="slot-row" [class.active-panel-row]="isActivePanelSlot(slot)">
+                <td (click)="toggleQueueRow(slot)">
+                  <span class="expand-arrow"
+                    [class.expanded]="isQueueRowExpanded(slot)">▶</span>
+                </td>
+                <td (click)="toggleQueueRow(slot)">
+                  <strong>{{ getDateAndMonthString(slot.startdate) }}</strong>
+                  {{ getTimeString(slot.startdate, slot.enddate) }}
+                </td>
+                <td style="text-align:center">
+                  <span class="badge badge-booked clickable-badge"
+                    (click)="openQueueTabPanelForSlot(slot, selectedStage, 'confirmed')">
+                    <mat-icon class="badge-click-icon">how_to_reg</mat-icon>
+                    {{ getConfirmedCountForSlot(slot, selectedStage) }}
+                  </span>
+                </td>
+                <td style="text-align:center">
+                  <span class="badge badge-nonconf clickable-badge"
+                    (click)="openQueueTabPanelForSlot(slot, selectedStage, 'non-confirmed')">
+                    <mat-icon class="badge-click-icon">schedule</mat-icon>
+                    {{ getNonConfirmedCountForSlot(slot, selectedStage) }}
+                  </span>
+                </td>
+                <td style="text-align:center">
+                  <span class="badge badge-none">
+                    {{ getConfirmedCountForSlot(slot, selectedStage) + getNonConfirmedCountForSlot(slot, selectedStage) }}
+                  </span>
+                </td>
+              </tr>
+
+              <!-- Expanded Segment Split -->
+              <tr *ngIf="isQueueRowExpanded(slot)">
+                <td colspan="5" class="segment-split-cell">
+                  <div class="segment-split-container">
+                    <div class="segment-hint">
+                      <mat-icon>info_outline</mat-icon>
+                      Select segments to build a communication list
+                    </div>
+                    <table class="segment-split-table">
+                      <thead>
+                        <tr>
+                          <th style="width:48px"></th>
+                          <th>Segment</th>
+                          <th style="text-align:center">Confirmed</th>
+                          <th style="text-align:center">Non-Confirmed</th>
+                          <th style="text-align:center">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <ng-container *ngFor="let segmentVar of slot.segmentVariations">
+                          <tr class="segment-row" [class.segment-row-selected]="isSegmentSelected(segmentVar.segmentId)">
+                            <td>
+                              <mat-checkbox
+                                [checked]="isSegmentSelected(segmentVar.segmentId)"
+                                (change)="toggleSegmentSelection(segmentVar.segmentId, $event.checked, slot, selectedStage)"
+                                (click)="$event.stopPropagation()">
+                              </mat-checkbox>
+                            </td>
+                            <td>{{ segmentVar.segmentName }}</td>
+                            <td style="text-align:center">
+                              <span class="badge badge-booked clickable-badge"
+                                (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'confirmed'); $event.stopPropagation()">
+                                {{ getConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
+                              </span>
+                            </td>
+                            <td style="text-align:center">
+                              <span class="badge badge-nonconf clickable-badge"
+                                (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'non-confirmed'); $event.stopPropagation()">
+                                {{ getNonConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
+                              </span>
+                            </td>
+                            <td style="text-align:center">
+                              <span class="badge badge-none">
+                                {{ getConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) + getNonConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
+                              </span>
+                            </td>
+                          </tr>
+                        </ng-container>
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+
+            </ng-container>
+          </ng-container>
+
+          <!-- Total Row -->
+          <tr class="total-row">
+            <td></td>
+            <td><strong>TOTAL</strong></td>
+            <td style="text-align:center">
+              <span class="badge badge-booked">
+                {{ getTotalConfirmedParticipantInTable() }}
+              </span>
+            </td>
+            <td style="text-align:center">
+              <span class="badge badge-nonconf">
+                {{ getTotalQueueNonConfirmedInTable() }}
+              </span>
+            </td>
+            <td style="text-align:center">
+              <span class="badge badge-none">
+                {{ getTotalConfirmedParticipantInTable() + getTotalQueueNonConfirmedInTable() }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Queue Tab Inner Panel -->
+    <div class="queue-tab-panel" *ngIf="showQueueTabPanel">
+
+      <!-- Panel Header -->
+      <div class="queue-panel-header-redesign">
+        <div class="queue-panel-header-top">
+          <div class="queue-panel-title-row">
+            <mat-icon>send</mat-icon>
+            <span>Send Communication</span>
+          </div>
+          <button mat-icon-button class="queue-panel-close-btn" (click)="showQueueTabPanel = false">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <div class="queue-panel-meta-row">
+          <div class="queue-panel-slot-info">
+            <mat-icon class="queue-panel-info-icon">event</mat-icon>
+            <span>{{ queueTabPanelSlotTime }}</span>
+          </div>
+          <div class="queue-panel-segment-info">
+            <mat-icon class="queue-panel-info-icon">label</mat-icon>
+            <span>{{ queueTabPanelSegmentName }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmed / Non-Confirmed Toggle Tabs -->
+      <div class="queue-panel-type-tabs">
+        <button class="queue-type-tab"
+          [class.active]="queueTabPanelType === 'confirmed'"
+          (click)="switchPanelType('confirmed')">
+          <mat-icon>how_to_reg</mat-icon>
+          Confirmed
+        </button>
+        <button class="queue-type-tab"
+          [class.active]="queueTabPanelType === 'non-confirmed'"
+          (click)="switchPanelType('non-confirmed')">
+          <mat-icon>schedule</mat-icon>
+          Non-Confirmed
+        </button>
+      </div>
+
+      <!-- Communication Action Bar -->
+      <div class="queue-panel-action-bar">
+        <div class="queue-panel-select-all">
+          <mat-checkbox
+            [checked]="areAllQueuePanelSelected()"
+            [indeterminate]="areSomeQueuePanelSelected()"
+            (change)="toggleAllQueuePanel($event.checked)">
+            Select All ({{ allParticipantsForStage.length }})
+          </mat-checkbox>
+        </div>
+        <div class="queue-panel-comm-actions" *ngIf="getSelectedParticipantsCount('all') > 0">
+          <button mat-mini-fab class="comm-fab notification-fab" matTooltip="Send Notification"
+            (click)="sendNotification()">
+            <mat-icon>notifications</mat-icon>
+          </button>
+          <button mat-mini-fab class="comm-fab whatsapp-fab" matTooltip="Send WhatsApp"
+            (click)="sendWhatsApp()">
+            <mat-icon>chat</mat-icon>
+          </button>
+          <button mat-mini-fab class="comm-fab email-fab" matTooltip="Send Email"
+            (click)="sendEmail()">
+            <mat-icon>email</mat-icon>
+          </button>
+          <span class="comm-count-label">{{ getSelectedParticipantsCount('all') }} selected</span>
+        </div>
+      </div>
+
+      <!-- Participants List -->
+      <div class="queue-panel-list-redesign">
+        <div class="queue-participant-card"
+          *ngFor="let participant of allParticipantsForStage; let i = index"
+          [class.selected]="participant.selected"
+          (click)="participant.selected = !participant.selected">
+          <mat-checkbox [(ngModel)]="participant.selected" (click)="$event.stopPropagation()">
+          </mat-checkbox>
+          <div class="queue-participant-details">
+            <div class="queue-participant-name">
+              <span class="queue-participant-index">#{{ i + 1 }}</span>
+              {{ getProfileName(participant.profile_id || participant.profileid) }}
+            </div>
+            <div class="queue-participant-meta">
+              <span class="queue-participant-phone"
+                *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid)">
+                <mat-icon>phone</mat-icon>
+                {{ getParticipantPhoneNumber(participant.profile_id || participant.profileid) }}
+              </span>
+              <span class="queue-participant-segment" *ngIf="participant.segmentName">
+                {{ participant.segmentName }}
+              </span>
+            </div>
+          </div>
+          <mat-chip class="non-queue-chip" *ngIf="participant.isNonQueueParticipant">NON-QUEUE</mat-chip>
+        </div>
+        <div class="queue-panel-empty" *ngIf="allParticipantsForStage.length === 0">
+          <mat-icon>person_off</mat-icon>
+          <span>No participants found</span>
+        </div>
+      </div>
     </div>
   </div>
 </ng-template>

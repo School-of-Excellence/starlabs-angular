@@ -9,7 +9,6 @@ import { AuthguardService } from '../../authguard.service';
 import { OpenviduVideoElementComponent } from '../openvidu-video-element/openvidu-video-element.component';
 import { CommonModule } from '@angular/common';
 import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvidu-audio-element.component';
-import { NoiseCancellationService } from '../../Service/NoiseCancellation/noisecancellation.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
@@ -17,8 +16,11 @@ import { LoadingProgressComponent } from '../../loading-progress/loading-progres
 import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
-import { DeepAudioFilterService } from '../../Service/NoiseCancellation/deep-audio-filter.service';
-import { AiCousticsService } from '../../Service/NoiseCancellation/ai-coustics.service';
+import { DeepAudioFilterService } from '../../Service/Deep Audio Filter/deep-audio-filter.service';
+// ── [DF3] DeepFilterNet3 noise cancellation service (ONNX · AudioWorklet · no API key needed)
+// Replaces Amazon Voice Focus as the active filter. VoiceFocus import + service kept intact below
+// so it can be re-enabled by swapping the method body back.
+import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -90,10 +92,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public route: ActivatedRoute,
     public httpClient: HttpClient,
     public guard: AuthguardService,
-    public noiseCancellationService: NoiseCancellationService,
     public dialog: MatDialog,
     private infraService: InstanceStatusService,
-    private audiofilterservice : AiCousticsService
+    private audiofilterservice : DeepAudioFilterService, // kept — not removed, used in debugAudioLevels()
+    private deepFilter3: DeepFilter3Service              // [DF3] active noise cancellation filter
   ){}
 
   ngAfterViewInit(): void {
@@ -144,7 +146,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.leaveRoom(false)
-    this.noiseCancellationService.cleanup()
     this.roomDetail = null
     this.roomSubscription?.next()
     this.roomSubscription?.complete()
@@ -778,7 +779,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if(!confirmed) return
 
     // Leave the room by calling 'disconnect' method over the Room object
-    this.audiofilterservice.destroy();
     await this.room()?.disconnect();
     this.room()?.removeAllListeners();
 
@@ -1110,15 +1110,39 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   // }
 
   /**
- * Enable microphone with RNNoise noise cancellation
- */
-  
-
-async enableMicrophoneWithNoiseCancellation(room: Room) {
+   * Enable microphone with DeepFilterNet3 noise cancellation.
+   *
+   * ── Audio pipeline ────────────────────────────────────────────────────────
+   *
+   *   getUserMedia (raw mic, 48 kHz)
+   *       │
+   *       ▼
+   *   DeepFilter3Service.init()          — loads ONNX model + AudioWorklet
+   *       │                                (~7.7 MB, one-time per session)
+   *       ▼
+   *   DeepFilter3Service.processStream() — wires audio graph:
+   *       │   MediaStreamSource
+   *       │       → AudioWorkletNode (deepfilternet3-noise-filter)
+   *       │           → MediaStreamDestination
+   *       ▼
+   *   cleanStream (MediaStream)          — background noise removed
+   *       │
+   *       ▼
+   *   room.localParticipant.publishTrack — LiveKit publishes clean audio
+   *
+   * ── Fallback ─────────────────────────────────────────────────────────────
+   *   If DeepFilterNet3 is not supported (non-Chromium browsers without
+   *   AudioWorklet) → native WebRTC noiseSuppression:true is used instead.
+   *
+   * ── Previous filter (Amazon Voice Focus) ─────────────────────────────────
+   *   The original Voice Focus implementation is preserved below, commented
+   *   out. To revert: comment the DF3 block, uncomment the Voice Focus block.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  async enableMicrophoneWithNoiseCancellation(room: Room) {
   try {
-    console.log('🎙️ Enabling microphone with ai-coustics (Quail)...');
 
-    // Stop preview audio track to prevent double capture
+    // ── Step 1 — Stop preview track to prevent double capture ────────────
     if (this.previewStream) {
       this.previewStream.getAudioTracks().forEach(t => {
         t.stop();
@@ -1126,41 +1150,120 @@ async enableMicrophoneWithNoiseCancellation(room: Room) {
       });
     }
 
-    // Step 1 — Get raw mic stream (Official Recommendation: 16kHz for efficiency)
+    // ── Step 2 — Capture raw mic stream ──────────────────────────────────
+    // noiseSuppression: false — DeepFilterNet3 handles this in the worklet.
+    // echoCancellation: true  — browser AEC still runs (removes speaker echo
+    //   before DF3 sees the signal, which improves DF3 accuracy).
     const rawStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
-        noiseSuppression: false, // ai-coustics handles this
+        noiseSuppression: false,  // [DF3] DeepFilterNet3 handles noise
         autoGainControl: true,
-        sampleRate: 16000, 
+        sampleRate: 48000,
         channelCount: 1
       }
     });
 
-    // Step 2 — Initialize ai-coustics via your service
-    // Pass the key from your environment file
-    await this.audiofilterservice.init();
+    console.log('🎙️ Raw mic stream obtained:', rawStream.getAudioTracks()[0].getSettings());
 
-    // Step 3 — Process the stream
-    const cleanStream = await this.audiofilterservice.processStream(rawStream);
-    const cleanAudioTrack = cleanStream.getAudioTracks()[0];
+    // ── Step 3 — Initialise DeepFilterNet3 ───────────────────────────────
+    // Downloads the ONNX model (~7.7 MB) and registers the AudioWorklet
+    // processor. Returns false on unsupported browsers (no AudioWorklet).
+    console.log('🔄 Initialising DeepFilterNet3 (loading WASM + ONNX model)…');
+    const df3Supported = await this.deepFilter3.init(80); // suppressionLevel 0–100
 
-    // Step 4 — Publish to LiveKit Room
-    // LiveKit treats this as a 'custom track'
+    let cleanAudioTrack: MediaStreamTrack;
+
+    if (df3Supported) {
+      // ── Step 4a — Wire the DF3 audio graph and get the clean stream ─────
+      //
+      //   rawStream (MediaStream)
+      //       └─ MediaStreamAudioSourceNode
+      //               └─ AudioWorkletNode  ← DeepFilterNet3 ONNX inference
+      //                       └─ MediaStreamAudioDestinationNode
+      //                               └─ cleanStream (MediaStream)
+      //
+      const cleanStream = await this.deepFilter3.processStream(rawStream);
+      cleanAudioTrack = cleanStream.getAudioTracks()[0];
+
+      console.log(
+        `✅ DeepFilterNet3 active — init: ${this.deepFilter3.initTimeMs}ms,`,
+        `graph setup: ${this.deepFilter3.processingLatencyMs}ms`
+      );
+
+    } else {
+      // ── Step 4b — Fallback: raw stream (browser will apply its own AEC) ─
+      console.warn('⚠️ DeepFilterNet3 not supported on this browser — using raw stream.');
+      cleanAudioTrack = rawStream.getAudioTracks()[0];
+    }
+
+    // ── Step 5 — Publish clean audio track to LiveKit room ───────────────
     await room.localParticipant.publishTrack(cleanAudioTrack, {
       source: Track.Source.Microphone,
-      name: 'ai-enhanced-mic',
-      dtx: true // Voice Activity Detection (saves bandwidth)
+      name: 'microphone'
     });
 
-    console.log('✅ ai-coustics active and published to LiveKit');
+    if (this.debugAudioLevels) this.debugAudioLevels();
+    console.log('✅ Microphone published with DeepFilterNet3 noise cancellation');
+
+    // ── [DISABLED] Amazon Voice Focus — original implementation ──────────
+    // Kept intact for easy revert. To re-enable:
+    //   1. Comment the DF3 block above (Steps 3–4b)
+    //   2. Uncomment this block
+    //
+    // console.log('🎙️ Enabling microphone with Amazon Voice Focus...');
+    //
+    // // Step 2 — Init Voice Focus
+    // const supported = await this.audiofilterservice.init();
+    //
+    // let cleanAudioTrack: MediaStreamTrack;
+    //
+    // if (supported) {
+    //   // Step 3a — Apply Voice Focus
+    //   const cleanStream = await this.audiofilterservice.processStream(rawStream);
+    //   cleanAudioTrack = cleanStream.getAudioTracks()[0];
+    //   console.log('✅ Amazon Voice Focus active');
+    // }
+    // ─────────────────────────────────────────────────────────────────────
 
   } catch (error) {
-    console.error('❌ ai-coustics integration failed:', error);
-    
-    // Fallback to Native LiveKit Microphone
-    await room.localParticipant.setMicrophoneEnabled(true);
-    console.log('✅ Microphone enabled with standard fallback');
+    console.error('❌ DeepFilterNet3 failed, falling back to native WebRTC:', error);
+
+    // Destroy DF3 instance if it was partially initialised
+    this.deepFilter3.destroy();
+
+    // Stop preview audio
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => t.stop());
+    }
+
+    // ── Native browser fallback — always works on all browsers ───────────
+    await room.localParticipant.setMicrophoneEnabled(true, {
+      echoCancellation: true,
+      noiseSuppression: true,   // WebRTC built-in suppression as last resort
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1
+    });
+
+    if (this.debugAudioLevels) this.debugAudioLevels();
+    console.log('✅ Microphone enabled with WebRTC native fallback');
+  }
+}
+
+// Keep your existing debugAudioLevels as-is
+debugAudioLevels() {
+  const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
+  if (micPub?.audioTrack) {
+    const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
+    console.log('📊 Audio Track Settings:', {
+      sampleRate: settings.sampleRate,
+      channelCount: settings.channelCount,
+      echoCancellation: settings.echoCancellation,
+      noiseSuppression: settings.noiseSuppression,
+      autoGainControl: settings.autoGainControl,
+      voiceFocusActive: this.audiofilterservice.isActive()
+    });
   }
 }
 
