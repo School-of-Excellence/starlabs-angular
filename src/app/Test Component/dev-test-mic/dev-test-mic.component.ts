@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
@@ -7,6 +7,8 @@ import { KoalaFilterService } from '../../Service/PicoVoice Koala/koala-filter.s
 type Status =
   | 'idle' | 'loading' | 'live' | 'live-error'
   | 'recording' | 'processing' | 'done' | 'error';
+
+type FileStatus = 'idle' | 'loading' | 'done' | 'error';
 
 export interface FilterMetrics {
   filterName: string;
@@ -26,7 +28,7 @@ export interface FilterMetrics {
   templateUrl: './dev-test-mic.component.html',
   styleUrl: './dev-test-mic.component.css'
 })
-export class DevTestMicComponent implements OnDestroy {
+export class DevTestMicComponent implements OnInit, OnDestroy {
 
   // ── UI state ─────────────────────────────────────────────────────────────
   status: Status = 'idle';
@@ -34,8 +36,8 @@ export class DevTestMicComponent implements OnDestroy {
   isLive = false;
 
   // ── Filter settings ───────────────────────────────────────────────────────
-  suppressionLevel = 50;          // DeepFilterNet3 (package default; 80 is too aggressive for speech)
-  accessKey = '';                 // Picovoice Koala
+  suppressionLevel = 80;            // DeepFilterNet3 — original quality-tested default
+  accessKey = '';                  // Picovoice Koala
   liveFilter: 'df3' | 'koala' = 'df3'; // which filter for Live Preview
 
   // ── Audio streams ─────────────────────────────────────────────────────────
@@ -69,10 +71,29 @@ export class DevTestMicComponent implements OnDestroy {
   koalaMetrics: FilterMetrics | null = null;
   userNotes = '';
 
+  // ── File Comparison Mode (Mode 1) ─────────────────────────────────────────
+  fileStatus: FileStatus = 'idle';
+  fileStatusMsg = '';
+  fileProgress = 0; // 0–100
+  fileInputUrl: string | null = null;   // original file for playback
+  fileOutputUrl: string | null = null;  // DF3-processed WAV
+  fileProcessingMs = 0;
+
   constructor(
     private df3: DeepFilter3Service,
     private koala: KoalaFilterService
   ) {}
+
+  // ─── Lifecycle ────────────────────────────────────────────────────────────
+
+  ngOnInit(): void {
+    // Pre-warm DF3 in the background as soon as this page loads.
+    // By the time the user clicks Start Live Preview or Start Recording,
+    // the ONNX model (~7.7 MB) is already downloaded and compiled — zero delay.
+    if (!this.df3.isInitialized()) {
+      this.df3.init(this.suppressionLevel).catch(() => {});
+    }
+  }
 
   // ─── Slider / key changes ─────────────────────────────────────────────────
 
@@ -80,6 +101,161 @@ export class DevTestMicComponent implements OnDestroy {
     if (this.isLive && this.liveFilter === 'df3') {
       this.df3.setSuppressionLevel(this.suppressionLevel);
     }
+  }
+
+  // ─── File Comparison Mode ─────────────────────────────────────────────────
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.processFileComparison(file);
+  }
+
+  async processFileComparison(file: File): Promise<void> {
+    this.fileStatus = 'loading';
+    this.fileStatusMsg = 'Reading file…';
+    this.fileProgress = 0;
+    this.resetFileResults();
+
+    const t0 = performance.now();
+
+    try {
+      // 1. Read file as ArrayBuffer and create a playback URL for the raw input
+      const rawBuffer = await file.arrayBuffer();
+      const rawBlob = new Blob([rawBuffer], { type: file.type || 'audio/webm' });
+      this.fileInputUrl = URL.createObjectURL(rawBlob);
+
+      // 2. Decode audio to PCM at 48 kHz
+      this.fileStatusMsg = 'Decoding audio to PCM…';
+      this.fileProgress = 10;
+      const decodeCtx = new AudioContext({ sampleRate: 48000 });
+      let audioBuffer: AudioBuffer;
+      try {
+        audioBuffer = await decodeCtx.decodeAudioData(rawBuffer.slice(0));
+      } finally {
+        await decodeCtx.close();
+      }
+
+      // Mix down to mono (channel 0) — DF3 processes mono at 48 kHz
+      let pcm = audioBuffer.getChannelData(0);
+
+      // 3. Resample to 48 kHz if the source differs
+      if (audioBuffer.sampleRate !== 48000) {
+        this.fileStatusMsg = `Resampling from ${audioBuffer.sampleRate} Hz → 48 000 Hz…`;
+        this.fileProgress = 20;
+        pcm = await this.resampleTo48k(pcm, audioBuffer.sampleRate);
+      }
+
+      this.fileProgress = 25;
+
+      // 4. Init DF3 (loads WASM + model)
+      this.fileStatusMsg = `Loading DeepFilterNet3 model… (suppression: ${this.suppressionLevel}/100)`;
+      const initOk = await this.df3.init(this.suppressionLevel);
+      if (!initOk) {
+        this.fileStatus = 'error';
+        this.fileStatusMsg = 'DeepFilterNet3 init failed — try Chrome 91+.';
+        return;
+      }
+      this.fileProgress = 40;
+
+      // 5. Process all frames offline (trailing partial frame is zero-padded — no truncation)
+      const totalFrames = Math.ceil(pcm.length / this.df3.frameLength);
+      this.fileStatusMsg = `Processing ${totalFrames} frames…`;
+
+      const processed = await this.df3.processOffline(pcm, (pct) => {
+        this.fileProgress = 40 + Math.round(pct * 55);
+      });
+      this.fileProgress = 95;
+
+      // 6. Encode processed PCM as WAV
+      this.fileStatusMsg = 'Encoding output WAV…';
+      const wavBlob = this.encodeWav(processed, 48000);
+      this.fileOutputUrl = URL.createObjectURL(wavBlob);
+
+      this.fileProcessingMs = Math.round(performance.now() - t0);
+      this.fileProgress = 100;
+      this.fileStatus = 'done';
+      this.fileStatusMsg = `Done — processed ${(pcm.length / 48000).toFixed(1)}s of audio in ${(this.fileProcessingMs / 1000).toFixed(1)}s`;
+
+    } catch (err) {
+      console.error('File comparison error:', err);
+      this.fileStatus = 'error';
+      this.fileStatusMsg = `Error: ${String(err)}`;
+    } finally {
+      this.df3.destroy();
+    }
+  }
+
+  /** Resample a Float32Array from srcRate → 48000 Hz using OfflineAudioContext. */
+  private async resampleTo48k(pcm: Float32Array, srcRate: number): Promise<Float32Array> {
+    const targetRate = 48000;
+    const targetLength = Math.ceil(pcm.length * targetRate / srcRate);
+    const offCtx = new OfflineAudioContext(1, targetLength, targetRate);
+    const srcBuf = offCtx.createBuffer(1, pcm.length, srcRate);
+    srcBuf.copyToChannel(pcm, 0);
+    const src = offCtx.createBufferSource();
+    src.buffer = srcBuf;
+    src.connect(offCtx.destination);
+    src.start(0);
+    const rendered = await offCtx.startRendering();
+    return rendered.getChannelData(0);
+  }
+
+  /**
+   * Encode a Float32Array of PCM samples as a standard 16-bit WAV file.
+   * @param samples  Mono PCM samples in the range [-1, 1]
+   * @param sampleRate  Samples per second (e.g. 48000)
+   */
+  private encodeWav(samples: Float32Array, sampleRate: number): Blob {
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+    const blockAlign = numChannels * bitsPerSample / 8;
+    const dataBytes = samples.length * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataBytes);
+    const view = new DataView(buffer);
+
+    // RIFF header
+    this.writeStr(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataBytes, true);
+    this.writeStr(view, 8, 'WAVE');
+
+    // fmt sub-chunk
+    this.writeStr(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);          // sub-chunk size
+    view.setUint16(20, 1, true);           // PCM = 1
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+
+    // data sub-chunk
+    this.writeStr(view, 36, 'data');
+    view.setUint32(40, dataBytes, true);
+
+    // PCM samples — clamp to [-1, 1] then scale to int16
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
+  private writeStr(view: DataView, offset: number, str: string): void {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  }
+
+  private resetFileResults(): void {
+    if (this.fileInputUrl)  { URL.revokeObjectURL(this.fileInputUrl);  this.fileInputUrl  = null; }
+    if (this.fileOutputUrl) { URL.revokeObjectURL(this.fileOutputUrl); this.fileOutputUrl = null; }
+    this.fileProcessingMs = 0;
   }
 
   // ─── Live Preview ─────────────────────────────────────────────────────────
@@ -104,7 +280,7 @@ export class DevTestMicComponent implements OnDestroy {
       // creating a feedback loop / echo that never stops. EC is safe here because
       // DF3 handles the actual noise; we just need the browser to prevent mic↔speaker loop.
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
       });
     } catch {
       this.status = 'live-error';
@@ -120,7 +296,14 @@ export class DevTestMicComponent implements OnDestroy {
   }
 
   private async startDF3LivePreview(): Promise<void> {
-    const ok = await this.df3.init(this.suppressionLevel);
+    // Use pre-warmed model if available; only call init() if pre-warm failed or page was cold.
+    let ok: boolean;
+    if (this.df3.isInitialized()) {
+      ok = true;
+    } else {
+      this.statusMessage = 'Loading DeepFilterNet3 model (~7.7 MB)…';
+      ok = await this.df3.init(this.suppressionLevel);
+    }
     if (!ok) {
       this.status = 'live-error';
       this.statusMessage = 'DeepFilterNet3 not supported on this browser (try Chrome 91+).';
@@ -198,9 +381,14 @@ export class DevTestMicComponent implements OnDestroy {
       return;
     }
 
-    // 2. Init DF3
-    this.statusMessage = 'Loading DeepFilterNet3 (~7.7 MB)…';
-    const df3Ok = await this.df3.init(this.suppressionLevel);
+    // 2. Init DF3 — skip if already pre-warmed by ngOnInit
+    let df3Ok: boolean;
+    if (this.df3.isInitialized()) {
+      df3Ok = true;
+    } else {
+      this.statusMessage = 'Loading DeepFilterNet3 (~7.7 MB)…';
+      df3Ok = await this.df3.init(this.suppressionLevel);
+    }
     if (!df3Ok) {
       this.status = 'error';
       this.statusMessage = 'DeepFilterNet3 not supported on this browser.';
@@ -414,6 +602,7 @@ export class DevTestMicComponent implements OnDestroy {
   get isRecording(): boolean { return this.status === 'recording'; }
   get isBusy(): boolean { return this.status === 'loading' || this.status === 'processing'; }
   get hasResults(): boolean { return this.status === 'done'; }
+  get isFileProcessing(): boolean { return this.fileStatus === 'loading'; }
 
   private resetResults(): void {
     [this.rawUrl, this.df3Url, this.koalaUrl].forEach(u => { if (u) URL.revokeObjectURL(u); });
@@ -428,5 +617,6 @@ export class DevTestMicComponent implements OnDestroy {
     this.stopLivePreview();
     this.teardownAnalysers();
     [this.rawUrl, this.df3Url, this.koalaUrl].forEach(u => { if (u) URL.revokeObjectURL(u); });
+    this.resetFileResults();
   }
 }

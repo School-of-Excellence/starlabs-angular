@@ -1,52 +1,55 @@
 /**
  * DeepFilter3Service
- * Runs DeepFilterNet3 WASM in a Web Worker (not AudioWorklet).
+ * Wraps DeepFilterNet3 (ONNX + AudioWorklet + WASM) for in-browser noise cancellation.
+ * No API key. Model ~7.7 MB, downloaded once and browser-cached from CDN.
  *
- * Why Web Worker instead of AudioWorklet?
- *   The WASM binary uses SIMD instructions that trigger RuntimeError: unreachable
- *   specifically inside Chrome's AudioWorklet thread. The same WASM works fine
- *   in a regular Web Worker. Architecture:
+ * Pipeline (live):
+ *   getUserMedia → MediaStreamSource → AudioWorkletNode (DF3) → GainBoost → MediaStreamDestination
  *
- *   Pipeline:
- *     getUserMedia (raw mic, 48 kHz)
- *       └─ MediaStreamAudioSourceNode
- *             └─ ScriptProcessorNode (main thread)
- *                   │  sends Float32 frames → Web Worker
- *                   │  Web Worker: df_process_frame(handle, frame) → WASM SIMD
- *                   │  receives denoised Float32 frames ← Web Worker
- *                   └─ MediaStreamAudioDestinationNode → cleanStream
+ * Pipeline (offline / file comparison):
+ *   Float32Array → OfflineAudioContext + AudioWorkletNode → Float32Array (processed)
  *
- * Assets (self-hosted, same origin → no CORS):
- *   /assets/deepfilter3/pkg/df_bg.wasm                    (8.8 MB)
- *   /assets/deepfilter3/models/DeepFilterNet3_onnx.tar.gz (7.6 MB)
- *   /assets/deepfilter3/df-worker.js                      (worker)
+ * VAD — Hybrid RMS + tap rejection:
+ *   Primary:   RMS energy vs slow-adapting noise floor (proven, works in all conditions)
+ *   Secondary: Frequency ratio guard — rejects broadband impulse noise (taps, knocks, keyboard)
+ *              A sound is a tap if ratio < 0.15 AND RMS spiked > 3× smoothed value (sudden)
  *
- * Package: deepfilternet3-noise-filter@1.1.4 (asset loader only)
+ *   Speech  → suppressionLevel 30  (gentle — consonants preserved)
+ *   Silence → suppressionLevel 80  (strong  — noise removed, signal above Opus DTX threshold)
+ *   Hangover: 300 ms hold on speech mode to capture trailing phonemes.
+ *
+ *   Gain: fixed ×1.5 — DF3 at level 30 barely reduces volume so a large boost is not needed.
+ *   A high gain caused clipping at the Opus encoder → distorted, unintelligible audio.
+ *
  * Browser support: Chrome 91+, Edge 91+ ✅ | Firefox ⚠️ | Safari ❌
+ * Package: deepfilternet3-noise-filter@1.2.1
  */
 
 import { Injectable } from '@angular/core';
-import { DeepFilterNoiseFilterProcessor } from 'deepfilternet3-noise-filter';
+import { DeepFilterNet3Core, DeepFilterNoiseFilterProcessor } from 'deepfilternet3-noise-filter';
+import { environment } from "../../../environments/environment";
 
 @Injectable({ providedIn: 'root' })
 export class DeepFilter3Service {
 
-  private worker: Worker | null = null;
+  private processor:    DeepFilterNet3Core | null = null;
   private audioContext: AudioContext | null = null;
-  private scriptNode: ScriptProcessorNode | null = null;
-  private source: MediaStreamAudioSourceNode | null = null;
-  private destination: MediaStreamAudioDestinationNode | null = null;
-  private hpFilter: BiquadFilterNode | null = null;     // sub-80 Hz rumble cut
-  private presence: BiquadFilterNode | null = null;     // 2.5 kHz presence boost
-  private compressor: DynamicsCompressorNode | null = null; // gentle voice levelling
+  private workletNode:  AudioWorkletNode | null = null;
+  private gainBoost:    GainNode | null = null;
+  private silentGain:   GainNode | null = null;
   private _isActive = false;
-  private _stopping = false; // flip true in destroy() so onaudioprocess outputs silence immediately
 
-  // Output queue — worker fills this, ScriptProcessorNode drains it
-  private outputQueue: Float32Array[] = [];
-  private frameLength = 480; // updated once worker signals ready
+  // ── VAD fields ────────────────────────────────────────────────────────────
+  private vadAnalyser:  AnalyserNode | null = null;
+  private vadInterval:  ReturnType<typeof setInterval> | null = null;
+  private noiseFloor  = 0.002;   // slow-adapting noise floor
+  private smoothedRms = 0;       // exponentially smoothed RMS
+  private hangover    = 0;       // frames remaining in hangover window
 
-  /** ms taken to fetch + compile WASM and model. Set after init(). */
+  /** DF3 native frame size at 48 kHz — 480 samples = 10 ms */
+  readonly frameLength = 480;
+
+  /** ms taken to load + compile the ONNX model. Set after init(). */
   initTimeMs = 0;
   /** ms taken to wire the audio graph. Set after processStream(). */
   processingLatencyMs = 0;
@@ -54,196 +57,97 @@ export class DeepFilter3Service {
   // ── Init ──────────────────────────────────────────────────────────────────
 
   /**
-   * Fetch WASM + model, spin up the Web Worker, wait for 'ready'.
-   * @param suppressionLevel  0–100, default 80
+   * Checks browser support, creates AudioContext (48 kHz), loads ONNX model.
+   * Safe to call eagerly (pre-warm) — AudioContext is resumed in processStream().
    */
   async init(suppressionLevel = 80): Promise<boolean> {
     try {
       if (!DeepFilterNoiseFilterProcessor.isSupported()) {
-        console.warn('⚠️ DeepFilterNet3: AudioWorklet not supported — WASM Worker may still work');
+        console.warn('⚠️ DeepFilterNet3 not supported on this browser');
+        return false;
       }
 
-      const base = `${window.location.origin}/assets/deepfilter3`;
-      const t0 = performance.now();
-
-      // Fetch WASM binary and model in parallel
-      const [wasmBytes, modelBytes] = await Promise.all([
-        fetch(`${base}/pkg/df_bg.wasm`).then(r => { if (!r.ok) throw new Error(`WASM fetch failed: ${r.status}`); return r.arrayBuffer(); }),
-        fetch(`${base}/models/DeepFilterNet3_onnx.tar.gz`).then(r => { if (!r.ok) throw new Error(`Model fetch failed: ${r.status}`); return r.arrayBuffer(); })
-      ]);
-
-      // Start worker
-      this.worker = new Worker(`${base}/df-worker.js`);
-
-      // Wait for worker to signal 'ready' (WASM compiled + model loaded)
-      await new Promise<void>((resolve, reject) => {
-        this.worker!.onmessage = (e) => {
-          if (e.data.type === 'ready') {
-            this.frameLength = e.data.frameLength;
-            console.log(`✅ DF3 Worker ready — frameLength: ${this.frameLength}`);
-            resolve();
-          } else if (e.data.type === 'error') {
-            reject(new Error(`DF3 Worker init error: ${e.data.message}`));
-          }
-        };
-        this.worker!.onerror = (err) => reject(err);
-
-        // Send WASM + model bytes to worker (transferred for zero-copy)
-        this.worker!.postMessage(
-          { type: 'init', wasmBytes, modelBytes, suppressionLevel },
-          [wasmBytes, modelBytes]
-        );
+      this.audioContext = new AudioContext({ sampleRate: 48000 });
+      this.processor = new DeepFilterNet3Core({
+        sampleRate: 48000,
+        noiseReductionLevel: suppressionLevel,
+        ...(environment["df3CdnUrl"] ? { assetConfig: { cdnUrl: environment["df3CdnUrl"] } } : {})
       });
 
-      // After worker is ready, hook up its processed frames into our output queue
-      this.worker.onmessage = (e) => {
-        if (e.data.type === 'processed') {
-          this.outputQueue.push(e.data.outputFrame);
-        }
-      };
-
-      this.audioContext = new AudioContext({ sampleRate: 48000 });
+      const t0 = performance.now();
+      await this.processor.initialize();
       this.initTimeMs = Math.round(performance.now() - t0);
 
-      console.log(`✅ DeepFilterNet3 initialized in ${this.initTimeMs}ms (WASM in Web Worker)`);
+      console.log(`✅ DeepFilterNet3 initialized in ${this.initTimeMs}ms`);
       return true;
 
     } catch (err) {
       console.error('❌ DeepFilterNet3 init failed:', err);
-      this.destroy();
       return false;
     }
   }
 
-  // ── Process ───────────────────────────────────────────────────────────────
+  // ── Live stream processing ─────────────────────────────────────────────────
 
   /**
-   * Wire the ScriptProcessorNode audio graph.
-   *
-   * Signal chain:
-   *   mic → ScriptProcessor (DF3 WASM via Worker)
-   *       → HighPassFilter (cut sub-80 Hz rumble)
-   *       → Presence boost  (+4 dB at 2.5 kHz — voice articulation)
-   *       → DynamicsCompressor (gentle levelling so voice stays prominent)
-   *       → MediaStreamDestination (clean output stream)
+   * Wires the audio graph and returns the noise-suppressed MediaStream.
+   * Falls back to the raw stream on error — audio always works.
+   * Must be called after a successful init().
    */
   async processStream(raw: MediaStream): Promise<MediaStream> {
-    if (!this.worker || !this.audioContext) {
+    if (!this.processor || !this.audioContext) {
       console.warn('DeepFilter3Service: not initialised, returning raw stream');
       return raw;
     }
 
     try {
       const t0 = performance.now();
-      const ctx = this.audioContext;
 
-      this.source      = ctx.createMediaStreamSource(raw);
-      this.destination = ctx.createMediaStreamDestination();
+      // Resume AudioContext if pre-warmed without a user gesture (Chrome suspends it).
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+        console.log('▶️ AudioContext resumed from suspended state');
+      }
 
-      // ── ScriptProcessorNode (DF3 WASM round-trip) ─────────────────────────
-      // 1024 samples at 48 kHz = 21 ms per callback (was 85 ms).
-      // Smaller buffer → more frequent callbacks → smoother, less "stuck" feel.
-      const bufferSize   = 1024;
-      // Pre-fill: hold back output until this many frames are queued.
-      // Gives the Worker time to build a steady pipeline before we start draining.
-      const preFillFrames = 6; // 6 × 480 samples = ~60 ms headroom
-      let   started       = false;
+      this.workletNode = await this.processor.createAudioWorkletNode(this.audioContext);
 
-      this.scriptNode = ctx.createScriptProcessor(bufferSize, 1, 1);
+      const ctx         = this.audioContext;
+      const source      = ctx.createMediaStreamSource(raw);
+      const destination = ctx.createMediaStreamDestination();
 
-      let inputAccum: Float32Array = new Float32Array(0);
+      // Fixed ×1.5 boost — compensates for the small volume reduction DF3 causes at
+      // level 30 (speech mode). A higher value (2.5–3.25) caused clipping at the
+      // Opus encoder, making the voice loud but unintelligible.
+      this.gainBoost = ctx.createGain();
+      this.gainBoost.gain.value = 1.5;
 
-      this.scriptNode.onaudioprocess = (ev) => {
-        const input  = ev.inputBuffer.getChannelData(0);
-        const output = ev.outputBuffer.getChannelData(0);
+      // Silent keepalive — Chrome suspends AudioContext if nothing reaches ctx.destination.
+      this.silentGain = ctx.createGain();
+      this.silentGain.gain.value = 0;
 
-        // Immediately silence on stop — breaks echo loop at once
-        if (this._stopping) { output.fill(0); return; }
+      // VAD analyser — fftSize 512 → 256 freq bins (93.75 Hz each) + 512 time samples.
+      // Supports both getFloatTimeDomainData (RMS) and getFloatFrequencyData (tap check).
+      this.vadAnalyser = ctx.createAnalyser();
+      this.vadAnalyser.fftSize = 512;
+      this.vadAnalyser.smoothingTimeConstant = 0;
 
-        // ── Feed input to Worker in exact frameLength chunks ───────────────
-        const combined = new Float32Array(inputAccum.length + input.length);
-        combined.set(inputAccum);
-        combined.set(input, inputAccum.length);
-
-        let offset = 0;
-        while (offset + this.frameLength <= combined.length) {
-          const frame = combined.slice(offset, offset + this.frameLength);
-          this.worker!.postMessage({ type: 'process', inputFrame: frame }, [frame.buffer]);
-          offset += this.frameLength;
-        }
-        inputAccum = combined.slice(offset);
-
-        // ── Wait for pre-fill before starting output ───────────────────────
-        if (!started) {
-          if (this.outputQueue.length >= preFillFrames) {
-            started = true;
-          } else {
-            output.fill(0);
-            return;
-          }
-        }
-
-        // ── Drain output queue → output buffer ────────────────────────────
-        let outOffset = 0;
-        while (outOffset < bufferSize && this.outputQueue.length > 0) {
-          const chunk  = this.outputQueue[0];
-          const needed = bufferSize - outOffset;
-          if (chunk.length <= needed) {
-            output.set(chunk, outOffset);
-            outOffset += chunk.length;
-            this.outputQueue.shift();
-          } else {
-            output.set(chunk.subarray(0, needed), outOffset);
-            this.outputQueue[0] = chunk.subarray(needed);
-            outOffset = bufferSize;
-          }
-        }
-        // Queue ran dry mid-callback: silence (never mix raw + processed)
-        if (outOffset < bufferSize) { output.fill(0, outOffset); }
-      };
-
-      // ── Voice clarity EQ chain ─────────────────────────────────────────────
-      // 1) High-pass: cut sub-80 Hz room rumble / handling noise
-      this.hpFilter = ctx.createBiquadFilter();
-      this.hpFilter.type            = 'highpass';
-      this.hpFilter.frequency.value = 80;
-      this.hpFilter.Q.value         = 0.7;
-
-      // 2) Presence boost: +4 dB at 2.5 kHz — the consonant/articulation range
-      //    makes speech sound crisper and easier to understand
-      this.presence = ctx.createBiquadFilter();
-      this.presence.type            = 'peaking';
-      this.presence.frequency.value = 2500;
-      this.presence.gain.value      = 4;
-      this.presence.Q.value         = 1.2;
-
-      // 3) Dynamics compressor: gently levels voice so quiet words aren't lost
-      //    threshold −24 dB, ratio 3:1, soft knee — transparent, not pumping
-      this.compressor = ctx.createDynamicsCompressor();
-      this.compressor.threshold.value = -24;
-      this.compressor.knee.value      = 12;
-      this.compressor.ratio.value     = 3;
-      this.compressor.attack.value    = 0.003;
-      this.compressor.release.value   = 0.25;
-
-      // ── Silent gain node keeps ScriptProcessorNode alive in Chrome ─────────
-      const silentGain = ctx.createGain();
-      silentGain.gain.value = 0;
-
-      // ── Connect signal chain ───────────────────────────────────────────────
-      this.source.connect(this.scriptNode);
-      this.scriptNode.connect(this.hpFilter);
-      this.hpFilter.connect(this.presence);
-      this.presence.connect(this.compressor);
-      this.compressor.connect(this.destination); // clean enhanced output
-      this.compressor.connect(silentGain);
-      silentGain.connect(ctx.destination);        // keeps graph alive
+      // mic → DF3 worklet → gainBoost → destination (clean stream)
+      //                              ↘ silentGain(0) → ctx.destination (keepalive)
+      // mic → vadAnalyser (parallel tap, analysis only)
+      source.connect(this.workletNode);
+      this.workletNode.connect(this.gainBoost);
+      this.gainBoost.connect(destination);
+      this.gainBoost.connect(this.silentGain);
+      this.silentGain.connect(ctx.destination);
+      source.connect(this.vadAnalyser);
 
       this.processingLatencyMs = Math.round(performance.now() - t0);
       this._isActive = true;
 
-      console.log(`✅ DeepFilterNet3 audio graph wired in ${this.processingLatencyMs}ms`);
-      return this.destination.stream;
+      this._startVad();
+
+      console.log(`✅ DeepFilterNet3 graph wired in ${this.processingLatencyMs}ms (hybrid VAD active)`);
+      return destination.stream;
 
     } catch (err) {
       console.error('❌ DeepFilterNet3 processStream failed:', err);
@@ -251,52 +155,215 @@ export class DeepFilter3Service {
     }
   }
 
+  // ── VAD loop ──────────────────────────────────────────────────────────────
+
+  /**
+   * Hybrid RMS + tap-rejection VAD — runs every 20 ms.
+   *
+   * Primary detection — RMS vs noise floor:
+   *   1. Measure RMS of the raw mic time-domain buffer.
+   *   2. Exponentially smooth RMS (α=0.3) to avoid frame jitter.
+   *   3. Slow-adapting noise floor — calibrates to room noise automatically.
+   *   4. isSpeechCandidate = smoothedRms > noiseFloor × 3.5
+   *
+   * Secondary guard — tap / impulse rejection:
+   *   5. Read frequency spectrum (FFT) from the same analyser frame.
+   *   6. Compute ratio = voiceBandPower (300–3400 Hz) / totalPower.
+   *   7. isTap = ratio < 0.15 AND rms > smoothedRms × 3.0
+   *      → ratio < 0.15: energy is spread flat (broadband impulse, not voice)
+   *      → rms spike × 3:  sudden onset (tap/knock, not gradual speech build-up)
+   *      Both must be true to reject — prevents falsely classifying loud speech as a tap.
+   *
+   * Final: isSpeech = isSpeechCandidate AND NOT isTap
+   *
+   * Speech  → setSuppressionLevel(30) — gentle, consonants survive
+   * Silence → setSuppressionLevel(80) — strong removal, signal stays above Opus DTX floor
+   * Hangover: hold speech mode for 300 ms after speech ends (trailing phonemes)
+   */
+  private _startVad(): void {
+    if (!this.vadAnalyser || !this.processor) return;
+
+    const FRAME_MS        = 20;
+    const HANGOVER_FRAMES = 15;       // 15 × 20ms = 300ms
+    const SPEECH_RATIO    = 3.5;      // RMS must be 3.5× above noise floor
+    const ALPHA_RMS       = 0.3;      // RMS smoothing factor
+    const ALPHA_FLOOR     = 0.02;     // noise floor drift speed
+    const TAP_RATIO       = 0.15;     // voice-band ratio below this = broadband = tap
+    const TAP_SPIKE       = 3.0;      // RMS must spike 3× smoothed to qualify as tap
+    const WARMUP_MS       = 500;
+    const warmupUntil     = Date.now() + WARMUP_MS;
+
+    // fftSize 512 → timeBuf needs 512 samples, freqBuf needs 256 bins
+    const fftSize  = this.vadAnalyser.fftSize;             // 512
+    const numBins  = this.vadAnalyser.frequencyBinCount;   // 256
+    const timeBuf  = new Float32Array(fftSize);
+    const freqBuf  = new Float32Array(numBins);
+
+    // Voice band bin range at 93.75 Hz/bin
+    const BIN_WIDTH      = 48000 / fftSize;                // 93.75 Hz
+    const VOICE_LOW_BIN  = Math.floor(300  / BIN_WIDTH);   // bin 3
+    const VOICE_HIGH_BIN = Math.floor(3400 / BIN_WIDTH);   // bin 36
+
+    this.noiseFloor  = 0.002;
+    this.smoothedRms = 0;
+    this.hangover    = 0;
+
+    this.vadInterval = setInterval(() => {
+      if (!this.vadAnalyser || !this.processor) return;
+
+      // ── Primary: RMS detection ──────────────────────────────────────────
+
+      this.vadAnalyser.getFloatTimeDomainData(timeBuf);
+      let sumSq = 0;
+      for (let i = 0; i < fftSize; i++) sumSq += timeBuf[i] * timeBuf[i];
+      const rms = Math.sqrt(sumSq / fftSize);
+
+      this.smoothedRms = ALPHA_RMS * rms + (1 - ALPHA_RMS) * this.smoothedRms;
+
+      // Noise floor: drops quickly when quiet, rises very slowly to avoid creep mid-sentence
+      if (this.smoothedRms < this.noiseFloor) {
+        this.noiseFloor = ALPHA_FLOOR * this.smoothedRms + (1 - ALPHA_FLOOR) * this.noiseFloor;
+      } else {
+        this.noiseFloor = 0.005 * this.smoothedRms + 0.995 * this.noiseFloor;
+      }
+      if (this.noiseFloor < 0.0008) this.noiseFloor = 0.0008;
+
+      const isSpeechCandidate = this.smoothedRms > this.noiseFloor * SPEECH_RATIO;
+
+      // ── Secondary: tap / impulse rejection ─────────────────────────────
+
+      let isTap = false;
+      if (isSpeechCandidate) {
+        // Only run FFT when RMS says "maybe speech" — saves CPU during silence
+        this.vadAnalyser.getFloatFrequencyData(freqBuf);
+        let voicePower = 0, totalPower = 0;
+        for (let i = 1; i < numBins; i++) {
+          const dB = freqBuf[i];
+          if (!isFinite(dB)) continue;
+          const power = Math.pow(10, dB / 10);
+          totalPower += power;
+          if (i >= VOICE_LOW_BIN && i <= VOICE_HIGH_BIN) voicePower += power;
+        }
+        const ratio = totalPower > 0 ? voicePower / totalPower : 0;
+        // Tap: broadband (low ratio) AND sudden onset (large spike above smoothed)
+        isTap = ratio < TAP_RATIO && rms > this.smoothedRms * TAP_SPIKE;
+      }
+
+      // ── Warm-up guard ──────────────────────────────────────────────────
+      if (Date.now() < warmupUntil) {
+        this.processor.setSuppressionLevel(30);
+        return;
+      }
+
+      // ── Final decision ─────────────────────────────────────────────────
+      const isSpeech = isSpeechCandidate && !isTap;
+
+      if (isSpeech) {
+        this.hangover = HANGOVER_FRAMES;
+        this.processor.setSuppressionLevel(30);   // gentle — consonants survive
+
+      } else if (this.hangover > 0) {
+        this.hangover--;
+        this.processor.setSuppressionLevel(30);   // hold for trailing phonemes
+
+      } else {
+        this.processor.setSuppressionLevel(80);   // strong — stays above Opus DTX floor
+      }
+
+    }, FRAME_MS);
+  }
+
+  // ── Offline processing (file comparison) ─────────────────────────────────
+
+  /**
+   * Process an entire Float32Array offline through DeepFilterNet3.
+   * Uses OfflineAudioContext — renders faster than realtime.
+   */
+  async processOffline(
+    audio: Float32Array,
+    onProgress?: (progress: number) => void
+  ): Promise<Float32Array> {
+    if (!this.processor) throw new Error('DeepFilter3Service: call init() before processOffline()');
+
+    onProgress?.(0.05);
+
+    try {
+      const offCtx = new OfflineAudioContext(1, audio.length, 48000);
+      const workletNode = await this.processor.createAudioWorkletNode(
+        offCtx as unknown as AudioContext
+      );
+
+      const srcBuffer = offCtx.createBuffer(1, audio.length, 48000);
+      srcBuffer.copyToChannel(new Float32Array(audio), 0);
+      const src = offCtx.createBufferSource();
+      src.buffer = srcBuffer;
+
+      src.connect(workletNode);
+      workletNode.connect(offCtx.destination);
+      src.start(0);
+
+      onProgress?.(0.2);
+
+      const rendered = await offCtx.startRendering();
+      onProgress?.(1);
+
+      return rendered.getChannelData(0).slice();
+
+    } catch (err) {
+      console.error('❌ DeepFilterNet3 processOffline failed:', err);
+      return audio;
+    }
+  }
+
   // ── Runtime controls ──────────────────────────────────────────────────────
 
-  /** Adjust suppression level at runtime (0–100). */
+  /** Change suppression strength (0–100) without restarting the graph. */
   setSuppressionLevel(level: number): void {
-    this.worker?.postMessage({ type: 'setLevel', level });
+    this.processor?.setSuppressionLevel(level);
   }
 
-  /** Bypass (false) or re-enable (true) noise suppression. */
+  /** Bypass (false) or re-enable (true) filtering without tearing down the graph. */
   setEnabled(on: boolean): void {
-    this.worker?.postMessage({ type: 'setBypass', bypass: !on });
+    this.processor?.setNoiseSuppressionEnabled(on);
   }
 
-  /** True once processStream() succeeds. */
+  /** True once processStream() succeeds; false after destroy(). */
   isActive(): boolean {
     return this._isActive;
   }
 
+  /** True if the ONNX model is loaded and ready — init() has already succeeded. */
+  isInitialized(): boolean {
+    return !!this.processor;
+  }
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
 
-  /** Terminate worker, close AudioContext, reset all state. */
+  /** Destroys the ONNX processor, closes AudioContext, resets all state. */
   destroy(): void {
-    // Flip stopping flag first — onaudioprocess will output silence on next tick
-    this._stopping = true;
-    this._isActive = false;
-    this.outputQueue = []; // drain queue so no stale audio plays after stop
+    if (this.vadInterval !== null) {
+      clearInterval(this.vadInterval);
+      this.vadInterval = null;
+    }
 
-    try { this.scriptNode?.disconnect(); } catch (_) {}
-    try { this.hpFilter?.disconnect(); }   catch (_) {}
-    try { this.presence?.disconnect(); }   catch (_) {}
-    try { this.compressor?.disconnect(); } catch (_) {}
-    try { this.source?.disconnect(); }     catch (_) {}
-    try { this.destination?.disconnect(); } catch (_) {}
-    try { this.audioContext?.close(); }    catch (_) {}
-    try { this.worker?.terminate(); }      catch (_) {}
+    try { this.vadAnalyser?.disconnect(); }  catch (_) {}
+    try { this.workletNode?.disconnect(); }  catch (_) {}
+    try { this.gainBoost?.disconnect(); }    catch (_) {}
+    try { this.silentGain?.disconnect(); }   catch (_) {}
+    try { this.processor?.destroy(); }       catch (_) {}
+    try { this.audioContext?.close(); }      catch (_) {}
 
-    this.worker       = null;
-    this.audioContext = null;
-    this.scriptNode   = null;
-    this.hpFilter     = null;
-    this.presence     = null;
-    this.compressor   = null;
-    this.source       = null;
-    this.destination  = null;
-    this._stopping    = false;
-    this.outputQueue  = [];
-    this.initTimeMs   = 0;
+    this.processor           = null;
+    this.audioContext        = null;
+    this.workletNode         = null;
+    this.gainBoost           = null;
+    this.silentGain          = null;
+    this.vadAnalyser         = null;
+    this._isActive           = false;
+    this.initTimeMs          = 0;
     this.processingLatencyMs = 0;
+    this.noiseFloor          = 0.002;
+    this.smoothedRms         = 0;
+    this.hangover            = 0;
   }
 }

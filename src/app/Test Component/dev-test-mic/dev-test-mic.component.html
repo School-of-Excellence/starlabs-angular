@@ -55,11 +55,65 @@
     </div>
   </div>
 
+  <!-- ── File Comparison Mode (Mode 1) ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="section-icon">📂</span>
+      Mode 1 — File Comparison
+      <span class="section-hint">Feed an audio file through DeepFilterNet3 — compare input vs output</span>
+    </div>
+
+    <div class="config-row" *ngIf="fileStatus !== 'loading'">
+      <label class="config-label">Select audio file (e.g. Raw.webm)</label>
+      <input type="file" accept="audio/*,video/webm,video/mp4"
+        (change)="onFileSelected($event)"
+        [disabled]="isFileProcessing || isBusy || isRecording || isLive"
+        class="file-input" />
+    </div>
+
+    <!-- Progress / status -->
+    <div class="status-banner"
+      [class.loading]="fileStatus === 'loading'"
+      [class.done]="fileStatus === 'done'"
+      [class.error]="fileStatus === 'error'"
+      *ngIf="fileStatusMsg">
+      <span class="dot" [class.pulse]="fileStatus === 'loading'"></span>
+      {{ fileStatusMsg }}
+      <span *ngIf="fileStatus === 'loading'" class="progress-pct"> {{ fileProgress }}%</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-bar-wrap" *ngIf="fileStatus === 'loading'">
+      <div class="progress-bar-fill" [style.width.%]="fileProgress"></div>
+    </div>
+
+    <!-- Result players -->
+    <div class="players-three" *ngIf="fileStatus === 'done'">
+
+      <div class="player-card raw">
+        <div class="player-label"><span>🔴</span> Input (Raw)</div>
+        <div class="player-sub">Original file — no processing</div>
+        <audio [src]="fileInputUrl!" controls *ngIf="fileInputUrl"></audio>
+      </div>
+
+      <div class="player-card df3">
+        <div class="player-label"><span>🟢</span> DeepFilterNet3 Output</div>
+        <div class="player-sub">Processed WAV · {{ suppressionLevel }}/100 suppression · {{ (fileProcessingMs / 1000).toFixed(1) }}s to process</div>
+        <audio [src]="fileOutputUrl!" controls *ngIf="fileOutputUrl"></audio>
+      </div>
+
+    </div>
+
+    <div class="info-hint" *ngIf="fileStatus === 'idle'">
+      <p>Tip: use <strong>Raw.webm</strong> as input and compare the DF3 output against <strong>Processed.webm</strong> — the Krisp-quality reference. Both files are in <code>/assets/</code>.</p>
+    </div>
+  </div>
+
   <!-- ── Live Preview ── -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎧</span>
-      Mode 1 — Live Preview
+      Mode 2 — Live Preview
       <span class="section-hint">Hear one filter at a time through headphones</span>
     </div>
 
@@ -96,7 +150,7 @@
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎙️</span>
-      Mode 2 — A/B/C Comparison Recording
+      Mode 3 — A/B/C Comparison Recording
       <span class="section-hint">Records Raw + DeepFilterNet3 + Koala simultaneously from the same mic</span>
     </div>
 
