@@ -78,7 +78,7 @@ export class AiCousticsService {
       return;
     }
 
-    const wsUrl = environment.aicWebSocketUrl;
+    const wsUrl = environment["aicWebSocketUrl"] ?? "";
     console.log(`🔌 Connecting to AIC backend: ${wsUrl}`);
 
     this.ws = new WebSocket(wsUrl);
