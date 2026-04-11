@@ -24,7 +24,17 @@
       <button mat-stroked-button type="button" (click)="managelist()">Lists & Segments</button>
 
     </div>
-
+    
+    <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1 mb-2">
+    <div class="fw-bold mb-2 h5">Live Queue</div>
+    <span *ngFor="let live of liveQueueList">
+      <button mat-stroked-button class="me-2 mb-2"
+        [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
+        (click)="selectedQueue = live; onQueueSelect()">
+        {{live["queuename"]}}
+      </button>
+    </span>
+  </div>
     <!-- Loading Spinner -->
     <div *ngIf="loading" class="loading-container">
       <mat-spinner diameter="50"></mat-spinner>
