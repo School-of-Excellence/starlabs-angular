@@ -28,7 +28,7 @@ export const routes: Routes = [
   //userprofile_old
   {path: 'userprofile_old', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
   {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
-  {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
+  {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard-v2/event-opportunity-dashboard-v2.component').then(m => m.EventOpportunityDashboardV2Component), canActivate:[authGuard]},
   {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
   {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
   // {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component)},
