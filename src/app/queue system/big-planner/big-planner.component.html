@@ -68,13 +68,20 @@
                       <span class="participant-name">{{mapProfile[invitation]}}</span>
                     </div>
                     <div class="participant-stats">
-                      <div class="stat-chip">
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'shadow')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()">
                         <span class="stat-label">Shadows:</span>
                         <span class="stat-value">{{profileShadowCount[invitation]?.length || 0}}</span>
                       </div>
-                      <div class="stat-chip">
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'studio')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()">
                         <span class="stat-label">Studios:</span>
                         <span class="stat-value">{{profileStudioCount[invitation]?.length || 0}}</span>
+                      </div>
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'pair')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()">
+                        <span class="stat-label">Pair:</span>
+                        <span class="stat-value">{{profilePairCount[invitation]?.length || 0}}</span>
                       </div>
                     </div>
                   </div>
@@ -95,16 +102,6 @@
               <div class="role-form-container">
                 <div *ngFor="let pair of newStudioPairing; let i = index" class="role-form-row">
                   <div class="role-form-fields">
-                    <mat-form-field appearance="outline" *ngIf="i == 0">
-                      <mat-label>ATC Model</mat-label>
-                      <mat-select [(ngModel)]="atcModel" multiple [disabled]="!showAtcModel()">
-                        <!-- <mat-option [value]="null">None</mat-option> -->
-                        <mat-option *ngFor="let list of filterAtcModels()" [value]="list.atcmodel"
-                          [disabled]="this.disabledAtcModels.includes(list.atcmodel)">
-                          {{list.atcmodel}}
-                        </mat-option>
-                      </mat-select>
-                    </mat-form-field>
 
                     <mat-form-field appearance="outline">
                       <mat-label>Activity</mat-label>
@@ -120,12 +117,23 @@
                     
                     <mat-form-field appearance="outline" >
                       <mat-label>Participant</mat-label>
-                      <mat-select [(ngModel)]="pair.profileid" (selectionChange)="filterAtcModels()" >
+                      <mat-select [(ngModel)]="pair.profileid" >
                         <mat-option>
                           <ngx-mat-select-search [(ngModel)]="filterText" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
                         </mat-option>
                         <mat-option *ngFor="let profile of filterInvitedParticipant(i)" [value]="profile.profileid">
                           {{profile.name}}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>ATC Model</mat-label>
+                      <mat-select [(ngModel)]="pair.atcmodel" multiple>
+                        <!-- <mat-option [value]="null">None</mat-option> -->
+                        <mat-option *ngFor="let list of productList" [value]="list.atcmodel"
+                          [disabled]="this.disabledAtcModels.includes(list.atcmodel)">
+                          {{list.atcmodel}}
                         </mat-option>
                       </mat-select>
                     </mat-form-field>
@@ -310,10 +318,13 @@
                   <ng-container matColumnDef="atcModel">
                     <th mat-header-cell *matHeaderCellDef>ATC Model</th>
                     <td mat-cell *matCellDef="let studio">
-                      <div>
-                        <ng-container *ngFor="let atcmodel of studio['atcmodel'] || []; let last = last">
+                      <div style="display: flex;gap:10px;align-items: center;">
+                        <div >
+                          <ng-container *ngFor="let atcmodel of studio['atcmodel'] || []; let last = last">
                           {{ atcmodel }}<span *ngIf="!last">, </span>
                         </ng-container>
+                        </div>
+                        <mat-icon style="font-size: 18px;cursor: pointer;" *ngIf="!viewOnly" (click)="openAtcEditMode(studio['docid'])">edit</mat-icon>
                       </div>
                     </td>
                   </ng-container>
@@ -367,3 +378,61 @@
       </mat-sidenav-container>
     </div>
   </div>
+
+  <div class="tooltip-box" [style.left.px]="cardTooltipX" [style.top.px]="cardTooltipY" *ngIf="activeHoverCard?.length > 0"
+    [style.opacity]="cardVisible ? 1 : 0">
+    <ng-container *ngIf="activeHoverCard && activeHoverCard.length > 0">
+      <div class="wrap">
+        <div *ngFor="let studio of activeHoverCard">
+          <div class="tt-row" >
+            <span class="tt-label">Participants : </span>
+            <span class="tt-value">{{ studio.participants.join(', ') }}</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-label">Activities : </span>
+            <span class="tt-value">{{ studio.activities.join(', ') }}</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-label">Atc Model : </span>
+            <span class="tt-value">{{ studio.atcModel.join(', ') }}</span>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+
+<!-- Backdrop overlay -->
+<div class="modal-backdrop" *ngIf="editAtcModel" (click)="cancelAtcEdit()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <span class="modal-title">ATC Model</span>
+      <button class="close-btn" (click)="cancelAtcEdit()">&#x2715;</button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Atc Model</mat-label>
+        <mat-select [(ngModel)]="editAtcModelData" multiple>
+          <mat-option
+            *ngFor="let list of productList"
+            [value]="list.atcmodel"
+            [disabled]="this.disabledAtcModels.includes(list.atcmodel)"
+          >
+            {{ list.atcmodel }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <button mat-stroked-button (click)="cancelAtcEdit()">Cancel</button>
+      <button mat-stroked-button (click)="applyAtcEdit()">Apply</button>
+    </div>
+
+  </div>
+</div>
