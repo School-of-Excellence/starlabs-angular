@@ -26,6 +26,39 @@
     <mat-icon class="clear-icon" *ngIf="searchQuery" (click)="searchQuery = ''; onSearch()">close</mat-icon>
   </div>
 
+  <!-- Select bar: toggle + selected count + bulk assign -->
+  <div class="up-select-bar" *ngIf="filteredParticipants.length > 0">
+    <button class="up-toggle" [class.on]="selectMode" (click)="toggleSelectMode()">
+      <mat-icon>{{selectMode ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+      {{selectMode ? 'Cancel' : 'Select'}}
+    </button>
+    <button class="up-all" *ngIf="selectMode" (click)="selectAll()">
+      <mat-icon>select_all</mat-icon> All
+    </button>
+    <span class="up-count" *ngIf="selectMode && selectedIds.size > 0">
+      {{selectedIds.size}} selected
+    </span>
+    <span style="flex:1"></span>
+    <button class="up-assign" *ngIf="selectMode && selectedIds.size > 0"
+      [matMenuTriggerFor]="cohortMenu">
+      <mat-icon>group_add</mat-icon> Assign to cohort…
+    </button>
+    <mat-menu #cohortMenu="matMenu" class="up-cohort-menu">
+      <div class="up-cohort-search" (click)="$event.stopPropagation()">
+        <mat-icon>search</mat-icon>
+        <input type="text" placeholder="Search cohort…" [(ngModel)]="cohortSearchQuery" (input)="onCohortSearch()"
+          (click)="$event.stopPropagation()">
+      </div>
+      <div class="up-cohort-list">
+        <button mat-menu-item *ngFor="let cohort of filteredCohortsList" (click)="assignToCohort(cohort)">
+          <span class="up-cohort-name">{{cohort.name}}</span>
+          <small class="up-cohort-sub">{{cohort.participantidlist?.length || 0}} ppl</small>
+        </button>
+        <div *ngIf="filteredCohortsList.length === 0" class="up-cohort-empty">No cohorts found</div>
+      </div>
+    </mat-menu>
+  </div>
+
   <div class="dialog-content">
     <div class="empty-state" *ngIf="filteredParticipants.length === 0">
       <mat-icon>check_circle</mat-icon>
@@ -34,7 +67,13 @@
     </div>
 
     <div class="participants-list" *ngIf="filteredParticipants.length > 0">
-      <div class="participant-item" *ngFor="let participant of filteredParticipants">
+      <div class="participant-item" *ngFor="let participant of filteredParticipants"
+        [class.selectable]="selectMode"
+        [class.checked]="selectMode && isChecked(participant)"
+        (click)="selectMode && toggleChecked(participant, $event)">
+        <span class="up-check" *ngIf="selectMode">
+          <mat-icon>check</mat-icon>
+        </span>
         <div class="participant-info">
           <div class="participant-avatar">
             {{(participant.name || 'P')[0] | uppercase}}
