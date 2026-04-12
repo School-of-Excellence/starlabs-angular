@@ -65,6 +65,10 @@ export class EventOpportunityDashboardV2Component {
   expandedStudioGroups: { [key: string]: boolean } = {};
   isLiveExpanded: boolean = true;
   isIdleExpanded: boolean = false;
+  isShadowingExpanded: boolean = false;
+  isNotShadowingExpanded: boolean = false;
+  isNoStudioShadowingExpanded: boolean = false;
+  eventCohorts: { [eventId: string]: Array<{ bigactivity: string, participantidlist: string[] }> } = {};
 
   // Custom Stage Panel
   showCustomStagePanel: boolean = false;
@@ -284,7 +288,46 @@ export class EventOpportunityDashboardV2Component {
     this.selectedEventName = '';
     this.arenaeticket = [];
   }
+
+  async loadEventCohorts() {
+    const now = new Date();
+    const marathons = await getDocs(query(
+      collection(this.firestore, 'big marathon'),
+      where('startdate', '<=', now)
+    ));
+    const activeMarathonRefs = marathons.docs
+      .filter(d => {
+        const end = d.data()['enddate'];
+        const endDate = end?.toDate ? end.toDate() : (end ? new Date(end) : null);
+        return endDate && endDate >= now;
+      })
+      .map(d => d.ref);
+
+    if (!activeMarathonRefs.length) return;
+
+    const cohortsSnap = await getDocs(query(
+      collection(this.firestore, 'bigcohorts'),
+      where('marathonref', 'in', activeMarathonRefs),
+      where('cohortType', '==', 'event')
+    ));
+
+    const map: { [eventId: string]: Array<{ bigactivity: string, participantidlist: string[] }> } = {};
+    cohortsSnap.docs.forEach(d => {
+      const data: any = d.data();
+      const eventRef = data['eventref'];
+      const eventId = typeof eventRef === 'string' ? eventRef : eventRef?.id;
+      if (!eventId || !data['bigactivity']) return;
+      map[eventId] = map[eventId] || [];
+      map[eventId].push({
+        bigactivity: data['bigactivity'],
+        participantidlist: data['participantidlist'] || [],
+      });
+    });
+    this.eventCohorts = map;
+  }
+
   getQueueData() {
+    this.loadEventCohorts();
     getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queueData => {
       this.queueList = queueData.docs.map(e => e.data())
       for (let i = 0; i < this.queueList.length; i++) {
@@ -311,49 +354,6 @@ export class EventOpportunityDashboardV2Component {
         this.customValuesFromSelectedQueues = queueData.filter(e => e['queuelist'].every((item: string) => this.selectedQueueList.includes(item))).sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
       })
 
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
-      collectionData(query(collection(this.firestore, 'queue activity log'),
-        where('queueid', 'in', this.selectedQueueList)
-      )).pipe(takeUntil(this.subscription)).subscribe(async snap => {
-
-        const tempCompletedStageCount: any = {};
-        const tempAllCompletedStageCount: any = {};
-
-        const fetchPromises = snap.map(async (element) => {
-          const queryref = getDoc(doc(this.firestore, element['sourceref'].path));
-          let document = (await queryref).data();
-          document['activitydate'] = element['activitydate'];
-
-          if (!document) return;
-
-          const queueid = element['source'] === "queue stage log" ? document['queueref'].id : document['queueid'];
-          const stagename = element['source'] === "queue stage log" ? document['currentstage'] : document['stagename'];
-
-          // Today's completed
-          if (element['activitydate']?.toDate() >= startOfDay && element['activitydate']?.toDate() <= endOfDay) {
-            tempCompletedStageCount[queueid] = tempCompletedStageCount[queueid] || {};
-            tempCompletedStageCount[queueid][stagename] = tempCompletedStageCount[queueid][stagename] || {};
-            tempCompletedStageCount[queueid][stagename][element['sourceref'].path] = tempCompletedStageCount[queueid][stagename][element['sourceref'].path] || [];
-            tempCompletedStageCount[queueid][stagename][element['sourceref'].path].push(document);
-          }
-
-          // All completed
-          tempAllCompletedStageCount[queueid] = tempAllCompletedStageCount[queueid] || {};
-          tempAllCompletedStageCount[queueid][stagename] = tempAllCompletedStageCount[queueid][stagename] || {};
-          tempAllCompletedStageCount[queueid][stagename][element['sourceref'].path] = tempAllCompletedStageCount[queueid][stagename][element['sourceref'].path] || [];
-          tempAllCompletedStageCount[queueid][stagename][element['sourceref'].path].push(document);
-        });
-
-        await Promise.all(fetchPromises);
-
-        this.completedStageCount = tempCompletedStageCount;
-        this.allCompletedStageCount = tempAllCompletedStageCount;
-      });
 
     } else {
       console.log('No queues selected, skipping stage fetch');
@@ -375,9 +375,59 @@ export class EventOpportunityDashboardV2Component {
     }
   }
 
+  private rebuildCompletedMaps(queueId: string, liveAssignmentList: any[]): void {
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+
+    const today: any = { ...this.completedStageCount };
+    const all: any = { ...this.allCompletedStageCount };
+    today[queueId] = {};
+    all[queueId] = {};
+
+    for (const element of liveAssignmentList) {
+      if (element['status'] !== 'completed' || element['isactivitydone'] !== true) continue;
+      const stagename = element['stagename'];
+      if (!stagename) continue;
+
+      const tsRaw = element['created'];
+      const ts = tsRaw?.toDate ? tsRaw.toDate() : (tsRaw ? new Date(tsRaw) : null);
+      const inToday = !!(ts && ts >= startOfDay && ts <= endOfDay);
+
+      const bigPid = element['participantid'];
+      if (!bigPid) continue;
+      const fanout: Record<string, string> = {
+        ...(element['participantsactivity'] || {}),
+        ...(element['bonusactivity'] || {}),
+      };
+
+      for (const profileid in fanout) {
+        const document: any = {
+          ...element,
+          participantid: bigPid,
+          profile_id: profileid,
+          activity: fanout[profileid],
+          activitydate: tsRaw,
+        };
+        const key = `${element['id'] || element['docid']}::${profileid}`;
+
+        all[queueId][stagename] = all[queueId][stagename] || {};
+        all[queueId][stagename][key] = [document];
+
+        if (inToday) {
+          today[queueId][stagename] = today[queueId][stagename] || {};
+          today[queueId][stagename][key] = [document];
+        }
+      }
+    }
+
+    this.completedStageCount = today;
+    this.allCompletedStageCount = all;
+  }
+
   handleEventData(eventData: any, queueId: string): void {
     this.mapData[queueId] = eventData;
     this.mapLiveAssignmentData = eventData["mapLiveStudioToData"];
+    this.rebuildCompletedMaps(queueId, eventData["liveAssignmentList"] || []);
     const stages: string[] = eventData["stages"] || [];
     const isFirstLoad = !this.initializedStagesPerQueue.has(queueId);
     for (const stage of stages) {
@@ -524,18 +574,31 @@ export class EventOpportunityDashboardV2Component {
     return participantIds.map(id => this.mapProfile[id] || id).filter(name => name);
   }
 
+  getGroupActivities(participants: any[]): string {
+    const names = new Set<string>();
+    participants.forEach(p => names.add(this.getActivityName(p)));
+    return Array.from(names).join(', ');
+  }
+
+  getActivityName(doc: any): string {
+    const map = this.mapData[this.selectedPanelQueueId]?.['mapBigActivity'] ?? {};
+    const pid = doc['participantid'] || doc['profile_id'];
+    const id = doc['activity'] || doc['bigactivity'] || doc['participantsactivity']?.[pid];
+    return map[id] || doc['activityname'] || doc['bigactivityname'] || 'Unknown';
+  }
+
   getGroupedByActivity(type: 'today' | 'all'): Array<{ activity: string, participants: any[] }> {
     const documents = type === 'today'
       ? this.getFilteredCompletedTodayParticipants(this.selectedPanelQueueId, this.selectedPanelStage)
       : this.getFilteredCompletedAllParticipants(this.selectedPanelQueueId, this.selectedPanelStage);
 
-    const map = new Map<string, { activity: string, participants: any[] }>();
+    const groups = new Map<string, { activity: string, participants: any[] }>();
     documents.forEach(doc => {
-      const activity = doc['activity'] || doc['activityname'] || doc['bigactivityname'] || 'Unknown';
-      if (!map.has(activity)) map.set(activity, { activity, participants: [] });
-      map.get(activity)!.participants.push(doc);
+      const activity = this.getActivityName(doc);
+      if (!groups.has(activity)) groups.set(activity, { activity, participants: [] });
+      groups.get(activity)!.participants.push(doc);
     });
-    return Array.from(map.values()).sort((a, b) => b.participants.length - a.participants.length);
+    return Array.from(groups.values()).sort((a, b) => b.participants.length - a.participants.length);
   }
 
   onGroupByActivityChange(): void {
@@ -631,7 +694,8 @@ export class EventOpportunityDashboardV2Component {
         data.push(obj)
       }
     }
-    return data
+    const nameOf = (s: any) => (s?.participants || []).map((p: string) => this.mapProfile[p] || p).join(', ').toLowerCase();
+    return data.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   }
 
   getStageStudioIdle(queueid: string, stage: string): any[] {
@@ -641,7 +705,9 @@ export class EventOpportunityDashboardV2Component {
       !this.mapData[queueid]['newStageStudioMap'][stage]['idle']) {
       return [];
     }
-    return this.mapData[queueid]['newStageStudioMap'][stage]['idle'];
+    const idle = [...this.mapData[queueid]['newStageStudioMap'][stage]['idle']];
+    const nameOf = (s: any) => (s?.participants || []).map((p: string) => this.mapProfile[p] || p).join(', ').toLowerCase();
+    return idle.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   }
 
   getMapLiveAssignmentActivity(queueid, studio, participant) {
@@ -689,14 +755,103 @@ export class EventOpportunityDashboardV2Component {
     return this.mapData[queueid]['studioPreAssign'][studio['docid']];
   }
 
-  getStudioAssignmentLength(queueid: string, studio: any): number {
-    if (!this.mapData[queueid] ||
-      !this.mapData[queueid]['studioAssignmentMap'] ||
-      !studio['docid'] ||
-      !this.mapData[queueid]['studioAssignmentMap'][studio['docid']]) {
-      return 0;
+  isStudioShadowing(queueid: string, studio: any): boolean {
+    const set: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    if (!set.size) return false;
+    const pa = studio?.['participantsactivity'] || {};
+    const ba = studio?.['bonusactivity'] || {};
+    for (const k in pa) if (set.has(pa[k])) return true;
+    for (const k in ba) if (set.has(ba[k])) return true;
+    return false;
+  }
+
+  getShadowingStudios(queueid: string, stage: string): any[] {
+    return this.getStageStudioLive(queueid, stage).filter(s => this.isStudioShadowing(queueid, s));
+  }
+
+  getNotShadowingStudios(queueid: string, stage: string): any[] {
+    return this.getStageStudioLive(queueid, stage).filter(s => !this.isStudioShadowing(queueid, s));
+  }
+
+  getNoStudioShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
+    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    if (!cohorts?.length) return [];
+
+    const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    const mapBigActivity = this.mapData[queueid]?.['mapBigActivity'] ?? {};
+    const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
+    const stageActivityIds = new Set<string>();
+    Object.values(compulsory).forEach((combo: any) => (combo || []).forEach((id: string) => stageActivityIds.add(id)));
+
+    const inStudioProfiles = new Set<string>();
+    const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+    liveList.forEach(e => {
+      if (e['stagename'] === stage && e['status'] === 'instudio') {
+        Object.keys(e['participantsactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        Object.keys(e['bonusactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        if (e['participantid']) inStudioProfiles.add(e['participantid']);
+      }
+    });
+
+    const seen = new Set<string>();
+    const out: Array<{ profileid: string, activity: string }> = [];
+    for (const cohort of cohorts) {
+      if (!shadowSet.has(cohort.bigactivity)) continue;
+      if (!stageActivityIds.has(cohort.bigactivity)) continue;
+      for (const pid of cohort.participantidlist) {
+        if (inStudioProfiles.has(pid) || seen.has(pid)) continue;
+        seen.add(pid);
+        out.push({ profileid: pid, activity: mapBigActivity[cohort.bigactivity] || cohort.bigactivity });
+      }
     }
-    return this.mapData[queueid]['studioAssignmentMap'][studio['docid']].length;
+    return out.sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
+  }
+
+  getNoStudioShadowingCount(queueid: string, stage: string): number {
+    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    if (!cohorts?.length) return 0;
+
+    const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
+    const stageActivityIds = new Set<string>();
+    Object.values(compulsory).forEach((combo: any) => (combo || []).forEach((id: string) => stageActivityIds.add(id)));
+
+    const inStudioProfiles = new Set<string>();
+    const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+    liveList.forEach(e => {
+      if (e['stagename'] === stage && e['status'] === 'instudio') {
+        Object.keys(e['participantsactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        Object.keys(e['bonusactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        if (e['participantid']) inStudioProfiles.add(e['participantid']);
+      }
+    });
+
+    const counted = new Set<string>();
+    for (const cohort of cohorts) {
+      if (!shadowSet.has(cohort.bigactivity)) continue;
+      if (!stageActivityIds.has(cohort.bigactivity)) continue;
+      for (const pid of cohort.participantidlist) {
+        if (!inStudioProfiles.has(pid)) counted.add(pid);
+      }
+    }
+    return counted.size;
+  }
+
+  getStudioAssignmentLength(queueid: string, studio: any): number {
+    const studioid = studio?.['docid'];
+    if (!studioid) return 0;
+    const stages = this.allCompletedStageCount[queueid] || {};
+    let count = 0;
+    for (const stage in stages) {
+      const entries = stages[stage];
+      for (const key in entries) {
+        const docs = entries[key] || [];
+        if (docs[0]?.['studioid'] === studioid) count++;
+      }
+    }
+    return count;
   }
 
   getStudioAssignmentParticipant(queueid: string, studio: any) {
@@ -947,7 +1102,7 @@ export class EventOpportunityDashboardV2Component {
       studioMap.get(studioId)!.participants.push(doc);
     });
 
-    return Array.from(studioMap.values()).sort((a, b) => b.participants.length - a.participants.length);
+    return Array.from(studioMap.values()).sort((a, b) => (a.studioName ?? '').localeCompare(b.studioName ?? ''));
   }
 
   getStudioName(studioId: string, queueid: string): string {

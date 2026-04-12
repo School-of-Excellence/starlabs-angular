@@ -52,6 +52,7 @@ export class EventOpportunityComponent {
   bigActivitySubcription: Subscription // in
   bigActivityList = [] // in
   mapBigActivity = {} //in
+  shadowActivityIds: Set<string> = new Set<string>()
 
   // Shadow Property
   profileShadowCount = {}
@@ -102,8 +103,10 @@ export class EventOpportunityComponent {
     })
     collectionData(collection(this.firestore, 'bigactivity')).pipe(takeUntil(this.subscription)).subscribe(snap => {
         this.bigActivityList = snap
+        this.shadowActivityIds = new Set<string>()
         this.bigActivityList.forEach(e => {
           this.mapBigActivity[e["docid"]] = e["activity"]
+          if (e["shadow"] === true) this.shadowActivityIds.add(e["docid"])
         })
       })
   }
@@ -406,7 +409,9 @@ export class EventOpportunityComponent {
         studioPreAssign : this.studioPreAssign,
         studioAssignmentMap : this.studioAssignmentMap,
         liveStudioMap :this.liveStudioMap,
-        studioMap: this.studioMap
+        studioMap: this.studioMap,
+        liveAssignmentList: this.liveAssignmentList,
+        shadowActivityIds: this.shadowActivityIds
       });
     }
 }

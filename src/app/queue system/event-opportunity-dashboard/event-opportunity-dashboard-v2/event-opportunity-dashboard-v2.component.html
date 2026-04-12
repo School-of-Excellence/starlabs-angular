@@ -202,7 +202,21 @@
                     </div>
                     <span class="count-value">{{ getStageStudioIdleLength(queueid, stage) }}</span>
                   </div>
-                  <div class="completed-row" 
+                  <div class="shadow-row">
+                    <div class="status-indicator">
+                      <span class="status-dot" style="background:#8e44ad"></span>
+                      <strong>Shadowing</strong>
+                    </div>
+                    <span class="count-value">{{ getShadowingStudios(queueid, stage).length }}</span>
+                  </div>
+                  <div class="not-shadow-row">
+                    <div class="status-indicator">
+                      <span class="status-dot" style="background:#f39c12"></span>
+                      <strong>Not Shadowing</strong>
+                    </div>
+                    <span class="count-value">{{ getNotShadowingStudios(queueid, stage).length }}</span>
+                  </div>
+                  <div class="completed-row"
                        [matTooltip]="getCompletedTooltip(queueid, stage, 'today')"
                        matTooltipClass="multi-line-tooltip"
                        matTooltipPosition="right">
@@ -212,7 +226,7 @@
                     </div>
                     <span class="count-value">{{ getStageCountValue(queueid, stage) }}</span>
                   </div>
-                  <div class="completed-row" 
+                  <div class="completed-row"
                        [matTooltip]="getCompletedTooltip(queueid, stage, 'all')"
                        matTooltipClass="multi-line-tooltip"
                        matTooltipPosition="right">
@@ -221,6 +235,13 @@
                       <strong>Completed - All</strong>
                     </div>
                     <span class="count-value">{{ getTotalCompletedCountValue(queueid, stage) }}</span>
+                  </div>
+                  <div class="no-studio-shadow-row">
+                    <div class="status-indicator">
+                      <span class="status-dot" style="background:#c0392b"></span>
+                      <strong>Shadowing - No Studio</strong>
+                    </div>
+                    <span class="count-value">{{ getNoStudioShadowingCount(queueid, stage) }}</span>
                   </div>
                 </div>
               </div>
@@ -443,6 +464,110 @@
               </div>
             </div>
           </div>
+
+          <!-- Shadowing Studios -->
+          <div class="stage-tile" [class.expanded]="isShadowingExpanded">
+            <div class="stage-tile-header shadow-header" (click)="isShadowingExpanded = !isShadowingExpanded">
+              <div class="stage-info">
+                <div class="stage-name-row">
+                  <mat-icon class="stage-icon">visibility</mat-icon>
+                  <span class="stage-name">Shadowing</span>
+                </div>
+              </div>
+              <div class="stage-count-section">
+                <span class="stage-count">{{ getShadowingStudios(selectedPanelQueueId, selectedPanelStage).length }}</span>
+                <mat-icon class="expand-icon">{{ isShadowingExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+            </div>
+            <div class="stage-tile-content" *ngIf="isShadowingExpanded">
+              <div class="participant-list">
+                <div class="participant-row" *ngFor="let studio of getShadowingStudios(selectedPanelQueueId, selectedPanelStage); let i = index">
+                  <div class="participant-index">{{ i + 1 }}</div>
+                  <div class="participant-info">
+                    <div *ngFor="let participant of studio['participants'] || []">
+                      <div class="participant-name-line">
+                        <span class="name">{{mapProfile[participant]}} - {{getMapBigActivity(selectedPanelQueueId, studio, participant)}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="empty-stage" *ngIf="getShadowingStudios(selectedPanelQueueId, selectedPanelStage).length === 0">
+                  <mat-icon>visibility_off</mat-icon>
+                  <span>No shadowing studios</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Not Shadowing Studios -->
+          <div class="stage-tile" [class.expanded]="isNotShadowingExpanded">
+            <div class="stage-tile-header not-shadow-header" (click)="isNotShadowingExpanded = !isNotShadowingExpanded">
+              <div class="stage-info">
+                <div class="stage-name-row">
+                  <mat-icon class="stage-icon">person</mat-icon>
+                  <span class="stage-name">Not Shadowing</span>
+                </div>
+              </div>
+              <div class="stage-count-section">
+                <span class="stage-count">{{ getNotShadowingStudios(selectedPanelQueueId, selectedPanelStage).length }}</span>
+                <mat-icon class="expand-icon">{{ isNotShadowingExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+            </div>
+            <div class="stage-tile-content" *ngIf="isNotShadowingExpanded">
+              <div class="participant-list">
+                <div class="participant-row" *ngFor="let studio of getNotShadowingStudios(selectedPanelQueueId, selectedPanelStage); let i = index">
+                  <div class="participant-index">{{ i + 1 }}</div>
+                  <div class="participant-info">
+                    <div *ngFor="let participant of studio['participants'] || []">
+                      <div class="participant-name-line">
+                        <span class="name">{{mapProfile[participant]}} - {{getMapBigActivity(selectedPanelQueueId, studio, participant)}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="empty-stage" *ngIf="getNotShadowingStudios(selectedPanelQueueId, selectedPanelStage).length === 0">
+                  <mat-icon>person_off</mat-icon>
+                  <span>No non-shadowing studios</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Studio - Shadowing -->
+          <div class="stage-tile" [class.expanded]="isNoStudioShadowingExpanded">
+            <div class="stage-tile-header no-studio-shadow-header" (click)="isNoStudioShadowingExpanded = !isNoStudioShadowingExpanded">
+              <div class="stage-info">
+                <div class="stage-name-row">
+                  <mat-icon class="stage-icon">person_off</mat-icon>
+                  <span class="stage-name">Shadowing - No Studio</span>
+                </div>
+              </div>
+              <div class="stage-count-section">
+                <span class="stage-count">{{ getNoStudioShadowingParticipants(selectedPanelQueueId, selectedPanelStage).length }}</span>
+                <mat-icon class="expand-icon">{{ isNoStudioShadowingExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+            </div>
+            <div class="stage-tile-content" *ngIf="isNoStudioShadowingExpanded">
+              <div class="participant-list">
+                <div class="participant-row" *ngFor="let p of getNoStudioShadowingParticipants(selectedPanelQueueId, selectedPanelStage); let i = index">
+                  <div class="participant-index">{{ i + 1 }}</div>
+                  <div class="participant-info">
+                    <div class="participant-name-line">
+                      <mat-icon>person</mat-icon>
+                      <span class="name">{{ mapProfile[p.profileid] || p.profileid }}</span>
+                    </div>
+                    <div class="participant-tags">
+                      <span class="tag queue-tag"><mat-icon>local_activity</mat-icon>{{ p.activity }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="empty-stage" *ngIf="getNoStudioShadowingParticipants(selectedPanelQueueId, selectedPanelStage).length === 0">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>All shadow participants have a studio</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </ng-container>
 
         <!-- Live Only View -->
@@ -507,6 +632,10 @@
                       <mat-icon class="stage-icon">meeting_room</mat-icon>
                       <span class="stage-name">{{ group.studioName }}</span>
                     </div>
+                    <div class="group-activity-line">
+                      <mat-icon>local_activity</mat-icon>
+                      <span>{{ getGroupActivities(group.participants) }}</span>
+                    </div>
                   </div>
                   <div class="stage-count-section">
                     <span class="stage-count">{{ group.participants.length }}</span>
@@ -524,8 +653,7 @@
                         </div>
                         <div class="participant-tags">
                           <span class="tag product-tag" *ngIf="doc.activitydate"><mat-icon>schedule</mat-icon>{{ formatActivityDate(doc.activitydate) }}</span>
-                          <span class="tag queue-tag" *ngIf="doc.activity"><mat-icon>local_activity</mat-icon>{{ doc.activity }}</span>
-                        </div>
+                                                  </div>
                       </div>
                     </div>
                   </div>
@@ -617,6 +745,10 @@
                       <mat-icon class="stage-icon">meeting_room</mat-icon>
                       <span class="stage-name">{{ group.studioName }}</span>
                     </div>
+                    <div class="group-activity-line">
+                      <mat-icon>local_activity</mat-icon>
+                      <span>{{ getGroupActivities(group.participants) }}</span>
+                    </div>
                   </div>
                   <div class="stage-count-section">
                     <span class="stage-count">{{ group.participants.length }}</span>
@@ -634,8 +766,7 @@
                         </div>
                         <div class="participant-tags">
                           <span class="tag product-tag" *ngIf="doc.activitydate"><mat-icon>schedule</mat-icon>{{ formatActivityDate(doc.activitydate) }}</span>
-                          <span class="tag queue-tag" *ngIf="doc.activity"><mat-icon>local_activity</mat-icon>{{ doc.activity }}</span>
-                        </div>
+                                                  </div>
                       </div>
                     </div>
                   </div>

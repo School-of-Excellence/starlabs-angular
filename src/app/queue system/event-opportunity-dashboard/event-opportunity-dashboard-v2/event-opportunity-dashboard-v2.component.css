@@ -20,6 +20,20 @@
   box-shadow: 0 4px 12px rgba(127, 41, 207, 0.35);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
+.group-activity-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #7F29CF;
+  font-weight: 500;
+}
+.group-activity-line mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
 .config-stages-row {
   display: flex;
   justify-content: flex-end;
@@ -393,6 +407,12 @@
 .live-row { background-color: #e3f7ea; border-left: 3px solid #2ecc71; }
 .idle-row { background-color: #fde5e5; border-left: 3px solid #e74c3c; }
 .completed-row { border-left: 3px solid #95a5a6; }
+.shadow-row { background-color: #f1e6f8; border-left: 3px solid #8e44ad; }
+.not-shadow-row { background-color: #fdf1dc; border-left: 3px solid #f39c12; }
+.shadow-row .count-value { color: #8e44ad; }
+.not-shadow-row .count-value { color: #d68910; }
+.no-studio-shadow-row { background-color: #fce3de; border-left: 3px solid #c0392b; }
+.no-studio-shadow-row .count-value { color: #c0392b; }
 
 .completed-row {
   background-color: #e8e8e8;
