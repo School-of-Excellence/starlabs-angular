@@ -724,12 +724,12 @@ export class DeliveryDashboardCloneComponent {
         this.selectedProductLabel = product;
         console.log("selected product", product, productId);
 
-        // if (this.appointmentsSubscription) {
-        //     this.appointmentsSubscription.unsubscribe();
-        // }
-        // if (this.subscriptions['productsChunks']) {
-        //     this.subscriptions['productsChunks'].unsubscribe();
-        // }
+        if (this.appointmentsSubscription) {
+            this.appointmentsSubscription.unsubscribe();
+        }
+        if (this.subscriptions['productsChunks']) {
+            this.subscriptions['productsChunks'].unsubscribe();
+        }
 
         this.resetStats();
         // await this.filterAppointmentsByType();
@@ -868,8 +868,6 @@ export class DeliveryDashboardCloneComponent {
             }
 
             // Filter Report Data
-            await this.FilterReportData(productId);
-
             const celebrationCall = this.getCardFunnel(productId).completed;
 
             this.productData.celebrationCall = await Promise.all(
@@ -882,6 +880,8 @@ export class DeliveryDashboardCloneComponent {
                     };
                 })
             );
+            await this.FilterReportData(productId);
+
             // this.cleanProductData();
             this.updateFilteredCards();
             console.log("all data", this.productData);
