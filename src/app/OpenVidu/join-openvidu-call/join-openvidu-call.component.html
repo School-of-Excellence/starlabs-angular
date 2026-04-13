@@ -188,8 +188,8 @@
         </app-openvidu-video-element>
 
         <div class="zoom-name-badge">
-          {{ loggedinProfileRole["name"] }} (You)
           <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+          {{ loggedinProfileRole["name"] }} (You)
           <span class="network-bars" [title]="'Network: ' + getNetworkBars(localParticipantIdentity).bars + ' bars'">
             <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 1"
               [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
@@ -215,8 +215,8 @@
           </app-openvidu-video-element>
 
           <div class="zoom-name-badge">
-            {{ remote.participantName }}
             <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+            {{ remote.participantName }}
             <span class="network-bars" [title]="'Network: ' + getNetworkBars(remote.participantIdentity).bars + ' bars'">
               <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
                 [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
@@ -246,8 +246,8 @@
         </app-openvidu-video-element>
 
         <div class="zoom-name-badge">
-          {{ loggedinProfileRole["name"] }} (You)
           <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+          {{ loggedinProfileRole["name"] }} (You)
           <span class="network-bars" [title]="'Network: ' + getNetworkBars(localParticipantIdentity).bars + ' bars'">
             <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 1"
               [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
@@ -290,8 +290,8 @@
           </mat-menu>
 
           <div class="zoom-name-badge">
-            {{ remote.participantName }}
             <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+            {{ remote.participantName }}
             <span class="network-bars" [title]="'Network: ' + getNetworkBars(remote.participantIdentity).bars + ' bars'">
               <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
                 [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
