@@ -136,6 +136,8 @@ export class FormBasedSubmissionComponent {
 
   ngAfterViewInit() {
     // console.log(" ngAfterViewInit participantformtemplateid",this.participantformtemplateid);
+    this.patchformid = this.route.snapshot.queryParams['id']
+    console.log("PATCHFORMID:", this.patchformid);
     this.formpatch = ![null, undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null, undefined].includes(this.participantformtemplateid) ? true : false)
     // console.log(this.formpatch);
     this.queueId = this.route.snapshot.queryParams['queueid'] ?? null
@@ -429,7 +431,7 @@ export class FormBasedSubmissionComponent {
               liveassignmentid: null,
             }
             let data = { ...participantQueueToken, ...token }
-            
+
             await updateDoc(doc(this.afs, "queue_token", data["docid"]), data).catch(err => {
               console.log(err);
             });
@@ -574,6 +576,13 @@ export class FormBasedSubmissionComponent {
 
   async getFormsOption() {
     console.log("Forms Draft");
+    // Guard: don't query if required values are missing
+    if (!this.patchformid || !this.profileid) {
+      console.warn("getFormsOption: missing patchformid or profileid, skipping draft fetch",
+        { patchformid: this.patchformid, profileid: this.profileid });
+      return;
+    }
+
     var draftforms = [];
     await getDocs(query(collection(this.afs, "big_temporary_forms"), where("formid", "==", this.patchformid), where("profileid", "==", this.profileid))).then(draft => {
       if (draft.docs.length != 0) {
@@ -589,7 +598,8 @@ export class FormBasedSubmissionComponent {
       var dialogRef = this.dialog.open(FormOptionComponent, {
         data: {
           drafts: draftforms,
-          mapProfile: {}
+          mapProfile: {},
+          bigform: true
         },
         autoFocus: false,
         maxHeight: "90vh",
