@@ -181,7 +181,7 @@
     <div class="participants-sidebar">
       
       <!-- LOCAL VIDEO -->
-      <div class="zoom-video-tile-small">
+      <div class="zoom-video-tile-small" [class.active-speaker]="activeSpeakers.includes(localParticipantIdentity)">
         <app-openvidu-video-element
           [track]="localParticipant()"
           [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
@@ -190,13 +190,24 @@
         <div class="zoom-name-badge">
           {{ loggedinProfileRole["name"] }} (You)
           <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+          <span class="network-bars" [title]="'Network: ' + getNetworkBars(localParticipantIdentity).bars + ' bars'">
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 1"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 2"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 3"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 4"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+          </span>
         </div>
       </div>
 
       <!-- REMOTE PARTICIPANTS (only camera videos, not screen shares) -->
       <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
-        <div class="zoom-video-tile-small" 
-            *ngIf="remote.trackPublication.kind === 'video' && remote.trackPublication.source !== 'screen_share'">
+        <div class="zoom-video-tile-small"
+            *ngIf="remote.trackPublication.kind === 'video' && remote.trackPublication.videoTrack && remote.trackPublication.source !== 'screen_share'" 
+            [class.active-speaker]="activeSpeakers.includes(remote.participantIdentity)">
 
           <app-openvidu-video-element
             [track]="remote.trackPublication.videoTrack"
@@ -206,7 +217,16 @@
           <div class="zoom-name-badge">
             {{ remote.participantName }}
             <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
-            <mat-icon class="material-icons text-primary" *ngIf="activeSpeakers.includes(remote.participantIdentity)">record_voice_over</mat-icon>
+            <span class="network-bars" [title]="'Network: ' + getNetworkBars(remote.participantIdentity).bars + ' bars'">
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 2"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 3"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 4"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+            </span>
           </div>
         </div>
       </ng-container>
@@ -219,7 +239,7 @@
     <div class="zoom-video-grid" [attr.data-count]="getVideoParticipantCount()">
 
       <!-- LOCAL VIDEO -->
-      <div class="zoom-video-tile">
+      <div class="zoom-video-tile" [class.active-speaker]="activeSpeakers.includes(localParticipantIdentity)">
         <app-openvidu-video-element
           [track]="localParticipant()"
           [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
@@ -228,22 +248,60 @@
         <div class="zoom-name-badge">
           {{ loggedinProfileRole["name"] }} (You)
           <mat-icon class="material-icons text-danger" *ngIf="isAudioMuted()">mic_off</mat-icon>
+          <span class="network-bars" [title]="'Network: ' + getNetworkBars(localParticipantIdentity).bars + ' bars'">
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 1"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 2"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 3"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+            <span class="bar" [class.active]="getNetworkBars(localParticipantIdentity).bars >= 4"
+              [style.background]="getNetworkBars(localParticipantIdentity).color"></span>
+          </span>
         </div>
       </div>
 
       <!-- REMOTE PARTICIPANTS -->
       <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
-        <div class="zoom-video-tile" *ngIf="remote.trackPublication.kind === 'video'">
+        <div class="zoom-video-tile" [class.active-speaker]="activeSpeakers.includes(remote.participantIdentity)" *ngIf="remote.trackPublication.kind === 'video' && remote.trackPublication.videoTrack">
 
           <app-openvidu-video-element
-            [track]="remote.trackPublication.videoTrack"
+            [track]="remote.trackPublication.videoTrack!"
             [participantIdentity]="remote.participantName">
           </app-openvidu-video-element>
+
+          <!-- Host controls menu -->
+          <button *ngIf="isHost()" class="participant-options-btn" [matMenuTriggerFor]="remoteTileMenu" (click)="$event.stopPropagation()">
+            <span class="material-icons">more_vert</span>
+          </button>
+          <mat-menu #remoteTileMenu="matMenu">
+            <button mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
+              <mat-icon>mic_off</mat-icon>
+              <span>Mute</span>
+            </button>
+            <button mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
+              <mat-icon>mic_off</mat-icon>
+              <span>Already Muted</span>
+            </button>
+            <button mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
+              <mat-icon>person_remove</mat-icon>
+              <span>Remove from Call</span>
+            </button>
+          </mat-menu>
 
           <div class="zoom-name-badge">
             {{ remote.participantName }}
             <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
-            <mat-icon class="material-icons text-primary" *ngIf="activeSpeakers.includes(remote.participantIdentity)">record_voice_over</mat-icon>
+            <span class="network-bars" [title]="'Network: ' + getNetworkBars(remote.participantIdentity).bars + ' bars'">
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 2"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 3"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+              <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 4"
+                [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
+            </span>
           </div>
         </div>
       </ng-container>
@@ -269,15 +327,30 @@
         <span class="zoom-btn-label">{{isAudioMuted() ? "Unmute" : "Mute"}}</span>
       </button>
 
-      <button class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
-        <span class="material-icons">{{isVideoHidden() ? "videocam_off" : "videocam"}}</span>
-        <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
-      </button>
+      <div class="camera-btn-group">
+        <button class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
+          <span class="material-icons">{{isVideoHidden() ? "videocam_off" : "videocam"}}</span>
+          <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
+        </button>
+        <button class="zoom-btn blur-menu-trigger" [matMenuTriggerFor]="blurMenu">
+          <span class="material-icons">expand_less</span>
+        </button>
+      </div>
 
-      <button class="zoom-btn" [class.fullscreen]="isVideoBlurred" (click)="toggleVideoBlur()">
-        <span class="material-icons">{{isVideoBlurred ? "blur_off" : "blur_on"}}</span>
-        <span class="zoom-btn-label">Blur Video</span>
-      </button>
+      <mat-menu #blurMenu="matMenu">
+        <button mat-menu-item (click)="applyBlur('mid')" [disabled]="blurLevel === 'mid'">
+          <mat-icon>blur_on</mat-icon>
+          <span>Blur Mid (60%)</span>
+        </button>
+        <button mat-menu-item (click)="applyBlur('high')" [disabled]="blurLevel === 'high'">
+          <mat-icon>blur_on</mat-icon>
+          <span>Blur High (100%)</span>
+        </button>
+        <button mat-menu-item (click)="applyBlur('none')" [disabled]="blurLevel === 'none'">
+          <mat-icon>blur_off</mat-icon>
+          <span>Remove Blur</span>
+        </button>
+      </mat-menu>
 
       <button class="zoom-btn" [class.active]="isScreenSharing()" (click)="toggleScreenShare()">
         <span class="material-icons">{{isScreenSharing() ? "stop_screen_share" : "screen_share"}}</span>
