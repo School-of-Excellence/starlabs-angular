@@ -17,10 +17,10 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class FormOptionComponent {
   draftOption = [];
-  constructor(@Inject(MAT_DIALOG_DATA) public forms, public dialogRef: MatDialogRef<any>, public firestore: Firestore) { 
+  constructor(@Inject(MAT_DIALOG_DATA) public forms, public dialogRef: MatDialogRef<any>, public firestore: Firestore) {
     this.draftOption = forms["drafts"] ?? []
   }
-  
+
   ngOnInit(): void {
   }
 
@@ -33,8 +33,8 @@ export class FormOptionComponent {
   }
 
   async deleteDraft(id, index){
-    if(confirm("Sure, do you want to delete this ATC")){
-      await deleteDoc(doc(collection(this.firestore,"temporary_forms"),id));
+    if(confirm("Sure, do you want to delete this draft")){
+      await deleteDoc(doc(collection(this.firestore, "big_temporary_forms"), id));
       this.draftOption.splice(index, 1);
     }
   }
