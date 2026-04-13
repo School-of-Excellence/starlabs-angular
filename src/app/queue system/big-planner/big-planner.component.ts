@@ -27,6 +27,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 interface CardData {
   participants: string[];
@@ -54,7 +55,8 @@ interface CardData {
     MatSortModule,
     MatListModule,
     MatButtonModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    MatTooltipModule
   ],
   templateUrl: './big-planner.component.html',
   styleUrl: './big-planner.component.css',
@@ -82,6 +84,10 @@ export class BigPlannerComponent {
   private unsubscribe$ = new Subject<void>();
   // Create Studio
   newStudioPairing = [];
+  overallAtcModel: any[] = [];
+  overallMandatoryActivities: string[] = [];
+  editMandatoryActivities: string | null = null;
+  editMandatoryActivitiesData: string[] = [];
   atcModel: Array<any> = [];
   disabledAtcModels: Array<any> = [];
 
@@ -134,7 +140,7 @@ export class BigPlannerComponent {
   filterActivityValue = '';
   filterAtcModelValue = '';
   filterStatusValue = '';
-  displayedColumns: string[] = ['status', 'participants', 'preassign', 'activities', 'atcModel', 'actions'];
+  displayedColumns: string[] = ['status', 'participants', 'preassign', 'activities', 'atcModel', 'mandatoryActivities', 'actions'];
   showFilters: boolean = false;
 
   openViduEnabled = false;
@@ -684,7 +690,6 @@ export class BigPlannerComponent {
     this.newStudioPairing.push({
       profileid: null,
       activity: null,
-      atcmodel : null,
     });
   }
 
@@ -697,16 +702,12 @@ export class BigPlannerComponent {
     let validation = true;
     const participants: string[] = [];
     const participantsactivity: any = {};
-    let atcmodel: any = [];
+    const atcmodel: any = (this.overallAtcModel && !this.overallAtcModel.includes(null))
+      ? this.overallAtcModel
+      : [];
 
     // 1️⃣ Validation + data preparation
     for (const element of this.newStudioPairing) {
-
-      // // atcmodel handling
-      if (element?.atcmodel && !element.atcmodel.includes?.(null)) {
-        atcmodel = element.atcmodel;
-      }
-
       // required fields check
       if (element?.profileid && element?.activity) {
         participants.push(element.profileid);
@@ -737,6 +738,7 @@ export class BigPlannerComponent {
         queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
         studioin: false,
         atcmodel,
+        mandatoryactivities: this.overallMandatoryActivities ?? [],
         openvidu: this.openViduEnabled ?? false
       });
 
@@ -749,6 +751,8 @@ export class BigPlannerComponent {
       });
 
       this.newStudioPairing = [];
+      this.overallAtcModel = [];
+      this.overallMandatoryActivities = [];
       this.addPair();
 
     } catch (error) {
@@ -1047,5 +1051,27 @@ export class BigPlannerComponent {
     })
     this.filterStudios();
     this.cancelAtcEdit();
+  }
+
+  openMandatoryEditMode(docId: string) {
+    const studio = this.filteredStudioPairingList.data.find((s) => s['docid'] === docId);
+    if (!studio) return;
+    this.editMandatoryActivities = docId;
+    this.editMandatoryActivitiesData = studio['mandatoryactivities'] || [];
+  }
+
+  cancelMandatoryEdit() {
+    this.editMandatoryActivities = null;
+    this.editMandatoryActivitiesData = [];
+  }
+
+  applyMandatoryEdit() {
+    const studio = this.filteredStudioPairingList.data.find((s) => s['docid'] === this.editMandatoryActivities);
+    if (!studio) return;
+    updateDoc(doc(this.firestore, "queue studio pairing", studio["docid"]), {
+      mandatoryactivities: this.editMandatoryActivitiesData
+    });
+    this.filterStudios();
+    this.cancelMandatoryEdit();
   }
 }
