@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 
 export const routes: Routes = [
-  {path: 'onboarding', loadComponent: () => import('./JourneyOnboardingDetail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent)},
+  {path: 'journeyonboardingdetail', loadComponent: () => import('./journey-onboarding-detail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent), canActivate:[authGuard]},
   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
   {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
   {path: 'routeconfiguration', loadComponent: () => import('./route-configuration-duplicate/route-configuration.component').then(m => m.RouteConfigurationComponent), canActivate:[authGuard]},
@@ -316,6 +316,9 @@ export const routes: Routes = [
 
   //queue-web
   {path: 'queue-web', loadComponent: () => import('./queue system/QueueWebVerison1/queue-web-version1.component').then(m => m.QueueWebVersion1Component), canActivate: [authGuard] },
+
+  // Dev - Test
+  {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
 ];
 
 // import { Routes } from '@angular/router';
