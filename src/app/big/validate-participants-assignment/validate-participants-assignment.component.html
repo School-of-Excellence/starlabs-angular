@@ -32,16 +32,34 @@
       </div>
     </div>
 
+    <!-- Needs Validation (rework) Filter -->
+    <div class="filter-section" *ngIf="selectedMarathonId">
+      <mat-checkbox
+        [checked]="onlyReworkFilter"
+        (change)="onToggleReworkFilter($event.checked)">
+        Needs Validation (Review)
+      </mat-checkbox>
+    </div>
+
+    <!-- Created by me Filter -->
+    <div class="filter-section" *ngIf="selectedMarathonId">
+      <mat-checkbox
+        [checked]="onlyMyActivities"
+        (change)="onToggleMyActivities($event.checked)">
+        Activity Given by Me
+      </mat-checkbox>
+    </div>
+
     <!-- Cohorts Filter Dropdown -->
-    <div class="filter-section" *ngIf="selectedMarathonId && filteredCohorts.length > 0">
+    <div class="filter-section" *ngIf="selectedMarathonId && displayCohorts.length > 0">
       <label class="filter-label">Filter by Cohort</label>
       <div class="select-wrapper">
-        <select 
+        <select
           class="select-input"
           [ngModel]="selectedFilterCohortId"
           (ngModelChange)="onCohortFilterChange($event)">
           <option [ngValue]="null">All Cohorts</option>
-          <option *ngFor="let cohort of filteredCohorts" [ngValue]="cohort.id">
+          <option *ngFor="let cohort of displayCohorts" [ngValue]="cohort.id">
             {{ cohort.name }}
           </option>
         </select>

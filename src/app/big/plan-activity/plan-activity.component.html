@@ -48,18 +48,28 @@
               <h5><i class="far fa-calendar-alt mr-1"></i>Select Date & Time</h5>
               <div class="row">
                 <div class="col-md-6">
-                  <mat-form-field class="w-100" appearance="outline">
+                  <mat-form-field class="w-100 dt-field" appearance="outline">
                     <mat-label>Start Date & Time</mat-label>
-                    <input matInput type="datetime-local" formControlName="startdate">
+                    <input #startdate matInput type="datetime-local" formControlName="startdate"
+                      (click)="startdate.showPicker && startdate.showPicker()">
+                    <button type="button" matSuffix mat-icon-button aria-label="Pick date"
+                      (click)="startdate.showPicker ? startdate.showPicker() : startdate.focus(); $event.stopPropagation()">
+                      <mat-icon>event</mat-icon>
+                    </button>
                     <mat-error *ngIf="assignmentForm.get('startdate').hasError('required')">
                       Start date & time is required
                     </mat-error>
                   </mat-form-field>
                 </div>
                 <div class="col-md-6">
-                  <mat-form-field class="w-100" appearance="outline">
+                  <mat-form-field class="w-100 dt-field" appearance="outline">
                     <mat-label>End Date & Time</mat-label>
-                    <input matInput type="datetime-local" formControlName="enddate">
+                    <input #enddate matInput type="datetime-local" formControlName="enddate"
+                      (click)="enddate.showPicker && enddate.showPicker()">
+                    <button type="button" matSuffix mat-icon-button aria-label="Pick date"
+                      (click)="enddate.showPicker ? enddate.showPicker() : enddate.focus(); $event.stopPropagation()">
+                      <mat-icon>event</mat-icon>
+                    </button>
                     <mat-error *ngIf="assignmentForm.get('enddate').hasError('required')">
                       End date & time is required
                     </mat-error>

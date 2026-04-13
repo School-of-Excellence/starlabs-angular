@@ -221,7 +221,12 @@ export class ManageCohertsComponent {
       // Show all participants by default (when no event is selected)
       this.filteredParticipants = this.data.totalParticipants || [];
       this.filteredParticipantsList = [...this.filteredParticipants];
-      
+
+      // If editing a cohort that has an eventref, re-filter participants by event
+      if (this.data.doc && this.data.doc['eventref']) {
+        this.onChangeEvent();
+      }
+
       // Update existing participants list after setting filtered participants
       this.updateExistingParticipantsNotInList();
     }

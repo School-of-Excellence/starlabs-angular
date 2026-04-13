@@ -112,8 +112,17 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   filteredCohorts: Cohort[] = [];
   selectedFilterCohortId: string | null = null;
 
+  // Rework-only filter (validation pending)
+  onlyReworkFilter = false;
+  cohortsWithRework: Set<string> = new Set();
+  assignmentsWithRework: Set<string> = new Set();
+
+  // Created-by-me filter
+  onlyMyActivities = false;
+
   // Assignment Selection
   assignments: Assignment[] = [];
+  cohortBaseAssignments: Assignment[] = [];
   filteredAssignments: Assignment[] = [];
   assignmentSearchText = '';
   selectedAssignmentId: string | null = null;
@@ -184,8 +193,23 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     await this.loadProfiles();
     await this.loadMarathons();
     await this.loadAllCohorts();
-    
+
     this.loading = false;
+
+    const params = this.route.snapshot.queryParams;
+    const marathonIdParam = params['marathonid'];
+    const cohortIdParam = params['cohortid'];
+    const assignmentIdParam = params['assignmentid'];
+
+    if (marathonIdParam) {
+      await this.onMarathonChange(marathonIdParam);
+      if (cohortIdParam) {
+        await this.onCohortFilterChange(cohortIdParam);
+      }
+      if (assignmentIdParam) {
+        await this.onAssignmentChange(assignmentIdParam);
+      }
+    }
   }
 
   ngOnDestroy(): void {
@@ -279,6 +303,52 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     
     this.filteredAssignments = [...this.assignments];
     this.loadingAssignments = false;
+
+    await this.loadReworkMap();
+    this.applyReworkFilter();
+  }
+
+  async loadReworkMap() {
+    this.cohortsWithRework = new Set();
+    this.assignmentsWithRework = new Set();
+    try {
+      const cohortIds = this.selectedFilterCohortId
+        ? [this.selectedFilterCohortId]
+        : this.filteredCohorts.map(c => c.id);
+
+      await Promise.all(cohortIds.map(async cohortId => {
+        const cohortRef = doc(this.firestore, 'big cohorts', cohortId);
+        const snap = await getDocs(query(
+          collection(this.firestore, 'big participants assignments'),
+          where('cohortsref', '==', cohortRef)
+        ));
+        snap.docs.forEach(d => {
+          const data: any = d.data();
+          if (data.status !== 'review') return;
+          if (data.cohortsref?.id) this.cohortsWithRework.add(data.cohortsref.id);
+          if (data.assignmentref?.id) this.assignmentsWithRework.add(data.assignmentref.id);
+        });
+      }));
+    } catch (e) {
+      console.error('Failed to load rework map', e);
+    }
+  }
+
+  async onToggleReworkFilter(checked: boolean) {
+    this.onlyReworkFilter = checked;
+    if (checked) {
+      await this.loadReworkMap();
+    }
+    this.applyReworkFilter();
+  }
+
+  applyReworkFilter() {
+    this.filterAssignmentsBySearch();
+  }
+
+  get displayCohorts(): Cohort[] {
+    if (!this.onlyReworkFilter) return this.filteredCohorts;
+    return this.filteredCohorts.filter(c => this.cohortsWithRework.has(c.id));
   }
 
   async onCohortFilterChange(cohortId: string | null) {
@@ -290,7 +360,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     
     if (!cohortId) {
       // Show all assignments for this marathon
-      this.filteredAssignments = [...this.assignments];
+      this.filterAssignmentsBySearch();
       return;
     }
     
@@ -312,34 +382,46 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     
     // Also filter by marathon if selected
     if (this.selectedMarathonId) {
-      this.filteredAssignments = cohortAssignments.filter(a => 
+      this.cohortBaseAssignments = cohortAssignments.filter(a =>
         a.marathonref?.id === this.selectedMarathonId
       );
     } else {
-      this.filteredAssignments = cohortAssignments;
+      this.cohortBaseAssignments = cohortAssignments;
     }
-    
+
+    if (this.onlyReworkFilter) {
+      await this.loadReworkMap();
+    }
+
+    this.filterAssignmentsBySearch();
     this.loadingAssignments = false;
   }
 
   filterAssignmentsBySearch() {
-    // This is called only for search filtering
-    if (!this.assignmentSearchText) {
-      // If cohort is selected, we keep the cohort-filtered results
-      // If no cohort, show all marathon assignments
-      if (!this.selectedFilterCohortId) {
-        this.filteredAssignments = [...this.assignments];
-      }
-      return;
+    let source = this.selectedFilterCohortId ? [...this.cohortBaseAssignments] : [...this.assignments];
+
+    if (this.assignmentSearchText) {
+      const searchText = this.assignmentSearchText.toLowerCase();
+      source = source.filter(a =>
+        a.title?.toLowerCase().includes(searchText) ||
+        a.assignmenttype?.toLowerCase().includes(searchText)
+      );
     }
-    
-    const searchText = this.assignmentSearchText.toLowerCase();
-    const sourceAssignments = this.selectedFilterCohortId ? this.filteredAssignments : this.assignments;
-    
-    this.filteredAssignments = sourceAssignments.filter(a =>
-      a.title?.toLowerCase().includes(searchText) ||
-      a.assignmenttype?.toLowerCase().includes(searchText)
-    );
+
+    if (this.onlyReworkFilter) {
+      source = source.filter(a => this.assignmentsWithRework.has(a.id));
+    }
+
+    if (this.onlyMyActivities && this.loggedInProfileId) {
+      source = source.filter(a => a['createdprofileref']?.id === this.loggedInProfileId);
+    }
+
+    this.filteredAssignments = source;
+  }
+
+  onToggleMyActivities(checked: boolean) {
+    this.onlyMyActivities = checked;
+    this.filterAssignmentsBySearch();
   }
 
   onAssignmentSearch(event: Event) {
