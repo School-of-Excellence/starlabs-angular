@@ -99,6 +99,7 @@ export class AppointmentZoomViewComponent {
         ZoomMtg.init({
           leaveUrl: this.buildMeetingEndUrl(),
           patchJsMedia: true,
+          defaultView: 'gallery',
           success: (success: any) => {
             console.log(success);
             ZoomMtg.join({
