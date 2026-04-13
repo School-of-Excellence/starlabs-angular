@@ -25,7 +25,8 @@ jobs:
           export const environment = {
             production: true,
             firebase: $FIREBASE_TEST_CONFIG,
-            watson: $WATSON_TEST_CONFIG
+            watson: $WATSON_TEST_CONFIG,
+            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3'
           };
           EOF
           
@@ -34,7 +35,8 @@ jobs:
           export const environment = {
             production: true,
             firebase: $FIREBASE_PROD_CONFIG,
-            watson: $WATSON_PROD_CONFIG
+            watson: $WATSON_PROD_CONFIG,
+            df3CdnUrl: 'https://breakthroughs.app/assets/df3'
           };
           EOF
       
