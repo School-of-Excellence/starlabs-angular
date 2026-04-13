@@ -763,6 +763,11 @@ html {
   background: #e4f5ef;
   border: 1px solid #bde8d8;
 }
+.badge.noteligible {
+  background: #fdecea;   /* light red background */
+  border: 1px solid #f5c2c0;  /* soft red border */
+  color: #b42318;        /* optional: readable red text */
+}
 
 .badge-num {
   font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
