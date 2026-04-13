@@ -1,5 +1,5 @@
 .mainscreen{
-    width: 100%;
+    /* width: 100%; */
   }
   
   .title{
@@ -33,4 +33,10 @@
   .closebtn{
     color: rgb(3, 48, 63);
     border: 1px solid rgb(3, 48, 63);
+  }
+
+  ul{
+    display: flex;
+    flex-direction: column;
+    gap : 10px;
   }

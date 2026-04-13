@@ -34,7 +34,7 @@ export class FormOptionComponent {
 
   async deleteDraft(id, index){
     if(confirm("Sure, do you want to delete this ATC")){
-      await deleteDoc(doc(collection(this.firestore,"temporary_forms"),id));
+      await deleteDoc(doc(collection(this.firestore,"big_temporary_forms"),id));
       this.draftOption.splice(index, 1);
     }
   }

@@ -22,6 +22,7 @@ import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
 
 @Component({
   selector: 'app-big-cohort-clone-2',
@@ -100,6 +101,11 @@ export class BigCohortClone2Component {
   sendSelectedCohortsWhatsapp(): void {
     if (this.selectedCohortIds.size === 0) return
     ;(this as any).sendCohortWhatsapp?.(this.mergedCohortForSelection())
+  }
+
+  sendSelectedCohortsPlaylist(): void {
+    if (this.selectedCohortIds.size === 0) return
+    ;(this as any).sendCohortRecommendedPlaylist?.(this.mergedCohortForSelection())
   }
 
   exportSelectedCohorts(): void {
@@ -1103,6 +1109,32 @@ export class BigCohortClone2Component {
     });
   };
 
+  sendCohortRecommendedPlaylist(cohorts){
+    let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
+    const selectedParticipants = selected.map((e)=>this.mapParticipantMetaData[e]);
+
+    console.log(selectedParticipants);
+    let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
+      data: {
+        participantlist: selectedParticipants,
+        // personalised : personalised
+      },
+      minWidth: "500px",
+      disableClose: true
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
+      if (result != null && result != undefined) {
+        let docid = doc(collection(this.firestore, "buffermix archive")).id
+        result['docid'] = docid
+        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
+          console.log("buffer document created");
+        }).catch(err => {
+          console.log(err);
+        })
+      }
+    });
+  }
+
   moveMenuSearchQuery: string = '';
   moveMenuFilteredCohorts: any[] = [];
   isMovingParticipant: boolean = false;
@@ -1693,19 +1725,19 @@ export class BigCohortClone2Component {
   }
 
   onEditAssignment(cohorts: any, assignment: any) {
-    console.log(this.cohortsList.map((e)=> e.marathonref.id || null));
+    console.log(this.cohortsList.map((e)=> e?.marathonref?.id || null));
     console.log(this.selectedMarathon);
     let dialogref = this.dialog.open(PlanActivityComponent, {
       data: {
         type: 'edit',
         doc: cohorts,
-        cohortslist: this.cohortsList.filter(e => this.selectedMarathon === e['marathonref'].id),
+        cohortslist: this.cohortsList.filter(e => this.selectedMarathon === e['marathonref']?.id),
         assignmentdoc: assignment,
         mapProfile: this.mapProfile,
       },
       disableClose: true,
-      width: '100%',
-      height: '100%',
+      width: '95vw',
+      height: '90vh',
       panelClass: 'full-width-dialog',
     })
     dialogref.afterClosed().subscribe((result) => {
