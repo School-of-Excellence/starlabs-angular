@@ -1711,7 +1711,7 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).reduce((sum, pid) => sum + this.getNonActiveSub(pid), 0);
     }
 
-    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible') {
+    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased') {
         this.selectedProductId = cardId;
         this.modalType = type;
 
@@ -1723,7 +1723,6 @@ export class DeliveryDashboardCloneComponent {
             case 'nextmonth': source = this.getCardGroupedNextMonth(cardId); break;
             case 'bonus': source = this.getCardGroupedBonus(cardId); break;
             case 'purchased': source = this.getCardGroupedPurchased(cardId); break;
-            case 'noteligible': source = this.getCardGroupedPurchased(cardId); break;
         }
 
         const grouped = {};
