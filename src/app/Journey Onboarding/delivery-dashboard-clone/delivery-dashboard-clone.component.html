@@ -607,13 +607,17 @@
                         <div class="detail-stage-label text-muted">
                           {{ stage }}
                         </div>
-                        <div class="">
+                        <div class="" *ngIf="appointment?.starttime">
                           <span class="detail-stage-label">Start: </span>
-                          <span class="detail-stage-label">{{ formatDateTime(c?.appointmentstart) }}</span>
+                          <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
                         </div>
-                        <div class="">
+                        <div class="" *ngIf="appointment?.endtime">
                            <span class="detail-stage-label">End: </span>
-                          <span class="detail-stage-label">{{ formatDateTime(c?.appointmentend) }}</span>
+                          <span class="detail-stage-label">{{ formatDateTime(appointment?.endtime) }}</span>
+                        </div>
+                         <div class="" *ngIf="appointment?.date">
+                          <span class="detail-stage-label">Submitted: </span>
+                          <span class="detail-stage-label">{{ formatDateTime(appointment?.date) }}</span>
                         </div>
                       </div>
                       <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">

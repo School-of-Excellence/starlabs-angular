@@ -620,6 +620,10 @@ html {
   background-color: #e6f4ea;
   color: #2e7d32;
 }
+.status-submitted {
+  color: #856404;
+  background-color: #FFF3CD;
+}
 
 .status-notscheduled {
   font-size: 10px;
