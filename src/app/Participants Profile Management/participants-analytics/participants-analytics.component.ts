@@ -508,43 +508,47 @@ export class ParticipantsAnalyticsComponent {
     })
 
     // participant products
-    const participantProductMap = {}
-    participantProductSnap.docs.forEach((productSnap) => {
-      const data = productSnap.data();
-      const profileid = data['profileid'];
-      const status = data['status'];
-      const product = data['productref'].id;
+    // const participantProductMap = {}
+    // participantProductSnap.docs.forEach((productSnap) => {
+    //   const data = productSnap.data();
+    //   const profileid = data['profileid'];
+    //   const status = data['status'];
+    //   const product = data['productref'].id;
 
-      if (![null, 'completed'].includes(status)) {
-        return
-      }
+    //   if (![null, 'completed'].includes(status)) {
+    //     return
+    //   }
 
-      if (!Object.hasOwn(participantProductMap, profileid)) {
-        participantProductMap[profileid] = {};
-      }
-      if (!Object.hasOwn(participantProductMap[profileid], product)) {
-        participantProductMap[profileid][product] = {
-          consumedCount: 0,
-          consumedDocuments: [],
-          unConsumedCount: 0,
-          unConsumedDocuments: [],
-        }
-      }
+    //   if (!Object.hasOwn(participantProductMap, profileid)) {
+    //     participantProductMap[profileid] = {};
+    //   }
+    //   if (!Object.hasOwn(participantProductMap[profileid], product)) {
+    //     participantProductMap[profileid][product] = {
+    //       consumedCount: 0,
+    //       consumedDocuments: [],
+    //       unConsumedCount: 0,
+    //       unConsumedDocuments: [],
+    //     }
+    //   }
 
-      if (status === 'completed') {
-        participantProductMap[profileid][product].consumedCount++;
-        participantProductMap[profileid][product].consumedDocuments.push(data)
-      } else if (status == null) {
-        participantProductMap[profileid][product].unConsumedCount++;
-        participantProductMap[profileid][product].unConsumedDocuments.push(data)
-      }
-    });
+    //   if (status === 'completed') {
+    //     participantProductMap[profileid][product].consumedCount++;
+    //     participantProductMap[profileid][product].consumedDocuments.push(data)
+    //   } else if (status == null) {
+    //     participantProductMap[profileid][product].unConsumedCount++;
+    //     participantProductMap[profileid][product].unConsumedDocuments.push(data)
+    //   }
+    // });
 
-    this.participantProductMap = participantProductMap;
+    // this.participantProductMap = participantProductMap;
 
     // Participant metadata
+    const participantProductMap = {}
     metadataSnap.docs.forEach(e => {
       const element = e.data();
+      const profileId = element['profileid'];
+      const consumedProducts = element['consumedproducts']|| [];
+      const unconsumedProducts = element['unconsumedproducts'] || [];
       element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
       if (![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
         for (let i = 0; i < element['profiletags'].length; i++) {
@@ -559,10 +563,34 @@ export class ParticipantsAnalyticsComponent {
       this.emailList.push(element['email'])
       this.dashboardEntireData.push(element)
 
-      if (element['name'] === 'Aishwarya Nikhil Shinde') {
-        console.log(element)
+      if (!Object.hasOwn(participantProductMap, profileId)) {
+        participantProductMap[profileId] = {};
       }
+
+      consumedProducts.forEach((p) => {
+        if (!Object.hasOwn(participantProductMap[profileId], p)) {
+          participantProductMap[profileId][p] = {
+            consumedCount: 0,
+            unConsumedCount: 0,
+          }
+        }
+
+        participantProductMap[profileId][p].consumedCount++;
+      })
+
+      unconsumedProducts.forEach((p) => {
+        if (!Object.hasOwn(participantProductMap[profileId], p)) {
+          participantProductMap[profileId][p] = {
+            consumedCount: 0,
+            unConsumedCount: 0,
+          }
+        }
+
+        participantProductMap[profileId][p].unConsumedCount++;
+      })
+
     })
+    this.participantProductMap = participantProductMap;
     this.customerSupportCategorys = Array.from(categorys.values()).filter((c: any) => ![null, undefined, ''].includes(c));
     loadingref.close();
 
@@ -1093,9 +1121,9 @@ export class ParticipantsAnalyticsComponent {
           } else {
             booleanarray.push(false)
           }
-        } 
+        }
         if (key === 'subscriptionend') {
-          const dateKey = e['customerstatus'] === 'active' ? 'subscriptionend' : ['discontinued' , 'non active'].includes(e['customerstatus'] ) ? 'lastsubscriptionend' : null;
+          const dateKey = e['customerstatus'] === 'active' ? 'subscriptionend' : ['discontinued', 'non active'].includes(e['customerstatus']) ? 'lastsubscriptionend' : null;
           if ([null, undefined, ''].includes(dateKey) || [null, undefined, ''].includes(e[dateKey])) {
             booleanarray.push(false)
           } else {
@@ -2324,10 +2352,6 @@ export class ParticipantsAnalyticsComponent {
 
     this.inputFile.nativeElement.value = '';
     reader.readAsArrayBuffer(file);
-  }
-
-  downloadSmapleImportFile() {
-
   }
 
   // checklists

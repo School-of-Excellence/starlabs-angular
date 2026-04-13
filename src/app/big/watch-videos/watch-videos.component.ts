@@ -204,12 +204,12 @@ export class WatchVideosComponent {
 
   async playVideo(video: any, index: number) {
     if (!this.canPlayVideo(index)) {
-      this.snackBar.open('Please watch the previous video first', 'Close', { duration: 3000 });
+      this.snackBar.open('Please watch the previous video first', 'Close', { duration: 3000 ,panelClass: ['custom-snackbar'] });
       return;
     }
 
     if (this.playedVideos.has(video.id)) {
-      this.snackBar.open('You have already completed this video', 'Close', { duration: 2000 });
+      this.snackBar.open('You have already completed this video', 'Close', { duration: 2000  , panelClass: ['custom-snackbar'] });
       return;
     }
 
@@ -246,7 +246,7 @@ export class WatchVideosComponent {
     overlay.style.top = '0';
     overlay.style.left = '0';
     overlay.style.width = '100%';
-    overlay.style.height = '100%';
+    overlay.style.height = '90%';
     overlay.style.zIndex = '10000';
     overlay.style.pointerEvents = 'none';
 
@@ -254,7 +254,7 @@ export class WatchVideosComponent {
     const controlBlocker = document.createElement('div');
     controlBlocker.style.position = 'absolute';
     controlBlocker.style.bottom = '0';
-    controlBlocker.style.left = '0';
+    controlBlocker.style.right = '0';
     controlBlocker.style.width = '100%';
     controlBlocker.style.height = '50px';
     controlBlocker.style.zIndex = '10001';
@@ -283,13 +283,13 @@ export class WatchVideosComponent {
     overlay.appendChild(closeButton);
     document.body.appendChild(videoElement);
     document.body.appendChild(overlay);
-    document.body.appendChild(controlBlocker);
+    // document.body.appendChild(controlBlocker);
 
     // Load saved progress
     videoElement.addEventListener('loadedmetadata', () => {
       if (savedProgress && savedProgress.currentTime && !savedProgress.completed) {
         videoElement.currentTime = savedProgress.currentTime;
-        this.snackBar.open(`Resuming from ${this.formatTime(savedProgress.currentTime)}`, 'Close', { duration: 2000 });
+        this.snackBar.open(`Resuming from ${this.formatTime(savedProgress.currentTime)}`, 'Close', { duration: 2000 , panelClass: ['custom-snackbar'] });
       }
       
       // Update lastValidTime after metadata is loaded
@@ -310,7 +310,7 @@ export class WatchVideosComponent {
       // Allow seeking backward, but not forward beyond watched point
       if (currentTime > this.activeVideoState.lastValidTime + 1) {
         videoElement.currentTime = this.activeVideoState.lastValidTime;
-        this.snackBar.open('⚠️ You cannot skip ahead. Please watch the video completely.', 'Close', { duration: 2000 });
+        this.snackBar.open('⚠️ You cannot skip ahead. Please watch the video completely.', 'Close', { duration: 2000 ,panelClass: ['custom-snackbar'] });
       } else {
         this.activeVideoState.lastValidTime = Math.max(this.activeVideoState.lastValidTime, currentTime);
       }

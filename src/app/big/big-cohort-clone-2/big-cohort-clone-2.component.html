@@ -478,6 +478,7 @@
           <button class="foot-btn whatsapp" (click)="sendCohortWhatsapp(cohorts); $event.stopPropagation()" title="WhatsApp all">
             <i class="fa-brands fa-whatsapp"></i>
           </button>
+          <button class="foot-btn" (click)="sendCohortRecommendedPlaylist(cohorts); $event.stopPropagation()" title="Recommend playlist all"><mat-icon>music_note</mat-icon></button>
           <span class="foot-spacer"></span>
           <button class="foot-btn primary" (click)="onCreateAssignment(cohorts); $event.stopPropagation()">
             <mat-icon>add</mat-icon> Activity
@@ -780,7 +781,7 @@
 
   <!-- ==================== SELECTION BAR ==================== -->
   <div class="selectbar" *ngIf="selectMode">
-    <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> cohort(s) selected</span>
+    <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
     <span class="sb-divider"></span>
     <button class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
       <mat-icon>select_all</mat-icon> All
@@ -794,6 +795,9 @@
       </button>
       <button class="sb-btn ghost wa" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
         <i class="fa-brands fa-whatsapp"></i>
+      </button>
+      <button class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()" title="recommend playlist selected cohorts">
+        <mat-icon>music_note</mat-icon> Recommend Playlist
       </button>
       <button class="sb-btn primary" (click)="exportSelectedCohorts()">
         <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})

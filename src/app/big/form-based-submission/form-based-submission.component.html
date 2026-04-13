@@ -105,7 +105,7 @@
         </div>
   
         <!-- slider -->
-        <div *ngIf="['slider'].includes(form.type)" class="mt10">
+        <!-- <div *ngIf="['slider'].includes(form.type)" class="mt10">
           <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
           <p>{{form.fielddescription}} </p>
           <span class="d-flex flex-row">
@@ -116,7 +116,7 @@
               [max]="form.options.length"
               step="1"
               tickInterval="1"
-              [formControlName]="form.formcontrol"
+              [formControlName]="form?.formcontrol"
               [required]="![null,undefined].includes(form.required) ? form.required :false"
               (change)="onSliderValueChange($event,deliveryForm.get(form.formcontrol),form.options); autoSave(this.deliveryForm.value)"
               >
@@ -130,8 +130,46 @@
             </span>
           </mat-error>
           <p *ngIf="!['',null,undefined].includes(form.fieldnotes)">Notes : {{!['',null,undefined].includes(form.fieldnotes) ? form.fieldnotes : null}}</p>
+        </div> -->
+
+        <div *ngIf="['slider'].includes(form.type)" class="mt10">
+          <span class="d-flex flex-row">
+            <h5>
+              <mat-label>{{ form.fieldname }}</mat-label>
+            </h5>
+            &nbsp;&nbsp;
+            <mat-icon style="margin-bottom: 10px; font-size: 16px;" *ngIf="form.required ?? false">
+              star
+            </mat-icon>
+          </span>
+          <p>{{ form.fielddescription }}</p>
+          <span class="d-flex flex-row">
+            <mat-label style="padding-top: 20px;">
+              {{ form.options[0] }}
+            </mat-label>
+            <mat-slider style="width:100%" min="1" [max]="form.options.length" step="1" tickInterval="1">
+              <input matSliderThumb [formControlName]="form.formcontrol" (input)="onSliderValueChange(
+                    $event,
+                    deliveryForm.get(form.formcontrol),
+                    form.options
+                  )" (change)="autoSave(deliveryForm.value)" />
+            </mat-slider>
+            <mat-label style="padding-top: 20px;">
+              {{ form.options[form.options.length - 1] }}
+            </mat-label>
+          </span>
+          <span class="d-flex justify-content-center">
+            {{ deliveryForm.get(form.formcontrol)?.value }}
+          </span>
+          <mat-error *ngIf="deliveryForm.get(form.formcontrol)?.touched">
+            <span *ngIf="deliveryForm.get(form.formcontrol)?.hasError('required')">
+              The above field is mandatory. Please check it.
+            </span>
+          </mat-error>
+          <p *ngIf="form.fieldnotes">
+            Notes : {{ form.fieldnotes }}
+          </p>
         </div>
-  
         <!-- multicheckbox -->
         <div *ngIf="['multicheckbox'].includes(form.type)" class="mt10">
           <span class="d-flex flex-row"><h5><mat-label>{{form.fieldname}}</mat-label></h5> &nbsp;&nbsp;<mat-icon style="margin-bottom: 10px;font-size: 16px;" *ngIf="![null,undefined].includes(form.required) ? form.required :false">star</mat-icon></span>
