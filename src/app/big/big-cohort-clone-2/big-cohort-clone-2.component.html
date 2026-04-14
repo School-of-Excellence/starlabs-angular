@@ -780,7 +780,38 @@
   </button>
 
   <!-- ==================== SELECTION BAR ==================== -->
+  <!-- <div class="selectbar" *ngIf="selectMode">
+    <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
+    <span class="sb-divider"></span>
+    <button class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
+      <mat-icon>select_all</mat-icon> All
+    </button>
+    <ng-container *ngIf="selectedCohortIds.size > 0">
+      <button class="sb-btn ghost" (click)="sendSelectedCohortsNotification()" title="Notify selected cohorts">
+        <mat-icon>notifications</mat-icon>
+      </button>
+      <button class="sb-btn ghost" (click)="sendSelectedCohortsEmail()" title="Email selected cohorts">
+        <mat-icon>email</mat-icon>
+      </button>
+     
+        <button class="sb-btn ghost wa" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
+          <i class="fa-brands fa-whatsapp"></i>
+        </button>
+        <button class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()" title="recommend playlist selected cohorts">
+          <mat-icon>music_note</mat-icon> Recommend Playlist
+        </button>
+        <button class="sb-btn primary" (click)="exportSelectedCohorts()">
+          <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})
+        </button>
+      
+    </ng-container>
+    <button class="sb-btn ghost" (click)="toggleSelectMode()" title="Exit select mode">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div> -->
+
   <div class="selectbar" *ngIf="selectMode">
+  <div class="sb-main-row">
     <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
     <span class="sb-divider"></span>
     <button class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
@@ -796,17 +827,22 @@
       <button class="sb-btn ghost wa" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
         <i class="fa-brands fa-whatsapp"></i>
       </button>
+    </ng-container>
+    <button class="sb-btn ghost" (click)="toggleSelectMode()" title="Exit select mode">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  <ng-container *ngIf="selectedCohortIds.size > 0">
+    <div class="sb-action-row">
       <button class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()" title="recommend playlist selected cohorts">
         <mat-icon>music_note</mat-icon> Recommend Playlist
       </button>
       <button class="sb-btn primary" (click)="exportSelectedCohorts()">
         <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})
       </button>
-    </ng-container>
-    <button class="sb-btn ghost" (click)="toggleSelectMode()" title="Exit select mode">
-      <mat-icon>close</mat-icon>
-    </button>
-  </div>
+    </div>
+  </ng-container>
+</div>
 
   <!-- ==================== PROGRESSION DIALOG ==================== -->
   <div class="dialog-scrim" *ngIf="showProgressionDialog" (click)="closeProgressionDialog()">

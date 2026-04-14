@@ -126,7 +126,6 @@ export class FormBasedSubmissionComponent {
   }
   ngOnInit(): void {
     this.initForm();
-    console.log('client form data ' , this.clientform , this.deliveryForm)
     // this.deliveryForm.valueChanges.pipe(
     //   debounceTime(1000),
     //   distinctUntilChanged()
@@ -195,7 +194,6 @@ export class FormBasedSubmissionComponent {
           }
         }
         this.showcontent = true
-          console.log('clint form : ' , this.clientform)
       } else if (![null, undefined].includes(this.route.snapshot.queryParams['patchdata']) || ![null, undefined].includes(this.participantformtemplateid)) {
         // console.log("view");
         // let formsByClientPath = ![null,undefined].includes(this.participantformtemplateid) ? this.afs.collection("bigformassignment").doc(this.participantformtemplateid.docid).ref.path : null
@@ -260,7 +258,6 @@ export class FormBasedSubmissionComponent {
           }
           //formpatch ended
           this.showcontent = true
-          console.log('clint form : ' , this.clientform)
         })
       }//patch value if condition
     }).then(() => {

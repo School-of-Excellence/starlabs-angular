@@ -960,9 +960,7 @@ export class BigCohortClone2Component {
     window.open(window.location.origin + '/group-chat');
   }
 
-  sendCohortNotification(cohorts){
-    console.log(cohorts);
-    
+  sendCohortNotification(cohorts){    
     let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
     const selectedParticipants = selected.map((e)=>this.mapParticipantMetaData[e])
     let dialogRef = this.dialog.open(AhNotificationComponent,{
@@ -1113,7 +1111,6 @@ export class BigCohortClone2Component {
     let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
     const selectedParticipants = selected.map((e)=>this.mapParticipantMetaData[e]);
 
-    console.log(selectedParticipants);
     let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
       data: {
         participantlist: selectedParticipants,

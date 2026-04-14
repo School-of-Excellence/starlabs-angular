@@ -61,7 +61,7 @@ export class WatchVideosComponent {
   ) {
     console.log(this.data);
     // console.log(localStorage.clear());
-    
+
     this.activityId = this.data.activity.id;
     this.assignmentId = this.data.activity.participantAssignmentId;
   }
@@ -98,16 +98,16 @@ export class WatchVideosComponent {
   // Load progress for all videos
   private loadAllProgress() {
     this.playedVideos.clear();
-    
+
     for (const video of this.videos) {
       const progress = this.getVideoProgress(video.id);
       if (progress && progress.completed === true) {
         this.playedVideos.add(video.id);
       }
     }
-    
+
     this.allCompleted = this.playedVideos.size === this.videos.length;
-    
+
     console.log('Loaded all progress:', {
       playedVideos: Array.from(this.playedVideos),
       totalVideos: this.videos.length,
@@ -120,13 +120,13 @@ export class WatchVideosComponent {
     try {
       const storageKey = this.getVideoStorageKey(videoId);
       const existingProgress = this.getVideoProgress(videoId);
-      
+
       // Calculate watched duration - take the maximum of what was previously watched
       // and the current time to handle seeking backward
-      const watchedDuration = completed 
-        ? duration 
+      const watchedDuration = completed
+        ? duration
         : Math.max(existingProgress?.watchedDuration || 0, currentTime);
-      
+
       const progress: VideoProgress = {
         videoId,
         currentTime,
@@ -139,7 +139,7 @@ export class WatchVideosComponent {
       };
 
       localStorage.setItem(storageKey, JSON.stringify(progress));
-      
+
       console.log(`Saved progress for video ${videoId}:`, {
         currentTime: Math.round(currentTime),
         duration: Math.round(duration),
@@ -157,7 +157,7 @@ export class WatchVideosComponent {
     try {
       const storageKey = this.getVideoStorageKey(videoId);
       const stored = localStorage.getItem(storageKey);
-      
+
       if (stored) {
         const progress = JSON.parse(stored) as VideoProgress;
         // Validate that the progress belongs to this activity
@@ -174,25 +174,25 @@ export class WatchVideosComponent {
   // Get progress percentage for a specific video
   getVideoProgressPercentage(videoId: string): number {
     const progress = this.getVideoProgress(videoId);
-    
+
     if (!progress || !progress.duration || progress.duration === 0) {
       return 0;
     }
-    
+
     if (progress.completed === true) {
       return 100;
     }
-    
+
     const percentage = Math.min(100, (progress.watchedDuration / progress.duration) * 100);
     return Math.round(percentage);
   }
 
   isVideoWatched(index: number): boolean {
     if (index < 0 || index >= this.videos.length) return false;
-    
+
     const videoId = this.videos[index]?.id;
     const progress = this.getVideoProgress(videoId);
-    
+
     return this.playedVideos.has(videoId) && progress?.completed === true;
   }
 
@@ -204,17 +204,18 @@ export class WatchVideosComponent {
 
   async playVideo(video: any, index: number) {
     if (!this.canPlayVideo(index)) {
-      this.snackBar.open('Please watch the previous video first', 'Close', { duration: 3000 ,panelClass: ['custom-snackbar'] });
+      this.snackBar.open('Please watch the previous video first', 'Close', { duration: 3000, panelClass: ['custom-snackbar'] });
       return;
     }
 
     if (this.playedVideos.has(video.id)) {
-      this.snackBar.open('You have already completed this video', 'Close', { duration: 2000  , panelClass: ['custom-snackbar'] });
+      this.snackBar.open('You have already completed this video', 'Close', { duration: 2000, panelClass: ['custom-snackbar'] });
       return;
     }
 
     // Clean up any existing video
     this.cleanupVideo();
+    let maxAllowedPx = 0;
 
     this.currentPlayingIndex = index;
     const savedProgress = this.getVideoProgress(video.id);
@@ -237,7 +238,7 @@ export class WatchVideosComponent {
     this.activeVideoState = {
       videoId: video.id,
       lastValidTime: savedProgress?.currentTime || 0,
-      element: videoElement
+      element: videoElement,
     };
 
     // Create overlay
@@ -255,10 +256,11 @@ export class WatchVideosComponent {
     controlBlocker.style.position = 'absolute';
     controlBlocker.style.bottom = '0';
     controlBlocker.style.right = '0';
-    controlBlocker.style.width = '100%';
+    controlBlocker.style.width = '98%';
     controlBlocker.style.height = '50px';
     controlBlocker.style.zIndex = '10001';
     controlBlocker.style.cursor = 'not-allowed';
+    controlBlocker.style.transition = 'width 0.1s linear';
 
     // Add close button
     const closeButton = document.createElement('button');
@@ -283,15 +285,15 @@ export class WatchVideosComponent {
     overlay.appendChild(closeButton);
     document.body.appendChild(videoElement);
     document.body.appendChild(overlay);
-    // document.body.appendChild(controlBlocker);
+    document.body.appendChild(controlBlocker);
 
     // Load saved progress
     videoElement.addEventListener('loadedmetadata', () => {
       if (savedProgress && savedProgress.currentTime && !savedProgress.completed) {
         videoElement.currentTime = savedProgress.currentTime;
-        this.snackBar.open(`Resuming from ${this.formatTime(savedProgress.currentTime)}`, 'Close', { duration: 2000 , panelClass: ['custom-snackbar'] });
+        this.snackBar.open(`Resuming from ${this.formatTime(savedProgress.currentTime)}`, 'Close', { duration: 2000, panelClass: ['custom-snackbar'] });
       }
-      
+
       // Update lastValidTime after metadata is loaded
       if (this.activeVideoState && this.activeVideoState.videoId === video.id) {
         this.activeVideoState.lastValidTime = savedProgress?.currentTime || 0;
@@ -306,11 +308,23 @@ export class WatchVideosComponent {
       }
 
       const currentTime = videoElement.currentTime;
-      
+      const duration = videoElement.duration;
+
+      const rect = videoElement.getBoundingClientRect();
+      const width = rect.width;
+
+      const progressPx = (videoElement.currentTime / videoElement.duration) * width;
+
+      maxAllowedPx = Math.max(maxAllowedPx, progressPx);
+
+      const remainingPx = width - maxAllowedPx;
+
+      controlBlocker.style.width = `${remainingPx}px`;
+
       // Allow seeking backward, but not forward beyond watched point
       if (currentTime > this.activeVideoState.lastValidTime + 1) {
         videoElement.currentTime = this.activeVideoState.lastValidTime;
-        this.snackBar.open('⚠️ You cannot skip ahead. Please watch the video completely.', 'Close', { duration: 2000 ,panelClass: ['custom-snackbar'] });
+        this.snackBar.open('⚠️ You cannot skip ahead. Please watch the video completely.', 'Close', { duration: 2000, panelClass: ['custom-snackbar'] });
       } else {
         this.activeVideoState.lastValidTime = Math.max(this.activeVideoState.lastValidTime, currentTime);
       }
@@ -318,13 +332,13 @@ export class WatchVideosComponent {
 
     // Save progress periodically - only for this specific video
     this.progressInterval = setInterval(() => {
-      if (this.activeVideoState && 
-          this.activeVideoState.videoId === video.id && 
-          this.currentPlayingIndex === index) {
-        
+      if (this.activeVideoState &&
+        this.activeVideoState.videoId === video.id &&
+        this.currentPlayingIndex === index) {
+
         const currentTime = videoElement.currentTime;
         const duration = videoElement.duration;
-        
+
         if (!isNaN(currentTime) && !isNaN(duration) && duration > 0) {
           this.saveVideoProgress(video.id, currentTime, duration, false);
           this.cdr.detectChanges();
@@ -334,7 +348,7 @@ export class WatchVideosComponent {
 
     // Play video - handle the promise properly
     const playPromise = videoElement.play();
-    
+
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
@@ -370,9 +384,9 @@ export class WatchVideosComponent {
     if (this.activeVideoState && this.currentPlayingIndex !== -1) {
       const videoElement = this.activeVideoState.element;
       this.saveVideoProgress(
-        this.activeVideoState.videoId, 
-        videoElement.currentTime, 
-        videoElement.duration, 
+        this.activeVideoState.videoId,
+        videoElement.currentTime,
+        videoElement.duration,
         false
       );
     }
@@ -404,7 +418,7 @@ export class WatchVideosComponent {
       this.saveVideoProgress(videoId, duration, duration, true);
       this.playedVideos.add(videoId);
       this.allCompleted = this.playedVideos.size === this.videos.length;
-      
+
       const video = this.videos.find(v => v.id === videoId);
       console.log('Video marked as complete:', {
         videoId: videoId,
@@ -412,7 +426,7 @@ export class WatchVideosComponent {
         playedVideos: Array.from(this.playedVideos),
         allCompleted: this.allCompleted
       });
-      
+
       this.snackBar.open(`✓ "${video?.title || 'Video'}" completed`, 'Close', { duration: 2000 });
 
       if (this.allCompleted) {
@@ -442,12 +456,12 @@ export class WatchVideosComponent {
 
     if (this.activeVideoState) {
       const videoElement = this.activeVideoState.element;
-      
+
       if (videoElement && document.body.contains(videoElement)) {
         videoElement.pause();
         document.body.removeChild(videoElement);
       }
-      
+
       this.activeVideoState = null;
     }
 
@@ -491,25 +505,25 @@ export class WatchVideosComponent {
   closeDialog() {
     const completedCount = this.playedVideos.size;
     const totalVideos = this.videos.length;
-    
+
     console.log('Close dialog check:', {
       completedCount,
       totalVideos,
       allCompleted: this.allCompleted,
       playedVideos: Array.from(this.playedVideos)
     });
-    
+
     if (completedCount > 0 && completedCount < totalVideos) {
       const confirmClose = confirm(`You have completed ${completedCount} out of ${totalVideos} videos. Your progress will be saved. Are you sure you want to close?`);
       if (!confirmClose) return;
     }
-    
-    this.cleanupVideo();
+
+    this.cleanupVideo()
     this.dialogRef.close({ completed: this.allCompleted });
   }
 
   async updateAssignmentStatus(status) {
-    
+
     updateDoc(doc(this.firestore, "big participants assignments", this.assignmentId), {
       status: status,
     }).then(() => {
