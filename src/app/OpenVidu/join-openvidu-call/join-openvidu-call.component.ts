@@ -21,6 +21,7 @@ import { MatDividerModule } from '@angular/material/divider';
 // Replaces Amazon Voice Focus as the active filter. VoiceFocus import + service kept intact below
 // so it can be re-enabled by swapping the method body back.
 import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
+import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -97,7 +98,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public dialog: MatDialog,
     private infraService: InstanceStatusService,
     // private audiofilterservice : DeepAudioFilterService, // kept — not removed, used in debugAudioLevels()
-    private deepFilter3: DeepFilter3Service              // [DF3] active noise cancellation filter
+    private deepFilter3: DeepFilter3Service,              // [DF3] active noise cancellation filter
+    private adaptiveQuality: AdaptiveQualityService
   ){}
 
   ngAfterViewInit(): void {
@@ -154,6 +156,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.adaptiveQuality.stopMonitoring();
     this.canvasPipelineCleanup?.();
     this.canvasPipelineCleanup = null;
     this.leaveRoom(false)
@@ -162,390 +165,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.roomSubscription?.complete()
   }
 
-  // async prepareParticipant() {
-  //   this.isRequesting = true;
-  //   this.meetingRoomStatus = null
-
-  //   try {
-  //     // Try to request permission
-  //     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-  //     // Stop immediately to just preview
-  //     // stream.getTracks().forEach(t => t.stop());
-
-  //     // Create temporary LocalVideoTrack for preview
-  //     const videoTrack = new LocalVideoTrack(stream.getVideoTracks()[0]);
-  //     this.localParticipant.set(videoTrack);
-
-  //     this.cameraStatus = 'granted';
-  //     this.micStatus = 'granted';
-  //     this.isRequesting = false;
-  //     return true;
-  //   } catch (err: any) {
-  //     console.error("Permission error:", err);
-
-  //     const isHardBlock = err.name === 'NotAllowedError' && err.message?.includes("Permission dismissed") === false;
-
-  //     if (isHardBlock) {
-  //       // HARD BLOCK → Chrome/Safari won’t prompt again
-  //       this.cameraStatus = 'denied';
-  //       this.micStatus = 'denied';
-
-  //       this.isRequesting = false;
-  //       return false;
-  //     }
-
-  //     // SOFT BLOCK or dismissed popup
-  //     this.cameraStatus = 'prompt';
-  //     this.micStatus = 'prompt';
-  //     this.isRequesting = false;
-  //     return false;
-  //   }
-  // }
-
-  // async joinCall() {
-  //   const allowed = await this.prepareParticipant();
-  //   if (!allowed) {
-  //     alert("Please allow Camera & Microphone to join the call.");
-  //     return;
-  //   }
-
-  //   this.meetingRoomStatus = "connecting"
-
-  //   // Create a new Room instance for this participant
-  //   const room = new Room();
-  //   this.room.set(room);
-
-  //   // Handle incoming remote tracks
-  //   room.on(
-  //     RoomEvent.TrackSubscribed, 
-  //     (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-  //       this.remoteParticipants.update((value) => {
-  //         value.set(publication.trackSid, {
-  //           trackPublication: publication,
-  //           participantIdentity: participant.identity,
-  //           participantName: participant.name ?? participant.identity
-  //         })
-  //         return value
-  //       });
-  //       console.log('Tracked', this.remoteParticipants());
-  //     }
-  //   );
-
-  //   // Handle remote track removal
-  //   room.on(
-  //     RoomEvent.TrackUnsubscribed, 
-  //     (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-  //       this.remoteParticipants.update((value) => {
-  //         value.delete(publication.trackSid)
-  //         return value
-  //       });
-
-  //       console.log('UnTracked', this.remoteParticipants());
-  //     }
-  //   );
-
-  //   // Handle Quality Change
-  //   room.on(
-  //     RoomEvent.ConnectionQualityChanged, 
-  //     (quality: ConnectionQuality, participant: Participant) => {
-  //     console.log("Network quality changed:", participant.identity, quality);
-  //     this.remoteParticipantsQuality.update((value) =>{
-  //       value.set(participant.identity, quality)
-  //       return value
-  //     })
-  //   });
-
-  //   // Track Muted Participants
-  //   room.on(RoomEvent.TrackMuted, (publication: RemoteTrackPublication, participant: Participant) => {
-  //     if (publication.kind === Track.Kind.Audio) {
-  //       this.remoteParticipantsMute.update((value) => {
-  //         value.set(participant.identity, true);
-  //         return value;
-  //       });
-  //       console.log('Audio muted:', participant.identity, this.remoteParticipantsMute().get(participant.identity));
-  //     }
-  //   });
-  //   // Track unMuted Participants
-  //   room.on(RoomEvent.TrackUnmuted, (publication: RemoteTrackPublication, participant: Participant) => {
-  //     if (publication.kind === Track.Kind.Audio) {
-  //       this.remoteParticipantsMute.update((value) => {
-  //         value.delete(participant.identity);
-  //         return value;
-  //       });
-  //       console.log('Audio unmuted:', participant.identity, this.remoteParticipantsMute().get(participant.identity));
-  //     }
-  //   });
-
-  //   // Track Active Speakers
-  //   room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
-  //     var speakerID = speakers.map(e => e.identity)
-
-  //     console.log("Active Speakers:", speakerID);
-  //     this.activeSpeakers = speakerID
-  //   });
-
-  //   try {
-  //     // Request a new token
-  //     const response = await this.getToken();
-  //     console.log('Token received:', response);
-
-  //     // Connect to the LiveKit room
-  //     // await ensures we wait until initial signaling is done
-  //     await room.connect(response.url, response.token);
-  //     this.meetingRoomStatus = "connected"
-  //     console.log('Room connected:', this.loggedinProfileid);
-
-  //     // Enable camera 
-  //     await room.localParticipant.setCameraEnabled(true);
-  //     // Set local video track
-  //     const videoTrack = room.localParticipant.videoTrackPublications.values().next().value?.videoTrack;
-  //     this.localParticipant.set(videoTrack);
-
-  //     // Enable Microphone
-  //     await room.localParticipant.setMicrophoneEnabled(true, {
-  //       noiseSuppression: true,
-  //       echoCancellation: true,
-  //       voiceIsolation: true
-  //     });
-
-  //     // Enable camera and microphone for publishing - Default
-  //     /*
-  //     await room.localParticipant.enableCameraAndMicrophone();
-  //     this.localParticipant.set(room.localParticipant.videoTrackPublications.values().next().value?.videoTrack); // Set Local Participant Video Track
-  //     */
-
-  //     // RNNoise Attempt
-  //     /*
-  //     try {
-  //       // Get noise-suppressed audio track
-  //       const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack();
-  //       // Publish clean audio to LiveKit
-  //       await room.localParticipant.publishTrack(cleanAudioTrack);
-
-  //       console.log("Rnnoise successfull")
-  //     } catch (audioCatch) { 
-  //       console.log("Audio Catch", audioCatch) 
-  //       console.log("Default Audio successfull")
-  //     }
-  //     */
-  //   } catch (error: any) {
-  //     // Handle connection errors gracefully
-  //     console.log(error)
-  //     console.log('There was an error connecting to the room:', error?.error?.errorMessage || error?.message || error);
-  //     this.leaveRoom(false);
-  //   }
-  // }
-
-  // // Get LiveKit Token
-  // async getToken() {
-  //   const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`;
-
-  //   // var randomID = Math.random().toString(36).substr(2, 9); // TODO: Remove ID
-    
-  //   const roomName = this.roomDetail.roomId
-  //   const participantName = this.loggedinProfileRole["name"] // + " - " + randomID
-  //   const participantId = this.loggedinProfileid // + " - " + randomID
-
-  //   const response = await lastValueFrom(
-  //     this.httpClient.post<{url: string, token: string }>(url, { roomName, participantName, participantId })
-  //   );
-
-  //   return response;
-  // }
-
-  // // Leave/Disconnect from the Room
-  // async leaveRoom(confirmLeave: boolean) {
-
-  //   var confirmed = confirmLeave ? confirm("Sure, do you want leave this meeting?") : true
-
-  //   if(!confirmed) return
-
-  //   // Leave the room by calling 'disconnect' method over the Room object
-  //   await this.room()?.disconnect();
-  //   this.room()?.removeAllListeners();
-
-  //   // Reset all variables
-  //   this.room.set(undefined);
-  //   this.localParticipant.set(undefined);
-  //   this.remoteParticipants.set(new Map());
-  //   this.remoteParticipantsQuality.set(new Map());
-  //   this.remoteParticipantsMute.set(new Map());
-  //   this.activeSpeakers = [];
-  //   this.meetingRoomStatus = "left"
-  // }
-
-  // // Close the Room and disconnect everyone
-  // async endCall(){
-  //   if(confirm("Sure, do you want to close this meeting for all?")){
-  //     var progress = this.dialog.open(LoadingProgressComponent, {data:{msg: "Ending Call..."},disableClose:true})
-  //     try {
-  //       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduCloseRoom`;
-  //       const response = await lastValueFrom(
-  //         this.httpClient.post(url, {
-  //           roomName: this.roomDetail["roomId"]
-  //         })
-  //       );
-
-  //       console.log(response);
-  //     } catch (error) {
-  //       console.log(error)
-  //     }
-  //     this.leaveRoom(false);
-  //     progress.close()
-  //   }
-  // }
-
-  // // Check Remote Audio
-  // isRemoteAudioMuted(participantIdentity: string): boolean {
-  //   return this.remoteParticipantsMute().get(participantIdentity) ?? false;
-  // }
-
-  // // Audio Control
-  // isAudioMuted():boolean{
-  //   return this.room()?.localParticipant.getTrackPublication(Track.Source.Microphone)?.isMuted ?? true
-  // }
-
-  // toggleMute(){
-  //   var value = this.isAudioMuted()
-  //   if(value){
-  //     this.room()?.localParticipant.getTrackPublication(Track.Source.Microphone).unmute()
-  //   }
-  //   else{
-  //     this.room()?.localParticipant.getTrackPublication(Track.Source.Microphone).mute()
-  //   }
-  // }
-
-  // // Video Control
-  // isVideoHidden():boolean{
-  //   return this.room()?.localParticipant.getTrackPublication(Track.Source.Camera)?.isMuted ?? true
-  // }
-
-  // toggleCamera(){
-  //   var value = this.isVideoHidden()
-  //   if(value){
-  //     this.room()?.localParticipant.getTrackPublication(Track.Source.Camera).unmute()
-  //   }
-  //   else{
-  //     this.room()?.localParticipant.getTrackPublication(Track.Source.Camera).mute()
-  //   }
-  // }
-
-  // // Screen Share Control
-  // async toggleScreenShare() {
-  //   if (!this.isSharing) {
-  //     await this.startScreenShare();
-  //   } else {
-  //     this.stopScreenShare();
-  //   }
-  //   this.isSharing = !this.isSharing;
-  // }
-
-  // async startScreenShare() {
-  //   const screenTracks = await createLocalScreenTracks({
-  //     audio: false,
-  //     resolution: { width: 1920, height: 1080 }
-  //   });
-
-  //   for (const track of screenTracks) {
-  //     await this.room()?.localParticipant.publishTrack(track);
-  //   }
-
-  //   console.log("Screen sharing started");
-  // }
-
-  // stopScreenShare() {
-  //   const pub = this.room()?.localParticipant.getTrackPublication(Track.Source.ScreenShare);
-  //   if (pub) {
-  //     this.room()?.localParticipant.unpublishTrack(pub.track!);
-  //     pub.track?.stop();
-  //     console.log("Screen sharing stopped");
-  //   }
-  // }
-
-  // // Recording Control
-  // toggleRecording(){
-  //   if(this.roomDetail.recordingstatus != "started"){
-  //     this.startRecording()
-  //   }
-  //   else{
-  //     this.stopRecording()
-  //   }
-  // }
-
-  // async startRecording(){
-  //   console.log("Recording started");
-  //   this.roomDetail.recordingstatus = "starting";
-  //   try {
-  //     var roomId = this.roomDetail["roomId"]
-  //     const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStartRecording`;
-  //     const response = await lastValueFrom(
-  //       this.httpClient.post(url, { roomId })
-  //     );
-  //     console.log(response)
-  //   } catch (error) {
-  //     console.log(error)
-  //     this.roomDetail.recordingstatus = null;
-  //   }
-  // }
-
-  // async stopRecording(){
-  //   console.log("Recording stopped");
-  //   var existingStatus = this.roomDetail.recordingstatus
-  //   try {
-  //     this.roomDetail.recordingstatus = "ending";
-  //     var egressId = this.roomDetail["egressId"]
-  //     if(egressId){
-  //       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStopRecording`;
-  //       const response = await lastValueFrom(
-  //         this.httpClient.post(url, { egressId: egressId, roomId: this.roomDetail.roomId })
-  //       );
-  //       console.log(response)
-  //     }
-  //     else{
-  //       console.log("No Egress ID Found")
-  //       this.roomDetail.recordingstatus = existingStatus;
-  //     }
-  //   } catch (error) { 
-  //     console.log(error)
-  //     this.roomDetail.recordingstatus = existingStatus;
-  //   }
-  // }
-
-  // @HostListener('document:fullscreenchange')
-  // onFullscreenChange() {
-  //   this.isFullscreen = !!document.fullscreenElement;
-  // }
-
-  // toggleFullscreen() {
-  //   const elem = this.meetingContainer.nativeElement;
-
-  //   if (!document.fullscreenElement) {
-  //     elem.requestFullscreen();
-  //     this.isFullscreen = true;
-  //   } else {
-  //     document.exitFullscreen();
-  //     this.isFullscreen = false;
-  //   }
-  // }
-
-  // // Take reference snapshot
-  // takeSnapshot() {
-  //   console.log("Snapshot taken");
-  //   // Implement your snapshot logic here
-  // }
-
-  // returnRemoteParticipantTrack() : TrackInfo[]{
-  //   return Array.from(this.remoteParticipants().values())
-  // }
-
-  // getVideoParticipantCount(): number {
-  //   // Count local participant (always has video) + remote video participants
-  //   const remoteVideoCount = this.returnRemoteParticipantTrack().filter(
-  //     remote => remote.trackPublication.kind === 'video'
-  //   ).length;
-  //   return 1 + remoteVideoCount;
-  // }
+  
 
   isHost(): boolean {
     if (!this.roomDetail || !this.loggedinProfileid) return false;
@@ -625,29 +245,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     this.meetingRoomStatus = "connecting"
 
-    // Create a new Room instance for this participant
-    const room = new Room({
-      // adaptiveStream — automatically reduces video quality for receivers
-      // who are CPU or bandwidth constrained. Prevents their side from freezing.
-      adaptiveStream: true,
+    // Detect device capabilities and pick the best starting quality tier
+    const initialTier = this.adaptiveQuality.detectInitialQuality();
 
-      // dynacast — pauses video layers that no subscriber is actively watching.
-      // Saves encoder CPU when other participants minimise or stop viewing your video.
-      dynacast: true,
-
-      // publishDefaults — simulcast publishes 3 quality layers (180p, 360p, 720p).
-      // If the 720p layer stutters under CPU load, viewers automatically receive
-      // 360p or 180p. The call never fully freezes — always a layer available.
-      publishDefaults: {
-        videoCodec: 'vp8',        // VP8 uses ~40% less CPU than H.264 on the SFU (no hardware decode needed)
-        simulcast: true,
-        videoSimulcastLayers: [VideoPresets.h90, VideoPresets.h180],
-        videoEncoding: {
-          maxBitrate: 600_000,    // 600 Kbps — sufficient for 480p main layer
-          maxFramerate: 20,       // 20fps — smooth enough for talking heads, saves ~35% encode CPU vs 30fps
-        },
-      },
-    });
+    // Create a new Room instance with adaptive quality config
+    const room = new Room(this.adaptiveQuality.getRoomConfig(initialTier));
     this.room.set(room);
 
     // Handle incoming remote tracks
@@ -751,27 +353,22 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
 
-      // Enable camera — capped at 480p 20fps.
-      // 480p 20fps uses ~50% less encode CPU than 720p 24fps while still looking
-      // sharp in typical grid layouts. DF3 WASM gets ample headroom on the main thread.
-      await room.localParticipant.setCameraEnabled(true, {
-        resolution: { width: 640, height: 480, frameRate: 20 }
-      });
+      // Enable camera at the adaptive tier's resolution
+      const cameraConstraints = this.adaptiveQuality.getCameraConstraints(initialTier);
+      await room.localParticipant.setCameraEnabled(true, cameraConstraints);
 
       const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
       this.localParticipant.set(videoTrack);
 
       // ── Raw track constraint enforcement ─────────────────────────────────
-      // Some browsers (mobile Chrome, older Samsung Internet) negotiate higher
-      // resolution than requested via getUserMedia. applyConstraints() forces
-      // the camera hardware to comply AFTER the track is live.
+      const tierCfg = cameraConstraints.resolution;
       const rawMediaTrack = videoTrack?.mediaStreamTrack;
       if (rawMediaTrack) {
         try {
           await rawMediaTrack.applyConstraints({
-            width:     { ideal: 640, max: 640 },
-            height:    { ideal: 480, max: 480 },
-            frameRate: { ideal: 20,  max: 20 },
+            width:     { ideal: tierCfg.width, max: tierCfg.width },
+            height:    { ideal: tierCfg.height, max: tierCfg.height },
+            frameRate: { ideal: tierCfg.frameRate, max: tierCfg.frameRate },
           });
           const settings = rawMediaTrack.getSettings();
           console.log(`Camera constrained: ${settings.width}x${settings.height}@${settings.frameRate}fps`);
@@ -780,8 +377,16 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         }
       }
 
-      // Apply default blur (Mid 60%) as soon as camera is ready
-      await this.applyBlur('mid');
+      // Apply blur based on tier — skip on low-end devices to save CPU
+      if (initialTier === 'low' || initialTier === 'minimal') {
+        console.log('⚡ Skipping blur (low-end device)');
+      } else {
+        // 'mid' blur for both medium and high/ultra tiers (blurRadius 6)
+        await this.applyBlur('mid');
+      }
+
+      // Start adaptive quality monitoring
+      this.adaptiveQuality.startMonitoring(room);
 
       // ── OffscreenCanvas pipeline (optional) ────────────────────────────────
       // Enforces exact 20fps draw rate independent of camera hardware.
