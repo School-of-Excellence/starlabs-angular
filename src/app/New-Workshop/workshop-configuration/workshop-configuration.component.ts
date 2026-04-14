@@ -23,7 +23,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
-import { COMMA, ENTER } from '@angular/cdk/keycodes';
+import { A, COMMA, ENTER } from '@angular/cdk/keycodes';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
@@ -642,9 +642,24 @@ async ngOnInit() {
     this.previousValue = [...(newValue || [])];
   });
 
-  // Initialize previous value
   this.previousValue = [...(this.settingsForm.get('categoriesforthisworkshop')?.value || [])];
 
+  this.settingsForm.get('evergreenWorkshop')?.valueChanges.subscribe(value => {
+    const meta = this.settingsForm.get('evergreenWorkshopMeta') as FormGroup;
+    if (value) {
+      meta.get('workshopDays')?.enable();
+      meta.get('workshopDays')?.setValidators([Validators.required, Validators.min(1)]);
+      meta.get('lastChallengeMessage')?.enable();
+      this.getDailyCommunicationArray().controls.forEach(c => c.enable());
+    } else {
+      meta.get('workshopDays')?.disable();
+      meta.get('workshopDays')?.clearValidators();
+      meta.get('lastChallengeMessage')?.disable();
+      this.getDailyCommunicationArray().controls.forEach(c => c.disable());
+    }
+    meta.get('workshopDays')?.updateValueAndValidity();
+    meta.get('lastChallengeMessage')?.updateValueAndValidity();
+  });
 
   this.settingsForm.get('cohortcategoriesforthisworkshop')?.valueChanges.subscribe((newValue: string[]) => {
     if (this.previousValueCohorts && this.previousValueCohorts.length > 0) {
@@ -678,6 +693,23 @@ async ngOnInit() {
       this.loadWorkshopData();
       this.loadIconData()
       this.getWorkshopCategories()
+    }
+  }
+  getDailyCommunicationArray(): FormArray{
+    return this.settingsForm.get('evergreenWorkshopMeta.dailyCommunication') as FormArray;
+  }
+  addDailyCommunication(): void{
+    const isEnabled = this.settingsForm.get('evergreenWorkshop')?.value;
+    this.getDailyCommunicationArray().push(
+      this.fb.control({
+        value:'', disabled:!isEnabled
+      })
+    )
+  }
+  removeDailyCommunication(index: number):void{
+    const arr = this.getDailyCommunicationArray();
+    if (arr.length > 1) {
+      arr.removeAt(index);
     }
   }
   async getWorkshopCategories() {
@@ -818,6 +850,14 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       enableshare: [false],
       triggerFunction:[false],
       activeparticipants: [false],
+      evergreenWorkshop:[false],
+      evergreenWorkshopMeta: this.fb.group({
+        workshopDays: [{ value: null, disabled: true }, [Validators.min(1)]],
+        lastChallengeMessage: [{ value: '', disabled: true }],
+        dailyCommunication: this.fb.array([
+          this.fb.control({value:'',disabled:true})
+        ])
+      }),
       newusersonly:[false],
       journeybased: [false],
       tierbased:[false],
@@ -1895,11 +1935,16 @@ private rebuildActivityIds(): void {
       this.settingsForm.patchValue({
         active: data['active'] || false,
         qanda: data['qanda'] || false,
-        breakdown : data['breakdown'] || false,
+        breakdown: data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
         triggerFunction: data['triggerFunction'] || false,
-        activeparticipants : data['activeparticipants'] || false,
-        newusersonly : data['newusersonly'] || false,
+        activeparticipants: data['activeparticipants'] || false,
+        evergreenWorkshop: data['evergreenWorkshop'] || false,
+        evergreenWorkshopMeta: {
+          workshopDays: data['evergreenWorkshopMeta']?.workshopDays ?? null,
+          lastChallengeMessage: data['evergreenWorkshopMeta']?.lastChallengeMessage ?? '',
+        },
+        newusersonly: data['newusersonly'] || false,
         journeybased: data['journeybased'] || false,
         tierbased: data['tierbased'] || false,
         categorybased: data['categorybased'] || false,
@@ -1907,25 +1952,87 @@ private rebuildActivityIds(): void {
         facilitator: data['facilitator'] || false,
         testusers: data['testusers'] || [],
         facilitatorprofiles: data['facilitatorprofiles'] || [],
-        selectedgroup : data['selectedgroup'] || null,
+        selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
-        mailTemplate :data['mailTemplate'] || null,
-        selectedjourneys:data['selectedjourneys'] || [],
-        selectedtiers:data['selectedtiers'] || [],
-        categoriesforthisworkshop:data['categoriesforthisworkshop'] || [],
-        cohortcategoriesforthisworkshop:data['cohortcategoriesforthisworkshop'] || [],
-        cohortsforthisworkshop:data['cohortsforthisworkshop'] || [],
-        categorythumbnail : data['categorythumbnail'] || '',
-        categoryVideo : data['categoryVideo'] || '',
+        mailTemplate: data['mailTemplate'] || null,
+        selectedjourneys: data['selectedjourneys'] || [],
+        selectedtiers: data['selectedtiers'] || [],
+        categoriesforthisworkshop: data['categoriesforthisworkshop'] || [],
+        cohortcategoriesforthisworkshop: data['cohortcategoriesforthisworkshop'] || [],
+        cohortsforthisworkshop: data['cohortsforthisworkshop'] || [],
+        categorythumbnail: data['categorythumbnail'] || '',
+        categoryVideo: data['categoryVideo'] || '',
         hero: data['hero'] || false,
         heroHeading: data['heroHeading'] || '',
         heroDescription: data['heroDescription'] || '',
         heroshowtype: data['heroshowtype'] || '',
         heroImage: data['heroImage'] || '',
-        heroVideo:  data['heroVideo'] || '',
+        heroVideo: data['heroVideo'] || '',
       });
+      const isEvergreenEnabled = !!data['evergreenWorkshop'];
+      const dailyComms: string[] = data['evergreenWorkshopMeta']?.dailyCommunication?.length
+        ? data['evergreenWorkshopMeta'].dailyCommunication
+        : [''];
+      const dailyArray = this.getDailyCommunicationArray();
+      dailyArray.clear();
+      dailyComms.forEach(msg => {
+        dailyArray.push(this.fb.control({ value: msg, disabled: !isEvergreenEnabled }));
+      });
+
+      if (isEvergreenEnabled) {
+        const meta = this.settingsForm.get('evergreenWorkshopMeta') as FormGroup;
+        meta.get('workshopDays')?.enable();
+        meta.get('lastChallengeMessage')?.enable();
+        dailyArray.controls.forEach(c => c.enable());
+      }
     }
   }
+  // patchSettingsData(data: WorkshopConfig): void {
+  //   if (data && typeof data === 'object') {
+  //     this.settingsForm.patchValue({
+  //       active: data['active'] || false,
+  //       qanda: data['qanda'] || false,
+  //       breakdown : data['breakdown'] || false,
+  //       enableshare: data['enableshare'] || false,
+  //       triggerFunction: data['triggerFunction'] || false,
+  //       activeparticipants : data['activeparticipants'] || false,
+  //       evergreenWorkshop : data['evergreenWorkshop'] || false, 
+  //       evergreenWorkshopMeta: {
+  //         workshopDays: data['evergreenWorkshopMeta']?.workshopDays ?? null,
+  //         lastChallengeMessage: data['evergreenWorkshopMeta']?.lastChallengeMessage ?? '',
+  //       },
+  //       newusersonly : data['newusersonly'] || false,
+  //       journeybased: data['journeybased'] || false,
+  //       tierbased: data['tierbased'] || false,
+  //       categorybased: data['categorybased'] || false,
+  //       testmode: data['testmode'] || false,
+  //       facilitator: data['facilitator'] || false,
+  //       testusers: data['testusers'] || [],
+  //       facilitatorprofiles: data['facilitatorprofiles'] || [],
+  //       selectedgroup : data['selectedgroup'] || null,
+  //       enrollwattimessage: data['enrollwattimessage'] || null,
+  //       mailTemplate :data['mailTemplate'] || null,
+  //       selectedjourneys:data['selectedjourneys'] || [],
+  //       selectedtiers:data['selectedtiers'] || [],
+  //       categoriesforthisworkshop:data['categoriesforthisworkshop'] || [],
+  //       cohortcategoriesforthisworkshop:data['cohortcategoriesforthisworkshop'] || [],
+  //       cohortsforthisworkshop:data['cohortsforthisworkshop'] || [],
+  //       categorythumbnail : data['categorythumbnail'] || '',
+  //       categoryVideo : data['categoryVideo'] || '',
+  //       hero: data['hero'] || false,
+  //       heroHeading: data['heroHeading'] || '',
+  //       heroDescription: data['heroDescription'] || '',
+  //       heroshowtype: data['heroshowtype'] || '',
+  //       heroImage: data['heroImage'] || '',
+  //       heroVideo:  data['heroVideo'] || '',
+  //     });
+  //     if (data['evergreenWorkshop']) {
+  //       const meta = this.settingsForm.get('evergreenWorkshopMeta') as FormGroup;
+  //       meta.get('workshopDays')?.enable();
+  //       meta.get('lastChallengeMessage')?.enable();
+  //     }
+  //   }
+  // }
 
   async saveSettings(): Promise<void> {
     if (!this.workshopId) return;
@@ -1940,6 +2047,8 @@ private rebuildActivityIds(): void {
         enableshare: this.settingsForm.get('enableshare')?.value || false,
         triggerFunction: this.settingsForm.get('triggerFunction')?.value || false,
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
+        evergreenWorkshop: this.settingsForm.get('evergreenWorkshop')?.value || false,
+        evergreenWorkshopMeta: this.settingsForm.get('evergreenWorkshopMeta')?.value ?? null,
         newusersonly: this.settingsForm.get('newusersonly')?.value || false,
         journeybased: this.settingsForm.get('journeybased')?.value || false,
         tierbased: this.settingsForm.get('tierbased')?.value || false,
@@ -2009,7 +2118,7 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction', event: any): void {
+  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }
