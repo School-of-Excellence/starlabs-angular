@@ -1,7 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, computed, effect, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets } from 'livekit-client';
+import { CdkDrag, CdkDragEnd, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { doc, docData, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { ActivatedRoute } from '@angular/router';
@@ -22,6 +23,7 @@ import { MatDividerModule } from '@angular/material/divider';
 // so it can be re-enabled by swapping the method body back.
 import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
+import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-layout.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -46,7 +48,9 @@ type RoomInfo = {
     CommonModule,
     MatIconModule,
     MatMenuModule,
-    MatDividerModule
+    MatDividerModule,
+    CdkDrag,
+    CdkDragHandle
   ],
   templateUrl: './join-openvidu-call.component.html',
   styleUrl: './join-openvidu-call.component.css'
@@ -90,6 +94,103 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   private previewStream: MediaStream | null = null;
   private canvasPipelineCleanup: (() => void) | null = null;
 
+  // ── Layout: screen share tracking ──────────────────────────────────────
+  screenShareTrack = signal<RemoteTrack | null>(null);
+  screenShareParticipantId = signal<string | null>(null);
+
+  // Layout mode computed from participant count and screen share state
+  layoutMode = computed<LayoutMode>(() => {
+    const remoteVideoCount = this.getRemoteVideoCount();
+    const hasScreenShare = this.screenShareTrack() !== null || this.isScreenSharing();
+    return this.videoLayout.getLayoutMode(remoteVideoCount, hasScreenShare);
+  });
+
+  // Spotlight: who is in main view
+  spotlightMain = computed(() => {
+    const state = this.videoLayout.spotlightState();
+    const remotes = this.returnRemoteVideoTracks();
+
+    // Screen share takes priority
+    if (state.isScreenShare && this.screenShareTrack()) {
+      const sharer = remotes.find(r => r.participantIdentity === this.screenShareParticipantId());
+      return {
+        type: 'screen' as const,
+        trackPublication: null as any,
+        videoTrack: this.screenShareTrack(),
+        participantId: this.screenShareParticipantId(),
+        participantName: sharer?.participantName || 'Screen'
+      };
+    }
+
+    // If local is set as main
+    if (state.mainParticipantId === 'local') {
+      return {
+        type: 'local' as const,
+        trackPublication: null as any,
+        videoTrack: this.localParticipant(),
+        participantId: 'local',
+        participantName: 'You'
+      };
+    }
+
+    // Default: first remote camera is main
+    const remote = remotes[0];
+    if (remote) {
+      return {
+        type: 'remote' as const,
+        trackPublication: remote.trackPublication,
+        videoTrack: remote.trackPublication.videoTrack,
+        participantId: remote.participantIdentity,
+        participantName: remote.participantName
+      };
+    }
+
+    return null;
+  });
+
+  // Spotlight: who is in PiP
+  spotlightPip = computed(() => {
+    const state = this.videoLayout.spotlightState();
+    const remotes = this.returnRemoteVideoTracks();
+
+    // If screen share is active, local is PiP
+    if (state.isScreenShare) {
+      return {
+        type: 'local' as const,
+        videoTrack: this.localParticipant(),
+        participantId: 'local',
+        participantName: 'You'
+      };
+    }
+
+    // If local is main, remote is PiP
+    if (state.mainParticipantId === 'local') {
+      const remote = remotes[0];
+      if (remote) {
+        return {
+          type: 'remote' as const,
+          videoTrack: remote.trackPublication.videoTrack,
+          participantId: remote.participantIdentity,
+          participantName: remote.participantName
+        };
+      }
+    }
+
+    // Default: local is PiP
+    return {
+      type: 'local' as const,
+      videoTrack: this.localParticipant(),
+      participantId: 'local',
+      participantName: 'You'
+    };
+  });
+
+  // Filmstrip scroll state
+  @ViewChild('filmstripContainer') filmstripContainer!: ElementRef<HTMLDivElement>;
+  canScrollLeft = false;
+  canScrollRight = false;
+  showFilmstripScrollButtons = false;
+
   constructor(
     public firestore: Firestore,
     public route: ActivatedRoute,
@@ -99,7 +200,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     private infraService: InstanceStatusService,
     // private audiofilterservice : DeepAudioFilterService, // kept — not removed, used in debugAudioLevels()
     private deepFilter3: DeepFilter3Service,              // [DF3] active noise cancellation filter
-    private adaptiveQuality: AdaptiveQualityService
+    private adaptiveQuality: AdaptiveQualityService,
+    public videoLayout: VideoLayoutService
   ){}
 
   ngAfterViewInit(): void {
@@ -254,7 +356,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     // Handle incoming remote tracks
     room.on(
-      RoomEvent.TrackSubscribed, 
+      RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         this.remoteParticipants.update((value) => {
           value.set(publication.trackSid, {
@@ -265,12 +367,23 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           return value
         });
         console.log('Tracked', this.remoteParticipants());
+
+        // Screen share detection
+        if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
+          console.log('Screen share started:', participant.identity);
+          this.screenShareTrack.set(track);
+          this.screenShareParticipantId.set(participant.identity);
+          this.videoLayout.setScreenShareActive(participant.identity, true);
+        }
+
+        // Check filmstrip scroll after new participant
+        setTimeout(() => this.checkFilmstripScroll(), 100);
       }
     );
 
     // Handle remote track removal
     room.on(
-      RoomEvent.TrackUnsubscribed, 
+      RoomEvent.TrackUnsubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         this.remoteParticipants.update((value) => {
           value.delete(publication.trackSid)
@@ -278,6 +391,17 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         });
 
         console.log('UnTracked', this.remoteParticipants());
+
+        // Screen share ended
+        if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
+          console.log('Screen share ended:', participant.identity);
+          this.screenShareTrack.set(null);
+          this.screenShareParticipantId.set(null);
+          this.videoLayout.setScreenShareActive(participant.identity, false);
+        }
+
+        // Check filmstrip scroll after participant left
+        setTimeout(() => this.checkFilmstripScroll(), 100);
       }
     );
 
@@ -491,6 +615,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.activeSpeakers = [];
     this.localParticipantIdentity = '';
     this.blurLevel = 'none';
+    this.screenShareTrack.set(null);
+    this.screenShareParticipantId.set(null);
+    this.videoLayout.resetSpotlight();
     this.meetingRoomStatus = "left"
   }
 
@@ -632,6 +759,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       await this.room()?.localParticipant.publishTrack(track);
     }
 
+    // Notify layout service about local screen share
+    this.screenShareParticipantId.set(this.localParticipantIdentity);
+    this.videoLayout.setScreenShareActive(this.localParticipantIdentity, true);
     console.log("Screen sharing started");
   }
 
@@ -640,6 +770,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (pub) {
       this.room()?.localParticipant.unpublishTrack(pub.track!);
       pub.track?.stop();
+
+      this.screenShareTrack.set(null);
+      this.screenShareParticipantId.set(null);
+      this.videoLayout.setScreenShareActive(this.localParticipantIdentity, false);
       console.log("Screen sharing stopped");
     }
   }
@@ -756,6 +890,102 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       remote => remote.trackPublication.kind === 'video'
     ).length;
     return 1 + remoteVideoCount;
+  }
+
+  // ── Layout helpers ─────────────────────────────────────────────────────
+
+  /** Returns only remote video (camera) tracks, excluding screen shares */
+  returnRemoteVideoTracks(): TrackInfo[] {
+    return this.returnRemoteParticipantTrack().filter(
+      r => r.trackPublication.kind === 'video' && r.trackPublication.source !== Track.Source.ScreenShare
+    );
+  }
+
+  /** Count of remote video (camera) participants */
+  private getRemoteVideoCount(): number {
+    return this.returnRemoteVideoTracks().length;
+  }
+
+  // ── PiP interaction methods ────────────────────────────────────────────
+
+  onPipClick() {
+    const pip = this.spotlightPip();
+    if (pip) {
+      this.videoLayout.swapSpotlight(pip.participantId);
+    }
+  }
+
+  onPipDragEnd(event: CdkDragEnd) {
+    const container = event.source.element.nativeElement.parentElement;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const pipRect = event.source.element.nativeElement.getBoundingClientRect();
+
+    const pipCenterX = pipRect.left - containerRect.left + pipRect.width / 2;
+    const pipCenterY = pipRect.top - containerRect.top + pipRect.height / 2;
+
+    this.videoLayout.snapPipToCorner(
+      containerRect.width,
+      containerRect.height,
+      pipCenterX,
+      pipCenterY
+    );
+
+    // Reset drag transform so CSS corner positioning takes over
+    event.source.reset();
+  }
+
+  togglePipSize() {
+    this.videoLayout.togglePipSize();
+  }
+
+  // ── Grid tile click → switch to spotlight ──────────────────────────────
+
+  onGridTileClick(participantId: string) {
+    console.log(`Grid tile clicked: ${participantId}`);
+  }
+
+  // ── Filmstrip methods ─────────────────────────────────────────────────
+
+  checkFilmstripScroll() {
+    const container = this.filmstripContainer?.nativeElement;
+    if (!container) return;
+
+    const hasOverflow = container.scrollWidth > container.clientWidth;
+    this.showFilmstripScrollButtons = hasOverflow;
+    this.canScrollLeft = container.scrollLeft > 0;
+    this.canScrollRight = container.scrollLeft < (container.scrollWidth - container.clientWidth - 10);
+  }
+
+  scrollFilmstrip(direction: 'left' | 'right') {
+    const container = this.filmstripContainer?.nativeElement;
+    if (!container) return;
+
+    const scrollAmount = 200;
+    const targetScroll = direction === 'left'
+      ? container.scrollLeft - scrollAmount
+      : container.scrollLeft + scrollAmount;
+
+    container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+  }
+
+  onFilmstripScroll() {
+    this.checkFilmstripScroll();
+  }
+
+  onFilmstripTileClick(participantId: string) {
+    console.log(`Filmstrip tile clicked: ${participantId}`);
+  }
+
+  getScreenShareParticipantName(): string {
+    const id = this.screenShareParticipantId();
+    if (!id) return 'Someone';
+    if (id === this.localParticipantIdentity) return 'You';
+    for (const p of this.remoteParticipants().values()) {
+      if (p.participantIdentity === id) return p.participantName;
+    }
+    return 'Someone';
   }
 
   // /**

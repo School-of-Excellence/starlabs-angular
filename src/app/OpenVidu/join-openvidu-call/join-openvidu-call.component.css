@@ -433,22 +433,282 @@
 }
 
 /* ============================ */
-/* SCREEN SHARE LAYOUT (ZOOM-STYLE) */
+/* SOLO LAYOUT                  */
 /* ============================ */
 
-.screen-share-layout {
+.solo-layout {
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  background: #000;
-  
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   margin-top: 40px;
   margin-bottom: 80px;
   height: calc(100vh - 40px - 80px);
+  background: #000;
+}
+
+.solo-video {
+  position: relative;
+  width: 80%;
+  max-width: 640px;
+  aspect-ratio: 4/3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.solo-video app-openvidu-video-element,
+.solo-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.waiting-message {
+  margin-top: 24px;
+  color: #888;
+  font-size: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* ============================ */
+/* SPOTLIGHT LAYOUT (2 participants) */
+/* ============================ */
+
+.spotlight-layout {
+  position: relative;
+  margin-top: 40px;
+  margin-bottom: 80px;
+  height: calc(100vh - 40px - 80px);
+  background: #000;
   overflow: hidden;
 }
 
-/* Main screen share area (left side, 80% width) */
+.spotlight-main {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #1a1a1a;
+}
+
+.spotlight-main app-openvidu-video-element,
+.spotlight-main video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.spotlight-main .participant-options-btn {
+  display: none;
+}
+
+.spotlight-main:hover .participant-options-btn {
+  display: flex;
+}
+
+/* Video placeholder for camera-off state */
+.video-placeholder-full {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+.video-placeholder-full.small {
+  min-height: 100%;
+}
+
+.avatar-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.avatar-circle.small {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+}
+
+/* ============================ */
+/* PiP VIDEO (Draggable)        */
+/* ============================ */
+
+.pip-video {
+  position: absolute;
+  width: 200px;
+  height: 150px;
+  border-radius: 12px;
+  overflow: visible;
+  background: #1a1a1a;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              right 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+/* Corner positions */
+.pip-video.bottom-right { bottom: 24px; right: 24px; }
+.pip-video.bottom-left { bottom: 24px; left: 24px; }
+.pip-video.top-right { top: 24px; right: 24px; }
+.pip-video.top-left { top: 24px; left: 24px; }
+
+/* Minimized state */
+.pip-video.minimized {
+  width: 120px;
+  height: 90px;
+}
+
+.pip-video.minimized .pip-label,
+.pip-video.minimized .pip-swap-hint {
+  display: none;
+}
+
+/* Hover effects */
+.pip-video:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.pip-video:hover .pip-controls,
+.pip-video:hover .pip-swap-hint,
+.pip-video:hover .pip-drag-handle {
+  opacity: 1;
+}
+
+/* While dragging */
+.pip-video.cdk-drag-dragging {
+  border-color: #4CAF50;
+  box-shadow: 0 16px 48px rgba(76, 175, 80, 0.3);
+  transition: none;
+}
+
+.pip-video app-openvidu-video-element,
+.pip-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pip-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.pip-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.pip-controls button {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.pip-controls button .material-icons {
+  font-size: 16px;
+}
+
+.pip-controls button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.pip-swap-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.pip-drag-handle {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px;
+  border-radius: 4px;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pip-drag-handle .material-icons {
+  font-size: 16px;
+}
+
+.pip-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* ============================ */
+/* SPOTLIGHT + FILMSTRIP MODE   */
+/* (Screen share active)        */
+/* ============================ */
+
+.spotlight-filmstrip-layout {
+  display: flex;
+  flex-direction: column;
+  margin-top: 40px;
+  margin-bottom: 80px;
+  height: calc(100vh - 40px - 80px);
+  background: #000;
+}
+
+/* Main screen share area */
 .screen-share-main {
   flex: 1;
   position: relative;
@@ -458,66 +718,321 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 0;
 }
 
 .screen-share-main app-openvidu-video-element,
 .screen-share-main video {
   width: 100%;
   height: 100%;
-  object-fit: contain; /* contain for screen share, not cover */
+  object-fit: contain;
 }
 
-/* Participants sidebar (right side, 20% width) */
-.participants-sidebar {
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-  overflow-x: hidden;
+.mirrorsharing {
+  transform: scaleX(-1);
 }
 
-/* Small tiles for sidebar */
-.zoom-video-tile-small {
-  position: relative;
-  background: #1a1a1a;
+.screen-share-label {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 16px;
   border-radius: 8px;
-  overflow: hidden;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.screen-share-label .material-icons {
+  font-size: 18px;
+}
+
+/* Filmstrip container */
+.filmstrip-container {
+  position: relative;
+  height: 140px;
+  min-height: 140px;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+/* Scroll buttons */
+.filmstrip-scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 16 / 9;
-  min-height: 120px;
+  padding: 0;
 }
 
-.zoom-video-tile-small app-openvidu-video-element,
-.zoom-video-tile-small video {
+.filmstrip-scroll-btn .material-icons {
+  font-size: 20px;
+}
+
+.filmstrip-scroll-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.filmstrip-scroll-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.filmstrip-scroll-btn.left {
+  left: 12px;
+}
+
+.filmstrip-scroll-btn.right {
+  right: 12px;
+}
+
+/* Scrollable filmstrip */
+.filmstrip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 12px 48px;
+  scroll-behavior: smooth;
+  flex: 1;
+
+  /* Hide scrollbar but keep functionality */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filmstrip::-webkit-scrollbar {
+  display: none;
+}
+
+/* Individual tile */
+.filmstrip-tile {
+  flex-shrink: 0;
+  width: 160px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #2a2a2a;
+  position: relative;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.filmstrip-tile:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.02);
+}
+
+/* Active speaker highlight */
+.filmstrip-tile.speaking {
+  border-color: #4CAF50;
+  box-shadow: 0 0 12px rgba(76, 175, 80, 0.4);
+}
+
+/* Screen sharer highlight */
+.filmstrip-tile.screen-sharer {
+  border-color: #2196F3;
+}
+
+.sharing-badge {
+  background: #2196F3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.filmstrip-tile app-openvidu-video-element,
+.filmstrip-tile video {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.mirrorsharing{
-  transform: scaleX(-1);
+.filmstrip-tile-label {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
 }
 
-/* Responsive adjustments */
+.filmstrip-tile-label .mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.mute-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(244, 67, 54, 0.8);
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mute-badge .mat-icon {
+  font-size: 12px;
+  width: 12px;
+  height: 12px;
+  color: white;
+}
+
+/* Speaking indicator animation */
+.speaking-indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(76, 175, 80, 0.8);
+  border-radius: 4px;
+}
+
+.speaking-indicator .wave {
+  width: 3px;
+  height: 12px;
+  background: white;
+  border-radius: 2px;
+  animation: soundWave 0.5s ease-in-out infinite;
+}
+
+.speaking-indicator .wave:nth-child(1) { animation-delay: 0s; }
+.speaking-indicator .wave:nth-child(2) { animation-delay: 0.1s; }
+.speaking-indicator .wave:nth-child(3) { animation-delay: 0.2s; }
+
+@keyframes soundWave {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1); }
+}
+
+/* ============================ */
+/* RESPONSIVE: SPOTLIGHT        */
+/* ============================ */
+
 @media (max-width: 768px) {
-  .screen-share-layout {
-    flex-direction: column;
+  .spotlight-layout .pip-video {
+    width: 120px;
+    height: 90px;
   }
 
-  .participants-sidebar {
-    width: 100%;
+  .spotlight-layout .pip-video.bottom-right { bottom: 16px; right: 12px; }
+  .spotlight-layout .pip-video.bottom-left { bottom: 16px; left: 12px; }
+
+  .pip-label { font-size: 10px; }
+}
+
+/* ============================ */
+/* RESPONSIVE: FILMSTRIP        */
+/* ============================ */
+
+@media (min-width: 1200px) {
+  .spotlight-filmstrip-layout {
     flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    max-height: 140px;
   }
 
-  .zoom-video-tile-small {
-    min-width: 160px;
-    flex-shrink: 0;
+  .spotlight-filmstrip-layout .screen-share-main {
+    flex: 1;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip-container {
+    width: 180px;
+    min-width: 180px;
+    height: 100%;
+    flex-direction: column;
+    border-top: none;
+    border-left: 1px solid #333;
+    padding: 8px 0;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip-scroll-btn {
+    position: relative;
+    transform: none;
+    margin: 8px auto;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip-scroll-btn.left,
+  .spotlight-filmstrip-layout .filmstrip-scroll-btn.right {
+    left: auto;
+    right: auto;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip .filmstrip-tile {
+    width: 100%;
+    height: 100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .spotlight-filmstrip-layout .filmstrip-container {
+    height: 100px;
+    min-height: 100px;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip {
+    padding: 8px 40px;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip .filmstrip-tile {
+    width: 120px;
+    height: 75px;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip .filmstrip-tile-label {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip-scroll-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .spotlight-filmstrip-layout .filmstrip-scroll-btn .material-icons {
+    font-size: 16px;
   }
 }
 
