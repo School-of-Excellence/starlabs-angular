@@ -181,7 +181,7 @@ export class DeliveryDashboardCloneComponent {
     bonusPackageIds: Set<string> = new Set();
     groupedBonus: { [key: string]: any[] } = {};
     groupedPurchased: { [key: string]: any[] } = {};
-    groupedNotEligible: { [key: string]: any[]} = {}
+    groupedNotEligible: { [key: string]: any[] } = {}
     avgInitToStart: { [key: string]: number } = {};
     avgStartToComplete: { [key: string]: number } = {};
     avgModalOpen = false;
@@ -328,7 +328,7 @@ export class DeliveryDashboardCloneComponent {
         "Next Month",
         "Onboarded",
         "Pre-Process",
-        "Upcoming D&I Appointments",
+        "D&I Appointments",
         "Report",
         "Celebration Call Completed"
     ];
@@ -517,8 +517,6 @@ export class DeliveryDashboardCloneComponent {
             // Load metadata + dependent data
             await this.loadParticipantMetadata();
 
-            await this.filterAppointmentsByType();
-
             // Filter only required Products from the Productlist
             this.mapProductGroupId = this.rawProductData
                 .filter(item =>
@@ -532,6 +530,8 @@ export class DeliveryDashboardCloneComponent {
                 }, {} as Record<string, string>);
 
             this.applyDateFilter();
+
+            if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
 
             // Process users (depends on mapprofile from metadata)
             this.coachesList = usersSnap.docs
@@ -563,14 +563,14 @@ export class DeliveryDashboardCloneComponent {
 
     ngOnDestroy() {
         // Unsubscribe from all subscriptions
-        Object.keys(this.subscriptions).forEach(key => {
-            if (this.subscriptions[key]) {
-                this.subscriptions[key].unsubscribe();
-            }
-        });
-        if (this.appointmentsSubscription) {
-            this.appointmentsSubscription.unsubscribe();
-        }
+        // Object.keys(this.subscriptions).forEach(key => {
+        //     if (this.subscriptions[key]) {
+        //         this.subscriptions[key].unsubscribe();
+        //     }
+        // });
+        // if (this.appointmentsSubscription) {
+        //     this.appointmentsSubscription.unsubscribe();
+        // }
     }
 
     onFilterClick(filter: string) {
@@ -666,7 +666,7 @@ export class DeliveryDashboardCloneComponent {
                             (groupedPurchased[productId] ||= []).push(item);
                         }
                     } else {
-                         (groupedNotEligible[productId] ||= []).push(item);
+                        (groupedNotEligible[productId] ||= []).push(item);
                     }
                 }
 
@@ -676,6 +676,9 @@ export class DeliveryDashboardCloneComponent {
 
                 if (status === 'ongoing') {
                     funnelData[productId].ongoing.push(item);
+                }
+                else if (status === 'completed') {
+                    funnelData[productId].completed.push(item);
                 }
 
                 if (isEligible) {
@@ -687,9 +690,6 @@ export class DeliveryDashboardCloneComponent {
                     } else if (status === 'ongoing') {
                         const d = this.getDateFromFieldPublic(statusdate['ongoing']);
                         if (this.isDateInRange(d)) funnelData[productId].started.push(item);
-                    } else if (status === 'completed') {
-                        const d = this.getDateFromFieldPublic(statusdate['completed']);
-                        if (this.isDateInRange(d)) funnelData[productId].completed.push(item);
                     }
                 }
             }
@@ -702,6 +702,8 @@ export class DeliveryDashboardCloneComponent {
             this.groupedBonus = groupedBonus;
             this.groupedPurchased = groupedPurchased;
             this.funnelData = funnelData;
+
+            if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
         } catch (err) {
             console.log("error apply date filter", err);
         }
@@ -724,20 +726,32 @@ export class DeliveryDashboardCloneComponent {
     }
 
     // Select Product
+    async updateProduct(product: string) {
+        const productId = this.mapProductGroupId[product];
+        this.selectedProductLabel = product;
+
+        // if (this.appointmentsSubscription) {
+        //     this.appointmentsSubscription.unsubscribe();
+        // }
+        // if (this.subscriptions['productsChunks']) {
+        //     this.subscriptions['productsChunks'].unsubscribe();
+        // }
+
+        await this.filterProductData(product, productId);
+        this.updateFilteredCards();
+    }
     async selectProduct(product: string) {
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
-        console.log("selected product", product, productId);
 
-        if (this.appointmentsSubscription) {
-            this.appointmentsSubscription.unsubscribe();
-        }
-        if (this.subscriptions['productsChunks']) {
-            this.subscriptions['productsChunks'].unsubscribe();
-        }
+        // if (this.appointmentsSubscription) {
+        //     this.appointmentsSubscription.unsubscribe();
+        // }
+        // if (this.subscriptions['productsChunks']) {
+        //     this.subscriptions['productsChunks'].unsubscribe();
+        // }
 
-        this.resetStats();
-        // await this.filterAppointmentsByType();
+        await this.filterAppointmentsByType();
         await this.filterProductData(product, productId);
         this.updateFilteredCards();
     }
@@ -875,24 +889,31 @@ export class DeliveryDashboardCloneComponent {
 
             // Filter Report Data
 
-            const celebrationCall = this.getCardFunnel(productId).completed;
+            const celebrationCall = this.funnelData[productId].completed;
 
-            productData.celebrationCall = await Promise.all(
-                celebrationCall.map(async (data) => {
-                    const allappointments = await this.getAllAppointments(productId, data.docid);
+            for (let data of celebrationCall) {
+                let appointments = Array.from(this.allAppointments.values() || [])
+                    .filter((app: any) => app.participantproductid === data.docid);
 
-                    return {
-                        ...data,
-                        allappointments: allappointments
-                    };
-                })
-            );
+                for (let appointment of appointments) {
+                    try {
+                        const appointmenttype = await this.resolveAppointmentType(appointment);
+                        appointment.appointmentTypeName = appointmenttype;
+                    } catch (err) {
+                        console.log("error", err);
+                    }
+                }
+
+                data = { ...data, allappointments: appointments };
+                productData.celebrationCall.push(data);
+            }
+
+            this.cleanProductData(productData);
+
             this.productData = productData;
 
-            this.cleanProductData();
-
             this.updateFilteredCards();
-            console.log("all data", this.productData);
+            console.log("all data", this.productData, this.funnelData);
         } catch (err) {
             console.log("error in filter product data", err);
         }
@@ -969,47 +990,43 @@ export class DeliveryDashboardCloneComponent {
             );
 
             forms.push(...formResults);
+            this.allAppointments = [...this.allAppointments, ...formResults];
         }
-        this.allAppointments = [...this.allAppointments, forms];
         productData.reports = forms;
     }
 
-    cleanProductData() {
-        if (!this.productData) return;
+    cleanProductData(productData: any) {
+        if (!productData) return;
 
-        let reportIds = new Set<string>();
-        let celebrationIds = new Set<string>();
+        const reportIds = new Set<string>();
+        const celebrationIds = new Set<string>();
 
-        if (Array.isArray(this.productData.reports)) {
-            reportIds = new Set(
-                this.productData.reports.map(
-                    (item: any) => item?.participantproductid
-                )
-            );
-        } else if (this.productData.reports) {
-            reportIds = new Set(
-                Object.values(this.productData.reports)
-                    .flatMap((arr: any) =>
-                        arr.map((item: any) => item?.participantproductid)
-                    )
+        if (Array.isArray(productData.reports)) {
+            productData.reports.forEach((item: any) => {
+                if (item?.participantproductid) {
+                    reportIds.add(item.participantproductid);
+                }
+            });
+        }
+
+        if (Array.isArray(productData.celebrationCall)) {
+            productData.celebrationCall.forEach((item: any) => {
+                if (item?.docid) {
+                    celebrationIds.add(item.docid);
+                }
+            });
+        }
+        console.log("reportids", reportIds, "celebrationids", celebrationIds, 'reports data', productData.reports);
+
+        if (reportIds.size && celebrationIds.size) {
+            productData.reports = productData.reports.filter(
+                (item: any) => !celebrationIds.has(item.participantproductid)
             );
         }
 
-        if (Array.isArray(this.productData.celebrationCall)) {
-            celebrationIds = new Set(
-                this.productData.celebrationCall.map(
-                    (item: any) => item?.participantproductid
-                )
-            );
-        }
-
-        this.productData.reports = (this.productData.reports || []).filter(
-            (item: any) => !celebrationIds.has(item.participantproductid)
-        );
-
-        Object.keys(this.productData).forEach((key) => {
+        Object.keys(productData).forEach((key) => {
             if (key !== 'reports' && key !== 'celebrationCall') {
-                this.productData[key] = (this.productData[key] || []).filter(
+                productData[key] = (productData[key] || []).filter(
                     (item: any) => !reportIds.has(item.participantproductid)
                 );
             }
@@ -1140,7 +1157,7 @@ export class DeliveryDashboardCloneComponent {
 
                     snapshots[index] = snapshot;
 
-                    allMatchedProducts.length = 0;
+                    const productMap = new Map<string, any>();
 
                     for (const snap of snapshots) {
                         if (!snap) continue;
@@ -1150,21 +1167,21 @@ export class DeliveryDashboardCloneComponent {
                                 activeProfileIds.has(data['profileid']) &&
                                 !rejectedStatuses.has(data['status']?.toLowerCase())
                             ) {
-                                allMatchedProducts.push(data);
+                                productMap.set(data.id, data);
                             }
                         }
                     }
 
-                    if (snapshots.length > 0) {
-                        this.allMatchedProductsRaw = [...allMatchedProducts];
-                        await this.applyDateFilter();
-                        if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+                    this.allMatchedProductsRaw = Array.from(productMap.values());
+                    await this.applyDateFilter();
+                    if (this.selectedProductLabel) {
+                        this.updateProduct(this.selectedProductLabel);
                     }
                 });
+
             this.subscriptions['productsChunks'].add(sub);
         });
     };
-
     getCardsByColumn(index: number) {
         switch (index) {
             case 0: return this.totalEligible;
@@ -2197,7 +2214,9 @@ export class DeliveryDashboardCloneComponent {
                         appointmenttype: d.data()['appointmenttype']
                     }));
 
-                    if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+                    console.log("appointmeents", this.allAppointments, this.mappedAppointmentTypes);
+
+                    if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
 
                     await this.processAppointments(appointmentsSnap, validProfileData);
 
@@ -2651,7 +2670,7 @@ export class DeliveryDashboardCloneComponent {
         this.productsSubscription = collectionData(productsRef, { idField: 'id' })
             .subscribe((products: any[]) => {
                 this.products = products;
-                // if(this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+                // if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
             });
 
         let tempArray1: any[] = [];
