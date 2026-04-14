@@ -24,5 +24,14 @@ bootstrapApplication(AppComponent, {
       registrationStrategy: 'registerWhenStable:30000'
     })
   ]
-})
-  .catch((err) => console.error(err));
+}).catch((err) => console.error(err));
+
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('Each child in a list should have a unique')) {
+    return; // suppress Zoom SDK's React key warning
+  }
+  originalWarn.apply(console, args);
+};
+
+  
