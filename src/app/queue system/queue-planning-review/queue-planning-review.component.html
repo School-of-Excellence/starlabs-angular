@@ -799,7 +799,7 @@
 
               <!-- Book button - only participants who have a queue token -->
               <button mat-icon-button
-                *ngIf="activePanelSection === 'non-confirmed' && selectedStageForPanel && !participant.isNonQueueParticipant"
+                *ngIf="activePanelSection === 'non-confirmed' && selectedStageForPanel"
                 matTooltip="Book Slot"
                 class="book-btn"
                 (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()">
