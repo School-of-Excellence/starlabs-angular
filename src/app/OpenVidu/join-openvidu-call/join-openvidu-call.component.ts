@@ -13,7 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-// import { BackgroundProcessor } from "@livekit/track-processors";
+import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
 // import { DeepAudioFilterService } from '../../Service/Deep Audio Filter/deep-audio-filter.service';
@@ -1086,8 +1086,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       await videoTrack.stopProcessor();
     } else {
       const blurRadius = level === 'mid' ? 6 : 15;
-      // const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
-      // videoTrack.setProcessor(blur);
+      const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
+      videoTrack.setProcessor(blur);
     }
 
     this.blurLevel = level;

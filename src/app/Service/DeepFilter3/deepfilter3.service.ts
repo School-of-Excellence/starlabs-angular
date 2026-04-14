@@ -26,13 +26,13 @@
  */
 
 import { Injectable } from '@angular/core';
-// import { DeepFilterNet3Core, DeepFilterNoiseFilterProcessor } from 'deepfilternet3-noise-filter';
+import { DeepFilterNet3Core, DeepFilterNoiseFilterProcessor } from 'deepfilternet3-noise-filter';
 import { environment } from "../../../environments/environment";
 
 @Injectable({ providedIn: 'root' })
 export class DeepFilter3Service {
 
-  private processor = null;
+  private processor:    DeepFilterNet3Core | null = null;
   private audioContext: AudioContext | null = null;
   private workletNode:  AudioWorkletNode | null = null;
   private gainBoost:    GainNode | null = null;
@@ -62,17 +62,17 @@ export class DeepFilter3Service {
    */
   async init(suppressionLevel = 80): Promise<boolean> {
     try {
-      // if (!DeepFilterNoiseFilterProcessor.isSupported()) {
-      //   console.warn('⚠️ DeepFilterNet3 not supported on this browser');
-      //   return false;
-      // }
+      if (!DeepFilterNoiseFilterProcessor.isSupported()) {
+        console.warn('⚠️ DeepFilterNet3 not supported on this browser');
+        return false;
+      }
 
       this.audioContext = new AudioContext({ sampleRate: 48000 });
-      // this.processor = new DeepFilterNet3Core({
-      //   sampleRate: 48000,
-      //   noiseReductionLevel: suppressionLevel,
-      //   ...(environment["df3CdnUrl"] ? { assetConfig: { cdnUrl: environment["df3CdnUrl"] } } : {})
-      // });
+      this.processor = new DeepFilterNet3Core({
+        sampleRate: 48000,
+        noiseReductionLevel: suppressionLevel,
+        ...(environment["df3CdnUrl"] ? { assetConfig: { cdnUrl: environment["df3CdnUrl"] } } : {})
+      });
 
       const t0 = performance.now();
       await this.processor.initialize();

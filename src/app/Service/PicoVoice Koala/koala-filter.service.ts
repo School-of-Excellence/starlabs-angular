@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
-// import { Koala } from '@picovoice/koala-web';
+import { Koala } from '@picovoice/koala-web';
 
 const MODEL_URL =
   'https://raw.githubusercontent.com/Picovoice/koala/main/lib/common/koala_params.pv';
 
 @Injectable({ providedIn: 'root' })
 export class KoalaFilterService {
-  private koala = null;
+  private koala: Koala | null = null;
 
   // Input capture pipeline
   private inputCtx: AudioContext | null = null;
@@ -48,11 +48,11 @@ export class KoalaFilterService {
       if (!res.ok) throw new Error(`Model fetch failed: ${res.status}`);
       const base64 = this.bufferToBase64(await res.arrayBuffer());
 
-      // this.koala = await Koala.create(
-      //   accessKey,
-      //   (enhanced: Int16Array) => this.onProcessed(enhanced),
-      //   { base64 }
-      // );
+      this.koala = await Koala.create(
+        accessKey,
+        (enhanced: Int16Array) => this.onProcessed(enhanced),
+        { base64 }
+      );
 
       this.delaySampleMs = Math.round(
         (this.koala.delaySample / this.koala.sampleRate) * 1000
