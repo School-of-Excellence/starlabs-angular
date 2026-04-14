@@ -174,6 +174,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   // Cached planning data
   cachedPlanningData: any = null;
   private dataReadyFlags = { tokens: false, planners: false, planning: false };
+  private planningSlotLookup = new Map<string, Set<string>>();
 
   // Queue tab panel
   showQueueTabPanel: boolean = false;
@@ -197,6 +198,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   interimReportStartDate: Date | null = null;
   interimReportEndDate: Date | null = null;
   showInterimDatePicker: boolean = false;
+  
   
   
 
@@ -326,17 +328,26 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       slotConfigured: false
     }));
 
-    for (const mergedSlot of this.mergedSlots) {
-      const segmentVar = mergedSlot.segmentVariations.find(sv => sv.segmentId === segmentId);
-      if (segmentVar) {
-        const variation = segmentVar.variations.find(v => v.variationId === variationId);
-        if (variation && variation.stageData) {
-          Object.keys(variation.stageData).forEach(stageName => {
-            const stageIdx = stageConfig.findIndex(s => s.stageName === stageName);
-            if (stageIdx >= 0) {
-              stageConfig[stageIdx].slotConfigured = true;
+    if (!this.cachedPlanningData || !this.cachedPlanningData.planning) {
+      return stageConfig;
+    }
+
+    for (const variationPlanning of this.cachedPlanningData.planning) {
+      if (variationPlanning.variationid !== variationId) continue;
+
+      if (variationPlanning.segments) {
+        for (const segmentData of variationPlanning.segments) {
+          if (segmentData.segmentid !== segmentId) continue;
+
+          if (segmentData.slots) {
+            for (const slot of segmentData.slots) {
+              const stageName = slot.stagename;
+              const stageIdx = stageConfig.findIndex(s => s.stageName === stageName);
+              if (stageIdx >= 0) {
+                stageConfig[stageIdx].slotConfigured = true;
+              }
             }
-          });
+          }
         }
       }
     }
@@ -516,11 +527,11 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.rebuildIfAllReady();
   }
 
-  rebuildIfAllReady() {
-    const { tokens, planners, planning } = this.dataReadyFlags;
-    if (!tokens || !planners || !planning) return;
-    this.rebuildMergedSlots();
-  }
+rebuildIfAllReady() {
+  const { tokens, planners, planning } = this.dataReadyFlags;
+  if (!tokens || !planners || !planning) return;
+  this.rebuildMergedSlots();
+}
 
   processMergedSlots() {
     this.rebuildIfAllReady();
@@ -587,27 +598,48 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       }
     }
 
-    this.mergedSlots = Array.from(slotsMap.values()).map(slotData => {
-      const segmentVariations = [];
+    // BUILD LOOKUP MAP FIRST
+    // Key: "startTs_endTs_stageName_segmentId" → true
+    this.planningSlotLookup = new Map<string, Set<string>>();
+    
+    slotsMap.forEach((slotData, slotKey) => {
+      slotData.segmentVariationsData.forEach((segVarData: any) => {
+        Object.keys(segVarData.stageData).forEach((stageName: string) => {
+          const lookupKey = `${slotData.startdate.getTime()}_${slotData.enddate.getTime()}_${stageName}`;
+          if (!this.planningSlotLookup.has(lookupKey)) {
+            this.planningSlotLookup.set(lookupKey, new Set<string>());
+          }
+          this.planningSlotLookup.get(lookupKey).add(segVarData.segmentId);
+        });
+      });
+    });
 
-      slotData.segmentVariationsData.forEach((segVarData, key) => {
-        const existingSegment = segmentVariations.find(sv => sv.segmentId === segVarData.segmentId);
+    // BUILD mergedSlots normally in one pass
+    this.mergedSlots = Array.from(slotsMap.values()).map(slotData => {
+      const segmentVariations: any[] = [];
+
+      slotData.segmentVariationsData.forEach((segVarData: any) => {
+        const existingSegment = segmentVariations.find(
+          sv => sv.segmentId === segVarData.segmentId
+        );
+
+        const variationEntry = {
+          variationId: segVarData.variationId,
+          variationName: this.getVariationName(segVarData.variationId),
+          stageData: this.calculateStageData(
+            segVarData.segmentId,
+            segVarData.variationId,
+            segVarData.stageData
+          )
+        };
 
         if (existingSegment) {
-          existingSegment.variations.push({
-            variationId: segVarData.variationId,
-            variationName: this.getVariationName(segVarData.variationId),
-            stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
-          });
+          existingSegment.variations.push(variationEntry);
         } else {
           segmentVariations.push({
             segmentId: segVarData.segmentId,
             segmentName: this.getSegmentName(segVarData.segmentId),
-            variations: [{
-              variationId: segVarData.variationId,
-              variationName: this.getVariationName(segVarData.variationId),
-              stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
-            }]
+            variations: [variationEntry]
           });
         }
       });
@@ -617,14 +649,13 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         enddate: slotData.enddate,
         starttime: slotData.starttime,
         endtime: slotData.endtime,
-        stages: Array.from(slotData.stages),
+        stages: Array.from(slotData.stages) as string[],
         segmentVariations: segmentVariations
       };
     });
 
     this.mergedSlots.sort((a, b) => a.startdate.getTime() - b.startdate.getTime());
   }
-
   recalculateMergedSlotParticipants() {
     const filterSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
       : this.activeInterimCard === 'not-completed' ? this.notCompletedInterimProfileIds
@@ -850,20 +881,13 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   }
 
   checkSlotExistsInPlanning(variationid: string, segmentid: string, stagename: string, startTs: number, endTs: number): boolean {
-    for (const mergedSlot of this.mergedSlots) {
-      const slotStartTs = mergedSlot.startdate.getTime();
-      const slotEndTs = mergedSlot.enddate.getTime();
-
-      if (slotStartTs === startTs && slotEndTs === endTs && mergedSlot.stages.includes(stagename)) {
-        const segmentVar = mergedSlot.segmentVariations.find(sv => sv.segmentId === segmentid);
-        if (segmentVar) {
-          const variation = segmentVar.variations.find(v => v.variationId === variationid);
-          if (variation && variation.stageData && variation.stageData[stagename]) {
-            return true;
-          }
-        }
-      }
+    const lookupKey = `${startTs}_${endTs}_${stagename}`;
+    const segmentSet = this.planningSlotLookup.get(lookupKey);
+    
+    if (segmentSet && segmentSet.has(segmentid)) {
+      return true;
     }
+    
     return false;
   }
 
@@ -1089,8 +1113,11 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         }
 
         const slotExistsInPlanning = this.checkSlotExistsInPlanning(
-          variationid, segmentid, stagename,
-          toTime(slot.startdate), toTime(slot.enddate)
+          slot.variationid || variationid,
+          slot.segmentid || segmentid,
+          stagename,
+          toTime(slot.startdate),
+          toTime(slot.enddate)
         );
 
         const participantSegmentId = this.getParticipantSegment(profileId);
