@@ -1,6 +1,6 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogActions, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, Subscription } from 'rxjs';
@@ -56,7 +56,8 @@ interface CardData {
     MatListModule,
     MatButtonModule,
     MatCheckboxModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatDialogModule
   ],
   templateUrl: './big-planner.component.html',
   styleUrl: './big-planner.component.css',
@@ -72,6 +73,7 @@ interface CardData {
 export class BigPlannerComponent {
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
+  @ViewChild('duplicateStudiosModel') duplicateStudiosModel : TemplateRef<ElementRef>;
   loggedinProfileRoles = {}
   mapProfile = {};
   mapProfileData = {};
@@ -89,7 +91,8 @@ export class BigPlannerComponent {
   editMandatoryActivities: string | null = null;
   editMandatoryActivitiesData: string[] = [];
   atcModel: Array<any> = [];
-  disabledAtcModels: Array<any> = [];
+  duplicatedStudios: Array<any>  | null= [];
+  duplicateModelRef !: MatDialogRef<any>
 
   // big Activity Property
   bigActivitySubcription: Subscription
@@ -110,7 +113,8 @@ export class BigPlannerComponent {
   studioPairingSubscription: Subscription
   studioPairingList = []
   profileStudioCount = {}
-  profilePairCount = {}
+  profilePairCount = {};
+  duplicateStuidoMap = {};
   studioPreAssign = {}
   studioinStudio = 0
 
@@ -446,29 +450,36 @@ export class BigPlannerComponent {
       this.filteredStudioPairingList.paginator = this.paginator;
       var profileCount = {}
       var pairMap = {};
+      var duplicatedStudiosMap = {};
       var localMap = {};
       var studioin = 0
       var checkin = 0
       for (let i = 0; i < this.studioPairingList.length; i++) {
         const studio = this.studioPairingList[i];
+        let isDuplicated = this.isStuidoExist(this.studioPairingList , studio);
         const participantsActivityMap = studio['participantsactivity'] || {};
         if (studio["studioin"]) studioin += 1
         if (studio["checkin"]) checkin += 1
         var participants = studio["participants"] ?? [];
+               
         participants.forEach(id => {
           profileCount[id] = profileCount[id] ?? [];
           pairMap[id] = pairMap[id] ?? [];
+          duplicatedStudiosMap[id] = duplicatedStudiosMap[id] ?? [];
           if (studio["studioin"]) profileCount[id].push(studio);
           if (participants.length > 1) pairMap[id].push(studio);
+          if (isDuplicated)  duplicatedStudiosMap[id].push(studio);
         })
         var studioActivity = Object.values(studio["participantsactivity"]).sort((a, b) => a.toString().localeCompare(b.toString())).join(",");
         (stageActivityParse[studioActivity] ?? []).forEach(stage => {
           localMap[stage] = localMap[stage] ?? []
           if (localMap[stage].filter((e: { [key: string]: any }) => e["docid"] == studio["docid"]).length == 0) localMap[stage].push(studio)
-        })
+        });
+
       }
       this.studioinStudio = studioin
       this.profileStudioCount = profileCount;
+      this.duplicateStuidoMap = duplicatedStudiosMap;
       this.profilePairCount = pairMap;
       this.stageStudioMap = localMap
       this.sortStudioAssignment();
@@ -641,31 +652,57 @@ export class BigPlannerComponent {
     return returnData.map((e) => this.mapProfileData[e]);
   }
 
-  // filterAtcModels() {
+  getDublicatedStudios() {
+    let duplicates = [];
+    for (let studio of this.studioPairingList) {
+      const participants = studio['participants'] || [];
+      const activityMap = studio['participantsactivity'] || {};
+      if (participants.length === this.newStudioPairing.length) {
+        const doesMatch = this.newStudioPairing.every((pair) => {
+          const profile = pair.profileid;
+          const activity = pair.activity;
+          if (activityMap[profile] && activityMap[profile] === activity) {
+            return true;
+          }
+          return false;
+        });
+        if (doesMatch) {
+          duplicates.push(studio);
+        }
+      }
+    }
+    return duplicates;
+  }
 
-  //   let disabledList = [];
-  //   for (let studio of this.studioPairingList) {
-  //     const participants = studio['participants'] || [];
-  //     const activityMap = studio['participantsactivity'] || {};
-  //     const studioAtcModel = studio['atcmodel'] || [];
-  //     if (participants.length === this.newStudioPairing.length) {
-  //       const doesMatch = this.newStudioPairing.every((pair) => {
-  //         const profile = pair.profileid;
-  //         const activity = pair.activity;
-  //         if (activityMap[profile] && activityMap[profile] === activity) {
-  //           return true;
-  //         }
-  //         return false;
-  //       });
-  //       if (doesMatch) {
-  //         disabledList.push(...studioAtcModel);
-  //       }
-  //     }
-  //   }
+  isStuidoExist(studioPairingList , selectedStudio){
+    let duplicated = false;
+    for (let studio of studioPairingList) {
+      
+      if (studio['docid'] === selectedStudio['docid']) {
+        continue
+      }
 
-  //   this.disabledAtcModels = disabledList;
-  //   return this.productList;
-  // }
+      const participants = studio['participants'] || [];
+      const activityMap = studio['participantsactivity'] || {};
+
+      const selectedStudioParticipants = selectedStudio['participants'] || [];
+      const selectedStudioActivityMap = selectedStudio['participantsactivity'] || {};
+    
+      if (participants.length === selectedStudioParticipants.length) {
+        const doesMatch = Object.keys(selectedStudioActivityMap).every((profileId) => {
+          const activity = selectedStudioActivityMap[profileId];
+          if (activityMap[profileId] && activityMap[profileId] === activity) {
+            return true;
+          }
+          return false;
+        });
+        if (doesMatch) {
+          return true
+        }
+      }
+    }
+    return duplicated;
+  }
 
   showAtcModel() {
     return this.newStudioPairing.every((pair) => {
@@ -696,6 +733,21 @@ export class BigPlannerComponent {
   removePair(index) {
     // console.log(index)
     this.newStudioPairing.splice(index, 1);
+  }
+
+  assignRoles(){
+    const duplicates = this.getDublicatedStudios();
+    if (duplicates.length > 0) {
+      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : duplicates});
+      this.duplicateModelRef.afterClosed().subscribe((data)=>{
+       if (data) {
+        this.createStudioPairing();
+       }
+
+      })
+    } else {
+      this.createStudioPairing();
+    }
   }
 
   async createStudioPairing() {
@@ -760,6 +812,12 @@ export class BigPlannerComponent {
       this.snackBar.open('Failed to create studio', null, {
         duration: 3000
       });
+    }
+  }
+
+  closeDuplicateStuioModel(data : boolean = false){
+    if (this.duplicateModelRef) {
+      this.duplicateModelRef.close(data);
     }
   }
 
@@ -985,6 +1043,16 @@ export class BigPlannerComponent {
           cards.push(c);
         })
         break
+      case 'duplicate':
+        this.duplicateStuidoMap[profileId]?.forEach((studio) => {
+          const c: CardData = {
+            participants: (studio['participants'] || []).map((p) => this.mapProfileData[p]?.name),
+            activities: (Object.values(studio['participantsactivity']) || []).map((a: string) => this.mapBigActivity[a] ?? ''),
+            atcModel: studio['atcmodel'] || []
+          }
+          cards.push(c);
+        })
+        break
       default:
         break;
     }
@@ -1038,6 +1106,10 @@ export class BigPlannerComponent {
   cancelAtcEdit(){
     this.editAtcModel = null;
     this.editAtcModelData = [];
+  }
+
+  onDuplicateClick(profileId : string){
+    this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : this.duplicateStuidoMap[profileId] || []});
   }
 
   // function to update atc model

@@ -83,6 +83,11 @@
                         <span class="stat-label">Pair:</span>
                         <span class="stat-value">{{profilePairCount[invitation]?.length || 0}}</span>
                       </div>
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'duplicate')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()" (click)="onDuplicateClick(invitation)">
+                        <span class="stat-label">Duplicate</span>
+                        <span class="stat-value">{{duplicateStuidoMap[invitation]?.length || 0}}</span>
+                      </div>
                     </div>
                   </div>
                 </mat-list-item>
@@ -148,8 +153,7 @@
                       <div class="overall-atc-label">ATC Model (applies to all)</div>
                       <mat-form-field appearance="outline" class="overall-atc-model">
                         <mat-select [(ngModel)]="overallAtcModel" multiple placeholder="Select ATC models">
-                          <mat-option *ngFor="let list of productList" [value]="list.atcmodel"
-                            [disabled]="this.disabledAtcModels.includes(list.atcmodel)">
+                          <mat-option *ngFor="let list of productList" [value]="list.atcmodel">
                             {{list.atcmodel}}
                           </mat-option>
                         </mat-select>
@@ -171,7 +175,7 @@
                 <mat-checkbox *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']" [(ngModel)]="openViduEnabled">Let this Studio use OpenVidu to make Call.</mat-checkbox>
     
                 <div class="assign-button-container">
-                  <button mat-raised-button color="primary" (click)="createStudioPairing()">
+                  <button mat-raised-button color="primary" (click)="assignRoles()">
                     Assign Role
                   </button>
                 </div>
@@ -458,7 +462,6 @@
           <mat-option
             *ngFor="let list of productList"
             [value]="list.atcmodel"
-            [disabled]="this.disabledAtcModels.includes(list.atcmodel)"
           >
             {{ list.atcmodel }}
           </mat-option>
@@ -497,3 +500,49 @@
     </div>
   </div>
 </div>
+
+<ng-template #duplicateStudiosModel let-duplicatedStudios>
+  <div class="tm-modal" *ngIf="duplicatedStudios">
+    <div class="tm-header">
+      <span class="tm-header__title">Duplicated Studios</span>
+      <button class="tm-header__close" (click)="closeDuplicateStuioModel(false)" >✕</button>
+    </div>
+    <div class="tm-card-list">
+      <div class="tm-card tm-card--dark" *ngFor="let studio of duplicatedStudios">
+        <div class="tm-card__body">
+          <div class="tm-card__top">
+            <div class="tm-card__identity">
+              <div>
+                <div class="tm-card__name"><span *ngFor="let participant of studio.participants">{{mapProfile[participant]}},</span></div>
+                <div class="tm-card__role">
+                  <span *ngFor="let participant of studio.participants">
+                    {{mapBigActivity[studio.participantsactivity[participant]]}}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <!-- <div class="tm-status-dot"></div> -->
+          </div>
+          <div class="tm-card__details">
+            <div class="tm-detail-group">
+              <div class="tm-detail-group__label">ATC Model</div>
+              <div class="tm-tag-list">
+                <span class="tm-tag" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
+              </div>
+            </div>
+            <div class="tm-detail-group tm-detail-group--wide">
+              <div class="tm-detail-group__label">Mandatory Activities</div>
+              <div class="tm-tag-list">
+                <span class="tm-tag-activity" *ngFor="let actId of studio['mandatoryactivities'] || []" >{{ mapBigActivity[actId] }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tm-footer">
+      <button class="tm-bassignRolestn tm-btn--cancel" (click)="closeDuplicateStuioModel(false)">Cancel</button>
+      <button class="tm-btn tm-btn--proceed" (click)="closeDuplicateStuioModel(true)">Proceed</button>
+    </div>
+  </div>
+</ng-template>
