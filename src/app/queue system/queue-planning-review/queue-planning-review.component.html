@@ -787,7 +787,25 @@
                 </div>
               </div>
             </div>
-            <div>
+            <div class="participant-actions">
+              <!-- Revert button - only for confirmed participants with queue token -->
+              <button mat-icon-button
+                *ngIf="activePanelSection === 'confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"
+                matTooltip="Revert Slot"
+                class="revert-btn"
+                (click)="revertSlot(participant, selectedStageForPanel); $event.stopPropagation()">
+                <mat-icon>undo</mat-icon>
+              </button>
+
+              <!-- Book button - only participants who have a queue token -->
+              <button mat-icon-button
+                *ngIf="activePanelSection === 'non-confirmed' && selectedStageForPanel && !participant.isNonQueueParticipant"
+                matTooltip="Book Slot"
+                class="book-btn"
+                (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()">
+                <mat-icon>event_available</mat-icon>
+              </button>
+
               <mat-checkbox [(ngModel)]="participant.selected" class="participant-checkbox">
               </mat-checkbox>
             </div>
@@ -1258,3 +1276,63 @@
     </div>
   </div>
 </ng-template>
+<!-- Book Slot Dialog -->
+<div class="book-slot-overlay" *ngIf="showBookSlotDialog" (click)="closeBookSlotDialog()">
+  <div class="book-slot-dialog" (click)="$event.stopPropagation()">
+
+    <div class="book-slot-header">
+      <h3>
+        <mat-icon>event_available</mat-icon>
+        Book Slot — {{ bookSlotStageName }}
+      </h3>
+      <button mat-icon-button (click)="closeBookSlotDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="book-slot-participant-info">
+      <mat-icon>person</mat-icon>
+      <span>{{ getProfileName(bookSlotParticipant?.profile_id || bookSlotParticipant?.profileid) }}</span>
+      <mat-chip *ngIf="bookSlotParticipant?.isNonQueueParticipant" class="non-queue-chip">NON-QUEUE</mat-chip>
+    </div>
+
+    <div class="book-slot-body">
+      <p class="book-slot-label">Select a slot:</p>
+
+      <div class="book-slot-list">
+        <div
+          *ngFor="let slot of bookSlotAvailableSlots; let i = index"
+          class="book-slot-item"
+          [class.book-slot-selected]="bookSlotSelectedIndex === i"
+          (click)="bookSlotSelectedIndex = i">
+          <div class="book-slot-radio">
+            <mat-icon *ngIf="bookSlotSelectedIndex === i">radio_button_checked</mat-icon>
+            <mat-icon *ngIf="bookSlotSelectedIndex !== i">radio_button_unchecked</mat-icon>
+          </div>
+          <div class="book-slot-info">
+            <span class="book-slot-time">{{ formatSlotForDisplay(slot) }}</span>
+            <span class="book-slot-capacity" *ngIf="slot.maxslot > 0">
+              {{ slot.usedslot || 0 }} / {{ slot.maxslot }} booked
+            </span>
+            <span class="book-slot-capacity" *ngIf="slot.maxslot === 0">
+              Unlimited slots
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="book-slot-footer">
+      <button mat-stroked-button (click)="closeBookSlotDialog()" [disabled]="bookSlotLoading">
+        Cancel
+      </button>
+      <button mat-raised-button color="primary"
+        [disabled]="bookSlotSelectedIndex === null || bookSlotLoading"
+        (click)="confirmBookSlot()">
+        <mat-spinner *ngIf="bookSlotLoading" diameter="18" style="display:inline-block; margin-right:6px;"></mat-spinner>
+        Confirm Booking
+      </button>
+    </div>
+
+  </div>
+</div>
