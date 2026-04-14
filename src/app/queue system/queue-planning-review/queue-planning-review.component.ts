@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, OnDestroy, OnInit, TemplateRef, ViewChild, AfterViewInit } from '@angular/core';
-import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query, setDoc, Timestamp, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -174,6 +174,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   // Cached planning data
   cachedPlanningData: any = null;
   private dataReadyFlags = { tokens: false, planners: false, planning: false };
+  private planningSlotLookup = new Map<string, Set<string>>();
 
   // Queue tab panel
   showQueueTabPanel: boolean = false;
@@ -198,8 +199,14 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   interimReportEndDate: Date | null = null;
   showInterimDatePicker: boolean = false;
   
+  // Slot booking/revert
+  showBookSlotDialog: boolean = false;
+  bookSlotParticipant: any = null;
+  bookSlotStageName: string = '';
+  bookSlotAvailableSlots: any[] = [];
+  bookSlotSelectedIndex: number | null = null;
+  bookSlotLoading: boolean = false;
   
-
   slotPlannerFilter = {
     startDate: null,
     endDate: null,
@@ -326,17 +333,26 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       slotConfigured: false
     }));
 
-    for (const mergedSlot of this.mergedSlots) {
-      const segmentVar = mergedSlot.segmentVariations.find(sv => sv.segmentId === segmentId);
-      if (segmentVar) {
-        const variation = segmentVar.variations.find(v => v.variationId === variationId);
-        if (variation && variation.stageData) {
-          Object.keys(variation.stageData).forEach(stageName => {
-            const stageIdx = stageConfig.findIndex(s => s.stageName === stageName);
-            if (stageIdx >= 0) {
-              stageConfig[stageIdx].slotConfigured = true;
+    if (!this.cachedPlanningData || !this.cachedPlanningData.planning) {
+      return stageConfig;
+    }
+
+    for (const variationPlanning of this.cachedPlanningData.planning) {
+      if (variationPlanning.variationid !== variationId) continue;
+
+      if (variationPlanning.segments) {
+        for (const segmentData of variationPlanning.segments) {
+          if (segmentData.segmentid !== segmentId) continue;
+
+          if (segmentData.slots) {
+            for (const slot of segmentData.slots) {
+              const stageName = slot.stagename;
+              const stageIdx = stageConfig.findIndex(s => s.stageName === stageName);
+              if (stageIdx >= 0) {
+                stageConfig[stageIdx].slotConfigured = true;
+              }
             }
-          });
+          }
         }
       }
     }
@@ -520,6 +536,12 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     const { tokens, planners, planning } = this.dataReadyFlags;
     if (!tokens || !planners || !planning) return;
     this.rebuildMergedSlots();
+    this.refreshSelectedSlot();
+    if (this.activePanelSection === 'confirmed') {
+      this.showAllConfirmedParticipants();
+    } else if (this.activePanelSection === 'non-confirmed') {
+      this.showAllNonConfirmedParticipants();
+    }
   }
 
   processMergedSlots() {
@@ -542,8 +564,16 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
             if (segmentData.slots && segmentData.slots.length > 0) {
               for (const slot of segmentData.slots) {
-                const startDate = slot.startdate ? slot.startdate.toDate() : null;
-                const endDate = slot.enddate ? slot.enddate.toDate() : null;
+              const toSafeDate = (d: any): Date | null => {
+                if (!d) return null;
+                if (d.toDate && typeof d.toDate === 'function') return d.toDate();
+                if (d.seconds !== undefined) return new Date(d.seconds * 1000);
+                if (d instanceof Date) return d;
+                return null;
+              };
+
+              const startDate = toSafeDate(slot.startdate);
+              const endDate = toSafeDate(slot.enddate);
                 const stageName = slot.stagename;
 
                 if (startDate && endDate) {
@@ -587,27 +617,48 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       }
     }
 
-    this.mergedSlots = Array.from(slotsMap.values()).map(slotData => {
-      const segmentVariations = [];
+    // BUILD LOOKUP MAP FIRST
+    // Key: "startTs_endTs_stageName_segmentId" → true
+    this.planningSlotLookup = new Map<string, Set<string>>();
+    
+    slotsMap.forEach((slotData, slotKey) => {
+      slotData.segmentVariationsData.forEach((segVarData: any) => {
+        Object.keys(segVarData.stageData).forEach((stageName: string) => {
+          const lookupKey = `${slotData.startdate.getTime()}_${slotData.enddate.getTime()}_${stageName}`;
+          if (!this.planningSlotLookup.has(lookupKey)) {
+            this.planningSlotLookup.set(lookupKey, new Set<string>());
+          }
+          this.planningSlotLookup.get(lookupKey).add(segVarData.segmentId);
+        });
+      });
+    });
 
-      slotData.segmentVariationsData.forEach((segVarData, key) => {
-        const existingSegment = segmentVariations.find(sv => sv.segmentId === segVarData.segmentId);
+    // BUILD mergedSlots normally in one pass
+    this.mergedSlots = Array.from(slotsMap.values()).map(slotData => {
+      const segmentVariations: any[] = [];
+
+      slotData.segmentVariationsData.forEach((segVarData: any) => {
+        const existingSegment = segmentVariations.find(
+          sv => sv.segmentId === segVarData.segmentId
+        );
+
+        const variationEntry = {
+          variationId: segVarData.variationId,
+          variationName: this.getVariationName(segVarData.variationId),
+          stageData: this.calculateStageData(
+            segVarData.segmentId,
+            segVarData.variationId,
+            segVarData.stageData
+          )
+        };
 
         if (existingSegment) {
-          existingSegment.variations.push({
-            variationId: segVarData.variationId,
-            variationName: this.getVariationName(segVarData.variationId),
-            stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
-          });
+          existingSegment.variations.push(variationEntry);
         } else {
           segmentVariations.push({
             segmentId: segVarData.segmentId,
             segmentName: this.getSegmentName(segVarData.segmentId),
-            variations: [{
-              variationId: segVarData.variationId,
-              variationName: this.getVariationName(segVarData.variationId),
-              stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
-            }]
+            variations: [variationEntry]
           });
         }
       });
@@ -617,14 +668,13 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         enddate: slotData.enddate,
         starttime: slotData.starttime,
         endtime: slotData.endtime,
-        stages: Array.from(slotData.stages),
+        stages: Array.from(slotData.stages) as string[],
         segmentVariations: segmentVariations
       };
     });
 
     this.mergedSlots.sort((a, b) => a.startdate.getTime() - b.startdate.getTime());
   }
-
   recalculateMergedSlotParticipants() {
     const filterSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
       : this.activeInterimCard === 'not-completed' ? this.notCompletedInterimProfileIds
@@ -850,20 +900,13 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   }
 
   checkSlotExistsInPlanning(variationid: string, segmentid: string, stagename: string, startTs: number, endTs: number): boolean {
-    for (const mergedSlot of this.mergedSlots) {
-      const slotStartTs = mergedSlot.startdate.getTime();
-      const slotEndTs = mergedSlot.enddate.getTime();
-
-      if (slotStartTs === startTs && slotEndTs === endTs && mergedSlot.stages.includes(stagename)) {
-        const segmentVar = mergedSlot.segmentVariations.find(sv => sv.segmentId === segmentid);
-        if (segmentVar) {
-          const variation = segmentVar.variations.find(v => v.variationId === variationid);
-          if (variation && variation.stageData && variation.stageData[stagename]) {
-            return true;
-          }
-        }
-      }
+    const lookupKey = `${startTs}_${endTs}_${stagename}`;
+    const segmentSet = this.planningSlotLookup.get(lookupKey);
+    
+    if (segmentSet && segmentSet.has(segmentid)) {
+      return true;
     }
+    
     return false;
   }
 
@@ -1050,8 +1093,10 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   ): any[] {
     const toTime = (d: any): number | null => {
       if (!d) return null;
-      const dateObj = d.toDate ? d.toDate() : new Date(d);
-      const t = new Date(dateObj).getTime();
+      if (d.seconds !== undefined) return d.seconds * 1000;
+      if (d.toDate && typeof d.toDate === 'function') return d.toDate().getTime();
+      if (d instanceof Date) return d.getTime();
+      const t = new Date(d).getTime();
       return Number.isNaN(t) ? null : t;
     };
 
@@ -1089,8 +1134,11 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         }
 
         const slotExistsInPlanning = this.checkSlotExistsInPlanning(
-          variationid, segmentid, stagename,
-          toTime(slot.startdate), toTime(slot.enddate)
+          slot.variationid || variationid,
+          slot.segmentid || segmentid,
+          stagename,
+          toTime(slot.startdate),
+          toTime(slot.enddate)
         );
 
         const participantSegmentId = this.getParticipantSegment(profileId);
@@ -3659,7 +3707,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         selected: true,
         participantSegmentId: participantSegmentId,
         segmentName: isInSegment ? this.getSegmentName(participantSegmentId) : null,
-        variationName: this.getParticipantVariation(token.variationid),
+        variationName: this.getParticipantVariation(token),
         selectedSlots: this.getParticipantSelectedSlots(token),
         isDuplicate: isDuplicate,
         duplicateSegments: duplicateSegments,
@@ -3688,6 +3736,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
   // Add new method to get participant's variation
   getParticipantVariation(participant: any): string {
+    if (!participant) return '';
     const stageSlots = participant.selectedstageslot || {};
     const stages = Object.keys(stageSlots);
 
@@ -4770,6 +4819,597 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     this.showInterimDatePicker = false;
     this.interimReportStartDate = null;
     this.interimReportEndDate = null;
+  }
+
+  // Get available slots for a participant
+  getAvailableSlotsForParticipant(segmentId: string, variationId: string, stageName: string): any[] {
+    const availableSlots: any[] = [];
+    const now = new Date();
+
+    if (!this.cachedPlanningData || !this.cachedPlanningData.planning) return [];
+
+    for (const variationPlanning of this.cachedPlanningData.planning) {
+      if (variationPlanning.variationid !== variationId) continue;
+
+      for (const segmentData of variationPlanning.segments || []) {
+        if (segmentData.segmentid !== segmentId) continue;
+
+        for (const slot of segmentData.slots || []) {
+          if (slot.stagename !== stageName) continue;
+
+          const endDate = slot.enddate?.toDate ? slot.enddate.toDate() : new Date(slot.enddate);
+          if (endDate < now) continue;
+
+          const maxSlot = slot.maxslot || 0;
+
+          const toSafeDate = (d: any): Date | null => {
+            if (!d) return null;
+            if (d.seconds !== undefined) return new Date(d.seconds * 1000);
+            if (d.toDate && typeof d.toDate === 'function') return d.toDate();
+            if (d instanceof Date) return d;
+            return null;
+          };
+
+          const slotStart = toSafeDate(slot.startdate);
+          const slotEnd = toSafeDate(slot.enddate);
+
+          let actualUsedSlot = slot.usedslot || 0;
+
+          if (slotStart && slotEnd) {
+            for (const mergedSlot of this.mergedSlots) {
+              if (mergedSlot.startdate.getTime() === slotStart.getTime() &&
+                  mergedSlot.enddate.getTime() === slotEnd.getTime()) {
+                for (const segVar of mergedSlot.segmentVariations) {
+                  if (segVar.segmentId !== segmentId) continue;
+                  for (const variation of segVar.variations) {
+                    if (variation.variationId !== variationId) continue;
+                    if (variation.stageData && variation.stageData[stageName]) {
+                      actualUsedSlot = variation.stageData[stageName].usedslot || 0;
+                    }
+                  }
+                }
+                break;
+              }
+            }
+          }
+
+          if (maxSlot !== 0 && actualUsedSlot >= maxSlot) continue;
+
+          availableSlots.push({
+            ...slot,
+            usedslot: actualUsedSlot,  
+            variationid: variationId,
+            segmentid: segmentId,
+            queueplanid: this.cachedPlanningData.docid
+          });
+        }
+      }
+    }
+
+    return availableSlots;
+  }
+
+  // Open book slot dialog
+  openBookSlotDialog(participant: any, stageName: string) {
+    console.log('Non-queue participant object:', JSON.stringify(participant));
+
+    const segmentId = participant.segmentId || participant.participantSegmentId;
+    const variationId = participant.variationId;
+
+    if (!segmentId || !variationId) {
+      alert('Cannot determine segment or variation for this participant.');
+      return;
+    }
+
+    const availableSlots = this.getAvailableSlotsForParticipant(segmentId, variationId, stageName);
+
+    if (availableSlots.length === 0) {
+      alert('No available slots for this stage.');
+      return;
+    }
+
+    this.bookSlotParticipant = participant;
+    this.bookSlotStageName = stageName;
+    this.bookSlotAvailableSlots = availableSlots;
+    this.bookSlotSelectedIndex = null;
+    this.showBookSlotDialog = true;
+  }
+
+  // Close book slot dialog
+  closeBookSlotDialog() {
+    this.showBookSlotDialog = false;
+    this.bookSlotParticipant = null;
+    this.bookSlotStageName = '';
+    this.bookSlotAvailableSlots = [];
+    this.bookSlotSelectedIndex = null;
+    this.bookSlotLoading = false;
+  }
+
+  // Format slot time for display
+  formatSlotForDisplay(slot: any): string {
+    const toDate = (d: any): Date => {
+      if (d?.toDate) return d.toDate();
+      return new Date(d);
+    };
+
+    const start = toDate(slot.startdate);
+    const end = toDate(slot.enddate);
+
+    const dayFormat = (d: Date) => `${d.getDate()} ${Object.keys(this.monthsMap)[d.getMonth()]}`;
+    const timeFormat = (d: Date) => {
+      const h = d.getHours();
+      const m = d.getMinutes().toString().padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${m} ${ampm}`;
+    };
+
+    const sameDay = start.toDateString() === end.toDateString();
+    if (sameDay) {
+      return `${dayFormat(start)} ${timeFormat(start)} - ${timeFormat(end)}`;
+    }
+    return `${dayFormat(start)} ${timeFormat(start)} - ${dayFormat(end)} ${timeFormat(end)}`;
+  }
+
+  // Update slot count in queue planning 
+  async updateSlotCountTransaction(
+    queuePlanId: string,
+    segmentId: string,
+    stageName: string,
+    variationId: string,
+    increment: boolean,
+    selectedSlot: any
+  ): Promise<boolean> {
+
+    const planningRef = doc(this.firestore, 'queue planning', queuePlanId);
+    let updated = false;
+
+    const toMillis = (d: any): number => {
+      if (!d) return 0;
+      if (d.seconds !== undefined) return d.seconds * 1000;
+      if (d.toDate && typeof d.toDate === 'function') return d.toDate().getTime();
+      if (d instanceof Date) return d.getTime();
+      return new Date(d).getTime();
+    };
+
+    const selectedStart = toMillis(selectedSlot.startdate);
+    const selectedEnd = toMillis(selectedSlot.enddate);
+
+    try {
+      await runTransaction(this.firestore, async (transaction) => {
+        const queueDoc = await transaction.get(planningRef);
+        if (!queueDoc.exists()) throw new Error('No Planning');
+
+        const data = queueDoc.data();
+        const planningList = data['planning'] as any[];
+        let found = false;
+
+        for (let i = 0; i < planningList.length; i++) {
+          if (planningList[i]['variationid'] !== variationId) continue;
+
+          const segments = planningList[i]['segments'] as any[];
+          for (let j = 0; j < segments.length; j++) {
+            if (segments[j]['segmentid'] !== segmentId) continue;
+
+            const slots = segments[j]['slots'] as any[];
+            for (let k = 0; k < slots.length; k++) {
+              const slot = slots[k];
+
+              const slotStart = toMillis(slot.startdate);
+              const slotEnd = toMillis(slot.enddate);
+
+              if (
+                slot['stagename'] !== stageName ||
+                slotStart !== selectedStart ||
+                slotEnd !== selectedEnd
+              ) continue;
+
+              // Found the slot — update usedslot
+              const currentUsed = slot['usedslot'] || 0;
+              const maxSlot = slot['maxslot'] || 0;
+
+              if (increment) {
+                if (maxSlot === 0 || currentUsed < maxSlot) {
+                  slot['usedslot'] = currentUsed + 1;
+                  updated = true;
+                  found = true;
+                } else {
+                  throw new Error('Slot Full');
+                }
+              } else {
+                slot['usedslot'] = currentUsed > 0 ? currentUsed - 1 : 0;
+                updated = true;
+                found = true;
+              }
+              break;
+            }
+            if (found) break;
+          }
+          if (found) break;
+        }
+
+        if (updated) {
+          transaction.update(planningRef, { 'planning': planningList });
+        } else {
+          throw new Error('Slot not found');
+        }
+      });
+    } catch (err) {
+      console.error('Transaction error:', err);
+      updated = false;
+    }
+
+    return updated;
+  }
+
+  // Confirm book slot
+  async confirmBookSlot() {
+    if (this.bookSlotSelectedIndex === null) {
+      alert('Please select a slot.');
+      return;
+    }
+
+    this.bookSlotLoading = true;
+    const participant = this.bookSlotParticipant;
+    const stageName = this.bookSlotStageName;
+    const selectedSlot = this.bookSlotAvailableSlots[this.bookSlotSelectedIndex];
+    const profileId = participant.profile_id || participant.profileid;
+    const segmentId = selectedSlot.segmentid;
+    const variationId = selectedSlot.variationid;
+    const queuePlanId = selectedSlot.queueplanid;
+
+    const toMillis = (d: any): number => {
+      if (!d) return 0;
+      if (d.seconds !== undefined) return d.seconds * 1000;
+      if (d.toDate && typeof d.toDate === 'function') return d.toDate().getTime();
+      if (d instanceof Date) return d.getTime();
+      return new Date(d).getTime();
+    };
+
+    try {
+      // Update slot count in queue planning
+      const updated = await this.updateSlotCountTransaction(
+        queuePlanId, segmentId, stageName, variationId, true, selectedSlot
+      );
+
+      if (!updated) {
+        alert('Failed to book slot. Slot may be full. Please try again.');
+        this.bookSlotLoading = false;
+        return;
+      }
+
+      // Update based on participant type
+      if (!participant.isNonQueueParticipant) {
+
+        //  Has queue token
+        const tokenId = participant.tokenid || participant.id;
+        const tokenRef = doc(this.firestore, 'queue_token', tokenId);
+
+        const slotData = {
+          ...selectedSlot,
+          stagename: stageName,
+          segmentid: segmentId,
+          variationid: variationId,
+          slotconfirmation: new Date().toISOString()
+        };
+
+        await updateDoc(tokenRef, {
+          [`selectedstageslot.${stageName}`]: slotData
+        });
+
+        // Update local queueTokenList immediately
+        const tokenIndex = this.queueTokenList.findIndex(t =>
+          (t.tokenid === tokenId || t.id === tokenId)
+        );
+        if (tokenIndex !== -1) {
+          const updatedToken = { ...this.queueTokenList[tokenIndex] };
+          const updatedStageSlot = { ...(updatedToken.selectedstageslot || {}) };
+          updatedStageSlot[stageName] = slotData;
+          updatedToken.selectedstageslot = updatedStageSlot;
+          this.queueTokenList[tokenIndex] = updatedToken;
+        }
+
+        } else {
+
+          //  No queue token (non-queue participant)
+          const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
+
+          //  find by arenaeventid matching this queue
+          let participantProductDocs = await getDocs(
+            query(
+              collection(this.firestore, 'participantsproduct'),
+              where('profileid', '==', profileId),
+              where('arenaeventid', '==', this.selectedQueue['docid'])
+            )
+          );
+
+          // find status null with no eventref
+          if (participantProductDocs.empty) {
+            const allDocs = await getDocs(
+              query(
+                collection(this.firestore, 'participantsproduct'),
+                where('profileid', '==', profileId),
+                where('status', '==', null)
+              )
+            );
+            const filtered = allDocs.docs.filter(d => {
+              const data = d.data();
+              return !data['eventref'] && !data['arenaeventid'];
+            });
+            if (filtered.length > 0) {
+              participantProductDocs = { empty: false, docs: filtered } as any;
+            }
+          }
+
+          if (participantProductDocs.empty) {
+            alert('No participant product found. Cannot complete booking.');
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          const participantProductDoc = participantProductDocs.docs[0];
+          const participantProductData = participantProductDoc.data();
+
+          // Check if product has queue delivery activity
+          const productRef = participantProductData['productref'];
+          if (!productRef) {
+            alert('No product found for this participant. Cannot book slot.');
+            await this.updateSlotCountTransaction(queuePlanId, segmentId, stageName, variationId, false, selectedSlot);
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          const deliverySequenceDocs = await getDocs(
+            query(
+              collection(this.firestore, 'productToDeliverySequence'),
+              where('product', '==', productRef)
+            )
+          );
+
+          if (deliverySequenceDocs.empty) {
+            alert('No delivery sequence configured for this participant\'s product. Cannot book slot.');
+            await this.updateSlotCountTransaction(queuePlanId, segmentId, stageName, variationId, false, selectedSlot);
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          const deliveryOptions = deliverySequenceDocs.docs[0].data()['deliveryoptions'] || [];
+          const lastOption = deliveryOptions[deliveryOptions.length - 1];
+          const deliverySequence = lastOption?.['deliverysequence'] || [];
+          const hasQueueActivity = deliverySequence.some((seq: any) => {
+            return seq['activity']?.path?.includes('queue');
+          });
+
+          if (!hasQueueActivity) {
+            alert('This participant cannot be booked as their product delivery type is not queue.');
+            await this.updateSlotCountTransaction(queuePlanId, segmentId, stageName, variationId, false, selectedSlot);
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          // Reset first if already initiated so Cloud Function triggers properly
+          if (participantProductData['status'] === 'initiated') {
+            await updateDoc(participantProductDoc.ref, {
+              'status': null,
+              'eventref': deleteField(),
+              'requestedslot': deleteField(),
+              'queuevariationid': deleteField()
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+          await updateDoc(participantProductDoc.ref, {
+            'status': 'initiated',
+            'eventref': queueRef,
+            'requestedslot': selectedSlot,
+            'queuevariationid': variationId,
+            'statusdate.initiated': new Date()
+          });
+
+          const eventParticipationRef = doc(collection(this.firestore, 'event participation request'));
+          await setDoc(eventParticipationRef, {
+            docid: eventParticipationRef.id,
+            doccreateddate: new Date(),
+            eventref: queueRef,
+            productref: participantProductData['productref'] || null,
+            status: 'approved',
+            profileid: profileId,
+            participantproductid: participantProductDoc.id,
+            arenaeventid: this.selectedQueue['docid'],
+            initiatedfrom: 'admin'
+          });
+
+          this.rebuildMergedSlots();
+          this.refreshSelectedSlot();
+          this.showAllNonConfirmedParticipants();
+          this.closeBookSlotDialog();
+          alert('Slot booked successfully');
+          return;
+        }
+
+      //  Remove from non-confirmed list immediately
+      this.nonConfirmedParticipants = this.nonConfirmedParticipants.filter(p => {
+        const pid = p.profile_id || p.profileid;
+        return pid !== profileId;
+      });
+
+      this.allParticipantsForStage = this.allParticipantsForStage.filter(p => {
+        const pid = p.profile_id || p.profileid;
+        return pid !== profileId;
+      });
+
+      // Rebuild with updated local data
+      this.rebuildMergedSlots();
+      this.refreshSelectedSlot();        
+      this.showAllConfirmedParticipants();
+      this.closeBookSlotDialog();
+      alert('Slot booked successfully!');
+
+    } catch (err) {
+      console.error('Error booking slot:', err);
+      alert('Error booking slot. Please try again.');
+      this.bookSlotLoading = false;
+    }
+  }
+
+
+  refreshSelectedSlot() {
+    if (!this.selectedSlot || !this.selectedStageForPanel) return;
+
+    const updatedSlot = this.mergedSlots.find(slot =>
+      slot.startdate.getTime() === this.selectedSlot.startdate.getTime() &&
+      slot.enddate.getTime() === this.selectedSlot.enddate.getTime()
+    );
+
+    if (updatedSlot) {
+      this.selectedSlot = updatedSlot;
+    }
+  }
+
+  // Revert slot for confirmed participant
+  async revertSlot(participant: any, stageName: string) {
+    const profileId = participant.profile_id || participant.profileid;
+    const name = this.getProfileName(profileId);
+
+    const confirmed = window.confirm(
+      `Are you sure you want to revert the slot for ${name} in stage "${stageName}"?`
+    );
+
+    if (!confirmed) return;
+
+    const stageSlots = participant.selectedstageslot || {};
+    const selectedSlot = stageSlots[stageName];
+
+    if (!selectedSlot) {
+      alert('No slot found for this stage.');
+      return;
+    }
+
+    const segmentId = selectedSlot.segmentid;
+    const variationId = selectedSlot.variationid || participant.variationId;
+    const queuePlanId = this.cachedPlanningData?.docid;
+
+    if (!queuePlanId) {
+      alert('Queue planning data not found.');
+      return;
+    }
+
+    const loading = this.dialog.open(LoadingProgressComponent, {
+      data: { msg: 'Reverting slot...' },
+      disableClose: true
+    });
+
+    try {
+      // Decrement usedslot in queue planning (transaction)
+      const updated = await this.updateSlotCountTransaction(
+        queuePlanId, segmentId, stageName, variationId, false, selectedSlot
+      );
+
+      if (!updated) {
+        loading.close();
+        alert('Failed to revert slot. Please try again.');
+        return;
+      }
+
+      // Delete selectedstageslot.{stageName} from queue_token
+      const tokenId = participant.tokenid || participant.id;
+
+      if (tokenId && !participant.isNonQueueParticipant) {
+        const tokenRef = doc(this.firestore, 'queue_token', tokenId);
+        await updateDoc(tokenRef, {
+          [`selectedstageslot.${stageName}`]: deleteField()
+        });
+
+        // Update local queueTokenList immediately
+        const tokenIndex = this.queueTokenList.findIndex(t =>
+          (t.tokenid === tokenId || t.id === tokenId)
+        );
+        if (tokenIndex !== -1) {
+          const updatedToken = { ...this.queueTokenList[tokenIndex] };
+          const updatedStageSlot = { ...(updatedToken.selectedstageslot || {}) };
+          delete updatedStageSlot[stageName];
+          updatedToken.selectedstageslot = updatedStageSlot;
+          this.queueTokenList[tokenIndex] = updatedToken;
+        }
+      } else if (participant.isNonQueueParticipant) {
+        // find by arenaeventid matching this queue
+        let participantProductDocs = await getDocs(
+          query(
+            collection(this.firestore, 'participantsproduct'),
+            where('profileid', '==', profileId),
+            where('arenaeventid', '==', this.selectedQueue['docid'])
+          )
+        );
+
+        // find by status initiated with this queue's eventref
+        if (participantProductDocs.empty) {
+          const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
+          const allDocs = await getDocs(
+            query(
+              collection(this.firestore, 'participantsproduct'),
+              where('profileid', '==', profileId),
+              where('status', '==', 'initiated')
+            )
+          );
+          const filtered = allDocs.docs.filter(d => {
+            const data = d.data();
+            const eventref = data['eventref'];
+            return eventref && eventref.path === queueRef.path;
+          });
+          if (filtered.length > 0) {
+            participantProductDocs = { empty: false, docs: filtered } as any;
+          }
+        }
+
+        if (!participantProductDocs.empty) {
+          await updateDoc(participantProductDocs.docs[0].ref, {
+            'status': null,
+            'eventref': deleteField(),
+            'requestedslot': deleteField(),
+            'queuevariationid': deleteField(),
+            'statusdate.initiated': deleteField()
+          });
+        }
+      }
+
+      // Manually update local queueTokenList immediately
+      const tokenIndex = this.queueTokenList.findIndex(t =>
+        (t.tokenid === tokenId || t.id === tokenId)
+      );
+
+      console.log('Token index in local list:', tokenIndex);
+
+      if (tokenIndex !== -1) {
+        const updatedToken = { ...this.queueTokenList[tokenIndex] };
+        const updatedStageSlot = { ...(updatedToken.selectedstageslot || {}) };
+        delete updatedStageSlot[stageName];
+        updatedToken.selectedstageslot = updatedStageSlot;
+        this.queueTokenList[tokenIndex] = updatedToken;
+      }
+
+      //Remove from confirmed list immediately
+      this.confirmedParticipants = this.confirmedParticipants.filter(p => {
+        const pid = p.profile_id || p.profileid;
+        return pid !== profileId;
+      });
+
+      this.allParticipantsForStage = this.allParticipantsForStage.filter(p => {
+        const pid = p.profile_id || p.profileid;
+        return pid !== profileId;
+      });
+
+      // Rebuild with updated local data
+      this.rebuildMergedSlots();
+      this.refreshSelectedSlot();        
+      this.showAllNonConfirmedParticipants();
+      loading.close();
+      alert('Slot reverted successfully!');
+
+    } catch (err) {
+      console.error('Error reverting slot:', err);
+      loading.close();
+      alert('Error reverting slot. Please try again.');
+    }
   }
 
 }
