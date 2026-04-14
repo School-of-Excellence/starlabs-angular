@@ -10,6 +10,12 @@ import { provideServiceWorker } from '@angular/service-worker';
 const app = initializeApp(environment.firebase);
 const firestore = getFirestore(app);
 
+(window as any).process = {
+  env: { DEBUG: undefined },
+  version: '',
+  nextTick: (fn: any) => setTimeout(fn, 0),
+};
+
 bootstrapApplication(AppComponent, {
   ...appConfig,
   providers: [
@@ -18,5 +24,14 @@ bootstrapApplication(AppComponent, {
       registrationStrategy: 'registerWhenStable:30000'
     })
   ]
-})
-  .catch((err) => console.error(err));
+}).catch((err) => console.error(err));
+
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('Each child in a list should have a unique')) {
+    return; // suppress Zoom SDK's React key warning
+  }
+  originalWarn.apply(console, args);
+};
+
+  

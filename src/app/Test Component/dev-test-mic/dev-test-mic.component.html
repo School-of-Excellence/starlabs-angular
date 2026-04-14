@@ -1,0 +1,311 @@
+<div class="test-container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">DeepFilterNet3 vs Koala · Noise Cancellation Comparison</div>
+    <h1>Noise Cancellation Test</h1>
+    <p class="subtitle">
+      Record raw + DeepFilterNet3 + Koala simultaneously from the same mic — then compare quality side by side.
+    </p>
+  </div>
+
+  <!-- Status Banner -->
+  <div class="status-banner"
+    [class.live]="status === 'live'"
+    [class.loading]="status === 'loading'"
+    [class.recording]="isRecording"
+    [class.processing]="status === 'processing'"
+    [class.done]="status === 'done'"
+    [class.error]="status === 'error' || status === 'live-error'"
+    *ngIf="statusMessage">
+    <span class="dot" [class.pulse]="status === 'live' || isRecording || status === 'loading'"></span>
+    {{ statusMessage }}
+  </div>
+
+  <!-- ── Config Section ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="section-icon">⚙️</span>
+      Configuration
+    </div>
+
+    <!-- Picovoice Access Key -->
+    <div class="config-row">
+      <label class="config-label">
+        Picovoice Access Key
+        <a class="key-link" href="https://console.picovoice.ai/" target="_blank">Get free key ↗</a>
+      </label>
+      <input class="key-input" type="password" [(ngModel)]="accessKey"
+        placeholder="Paste your AccessKey here…"
+        [disabled]="isBusy || isRecording || isLive" />
+    </div>
+
+    <!-- DF3 Suppression -->
+    <div class="config-row">
+      <label class="config-label">DeepFilterNet3 Suppression Level</label>
+      <div class="slider-row">
+        <label>Low</label>
+        <input type="range" min="0" max="100" step="1"
+          [(ngModel)]="suppressionLevel"
+          (input)="onSuppressionChange()"
+          [disabled]="isBusy || isRecording" />
+        <label>High</label>
+        <span class="slider-val">{{ suppressionLevel }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── File Comparison Mode (Mode 1) ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="section-icon">📂</span>
+      Mode 1 — File Comparison
+      <span class="section-hint">Feed an audio file through DeepFilterNet3 — compare input vs output</span>
+    </div>
+
+    <div class="config-row" *ngIf="fileStatus !== 'loading'">
+      <label class="config-label">Select audio file (e.g. Raw.webm)</label>
+      <input type="file" accept="audio/*,video/webm,video/mp4"
+        (change)="onFileSelected($event)"
+        [disabled]="isFileProcessing || isBusy || isRecording || isLive"
+        class="file-input" />
+    </div>
+
+    <!-- Progress / status -->
+    <div class="status-banner"
+      [class.loading]="fileStatus === 'loading'"
+      [class.done]="fileStatus === 'done'"
+      [class.error]="fileStatus === 'error'"
+      *ngIf="fileStatusMsg">
+      <span class="dot" [class.pulse]="fileStatus === 'loading'"></span>
+      {{ fileStatusMsg }}
+      <span *ngIf="fileStatus === 'loading'" class="progress-pct"> {{ fileProgress }}%</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-bar-wrap" *ngIf="fileStatus === 'loading'">
+      <div class="progress-bar-fill" [style.width.%]="fileProgress"></div>
+    </div>
+
+    <!-- Result players -->
+    <div class="players-three" *ngIf="fileStatus === 'done'">
+
+      <div class="player-card raw">
+        <div class="player-label"><span>🔴</span> Input (Raw)</div>
+        <div class="player-sub">Original file — no processing</div>
+        <audio [src]="fileInputUrl!" controls *ngIf="fileInputUrl"></audio>
+      </div>
+
+      <div class="player-card df3">
+        <div class="player-label"><span>🟢</span> DeepFilterNet3 Output</div>
+        <div class="player-sub">Processed WAV · {{ suppressionLevel }}/100 suppression · {{ (fileProcessingMs / 1000).toFixed(1) }}s to process</div>
+        <audio [src]="fileOutputUrl!" controls *ngIf="fileOutputUrl"></audio>
+      </div>
+
+    </div>
+
+    <div class="info-hint" *ngIf="fileStatus === 'idle'">
+      <p>Tip: use <strong>Raw.webm</strong> as input and compare the DF3 output against <strong>Processed.webm</strong> — the Krisp-quality reference. Both files are in <code>/assets/</code>.</p>
+    </div>
+  </div>
+
+  <!-- ── Live Preview ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="section-icon">🎧</span>
+      Mode 2 — Live Preview
+      <span class="section-hint">Hear one filter at a time through headphones</span>
+    </div>
+
+    <!-- Filter selector -->
+    <div class="filter-toggle" *ngIf="!isLive">
+      <label class="toggle-label">Preview with:</label>
+      <label class="radio-opt" [class.active]="liveFilter === 'df3'">
+        <input type="radio" [(ngModel)]="liveFilter" value="df3" [disabled]="isBusy" />
+        DeepFilterNet3
+      </label>
+      <label class="radio-opt" [class.active]="liveFilter === 'koala'">
+        <input type="radio" [(ngModel)]="liveFilter" value="koala" [disabled]="isBusy" />
+        Koala
+      </label>
+    </div>
+
+    <div class="controls" *ngIf="!isLive">
+      <button class="btn btn-primary" (click)="startLivePreview()"
+        [disabled]="isBusy || isRecording">
+        ▶ Start Live Preview
+      </button>
+    </div>
+
+    <div class="live-controls" *ngIf="isLive">
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        LIVE — {{ liveFilter === 'df3' ? 'DeepFilterNet3' : 'Koala' }} Active
+      </div>
+      <button class="btn btn-stop" (click)="stopLivePreview()">■ Stop Preview</button>
+    </div>
+  </div>
+
+  <!-- ── A/B/C Recording ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="section-icon">🎙️</span>
+      Mode 3 — A/B/C Comparison Recording
+      <span class="section-hint">Records Raw + DeepFilterNet3 + Koala simultaneously from the same mic</span>
+    </div>
+
+    <div class="controls" *ngIf="!isRecording">
+      <button class="btn btn-record" (click)="startABCRecording()"
+        [disabled]="isLive || isBusy">
+        ⏺ Start Recording
+      </button>
+    </div>
+
+    <div class="controls" *ngIf="isRecording">
+      <button class="btn btn-stop" (click)="stopABCRecording()">
+        ■ Stop &amp; Compare
+      </button>
+    </div>
+
+    <!-- Three-way players -->
+    <div class="players-three" *ngIf="rawUrl || df3Url || koalaUrl">
+
+      <div class="player-card raw">
+        <div class="player-label"><span>🔴</span> Raw Microphone</div>
+        <div class="player-sub">No processing</div>
+        <audio [src]="rawUrl!" controls *ngIf="rawUrl"></audio>
+        <div class="placeholder" *ngIf="!rawUrl">—</div>
+      </div>
+
+      <div class="player-card df3">
+        <div class="player-label"><span>🟢</span> DeepFilterNet3</div>
+        <div class="player-sub">ONNX · AudioWorklet</div>
+        <audio [src]="df3Url!" controls *ngIf="df3Url"></audio>
+        <div class="placeholder loading-ph" *ngIf="!df3Url && status === 'processing'">Processing…</div>
+        <div class="placeholder" *ngIf="!df3Url && status !== 'processing'">—</div>
+      </div>
+
+      <div class="player-card koala">
+        <div class="player-label"><span>🔵</span> Koala (Picovoice)</div>
+        <div class="player-sub">WASM · 16 kHz WAV</div>
+        <audio [src]="koalaUrl!" controls *ngIf="koalaUrl"></audio>
+        <div class="placeholder loading-ph" *ngIf="!koalaUrl && status === 'processing'">Processing…</div>
+        <div class="placeholder" *ngIf="!koalaUrl && status !== 'processing'">—</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Comparison Report ── -->
+  <div class="section report-section" *ngIf="df3Metrics">
+    <div class="section-title">
+      <span class="section-icon">📊</span>
+      Comparison Report
+      <span class="section-hint">Measured automatically during the recording session</span>
+    </div>
+
+    <div class="metrics-grid">
+
+      <!-- DF3 metrics -->
+      <div class="metrics-col">
+        <div class="metrics-header df3-header">🟢 DeepFilterNet3</div>
+        <table class="metrics-table">
+          <tbody>
+            <tr><td class="ml">Init Time</td><td class="mv">{{ df3Metrics.initTimeMs }} ms</td></tr>
+            <tr><td class="ml">Graph Setup</td><td class="mv">{{ df3Metrics.setupMs }} ms</td></tr>
+            <tr><td class="ml separator" colspan="2"></td></tr>
+            <tr><td class="ml">Raw Energy</td><td class="mv">{{ df3Metrics.rawEnergyDb }} dBFS</td></tr>
+            <tr><td class="ml">Clean Energy</td><td class="mv">{{ df3Metrics.cleanEnergyDb }} dBFS</td></tr>
+            <tr>
+              <td class="ml">Noise Reduction</td>
+              <td class="mv">
+                <span class="nr-value" [class.nr-positive]="df3Metrics.noiseReductionDb > 0" [class.nr-negative]="df3Metrics.noiseReductionDb <= 0">
+                  {{ df3Metrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ df3Metrics.noiseReductionDb }} dB
+                </span>
+              </td>
+            </tr>
+            <tr><td class="ml separator" colspan="2"></td></tr>
+            <tr><td class="ml">Sample Rate</td><td class="mv">{{ df3Metrics.sampleRate }} Hz</td></tr>
+            <tr><td class="ml">Config</td><td class="mv">{{ df3Metrics.extraInfo }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- VS divider + Koala metrics (only when Koala was active) -->
+      <ng-container *ngIf="koalaMetrics">
+        <div class="vs-col">
+          <div class="vs-badge">VS</div>
+        </div>
+
+        <div class="metrics-col">
+          <div class="metrics-header koala-header">🔵 Koala (Picovoice)</div>
+          <table class="metrics-table">
+            <tbody>
+              <tr><td class="ml">Init Time</td><td class="mv">{{ koalaMetrics.initTimeMs }} ms</td></tr>
+              <tr><td class="ml">Capture Setup</td><td class="mv">{{ koalaMetrics.setupMs }} ms</td></tr>
+              <tr><td class="ml separator" colspan="2"></td></tr>
+              <tr><td class="ml">Raw Energy</td><td class="mv">{{ koalaMetrics.rawEnergyDb }} dBFS</td></tr>
+              <tr><td class="ml">Clean Energy</td><td class="mv">{{ koalaMetrics.cleanEnergyDb }} dBFS</td></tr>
+              <tr>
+                <td class="ml">Noise Reduction</td>
+                <td class="mv">
+                  <span class="nr-value" [class.nr-positive]="koalaMetrics.noiseReductionDb > 0" [class.nr-negative]="koalaMetrics.noiseReductionDb <= 0">
+                    {{ koalaMetrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ koalaMetrics.noiseReductionDb }} dB
+                  </span>
+                </td>
+              </tr>
+              <tr><td class="ml separator" colspan="2"></td></tr>
+              <tr><td class="ml">Sample Rate</td><td class="mv">{{ koalaMetrics.sampleRate }} Hz</td></tr>
+              <tr><td class="ml">Config</td><td class="mv">{{ koalaMetrics.extraInfo }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
+    </div>
+
+    <!-- Winner banner (only when both filters ran) -->
+    <div class="winner-banner" *ngIf="koalaMetrics">
+      <span class="winner-label">📈 Higher Noise Reduction:</span>
+      <span class="winner-name">
+        {{ df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? '🟢 DeepFilterNet3' : '🔵 Koala' }}
+        ({{ (df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? df3Metrics!.noiseReductionDb : koalaMetrics.noiseReductionDb) }} dB)
+      </span>
+    </div>
+
+    <!-- Notes + Download -->
+    <div class="notes-row">
+      <label class="notes-label">Notes — Subjective Observations</label>
+      <textarea class="notes-area" [(ngModel)]="userNotes" rows="3"
+        placeholder="e.g. DF3 removed fan hum better, Koala preserved voice more naturally…"></textarea>
+    </div>
+
+    <div class="download-row">
+      <button class="btn btn-download" (click)="downloadReport()">
+        ⬇ Download Comparison Report JSON
+      </button>
+      <span class="download-hint">noise-filter-comparison-&lt;timestamp&gt;.json</span>
+    </div>
+  </div>
+
+  <!-- How it works (idle only) -->
+  <div class="info-card" *ngIf="status === 'idle'">
+    <div class="info-title">How it works</div>
+    <div class="info-row">
+      <span class="step-chip">1</span>
+      <span>Get a <strong>free Picovoice access key</strong> at <a href="https://console.picovoice.ai/" target="_blank">console.picovoice.ai</a> — no credit card, takes 30 seconds.</span>
+    </div>
+    <div class="info-row">
+      <span class="step-chip">2</span>
+      <span>Paste the key above, set your <strong>DF3 suppression level</strong>, then use <strong>Live Preview</strong> to hear each filter individually.</span>
+    </div>
+    <div class="info-row">
+      <span class="step-chip">3</span>
+      <span><strong>A/B/C Recording</strong> records Raw + DeepFilterNet3 + Koala simultaneously from the same mic — the fairest comparison possible.</span>
+    </div>
+    <div class="info-row">
+      <span class="step-chip">4</span>
+      <span>Listen to all three players, check the <strong>metrics report</strong>, and <strong>download JSON</strong> with both filter results for your records.</span>
+    </div>
+  </div>
+
+</div>
