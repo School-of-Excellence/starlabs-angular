@@ -9,24 +9,28 @@
   <div class="row g-3">
     <div class="col-12" *ngFor="let studio of openViduRoomList">
       <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
             <h5 class="mb-0">{{studio["title"]}}</h5>
             <small class="text-muted">Room ID: {{studio['roomid']}}</small>
           </div>
-          <div>
-            <button 
+          <div class="d-flex align-items-center gap-2">
+            <!-- Listening pill — visible only when listening to this room -->
+            <div class="listening-pill" *ngIf="listeningRoom === studio['roomid']">
+              <div class="listening-wave"><span></span><span></span><span></span><span></span></div>
+              Listening
+            </div>
+            <button
               class="btn btn-sm"
               [class.btn-danger]="listeningRoom == studio['roomid']"
               [class.btn-outline-primary]="listeningRoom != studio['roomid']"
+              [disabled]="roomConnecting().get(studio['roomid'])"
               (click)="toggleListening(studio['roomid'])">
               <i class="bi" [class.bi-volume-up-fill]="listeningRoom == studio['roomid']" [class.bi-volume-mute]="listeningRoom != studio['roomid']"></i>
               {{listeningRoom == studio['roomid'] ? "Stop" : "Start"}} Listening
             </button>
-            <button 
-              class="btn btn-sm ms-3 text-light border-0"
-              [class.btn-danger]="true"
-              [class.btn-outline-primary]="true"
+            <button
+              class="btn btn-sm btn-danger border-0"
               (click)="endCall(studio['roomid'])">
               End Room
             </button>
@@ -34,47 +38,67 @@
         </div>
 
         <div class="card-body">
-          <div *ngIf="mapOpenViduRooms().get(studio['roomid']) as assignment; else nocall">
-            <!-- Participant count -->
-            <div class="mb-2">
-              <span class="badge bg-secondary">{{getVideoParticipantCount(assignment.values())}} Participants</span>
-            </div>
 
-            <!-- Horizontal scrollable video grid -->
-            <div class="video-scroll-container">
-              <div class="video-grid">
-                <div *ngFor="let remote of returnRemoteParticipantTrack(assignment.values())" class="video-wrapper">
-                  <div class="video-tile" *ngIf="remote.trackPublication.kind === 'video'">
-                    <app-openvidu-video-element
-                      [track]="remote.trackPublication.videoTrack"
-                      [participantIdentity]="remote.participantName">
-                    </app-openvidu-video-element>
+          <!-- Connecting state -->
+          <div *ngIf="roomConnecting().get(studio['roomid'])" class="room-connecting">
+            <div class="connecting-spinner"></div>
+            <span>Joining room...</span>
+          </div>
 
-                    <!-- Name badge - bottom left -->
-                    <div class="name-badge">
-                      {{ remote.participantName }}
+          <!-- Live content -->
+          <ng-container *ngIf="!roomConnecting().get(studio['roomid'])">
+            <div class="video-section" *ngIf="mapOpenViduRooms().get(studio['roomid']) as assignment; else nocall">
+              <!-- Participant count -->
+              <div class="mb-2">
+                <span class="badge bg-secondary">{{getVideoParticipantCount(assignment.values())}} Participants</span>
+              </div>
+
+              <!-- Horizontal scrollable video grid -->
+              <div class="video-scroll-container">
+                <div class="video-grid">
+                  <div *ngFor="let remote of returnRemoteParticipantTrack(assignment.values())" class="video-wrapper">
+                    <div class="video-tile" *ngIf="remote.trackPublication.kind === 'video'" [class.active-speaker-cctv]="isActiveSpeaker(studio['roomid'], remote.participantIdentity)">
+                      <app-openvidu-video-element
+                        [track]="remote.trackPublication.videoTrack"
+                        [participantIdentity]="remote.participantName">
+                      </app-openvidu-video-element>
+
+                      <!-- Name badge -->
+                      <div class="name-badge">
+                        <mat-icon class="badge-mic-icon"
+                          [class.text-danger]="isParticipantMuted(studio['roomid'], remote.participantIdentity)">
+                          {{ isParticipantMuted(studio['roomid'], remote.participantIdentity) ? 'mic_off' : 'mic' }}
+                        </mat-icon>
+                        {{ remote.participantName }}
+                        <span class="network-bars">
+                          <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 1" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
+                          <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 2" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
+                          <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 3" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
+                          <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 4" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              <!-- Hidden audio (active only when listening) -->
+              <div class="d-none" *ngIf="listeningRoom == studio['roomid']">
+                <ng-container *ngFor="let remote of returnRemoteParticipantTrack(assignment.values())">
+                  <app-openvidu-audio-element
+                    *ngIf="remote.trackPublication.kind === 'audio'"
+                    [track]="remote.trackPublication.audioTrack">
+                  </app-openvidu-audio-element>
+                </ng-container>
+              </div>
             </div>
 
-            <!-- Audio elements (hidden) -->
-            <div class="d-none" *ngIf="listeningRoom == studio['roomid']">
-              <ng-container *ngFor="let remote of returnRemoteParticipantTrack(assignment.values())">
-                <app-openvidu-audio-element
-                  *ngIf="remote.trackPublication.kind === 'audio'"
-                  [track]="remote.trackPublication.audioTrack">
-                </app-openvidu-audio-element>
-              </ng-container>
-            </div>
-          </div>
-
-          <ng-template #nocall>
-            <div class="text-center text-muted py-4">
-              <p class="mb-0">No active participants</p>
-            </div>
-          </ng-template>
+            <ng-template #nocall>
+              <div class="text-center text-muted py-4">
+                <p class="mb-0">No active participants</p>
+              </div>
+            </ng-template>
+          </ng-container>
         </div>
       </div>
     </div>
