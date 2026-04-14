@@ -22,6 +22,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
 import * as XLSX from 'xlsx';
 import { getStorage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { HttpClient } from '@angular/common/http';
@@ -46,17 +48,15 @@ const FAVOURITES_KEY = 'wati_favourite_templates';
     MatFormFieldModule, FormsModule, NgIf, MatInputModule, MatSelectModule,
     NgxMatSelectSearchModule, MatButtonModule, CommonModule, MatTabsModule,
     MatCheckboxModule, MatIconModule, MatCardModule, MatProgressSpinnerModule,
-    MatChipsModule, MatProgressBarModule, MatRadioModule, MatTooltipModule, MatDividerModule,
+    MatChipsModule, MatProgressBarModule, MatRadioModule, MatTooltipModule,
+    MatDividerModule, MatDatepickerModule, MatNativeDateModule,
   ],
   templateUrl: './wati-input.component.html',
   styleUrl: './wati-input.component.css'
 })
 export class WatiInputComponent {
 
-  // ── UI state ─────────────────────────────────────────────────────────
-  showFormatGuide: boolean = false;
-
-  // ── String fields ─────────────────────────────────────────────────────
+  showFormatGuide = false;
   searchCategory = '';
   searchSubCategory = '';
   templateType = 'Standard';
@@ -67,16 +67,11 @@ export class WatiInputComponent {
   testNumbers = '';
   searchProfile = '';
   newTestNumber = '';
-
-  // ── Recent tab search ─────────────────────────────────────────────────
   searchRecent = '';
   filteredRecentTemplates: any[] = [];
+  favouriteTemplates: any[] = [];
+  favouriteIds: Set<string> = new Set<string>();
 
-  // ── Favourites ────────────────────────────────────────────────────────
-  favouriteTemplates: any[] = [];      // full template objects stored in localStorage
-  favouriteIds: Set<string> = new Set<string>(); // set of elementName keys for O(1) lookup
-
-  // ── File upload state ─────────────────────────────────────────────────
   uploadedFile: File | null = null;
   excelData: any[] = [];
   excelHeaders: string[] = [];
@@ -88,40 +83,23 @@ export class WatiInputComponent {
   fileUploadUrl = '';
   isUploadingFile = false;
 
-  // ── Parameter config ──────────────────────────────────────────────────
   templateParamNames: string[] = [];
   templateParams: TemplateParam[] = [];
   metadataFields: string[] = [];
   isLoadingMetadataFields = false;
 
-  // ── Objects ───────────────────────────────────────────────────────────
   selectedTemplate: any = {};
   mapProfile: Record<string, any> = {};
   selectedQueuedTemplate: any = null;
   queuedRecipients: any[] = [];
 
   bufferDoc: any = {
-    profileid: [],
-    createdby: null,
-    date: new Date(),
-    status: 'created',
-    body: '',
-    templateid: '',
-    broadcastname: '',
-    notes: '',
-    watitemplateid: '',
-    wati_msgid: [],
-    params: [],
-    validated: true,
-    serverurl: '',
-    serverid: '',
-    numbers: [],
-    numbermap: {},
-    parameterConfig: [],
-    paramFillMode: 'static' as ParamFillType,
+    profileid: [], createdby: null, date: new Date(), status: 'created',
+    body: '', templateid: '', broadcastname: '', notes: '', watitemplateid: '',
+    wati_msgid: [], params: [], validated: true, serverurl: '', serverid: '',
+    numbers: [], numbermap: {}, parameterConfig: [], paramFillMode: 'static' as ParamFillType,
   };
 
-  // ── Arrays ────────────────────────────────────────────────────────────
   templateCategories: any[] = [];
   templateSubCategories: any[] = [];
   watiTemplates: any[] = [];
@@ -135,7 +113,6 @@ export class WatiInputComponent {
   testNumbersList: any[] = [];
   serverUrls: any[] = [];
 
-  // ── Booleans ──────────────────────────────────────────────────────────
   isTemplateAvailable = true;
   isTestMode = false;
   isLoading = false;
@@ -147,7 +124,6 @@ export class WatiInputComponent {
   isLoadingQueuedRecipients = false;
   isSendingQueued = false;
 
-  // ── Pagination ────────────────────────────────────────────────────────
   readonly DISPLAY_LIMIT = 50;
   hasMoreTemplates = false;
 
@@ -156,9 +132,25 @@ export class WatiInputComponent {
   private searchSubject = new Subject<string>();
   private profileSearchSubject = new Subject<string>();
 
-  // ── Cloud Function URL ────────────────────────────────────────────────
+  // ── Schedule ──────────────────────────────────────────────────────────
+  isScheduled = false;
+  scheduleDate: Date | null = null;
+  scheduleHour = '';
+  scheduleMinute = '';
+  schedulePeriod: 'AM' | 'PM' = 'AM';
+  hours: string[] = [];
+  minutes: string[] = [];
+
+  // ── Parameter Presets ─────────────────────────────────────────────────
+  private readonly PARAM_PRESETS_KEY = 'wati_param_presets';
+  savedPresets: { name: string; params: TemplateParam[] }[] = [];
+  selectedPresetName = '';
+  newPresetName = '';
+  showPresetSaveInput = false;
+
   private readonly SEND_FUNCTION_URL = 'https://sendwhatsappbroadcast-rhdwzw46ya-uc.a.run.app';
   private readonly PROD_SEND_FUNCTION_URL = 'https://sendwhatsappbroadcast-kakybqnyrq-uc.a.run.app';
+
   constructor(
     private firestore: Firestore,
     @Inject(MAT_DIALOG_DATA) public data: any,
@@ -176,19 +168,20 @@ export class WatiInputComponent {
 
     this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))
       .subscribe(t => { this.searchTemplate = t; this.applyFiltersAndLimit(); this.isSearching = false; });
-
     this.profileSearchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))
       .subscribe(t => this.performProfileSearch(t));
+
+    // Build schedule picker arrays
+    this.hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+    this.minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
     if (this.data) {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const tag = `${pad(now.getDate())}_${pad(now.getMonth() + 1)}_${now.getFullYear()}_${pad(now.getHours())}_${pad(now.getMinutes())}`;
-
       this.bufferDoc.profileid = data.map((e: any) => e.profileid);
       this.bufferDoc.broadcastname = (this.bufferDoc.profileid.length === 1)
         ? `Individual_${tag}` : `Broadcast_${tag}`;
-
       this.auth.getRoles().then((e: any) => this.bufferDoc.createdby = e['profile_ref'].id);
     } else {
       this.dialogRef.close();
@@ -203,6 +196,13 @@ export class WatiInputComponent {
   }
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+
+  // ── Scroll helper ─────────────────────────────────────────────────────
+  private scrollToConfigureParams() {
+    setTimeout(() => {
+      document.getElementById('configure-params-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }
 
   // ══════════════════════════════════════════════════════════════════════
   // FAVOURITES
@@ -223,25 +223,16 @@ export class WatiInputComponent {
     this.favouriteIds = new Set(this.favouriteTemplates.map((t: any) => this.favouriteKey(t)));
   }
 
-  private favouriteKey(t: any): string {
-    return `${t.elementName}__${t.serverid ?? t.servername ?? ''}`;
-  }
-
-  isFavourite(t: any): boolean {
-    return this.favouriteIds.has(this.favouriteKey(t));
-  }
+  private favouriteKey(t: any): string { return `${t.elementName}__${t.serverid ?? t.servername ?? ''}`; }
+  isFavourite(t: any): boolean { return this.favouriteIds.has(this.favouriteKey(t)); }
 
   toggleFavourite(event: Event, t: any) {
     event.stopPropagation();
     const key = this.favouriteKey(t);
     if (this.favouriteIds.has(key)) {
-      const check = confirm('Are you sure want to remove from Favourites');
-      if (check){
-        this.favouriteTemplates = this.favouriteTemplates.filter(f => this.favouriteKey(f) !== key);
-        this.snackBar.open('Removed from favourites', 'Close', { duration: 2000 });
-      }else{
-        return;
-      }
+      if (!confirm('Remove from Favourites?')) return;
+      this.favouriteTemplates = this.favouriteTemplates.filter(f => this.favouriteKey(f) !== key);
+      this.snackBar.open('Removed from favourites', 'Close', { duration: 2000 });
     } else {
       this.favouriteTemplates = [t, ...this.favouriteTemplates];
       this.snackBar.open('Added to favourites ★', 'Close', { duration: 2000 });
@@ -250,77 +241,53 @@ export class WatiInputComponent {
   }
 
   selectFavouriteTemplate(t: any) {
-    // Works like onTemplateChange but with a plain object
     this.resetQueuedTemplateState();
     this.selectedTemplate = { ...t };
     this.bufferDoc.serverurl = t.serverurl;
     this.bufferDoc.serverid = t.serverid;
     this.isTemplateAvailable = false;
-
-    // Check if template exists in wati templates collection
     getDocs(query(collection(this.firestore, 'wati templates'), where('templateid', '==', t.id)))
       .then(snap => {
         if (!snap.empty) {
           this.isTemplateAvailable = true;
           const data = snap.docs[0].data();
-          Object.assign(this.selectedTemplate, {
-            docid: data['docid'], category: data['category'],
-            subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'],
-          });
+          Object.assign(this.selectedTemplate, { docid: data['docid'], category: data['category'], subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'] });
         }
       }).catch(e => console.error(e));
-
     this.initParamConfig(this.parseTemplateParams(t.bodyOriginal || ''));
-    this.snackBar.open(`Template "${t.elementName}" selected from favourites`, 'OK', { duration: 2000 });
+    this.snackBar.open(`Template "${t.elementName}" selected`, 'OK', { duration: 2000 });
+    this.scrollToConfigureParams();
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // RECENT TAB SEARCH
   // ══════════════════════════════════════════════════════════════════════
-
   onSearchRecent() {
     const s = this.searchRecent.toLowerCase().trim();
-    if (!s) {
-      this.filteredRecentTemplates = [...this.recentTemplates];
-      return;
-    }
+    if (!s) { this.filteredRecentTemplates = [...this.recentTemplates]; return; }
     this.filteredRecentTemplates = this.recentTemplates.filter(t =>
-      t.watitemplateid?.toLowerCase().includes(s) ||
-      t.broadcastname?.toLowerCase().includes(s) ||
-      t.serverid?.toLowerCase().includes(s) ||
-      t.notes?.toLowerCase().includes(s)
+      t.watitemplateid?.toLowerCase().includes(s) || t.broadcastname?.toLowerCase().includes(s) ||
+      t.serverid?.toLowerCase().includes(s) || t.notes?.toLowerCase().includes(s)
     );
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // METADATA FIELDS
+  // METADATA / PARAM PARSING
   // ══════════════════════════════════════════════════════════════════════
-
   async loadMetadataFields() {
     this.isLoadingMetadataFields = true;
     try {
       const snap = await getDocs(query(collection(this.firestore, 'participant metadata'), limit(1)));
-      if (!snap.empty) {
-        this.metadataFields = Object.keys(snap.docs[0].data()).sort();
-      }
-    } catch (e) {
-      console.error('Error loading metadata fields', e);
-    } finally {
-      this.isLoadingMetadataFields = false;
-    }
+      if (!snap.empty) this.metadataFields = Object.keys(snap.docs[0].data()).sort();
+    } catch (e) { console.error('Error loading metadata fields', e); }
+    finally { this.isLoadingMetadataFields = false; }
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // TEMPLATE PARAM PARSING
-  // ══════════════════════════════════════════════════════════════════════
 
   private parseTemplateParams(body: string): string[] {
     const regex = /\{\{(\w+)\}\}/g;
     const names: string[] = [];
     let m: RegExpExecArray | null;
-    while ((m = regex.exec(body)) !== null) {
-      if (!names.includes(m[1])) names.push(m[1]);
-    }
+    while ((m = regex.exec(body)) !== null) { if (!names.includes(m[1])) names.push(m[1]); }
     return names;
   }
 
@@ -331,98 +298,66 @@ export class WatiInputComponent {
       return existing ?? { name, fillType: 'static', staticValue: '', metadataField: '', excelColumn: '' };
     });
     this.updatePreview();
+    this.loadPresetsForTemplate();
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // PREVIEW
   // ══════════════════════════════════════════════════════════════════════
-
   getFormattedPreviewHtml(): string {
     if (!this.selectedTemplate?.['bodyOriginal']) return '';
     let body: string = this.selectedTemplate['bodyOriginal'];
-
     body = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
     this.templateParams.forEach(p => {
-      const rawPlaceholder = `{{${p.name}}}`;
-      let chipClass = 'chip-static';
-      let display = p.staticValue || `{{${p.name}}}`;
-
-      if (p.fillType === 'metadata') {
-        chipClass = 'chip-metadata';
-        display = p.metadataField ? `[${p.metadataField}]` : `{{${p.name}}}`;
-      } else if (p.fillType === 'excel') {
-        chipClass = 'chip-excel';
-        display = p.excelColumn ? `[${p.excelColumn}]` : `{{${p.name}}}`;
-      }
-
-      body = body.split(rawPlaceholder).join(`<span class="${chipClass}">${display}</span>`);
+      const raw = `{{${p.name}}}`;
+      let cls = 'chip-static', disp = p.staticValue || raw;
+      if (p.fillType === 'metadata') { cls = 'chip-metadata'; disp = p.metadataField ? `[${p.metadataField}]` : raw; }
+      else if (p.fillType === 'excel') { cls = 'chip-excel'; disp = p.excelColumn ? `[${p.excelColumn}]` : raw; }
+      body = body.split(raw).join(`<span class="${cls}">${disp}</span>`);
     });
-
-    body = body.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
-    body = body.replace(/_([^_\n]+)_/g, '<em>$1</em>');
-    body = body.replace(/\n/g, '<br>');
-
+    body = body.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>').replace(/_([^_\n]+)_/g, '<em>$1</em>').replace(/\n/g, '<br>');
     return body;
   }
 
   onParamValueChange() { this.updatePreview(); }
-  private updatePreview() { /* triggers change detection */ }
+  private updatePreview() { }
+  setParamFillType(param: TemplateParam, type: ParamFillType) { param.fillType = type; this.updatePreview(); }
 
-  setParamFillType(param: TemplateParam, type: ParamFillType) {
-    param.fillType = type;
-    this.updatePreview();
-  }
-
+  // ══════════════════════════════════════════════════════════════════════
+  // LOAD DATA
+  // ══════════════════════════════════════════════════════════════════════
   async loadTemplatesFromAllServers() {
     this.isLoading = true;
     let watiData: Record<string, any> = {};
     const watiDoc = await getDoc(doc(this.firestore, 'classify', 'wati'));
-
     if (watiDoc.exists()) {
       watiData = watiDoc.data();
       this.serverUrls = Object.keys(watiData);
       this.auth.openSnackBar(`Fetching ${this.serverUrls.length} - Servers Templates`, 'OK', 600);
-    } else {
-      this.auth.openSnackBar(`No Wati Server Found`, 'OK', 600);
-      this.isLoading = false;
-      return;
-    }
+    } else { this.auth.openSnackBar('No Wati Server Found', 'OK', 600); this.isLoading = false; return; }
 
-    forkJoin(this.serverUrls.map((serverid) => this.watiService.getTemplates(serverid, watiData))).subscribe({
+    forkJoin(this.serverUrls.map(sid => this.watiService.getTemplates(sid, watiData))).subscribe({
       next: (responses: any[][]) => {
         this.watiTemplates = [];
-
         responses.forEach((templates, idx) => {
-          const serverid = this.serverUrls[idx];
-          const serverConfig = watiData[serverid];
-
+          const sid = this.serverUrls[idx], cfg = watiData[sid];
           templates.filter(t => t.status?.toLowerCase() === 'approved').forEach(t => {
-            t.serverid = serverid;
-            t.servername = serverConfig.watiname;
-            t.serverurl = serverConfig.endpoint
+            t.serverid = sid; t.servername = cfg.watiname; t.serverurl = cfg.endpoint;
             this.watiTemplates.push(t);
           });
         });
-
         this.watiTemplates.sort((a, b) => b['lastModified'] - a['lastModified']);
         this.applyFiltersAndLimit();
         this.isLoading = false;
       },
-      error: () => {
-        this.snackBar.open('Error loading templates', 'Close', { duration: 3000 });
-        this.isLoading = false;
-      }
+      error: () => { this.snackBar.open('Error loading templates', 'Close', { duration: 3000 }); this.isLoading = false; }
     });
   }
 
   async loadRecentTemplates() {
     try {
       const snap = await getDocs(query(collection(this.firestore, 'wati templates'), orderBy('date', 'desc'), limit(10)));
-      this.recentTemplates = snap.docs.map(d => ({
-        id: d.id, ...d.data(),
-        watitemplateid: d.data()['watitemplateid'] ?? d.data()['templatename'] ?? '',
-      }));
+      this.recentTemplates = snap.docs.map(d => ({ id: d.id, ...d.data(), watitemplateid: d.data()['watitemplateid'] ?? d.data()['templatename'] ?? '' }));
       this.filteredRecentTemplates = [...this.recentTemplates];
     } catch (e) { console.error('Error loading recent templates', e); }
   }
@@ -442,40 +377,21 @@ export class WatiInputComponent {
       const snap = await getDocs(query(collection(this.firestore, 'profile_data'), orderBy('name', 'asc')));
       this.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p['number']);
       this.filteredProfiles = [...this.profiles];
-      snap.docs.forEach(d => {
-        const pd = d.data();
-        if (pd['number']) this.mapProfile[d.id] = { id: d.id, ...pd };
-      });
+      snap.docs.forEach(d => { const pd = d.data(); if (pd['number']) this.mapProfile[d.id] = { id: d.id, ...pd }; });
     } catch (e) { console.error(e); }
     finally { this.isLoadingProfiles = false; }
   }
 
-  async loadParticipantPhoneNumbers() {
-    for (const participant of this.data) {
-      const profileId = participant.profileid || participant.profile_id;
-      if (profileId && !this.mapProfile[profileId]?.number) {
-        try {
-          const profileDoc = await getDoc(doc(this.firestore, 'profile_data', profileId));
-          if (profileDoc.exists()) {
-            this.mapProfile[profileId] = { ...this.mapProfile[profileId], ...profileDoc.data() };
-          }
-        } catch (e) { console.warn('Failed to load profile:', profileId); }
-      }
-    }
-  }
-
+  // ══════════════════════════════════════════════════════════════════════
+  // TEMPLATE SELECTION
+  // ══════════════════════════════════════════════════════════════════════
   isTemplatePresent(): boolean { return Object.keys(this.selectedTemplate).length !== 0; }
 
   applyFiltersAndLimit() {
     let filtered = [...this.watiTemplates];
     if (this.searchTemplate.trim()) {
       const s = this.searchTemplate.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.elementName?.toLowerCase().includes(s) ||
-        t.category?.toLowerCase().includes(s) ||
-        t.servername?.toLowerCase().includes(s) ||
-        t.bodyOriginal?.toLowerCase().includes(s)
-      );
+      filtered = filtered.filter(t => t.elementName?.toLowerCase().includes(s) || t.category?.toLowerCase().includes(s) || t.servername?.toLowerCase().includes(s) || t.bodyOriginal?.toLowerCase().includes(s));
     }
     this.filteredTemplates = filtered;
     this.hasMoreTemplates = filtered.length > this.DISPLAY_LIMIT;
@@ -489,7 +405,6 @@ export class WatiInputComponent {
     this.displayTemplates = [...this.displayTemplates, ...this.filteredTemplates.slice(n, n + this.DISPLAY_LIMIT)];
     this.hasMoreTemplates = this.displayTemplates.length < this.filteredTemplates.length;
   }
-
   getTemplatesCountInfo(): string {
     if (this.isLoading) return 'Loading…';
     if (this.isSearching) return 'Searching…';
@@ -497,15 +412,10 @@ export class WatiInputComponent {
   }
 
   onSearchProfile() { this.profileSearchSubject.next(this.searchProfile); }
-
   private performProfileSearch(term: string) {
     if (!term.trim()) { this.filteredProfiles = [...this.profiles]; return; }
     const s = term.toLowerCase();
-    this.filteredProfiles = this.profiles.filter(p =>
-      p.name?.toLowerCase().includes(s) ||
-      p.email?.toLowerCase().includes(s) ||
-      p.number?.includes(s)
-    );
+    this.filteredProfiles = this.profiles.filter(p => p.name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s) || p.number?.includes(s));
   }
 
   async onTemplateChange(event: any) {
@@ -514,109 +424,65 @@ export class WatiInputComponent {
     this.bufferDoc.serverurl = event.value.serverurl;
     this.bufferDoc.serverid = event.value.serverid;
     this.isTemplateAvailable = false;
-
     try {
       const snap = await getDocs(query(collection(this.firestore, 'wati templates'), where('templateid', '==', event.value['id'])));
       if (!snap.empty) {
         this.isTemplateAvailable = true;
         const data = snap.docs[0].data();
-        Object.assign(this.selectedTemplate, {
-          docid: data['docid'], category: data['category'],
-          subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'],
-        });
+        Object.assign(this.selectedTemplate, { docid: data['docid'], category: data['category'], subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'] });
       }
-    } catch (e) {
-      console.error('Error checking template existence', e);
-      this.isTemplateAvailable = false;
-    }
-
+    } catch (e) { console.error(e); this.isTemplateAvailable = false; }
     this.initParamConfig(this.parseTemplateParams(event.value['bodyOriginal'] || ''));
+    this.scrollToConfigureParams();
   }
 
   selectRecentTemplate(template: any) {
     this.resetQueuedTemplateState();
     this.selectedTemplate = {
-      elementName: template.watitemplateid ?? template.templatename ?? '',
-      bodyOriginal: template.textbody ?? template.htmlbody ?? '',
-      serverurl: template.serverurl ?? '',
-      serverid: template.serverid ?? '',
-      servername: template.servername ?? '',
-      id: template.templateid ?? '',
-      templateid: template.templateid ?? '',
-      docid: template.id,
-      category: template.category ?? null,
-      subcategory: template.subcategory ?? null,
-      notes: template.notes ?? '',
+      elementName: template.watitemplateid ?? template.templatename ?? '', bodyOriginal: template.textbody ?? template.htmlbody ?? '',
+      serverurl: template.serverurl ?? '', serverid: template.serverid ?? '', servername: template.servername ?? '',
+      id: template.templateid ?? '', templateid: template.templateid ?? '', docid: template.id,
+      category: template.category ?? null, subcategory: template.subcategory ?? null, notes: template.notes ?? '',
     };
     this.bufferDoc.serverurl = template.serverurl ?? '';
     this.bufferDoc.serverid = template.serverid ?? '';
     this.isTemplateAvailable = true;
     this.initParamConfig(this.parseTemplateParams(this.selectedTemplate['bodyOriginal'] || ''));
+    this.scrollToConfigureParams();
   }
 
   async selectQueuedTemplate(template: any) {
     this.resetQueuedTemplateState();
     this.isQueuedTemplate = true;
     this.selectedQueuedTemplate = template;
-    const found = this.watiTemplates.find(t =>
-      t.elementName === template.templateData?.elementName && t.serverurl === template.serverurl
-    );
-    if (found) {
-      this.selectedTemplate = found;
-      this.bufferDoc.serverurl = template.serverurl;
-      this.bufferDoc.serverid = template.serverid;
-      this.bufferDoc.broadcastname = template.broadcastname;
-      this.bufferDoc.notes = template.notes;
-      this.bufferDoc.profileid = template.profileid;
-      this.bufferDoc.numbers = template.numbers || [];
-      this.bufferDoc.numbermap = template.numbermap || {};
-      this.isTemplateAvailable = true;
-      this.showRecipients = true;
-
-      if (template.parameterConfig?.length) {
-        this.templateParams = template.parameterConfig;
-        this.templateParamNames = this.templateParams.map(p => p.name);
-      } else {
-        this.initParamConfig(this.parseTemplateParams(found['bodyOriginal'] || ''));
-      }
-      // Restore static param values from the queued doc so preview shows correctly
-      if (template.parameterConfig?.length) {
-        this.updatePreview();
-      }
-      await this.loadQueuedRecipients(template.profileid);
+    const found = this.watiTemplates.find(t => t.elementName === template.templateData?.elementName && t.serverurl === template.serverurl);
+    const tplData = found ?? {
+      elementName: template.templateData?.elementName ?? template.watitemplateid ?? '',
+      bodyOriginal: template.body ?? template.templateData?.bodyOriginal ?? '',
+      serverurl: template.serverurl ?? '', serverid: template.serverid ?? '',
+      servername: template.templateData?.servername ?? '', id: template.templateid ?? '',
+      templateid: template.templateid ?? '', docid: template.id,
+      category: template.category ?? null, subcategory: template.subcategory ?? null, notes: template.notes ?? '',
+    };
+    this.selectedTemplate = found ? found : tplData;
+    this.bufferDoc.serverurl = template.serverurl ?? '';
+    this.bufferDoc.serverid = template.serverid ?? '';
+    this.bufferDoc.broadcastname = template.broadcastname ?? '';
+    this.bufferDoc.profileid = template.profileid ?? [];
+    this.bufferDoc.numbers = template.numbers || [];
+    this.bufferDoc.numbermap = template.numbermap || {};
+    if (found) { this.bufferDoc.notes = template.notes; }
+    this.isTemplateAvailable = true;
+    this.showRecipients = true;
+    if (template.parameterConfig?.length) {
+      this.templateParams = template.parameterConfig;
+      this.templateParamNames = this.templateParams.map(p => p.name);
+      this.updatePreview();
     } else {
-      // Template not yet loaded from server — build selectedTemplate from the queued doc
-      this.selectedTemplate = {
-        elementName: template.templateData?.elementName ?? template.watitemplateid ?? '',
-        bodyOriginal: template.body ?? template.templateData?.bodyOriginal ?? '',
-        serverurl: template.serverurl ?? '',
-        serverid: template.serverid ?? '',
-        servername: template.templateData?.servername ?? '',
-        id: template.templateid ?? '',
-        templateid: template.templateid ?? '',
-        docid: template.id,
-        category: template.category ?? null,
-        subcategory: template.subcategory ?? null,
-        notes: template.notes ?? '',
-      };
-      this.bufferDoc.serverurl = template.serverurl ?? '';
-      this.bufferDoc.serverid = template.serverid ?? '';
-      this.bufferDoc.broadcastname = template.broadcastname ?? '';
-      this.bufferDoc.profileid = template.profileid ?? [];
-      this.bufferDoc.numbers = template.numbers || [];
-      this.bufferDoc.numbermap = template.numbermap || {};
-      this.isTemplateAvailable = true;
-      this.showRecipients = true;
-
-      if (template.parameterConfig?.length) {
-        this.templateParams = template.parameterConfig;
-        this.templateParamNames = this.templateParams.map(p => p.name);
-        this.updatePreview();
-      } else {
-        this.initParamConfig(this.parseTemplateParams(this.selectedTemplate['bodyOriginal'] || ''));
-      }
-      await this.loadQueuedRecipients(template.profileid);
+      this.initParamConfig(this.parseTemplateParams(this.selectedTemplate['bodyOriginal'] || ''));
     }
+    await this.loadQueuedRecipients(template.profileid);
+    this.scrollToConfigureParams();
   }
 
   async loadQueuedRecipients(profileIds: string[]) {
@@ -634,25 +500,20 @@ export class WatiInputComponent {
     finally { this.isLoadingQueuedRecipients = false; }
   }
 
-  resetQueuedTemplateState() {
-    this.isQueuedTemplate = false;
-    this.selectedQueuedTemplate = null;
-    this.queuedRecipients = [];
-  }
+  resetQueuedTemplateState() { this.isQueuedTemplate = false; this.selectedQueuedTemplate = null; this.queuedRecipients = []; }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // EXCEL HELPERS
+  // ══════════════════════════════════════════════════════════════════════
   hasExcelParam(): boolean { return this.templateParams.some(p => p.fillType === 'excel'); }
   getExcelMappedParams(): TemplateParam[] { return this.templateParams.filter(p => p.fillType === 'excel'); }
   isColumnMapped(header: string): boolean { return this.templateParams.some(p => p.fillType === 'excel' && p.excelColumn === header); }
-  isPhoneColumn(header: string): boolean {
-    const ph = ['phone', 'number', 'mobile', 'contact', 'phonenumber', 'phone_number'];
-    return ph.some(k => header.toLowerCase().includes(k));
-  }
+  isPhoneColumn(header: string): boolean { return ['phone', 'number', 'mobile', 'contact', 'phonenumber', 'phone_number'].some(k => header.toLowerCase().includes(k)); }
   isParamConfigValid(): boolean { return !this.templateParams.some(p => p.fillType === 'excel' && !p.excelColumn); }
 
   private buildParamConfigForSave(): TemplateParam[] {
     return this.templateParams.map(p => ({
-      name: p.name,
-      fillType: p.fillType,
+      name: p.name, fillType: p.fillType,
       staticValue: p.fillType === 'static' ? (p.staticValue || '') : null,
       metadataField: p.fillType === 'metadata' ? (p.metadataField || '') : null,
       excelColumn: p.fillType === 'excel' ? (p.excelColumn || '') : null,
@@ -677,53 +538,30 @@ export class WatiInputComponent {
     ws['!cols'] = headers.map(() => ({ wch: 22 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Recipients');
-    const templateName = this.selectedTemplate?.['elementName'] || 'template';
-    XLSX.writeFile(wb, `${templateName}_recipients_sample.xlsx`);
-    this.snackBar.open('Sample Excel downloaded.', 'Close', { duration: 4000 });
+    XLSX.writeFile(wb, `${this.selectedTemplate?.['elementName'] || 'template'}_recipients_sample.xlsx`);
+    this.snackBar.open('Sample Excel downloaded', 'Close', { duration: 4000 });
   }
 
-  getSampleValue(paramName: string): string {
-    const map: Record<string, string> = {
-      name: 'Rahul Sharma', sedate: '25th July 2025', date: '25th July 2025',
-      time: '10:00 AM', amount: '₹5000', course: 'Leadership Program',
-      link: 'https://zoom.us/j/123456', code: 'ABC123', batch: 'Batch 7',
-    };
-    return map[paramName.toLowerCase()] ?? `Sample ${paramName}`;
+  getSampleValue(n: string): string {
+    const m: Record<string, string> = { name: 'Rahul Sharma', sedate: '25th July 2025', date: '25th July 2025', time: '10:00 AM', amount: '₹5000', course: 'Leadership Program', link: 'https://zoom.us/j/123456', code: 'ABC123', batch: 'Batch 7' };
+    return m[n.toLowerCase()] ?? `Sample ${n}`;
+  }
+  getSampleValue2(n: string): string {
+    const m: Record<string, string> = { name: 'Priya Patel', sedate: '26th July 2025', date: '26th July 2025', time: '2:00 PM', amount: '₹7500', course: 'Executive Coaching', link: 'https://zoom.us/j/789012', code: 'XYZ789', batch: 'Batch 8' };
+    return m[n.toLowerCase()] ?? `Sample ${n} 2`;
   }
 
-  getSampleValue2(paramName: string): string {
-    const map: Record<string, string> = {
-      name: 'Priya Patel', sedate: '26th July 2025', date: '26th July 2025',
-      time: '2:00 PM', amount: '₹7500', course: 'Executive Coaching',
-      link: 'https://zoom.us/j/789012', code: 'XYZ789', batch: 'Batch 8',
-    };
-    return map[paramName.toLowerCase()] ?? `Sample ${paramName} 2`;
-  }
-
-  scrollToExcelUpload() {
-    setTimeout(() => {
-      const el = document.getElementById('excel-upload-section');
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  }
+  scrollToExcelUpload() { setTimeout(() => document.getElementById('excel-upload-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }
 
   onFileSelected(event: any) {
     const file = event.target.files[0];
-    if (file && this.isExcelFile(file)) {
-      this.uploadedFile = file;
-      this.processExcelFile(file);
-    } else {
-      this.snackBar.open('Please select a valid Excel file (.xlsx or .xls)', 'Close', { duration: 3000 });
-    }
+    if (file && this.isExcelFile(file)) { this.uploadedFile = file; this.processExcelFile(file); }
+    else { this.snackBar.open('Please select a valid Excel file (.xlsx or .xls)', 'Close', { duration: 3000 }); }
     event.target.value = '';
   }
 
   private isExcelFile(file: File): boolean {
-    const validTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel'
-    ];
-    return validTypes.includes(file.type) || file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    return ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'].includes(file.type) || file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
   }
 
   private processExcelFile(file: File) {
@@ -731,21 +569,12 @@ export class WatiInputComponent {
     reader.onload = (e: any) => {
       try {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        this.excelData = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (this.excelData.length > 0) {
-          this.excelHeaders = (this.excelData[0] as any[]).map(h => h?.toString().trim() || '');
-        }
+        this.excelData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+        if (this.excelData.length > 0) this.excelHeaders = (this.excelData[0] as any[]).map(h => h?.toString().trim() || '');
         this.extractPhoneNumbers();
-        if (this.phoneNumbers.length > 0) {
-          this.validatePhoneNumbers();
-        } else {
-          this.snackBar.open('No phone numbers found. Ensure you have a "phone" / "number" / "mobile" column.', 'Close', { duration: 5000 });
-        }
-      } catch (err) {
-        console.error(err);
-        this.snackBar.open('Error processing Excel file', 'Close', { duration: 3000 });
-      }
+        if (this.phoneNumbers.length > 0) this.validatePhoneNumbers();
+        else this.snackBar.open('No phone numbers found.', 'Close', { duration: 5000 });
+      } catch { this.snackBar.open('Error processing Excel file', 'Close', { duration: 3000 }); }
     };
     reader.readAsArrayBuffer(file);
   }
@@ -753,60 +582,37 @@ export class WatiInputComponent {
   private extractPhoneNumbers() {
     if (this.excelData.length < 2) return;
     const headers = this.excelData[0] as any[];
-    const phoneIdx = headers.findIndex(h => {
-      const s = h?.toString().toLowerCase().trim();
-      return ['phone', 'number', 'mobile', 'contact', 'phonenumber', 'phone_number'].some(k => s?.includes(k));
-    });
-    if (phoneIdx === -1) {
-      this.snackBar.open('Phone column not found in Excel headers.', 'Close', { duration: 5000 });
-      return;
-    }
+    const phoneIdx = headers.findIndex(h => ['phone', 'number', 'mobile', 'contact', 'phonenumber', 'phone_number'].some(k => h?.toString().toLowerCase().trim()?.includes(k)));
+    if (phoneIdx === -1) { this.snackBar.open('Phone column not found.', 'Close', { duration: 5000 }); return; }
     this.phoneNumbers = [];
     for (let i = 1; i < this.excelData.length; i++) {
       const val = this.excelData[i][phoneIdx];
-      if (val) {
-        const cleaned = this.cleanPhoneNumber(val.toString());
-        if (cleaned) this.phoneNumbers.push(cleaned);
-      }
+      if (val) { const c = this.cleanPhoneNumber(val.toString()); if (c) this.phoneNumbers.push(c); }
     }
   }
 
   private cleanPhoneNumber(phone: string): string {
-    let cleaned = phone.replace(/[^\d+]/g, '');
-    if (!cleaned.startsWith('+') && cleaned.length === 10) cleaned = '+91' + cleaned;
-    return cleaned;
+    let c = phone.replace(/[^\d+]/g, '');
+    if (!c.startsWith('+') && c.length === 10) c = '+91' + c;
+    return c;
   }
 
   private async validatePhoneNumbers() {
     this.isValidatingNumbers = true;
-    this.validNumbers = [];
-    this.invalidNumbers = [];
+    this.validNumbers = []; this.invalidNumbers = [];
     try {
-      const existing = new Set<string>(
-        this.data
-          .map((d: any) => d?.['number'] || d?.['phonenumber'])
-          .filter(Boolean)
-          .map((n: string) => this.cleanPhoneNumber(n.toString()))
-      );
+      const existing = new Set<string>(this.data.map((d: any) => d?.['number'] || d?.['phonenumber']).filter(Boolean).map((n: string) => this.cleanPhoneNumber(n.toString())));
       this.phoneNumbers.forEach(p => (existing.has(p) ? this.validNumbers : this.invalidNumbers).push(p));
       this.showValidationResults = true;
       this.snackBar.open(`Validated: ${this.validNumbers.length} valid, ${this.invalidNumbers.length} not found`, 'Close', { duration: 5000 });
-    } catch (e) {
-      this.snackBar.open('Error validating phone numbers', 'Close', { duration: 3000 });
-    } finally {
-      this.isValidatingNumbers = false;
-    }
+    } catch { this.snackBar.open('Error validating phone numbers', 'Close', { duration: 3000 }); }
+    finally { this.isValidatingNumbers = false; }
   }
 
   removeUploadedFile() {
-    this.uploadedFile = null;
-    this.excelData = [];
-    this.excelHeaders = [];
-    this.phoneNumbers = [];
-    this.validNumbers = [];
-    this.invalidNumbers = [];
-    this.showValidationResults = false;
-    this.fileUploadUrl = '';
+    this.uploadedFile = null; this.excelData = []; this.excelHeaders = [];
+    this.phoneNumbers = []; this.validNumbers = []; this.invalidNumbers = [];
+    this.showValidationResults = false; this.fileUploadUrl = '';
     this.templateParams.forEach(p => { if (p.fillType === 'excel') p.excelColumn = ''; });
     this.updatePreview();
   }
@@ -816,79 +622,29 @@ export class WatiInputComponent {
     this.isUploadingFile = true;
     try {
       const storage = getStorage();
-      const fileName = `wati-uploads/${Date.now()}_${this.uploadedFile.name}`;
-      const snap = await uploadBytes(ref(storage, fileName), this.uploadedFile);
+      const snap = await uploadBytes(ref(storage, `wati-uploads/${Date.now()}_${this.uploadedFile.name}`), this.uploadedFile);
       this.fileUploadUrl = await getDownloadURL(snap.ref);
       return this.fileUploadUrl;
-    } catch (e) {
-      this.snackBar.open('Error uploading file', 'Close', { duration: 3000 });
-      return '';
-    } finally {
-      this.isUploadingFile = false;
-    }
+    } catch { this.snackBar.open('Error uploading file', 'Close', { duration: 3000 }); return ''; }
+    finally { this.isUploadingFile = false; }
   }
 
-  addProfileToTest(profile: any) {
-    if (!profile.number) { this.snackBar.open('No phone number on this profile', 'Close', { duration: 3000 }); return; }
-    if (this.selectedProfiles.find(p => p.id === profile.id)) { this.snackBar.open('Already in test list', 'Close', { duration: 2000 }); return; }
-    this.selectedProfiles.push(profile);
-    this.updateTestNumbersList();
-  }
-
-  removeProfileFromTest(profile: any) {
-    this.selectedProfiles = this.selectedProfiles.filter(p => p.id !== profile.id);
-    this.updateTestNumbersList();
-  }
-
-  isProfileSelected(profile: any) { return this.selectedProfiles.some(p => p.id === profile.id); }
-
-  addManualTestNumber() {
-    const n = this.newTestNumber.trim();
-    if (!n) return;
-    if (this.testNumbersList.find(i => i.number === n)) { this.snackBar.open('Already in list', 'Close', { duration: 2000 }); return; }
-    this.testNumbersList.push({ number: n, type: 'manual', name: 'Manual Entry' });
-    this.newTestNumber = '';
-    this.updateTestNumbers();
-  }
-
-  removeTestNumber(idx: number) { this.testNumbersList.splice(idx, 1); this.updateTestNumbers(); }
-
-  updateTestNumbersList() {
-    this.testNumbersList = this.testNumbersList.filter(i => i.type === 'manual');
-    this.selectedProfiles.forEach(p => {
-      if (p.number) this.testNumbersList.push({ number: p.number, type: 'profile', name: p.name || 'Unknown', profileId: p.id });
-    });
-    this.updateTestNumbers();
-  }
-
-  updateTestNumbers() { this.testNumbers = this.testNumbersList.map(i => i.number).join(', '); }
-
+  // ══════════════════════════════════════════════════════════════════════
+  // RECIPIENTS / TEST
+  // ══════════════════════════════════════════════════════════════════════
   onShowRecipients() { this.showRecipients = !this.showRecipients; }
   getRecipientCount() { return this.bufferDoc.profileid.length; }
-
   getRecipientList() {
-    if (this.isQueuedTemplate) {
-      return this.bufferDoc.profileid.map((id: string) => ({
-        name: this.mapProfile[id]?.['name'],
-        email: this.mapProfile[id]?.['email'],
-        profile: this.mapProfile[id]?.['profile'],
-      }));
-    }
+    if (this.isQueuedTemplate) return this.bufferDoc.profileid.map((id: string) => ({ name: this.mapProfile[id]?.['name'], email: this.mapProfile[id]?.['email'], profile: this.mapProfile[id]?.['profile'] }));
     return this.data || [];
   }
-
-  isQueueDisabled() { return this.isQueuedTemplate; }
   canUploadExcel() { return this.isTemplatePresent() && !this.isTestMode; }
 
   private populateNumbersAndMap() {
-    this.bufferDoc.numbers = [];
-    this.bufferDoc.numbermap = {};
+    this.bufferDoc.numbers = []; this.bufferDoc.numbermap = {};
     this.bufferDoc.profileid.forEach((id: string) => {
       const p = this.mapProfile[id];
-      if (p) {
-        const num = p.phone || p.phoneNumber || p.number || '';
-        if (num) { this.bufferDoc.numbers.push(num); this.bufferDoc.numbermap[num] = id; }
-      }
+      if (p) { const num = p.phone || p.phoneNumber || p.number || ''; if (num) { this.bufferDoc.numbers.push(num); this.bufferDoc.numbermap[num] = id; } }
     });
   }
 
@@ -896,40 +652,23 @@ export class WatiInputComponent {
     if (!this.selectedQueuedTemplate) { this.snackBar.open('No queued template selected', 'Close', { duration: 3000 }); return; }
     const archiveid = this.selectedQueuedTemplate['docid'] ?? this.selectedQueuedTemplate['id'];
     if (!archiveid) { this.snackBar.open('Archive ID not found', 'Close', { duration: 3000 }); return; }
-
     this.isSendingQueued = true;
     try {
-      // Determine project from environment
       const projectId = (environment as any)['projectId'] ?? (environment as any)['firebase']?.['projectId'] ?? '';
-      const payload: any = { archiveid, projectId };
-
-      await this.http.post(this.PROD_SEND_FUNCTION_URL, payload, {
-        headers: { 'Content-Type': 'application/json' }
-      }).toPromise();
-
+      await this.http.post(this.PROD_SEND_FUNCTION_URL, { archiveid, projectId }, { headers: { 'Content-Type': 'application/json' } }).toPromise();
       this.snackBar.open('Message sent successfully!', 'Close', { duration: 4000 });
       this.dialogRef.close({ status: 'sent', archiveid });
-    } catch (e: any) {
-      console.error('Send queued error', e);
-      this.snackBar.open(`Failed to send: ${e?.error?.message ?? e?.message ?? 'Unknown error'}`, 'Close', { duration: 5000 });
-    } finally {
-      this.isSendingQueued = false;
-    }
+    } catch (e: any) { this.snackBar.open(`Failed: ${e?.error?.message ?? e?.message ?? 'Unknown error'}`, 'Close', { duration: 5000 }); }
+    finally { this.isSendingQueued = false; }
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // SUBMIT HELPERS
   // ══════════════════════════════════════════════════════════════════════
-
   private async ensureTemplateExists(docID: string) {
-    console.log(this.selectedTemplate);
-    if (this.isTemplateAvailable) {
-      console.log('Template already exists in wati templates — skipping creation.');
-      return;
-    }
+    if (this.isTemplateAvailable) return;
     const existing = await getDocs(query(collection(this.firestore, 'wati templates'), where('templateid', '==', this.selectedTemplate['id'])));
     if (!existing.empty) { this.isTemplateAvailable = true; return; }
-
     await setDoc(doc(this.firestore, 'wati templates', docID), {
       active: false, docid: docID, date: serverTimestamp(), createdby: this.auth.uid,
       textbody: this.selectedTemplate['bodyOriginal'], htmlbody: this.selectedTemplate['bodyOriginal'],
@@ -938,23 +677,19 @@ export class WatiInputComponent {
       watistatus: 'approved', serverurl: this.selectedTemplate['serverurl'], serverid: this.selectedTemplate['serverid'],
       notes: this.notes, type: 'whatsapp', templateid: this.selectedTemplate['id'], watitemplateid: this.selectedTemplate['elementName'],
     });
-    console.log('New template created in wati templates:', docID);
     await this.loadRecentTemplates();
   }
 
   private buildArchiveDoc(archiveid: string, status: string): any {
-    const paramConfig = this.buildParamConfigForSave();
-    const dominantMode = this.getDominantFillMode();
     const archiveDoc: any = {
-      ...this.bufferDoc, docid: archiveid,
-      body: this.selectedTemplate['bodyOriginal'],
+      ...this.bufferDoc, docid: archiveid, body: this.selectedTemplate['bodyOriginal'],
       templateid: this.isTemplateAvailable ? this.selectedTemplate['templateid'] : this.selectedTemplate['id'],
       watitemplateid: this.selectedTemplate['elementName'],
       serverurl: this.selectedTemplate['serverurl'], serverid: this.selectedTemplate['serverid'],
       templatevalidated: status === 'created', status,
       pending: this.bufferDoc.numbers,
       notes: this.isTemplateAvailable ? this.selectedTemplate['notes'] : this.notes,
-      parameterConfig: paramConfig, paramFillMode: dominantMode,
+      parameterConfig: this.buildParamConfigForSave(), paramFillMode: this.getDominantFillMode(),
       templateData: { ...this.selectedTemplate },
     };
     if (status === 'queued') { archiveDoc.queuedAt = serverTimestamp(); archiveDoc.templatevalidated = false; }
@@ -966,54 +701,152 @@ export class WatiInputComponent {
         invalidNumbersList: this.invalidNumbers, headers: this.excelHeaders,
       };
     }
-    if (this.selectedTemplate['customParams']) {
-      this.selectedTemplate['customParams'].forEach((e: any) => archiveDoc.params.push(e['paramName']));
-    }
+    if (this.selectedTemplate['customParams']) this.selectedTemplate['customParams'].forEach((e: any) => archiveDoc.params.push(e['paramName']));
     return archiveDoc;
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // SUBMIT
   // ══════════════════════════════════════════════════════════════════════
-
   async onSubmit() {
     if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
-
-    // If it's a queued template, send via HTTP Cloud Function
-    if (this.isQueuedTemplate) {
-      await this.sendQueuedTemplate();
-      return;
-    }
-
+    if (this.isQueuedTemplate) { await this.sendQueuedTemplate(); return; }
     if (this.uploadedFile) await this.uploadFileToStorage();
-
     const docID = doc(collection(this.firestore, 'wati templates')).id;
     await this.ensureTemplateExists(docID);
-
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
-    const archiveDoc = this.buildArchiveDoc(archiveid, 'created');
-
-    await setDoc(doc(this.firestore, 'wati archive', archiveid), archiveDoc)
-      .then(() => this.dialogRef.close({ status: 'success', archiveid: archiveid }))
+    await setDoc(doc(this.firestore, 'wati archive', archiveid), this.buildArchiveDoc(archiveid, 'created'))
+      .then(() => this.dialogRef.close({ status: 'success', archiveid }))
       .catch(() => this.dialogRef.close({ status: 'failed' }));
   }
 
   async addtoQueueFunction() {
     if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
     if (this.uploadedFile) await this.uploadFileToStorage();
-
     const docID = doc(collection(this.firestore, 'wati templates')).id;
     await this.ensureTemplateExists(docID);
-
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
-    const archiveDoc = this.buildArchiveDoc(archiveid, 'queued');
-
-    await setDoc(doc(this.firestore, 'wati archive', archiveid), archiveDoc)
+    await setDoc(doc(this.firestore, 'wati archive', archiveid), this.buildArchiveDoc(archiveid, 'queued'))
       .then(() => { this.snackBar.open('Added to queue', 'Close', { duration: 3000 }); this.dialogRef.close('queued'); })
       .catch(() => this.dialogRef.close('failed'));
   }
 
   closeDialog() { this.dialogRef.close(null); }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // SCHEDULE
+  // ══════════════════════════════════════════════════════════════════════
+  onScheduleToggle() {
+    if (this.isScheduled) {
+      const def = new Date(Date.now() + 3600000);
+      this.scheduleDate = def;
+      let h = def.getHours();
+      this.schedulePeriod = h >= 12 ? 'PM' : 'AM';
+      if (h === 0) h = 12; else if (h > 12) h -= 12;
+      this.scheduleHour = String(h).padStart(2, '0');
+      const rm = Math.ceil(def.getMinutes() / 5) * 5;
+      this.scheduleMinute = String(rm >= 60 ? 0 : rm).padStart(2, '0');
+    } else { this.scheduleDate = null; this.scheduleHour = ''; this.scheduleMinute = ''; }
+  }
+
+  getScheduledDateTime(): Date | null {
+    if (!this.scheduleDate || !this.scheduleHour || !this.scheduleMinute) return null;
+    const d = new Date(this.scheduleDate);
+    let h = parseInt(this.scheduleHour, 10);
+    if (this.schedulePeriod === 'AM' && h === 12) h = 0;
+    else if (this.schedulePeriod === 'PM' && h !== 12) h += 12;
+    d.setHours(h, parseInt(this.scheduleMinute, 10), 0, 0);
+    return d;
+  }
+
+  isScheduleValid(): boolean {
+    if (!this.isScheduled) return true;
+    const dt = this.getScheduledDateTime();
+    return dt !== null && dt > new Date();
+  }
+
+  getSchedulePreviewText(): string {
+    const dt = this.getScheduledDateTime();
+    if (!dt) return '';
+    return dt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+
+  dateFilter = (d: Date | null): boolean => {
+    if (!d) return false;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return d >= today;
+  };
+
+  setQuickDate(option: 'today' | 'tomorrow' | 'nextWeek') {
+    const d = new Date();
+    if (option === 'tomorrow') d.setDate(d.getDate() + 1);
+    else if (option === 'nextWeek') d.setDate(d.getDate() + 7);
+    this.scheduleDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  isQuickDate(option: 'today' | 'tomorrow' | 'nextWeek'): boolean {
+    if (!this.scheduleDate) return false;
+    const d = new Date();
+    if (option === 'tomorrow') d.setDate(d.getDate() + 1);
+    else if (option === 'nextWeek') d.setDate(d.getDate() + 7);
+    return this.scheduleDate.getFullYear() === d.getFullYear() && this.scheduleDate.getMonth() === d.getMonth() && this.scheduleDate.getDate() === d.getDate();
+  }
+
+  async onScheduleSubmit() {
+    if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
+    if (!this.isScheduleValid()) { this.snackBar.open('Select a valid future date and time', 'Close', { duration: 3000 }); return; }
+    if (this.uploadedFile) await this.uploadFileToStorage();
+    const docID = doc(collection(this.firestore, 'wati templates')).id;
+    await this.ensureTemplateExists(docID);
+    const archiveid = doc(collection(this.firestore, 'wati archive')).id;
+    this.populateNumbersAndMap();
+    const scheduledAt = this.getScheduledDateTime()!;
+    const archiveDoc = this.buildArchiveDoc(archiveid, 'scheduled');
+    archiveDoc.scheduledAt = scheduledAt;
+    archiveDoc.scheduledDateISO = scheduledAt.toISOString();
+    await setDoc(doc(this.firestore, 'wati archive', archiveid), archiveDoc)
+      .then(() => { this.snackBar.open(`Scheduled for ${this.getSchedulePreviewText()}`, 'Close', { duration: 4000 }); this.dialogRef.close({ status: 'scheduled', archiveid }); })
+      .catch(() => this.dialogRef.close({ status: 'failed' }));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // PARAMETER PRESETS
+  // ══════════════════════════════════════════════════════════════════════
+  private getPresetStorageKey(): string { return `${this.PARAM_PRESETS_KEY}__${this.selectedTemplate?.['elementName'] || ''}__${this.selectedTemplate?.['serverid'] || ''}`; }
+
+  loadPresetsForTemplate() {
+    this.savedPresets = []; this.selectedPresetName = '';
+    if (!this.selectedTemplate?.['elementName']) return;
+    try { const raw = localStorage.getItem(this.getPresetStorageKey()); if (raw) this.savedPresets = JSON.parse(raw); } catch { this.savedPresets = []; }
+  }
+
+  saveCurrentParamsAsPreset() {
+    const name = this.newPresetName.trim();
+    if (!name) { this.snackBar.open('Enter a preset name', 'Close', { duration: 2000 }); return; }
+    this.savedPresets = this.savedPresets.filter(p => p.name !== name);
+    this.savedPresets.unshift({ name, params: this.templateParams.map(p => ({ ...p })) });
+    localStorage.setItem(this.getPresetStorageKey(), JSON.stringify(this.savedPresets));
+    this.snackBar.open(`Preset "${name}" saved`, 'Close', { duration: 2000 });
+    this.newPresetName = ''; this.showPresetSaveInput = false;
+  }
+
+  applyPreset(preset: { name: string; params: TemplateParam[] }) {
+    for (const saved of preset.params) {
+      const t = this.templateParams.find(p => p.name === saved.name);
+      if (t) { t.fillType = saved.fillType; t.staticValue = saved.staticValue || ''; t.metadataField = saved.metadataField || ''; t.excelColumn = saved.excelColumn || ''; }
+    }
+    this.selectedPresetName = preset.name;
+    this.updatePreview();
+    this.snackBar.open(`Preset "${preset.name}" applied`, 'Close', { duration: 2000 });
+  }
+
+  deletePreset(event: Event, preset: { name: string; params: TemplateParam[] }) {
+    event.stopPropagation();
+    this.savedPresets = this.savedPresets.filter(p => p.name !== preset.name);
+    localStorage.setItem(this.getPresetStorageKey(), JSON.stringify(this.savedPresets));
+    if (this.selectedPresetName === preset.name) this.selectedPresetName = '';
+    this.snackBar.open(`Preset deleted`, 'Close', { duration: 2000 });
+  }
 }
