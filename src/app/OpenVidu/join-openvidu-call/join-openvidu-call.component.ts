@@ -3,7 +3,7 @@ import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { doc, docData, Firestore } from '@angular/fire/firestore';
+import { doc, docData, Firestore, setDoc, updateDoc, getDocs, collection, query, where, orderBy, limit, arrayUnion, serverTimestamp, Timestamp } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { ActivatedRoute } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -39,6 +39,54 @@ type RoomInfo = {
   roomstatus: "live" | "finished"
   recordingstatus: "started" | "ended" | "starting" | "ending" | "idle"
 };
+
+interface OpenViduCallQualitySnapshot {
+  minute: number;       // Which minute of the call this snapshot belongs to, starts at 1.
+  timestamp: Timestamp; // Firestore server timestamp recorded when this snapshot was taken.
+  video: {
+    resolution: string;         // Actual frame size being encoded and sent (e.g. '1280x720'); drops when CPU or bandwidth constrained.
+    fps: number;                // Frames per second the encoder is pushing; target is 24, below 15 looks choppy.
+    bitrate: number;            // kbps of video data sent this minute; calculated from delta bytesSent × 8.
+    qualityLimitReason: string; // Why the encoder reduced quality — 'none' healthy, 'cpu' device bottleneck, 'bandwidth' network bottleneck.
+    packetLoss: number;         // % of outbound video packets that never reached the LiveKit server this minute.
+    nackCount: number;          // Times receivers asked this participant to resend a lost video packet this minute.
+    pliCount: number;           // Times a receiver's video decoder broke and requested a full keyframe reset this minute.
+    freezeCount: number;        // Number of times received video froze on this participant's screen this minute.
+    freezeDuration: number;     // Total seconds of frozen video seen by this participant this minute.
+    mute: boolean;              // Camera Muted/Unmuted
+  };
+  audio: {
+    bitrate: number;    // kbps of audio data sent; Opus target 32–64 kbps, always active since DTX is disabled.
+    packetLoss: number; // % of outbound audio packets lost; above 3% causes audible cut-outs, more perceptible than video loss.
+    jitter: number;     // ms of variation in incoming audio packet arrival timing; high jitter causes glitches and adds buffer delay.
+    mute: boolean;      // Mic Muted/Unmuted
+  };
+  noiseCancellation: {
+    df3Active: boolean;       // True if the DeepFilterNet3 ONNX pipeline is running; false means raw unfiltered audio is being published.
+    echoCancellation: boolean; // True if browser AEC is removing speaker output from mic input; should always be true.
+    noiseSuppression: boolean; // True if DF3 noise suppression is actively running; source of truth is DeepFilter3Service.isActive().
+    agc: boolean;              // Browser AGC state; should always be false since DF3 uses a fixed ×1.5 gain boost instead.
+  };
+  mic: {
+    levelDb: number;                  // Mic input level in dBFS (negative scale); sweet spot −20 to −10, below −30 too quiet, above −5 clips.
+    vadState: 'speech' | 'silence';   // DF3 VAD decision at snapshot time; speech triggers suppression level 30, silence triggers 80.
+    suppressionLevel: number;         // Active DF3 suppression strength — 30 gentle during speech to preserve consonants, 80 strong during silence.
+  };
+  network: {
+    rtt: number;                 // ms round-trip time to the LiveKit server; one-way lag is roughly rtt ÷ 2, above 200 ms feels laggy.
+    availableBandwidth: number;  // kbps WebRTC congestion control estimates as available outgoing bandwidth; drives simulcast layer selection.
+    iceType: string;             // How the connection is routed — 'host' direct (best), 'srflx' through NAT (normal), 'relay' TURN (worst).
+    connectionQuality: string;   // LiveKit's own quality score computed from RTT and loss — 'Excellent', 'Good', or 'Poor'.
+  };
+  inbound: {
+    resolution: string; // Resolution this participant is receiving and seeing of others' video streams.
+    fps: number;        // Frames per second being received from others; low value means others' video looks choppy on this screen.
+    packetLoss: number; // % of incoming video packets lost in transit from the LiveKit server to this participant.
+    freezeCount: number; // Number of freeze events on received video streams this minute.
+    freezeDuration: number; // Total seconds others' video was frozen on this participant's screen this minute.
+    jitter: number;         // ms of variation in incoming video packet timing; high value forces the jitter buffer to grow, adding delay.
+  };
+}
 
 @Component({
   selector: 'app-join-openvidu-call',
@@ -156,6 +204,28 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   canScrollRight = false;
   showFilmstripScrollButtons = false;
 
+  // ── Call Quality Tracking ─────────────────────────────────────────────────
+  private qualitySnapshots: OpenViduCallQualitySnapshot[] = [];
+  private qualityMinuteTimer: ReturnType<typeof setInterval> | null = null;
+  private qualityBatchTimer: ReturnType<typeof setInterval> | null = null;
+  private qualityMinuteCount = 0;
+  private qualityDocumentId: string | null = null;
+  private qualityPrevStats: {
+    bytesSentVideo: number;
+    bytesSentAudio: number;
+    packetsSentVideo: number;
+    packetsLostVideo: number;
+    packetsSentAudio: number;
+    packetsLostAudio: number;
+    packetsReceivedInbound: number;
+    packetsLostInbound: number;
+    freezeCount: number;
+    freezeDuration: number;
+    nackCount: number;
+    pliCount: number;
+    timestamp: number;
+  } | null = null;
+
   constructor(
     public firestore: Firestore,
     public route: ActivatedRoute,
@@ -240,11 +310,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.roomSubscription?.complete()
   }
 
-  
 
   isHost(): boolean {
     if (!this.roomDetail || !this.loggedinProfileid) return false;
-    return this.roomDetail.hosts?.includes(this.loggedinProfileid) || false;
+    return this.roomDetail.hosts?.includes(this.loggedinProfileid) || this.loggedinProfileRole["developer"] || this.loggedinProfileRole["tester"];
   }
 
   async checkServer(){
@@ -483,6 +552,15 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
 
+      // ── Quality tracking ──────────────────────────────────────────────────
+      try {
+        await this.initQualityTracking();
+        this.startQualityTimers();
+      } catch (qualityTrackError) {
+        console.log(qualityTrackError)
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       this.startQualityMonitoring(room);
 
       setTimeout(() => this.forceHighQualityForRemotes(), 3000);
@@ -624,6 +702,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (this.meetingRoomStatus === 'left' || this.meetingRoomStatus === 'ended') return;
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
 
+    await this.stopQualityTracking('left');
+
     const currentRoom = this.room();
     // Remove all listeners BEFORE disconnect so RoomEvent.Disconnected doesn't re-trigger leaveRoom
     currentRoom?.removeAllListeners();
@@ -662,6 +742,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       } catch (error) {
         console.log(error)
       }
+      await this.stopQualityTracking('ended');
       this.leaveRoom(false);
       progress.close()
     }
@@ -1679,5 +1760,302 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       alert(errorMessage);
     }
   }
- 
+
+  // ── Call Quality Tracking ─────────────────────────────────────────────────
+
+  private getPublisherPC(): RTCPeerConnection | null {
+    const room = this.room();
+    if (!room) return null;
+    // @ts-ignore — engine is not in the public typings but is stable
+    return room.engine?.pcManager?.publisher?.pc ?? null;
+  }
+
+  private getSubscriberPC(): RTCPeerConnection | null {
+    const room = this.room();
+    if (!room) return null;
+    // @ts-ignore
+    return room.engine?.pcManager?.subscriber?.pc ?? null;
+  }
+
+  private async initQualityTracking(): Promise<void> {
+    const profileId = this.loggedinProfileid;
+    const roomId = this.roomDetail.roomId;
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const baseDocId = `${profileId}_${roomId}_${today}`;
+
+    const colRef = collection(this.firestore, 'openviduCallQuality');
+    const q = query(colRef, where('profileId', '==', profileId), where('roomId', '==', roomId), orderBy('createdAt', 'desc'), limit(1));
+
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const existingDoc = snapshot.docs[0];
+      const data = existingDoc.data();
+      const sizeBytes = new TextEncoder().encode(JSON.stringify(data)).length;
+      const sizePercent = (sizeBytes / 1_048_576) * 100;
+
+      if (sizePercent < 85) {
+        this.qualityDocumentId = existingDoc.id;
+        console.log(`✅ Quality doc reused: ${existingDoc.id} (${sizePercent.toFixed(1)}% full)`);
+        return;
+      }
+
+      console.warn(`⚠️ Quality doc at ${sizePercent.toFixed(1)}% — creating new document`);
+    }
+
+    this.qualityDocumentId = `${baseDocId}_${Date.now()}`;
+    await setDoc(doc(this.firestore, 'openviduCallQuality', this.qualityDocumentId), {
+      profileId,
+      roomId,
+      createdAt: serverTimestamp(),
+      lastUpdatedAt: serverTimestamp(),
+      exitReason: null,
+      snapshots: []
+    });
+
+    console.log(`✅ Quality doc created: ${this.qualityDocumentId}`);
+  }
+
+  private async buildSnapshot(): Promise<OpenViduCallQualitySnapshot | null> {
+    const pubPC = this.getPublisherPC();
+    const subPC = this.getSubscriberPC();
+    if (!pubPC || !subPC) return null;
+
+    const now = Date.now();
+
+    // ── Publisher stats ──────────────────────────────────────────────────────
+    const pubStats = await pubPC.getStats();
+
+    let videoOut = { resolution: 'unknown', fps: 0, bytesSent: 0, qualityLimitReason: 'none', packetsSent: 0, packetsLost: 0, nackCount: 0, pliCount: 0 };
+    let audioOut = { bytesSent: 0, packetsSent: 0, packetsLost: 0 };
+    let network  = { rtt: 0, availableBandwidth: 0, iceType: 'unknown' };
+
+    pubStats.forEach((stat: any) => {
+      if (stat.type === 'outbound-rtp' && stat.kind === 'video' && stat.rid === 'f') {
+        videoOut = {
+          resolution: `${stat.frameWidth ?? 0}x${stat.frameHeight ?? 0}`,
+          fps: Math.round(stat.framesPerSecond ?? 0),
+          bytesSent: stat.bytesSent ?? 0,
+          qualityLimitReason: stat.qualityLimitationReason ?? 'none',
+          packetsSent: stat.packetsSent ?? 0,
+          packetsLost: stat.packetsLost ?? 0,
+          nackCount: stat.nackCount ?? 0,
+          pliCount: stat.pliCount ?? 0
+        };
+      }
+      if (stat.type === 'outbound-rtp' && stat.kind === 'audio') {
+        audioOut = {
+          bytesSent: stat.bytesSent ?? 0,
+          packetsSent: stat.packetsSent ?? 0,
+          packetsLost: stat.packetsLost ?? 0
+        };
+      }
+      if (stat.type === 'candidate-pair' && stat.state === 'succeeded') {
+        network.rtt = parseFloat(((stat.currentRoundTripTime ?? 0) * 1000).toFixed(1));
+        network.availableBandwidth = Math.round((stat.availableOutgoingBitrate ?? 0) / 1000);
+      }
+      if (stat.type === 'local-candidate') {
+        network.iceType = stat.candidateType ?? 'unknown';
+      }
+    });
+
+    // ── Subscriber stats ─────────────────────────────────────────────────────
+    const subStats = await subPC.getStats();
+
+    let videoIn = { resolution: 'unknown', fps: 0, packetsReceived: 0, packetsLost: 0, freezeCount: 0, freezeDuration: 0, jitter: 0 };
+    let audioIn = { jitter: 0 };
+
+    subStats.forEach((stat: any) => {
+      if (stat.type === 'inbound-rtp' && stat.kind === 'video') {
+        videoIn = {
+          resolution: `${stat.frameWidth ?? 0}x${stat.frameHeight ?? 0}`,
+          fps: Math.round(stat.framesPerSecond ?? 0),
+          packetsReceived: stat.packetsReceived ?? 0,
+          packetsLost: stat.packetsLost ?? 0,
+          freezeCount: stat.freezeCount ?? 0,
+          freezeDuration: parseFloat((stat.totalFreezesDuration ?? 0).toFixed(2)),
+          jitter: parseFloat(((stat.jitter ?? 0) * 1000).toFixed(1))
+        };
+      }
+      if (stat.type === 'inbound-rtp' && stat.kind === 'audio') {
+        audioIn.jitter = parseFloat(((stat.jitter ?? 0) * 1000).toFixed(1));
+      }
+    });
+
+    // ── Delta calculations ───────────────────────────────────────────────────
+    const prev = this.qualityPrevStats;
+    const elapsed = prev ? (now - prev.timestamp) / 1000 : 60;
+
+    const videoBitrate = prev ? Math.round(((videoOut.bytesSent - prev.bytesSentVideo) * 8) / elapsed / 1000) : 0;
+    const audioBitrate = prev ? Math.round(((audioOut.bytesSent - prev.bytesSentAudio) * 8) / elapsed / 1000) : 0;
+
+    const videoLossDelta = prev ? (videoOut.packetsLost - prev.packetsLostVideo) : 0;
+    const videoSentDelta = prev ? (videoOut.packetsSent - prev.packetsSentVideo) : 1;
+    const videoPacketLossPct = parseFloat(((videoLossDelta / (videoLossDelta + videoSentDelta)) * 100).toFixed(2));
+
+    const audioLossDelta = prev ? (audioOut.packetsLost - prev.packetsLostAudio) : 0;
+    const audioSentDelta = prev ? (audioOut.packetsSent - prev.packetsSentAudio) : 1;
+    const audioPacketLossPct = parseFloat(((audioLossDelta / (audioLossDelta + audioSentDelta)) * 100).toFixed(2));
+
+    const inboundLossDelta     = prev ? (videoIn.packetsLost - prev.packetsLostInbound) : 0;
+    const inboundReceivedDelta = prev ? (videoIn.packetsReceived - prev.packetsReceivedInbound) : 1;
+    const inboundLossPct = parseFloat(((inboundLossDelta / (inboundLossDelta + inboundReceivedDelta)) * 100).toFixed(2));
+
+    const freezeCountDelta    = prev ? Math.max(0, videoIn.freezeCount - prev.freezeCount) : 0;
+    const freezeDurationDelta = prev ? parseFloat(Math.max(0, videoIn.freezeDuration - prev.freezeDuration).toFixed(2)) : 0;
+    const nackCountDelta      = prev ? Math.max(0, videoOut.nackCount - prev.nackCount) : 0;
+    const pliCountDelta       = prev ? Math.max(0, videoOut.pliCount - prev.pliCount) : 0;
+
+    // ── Store prev ───────────────────────────────────────────────────────────
+    this.qualityPrevStats = {
+      bytesSentVideo: videoOut.bytesSent,
+      bytesSentAudio: audioOut.bytesSent,
+      packetsSentVideo: videoOut.packetsSent,
+      packetsLostVideo: videoOut.packetsLost,
+      packetsSentAudio: audioOut.packetsSent,
+      packetsLostAudio: audioOut.packetsLost,
+      packetsReceivedInbound: videoIn.packetsReceived,
+      packetsLostInbound: videoIn.packetsLost,
+      freezeCount: videoIn.freezeCount,
+      freezeDuration: videoIn.freezeDuration,
+      nackCount: videoOut.nackCount,
+      pliCount: videoOut.pliCount,
+      timestamp: now
+    };
+
+    // ── Mic track settings ───────────────────────────────────────────────────
+    const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
+    const trackSettings = micPub?.audioTrack?.mediaStreamTrack?.getSettings() ?? {};
+
+    // ── Connection quality ───────────────────────────────────────────────────
+    const localQuality = this.remoteParticipantsQuality().get(this.localParticipantIdentity) ?? 'Unknown';
+
+    this.qualityMinuteCount++;
+
+    return {
+      minute: this.qualityMinuteCount,
+      timestamp: Timestamp.now(),
+
+      video: {
+        resolution: videoOut.resolution,
+        fps: videoOut.fps,
+        bitrate: videoBitrate,
+        qualityLimitReason: videoOut.qualityLimitReason,
+        packetLoss: Math.max(0, videoPacketLossPct),
+        nackCount: nackCountDelta,
+        pliCount: pliCountDelta,
+        freezeCount: freezeCountDelta,
+        freezeDuration: freezeDurationDelta,
+        mute: this.isVideoHidden()
+      },
+
+      audio: {
+        bitrate: audioBitrate,
+        packetLoss: Math.max(0, audioPacketLossPct),
+        jitter: audioIn.jitter,
+        mute: this.isAudioMuted()
+      },
+
+      noiseCancellation: {
+        df3Active: this.deepFilter3.isActive(),
+        echoCancellation: (trackSettings as any)['echoCancellation'] ?? true,
+        noiseSuppression: this.deepFilter3.isActive(),
+        agc: (trackSettings as any)['autoGainControl'] ?? false
+      },
+
+      mic: {
+        levelDb: this.deepFilter3.getMicLevelDb(),
+        vadState: this.deepFilter3.getVadState(),
+        suppressionLevel: this.deepFilter3.getCurrentSuppressionLevel()
+      },
+
+      network: {
+        rtt: network.rtt,
+        availableBandwidth: network.availableBandwidth,
+        iceType: network.iceType,
+        connectionQuality: String(localQuality)
+      },
+
+      inbound: {
+        resolution: videoIn.resolution,
+        fps: videoIn.fps,
+        packetLoss: Math.max(0, inboundLossPct),
+        freezeCount: freezeCountDelta,
+        freezeDuration: freezeDurationDelta,
+        jitter: videoIn.jitter
+      }
+    };
+  }
+
+  private startQualityTimers(): void {
+    this.qualityMinuteTimer = setInterval(async () => {
+      const snapshot = await this.buildSnapshot();
+      if (snapshot) {
+        this.qualitySnapshots.push(snapshot);
+        console.log(`📊 Quality snapshot ${snapshot.minute} collected`);
+      }
+    }, 10_000);
+
+    this.qualityBatchTimer = setInterval(async () => {
+      await this.flushQualityBatch('batch');
+    }, 300_000);
+
+    window.addEventListener('pagehide', this.handleQualityBeacon);
+  }
+
+  private async flushQualityBatch(reason: string): Promise<void> {
+    if (!this.qualityDocumentId || this.qualitySnapshots.length === 0) return;
+
+    const toFlush = [...this.qualitySnapshots];
+    this.qualitySnapshots = [];
+
+    try {
+      const ref = doc(this.firestore, 'openviduCallQuality', this.qualityDocumentId);
+      await updateDoc(ref, {
+        snapshots: arrayUnion(...toFlush),
+        lastUpdatedAt: serverTimestamp()
+      });
+      console.log(`✅ Quality batch flushed (${reason}): ${toFlush.length} snapshots`);
+    } catch (err) {
+      this.qualitySnapshots = [...toFlush, ...this.qualitySnapshots];
+      console.error('❌ Quality batch flush failed:', err);
+    }
+  }
+
+  private async stopQualityTracking(exitReason: 'left' | 'ended'): Promise<void> {
+    if (this.qualityMinuteTimer) { clearInterval(this.qualityMinuteTimer); this.qualityMinuteTimer = null; }
+    if (this.qualityBatchTimer)  { clearInterval(this.qualityBatchTimer);  this.qualityBatchTimer = null; }
+
+    window.removeEventListener('pagehide', this.handleQualityBeacon);
+
+    await this.flushQualityBatch('exit');
+
+    if (this.qualityDocumentId) {
+      await updateDoc(doc(this.firestore, 'openviduCallQuality', this.qualityDocumentId), {
+        exitReason,
+        lastUpdatedAt: serverTimestamp()
+      });
+    }
+
+    this.qualitySnapshots = [];
+    this.qualityMinuteCount = 0;
+    this.qualityDocumentId = null;
+    this.qualityPrevStats = null;
+  }
+
+  private handleQualityBeacon = (): void => {
+    if (!this.qualityDocumentId || this.qualitySnapshots.length === 0) return;
+
+    const payload = JSON.stringify({
+      documentId: this.qualityDocumentId,
+      snapshots: this.qualitySnapshots,
+      exitReason: 'tab_closed'
+    });
+
+    navigator.sendBeacon(
+      `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/flushOpenviduCallQuality`,
+      new Blob([payload], { type: 'application/json' })
+    );
+  };
+
 }
