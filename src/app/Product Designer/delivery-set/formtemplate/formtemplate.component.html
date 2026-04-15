@@ -1,5 +1,27 @@
 <!-- Main container with responsive card-based layout -->
-<div class="form-container" *ngIf="showcontent">
+<!-- Floating draft save status — OUTSIDE form-container so filter/blur doesn't affect it -->
+<div class="draft-save-indicator floating" [ngClass]="draftSaveStatus">
+  <ng-container [ngSwitch]="draftSaveStatus">
+    <ng-container *ngSwitchCase="'saving'">
+      <mat-icon class="spin">sync</mat-icon>
+      <span>Saving draft…</span>
+    </ng-container>
+    <ng-container *ngSwitchCase="'saved'">
+      <mat-icon>cloud_done</mat-icon>
+      <span>Draft saved{{ draftSavedAt ? ' at ' + (draftSavedAt | date:'shortTime') : '' }}</span>
+    </ng-container>
+    <ng-container *ngSwitchCase="'failed'">
+      <mat-icon>cloud_off</mat-icon>
+      <span>Draft save failed{{ draftSaveError ? ' — ' + draftSaveError : '' }}</span>
+    </ng-container>
+    <ng-container *ngSwitchDefault>
+      <mat-icon>cloud_queue</mat-icon>
+      <span>Draft not saved yet</span>
+    </ng-container>
+  </ng-container>
+</div>
+
+<div class="form-container" *ngIf="showcontent" [class.connectivity-blocked]="connectivityDialogRef">
   <!-- Form header with improved styling -->
   <div class="form-header">
     <div class="form-title">
