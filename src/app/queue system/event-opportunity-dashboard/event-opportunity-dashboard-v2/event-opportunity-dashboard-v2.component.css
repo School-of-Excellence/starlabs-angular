@@ -144,7 +144,7 @@
 }
 .auto-grid-item { width: 100%; }
 .scope-card.compact {
-  height: 300px;
+  height: 440px;
 }
 .scope-card.compact .header-bar {
   flex: 1;
@@ -818,8 +818,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1;
-  overflow-y: auto;
 }
 
 .section-header {
@@ -1450,12 +1448,12 @@
 .stage-tile-content {
   border-top: 1px solid #e0e0e0;
   background: #fafafa;
-  animation: slideDown 0.2s ease;
+  animation: fadeIn 0.2s ease;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 1000px; }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .participant-list {
@@ -1463,8 +1461,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 300px;
-  overflow-y: auto;
 }
 
 .participant-row {
