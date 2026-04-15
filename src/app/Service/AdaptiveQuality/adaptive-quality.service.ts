@@ -87,8 +87,18 @@ export class AdaptiveQualityService {
   getRoomConfig(tier: QualityTier) {
     const cfg = TIER_CONFIG[tier];
     return {
-      adaptiveStream: true,
+      adaptiveStream: {
+        pixelDensity: 'screen' as const,
+        pauseVideoInBackground: true,
+      },
       dynacast: true,
+      reconnectPolicy: {
+        nextRetryDelayInMs: (context: { retryCount: number }) => {
+          const delays = [500, 1000, 2000, 4000, 8000];
+          if (context.retryCount >= delays.length) return null as any;
+          return delays[context.retryCount];
+        },
+      },
       publishDefaults: {
         videoCodec: 'vp8' as const,
         simulcast: true,

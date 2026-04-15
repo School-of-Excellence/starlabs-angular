@@ -3,11 +3,6 @@ import { Injectable, signal } from '@angular/core';
 export type LayoutMode = 'solo' | 'spotlight' | 'spotlight-filmstrip' | 'grid';
 export type PipPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
-export interface SpotlightState {
-  mainParticipantId: string | null; // null = default (remote in main), 'local' = local in main
-  isScreenShare: boolean;
-}
-
 @Injectable({ providedIn: 'root' })
 export class VideoLayoutService {
 
@@ -20,12 +15,6 @@ export class VideoLayoutService {
   // Is PiP minimized
   isPipMinimized = signal(false);
 
-  // Spotlight state - who is in main view
-  spotlightState = signal<SpotlightState>({
-    mainParticipantId: null,
-    isScreenShare: false
-  });
-
   // Determine layout mode based on participant count and screen share
   getLayoutMode(remoteCount: number, hasScreenShare: boolean): LayoutMode {
     if (hasScreenShare) return 'spotlight-filmstrip';
@@ -34,36 +23,8 @@ export class VideoLayoutService {
     return 'grid';
   }
 
-  // Swap main and PiP videos
-  swapSpotlight(participantId: string | 'local') {
-    const current = this.spotlightState();
-    if (current.isScreenShare) {
-      console.log('Cannot swap during screen share');
-      return;
-    }
-
-    this.spotlightState.set({
-      ...current,
-      mainParticipantId: participantId === 'local' ? 'local' : participantId
-    });
-    console.log(`Spotlight swapped to: ${participantId}`);
-  }
-
-  // Reset spotlight to default (remote as main)
-  resetSpotlight() {
-    this.spotlightState.set({
-      mainParticipantId: null,
-      isScreenShare: false
-    });
-    console.log('Spotlight reset to default');
-  }
-
   // Set screen share as main
   setScreenShareActive(participantId: string, active: boolean) {
-    this.spotlightState.set({
-      mainParticipantId: active ? participantId : null,
-      isScreenShare: active
-    });
     console.log(`Screen share ${active ? 'started' : 'ended'}: ${participantId}`);
   }
 

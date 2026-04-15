@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "breakthroughs-test",
+    "site": "starlabs-test",
     "public": "dist/atctranscription/browser",
     "ignore": [
       "firebase.json",

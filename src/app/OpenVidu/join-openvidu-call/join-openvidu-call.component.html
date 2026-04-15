@@ -124,7 +124,7 @@
     </div>
   </div>
 
-  <!-- ============== SOLO MODE ============== -->
+  <!-- ============== SOLO MODE (fullscreen local video) ============== -->
   <div class="solo-layout" *ngIf="layoutMode() === 'solo'">
     <div class="solo-video">
       <app-openvidu-video-element
@@ -140,75 +140,48 @@
         {{ loggedinProfileRole["name"] }} (You)
       </div>
     </div>
-    <div class="waiting-message">Waiting for others to join...</div>
   </div>
 
   <!-- ============== SPOTLIGHT MODE (2 participants, no screen share) ============== -->
+  <!-- Spotlight Layout -->
   <div class="spotlight-layout" *ngIf="layoutMode() === 'spotlight'">
 
     <!-- Main Video -->
-    <div class="spotlight-main" *ngIf="spotlightMain() as main">
-      <!-- Remote camera as main (default) -->
-      <ng-container *ngIf="main.type === 'remote'">
-        <app-openvidu-video-element
-          *ngIf="main.videoTrack"
-          [track]="main.videoTrack"
-          [participantIdentity]="main.participantName">
-        </app-openvidu-video-element>
-        <div class="video-placeholder-full" *ngIf="!main.videoTrack">
-          <div class="avatar-circle">{{ main.participantName?.charAt(0)?.toUpperCase() || '?' }}</div>
-        </div>
-      </ng-container>
-
-      <!-- Local camera as main (when swapped) -->
-      <ng-container *ngIf="main.type === 'local'">
-        <app-openvidu-video-element
-          *ngIf="main.videoTrack"
-          [track]="main.videoTrack"
-          [participantIdentity]="loggedinProfileRole['name'] + ' (You)'">
-        </app-openvidu-video-element>
-        <div class="video-placeholder-full" *ngIf="!main.videoTrack">
-          <div class="avatar-circle">{{ loggedinProfileRole['name']?.charAt(0)?.toUpperCase() || 'Y' }}</div>
-        </div>
-      </ng-container>
-
-      <div class="zoom-name-badge">
-        <mat-icon class="material-icons text-danger" *ngIf="main.type === 'local' ? isAudioMuted() : isRemoteAudioMuted(main.participantId)">mic_off</mat-icon>
-        {{ main.type === 'local' ? loggedinProfileRole['name'] + ' (You)' : main.participantName }}
-        <span class="network-bars" *ngIf="main.participantId" [title]="'Network: ' + getNetworkBars(main.participantId).bars + ' bars'">
-          <span class="bar" [class.active]="getNetworkBars(main.participantId).bars >= 1"
-            [style.background]="getNetworkBars(main.participantId).color"></span>
-          <span class="bar" [class.active]="getNetworkBars(main.participantId).bars >= 2"
-            [style.background]="getNetworkBars(main.participantId).color"></span>
-          <span class="bar" [class.active]="getNetworkBars(main.participantId).bars >= 3"
-            [style.background]="getNetworkBars(main.participantId).color"></span>
-          <span class="bar" [class.active]="getNetworkBars(main.participantId).bars >= 4"
-            [style.background]="getNetworkBars(main.participantId).color"></span>
-        </span>
-      </div>
-
-      <!-- Host controls on main video (only for remote) -->
-      <button *ngIf="isHost() && main.type === 'remote'" class="participant-options-btn" [matMenuTriggerFor]="spotlightMainMenu" (click)="$event.stopPropagation()">
-        <span class="material-icons">more_vert</span>
-      </button>
-      <mat-menu #spotlightMainMenu="matMenu">
-        <button mat-menu-item *ngIf="!isRemoteAudioMuted(main.participantId)" (click)="toggleParticipantMute(main.participantId, main.participantName, false)">
-          <mat-icon>mic_off</mat-icon>
-          <span>Mute</span>
-        </button>
-        <button mat-menu-item disabled *ngIf="isRemoteAudioMuted(main.participantId)">
-          <mat-icon>mic_off</mat-icon>
-          <span>Already Muted</span>
-        </button>
-        <button mat-menu-item class="text-danger" (click)="removePanticipant(main.participantId, main.participantName)">
-          <mat-icon>person_remove</mat-icon>
-          <span>Remove from Call</span>
-        </button>
-      </mat-menu>
+    <div class="main-video">
+      @if (spotlightMain(); as main) {
+        
+        <!-- Screen Share -->
+        @if (main.type === 'screen' && main.mediaStream) {
+          <video 
+            [srcObject]="main.mediaStream"
+            autoplay 
+            playsinline
+            class="screen-share-video"
+          ></video>
+        }
+        
+        <!-- Remote Camera -->
+        @if (main.type === 'remote' && main.mediaStream) {
+          <video 
+            [srcObject]="main.mediaStream"
+            autoplay 
+            playsinline
+          ></video>
+        }
+        
+        <!-- Placeholder when no video -->
+        @if (!main.mediaStream) {
+          <div class="video-placeholder">
+            <div class="avatar">{{ main.participantName?.charAt(0)?.toUpperCase() || '?' }}</div>
+          </div>
+        }
+        
+        <div class="participant-label">{{ main.participantName }}</div>
+      }
     </div>
 
-    <!-- PiP Video (Draggable) -->
-    <div
+    <!-- PiP Video -->
+    <div 
       class="pip-video"
       *ngIf="spotlightPip() as pip"
       [ngClass]="{
@@ -220,47 +193,35 @@
       }"
       cdkDrag
       cdkDragBoundary=".spotlight-layout"
+      [cdkDragFreeDragPosition]="pipDragPosition"
+      (cdkDragStarted)="onPipDragStarted()"
       (cdkDragEnded)="onPipDragEnd($event)"
-      (click)="onPipClick()"
     >
-      <ng-container *ngIf="pip.type === 'local'">
-        <app-openvidu-video-element
-          *ngIf="pip.videoTrack"
-          [track]="pip.videoTrack"
-          [participantIdentity]="'You'">
-        </app-openvidu-video-element>
-        <div class="video-placeholder-full small" *ngIf="!pip.videoTrack">
-          <div class="avatar-circle small">{{ loggedinProfileRole['name']?.charAt(0)?.toUpperCase() || 'Y' }}</div>
+      @if (pip.mediaStream) {
+        <video 
+          [srcObject]="pip.mediaStream"
+          autoplay 
+          playsinline
+          [muted]="pip.type === 'local'"
+          [class.mirror]="pip.type === 'local'"
+        ></video>
+      } @else {
+        <div class="video-placeholder">
+          <div class="avatar small">{{ pip.participantName?.charAt(0)?.toUpperCase() || '?' }}</div>
         </div>
-      </ng-container>
-
-      <ng-container *ngIf="pip.type === 'remote'">
-        <app-openvidu-video-element
-          *ngIf="pip.videoTrack"
-          [track]="pip.videoTrack"
-          [participantIdentity]="pip.participantName">
-        </app-openvidu-video-element>
-        <div class="video-placeholder-full small" *ngIf="!pip.videoTrack">
-          <div class="avatar-circle small">{{ pip.participantName?.charAt(0)?.toUpperCase() || '?' }}</div>
-        </div>
-      </ng-container>
-
-      <div class="pip-label">{{ pip.type === 'local' ? 'You' : pip.participantName }}</div>
-
-      <div class="pip-controls">
-        <button (click)="togglePipSize(); $event.stopPropagation()" title="Resize">
-          <span class="material-icons">{{ videoLayout.isPipMinimized() ? 'open_in_full' : 'close_fullscreen' }}</span>
+      }
+      
+      <div class="pip-label">{{ pip.participantName }}</div>
+      
+      <div class="pip-controls" (click)="$event.stopPropagation()">
+        <button (click)="togglePipSize(); $event.stopPropagation()">
+          {{ videoLayout.isPipMinimized() ? '⬜' : '—' }}
         </button>
-      </div>
-
-      <div class="pip-swap-hint">Click to swap</div>
-      <div class="pip-drag-handle" cdkDragHandle>
-        <span class="material-icons">drag_indicator</span>
       </div>
     </div>
 
   </div>
-
+  
   <!-- ============== SPOTLIGHT + FILMSTRIP MODE (Screen share active) ============== -->
   <div class="spotlight-filmstrip-layout" *ngIf="layoutMode() === 'spotlight-filmstrip'">
 

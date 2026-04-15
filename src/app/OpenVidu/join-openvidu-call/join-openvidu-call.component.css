@@ -433,14 +433,10 @@
 }
 
 /* ============================ */
-/* SOLO LAYOUT                  */
+/* SOLO LAYOUT (fullscreen)     */
 /* ============================ */
 
 .solo-layout {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   margin-top: 40px;
   margin-bottom: 80px;
   height: calc(100vh - 40px - 80px);
@@ -449,12 +445,10 @@
 
 .solo-video {
   position: relative;
-  width: 80%;
-  max-width: 640px;
-  aspect-ratio: 4/3;
-  border-radius: 12px;
+  width: 100%;
+  height: 100%;
+  background: #000;
   overflow: hidden;
-  background: #1a1a1a;
 }
 
 .solo-video app-openvidu-video-element,
@@ -462,18 +456,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.waiting-message {
-  margin-top: 24px;
-  color: #888;
-  font-size: 16px;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
 }
 
 /* ============================ */
@@ -489,30 +471,80 @@
   overflow: hidden;
 }
 
-.spotlight-main {
+/* Main video fills the entire spotlight area */
+.main-video {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  position: relative;
-  background: #1a1a1a;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.spotlight-main app-openvidu-video-element,
-.spotlight-main video {
+.main-video video {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  background: #000;
 }
 
-.spotlight-main .participant-options-btn {
+.main-video video.mirror {
+  transform: scaleX(-1);
+}
+
+.main-video video.screen-share-video {
+  object-fit: contain;
+  background: #1a1a1a;
+}
+
+.main-video .participant-label {
+  position: absolute;
+  bottom: 100px;
+  left: 24px;
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+}
+
+.main-video .video-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+}
+
+.main-video .video-placeholder .avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 48px;
+  font-weight: 600;
+}
+
+.main-video .participant-options-btn {
   display: none;
 }
 
-.spotlight-main:hover .participant-options-btn {
+.main-video:hover .participant-options-btn {
   display: flex;
 }
 
-/* Video placeholder for camera-off state */
-.video-placeholder-full {
+/* PiP video placeholder */
+.pip-video .video-placeholder {
   width: 100%;
   height: 100%;
   display: flex;
@@ -521,8 +553,18 @@
   background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
 }
 
-.video-placeholder-full.small {
-  min-height: 100%;
+.pip-video .video-placeholder .avatar.small,
+.main-video .video-placeholder .avatar.small {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .avatar-circle {
@@ -553,11 +595,10 @@
   width: 200px;
   height: 150px;
   border-radius: 12px;
-  overflow: visible;
   background: #1a1a1a;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   border: 2px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
+  cursor: grab;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -566,6 +607,10 @@
               top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 100;
   overflow: hidden;
+}
+
+.pip-video:active {
+  cursor: grabbing;
 }
 
 /* Corner positions */
@@ -580,8 +625,7 @@
   height: 90px;
 }
 
-.pip-video.minimized .pip-label,
-.pip-video.minimized .pip-swap-hint {
+.pip-video.minimized .pip-label {
   display: none;
 }
 
@@ -591,17 +635,17 @@
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
 }
 
-.pip-video:hover .pip-controls,
-.pip-video:hover .pip-swap-hint,
-.pip-video:hover .pip-drag-handle {
+.pip-video:hover .pip-controls {
   opacity: 1;
 }
 
 /* While dragging */
 .pip-video.cdk-drag-dragging {
+  cursor: grabbing;
   border-color: #4CAF50;
-  box-shadow: 0 16px 48px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 16px 48px rgba(76, 175, 80, 0.4);
   transition: none;
+  z-index: 1000;
 }
 
 .pip-video app-openvidu-video-element,
@@ -654,45 +698,6 @@
   background: rgba(0, 0, 0, 0.9);
 }
 
-.pip-swap-hint {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 10px;
-  opacity: 0;
-  transition: opacity 0.2s;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.pip-drag-handle {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px;
-  border-radius: 4px;
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pip-drag-handle .material-icons {
-  font-size: 16px;
-}
-
-.pip-drag-handle:active {
-  cursor: grabbing;
-}
 
 /* ============================ */
 /* SPOTLIGHT + FILMSTRIP MODE   */

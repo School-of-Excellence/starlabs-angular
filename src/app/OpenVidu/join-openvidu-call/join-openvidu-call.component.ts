@@ -1,8 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { AfterViewInit, Component, computed, effect, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets } from 'livekit-client';
-import { CdkDrag, CdkDragEnd, CdkDragHandle } from '@angular/cdk/drag-drop';
+import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality } from 'livekit-client';
+import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { doc, docData, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { ActivatedRoute } from '@angular/router';
@@ -49,8 +49,7 @@ type RoomInfo = {
     MatIconModule,
     MatMenuModule,
     MatDividerModule,
-    CdkDrag,
-    CdkDragHandle
+    CdkDrag
   ],
   templateUrl: './join-openvidu-call.component.html',
   styleUrl: './join-openvidu-call.component.css'
@@ -97,6 +96,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   // ── Layout: screen share tracking ──────────────────────────────────────
   screenShareTrack = signal<RemoteTrack | null>(null);
   screenShareParticipantId = signal<string | null>(null);
+  localVideoStream = signal<MediaStream | null>(null);
 
   // Layout mode computed from participant count and screen share state
   layoutMode = computed<LayoutMode>(() => {
@@ -105,41 +105,25 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return this.videoLayout.getLayoutMode(remoteVideoCount, hasScreenShare);
   });
 
-  // Spotlight: who is in main view
   spotlightMain = computed(() => {
-    const state = this.videoLayout.spotlightState();
     const remotes = this.returnRemoteVideoTracks();
 
-    // Screen share takes priority
-    if (state.isScreenShare && this.screenShareTrack()) {
-      const sharer = remotes.find(r => r.participantIdentity === this.screenShareParticipantId());
+    if (this.screenShareTrack()) {
+      const sharerId = this.screenShareParticipantId();
+      const sharer = remotes.find(r => r.participantIdentity === sharerId);
       return {
         type: 'screen' as const,
-        trackPublication: null as any,
-        videoTrack: this.screenShareTrack(),
-        participantId: this.screenShareParticipantId(),
+        mediaStream: this.screenShareTrack()?.mediaStream || null,
+        participantId: sharerId,
         participantName: sharer?.participantName || 'Screen'
       };
     }
 
-    // If local is set as main
-    if (state.mainParticipantId === 'local') {
-      return {
-        type: 'local' as const,
-        trackPublication: null as any,
-        videoTrack: this.localParticipant(),
-        participantId: 'local',
-        participantName: 'You'
-      };
-    }
-
-    // Default: first remote camera is main
     const remote = remotes[0];
     if (remote) {
       return {
         type: 'remote' as const,
-        trackPublication: remote.trackPublication,
-        videoTrack: remote.trackPublication.videoTrack,
+        mediaStream: remote.trackPublication.videoTrack?.mediaStream || null,
         participantId: remote.participantIdentity,
         participantName: remote.participantName
       };
@@ -148,38 +132,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return null;
   });
 
-  // Spotlight: who is in PiP
   spotlightPip = computed(() => {
-    const state = this.videoLayout.spotlightState();
-    const remotes = this.returnRemoteVideoTracks();
-
-    // If screen share is active, local is PiP
-    if (state.isScreenShare) {
-      return {
-        type: 'local' as const,
-        videoTrack: this.localParticipant(),
-        participantId: 'local',
-        participantName: 'You'
-      };
-    }
-
-    // If local is main, remote is PiP
-    if (state.mainParticipantId === 'local') {
-      const remote = remotes[0];
-      if (remote) {
-        return {
-          type: 'remote' as const,
-          videoTrack: remote.trackPublication.videoTrack,
-          participantId: remote.participantIdentity,
-          participantName: remote.participantName
-        };
-      }
-    }
-
-    // Default: local is PiP
     return {
       type: 'local' as const,
-      videoTrack: this.localParticipant(),
+      mediaStream: this.localVideoStream(),
       participantId: 'local',
       participantName: 'You'
     };
@@ -258,6 +214,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.qualityChangeDebounce.forEach(timeout => clearTimeout(timeout));
+    this.qualityChangeDebounce.clear();
+    this.lastQualityChange.clear();
+
     this.adaptiveQuality.stopMonitoring();
     this.canvasPipelineCleanup?.();
     this.canvasPipelineCleanup = null;
@@ -358,15 +318,30 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-        this.remoteParticipants.update((value) => {
-          value.set(publication.trackSid, {
+        if (track.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+          publication.setVideoQuality(VideoQuality.HIGH);
+          const layout = this.layoutMode();
+          if (layout === 'spotlight' || layout === 'solo') {
+            publication.setVideoDimensions({ width: 1280, height: 720 });
+          } else {
+            publication.setVideoDimensions({ width: 640, height: 480 });
+          }
+          console.log(`📺 Requested HIGH quality for: ${participant.identity}`);
+        }
+
+        this.remoteParticipants.update((prev) => {
+          const next = new Map(prev);
+          next.set(publication.trackSid, {
             trackPublication: publication,
             participantIdentity: participant.identity,
             participantName: participant.name ?? participant.identity
-          })
-          return value
+          });
+          return next;
         });
+
+        const mode = this.layoutMode();
         console.log('Tracked', this.remoteParticipants());
+        console.log(`Layout after track subscribed: ${mode} (${this.remoteParticipants().size} remotes)`);
 
         // Screen share detection
         if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
@@ -385,9 +360,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.TrackUnsubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-        this.remoteParticipants.update((value) => {
-          value.delete(publication.trackSid)
-          return value
+        this.remoteParticipants.update((prev) => {
+          const next = new Map(prev);
+          next.delete(publication.trackSid);
+          return next;
         });
 
         console.log('UnTracked', this.remoteParticipants());
@@ -407,33 +383,36 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     // Handle Quality Change
     room.on(
-      RoomEvent.ConnectionQualityChanged, 
+      RoomEvent.ConnectionQualityChanged,
       (quality: ConnectionQuality, participant: Participant) => {
         console.log("Network quality changed:", participant.identity, quality);
-        this.remoteParticipantsQuality.update((value) =>{
-          value.set(participant.identity, quality)
-          return value
-        })
+        this.remoteParticipantsQuality.update((prev) => {
+          const next = new Map(prev);
+          next.set(participant.identity, quality);
+          return next;
+        });
     });
 
     // Track Muted Participants
     room.on(RoomEvent.TrackMuted, (publication: RemoteTrackPublication, participant: Participant) => {
       if (publication.kind === Track.Kind.Audio) {
-        this.remoteParticipantsMute.update((value) => {
-          value.set(participant.identity, true);
-          return value;
+        this.remoteParticipantsMute.update((prev) => {
+          const next = new Map(prev);
+          next.set(participant.identity, true);
+          return next;
         });
-        console.log('Audio muted:', participant.identity, this.remoteParticipantsMute().get(participant.identity));
+        console.log('Audio muted:', participant.identity);
       }
     });
     // Track unMuted Participants
     room.on(RoomEvent.TrackUnmuted, (publication: RemoteTrackPublication, participant: Participant) => {
       if (publication.kind === Track.Kind.Audio) {
-        this.remoteParticipantsMute.update((value) => {
-          value.delete(participant.identity);
-          return value;
+        this.remoteParticipantsMute.update((prev) => {
+          const next = new Map(prev);
+          next.delete(participant.identity);
+          return next;
         });
-        console.log('Audio unmuted:', participant.identity, this.remoteParticipantsMute().get(participant.identity));
+        console.log('Audio unmuted:', participant.identity);
       }
     });
 
@@ -447,8 +426,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     // Clean up state maps when a participant disconnects — prevents memory leak
     room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-      this.remoteParticipantsQuality.update(map => { map.delete(participant.identity); return map; });
-      this.remoteParticipantsMute.update(map => { map.delete(participant.identity); return map; });
+      this.remoteParticipantsQuality.update(prev => { const next = new Map(prev); next.delete(participant.identity); return next; });
+      this.remoteParticipantsMute.update(prev => { const next = new Map(prev); next.delete(participant.identity); return next; });
       console.log('Participant disconnected, state cleaned:', participant.identity);
     });
 
@@ -477,12 +456,24 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
 
+      this.startQualityMonitoring(room);
+
       // Enable camera at the adaptive tier's resolution
       const cameraConstraints = this.adaptiveQuality.getCameraConstraints(initialTier);
       await room.localParticipant.setCameraEnabled(true, cameraConstraints);
 
       const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
       this.localParticipant.set(videoTrack);
+
+      // ⬇️ ADD THIS: Store the MediaStream for local video
+      if (videoTrack?.mediaStreamTrack) {
+        const localStream = new MediaStream([videoTrack.mediaStreamTrack]);
+        this.localVideoStream.set(localStream);
+        console.log('📹 Local video stream stored');
+      } else if (videoTrack?.mediaStream) {
+        this.localVideoStream.set(videoTrack.mediaStream);
+        console.log('📹 Local video mediaStream stored');
+      }
 
       // ── Raw track constraint enforcement ─────────────────────────────────
       const tierCfg = cameraConstraints.resolution;
@@ -617,7 +608,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.blurLevel = 'none';
     this.screenShareTrack.set(null);
     this.screenShareParticipantId.set(null);
-    this.videoLayout.resetSpotlight();
     this.meetingRoomStatus = "left"
   }
 
@@ -847,20 +837,59 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   /** Apply background blur at a given level, or remove it. */
   async applyBlur(level: 'none' | 'mid' | 'high') {
     const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
-    if (!cameraPub || !cameraPub.videoTrack) return;
+    if (!cameraPub || !cameraPub.videoTrack) {
+      console.warn('⚠️ No camera track for blur');
+      return;
+    }
 
     const videoTrack = cameraPub.videoTrack;
 
-    if (level === 'none') {
-      await videoTrack.stopProcessor();
-    } else {
-      const blurRadius = level === 'mid' ? 6 : 15;
-      const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
-      videoTrack.setProcessor(blur);
+    try {
+      if (level === 'none') {
+        await videoTrack.stopProcessor();
+        console.log('🔲 Blur removed');
+      } else {
+        const blurRadius = level === 'mid' ? 6 : 15;
+        const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
+        await videoTrack.setProcessor(blur);
+        console.log(`🔲 Blur applied: ${level} (radius: ${blurRadius})`);
+      }
+
+      this.blurLevel = level;
+
+      await this.refreshLocalVideoStream();
+    } catch (error) {
+      console.error('🔴 Blur error:', error);
+    }
+  }
+
+  private async refreshLocalVideoStream(): Promise<void> {
+    const room = this.room();
+    if (!room) {
+      console.warn('⚠️ No room for stream refresh');
+      return;
     }
 
-    this.blurLevel = level;
-    console.log('Blur level set to:', level);
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const publication = this.getLocalTrackPublication(Track.Source.Camera);
+    const track: any = publication?.track;
+
+    if (!track) {
+      console.warn('⚠️ No camera track found');
+      return;
+    }
+
+    if (track.mediaStreamTrack) {
+      const newStream = new MediaStream([track.mediaStreamTrack]);
+      this.localVideoStream.set(newStream);
+      console.log('📹 Local video stream refreshed');
+    } else if (track.mediaStream) {
+      this.localVideoStream.set(track.mediaStream);
+      console.log('📹 Local video stream refreshed (mediaStream)');
+    } else {
+      console.warn('⚠️ Track has no mediaStreamTrack');
+    }
   }
 
   /** Returns mobile-style signal bar info for a remote participant. */
@@ -906,18 +935,80 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return this.returnRemoteVideoTracks().length;
   }
 
+  // ── Remote video quality monitoring ────────────────────────────────────
+
+  private qualityChangeDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+  private lastQualityChange = new Map<string, number>();
+  private readonly QUALITY_CHANGE_COOLDOWN = 5000;
+
+  private startQualityMonitoring(room: Room) {
+    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
+      if (participant.identity === room.localParticipant.identity) return;
+
+      console.log(`📶 ${participant.identity} connection: ${ConnectionQuality[quality] ?? quality}`);
+
+      const remoteParticipant = (room as any).participants?.get(participant.identity)
+        ?? (room as any).remoteParticipants?.get(participant.identity);
+      if (!remoteParticipant) return;
+
+      const videoPub = Array.from(remoteParticipant.videoTrackPublications?.values?.() ?? remoteParticipant.videoTracks?.values?.() ?? [])
+        .find((p: any) => p.source === Track.Source.Camera) as RemoteTrackPublication | undefined;
+
+      const targetQuality =
+        quality === ConnectionQuality.Excellent ? VideoQuality.HIGH
+        : quality === ConnectionQuality.Good ? VideoQuality.MEDIUM
+        : VideoQuality.LOW;
+
+      if (videoPub) {
+        this.setParticipantQuality(videoPub, participant.identity, targetQuality);
+      }
+    });
+  }
+
+  private setParticipantQuality(
+    publication: RemoteTrackPublication,
+    participantId: string,
+    quality: VideoQuality
+  ) {
+    const now = Date.now();
+    const lastChange = this.lastQualityChange.get(participantId) || 0;
+
+    if (now - lastChange < this.QUALITY_CHANGE_COOLDOWN) {
+      console.log(`⏳ Skipping quality change for ${participantId} (cooldown)`);
+      return;
+    }
+
+    const pending = this.qualityChangeDebounce.get(participantId);
+    if (pending) clearTimeout(pending);
+
+    const timeout = setTimeout(() => {
+      publication.setVideoQuality(quality);
+      this.lastQualityChange.set(participantId, Date.now());
+      console.log(`📺 Quality applied: ${participantId} → ${VideoQuality[quality] ?? quality}`);
+    }, 1000);
+
+    this.qualityChangeDebounce.set(participantId, timeout);
+  }
+
   // ── PiP interaction methods ────────────────────────────────────────────
 
+  pipDragPosition = { x: 0, y: 0 };
+  private isDragging = false;
+
   onPipClick() {
-    const pip = this.spotlightPip();
-    if (pip) {
-      this.videoLayout.swapSpotlight(pip.participantId);
-    }
+    // Swap feature removed
+  }
+
+  onPipDragStarted() {
+    this.isDragging = true;
   }
 
   onPipDragEnd(event: CdkDragEnd) {
-    const container = event.source.element.nativeElement.parentElement;
-    if (!container) return;
+    const container = document.querySelector('.spotlight-layout') as HTMLElement;
+    if (!container) {
+      this.isDragging = false;
+      return;
+    }
 
     const containerRect = container.getBoundingClientRect();
     const pipRect = event.source.element.nativeElement.getBoundingClientRect();
@@ -933,7 +1024,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     );
 
     // Reset drag transform so CSS corner positioning takes over
+    this.pipDragPosition = { x: 0, y: 0 };
     event.source.reset();
+
+    // Delay clearing isDragging so the click handler (which fires after dragEnd) ignores it
+    setTimeout(() => { this.isDragging = false; }, 50);
   }
 
   togglePipSize() {
@@ -987,6 +1082,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
     return 'Someone';
   }
+
+  
 
   // /**
   // * Enable microphone with RNNoise noise cancellation
