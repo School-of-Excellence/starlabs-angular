@@ -1622,10 +1622,12 @@ export class BigCohortCloneComponent {
     window.open(url.toString(), "_blank")
   }
 
-  onValidateParticipantAssignment(assignmentDocId: string) {
+  onValidateParticipantAssignment(assignmentDocId: string, cohortId?: string) {
     let url = this.router.createUrlTree(['/validateParticipantAssignments/'], {
       queryParams: {
         assignmentid: assignmentDocId,
+        marathonid: this.selectedMarathon || null,
+        cohortid: cohortId || null,
       }
     })
     window.open(url.toString(), "_blank")

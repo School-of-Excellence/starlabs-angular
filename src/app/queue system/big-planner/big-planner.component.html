@@ -68,13 +68,20 @@
                       <span class="participant-name">{{mapProfile[invitation]}}</span>
                     </div>
                     <div class="participant-stats">
-                      <div class="stat-chip">
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'shadow')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()">
                         <span class="stat-label">Shadows:</span>
                         <span class="stat-value">{{profileShadowCount[invitation]?.length || 0}}</span>
                       </div>
-                      <div class="stat-chip">
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'studio')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()">
                         <span class="stat-label">Studios:</span>
                         <span class="stat-value">{{profileStudioCount[invitation]?.length || 0}}</span>
+                      </div>
+                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'pair')" (mousemove)="onMove($event)"
+                        (mouseleave)="onLeave()">
+                        <span class="stat-label">Pair:</span>
+                        <span class="stat-value">{{profilePairCount[invitation]?.length || 0}}</span>
                       </div>
                     </div>
                   </div>
@@ -94,6 +101,7 @@
             <mat-card-content>
               <div class="role-form-container">
                 <div *ngFor="let pair of newStudioPairing; let i = index" class="role-form-row">
+                  <div class="row-index">{{ i + 1 }}</div>
                   <div class="role-form-fields">
 
                     <mat-form-field appearance="outline">
@@ -108,9 +116,9 @@
                       </mat-select>
                     </mat-form-field>
                     
-                    <mat-form-field appearance="outline">
+                    <mat-form-field appearance="outline" >
                       <mat-label>Participant</mat-label>
-                      <mat-select [(ngModel)]="pair.profileid">
+                      <mat-select [(ngModel)]="pair.profileid" >
                         <mat-option>
                           <ngx-mat-select-search [(ngModel)]="filterText" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
                         </mat-option>
@@ -119,25 +127,44 @@
                         </mat-option>
                       </mat-select>
                     </mat-form-field>
-    
-                    <mat-form-field appearance="outline">
-                      <mat-label>ATC Model</mat-label>
-                      <mat-select [(ngModel)]="pair.atcmodel" multiple>
-                        <mat-option [value]="null">None</mat-option>
-                        <mat-option *ngFor="let list of productList" [value]="list.atcmodel">
-                          {{list.atcmodel}}
-                        </mat-option>
-                      </mat-select>
-                    </mat-form-field>
+
                   </div>
-    
+
                   <div class="role-form-actions">
-                    <button *ngIf="i + 1 === newStudioPairing.length" mat-mini-fab color="primary" (click)="addPair()">
-                      <mat-icon>add</mat-icon>
+                    <button *ngIf="i !== 0" type="button" class="row-action-btn remove" (click)="removePair(i)" aria-label="Remove">
+                      <mat-icon>close</mat-icon>
                     </button>
-                    <button *ngIf="i !== 0" mat-mini-fab color="warn" (click)="removePair(i)">
-                      <mat-icon>remove</mat-icon>
-                    </button>
+                  </div>
+                </div>
+
+                <button type="button" class="add-pair-btn" (click)="addPair()">
+                  <mat-icon>add</mat-icon>
+                  <span>Add Participant</span>
+                </button>
+
+                <div class="overall-atc-section">
+                  <div class="overall-atc-row">
+                    <div class="overall-atc-field">
+                      <div class="overall-atc-label">ATC Model (applies to all)</div>
+                      <mat-form-field appearance="outline" class="overall-atc-model">
+                        <mat-select [(ngModel)]="overallAtcModel" multiple placeholder="Select ATC models">
+                          <mat-option *ngFor="let list of productList" [value]="list.atcmodel"
+                            [disabled]="this.disabledAtcModels.includes(list.atcmodel)">
+                            {{list.atcmodel}}
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+                    <div class="overall-atc-field">
+                      <div class="overall-atc-label">Mandatory Activities</div>
+                      <mat-form-field appearance="outline" class="overall-atc-model">
+                        <mat-select [(ngModel)]="overallMandatoryActivities" multiple placeholder="Select activities">
+                          <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
+                            {{activity.activity}}
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
                   </div>
                 </div>
 
@@ -309,40 +336,63 @@
                   <ng-container matColumnDef="atcModel">
                     <th mat-header-cell *matHeaderCellDef>ATC Model</th>
                     <td mat-cell *matCellDef="let studio">
-                      <div>
-                        <ng-container *ngFor="let atcmodel of studio['atcmodel'] || []; let last = last">
-                          {{ atcmodel }}<span *ngIf="!last">, </span>
-                        </ng-container>
+                      <div class="chip-cell">
+                        <div class="chip-list">
+                          <span class="chip chip-atc" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
+                          <span class="chip-empty" *ngIf="!(studio['atcmodel'] && studio['atcmodel'].length)">—</span>
+                        </div>
+                        <button *ngIf="!viewOnly" class="cell-edit-btn" (click)="openAtcEditMode(studio['docid'])" matTooltip="Edit ATC Model">
+                          <mat-icon>edit</mat-icon>
+                        </button>
                       </div>
                     </td>
                   </ng-container>
   
+                  <!-- Mandatory Activities Column -->
+                  <ng-container matColumnDef="mandatoryActivities">
+                    <th mat-header-cell *matHeaderCellDef>Mandatory Activities</th>
+                    <td mat-cell *matCellDef="let studio">
+                      <div class="chip-cell">
+                        <div class="chip-list">
+                          <span class="chip chip-mandatory" *ngFor="let actId of studio['mandatoryactivities'] || []">{{ mapBigActivity[actId] }}</span>
+                          <span class="chip-empty" *ngIf="!(studio['mandatoryactivities'] && studio['mandatoryactivities'].length)">—</span>
+                        </div>
+                        <button *ngIf="!viewOnly" class="cell-edit-btn" (click)="openMandatoryEditMode(studio['docid'])" matTooltip="Edit Mandatory Activities">
+                          <mat-icon>edit</mat-icon>
+                        </button>
+                      </div>
+                    </td>
+                  </ng-container>
+
                   <!-- Actions Column -->
                   <ng-container matColumnDef="actions">
                     <th mat-header-cell *matHeaderCellDef>Actions</th>
                     <td mat-cell *matCellDef="let studio">
                       <div *ngIf="!viewOnly" class="actions-cell">
-                        <mat-slide-toggle 
-                          color="primary"
-                          [checked]="studio.studioin" 
-                          (change)="toggleStudio(studio)">
-                          {{studio.studioin ? "Studio Enabled" : "Studio Disabled"}}
-                        </mat-slide-toggle>
-  
-                        <mat-slide-toggle 
-                          color="primary"
-                          [checked]="studio.checkin" 
-                          (change)="toggleCheckin(studio)">
-                          {{studio.checkin ? "Check In" : "Check Out"}}
-                        </mat-slide-toggle>
+                        <button type="button" class="action-pill"
+                          [class.on]="studio.studioin"
+                          (click)="toggleStudio(studio)"
+                          [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
+                          <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
+                          <span>Studio</span>
+                        </button>
 
-                        <mat-slide-toggle 
+                        <button type="button" class="action-pill"
+                          [class.on]="studio.checkin"
+                          (click)="toggleCheckin(studio)"
+                          [matTooltip]="studio.checkin ? 'Checked In' : 'Checked Out'">
+                          <mat-icon>{{ studio.checkin ? 'login' : 'logout' }}</mat-icon>
+                          <span>{{ studio.checkin ? 'In' : 'Out' }}</span>
+                        </button>
+
+                        <button type="button" class="action-pill"
                           *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']"
-                          color="primary"
-                          [checked]="studio.openvidu" 
-                          (change)="toggleOpenVidu(studio)">
-                          {{studio.openvidu ? "OpenVidu Enabled" : "OpenVidu Disabled"}}
-                        </mat-slide-toggle>
+                          [class.on]="studio.openvidu"
+                          (click)="toggleOpenVidu(studio)"
+                          [matTooltip]="studio.openvidu ? 'OpenVidu Enabled' : 'OpenVidu Disabled'">
+                          <mat-icon>videocam</mat-icon>
+                          <span>OpenVidu</span>
+                        </button>
                         
                         <button *ngIf="deleteOption" 
                           mat-icon-button color="warn" 
@@ -366,3 +416,84 @@
       </mat-sidenav-container>
     </div>
   </div>
+
+  <div class="tooltip-box" [style.left.px]="cardTooltipX" [style.top.px]="cardTooltipY" *ngIf="activeHoverCard?.length > 0"
+    [style.opacity]="cardVisible ? 1 : 0">
+    <ng-container *ngIf="activeHoverCard && activeHoverCard.length > 0">
+      <div class="wrap">
+        <div *ngFor="let studio of activeHoverCard">
+          <div class="tt-row" >
+            <span class="tt-label">Participants : </span>
+            <span class="tt-value">{{ studio.participants.join(', ') }}</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-label">Activities : </span>
+            <span class="tt-value">{{ studio.activities.join(', ') }}</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-label">Atc Model : </span>
+            <span class="tt-value">{{ studio.atcModel.join(', ') }}</span>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+
+<!-- Backdrop overlay -->
+<div class="modal-backdrop" *ngIf="editAtcModel" (click)="cancelAtcEdit()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <span class="modal-title">ATC Model</span>
+      <button class="close-btn" (click)="cancelAtcEdit()">&#x2715;</button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Atc Model</mat-label>
+        <mat-select [(ngModel)]="editAtcModelData" multiple>
+          <mat-option
+            *ngFor="let list of productList"
+            [value]="list.atcmodel"
+            [disabled]="this.disabledAtcModels.includes(list.atcmodel)"
+          >
+            {{ list.atcmodel }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <button mat-stroked-button (click)="cancelAtcEdit()">Cancel</button>
+      <button mat-stroked-button (click)="applyAtcEdit()">Apply</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-backdrop" *ngIf="editMandatoryActivities" (click)="cancelMandatoryEdit()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">Mandatory Activities</span>
+      <button class="close-btn" (click)="cancelMandatoryEdit()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Mandatory Activities</mat-label>
+        <mat-select [(ngModel)]="editMandatoryActivitiesData" multiple>
+          <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
+            {{ activity.activity }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="modal-footer">
+      <button mat-stroked-button (click)="cancelMandatoryEdit()">Cancel</button>
+      <button mat-stroked-button (click)="applyMandatoryEdit()">Apply</button>
+    </div>
+  </div>
+</div>
