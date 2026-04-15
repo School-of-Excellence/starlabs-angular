@@ -477,7 +477,6 @@ export class DeliveryDashboardCloneComponent {
                 ),
             ]);
 
-
             const packageSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'package'),
@@ -517,6 +516,16 @@ export class DeliveryDashboardCloneComponent {
             // Load metadata + dependent data
             await this.loadParticipantMetadata();
 
+            const appointmentTypesSnap = await runInInjectionContext(this.injector, () =>
+                getDocs(collection(this.firestore, 'appointmenttype'))
+            );
+
+            this.mappedAppointmentTypes = appointmentTypesSnap.docs.map(d => ({
+                id: d.id,
+                appointmenttype: d.data()['appointmenttype']
+            }));
+
+
             // Filter only required Products from the Productlist
             this.mapProductGroupId = this.rawProductData
                 .filter(item =>
@@ -529,10 +538,6 @@ export class DeliveryDashboardCloneComponent {
                     return acc;
                 }, {} as Record<string, string>);
 
-            this.applyDateFilter();
-
-            if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
-
             // Process users (depends on mapprofile from metadata)
             this.coachesList = usersSnap.docs
                 .map((e) => e.data())
@@ -541,8 +546,6 @@ export class DeliveryDashboardCloneComponent {
                     const nameB = (this.mapprofile[b['profile_ref']?.id] || '').toLowerCase();
                     return nameA.localeCompare(nameB);
                 });
-
-            // if(this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
 
             // this.initSpecialistDateRange();
             // this.specialistRange.valueChanges.subscribe((val) => {
@@ -563,14 +566,9 @@ export class DeliveryDashboardCloneComponent {
 
     ngOnDestroy() {
         // Unsubscribe from all subscriptions
-        // Object.keys(this.subscriptions).forEach(key => {
-        //     if (this.subscriptions[key]) {
-        //         this.subscriptions[key].unsubscribe();
-        //     }
-        // });
-        // if (this.appointmentsSubscription) {
-        //     this.appointmentsSubscription.unsubscribe();
-        // }
+        this.participantsProductDataSubscription?.unsubscribe();
+        this.appointmentsSubscription?.unsubscribe();
+        this.formsSubscription?.unsubscribe();
     }
 
     onFilterClick(filter: string) {
@@ -677,9 +675,6 @@ export class DeliveryDashboardCloneComponent {
                 if (status === 'ongoing') {
                     funnelData[productId].ongoing.push(item);
                 }
-                else if (status === 'completed') {
-                    funnelData[productId].completed.push(item);
-                }
 
                 if (isEligible) {
                     if (!status) {
@@ -690,6 +685,9 @@ export class DeliveryDashboardCloneComponent {
                     } else if (status === 'ongoing') {
                         const d = this.getDateFromFieldPublic(statusdate['ongoing']);
                         if (this.isDateInRange(d)) funnelData[productId].started.push(item);
+                    } else if (status === 'completed') {
+                        const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
+                        if (this.isDateInRange(completedDate)) funnelData[productId].completed.push(item);
                     }
                 }
             }
@@ -702,8 +700,6 @@ export class DeliveryDashboardCloneComponent {
             this.groupedBonus = groupedBonus;
             this.groupedPurchased = groupedPurchased;
             this.funnelData = funnelData;
-
-            if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
         } catch (err) {
             console.log("error apply date filter", err);
         }
@@ -726,34 +722,26 @@ export class DeliveryDashboardCloneComponent {
     }
 
     // Select Product
+    async selectProduct(product: string) {
+        // this.participantsProductDataSubscription?.unsubscribe();
+        // this.appointmentsSubscription?.unsubscribe();
+        // this.formsSubscription?.unsubscribe();
+
+        const productId = this.mapProductGroupId[product];
+        this.selectedProductLabel = product;
+
+        if (this.allAppointments?.length === 0) {
+            await this.filterAppointmentsByType();
+        }
+        if (this.productData.reports.length === 0) {
+            await this.FilterReportData(productId);
+        }
+    }
+
     async updateProduct(product: string) {
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
-
-        // if (this.appointmentsSubscription) {
-        //     this.appointmentsSubscription.unsubscribe();
-        // }
-        // if (this.subscriptions['productsChunks']) {
-        //     this.subscriptions['productsChunks'].unsubscribe();
-        // }
-
         await this.filterProductData(product, productId);
-        this.updateFilteredCards();
-    }
-    async selectProduct(product: string) {
-        const productId = this.mapProductGroupId[product];
-        this.selectedProductLabel = product;
-
-        // if (this.appointmentsSubscription) {
-        //     this.appointmentsSubscription.unsubscribe();
-        // }
-        // if (this.subscriptions['productsChunks']) {
-        //     this.subscriptions['productsChunks'].unsubscribe();
-        // }
-
-        await this.filterAppointmentsByType();
-        await this.filterProductData(product, productId);
-        this.updateFilteredCards();
     }
 
     updateFilteredCards() {
@@ -815,8 +803,6 @@ export class DeliveryDashboardCloneComponent {
 
             // Filter Onboarded, Upcoming D&I Appointments, Report
             const ongoingData = this.funnelData[productId]?.ongoing;
-
-            await this.FilterReportData(productId, productData);
 
             if (ongoingData.length > 0) {
                 for (let data of ongoingData) {
@@ -887,7 +873,8 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
 
-            // Filter Report Data
+            // Filter Celebration Call Completed
+            productData.reports = this.productData?.reports;
 
             const celebrationCall = this.funnelData[productId].completed;
 
@@ -909,11 +896,8 @@ export class DeliveryDashboardCloneComponent {
             }
 
             this.cleanProductData(productData);
-
             this.productData = productData;
-
             this.updateFilteredCards();
-            console.log("all data", this.productData, this.funnelData);
         } catch (err) {
             console.log("error in filter product data", err);
         }
@@ -945,54 +929,67 @@ export class DeliveryDashboardCloneComponent {
         else productData.totalEligible.push(mergedData);
     }
 
-    async FilterReportData(productId: string, productData: any) {
-        // Filter Report
+    async FilterReportData(productId: string) {
         const forms: any[] = [];
+        let allappointments: any;
+        this.formsSubscription = new Subscription();
+
         for (let i = 0; i < this.allMatchedProductsRaw.length; i += 10) {
 
             const chunk = this.allMatchedProductsRaw
                 .slice(i, i + 10)
                 .map(item => item.docid);
 
-            const formsSnap = await runInInjectionContext(this.injector, () =>
-                getDocs(
-                    query(
-                        collection(this.firestore, 'formsByClient'),
-                        where('participantproductid', 'in', chunk)
-                    )
-                )
-            );
-            const formResults = await Promise.all(
-                formsSnap.docs.map(async (d) => {
-                    const data = d.data() as any;
-                    let appointments = Array.from(this.allAppointments.values() || [])
-                        .filter((app: any) => app.participantproductid === data.participantproductid);
-
-                    for (let appointment of appointments) {
-                        try {
-                            const appointmenttype = await this.resolveAppointmentType(appointment);
-                            appointment.appointmentTypeName = appointmenttype;
-                        } catch (err) {
-                            console.log("error", err);
-                        }
-                    }
-
-                    appointments = [...appointments, data];
-
-                    return {
-                        ...data,
-                        status: data?.date ? 'submitted' : 'pending',
-                        appointmentstart: data?.date || null,
-                        productid: productId,
-                        allappointments: appointments || []
-                    };
-                })
+            const q = query(
+                collection(this.firestore, 'formsByClient'),
+                where('participantproductid', 'in', chunk)
             );
 
-            forms.push(...formResults);
-            this.allAppointments = [...this.allAppointments, ...formResults];
+            await new Promise<void>((resolve) => {
+                const sub = runInInjectionContext(this.injector, () =>
+                    collectionData(q, { idField: 'id' })
+                ).subscribe(async (docs: any[]) => {
+
+                    const formResults = await Promise.all(
+                        docs.map(async (data: any) => {
+
+                            let appointments = Array.from(this.allAppointments.values() || [])
+                                .filter((app: any) => app.participantproductid === data.participantproductid);
+
+                            for (let appointment of appointments) {
+                                try {
+                                    const appointmenttype = await this.resolveAppointmentType(appointment);
+                                    appointment.appointmentTypeName = appointmenttype;
+                                } catch (err) {
+                                    console.log("error", err);
+                                }
+                            }
+
+                            appointments = [...appointments, data];
+
+                            return {
+                                ...data,
+                                status: data?.date ? 'submitted' : 'pending',
+                                appointmentstart: data?.date || null,
+                                productid: productId,
+                                allappointments: appointments || []
+                            };
+                        })
+                    );
+
+                    forms.push(...formResults);
+                    allappointments = [...this.allAppointments, ...formResults];
+
+                    if (this.selectedProductLabel && this.allAppointments.length > 0) this.updateProduct(this.selectedProductLabel);
+
+                    sub.unsubscribe();
+                    resolve();
+                });
+                this.formsSubscription.add(sub);
+            });
         }
-        productData.reports = forms;
+        this.allAppointments = allappointments;
+        this.productData.reports = forms;
     }
 
     cleanProductData(productData: any) {
@@ -1016,7 +1013,6 @@ export class DeliveryDashboardCloneComponent {
                 }
             });
         }
-        console.log("reportids", reportIds, "celebrationids", celebrationIds, 'reports data', productData.reports);
 
         if (reportIds.size && celebrationIds.size) {
             productData.reports = productData.reports.filter(
@@ -1137,11 +1133,10 @@ export class DeliveryDashboardCloneComponent {
         }
 
         const snapshots: any[] = [];
-        var allMatchedProducts: any[] = [];
 
-        this.subscriptions['productsChunks'] = new Subscription();
+        this.participantsProductDataSubscription = new Subscription();
 
-        productChunks.forEach(async (chunk, index) => {
+        productChunks.forEach((chunk, index) => {
 
             const q = query(
                 collection(this.firestore, 'participantsproduct'),
@@ -1173,28 +1168,17 @@ export class DeliveryDashboardCloneComponent {
                     }
 
                     this.allMatchedProductsRaw = Array.from(productMap.values());
+
                     await this.applyDateFilter();
+
                     if (this.selectedProductLabel) {
                         this.updateProduct(this.selectedProductLabel);
                     }
                 });
 
-            this.subscriptions['productsChunks'].add(sub);
+            this.participantsProductDataSubscription.add(sub);
         });
     };
-    getCardsByColumn(index: number) {
-        switch (index) {
-            case 0: return this.totalEligible;
-            case 1: return this.pastMonth;
-            case 2: return this.thisMonth;
-            case 3: return this.nextMonth;
-            case 4: return this.onBoarded || [];
-            case 6: return this.upcomingDIAppointments;
-            case 7: return this.report || [];
-            case 8: return this.celebrationCall;
-            default: return [];
-        }
-    }
 
     initSpecialistDateRange() {
         const now = new Date();
@@ -2149,32 +2133,16 @@ export class DeliveryDashboardCloneComponent {
     appointmentTypes: any[] = [];
     mappedAppointmentTypes: any[] = [];
     private appointmentsSubscription: Subscription;
+    private participantsProductDataSubscription: Subscription;
+    private formsSubscription: Subscription;
+
 
     async filterAppointmentsByType() {
-        console.log("appointmnts fetching");
         this.journeyFlowLoading = true;
         this.cdr.detectChanges();
 
         try {
-            const validProfileData = new Map<string, string[]>();
-
-            Object.keys(this.mapMetaData).forEach(profileId => {
-                const data = this.mapMetaData[profileId];
-                const activeJourney = data['activejourney'];
-                const activeProduct = data['activeproduct'];
-
-                if (activeJourney && activeProduct && activeProduct.length > 0) {
-                    const profileRef = `profile_data/${profileId}`;
-                    validProfileData.set(profileRef, activeProduct);
-                }
-            });
-
-            if (validProfileData.size === 0) {
-                this.loadingStates.appointments = true;
-                this.journeyFlowLoading = false;
-                this.cdr.detectChanges();
-                // return false;
-            }
+            this.appointmentsSubscription = new Subscription();
 
             const monthStart = new Date(
                 this.selectedMonth.getFullYear(),
@@ -2200,259 +2168,23 @@ export class DeliveryDashboardCloneComponent {
                 where("starttime", "<=", endTimestamp)
             );
 
-            this.appointmentsSubscription = collectionData(q, { idField: 'id' })
+            const sub = collectionData(q, { idField: 'id' })
                 .subscribe(async (appointmentsSnap: any[]) => {
-
-                    this.allAppointments = [...appointmentsSnap];
-
-                    const appointmentTypesSnap = await runInInjectionContext(this.injector, () =>
-                        getDocs(collection(this.firestore, 'appointmenttype'))
-                    );
-
-                    this.mappedAppointmentTypes = appointmentTypesSnap.docs.map(d => ({
-                        id: d.id,
-                        appointmenttype: d.data()['appointmenttype']
-                    }));
-
-                    console.log("appointmeents", this.allAppointments, this.mappedAppointmentTypes);
+                    this.allAppointments = [...appointmentsSnap]; // flickering
 
                     if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
 
-                    await this.processAppointments(appointmentsSnap, validProfileData);
-
                     this.loadingStates.appointments = true;
                     this.journeyFlowLoading = false;
-
-                    // if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
-                    this.applyDateFilter();
                     this.cdr.detectChanges();
-                    // return true;
                 });
-
+            this.appointmentsSubscription.add(sub);
         } catch (error) {
             console.error("Error loading appointments:", error);
             this.loadingStates.appointments = true;
             this.journeyFlowLoading = false;
             this.cdr.detectChanges();
-            // return false;
         }
-    }
-
-    async processAppointments(appointmentsSnap: any, validProfileData: any) {
-
-        if (appointmentsSnap.length === 0) {
-            this.loadingStates.appointments = true;
-            this.journeyFlowLoading = false;
-            this.cdr.detectChanges();
-            return;
-        }
-
-        const participantAppointments = new Map();
-
-        appointmentsSnap.forEach(doc => {
-            const appointmentData = doc;
-            const bookedBy = appointmentData["bookedby"];
-            const bookedByPath = bookedBy?.path || null;
-            const participantId = bookedBy?.id;
-            const startTime = appointmentData["endtime"];
-            const productId = appointmentData["productid"];
-
-            if (bookedByPath && validProfileData.has(bookedByPath) && participantId && productId) {
-
-                const activeProducts = validProfileData.get(bookedByPath);
-
-                if (activeProducts?.includes(productId)) {
-
-                    appointmentData["docid"] = doc.id;
-
-                    const existing = participantAppointments.get(participantId);
-
-                    if (!existing) {
-                        participantAppointments.set(participantId, { latest: appointmentData, previous: null });
-                    } else {
-
-                        const existingTime = existing.latest.starttime?.seconds || 0;
-                        const currentTime = startTime?.seconds || 0;
-
-                        if (currentTime > existingTime) {
-
-                            participantAppointments.set(participantId, {
-                                latest: appointmentData,
-                                previous: existing.latest
-                            });
-
-                        } else if (currentTime < existingTime) {
-
-                            const previousTime = existing.previous?.starttime?.seconds || 0;
-
-                            if (currentTime > previousTime) {
-
-                                participantAppointments.set(participantId, {
-                                    latest: existing.latest,
-                                    previous: appointmentData
-                                });
-
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // if(this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
-
-        const participantLatestAppointments = new Map();
-
-        participantAppointments.forEach((value, key) => {
-            const latestWithPrevious = {
-                ...value.latest,
-                previousAppointment: value.previous
-            };
-            participantLatestAppointments.set(key, latestWithPrevious);
-        });
-
-        if (participantLatestAppointments.size === 0) {
-            this.loadingStates.appointments = true;
-            this.journeyFlowLoading = false;
-            this.cdr.detectChanges();
-            return;
-        }
-
-        const allAppointments = Array.from(participantLatestAppointments.values());
-        const appointmentTypeRefs = new Map();
-
-        allAppointments.forEach(appointmentData => {
-            const ref = appointmentData["appointment"];
-            if (ref) appointmentTypeRefs.set(ref.path, ref);
-            const prevRef = appointmentData.previousAppointment?.appointment;
-            if (prevRef) appointmentTypeRefs.set(prevRef.path, prevRef);
-        });
-
-        const appointmentTypePromises = Array.from(appointmentTypeRefs.values()).map(ref =>
-            getDoc(ref).catch(error => {
-                console.error("Error fetching appointment type:", error);
-                return null;
-            })
-        );
-
-        const appointmentTypeDocs = await Promise.all(appointmentTypePromises);
-        const typeNameMap = new Map();
-
-        Array.from(appointmentTypeRefs.keys()).forEach((path, index) => {
-            const doc = appointmentTypeDocs[index];
-            if (doc?.exists()) typeNameMap.set(path, doc.data()["appointmenttype"] || "");
-        });
-
-        const categoryMap = {
-            "Welcome To WiSH": "welcomeCall",
-            "EI Starter Pack Clarity Call": "clarityCall",
-            "A&H Light Diagnostics": "diagnostics",
-            "EI Starter Pack Diagnostics": "diagnostics",
-            "WiSH Diagnostics": "diagnostics",
-            "Critical Support Diagnostics": "diagnostics",
-            "EI Diagnostics": "diagnostics",
-            "EI Implementation": "implementation",
-            "WiSH Implementation": "implementation",
-            "Critical Support Implementation": "implementation",
-            "A&H Light Implementation": "implementation",
-            "EI Starter Pack Implementation": "implementation",
-            "Critical Support Mid Review": "midReviewDiagnostics",
-            "A&H Light Mid Review": "midReviewDiagnostics",
-            "A&H Light Review": "finalReview",
-            "EI Review": "finalReview",
-            "WiSH Review": "finalReview",
-            "EI Starter Pack Review": "finalReview",
-            "Critical Support Review": "finalReview",
-            "WiSH Final Review Call": "finalReview",
-            "EI Celebration Call": "completed",
-            "WiSH Celebration Call": "completed",
-            "WiSH Experience Call": "completed",
-        };
-
-        const productKeywordsMap: any = {
-            "WISH": ["WiSH"],
-            "A&H LIGHT": ["A&H Light"],
-            "EI Solution": ["EI Solution", "EI Celebration", "EI Implementation", "EI Diagnostics", "EI Review"],
-            "EI Starter Pack": ["EI Starter Pack"],
-            "Critical Support": ["Critical Support"]
-        };
-
-        allAppointments.forEach(appointmentData => {
-            const appointmentTypeRef = appointmentData["appointment"];
-            if (appointmentTypeRef) {
-                const appointmentTypeName = typeNameMap.get(appointmentTypeRef.path);
-                if (appointmentTypeName) {
-                    appointmentData["appointmentTypeName"] = appointmentTypeName;
-                    appointmentData["category"] = categoryMap[appointmentTypeName] || null;
-                }
-            }
-
-            if (appointmentData.previousAppointment?.appointment) {
-                const prevTypeName = typeNameMap.get(appointmentData.previousAppointment.appointment.path);
-                if (prevTypeName) {
-                    appointmentData.previousAppointment["appointmentTypeName"] = prevTypeName;
-                }
-            }
-        });
-
-        let filteredLatestAppointments = allAppointments;
-
-        if (this.selectedProduct !== "All Products Overview") {
-            const selectedKeywords = productKeywordsMap[this.selectedProduct] || [];
-            filteredLatestAppointments = allAppointments.filter(appointment => {
-                const appointmentTypeName = appointment["appointmentTypeName"] || "";
-                return selectedKeywords.some(keyword => appointmentTypeName.includes(keyword));
-            });
-        }
-
-        const stuckCasesArray = [];
-
-        filteredLatestAppointments.forEach(latestAppointment => {
-            const appointmentEnd = latestAppointment["endtime"] || latestAppointment["starttime"];
-            const appointmentEndDate = appointmentEnd?.toDate ? appointmentEnd.toDate() : appointmentEnd;
-            const daysSinceAppointment = this.calculateWaitingPeriod(appointmentEndDate);
-
-            const participantId = latestAppointment["bookedby"]?.id;
-
-            let assignedToName = 'Unassigned';
-            if (latestAppointment["hosts"] && latestAppointment["hosts"].length > 0) {
-                const roleRef = latestAppointment["hosts"][0];
-                if (roleRef?.id) {
-                    assignedToName = this.mapprofile[roleRef.id] || roleRef.id;
-                }
-            }
-
-            const productId = latestAppointment["productid"];
-            const actualProductName = this.mapProductName[productId] || 'N/A';
-
-            latestAppointment["waitingperiod"] = daysSinceAppointment;
-            latestAppointment["profileid"] = participantId;
-            latestAppointment["appointmentstatus"] = latestAppointment["attended"] ? 'Completed' : 'Scheduled';
-            latestAppointment["appointment"] = latestAppointment["appointmentTypeName"] || 'N/A';
-            latestAppointment["product"] = actualProductName;
-            latestAppointment["date"] = appointmentEnd;
-            latestAppointment["assignedto"] = assignedToName;
-
-            const journeyId = this.mapMetaData[participantId]?.['activejourney'];
-            latestAppointment["activejourney"] = this.mapjourneyname[journeyId] || 'N/A';
-
-            latestAppointment["escalationlevel"] =
-                daysSinceAppointment > 30 ? 'HIGH' :
-                    daysSinceAppointment > 15 ? 'MEDIUM' : 'LOW';
-
-            latestAppointment["issuetype"] =
-                daysSinceAppointment > 15 ? 'Stuck in Phase' : 'In Progress';
-
-            latestAppointment["lastaction"] =
-                latestAppointment.previousAppointment?.appointmentTypeName || 'N/A';
-
-            latestAppointment["resolution"] =
-                daysSinceAppointment > 15 ? 'Pending' : 'N/A';
-
-            if (daysSinceAppointment > 15) {
-                stuckCasesArray.push(latestAppointment);
-            }
-        });
     }
 
     applyProductFilter() {
@@ -2670,7 +2402,6 @@ export class DeliveryDashboardCloneComponent {
         this.productsSubscription = collectionData(productsRef, { idField: 'id' })
             .subscribe((products: any[]) => {
                 this.products = products;
-                // if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
             });
 
         let tempArray1: any[] = [];
