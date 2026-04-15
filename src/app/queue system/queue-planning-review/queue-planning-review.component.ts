@@ -532,11 +532,17 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.rebuildIfAllReady();
   }
 
-rebuildIfAllReady() {
-  const { tokens, planners, planning } = this.dataReadyFlags;
-  if (!tokens || !planners || !planning) return;
-  this.rebuildMergedSlots();
-}
+  rebuildIfAllReady() {
+    const { tokens, planners, planning } = this.dataReadyFlags;
+    if (!tokens || !planners || !planning) return;
+    this.rebuildMergedSlots();
+    this.refreshSelectedSlot();
+    if (this.activePanelSection === 'confirmed') {
+      this.showAllConfirmedParticipants();
+    } else if (this.activePanelSection === 'non-confirmed') {
+      this.showAllNonConfirmedParticipants();
+    }
+  }
 
   processMergedSlots() {
     this.rebuildIfAllReady();
@@ -4885,6 +4891,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
   // Open book slot dialog
   openBookSlotDialog(participant: any, stageName: string) {
+    console.log('Non-queue participant object:', JSON.stringify(participant));
+
     const segmentId = participant.segmentId || participant.participantSegmentId;
     const variationId = participant.variationId;
 
@@ -4973,9 +4981,6 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         if (!queueDoc.exists()) throw new Error('No Planning');
 
         const data = queueDoc.data();
-
-        // Work directly on the original array — do NOT JSON.parse/stringify
-        // This preserves Firestore Timestamp objects
         const planningList = data['planning'] as any[];
         let found = false;
 
@@ -5062,7 +5067,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     };
 
     try {
-      // Step 1 — Update slot count in queue planning
+      // Update slot count in queue planning
       const updated = await this.updateSlotCountTransaction(
         queuePlanId, segmentId, stageName, variationId, true, selectedSlot
       );
@@ -5073,10 +5078,10 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         return;
       }
 
-      // Step 2 — Update based on participant type
+      // Update based on participant type
       if (!participant.isNonQueueParticipant) {
 
-        // Case A — Has queue token
+        //  Has queue token
         const tokenId = participant.tokenid || participant.id;
         const tokenRef = doc(this.firestore, 'queue_token', tokenId);
 
@@ -5104,89 +5109,125 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
           this.queueTokenList[tokenIndex] = updatedToken;
         }
 
-      } else {
+        } else {
 
-        // Case B — No queue token (non-queue participant)
-        const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
+          //  No queue token (non-queue participant)
+          const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
 
-        const participantProductDocs = await getDocs(
-          query(
-            collection(this.firestore, 'participantsproduct'),
-            where('profileid', '==', profileId)
-          )
-        );
+          //  find by arenaeventid matching this queue
+          let participantProductDocs = await getDocs(
+            query(
+              collection(this.firestore, 'participantsproduct'),
+              where('profileid', '==', profileId),
+              where('arenaeventid', '==', this.selectedQueue['docid'])
+            )
+          );
 
-        if (participantProductDocs.empty) {
-          alert('No participant product found. Cannot complete booking.');
-          this.bookSlotLoading = false;
+          // find status null with no eventref
+          if (participantProductDocs.empty) {
+            const allDocs = await getDocs(
+              query(
+                collection(this.firestore, 'participantsproduct'),
+                where('profileid', '==', profileId),
+                where('status', '==', null)
+              )
+            );
+            const filtered = allDocs.docs.filter(d => {
+              const data = d.data();
+              return !data['eventref'] && !data['arenaeventid'];
+            });
+            if (filtered.length > 0) {
+              participantProductDocs = { empty: false, docs: filtered } as any;
+            }
+          }
+
+          if (participantProductDocs.empty) {
+            alert('No participant product found. Cannot complete booking.');
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          const participantProductDoc = participantProductDocs.docs[0];
+          const participantProductData = participantProductDoc.data();
+
+          // Check if product has queue delivery activity
+          const productRef = participantProductData['productref'];
+          if (!productRef) {
+            alert('No product found for this participant. Cannot book slot.');
+            await this.updateSlotCountTransaction(queuePlanId, segmentId, stageName, variationId, false, selectedSlot);
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          const deliverySequenceDocs = await getDocs(
+            query(
+              collection(this.firestore, 'productToDeliverySequence'),
+              where('product', '==', productRef)
+            )
+          );
+
+          if (deliverySequenceDocs.empty) {
+            alert('No delivery sequence configured for this participant\'s product. Cannot book slot.');
+            await this.updateSlotCountTransaction(queuePlanId, segmentId, stageName, variationId, false, selectedSlot);
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          const deliveryOptions = deliverySequenceDocs.docs[0].data()['deliveryoptions'] || [];
+          const lastOption = deliveryOptions[deliveryOptions.length - 1];
+          const deliverySequence = lastOption?.['deliverysequence'] || [];
+          const hasQueueActivity = deliverySequence.some((seq: any) => {
+            return seq['activity']?.path?.includes('queue');
+          });
+
+          if (!hasQueueActivity) {
+            alert('This participant cannot be booked as their product delivery type is not queue.');
+            await this.updateSlotCountTransaction(queuePlanId, segmentId, stageName, variationId, false, selectedSlot);
+            this.bookSlotLoading = false;
+            return;
+          }
+
+          // Reset first if already initiated so Cloud Function triggers properly
+          if (participantProductData['status'] === 'initiated') {
+            await updateDoc(participantProductDoc.ref, {
+              'status': null,
+              'eventref': deleteField(),
+              'requestedslot': deleteField(),
+              'queuevariationid': deleteField()
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+          await updateDoc(participantProductDoc.ref, {
+            'status': 'initiated',
+            'eventref': queueRef,
+            'requestedslot': selectedSlot,
+            'queuevariationid': variationId,
+            'statusdate.initiated': new Date()
+          });
+
+          const eventParticipationRef = doc(collection(this.firestore, 'event participation request'));
+          await setDoc(eventParticipationRef, {
+            docid: eventParticipationRef.id,
+            doccreateddate: new Date(),
+            eventref: queueRef,
+            productref: participantProductData['productref'] || null,
+            status: 'approved',
+            profileid: profileId,
+            participantproductid: participantProductDoc.id,
+            arenaeventid: this.selectedQueue['docid'],
+            initiatedfrom: 'admin'
+          });
+
+          this.rebuildMergedSlots();
+          this.refreshSelectedSlot();
+          this.showAllNonConfirmedParticipants();
+          this.closeBookSlotDialog();
+          alert('Slot booked successfully');
           return;
         }
 
-        const participantProductDoc = participantProductDocs.docs[0];
-        const participantProductData = participantProductDoc.data();
-
-        await updateDoc(participantProductDoc.ref, {
-          'status': 'initiated',
-          'eventref': queueRef,
-          'requestedslot': selectedSlot,
-          'queuevariationid': variationId,
-          'statusdate.initiated': new Date()
-        });
-
-        const eventParticipationRef = doc(collection(this.firestore, 'event participation request'));
-        await setDoc(eventParticipationRef, {
-          docid: eventParticipationRef.id,
-          doccreateddate: new Date(),
-          eventref: queueRef,
-          productref: participantProductData['productref'] || null,
-          status: 'approved',
-          profileid: profileId,
-          participantproductid: participantProductDoc.id,
-          arenaeventid: this.selectedQueue['docid'],
-          initiatedfrom: 'admin'
-        });
-
-        // Update cachedPlanningData locally to reflect new usedslot
-        if (this.cachedPlanningData && this.cachedPlanningData.planning) {
-          for (const plan of this.cachedPlanningData.planning) {
-            if (plan['variationid'] !== variationId) continue;
-            for (const segment of plan['segments'] || []) {
-              if (segment['segmentid'] !== segmentId) continue;
-              for (const slot of segment['slots'] || []) {
-                if (
-                  slot['stagename'] === stageName &&
-                  toMillis(slot.startdate) === toMillis(selectedSlot.startdate) &&
-                  toMillis(slot.enddate) === toMillis(selectedSlot.enddate)
-                ) {
-                  slot['usedslot'] = (slot['usedslot'] || 0) + 1;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        // Add temporary token entry so confirmed list shows this participant
-        this.queueTokenList.push({
-          profile_id: profileId,
-          profileid: profileId,
-          tokenstatus: 'Active',
-          stagestatus: 'Approved',
-          delete: null,
-          currentstage: stageName,
-          selectedstageslot: {
-            [stageName]: {
-              ...selectedSlot,
-              stagename: stageName,
-              segmentid: segmentId,
-              variationid: variationId
-            }
-          },
-          isTemporary: true
-        });
-      }
-
-      // Step 3 — Remove from non-confirmed list immediately
+      //  Remove from non-confirmed list immediately
       this.nonConfirmedParticipants = this.nonConfirmedParticipants.filter(p => {
         const pid = p.profile_id || p.profileid;
         return pid !== profileId;
@@ -5197,7 +5238,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         return pid !== profileId;
       });
 
-      // Step 4 — Rebuild with updated local data
+      // Rebuild with updated local data
       this.rebuildMergedSlots();
       this.refreshSelectedSlot();        
       this.showAllConfirmedParticipants();
@@ -5259,7 +5300,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     });
 
     try {
-      // Step 1 — Decrement usedslot in queue planning (transaction)
+      // Decrement usedslot in queue planning (transaction)
       const updated = await this.updateSlotCountTransaction(
         queuePlanId, segmentId, stageName, variationId, false, selectedSlot
       );
@@ -5270,7 +5311,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         return;
       }
 
-      // Step 2 — Delete selectedstageslot.{stageName} from queue_token
+      // Delete selectedstageslot.{stageName} from queue_token
       const tokenId = participant.tokenid || participant.id;
 
       if (tokenId && !participant.isNonQueueParticipant) {
@@ -5291,13 +5332,34 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
           this.queueTokenList[tokenIndex] = updatedToken;
         }
       } else if (participant.isNonQueueParticipant) {
-        // Non-queue participant — revert participantsproduct status back
-        const participantProductDocs = await getDocs(
+        // find by arenaeventid matching this queue
+        let participantProductDocs = await getDocs(
           query(
             collection(this.firestore, 'participantsproduct'),
-            where('profileid', '==', profileId)
+            where('profileid', '==', profileId),
+            where('arenaeventid', '==', this.selectedQueue['docid'])
           )
         );
+
+        // find by status initiated with this queue's eventref
+        if (participantProductDocs.empty) {
+          const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
+          const allDocs = await getDocs(
+            query(
+              collection(this.firestore, 'participantsproduct'),
+              where('profileid', '==', profileId),
+              where('status', '==', 'initiated')
+            )
+          );
+          const filtered = allDocs.docs.filter(d => {
+            const data = d.data();
+            const eventref = data['eventref'];
+            return eventref && eventref.path === queueRef.path;
+          });
+          if (filtered.length > 0) {
+            participantProductDocs = { empty: false, docs: filtered } as any;
+          }
+        }
 
         if (!participantProductDocs.empty) {
           await updateDoc(participantProductDocs.docs[0].ref, {
@@ -5310,7 +5372,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         }
       }
 
-      // Step 3 — Manually update local queueTokenList immediately
+      // Manually update local queueTokenList immediately
       const tokenIndex = this.queueTokenList.findIndex(t =>
         (t.tokenid === tokenId || t.id === tokenId)
       );
@@ -5325,7 +5387,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         this.queueTokenList[tokenIndex] = updatedToken;
       }
 
-      // Step 4 — Remove from confirmed list immediately
+      //Remove from confirmed list immediately
       this.confirmedParticipants = this.confirmedParticipants.filter(p => {
         const pid = p.profile_id || p.profileid;
         return pid !== profileId;
@@ -5336,7 +5398,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         return pid !== profileId;
       });
 
-      // Step 5 — Rebuild with updated local data
+      // Rebuild with updated local data
       this.rebuildMergedSlots();
       this.refreshSelectedSlot();        
       this.showAllNonConfirmedParticipants();

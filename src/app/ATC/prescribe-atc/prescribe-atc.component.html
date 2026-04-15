@@ -86,10 +86,10 @@
       <section class="content-section" *ngIf="product != null">
         <h2 class="section-heading">ATC DIRECTIVE</h2>
         <div class="directive-container">
-          <div class="directive-text">
-            <label>{{atcdirective != null ? atcdirective : 'Provide ATC Directive'}}</label>
+          <div class="directive-text" *ngIf="atcdirective">
+            <label>{{atcdirective}}</label>
           </div>
-          <button class="edit-button primary-button" mat-button (click)="editDirective()" [disabled]="assignmentInitiated">Update Directive</button>
+          <button class="edit-button primary-button" mat-button (click)="editDirective()" [disabled]="assignmentInitiated">{{ atcdirective ? 'Edit Directive' : 'Add Directive' }}</button>
         </div>
       </section>
       
