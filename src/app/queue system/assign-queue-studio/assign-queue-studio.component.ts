@@ -83,10 +83,38 @@ export class AssignQueueStudioComponent {
           this.formbuilder.group({
             activity: [key, {validators: [Validators.required], updateOn: "change"}],
             participants: [dialogdata["additionalactivities"][key], {validators: [Validators.required], updateOn: "change"}],
+            mandatory: [false],
           })
         )
       })
+
+      this.activityForm.controls['selectedstudio'].valueChanges.subscribe(studio => {
+        this.applyMandatoryActivities(studio);
+      });
+
+      const preselected = this.activityForm.controls['selectedstudio'].value;
+      if (preselected) {
+        this.applyMandatoryActivities(preselected);
+      }
     }
+  }
+
+  applyMandatoryActivities(studio: any) {
+    const formArray = this.bonusActivityForm();
+    for (let i = formArray.length - 1; i >= 0; i--) {
+      if (formArray.at(i).get('mandatory')?.value) {
+        formArray.removeAt(i);
+      }
+    }
+    const mandatory: string[] = studio?.['mandatoryactivities'] ?? [];
+    mandatory.forEach((activityId, index) => {
+      const group = this.formbuilder.group({
+        activity: [{value: activityId, disabled: true}, {validators: [Validators.required], updateOn: "change"}],
+        participants: [null, {validators: [Validators.required], updateOn: "change"}],
+        mandatory: [true],
+      });
+      formArray.insert(index, group);
+    });
   }
 
   ngOnInit(): void {
@@ -104,6 +132,7 @@ export class AssignQueueStudioComponent {
     return this.formbuilder.group({
       activity: [, {validators: [Validators.required], updateOn: "change"}],
       participants: [, {validators: [Validators.required], updateOn: "change"}],
+      mandatory: [false],
     })
   }
 
@@ -112,11 +141,12 @@ export class AssignQueueStudioComponent {
   }
 
   removeBonusArray(index){
+    if (this.bonusActivityForm().at(index)?.get('mandatory')?.value) return;
     this.bonusActivityForm().removeAt(index)
   }
 
   submit(){
-    var formvalue = this.activityForm.value
+    var formvalue = this.activityForm.getRawValue()
     console.log(formvalue)
     if(this.activityForm.valid){
       var result = formvalue["selectedstudio"] ?? {}

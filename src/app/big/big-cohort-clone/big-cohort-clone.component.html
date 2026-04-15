@@ -478,7 +478,7 @@
                       (click)="onStartMetting($any(assignment.key))">
                       <mat-icon>videocam</mat-icon> Start Meeting
                     </button>
-                    <button class="mini-btn" (click)="onValidateParticipantAssignment($any(assignment.key))">
+                    <button class="mini-btn" (click)="onValidateParticipantAssignment($any(assignment.key), cohorts['docid'])">
                       <mat-icon>verified_user</mat-icon> Validate
                     </button>
                   </div>

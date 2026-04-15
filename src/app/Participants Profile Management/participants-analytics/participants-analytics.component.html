@@ -4,7 +4,7 @@
     <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="Checklists">Checklists</button>
     <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="actions">Actions</button>
     <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="exports"> Export </button>
-    <button mat-stroked-button class="ms-2" (click)="inputFile.click()"> Import </button>
+    <button mat-stroked-button class="ms-2" (click)="handleImportClick()"> Import </button>
     <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
     <button mat-stroked-button class="ms-2" (click)="showSectionType='showTableColumn'"> Add Column to Table </button>
     <button mat-stroked-button class="ms-2" (click)="showSectionType='savedFilters'"> Saved Filters </button>
@@ -191,7 +191,7 @@
               </mat-option>
               <mat-option [value]="'none'">No Profile Tag</mat-option>
               <mat-option *ngFor="let option of onfiltertags()" [value]="option">
-                {{mapfiltervalues[option]}}
+                {{mapfiltervalues[option]}} 
               </mat-option>
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
@@ -207,7 +207,7 @@
               <mat-date-range-picker #picker></mat-date-range-picker>
             </mat-form-field>
           </div>&nbsp;&nbsp;
-          <mat-form-field appearance="outline" style="min-width:300px;">
+          <!-- <mat-form-field appearance="outline" style="min-width:300px;">
             <mat-label>Consumed Products</mat-label>
             <mat-select [(ngModel)]="filterdata['consumedproducts']" name="consumedproducts" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
@@ -217,8 +217,8 @@
                 {{option.product}}
               </mat-option>
             </mat-select>
-          </mat-form-field>&nbsp;&nbsp;
-          <mat-form-field appearance="outline" style="min-width: 300px;">
+          </mat-form-field>&nbsp;&nbsp; -->
+          <!-- <mat-form-field appearance="outline" style="min-width: 300px;">
             <mat-label>UnConsumed Products</mat-label>
             <mat-select [(ngModel)]="filterdata['unconsumedproducts']" name="unconsumedproducts" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
@@ -228,19 +228,19 @@
                 {{option.product}}
               </mat-option>
             </mat-select>
-          </mat-form-field>&nbsp;&nbsp;
-          <mat-form-field appearance="outline">
+          </mat-form-field>&nbsp;&nbsp; -->
+          <!-- <mat-form-field appearance="outline">
             <mat-label>Select Operator</mat-label>
             <mat-select [(ngModel)]="filterdata['operator']" name="operator" (ngModelChange)="returnFilterText()">
               <mat-option *ngFor="let option of mapOperator | keyvalue" [value]="option.value">
                 {{option.key}}
               </mat-option>
             </mat-select>
-          </mat-form-field>&nbsp;&nbsp;
-          <mat-form-field appearance="outline">
+          </mat-form-field>&nbsp;&nbsp; -->
+          <!-- <mat-form-field appearance="outline">
             <mat-label>Product Count</mat-label>
             <input matInput type="number" [(ngModel)]="filterdata['productcount']" name="productcount" (ngModelChange)="returnFilterText()" placeholder="enter product count">
-          </mat-form-field>&nbsp;&nbsp;
+          </mat-form-field>&nbsp;&nbsp; -->
           <mat-form-field appearance="outline" style="min-width: 350px;">
             <mat-label>Select Product</mat-label>
             <mat-select [(ngModel)]="filterdata['products']" name="products" (selectionChange)="returnFilterText()">
@@ -280,7 +280,7 @@
               </mat-option>
             </mat-select>	
           </mat-form-field>&nbsp;&nbsp;
-          <mat-form-field class="ml-2 mr-2" appearance="outline" *ngIf="filterdata['queueevent']">
+          <!-- <mat-form-field class="ml-2 mr-2" appearance="outline" *ngIf="filterdata['queueevent']">
             <mat-label>Select Queue Stage</mat-label>
             <mat-select [(ngModel)]="filterdata['queuestage']" name="queuestage" (ngModelChange)="returnFilterText()" aria-label="select QueueStage">
                <mat-option>
@@ -290,7 +290,7 @@
                 {{ stage }}
               </mat-option>
             </mat-select>	
-          </mat-form-field>&nbsp;&nbsp;
+          </mat-form-field>&nbsp;&nbsp; -->
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>ATC Count</mat-label>
             <input matInput type="number" [(ngModel)]="filterdata['atccount']" name="atccount" (ngModelChange)="returnFilterText()" placeholder="enter atc count">
@@ -381,10 +381,6 @@
               </mat-option>
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
-          <!-- <mat-form-field appearance="outline">
-            <mat-label>Search Label</mat-label>
-            <input type="text" matInput [(ngModel)]="filterdata['label']" name="label">
-          </mat-form-field>&nbsp;&nbsp; -->
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Registered User</mat-label>
             <mat-select [(ngModel)]="filterdata['registereduser']" name="registereduser" multiple (selectionChange)="returnFilterText()">
@@ -394,6 +390,147 @@
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
         </form>
+
+        <div class="filter-section" style="margin-left: 15px;">
+        <h2>Product Filter</h2>
+            <!-- Date Range Filter -->
+            <div class="filter-content">
+                <form [formGroup]="filterForm">
+        
+                    <!-- Consumed Products Section -->
+                    <div class="filter-section">
+                        <h3>Consumed Products</h3>
+                        <div formArrayName="consumedProducts">
+                            <div *ngFor="let product of consumedProducts.controls; let i = index" class="product-row">
+                                <div [formGroupName]="i" class="product-group">
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Product</mat-label>
+                                        <mat-select formControlName="productId">
+                                            <mat-option>
+                                                <ngx-mat-select-search [(ngModel)]="filterproductlist"
+                                                    [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
+                                                    [noEntriesFoundLabel]="'No matching records found'">
+                                                </ngx-mat-select-search>
+                                            </mat-option>
+                                            <mat-option *ngFor="let option of onfilterproducts()" [value]="option.id">
+                                                {{option.product}}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('productId')?.hasError('required')">
+                                            Product is required
+                                        </mat-error>
+                                    </mat-form-field>
+
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Comparison</mat-label>
+                                        <mat-select formControlName="comparison">
+                                            <mat-option value="equalto">
+                                                Equal To
+                                            </mat-option>
+                                            <mat-option value="groreqto">
+                                                Greater Than or Equal to
+                                            </mat-option>
+                                            <mat-option value="lsoreqto">
+                                                Less Than or Equal to
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('comparison')?.hasError('required')">
+                                            Comparison is required
+                                        </mat-error>
+                                    </mat-form-field>
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Minimum Count</mat-label>
+                                        <input matInput type="number" formControlName="count" placeholder="Min count" min="0">
+                                        <mat-error *ngIf="product.get('count')?.hasError('required')">
+                                            Count is required
+                                        </mat-error>
+                                        <mat-error *ngIf="product.get('count')?.hasError('min')">
+                                            Count must be greater than or equal to 0
+                                        </mat-error>
+                                    </mat-form-field>
+                                    <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)" type="button">
+                                        <mat-icon>delete</mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <button mat-stroked-button color="primary" (click)="addConsumedProduct()" type="button">
+                            <mat-icon>add</mat-icon>
+                            Add Consumed Product
+                        </button>
+                    </div>
+        
+                    <!-- Unconsumed Products Section -->
+                    <div class="filter-section">
+                        <h3>Unconsumed Products</h3>
+                        <div formArrayName="unconsumedProducts">
+                            <div *ngFor="let product of unconsumedProducts.controls; let i = index" class="product-row">
+                                <div [formGroupName]="i" class="product-group">
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Product</mat-label>
+                                        <mat-select formControlName="productId">
+                                            <mat-option>
+                                                <ngx-mat-select-search [(ngModel)]="filterunconsumedproductlist"
+                                                    [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
+                                                    [noEntriesFoundLabel]="'No matching records found'">
+                                                </ngx-mat-select-search>
+                                            </mat-option>
+                                            <mat-option *ngFor="let option of onfilterunconsumedproducts()" [value]="option.id">
+                                                {{option.product}}
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('productId')?.hasError('required')">
+                                            Product is required
+                                        </mat-error>
+                                    </mat-form-field>
+
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Comparison</mat-label>
+                                        <mat-select formControlName="comparison">
+                                            <mat-option value="equalto">
+                                                Equal To
+                                            </mat-option>
+                                            <mat-option value="groreqto">
+                                                Greater Than or Equal to
+                                            </mat-option>
+                                            <mat-option value="lsoreqto">
+                                                Less Than or Equal to
+                                            </mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="product.get('comparison')?.hasError('required')">
+                                            Comparison is required
+                                        </mat-error>
+                                    </mat-form-field>
+        
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Minimum Count</mat-label>
+                                        <input matInput type="number" formControlName="count" placeholder="Min count" min="0">
+                                        <mat-error *ngIf="product.get('count')?.hasError('required')">
+                                            Count is required
+                                        </mat-error>
+                                        <mat-error *ngIf="product.get('count')?.hasError('min')">
+                                            Count must be greater than or equal to 0
+                                        </mat-error>
+                                    </mat-form-field>
+                                    <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)" type="button">
+                                        <mat-icon>delete</mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <button mat-stroked-button color="primary" (click)="addUnconsumedProduct()" type="button">
+                            <mat-icon>add</mat-icon>
+                            Add Unconsumed Product
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div style="display:flex;flex-direction : column ; gap : 15px">
           <div *ngIf="filterByProducts?.consumed.length > 0">
             <h2>Consumed Products</h2>
@@ -427,7 +564,7 @@
               </div>
             </div>
           </div>
-          <button mat-stroked-button type="button" (click)="exportWithFilters()">Product Filter</button>&nbsp;&nbsp;
+          <!-- <button mat-stroked-button type="button" (click)="exportWithFilters()">Product Filter</button>&nbsp;&nbsp; -->
         </div>
         <div class="d-flex justify-content-center" style="margin-bottom:10px;">
           <button mat-stroked-button type="button" (click)="onDataSearch();" [disabled]="searchValidation()">Search</button>&nbsp;&nbsp;
@@ -437,40 +574,38 @@
       </div>
       <mat-divider></mat-divider>
     </div>
-    <div *ngIf="showSectionType === 'showTableColumn'">
-      <mat-divider class="mt-2 mb-2"></mat-divider>
-      <div class="d-flex flex-row justify-content-center">
-        <mat-form-field class="w-50" appearance="outline">
-          <mat-label>Add Column to Table</mat-label>
-          <mat-select [(ngModel)]="selectedColumns" name="selectedColumns" (selectionChange)="onColumnNameSelect(selectedColumns)" multiple>
-            <mat-select-trigger>
-              {{this.displayedColumns ? this.displayedColumns[0] : ''}}
-              <span *ngIf="this.displayedColumns?.length > 1" class="example-additional-selection">
-                (+{{this.displayedColumns.length - 1}} {{this.displayedColumns?.length === 2 ? 'other' : 'others'}})
-              </span>
-            </mat-select-trigger>
-            <mat-option>
-              <ngx-mat-select-search 
-                [(ngModel)]="searchColumn" 
-                [ngModelOptions]="{standalone: true}" 
-                placeholderLabel="Columns" 
-                [placeholderLabel]="'Search'" 
-                [noEntriesFoundLabel]="'No matching records found'" 
-                ngDefaultControl>
-              </ngx-mat-select-search>
-            </mat-option>
-            <mat-option *ngFor="let item of returnTableColumns().sort()" [value]="item">
-              {{item}}
-            </mat-option>
-          </mat-select>
-          <mat-hint class="clickable-hint" (click)="onDataSearch()">
-            Click here to get updated data on table ({{nooftimesloaded}}).
-          </mat-hint>
-        </mat-form-field>
-      </div>
-
-      <mat-divider class="mt-2 mb-2"></mat-divider>
+    <div *ngIf="showSectionType === 'showTableColumn'" class="addcolumn-wrapper">
+      <div>
+        <mat-divider class="mt-2 mb-2"></mat-divider>
+        <div class="d-flex flex-row justify-content-center">
+          <mat-form-field class="w-50" appearance="outline">
+            <mat-label>Add Column to Table</mat-label>
+            <mat-select [(ngModel)]="selectedColumns" name="selectedColumns" 
+            (selectionChange)="onColumnNameSelect(selectedColumns)" multiple>
+              <mat-select-trigger>
+                {{this.displayedColumns ? this.displayedColumns[0] : ''}}
+                <span *ngIf="this.displayedColumns?.length > 1" class="example-additional-selection">
+                  (+{{this.displayedColumns.length - 1}} {{this.displayedColumns?.length === 2 ? 'other' : 'others'}})
+                </span>
+              </mat-select-trigger>
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="searchColumn" [ngModelOptions]="{standalone: true}"
+                  placeholderLabel="Columns" [placeholderLabel]="'Search'"
+                  [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl>
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let item of returnTableColumns().sort()" [value]="item">
+                {{item}}
+              </mat-option>
+            </mat-select>
+            <mat-hint class="clickable-hint" (click)="onDataSearch()">
+              Click here to get updated data on table ({{nooftimesloaded}}).
+            </mat-hint>
+          </mat-form-field>
+        </div>
+          </div>
     </div>
+    <mat-divider class="mt-2 mb-2"></mat-divider>
   </section>
 
   <section>
@@ -516,10 +651,12 @@
         <ng-container matColumnDef="{{column}}" *ngFor="let column of displayedColumns | excludeFilterString : 'select'">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> 
             <span *ngIf="column != 'select'">{{column | titlecase}}</span>&nbsp;&nbsp;
-            <span *ngIf="column === 'productcount'">Filter Count / Total Count</span> 
+            <!-- <span *ngIf="column != 'select' && !(column.startsWith('consumed') || column.startsWith('unconsumed'))">{{column | titlecase}}</span>&nbsp;&nbsp; -->
+            <span *ngIf="column === 'productcount'">Filter Count / Total Count</span>&nbsp;&nbsp;
+            <!-- <span *ngIf="column.startsWith('consumed') || column.startsWith('unconsumed')">{{getColumnForTableHeader(column)}}</span> -->
           </th>
           <td [ngClass]="{'remarks-column': column === 'remarks'}" mat-cell *matCellDef="let element">
-            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth'].includes(column)">{{element[column]}}</span>
+            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth' , 'purchase'].includes(column)">{{element[column]}}</span>
             <span *ngIf="['consumedproducts', 'unconsumedproducts', 'activeproduct', 'profiletags', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier'].includes(column)">
               <ng-container *ngIf="element[column]">
                
@@ -555,20 +692,20 @@
             <!-- /* productevent as pe */ -->
             <span *ngIf="column == 'productevent'">
               <span *ngIf="filterdata['productevent'] != null && (filterdata['products'] != null)">
-                {{filterdata['products']}} : {{ ![null,undefined].includes(element[column][filterdata['products']]) ? element[column][filterdata['products']].join(",  ") : null}}
+                {{mapfiltervalues[filterdata['products']]}} : {{ ![null,undefined].includes(element[column][filterdata['products']]) ? getEventsForProduct(element[column][filterdata['products']]) : null}}
               </span>
               <!-- peOpt - product event option -->
               <span *ngIf="filterdata['products'] ===  null || filterdata['products']===undefined">
-                <li *ngFor="let peOpt of element[column] | keyvalue">{{mapfiltervalues[$any(peOpt.key)]}} : {{mapfiltervalues[$any(peOpt.value)]}}</li>
+                <li *ngFor="let peOpt of element[column] | keyvalue">{{mapfiltervalues[$any(peOpt.key)]}} : {{getEventsForProduct($any(peOpt.value))}}</li>
               </span>
             </span>
             <span *ngIf="column == 'queueevent'">
               <span *ngIf="filterdata['queueevent'] != null && (filterdata['products'] != null)">
-                {{filterdata['products']}} : {{ ![null,undefined].includes(element[column][filterdata['products']]) ? element[column][filterdata['products']].join(",  ") : null}}
+                {{mapfiltervalues[filterdata['products']]}} : {{ ![null,undefined].includes(element[column][filterdata['products']]) ? getQueueForProduct(element[column][filterdata['products']]) : null}}
               </span>
               <!-- peOpt - product event option -->
               <span *ngIf="filterdata['products'] ===  null || filterdata['products']===undefined">
-                <li *ngFor="let peOpt of element[column] | keyvalue">{{mapfiltervalues[$any(peOpt.key)]}} : {{mapfiltervalues[$any(peOpt.value)]}}</li>
+                <li *ngFor="let peOpt of element[column] | keyvalue">{{mapfiltervalues[$any(peOpt.key)]}} : {{getQueueForProduct($any(peOpt.value))}}</li>
               </span>
             </span>
             <!-- show eiflix recommended playlist -->
@@ -595,6 +732,19 @@
             <span *ngIf="column === 'journey'">{{element['customerstatus'] === 'active' ? mapfiltervalues[element['activejourney']] : element['customerstatus'] === 'non active' ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
             <!-- age -->
              <span *ngIf="column === 'age'">{{calculateAge(element['dateofbirth'])}}</span>
+             <!-- product -->
+              <!-- <span *ngIf="column.startsWith('consumed') || column.startsWith('unconsumed')" >{{getProductCountForParticipant(column , element['profileid'])}}</span> -->
+               <span *ngIf="column === 'consumedproductcount'">
+                <li *ngFor="let product of getProductForParticipant(element['profileid'] , 'consumedCount')">{{productMap[product.key]?.product}} ( {{product?.count}} )</li>
+               </span>
+               <span *ngIf="column === 'unconsumedproductcount'">
+                <li *ngFor="let product of getProductForParticipant(element['profileid'] , 'unconsumedCount')">{{productMap[product.key]?.product}} ( {{product?.count}} )</li>
+               </span>
+
+               <!-- purchase -->
+                <span *ngIf="column === 'purchase'">
+                  <li *ngFor="let purchase of element['purchase'] || []">{{purchase}}</li>
+                </span>
           </td>
         </ng-container>
 
