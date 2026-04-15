@@ -103,6 +103,8 @@ export class FormtemplateComponent {
   draftSavedAt: Date | null = null;
   draftSaveError: string | null = null;
   private draftSaveEpoch = 0;
+  private autoSaveDebounceTimer: any = null;
+  private readonly AUTOSAVE_DEBOUNCE_MS = 600;
 
   // --- Connectivity monitoring ---
   connectivityDialogRef: MatDialogRef<ConnectivityAlertComponent> | null = null;
@@ -212,7 +214,13 @@ export class FormtemplateComponent {
     if (this.showcontent && this.deliveryForm) {
       inst.setDraftStatus('saving');
       try {
-        await this.autoSave(this.deliveryForm.getRawValue());
+        // Cancel any pending debounced save; force an immediate one so the draft
+        // is guaranteed in-flight before we block the UI.
+        if (this.autoSaveDebounceTimer) {
+          clearTimeout(this.autoSaveDebounceTimer);
+          this.autoSaveDebounceTimer = null;
+        }
+        await this._performAutoSave(this.deliveryForm.getRawValue());
         inst.setDraftStatus('saved');
       } catch (err) {
         console.error('Draft save failed during bad connection:', err);
@@ -836,7 +844,18 @@ export class FormtemplateComponent {
     });
   }
 
-  async autoSave(value: any) {
+  autoSave(value: any) {
+    // Debounce: reset the timer on every keystroke; only actually save once
+    // the user pauses typing for AUTOSAVE_DEBOUNCE_MS.
+    this.draftSaveStatus = 'saving';
+    if (this.autoSaveDebounceTimer) clearTimeout(this.autoSaveDebounceTimer);
+    this.autoSaveDebounceTimer = setTimeout(() => {
+      this.autoSaveDebounceTimer = null;
+      this._performAutoSave(value).catch(() => {});
+    }, this.AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  private async _performAutoSave(value: any) {
     console.log(value);
     console.log(this.submittedClientForm)
 
