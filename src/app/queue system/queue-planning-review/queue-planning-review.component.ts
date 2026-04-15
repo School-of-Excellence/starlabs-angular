@@ -206,6 +206,9 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   bookSlotAvailableSlots: any[] = [];
   bookSlotSelectedIndex: number | null = null;
   bookSlotLoading: boolean = false;
+  // Arena event id for selected queue
+  selectedQueueArenaEventId: string | null = null;
+  selectedQueueProductRef: any = null;
   
   slotPlannerFilter = {
     startDate: null,
@@ -400,6 +403,8 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.queuePlanningSegmentList = [];
     this.cachedPlanningData = null;
     this.dataReadyFlags = { tokens: false, planners: false, planning: false };
+    this.selectedQueueArenaEventId = null;
+    this.selectedQueueProductRef = null;
 
     this.closeSlotPanel();
     this.cancelSubscriptions();
@@ -482,6 +487,17 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         collection(this.firestore, 'queue planning'),
         where('queueid', '==', this.selectedQueue['docid'])
       );
+
+      // Fetch arena event id 
+      const arenaEventsResult = await getDocs(query(collection(this.firestore, 'arena events'),where('type', '==', 'queue'),where('eventref', '==', queueRef)));
+      if (!arenaEventsResult.empty) {
+        this.selectedQueueArenaEventId = arenaEventsResult.docs[0].data()['docid'] || arenaEventsResult.docs[0].id;
+      } else {
+        this.selectedQueueArenaEventId = null;
+      }
+      // Store product ref 
+      const queueEligibleProduct = await getDocs(query(collection(this.firestore, 'products'), where('checkforqueue', '==', true)));
+      this.selectedQueueProductRef = !queueEligibleProduct.empty ? queueEligibleProduct.docs[0].ref : null;
 
       const planningSub = collectionData(planningQuery, { idField: 'id' }).subscribe(async (planningDocs) => {
         if (planningDocs.length > 0) {
@@ -5075,38 +5091,35 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         return;
       }
 
-      // Non-queue participant 
+      // Non-queue participant
       const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
 
-      const queueEligibleProduct = await getDocs(
-        query(collection(this.firestore, 'products'), where('checkforqueue', '==', true))
-      );
-
-      if (queueEligibleProduct.empty) {
+      if (!this.selectedQueueProductRef) {
         alert('No queue eligible product found.');
         this.bookSlotLoading = false;
         return;
       }
 
-      // participantproduct with status null
-      let pendingProductDoc = null;
-      let pendingProductData = null;
+      // Find participantsproduct with status null
+      const pendingProductResult = await getDocs(
+        query(
+          collection(this.firestore, 'participantsproduct'),
+          where('profileid', '==', profileId),
+          where('productref', '==', this.selectedQueueProductRef),
+          where('status', '==', null)
+        )
+      );
 
-      for (const productDoc of queueEligibleProduct.docs) {
-        const pendingProductResult = await getDocs(query(collection(this.firestore, 'participantsproduct'),where('profileid', '==', profileId),where('productref', '==', productDoc.ref),where('status', '==', null)));
-        if (!pendingProductResult.empty) {
-          pendingProductDoc = pendingProductResult.docs[0];
-          pendingProductData = pendingProductDoc.data();
-          break;
-        }
-      }
-
-      if (!pendingProductDoc) {
+      if (pendingProductResult.empty) {
         alert('No participant product found. Cannot complete booking.');
         this.bookSlotLoading = false;
         return;
       }
 
+      const pendingProductDoc = pendingProductResult.docs[0];
+      const pendingProductData = pendingProductDoc.data();
+
+      // Increment usedslot
       const updated = await this.updateSlotCount(
         queuePlanId, segmentId, stageName, variationId, true, selectedSlot
       );
@@ -5117,27 +5130,45 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         return;
       }
 
-      await updateDoc(pendingProductDoc.ref, {
-        'status': 'initiated',
-        'eventref': queueRef,
-        'requestedslot': selectedSlot,
-        'queuevariationid': variationId,
-        'statusdate.initiated': new Date()
-      });
+      // Generate event participation request ID
+      const eventParticipationRef = doc(collection(this.firestore, 'event participation request'));
+      const eventParticipationId = eventParticipationRef.id;
+
+      // Write participantsproduct + event participation request together
+      await Promise.all([
+        updateDoc(pendingProductDoc.ref, {
+          'status': 'initiated',
+          'eventref': queueRef,
+          'requestedslot': selectedSlot,
+          'queuevariationid': variationId,
+          'statusdate.initiated': new Date(),
+          'eventparticipationid': eventParticipationId,
+          'arenaeventid': this.selectedQueueArenaEventId
+        }),
+        setDoc(eventParticipationRef, {
+          'docid': eventParticipationId,
+          'doccreateddate': new Date(),
+          'eventref': queueRef,
+          'productref': pendingProductData['productref'],
+          'status': 'approved',
+          'profileid': profileId,
+          'participantproductid': pendingProductDoc.id,
+          'arenaeventid': this.selectedQueueArenaEventId,
+          'initiatedfrom': 'web'
+        })
+      ]);
 
       this.rebuildMergedSlots();
       this.refreshSelectedSlot();
       this.showAllNonConfirmedParticipants();
       this.closeBookSlotDialog();
       alert('Slot booked successfully!');
-
     } catch (err) {
       console.error('Error booking slot:', err);
       alert('Error booking slot. Please try again.');
       this.bookSlotLoading = false;
     }
   }
-
 
   refreshSelectedSlot() {
     if (!this.selectedSlot || !this.selectedStageForPanel) return;
