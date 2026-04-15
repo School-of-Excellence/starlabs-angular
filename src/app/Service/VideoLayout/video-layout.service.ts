@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type LayoutMode = 'solo' | 'spotlight' | 'spotlight-filmstrip' | 'grid';
+export type LayoutMode = 'spotlight' | 'grid' | 'screen-share';
 export type PipPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 @Injectable({ providedIn: 'root' })
@@ -17,8 +17,8 @@ export class VideoLayoutService {
 
   // Determine layout mode based on participant count and screen share
   getLayoutMode(remoteCount: number, hasScreenShare: boolean): LayoutMode {
-    if (hasScreenShare) return 'spotlight-filmstrip';
-    if (remoteCount === 0) return 'solo';
+    if (hasScreenShare) return 'screen-share';
+    if (remoteCount === 0) return 'grid';
     if (remoteCount === 1) return 'spotlight';
     return 'grid';
   }

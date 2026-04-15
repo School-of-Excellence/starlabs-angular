@@ -65,7 +65,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   remoteParticipants = signal<Map<string, TrackInfo>>(new Map());
   remoteParticipantsQuality = signal<Map<string, ConnectionQuality>>(new Map());
   remoteParticipantsMute = signal<Map<string, boolean>>(new Map());
+  localNetworkQuality = signal<ConnectionQuality>(ConnectionQuality.Unknown);
+  isMicMuted = signal<boolean>(false);
   activeSpeakers:Array<string> = [];
+  
 
   // Meta Data
   roomDetail: RoomInfo | undefined | null;
@@ -98,11 +101,17 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   screenShareParticipantId = signal<string | null>(null);
   localVideoStream = signal<MediaStream | null>(null);
 
+  
+
   // Layout mode computed from participant count and screen share state
   layoutMode = computed<LayoutMode>(() => {
     const remoteVideoCount = this.getRemoteVideoCount();
-    const hasScreenShare = this.screenShareTrack() !== null || this.isScreenSharing();
-    return this.videoLayout.getLayoutMode(remoteVideoCount, hasScreenShare);
+    const hasScreenShare = this.getActiveScreenShare() !== null;
+    
+    if (hasScreenShare) return 'screen-share';  // Screen share layout
+    if (remoteVideoCount === 0) return 'grid';   // 1 participant = grid (not solo)
+    if (remoteVideoCount === 1) return 'spotlight'; // 2 participants = spotlight
+    return 'grid';  // 3+ participants = grid
   });
 
   spotlightMain = computed(() => {
@@ -396,6 +405,12 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       RoomEvent.ConnectionQualityChanged,
       (quality: ConnectionQuality, participant: Participant) => {
         console.log("Network quality changed:", participant.identity, ConnectionQuality[quality]);
+
+        if (participant.identity === room.localParticipant.identity) {
+          this.localNetworkQuality.set(quality);
+          console.log("📶 Local network quality:", ConnectionQuality[quality]);
+        }
+
         this.remoteParticipantsQuality.update((prev) => {
           const next = new Map(prev);
           next.set(participant.identity, quality);
@@ -679,12 +694,36 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     var value = this.isAudioMuted()
     const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
     if (!micPub) return;
-    
+
     if(value){
       micPub.unmute()
+      this.isMicMuted.set(false);
     }
     else{
       micPub.mute()
+      this.isMicMuted.set(true);
+    }
+  }
+
+  getNetworkQualityClass(quality: ConnectionQuality | undefined): string {
+    if (quality === undefined || quality === null) return 'unknown';
+    switch (quality) {
+      case ConnectionQuality.Excellent: return 'excellent';
+      case ConnectionQuality.Good: return 'good';
+      case ConnectionQuality.Poor: return 'poor';
+      case ConnectionQuality.Lost: return 'lost';
+      default: return 'unknown';
+    }
+  }
+
+  getNetworkQualityLabel(quality: ConnectionQuality | undefined): string {
+    if (quality === undefined || quality === null) return 'Unknown';
+    switch (quality) {
+      case ConnectionQuality.Excellent: return 'Excellent';
+      case ConnectionQuality.Good: return 'Good';
+      case ConnectionQuality.Poor: return 'Poor';
+      case ConnectionQuality.Lost: return 'Disconnected';
+      default: return 'Unknown';
     }
   }
 

@@ -432,31 +432,6 @@
   }
 }
 
-/* ============================ */
-/* SOLO LAYOUT (fullscreen)     */
-/* ============================ */
-
-.solo-layout {
-  margin-top: 40px;
-  margin-bottom: 80px;
-  height: calc(100vh - 40px - 80px);
-  background: #000;
-}
-
-.solo-video {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  overflow: hidden;
-}
-
-.solo-video app-openvidu-video-element,
-.solo-video video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 
 /* ============================ */
 /* SPOTLIGHT LAYOUT (2 participants) */
@@ -699,347 +674,7 @@
 }
 
 
-/* ============================ */
-/* SPOTLIGHT + FILMSTRIP MODE   */
-/* (Screen share active)        */
-/* ============================ */
 
-.spotlight-filmstrip-layout {
-  display: flex;
-  flex-direction: column;
-  margin-top: 40px;
-  margin-bottom: 80px;
-  height: calc(100vh - 40px - 80px);
-  background: #000;
-}
-
-/* Main screen share area */
-.screen-share-main {
-  flex: 1;
-  position: relative;
-  background: #1a1a1a;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-}
-
-.screen-share-main app-openvidu-video-element,
-.screen-share-main video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.mirrorsharing {
-  transform: scaleX(-1);
-}
-
-.screen-share-label {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  backdrop-filter: blur(4px);
-  pointer-events: none;
-}
-
-.screen-share-label .material-icons {
-  font-size: 18px;
-}
-
-/* Filmstrip container */
-.filmstrip-container {
-  position: relative;
-  height: 140px;
-  min-height: 140px;
-  background: #1a1a1a;
-  border-top: 1px solid #333;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-}
-
-/* Scroll buttons */
-.filmstrip-scroll-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  cursor: pointer;
-  z-index: 10;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.filmstrip-scroll-btn .material-icons {
-  font-size: 20px;
-}
-
-.filmstrip-scroll-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.filmstrip-scroll-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.filmstrip-scroll-btn.left {
-  left: 12px;
-}
-
-.filmstrip-scroll-btn.right {
-  right: 12px;
-}
-
-/* Scrollable filmstrip */
-.filmstrip {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 12px 48px;
-  scroll-behavior: smooth;
-  flex: 1;
-
-  /* Hide scrollbar but keep functionality */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.filmstrip::-webkit-scrollbar {
-  display: none;
-}
-
-/* Individual tile */
-.filmstrip-tile {
-  flex-shrink: 0;
-  width: 160px;
-  height: 100px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #2a2a2a;
-  position: relative;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.2s;
-}
-
-.filmstrip-tile:hover {
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: scale(1.02);
-}
-
-/* Active speaker highlight */
-.filmstrip-tile.speaking {
-  border-color: #4CAF50;
-  box-shadow: 0 0 12px rgba(76, 175, 80, 0.4);
-}
-
-/* Screen sharer highlight */
-.filmstrip-tile.screen-sharer {
-  border-color: #2196F3;
-}
-
-.sharing-badge {
-  background: #2196F3;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  margin-left: 4px;
-}
-
-.filmstrip-tile app-openvidu-video-element,
-.filmstrip-tile video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.filmstrip-tile-label {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  right: 4px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  pointer-events: none;
-}
-
-.filmstrip-tile-label .mat-icon {
-  font-size: 14px;
-  width: 14px;
-  height: 14px;
-}
-
-.mute-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(244, 67, 54, 0.8);
-  padding: 2px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mute-badge .mat-icon {
-  font-size: 12px;
-  width: 12px;
-  height: 12px;
-  color: white;
-}
-
-/* Speaking indicator animation */
-.speaking-indicator {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  display: flex;
-  gap: 2px;
-  padding: 4px 6px;
-  background: rgba(76, 175, 80, 0.8);
-  border-radius: 4px;
-}
-
-.speaking-indicator .wave {
-  width: 3px;
-  height: 12px;
-  background: white;
-  border-radius: 2px;
-  animation: soundWave 0.5s ease-in-out infinite;
-}
-
-.speaking-indicator .wave:nth-child(1) { animation-delay: 0s; }
-.speaking-indicator .wave:nth-child(2) { animation-delay: 0.1s; }
-.speaking-indicator .wave:nth-child(3) { animation-delay: 0.2s; }
-
-@keyframes soundWave {
-  0%, 100% { transform: scaleY(0.5); }
-  50% { transform: scaleY(1); }
-}
-
-/* ============================ */
-/* RESPONSIVE: SPOTLIGHT        */
-/* ============================ */
-
-@media (max-width: 768px) {
-  .spotlight-layout .pip-video {
-    width: 120px;
-    height: 90px;
-  }
-
-  .spotlight-layout .pip-video.bottom-right { bottom: 16px; right: 12px; }
-  .spotlight-layout .pip-video.bottom-left { bottom: 16px; left: 12px; }
-
-  .pip-label { font-size: 10px; }
-}
-
-/* ============================ */
-/* RESPONSIVE: FILMSTRIP        */
-/* ============================ */
-
-@media (min-width: 1200px) {
-  .spotlight-filmstrip-layout {
-    flex-direction: row;
-  }
-
-  .spotlight-filmstrip-layout .screen-share-main {
-    flex: 1;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip-container {
-    width: 180px;
-    min-width: 180px;
-    height: 100%;
-    flex-direction: column;
-    border-top: none;
-    border-left: 1px solid #333;
-    padding: 8px 0;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip-scroll-btn {
-    position: relative;
-    transform: none;
-    margin: 8px auto;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip-scroll-btn.left,
-  .spotlight-filmstrip-layout .filmstrip-scroll-btn.right {
-    left: auto;
-    right: auto;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip {
-    flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: 12px;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip .filmstrip-tile {
-    width: 100%;
-    height: 100px;
-  }
-}
-
-@media (max-width: 768px) {
-  .spotlight-filmstrip-layout .filmstrip-container {
-    height: 100px;
-    min-height: 100px;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip {
-    padding: 8px 40px;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip .filmstrip-tile {
-    width: 120px;
-    height: 75px;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip .filmstrip-tile-label {
-    font-size: 10px;
-    padding: 2px 4px;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip-scroll-btn {
-    width: 28px;
-    height: 28px;
-  }
-
-  .spotlight-filmstrip-layout .filmstrip-scroll-btn .material-icons {
-    font-size: 16px;
-  }
-}
 
 /* Tile Overlay */
 .tile-overlay {
@@ -1202,4 +837,221 @@
 
 .blur-menu-trigger.blur-active:hover {
   background: #0d47a1;
+}
+
+/* ============== VIDEO INDICATORS ============== */
+.video-indicators {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.main-indicators {
+  top: 16px;
+  right: 16px;
+}
+
+.pip-indicators {
+  top: 6px;
+  right: 6px;
+}
+
+.indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+
+.main-indicators .indicator {
+  width: 36px;
+  height: 36px;
+}
+
+.pip-indicators .indicator {
+  width: 24px;
+  height: 24px;
+}
+
+.indicator-icon {
+  fill: currentColor;
+}
+
+.main-indicators .indicator-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.pip-indicators .indicator-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.network-indicator.excellent {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.network-indicator.good {
+  color: #8bc34a;
+  background: rgba(139, 195, 74, 0.2);
+}
+
+.network-indicator.poor {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.2);
+}
+
+.network-indicator.lost {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.2);
+}
+
+.network-indicator.unknown {
+  color: #9e9e9e;
+  background: rgba(158, 158, 158, 0.2);
+}
+
+.mute-indicator {
+  color: #ffffff;
+  background: rgba(244, 67, 54, 0.85);
+}
+
+.main-video.active-speaker .main-indicators .network-indicator {
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+/* ============================ */
+/* SCREEN SHARE LAYOUT          */
+/* ============================ */
+.screen-share-layout {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: #000;
+  margin-top: 40px;
+  margin-bottom: 80px;
+  height: calc(100vh - 40px - 80px);
+  overflow: hidden;
+}
+
+/* Main screen share area (left side) */
+.screen-share-main {
+  flex: 1;
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen-share-main app-openvidu-video-element,
+.screen-share-main video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Participants sidebar (right side - SCROLLABLE) */
+.participants-sidebar {
+  width: 280px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;      /* ⬅️ Vertical scroll */
+  overflow-x: hidden;
+  padding: 6px;
+  max-height: 100%;
+}
+
+/* Custom scrollbar for sidebar */
+.participants-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.participants-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.participants-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.participants-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Small tiles for sidebar */
+.zoom-video-tile-small {
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  min-height: 120px;
+  flex-shrink: 0;        /* ⬅️ Prevents squishing */
+}
+
+.zoom-video-tile-small app-openvidu-video-element,
+.zoom-video-tile-small video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.zoom-video-tile-small .zoom-name-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.zoom-video-tile-small .network-bars {
+  height: 10px;
+}
+
+.zoom-video-tile-small .network-bars .bar {
+  width: 2px;
+}
+
+.zoom-video-tile-small .network-bars .bar:nth-child(1) { height: 3px; }
+.zoom-video-tile-small .network-bars .bar:nth-child(2) { height: 5px; }
+.zoom-video-tile-small .network-bars .bar:nth-child(3) { height: 7px; }
+.zoom-video-tile-small .network-bars .bar:nth-child(4) { height: 9px; }
+
+/* ============================ */
+/* RESPONSIVE: SCREEN SHARE     */
+/* ============================ */
+@media (max-width: 768px) {
+  .screen-share-layout {
+    flex-direction: column;
+  }
+
+  .participants-sidebar {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: 140px;
+    padding: 6px;
+  }
+
+  .zoom-video-tile-small {
+    min-width: 160px;
+    min-height: 90px;
+    flex-shrink: 0;
+  }
 }
