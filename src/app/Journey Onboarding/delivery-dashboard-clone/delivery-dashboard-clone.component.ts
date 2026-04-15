@@ -3,7 +3,7 @@ import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule }
 import { CommonModule, DatePipe, KeyValue } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
-import { Subscription, combineLatest } from 'rxjs';
+import { Observable, Subscription, combineLatest } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -458,6 +458,8 @@ export class DeliveryDashboardCloneComponent {
         celebrationCall: []
     }
 
+    participantLoading = false;
+
     async ngOnInit() {
         // this.isLoading = true;
         this.setCurrentMonth();
@@ -689,7 +691,7 @@ export class DeliveryDashboardCloneComponent {
                         const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
                         if (this.isDateInRange(completedDate)) funnelData[productId].completed.push(item);
                     }
-                }
+                } else groupedNotEligible(item);
             }
 
             // assign
@@ -699,6 +701,7 @@ export class DeliveryDashboardCloneComponent {
             this.groupedNextMonth = groupedNextMonth;
             this.groupedBonus = groupedBonus;
             this.groupedPurchased = groupedPurchased;
+            this.notEligible = groupedNotEligible;
             this.funnelData = funnelData;
         } catch (err) {
             console.log("error apply date filter", err);
@@ -726,16 +729,19 @@ export class DeliveryDashboardCloneComponent {
         // this.participantsProductDataSubscription?.unsubscribe();
         // this.appointmentsSubscription?.unsubscribe();
         // this.formsSubscription?.unsubscribe();
-
+        this.participantLoading = true;
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
-
+        console.log('FROM SELECT PRODUCT')
+        
         if (this.allAppointments?.length === 0) {
             await this.filterAppointmentsByType();
-        }
-        if (this.productData.reports.length === 0) {
+        } 
+        if (this.productData?.reports?.length === 0) {
             await this.FilterReportData(productId);
         }
+        await this.filterProductData(product, productId);
+        this.participantLoading = false;
     }
 
     async updateProduct(product: string) {
@@ -929,68 +935,79 @@ export class DeliveryDashboardCloneComponent {
         else productData.totalEligible.push(mergedData);
     }
 
-    async FilterReportData(productId: string) {
-        const forms: any[] = [];
-        let allappointments: any;
-        this.formsSubscription = new Subscription();
+   async FilterReportData(productId: string) {
+    const forms: any[] = [];
 
-        for (let i = 0; i < this.allMatchedProductsRaw.length; i += 10) {
-
-            const chunk = this.allMatchedProductsRaw
-                .slice(i, i + 10)
-                .map(item => item.docid);
-
-            const q = query(
-                collection(this.firestore, 'formsByClient'),
-                where('participantproductid', 'in', chunk)
-            );
-
-            await new Promise<void>((resolve) => {
-                const sub = runInInjectionContext(this.injector, () =>
-                    collectionData(q, { idField: 'id' })
-                ).subscribe(async (docs: any[]) => {
-
-                    const formResults = await Promise.all(
-                        docs.map(async (data: any) => {
-
-                            let appointments = Array.from(this.allAppointments.values() || [])
-                                .filter((app: any) => app.participantproductid === data.participantproductid);
-
-                            for (let appointment of appointments) {
-                                try {
-                                    const appointmenttype = await this.resolveAppointmentType(appointment);
-                                    appointment.appointmentTypeName = appointmenttype;
-                                } catch (err) {
-                                    console.log("error", err);
-                                }
-                            }
-
-                            appointments = [...appointments, data];
-
-                            return {
-                                ...data,
-                                status: data?.date ? 'submitted' : 'pending',
-                                appointmentstart: data?.date || null,
-                                productid: productId,
-                                allappointments: appointments || []
-                            };
-                        })
-                    );
-
-                    forms.push(...formResults);
-                    allappointments = [...this.allAppointments, ...formResults];
-
-                    if (this.selectedProductLabel && this.allAppointments.length > 0) this.updateProduct(this.selectedProductLabel);
-
-                    sub.unsubscribe();
-                    resolve();
-                });
-                this.formsSubscription.add(sub);
-            });
-        }
-        this.allAppointments = allappointments;
-        this.productData.reports = forms;
+    if (this.formsSubscription) {
+        this.formsSubscription.unsubscribe(); 
     }
+
+    const observables: Observable<any[]>[] = [];
+
+    for (let i = 0; i < this.allMatchedProductsRaw.length; i += 10) {
+
+        const chunk = this.allMatchedProductsRaw
+            .slice(i, i + 10)
+            .map(item => item.docid);
+
+        const q = query(
+            collection(this.firestore, 'formsByClient'),
+            where('participantproductid', 'in', chunk)
+        );
+
+        const obs$ = runInInjectionContext(this.injector, () =>
+            collectionData(q, { idField: 'id' })
+        );
+
+        observables.push(obs$);
+    }
+
+    this.formsSubscription = combineLatest(observables)
+        .subscribe(async (snapshots: any[][]) => {
+
+            forms.length = 0; // clear previous data
+
+            for (const docs of snapshots) {
+
+                const formResults = await Promise.all(
+                    docs.map(async (data: any) => {
+
+                        let appointments = Array.from(this.allAppointments.values() || [])
+                            .filter((app: any) =>
+                                app.participantproductid === data.participantproductid
+                            );
+
+                        for (let appointment of appointments) {
+                            try {
+                                const appointmenttype = await this.resolveAppointmentType(appointment);
+                                appointment.appointmentTypeName = appointmenttype;
+                            } catch (err) {
+                                console.log("error", err);
+                            }
+                        }
+
+                        appointments = [...appointments, data];
+
+                        return {
+                            ...data,
+                            status: data?.date ? 'submitted' : 'pending',
+                            appointmentstart: data?.date || null,
+                            productid: productId,
+                            allappointments: appointments || []
+                        };
+                    })
+                );
+
+                forms.push(...formResults);
+            }
+            this.allAppointments = [...this.allAppointments, ...forms];
+            this.productData.reports = forms;
+
+            if (this.selectedProductLabel) {
+                this.updateProduct(this.selectedProductLabel);
+            }
+        });
+}
 
     cleanProductData(productData: any) {
         if (!productData) return;
@@ -2170,9 +2187,11 @@ export class DeliveryDashboardCloneComponent {
 
             const sub = collectionData(q, { idField: 'id' })
                 .subscribe(async (appointmentsSnap: any[]) => {
-                    this.allAppointments = [...appointmentsSnap]; // flickering
+                    console.log('COMES IN')
+                    this.allAppointments = [...appointmentsSnap];
 
                     if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
+                    console.log("all appointments", this.allAppointments);
 
                     this.loadingStates.appointments = true;
                     this.journeyFlowLoading = false;
@@ -3870,6 +3889,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     clearStats() {
+        this.participantLoading = false;
         this.selectedProductLabel = "";
         this.filteredCardsMap = {};
         this.productData = {};

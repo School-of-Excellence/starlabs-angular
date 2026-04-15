@@ -63,8 +63,9 @@
             <span class="badge-num">{{ getCardGroupedFiltered(cardId).length | number }}</span>
             <span class="badge-label">Eligible</span>
           </div>
-           <div class="badge noteligible clickable" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
-           <span class="badge-num">{{ notEligible?.length || 0 }}</span>
+          <div class="badge noteligible clickable"
+            (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
+            <span class="badge-num">{{ notEligible?.length || 0 }}</span>
             <span class="badge-label">Not Eligible</span>
           </div>
         </div>
@@ -556,15 +557,19 @@
     <!-- Flow Stats Cards -->
     <!-- Total Eligible -->
     <div class="d-flex board">
-      <div class="column" *ngFor="let col of columns; let i = index">
-        <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
-          <div class="col-header-left">
-            <span class="col-title">{{ col }}</span>
+      <div id="loading" *ngIf="participantLoading">
+        <div class="spinner"></div>
+      </div>
+      <ng-container *ngIf="!participantLoading">
+        <div class="column" *ngFor="let col of columns; let i = index">
+          <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
+            <div class="col-header-left">
+              <span class="col-title">{{ col }}</span>
+            </div>
+            <span class="col-badge">
+              {{ filteredCardsMap[i]?.length || 0 }}
+            </span>
           </div>
-          <span class="col-badge">
-            {{ filteredCardsMap[i]?.length || 0 }}
-          </span>
-        </div>
 
         <div class="col-body">
           <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
@@ -648,7 +653,7 @@
           </ng-template>
         </div>
       </div>
-    </div>
+    </ng-container>
 
     <!-- Flow Table -->
     <div class="flow-table-container" *ngIf="showTable">

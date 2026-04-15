@@ -608,6 +608,7 @@ html {
   font-weight: 600;
   font-weight: bold;
 }
+
 .status-badge {
   padding: 4px 10px;
   border-radius: 20px;
@@ -620,6 +621,7 @@ html {
   background-color: #e6f4ea;
   color: #2e7d32;
 }
+
 .status-submitted {
   color: #856404;
   background-color: #FFF3CD;
@@ -763,10 +765,14 @@ html {
   background: #e4f5ef;
   border: 1px solid #bde8d8;
 }
+
 .badge.noteligible {
-  background: #fdecea;   /* light red background */
-  border: 1px solid #f5c2c0;  /* soft red border */
-  color: #b42318;        /* optional: readable red text */
+  background: #fdecea;
+  /* light red background */
+  border: 1px solid #f5c2c0;
+  /* soft red border */
+  color: #b42318;
+  /* optional: readable red text */
 }
 
 .badge-num {
@@ -3769,4 +3775,27 @@ table.specialist-table tr:hover td {
 .flow-stat strong {
   font-size: 16px;
   color: #1e293b;
+}
+
+#loading {
+  width: 100%;
+  height: fit-content;
+  background: rgba(255,255,255,0.8);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin-top: 3rem;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 6px solid #ccc;
+  border-top: 6px solid #28a745;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
