@@ -133,7 +133,7 @@ export class ManageCohertsComponent {
       name: [null, Validators.required],
       cohortCategory: ['studio', Validators.required],
       cohortType: ['general', Validators.required],
-      participantidlist: [[], Validators.required],
+      participantidlist: [[]],
       createddate: [null, Validators.required],
       udpateddate: [null, Validators.required],
       marathonref: [null, Validators.required],
