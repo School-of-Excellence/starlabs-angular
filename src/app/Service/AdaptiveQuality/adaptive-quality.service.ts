@@ -14,9 +14,9 @@ interface TierConfig {
 const TIER_CONFIG: Record<QualityTier, TierConfig> = {
   ultra:   { width: 1920, height: 1080, frameRate: 30, maxBitrate: 2_500_000, simulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720] },
   high:    { width: 1280, height: 720,  frameRate: 24, maxBitrate: 1_500_000, simulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720] },
-  medium:  { width: 640,  height: 480,  frameRate: 20, maxBitrate: 600_000,   simulcastLayers: [VideoPresets.h90, VideoPresets.h180] },
-  low:     { width: 480,  height: 360,  frameRate: 15, maxBitrate: 400_000,   simulcastLayers: [VideoPresets.h90, VideoPresets.h180] },
-  minimal: { width: 320,  height: 240,  frameRate: 12, maxBitrate: 200_000,   simulcastLayers: [VideoPresets.h90] },
+  medium:  { width: 640,  height: 480,  frameRate: 20, maxBitrate: 600_000,   simulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720] },
+  low:     { width: 480,  height: 360,  frameRate: 15, maxBitrate: 400_000,   simulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720] },
+  minimal: { width: 320,  height: 240,  frameRate: 12, maxBitrate: 200_000,   simulcastLayers: [VideoPresets.h180, VideoPresets.h360] },
 };
 
 const TIER_ORDER: QualityTier[] = ['minimal', 'low', 'medium', 'high', 'ultra'];
@@ -87,10 +87,7 @@ export class AdaptiveQualityService {
   getRoomConfig(tier: QualityTier) {
     const cfg = TIER_CONFIG[tier];
     return {
-      adaptiveStream: {
-        pixelDensity: 'screen' as const,
-        pauseVideoInBackground: true,
-      },
+      adaptiveStream: false,
       dynacast: true,
       reconnectPolicy: {
         nextRetryDelayInMs: (context: { retryCount: number }) => {

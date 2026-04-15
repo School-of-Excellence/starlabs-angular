@@ -214,6 +214,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.qualityCheckInterval) {
+      clearInterval(this.qualityCheckInterval);
+      this.qualityCheckInterval = null;
+    }
     this.qualityChangeDebounce.forEach(timeout => clearTimeout(timeout));
     this.qualityChangeDebounce.clear();
     this.lastQualityChange.clear();
@@ -320,13 +324,19 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
           publication.setVideoQuality(VideoQuality.HIGH);
-          const layout = this.layoutMode();
-          if (layout === 'spotlight' || layout === 'solo') {
-            publication.setVideoDimensions({ width: 1280, height: 720 });
-          } else {
-            publication.setVideoDimensions({ width: 640, height: 480 });
-          }
-          console.log(`📺 Requested HIGH quality for: ${participant.identity}`);
+          publication.setVideoDimensions({ width: 1920, height: 1080 });
+
+          console.log(`📺 Requested HIGH quality for: ${participant.identity}`, {
+            simulcasted: publication.simulcasted,
+            currentQuality: publication.videoQuality,
+          });
+
+          setTimeout(() => {
+            console.log(`📊 Quality verify for ${participant.identity}:`, {
+              quality: ['LOW', 'MEDIUM', 'HIGH'][publication.videoQuality as any] ?? publication.videoQuality,
+              dimensions: publication.dimensions,
+            });
+          }, 2000);
         }
 
         this.remoteParticipants.update((prev) => {
@@ -385,12 +395,14 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.ConnectionQualityChanged,
       (quality: ConnectionQuality, participant: Participant) => {
-        console.log("Network quality changed:", participant.identity, quality);
+        console.log("Network quality changed:", participant.identity, ConnectionQuality[quality]);
         this.remoteParticipantsQuality.update((prev) => {
           const next = new Map(prev);
           next.set(participant.identity, quality);
           return next;
         });
+
+        this.handleConnectionQualityChange(quality, participant, room);
     });
 
     // Track Muted Participants
@@ -457,6 +469,14 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       console.log('Room connected:', this.loggedinProfileid);
 
       this.startQualityMonitoring(room);
+
+      setTimeout(() => this.forceHighQualityForRemotes(), 3000);
+      setTimeout(() => this.forceHighQualityForRemotes(), 8000);
+
+      room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+        console.log(`👤 Participant connected: ${participant.identity}`);
+        setTimeout(() => this.forceHighQualityForRemotes(), 3000);
+      });
 
       // Enable camera at the adaptive tier's resolution
       const cameraConstraints = this.adaptiveQuality.getCameraConstraints(initialTier);
@@ -673,16 +693,27 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return this.getLocalTrackPublication(Track.Source.Camera)?.isMuted ?? true
   }
 
-  toggleCamera(){
-    var value = this.isVideoHidden()
-    const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
-    if (!cameraPub) return;
-    
-    if(value){
-      cameraPub.unmute()
-    }
-    else{
-      cameraPub.mute()
+  async toggleCamera(){
+    const room = this.room();
+    if (!room) return;
+
+    const isCurrentlyEnabled = room.localParticipant.isCameraEnabled;
+
+    if (isCurrentlyEnabled) {
+      await room.localParticipant.setCameraEnabled(false);
+      this.localVideoStream.set(null);
+      console.log('📷 Camera disabled');
+    } else {
+      const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
+      await room.localParticipant.setCameraEnabled(true, cameraConstraints);
+
+      await this.refreshLocalVideoStream();
+
+      if (this.blurLevel !== 'none') {
+        await this.applyBlur(this.blurLevel);
+      }
+
+      console.log('📷 Camera enabled');
     }
   }
 
@@ -940,6 +971,88 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   private qualityChangeDebounce = new Map<string, ReturnType<typeof setTimeout>>();
   private lastQualityChange = new Map<string, number>();
   private readonly QUALITY_CHANGE_COOLDOWN = 5000;
+  private qualityCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+  private forceHighQualityForRemotes(): void {
+    const room = this.room();
+    if (!room) return;
+
+    console.log('🔄 Forcing HIGH quality for all remote participants...');
+
+    const remoteMap: Map<string, RemoteParticipant> =
+      (room as any).participants ?? (room as any).remoteParticipants;
+    if (!remoteMap) return;
+
+    remoteMap.forEach((participant: RemoteParticipant, identity: string) => {
+      const pubs: RemoteTrackPublication[] = Array.from(
+        (participant as any).videoTrackPublications?.values?.()
+          ?? (participant as any).videoTracks?.values?.()
+          ?? []
+      );
+      pubs.forEach((publication: RemoteTrackPublication) => {
+        if (publication.source === Track.Source.Camera && publication.isSubscribed && publication.track) {
+          console.log(`📊 ${identity} before:`, {
+            quality: ['LOW', 'MEDIUM', 'HIGH'][publication.videoQuality as any] ?? publication.videoQuality,
+            dimensions: publication.dimensions,
+            simulcasted: publication.simulcasted,
+          });
+
+          publication.setVideoQuality(VideoQuality.HIGH);
+          publication.setVideoDimensions({ width: 1920, height: 1080 });
+
+          console.log(`📺 Forced HIGH quality for: ${identity}`);
+        }
+      });
+    });
+  }
+
+  private handleConnectionQualityChange(
+    quality: ConnectionQuality,
+    participant: Participant,
+    room: Room
+  ): void {
+    if (participant.identity === room.localParticipant.identity) return;
+
+    const remoteMap: Map<string, RemoteParticipant> =
+      (room as any).participants ?? (room as any).remoteParticipants;
+    const remoteParticipant = remoteMap?.get(participant.identity);
+    if (!remoteParticipant) return;
+
+    const pubs: RemoteTrackPublication[] = Array.from(
+      (remoteParticipant as any).videoTrackPublications?.values?.()
+        ?? (remoteParticipant as any).videoTracks?.values?.()
+        ?? []
+    );
+    const videoPub = pubs.find((p: RemoteTrackPublication) => p.source === Track.Source.Camera);
+
+    if (!videoPub || !videoPub.isSubscribed) return;
+
+    let targetQuality: VideoQuality;
+    let qualityName: string;
+
+    switch (quality) {
+      case ConnectionQuality.Excellent:
+        targetQuality = VideoQuality.HIGH;
+        qualityName = 'HIGH';
+        break;
+      case ConnectionQuality.Good:
+        targetQuality = VideoQuality.HIGH;
+        qualityName = 'HIGH';
+        break;
+      case ConnectionQuality.Poor:
+        targetQuality = VideoQuality.MEDIUM;
+        qualityName = 'MEDIUM';
+        break;
+      case ConnectionQuality.Lost:
+      default:
+        targetQuality = VideoQuality.LOW;
+        qualityName = 'LOW';
+        break;
+    }
+
+    videoPub.setVideoQuality(targetQuality);
+    console.log(`📶 ${participant.identity} connection: ${ConnectionQuality[quality]} → Quality: ${qualityName}`);
+  }
 
   private startQualityMonitoring(room: Room) {
     room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
