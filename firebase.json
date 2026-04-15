@@ -9,6 +9,12 @@
     ],
     "headers": [
       {
+        "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
         "source": "/openmeeting/**",
         "headers": [
           {
@@ -61,14 +67,6 @@
       }
     ],
     "rewrites": [
-      {
-        "source": "/openmeeting/**",
-        "destination": "/openmeeting/index.html"
-      },
-      {
-        "source": "/zoommeeting_bigparticipants/**",
-        "destination": "/zoommeeting_bigparticipants/index.html"
-      },
       {
         "source": "**",
         "destination": "/index.html"

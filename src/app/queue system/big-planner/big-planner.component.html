@@ -30,18 +30,29 @@
       <mat-sidenav-container class="sidenav-container">
         <mat-sidenav #sidenav [mode]="'side'" *ngIf="!viewOnly" [opened]="displayParticipantRole" class="participants-sidenav" [fixedInViewport]="false">
           <mat-card class="participant-card">
-            <mat-card-header>
+            <mat-card-header class="participant-card-header">
               <mat-card-title>
                 <div class="card-title-row">
-                  <span>B!G Participants</span>
-                  <span class="participant-count">{{cohortparticipantsList.length}}</span>
+                  <div class="title-leading">
+                    <div class="title-icon-wrap">
+                      <mat-icon>groups</mat-icon>
+                    </div>
+                    <div class="title-text">
+                      <span class="title-main">B!G Participants</span>
+                      <span class="title-sub">People in this cohort</span>
+                    </div>
+                  </div>
+                  <span class="participant-count" [attr.title]="cohortparticipantsList.length + ' participants'">
+                    <mat-icon class="count-icon">person</mat-icon>
+                    <span class="count-value">{{cohortparticipantsList.length}}</span>
+                  </span>
                 </div>
               </mat-card-title>
             </mat-card-header>
             <mat-divider></mat-divider>
             <mat-card-content>
               <mat-nav-list class="participant-list">
-                <mat-list-item *ngFor="let invitation of cohortparticipantsList" class="participant-item">
+                <mat-list-item *ngFor="let invitation of cohortparticipantsList; let i = index" class="participant-item">
                   <!-- <div class="participant-row">
                     <div class="status-and-name">
                       <mat-icon class="status-icon" [ngClass]="invitation.status === 'away' ? 'status-away' : 'status-active'">
@@ -62,29 +73,34 @@
                   </div> -->
                   <div class="participant-row">
                     <div class="status-and-name">
+                      <span class="sno-badge">{{ i + 1 }}</span>
                       <!-- <mat-icon class="status-icon" [ngClass]="invitation.status === 'away' ? 'status-away' : 'status-active'">
                         fiber_manual_record
                       </mat-icon> -->
-                      <span class="participant-name">{{mapProfile[invitation]}}</span>
+                      <span class="participant-name" [title]="mapProfile[invitation]">{{mapProfile[invitation]}}</span>
                     </div>
                     <div class="participant-stats">
-                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'shadow')" (mousemove)="onMove($event)"
+                      <div class="stat-chip chip-shadow" (mouseenter)="onEnter($event, invitation , 'shadow')"
                         (mouseleave)="onLeave()">
-                        <span class="stat-label">Shadows:</span>
+                        <mat-icon class="chip-icon">visibility</mat-icon>
+                        <span class="stat-label">Shadows</span>
                         <span class="stat-value">{{profileShadowCount[invitation]?.length || 0}}</span>
                       </div>
-                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'studio')" (mousemove)="onMove($event)"
+                      <div class="stat-chip chip-studio" (mouseenter)="onEnter($event, invitation , 'studio')"
                         (mouseleave)="onLeave()">
-                        <span class="stat-label">Studios:</span>
+                        <mat-icon class="chip-icon">groups</mat-icon>
+                        <span class="stat-label">Studios</span>
                         <span class="stat-value">{{profileStudioCount[invitation]?.length || 0}}</span>
                       </div>
-                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'pair')" (mousemove)="onMove($event)"
+                      <div class="stat-chip chip-pair" (mouseenter)="onEnter($event, invitation , 'pair')"
                         (mouseleave)="onLeave()">
-                        <span class="stat-label">Pair:</span>
+                        <mat-icon class="chip-icon">group</mat-icon>
+                        <span class="stat-label">Pair</span>
                         <span class="stat-value">{{profilePairCount[invitation]?.length || 0}}</span>
                       </div>
-                      <div class="stat-chip" (mouseenter)="onEnter($event, invitation , 'duplicate')" (mousemove)="onMove($event)"
+                      <div class="stat-chip chip-duplicate" (mouseenter)="onEnter($event, invitation , 'duplicate')"
                         (mouseleave)="onLeave()" (click)="onDuplicateClick(invitation)">
+                        <mat-icon class="chip-icon">content_copy</mat-icon>
                         <span class="stat-label">Duplicate</span>
                         <span class="stat-value">{{duplicateStuidoMap[invitation]?.length || 0}}</span>
                       </div>
@@ -421,26 +437,50 @@
     </div>
   </div>
 
-  <div class="tooltip-box" [style.left.px]="cardTooltipX" [style.top.px]="cardTooltipY" *ngIf="activeHoverCard?.length > 0"
-    [style.opacity]="cardVisible ? 1 : 0">
-    <ng-container *ngIf="activeHoverCard && activeHoverCard.length > 0">
-      <div class="wrap">
-        <div *ngFor="let studio of activeHoverCard">
-          <div class="tt-row" >
-            <span class="tt-label">Participants : </span>
-            <span class="tt-value">{{ studio.participants.join(', ') }}</span>
+  <div class="tooltip-box" [class.tt-type-shadow]="hoverType==='shadow'"
+    [class.tt-type-studio]="hoverType==='studio'" [class.tt-type-pair]="hoverType==='pair'"
+    [class.tt-type-duplicate]="hoverType==='duplicate'"
+    [style.left.px]="cardTooltipX" [style.top.px]="cardTooltipY"
+    *ngIf="activeHoverCard && cardVisible"
+    [style.opacity]="cardVisible ? 1 : 0"
+    (mouseenter)="onTooltipEnter()" (mouseleave)="onTooltipLeave()">
+    <div class="tt-header">
+      <mat-icon class="tt-header-icon">{{ hoverIcon(hoverType) }}</mat-icon>
+      <div class="tt-header-text">
+        <div class="tt-title">{{ hoverTitle }}</div>
+        <div class="tt-subtitle" *ngIf="hoverProfileName">{{ hoverProfileName }}</div>
+      </div>
+      <span class="tt-count">{{ activeHoverCard.length }}</span>
+    </div>
+
+    <div class="tt-body" *ngIf="activeHoverCard.length > 0; else emptyTpl">
+      <div class="tt-card" *ngFor="let studio of activeHoverCard; let i = index">
+        <div class="tt-card-head">
+          <span class="tt-card-index">#{{ i + 1 }}</span>
+          <span class="tt-card-title">Entry {{ i + 1 }}</span>
+        </div>
+        <div class="tt-card-body">
+          <div class="tt-row">
+            <mat-icon class="tt-row-icon">people</mat-icon>
+            <span class="tt-label">Participants</span>
+            <span class="tt-value">{{ studio.participants.join(', ') || '—' }}</span>
           </div>
           <div class="tt-row">
-            <span class="tt-label">Activities : </span>
-            <span class="tt-value">{{ studio.activities.join(', ') }}</span>
+            <mat-icon class="tt-row-icon">assignment</mat-icon>
+            <span class="tt-label">Activities</span>
+            <span class="tt-value">{{ studio.activities.join(', ') || '—' }}</span>
           </div>
           <div class="tt-row">
-            <span class="tt-label">Atc Model : </span>
-            <span class="tt-value">{{ studio.atcModel.join(', ') }}</span>
+            <mat-icon class="tt-row-icon">category</mat-icon>
+            <span class="tt-label">ATC Model</span>
+            <span class="tt-value">{{ studio.atcModel.join(', ') || '—' }}</span>
           </div>
         </div>
       </div>
-    </ng-container>
+    </div>
+    <ng-template #emptyTpl>
+      <div class="tt-empty">No entries to show.</div>
+    </ng-template>
   </div>
 
 
@@ -450,14 +490,20 @@
 
     <!-- Header -->
     <div class="modal-header">
-      <span class="modal-title">ATC Model</span>
-      <button class="close-btn" (click)="cancelAtcEdit()">&#x2715;</button>
+      <div class="modal-header-leading">
+        <div class="modal-header-icon"><mat-icon>category</mat-icon></div>
+        <div class="modal-header-text">
+          <span class="modal-title">Edit ATC Model</span>
+          <span class="modal-subtitle">Select one or more models for this studio</span>
+        </div>
+      </div>
+      <button class="close-btn" (click)="cancelAtcEdit()" aria-label="Close">&#x2715;</button>
     </div>
 
     <!-- Body -->
     <div class="modal-body">
       <mat-form-field appearance="outline" style="width: 100%;">
-        <mat-label>Atc Model</mat-label>
+        <mat-label>ATC Model</mat-label>
         <mat-select [(ngModel)]="editAtcModelData" multiple>
           <mat-option
             *ngFor="let list of productList"
@@ -471,8 +517,8 @@
 
     <!-- Footer -->
     <div class="modal-footer">
-      <button mat-stroked-button (click)="cancelAtcEdit()">Cancel</button>
-      <button mat-stroked-button (click)="applyAtcEdit()">Apply</button>
+      <button mat-stroked-button class="btn-ghost" (click)="cancelAtcEdit()">Cancel</button>
+      <button mat-flat-button color="primary" class="btn-primary" (click)="applyAtcEdit()">Apply</button>
     </div>
 
   </div>
@@ -481,8 +527,14 @@
 <div class="modal-backdrop" *ngIf="editMandatoryActivities" (click)="cancelMandatoryEdit()">
   <div class="modal-card" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <span class="modal-title">Mandatory Activities</span>
-      <button class="close-btn" (click)="cancelMandatoryEdit()">&#x2715;</button>
+      <div class="modal-header-leading">
+        <div class="modal-header-icon"><mat-icon>assignment_turned_in</mat-icon></div>
+        <div class="modal-header-text">
+          <span class="modal-title">Mandatory Activities</span>
+          <span class="modal-subtitle">Choose activities required for this studio</span>
+        </div>
+      </div>
+      <button class="close-btn" (click)="cancelMandatoryEdit()" aria-label="Close">&#x2715;</button>
     </div>
     <div class="modal-body">
       <mat-form-field appearance="outline" style="width: 100%;">
@@ -495,8 +547,8 @@
       </mat-form-field>
     </div>
     <div class="modal-footer">
-      <button mat-stroked-button (click)="cancelMandatoryEdit()">Cancel</button>
-      <button mat-stroked-button (click)="applyMandatoryEdit()">Apply</button>
+      <button mat-stroked-button class="btn-ghost" (click)="cancelMandatoryEdit()">Cancel</button>
+      <button mat-flat-button color="primary" class="btn-primary" (click)="applyMandatoryEdit()">Apply</button>
     </div>
   </div>
 </div>
@@ -507,33 +559,41 @@
       <span class="tm-header__title">Duplicated Studios</span>
       <button class="tm-header__close" (click)="closeDuplicateStuioModel(false)" >✕</button>
     </div>
+    <div class="tm-notice">
+      <mat-icon class="tm-notice__icon">info</mat-icon>
+      <div class="tm-notice__text">
+        <strong>{{ duplicatedStudios.length }}</strong>
+        duplicated {{ duplicatedStudios.length === 1 ? 'studio has' : 'studios have' }} already been created with the same participants.
+        Do you want to proceed and create a new studio on top of {{ duplicatedStudios.length === 1 ? 'this' : 'these' }}?
+      </div>
+    </div>
     <div class="tm-card-list">
-      <div class="tm-card tm-card--dark" *ngFor="let studio of duplicatedStudios">
+      <div class="tm-card" *ngFor="let studio of duplicatedStudios; let i = index">
         <div class="tm-card__body">
           <div class="tm-card__top">
+            <span class="tm-sno">#{{ i + 1 }}</span>
             <div class="tm-card__identity">
-              <div>
-                <div class="tm-card__name"><span *ngFor="let participant of studio.participants">{{mapProfile[participant]}},</span></div>
-                <div class="tm-card__role">
-                  <span *ngFor="let participant of studio.participants">
-                    {{mapBigActivity[studio.participantsactivity[participant]]}}
-                  </span>
-                </div>
+              <div class="tm-card__name">
+                <ng-container *ngFor="let participant of studio.participants; let last = last">{{ mapProfile[participant] }}<span *ngIf="!last">, </span></ng-container>
+              </div>
+              <div class="tm-card__role">
+                <ng-container *ngFor="let participant of studio.participants; let last = last">{{ mapBigActivity[studio.participantsactivity[participant]] }}<span *ngIf="!last"> · </span></ng-container>
               </div>
             </div>
-            <!-- <div class="tm-status-dot"></div> -->
           </div>
           <div class="tm-card__details">
-            <div class="tm-detail-group">
-              <div class="tm-detail-group__label">ATC Model</div>
+            <div class="tm-detail-row">
+              <span class="tm-detail-group__label">ATC</span>
               <div class="tm-tag-list">
                 <span class="tm-tag" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
+                <span class="tm-none" *ngIf="!(studio['atcmodel'] || []).length">—</span>
               </div>
             </div>
-            <div class="tm-detail-group tm-detail-group--wide">
-              <div class="tm-detail-group__label">Mandatory Activities</div>
+            <div class="tm-detail-row">
+              <span class="tm-detail-group__label">Mandatory</span>
               <div class="tm-tag-list">
-                <span class="tm-tag-activity" *ngFor="let actId of studio['mandatoryactivities'] || []" >{{ mapBigActivity[actId] }}</span>
+                <span class="tm-tag-activity" *ngFor="let actId of studio['mandatoryactivities'] || []">{{ mapBigActivity[actId] }}</span>
+                <span class="tm-none" *ngIf="!(studio['mandatoryactivities'] || []).length">—</span>
               </div>
             </div>
           </div>

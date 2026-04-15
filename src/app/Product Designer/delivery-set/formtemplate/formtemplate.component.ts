@@ -1,5 +1,7 @@
-import { Component, inject, Input, OnInit, Output, EventEmitter, ViewChildren, QueryList, ElementRef } from '@angular/core';
-import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot} from '@angular/fire/firestore';
+import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, ViewChildren, QueryList, ElementRef, signal } from '@angular/core';
+import { ConnectivityAlertComponent } from './connectivity-alert.component';
+import { MatDialogRef } from '@angular/material/dialog';
+import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { FormGroup,FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule}from'@angular/forms';
@@ -96,6 +98,24 @@ export class FormtemplateComponent {
   @Input() isInline: boolean = false;
   @Output() formSubmitted = new EventEmitter<void>();
 
+  // --- Draft save status (shown in form header) ---
+  draftSaveStatus: 'idle' | 'saving' | 'saved' | 'failed' = 'idle';
+  draftSavedAt: Date | null = null;
+  draftSaveError: string | null = null;
+  private draftSaveEpoch = 0;
+  private autoSaveDebounceTimer: any = null;
+  private readonly AUTOSAVE_DEBOUNCE_MS = 600;
+
+  // --- Connectivity monitoring ---
+  connectivityDialogRef: MatDialogRef<ConnectivityAlertComponent> | null = null;
+  private connectivityPingTimer: any = null;
+  private connectivityState: 'good' | 'bad' = 'good';
+  private badSince: number | null = null;
+  private readonly BAD_DEBOUNCE_MS = 3000;
+  private onlineHandler = () => this.evaluateConnectivity();
+  private offlineHandler = () => this.evaluateConnectivity(true);
+  private connectionChangeHandler = () => this.evaluateConnectivity();
+
   constructor(
     private route : ActivatedRoute,
     private dialog : MatDialog,
@@ -111,7 +131,110 @@ export class FormtemplateComponent {
     window.close();
   }
 
+  ngOnDestroy() {
+    window.removeEventListener('online', this.onlineHandler);
+    window.removeEventListener('offline', this.offlineHandler);
+    const conn = (navigator as any).connection;
+    conn?.removeEventListener?.('change', this.connectionChangeHandler);
+    if (this.connectivityPingTimer) clearInterval(this.connectivityPingTimer);
+    this.connectivityDialogRef?.close();
+  }
+
+  private startConnectivityMonitoring() {
+    window.addEventListener('online', this.onlineHandler);
+    window.addEventListener('offline', this.offlineHandler);
+    const conn = (navigator as any).connection;
+    conn?.addEventListener?.('change', this.connectionChangeHandler);
+    this.connectivityPingTimer = setInterval(() => this.pingConnectivity(), 15000);
+    this.evaluateConnectivity();
+  }
+
+  private async pingConnectivity() {
+    if (!navigator.onLine) {
+      this.evaluateConnectivity(true);
+      return;
+    }
+    const started = Date.now();
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      await fetch('https://www.gstatic.com/generate_204?ts=' + started, {
+        method: 'GET', cache: 'no-store', mode: 'no-cors', signal: ctrl.signal
+      });
+      clearTimeout(t);
+      const rtt = Date.now() - started;
+      this.evaluateConnectivity(false, rtt);
+    } catch {
+      this.evaluateConnectivity(true);
+    }
+  }
+
+  private isBadConnection(forceOffline = false, rtt?: number): boolean {
+    if (forceOffline || !navigator.onLine) return true;
+    const conn = (navigator as any).connection;
+    if (conn?.effectiveType && ['slow-2g', '2g'].includes(conn.effectiveType)) return true;
+    if (conn?.downlink != null && conn.downlink > 0 && conn.downlink < 0.3) return true;
+    if (rtt != null && rtt > 4000) return true;
+    return false;
+  }
+
+  private evaluateConnectivity(forceOffline = false, rtt?: number) {
+    const bad = this.isBadConnection(forceOffline, rtt);
+    if (bad) {
+      if (this.badSince == null) this.badSince = Date.now();
+      const sustained = Date.now() - this.badSince >= this.BAD_DEBOUNCE_MS || forceOffline || !navigator.onLine;
+      if (sustained && this.connectivityState !== 'bad') {
+        this.connectivityState = 'bad';
+        this.handleBadConnection();
+      }
+    } else {
+      this.badSince = null;
+      if (this.connectivityState !== 'good') {
+        this.connectivityState = 'good';
+        this.connectivityDialogRef?.close();
+        this.connectivityDialogRef = null;
+      }
+    }
+  }
+
+  private async handleBadConnection() {
+    if (this.formpatch) return; // preview/patch mode - no drafts
+    if (this.connectivityDialogRef) return;
+
+    const offline = !navigator.onLine;
+    this.connectivityDialogRef = this.dialog.open(ConnectivityAlertComponent, {
+      disableClose: true,
+      width: '420px',
+      data: { offline, draftStatus: 'saving' }
+    });
+
+    const inst = this.connectivityDialogRef.componentInstance;
+    inst.setOffline(offline);
+
+    if (this.showcontent && this.deliveryForm) {
+      inst.setDraftStatus('saving');
+      try {
+        // Cancel any pending debounced save; force an immediate one so the draft
+        // is guaranteed in-flight before we block the UI.
+        if (this.autoSaveDebounceTimer) {
+          clearTimeout(this.autoSaveDebounceTimer);
+          this.autoSaveDebounceTimer = null;
+        }
+        await this._performAutoSave(this.deliveryForm.getRawValue());
+        inst.setDraftStatus('saved');
+      } catch (err) {
+        console.error('Draft save failed during bad connection:', err);
+        inst.setDraftStatus('failed');
+      }
+    } else {
+      inst.setDraftStatus('idle');
+    }
+
+    inst.setOffline(!navigator.onLine);
+  }
+
   async ngOnInit() {
+    this.startConnectivityMonitoring();
      // Get queue ID from route params
     this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.formpatch = ![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null,undefined].includes(this.participantformtemplateid) ? true : false)
@@ -721,10 +844,25 @@ export class FormtemplateComponent {
     });
   }
 
-  async autoSave(value: any) {
+  autoSave(value: any) {
+    // Debounce: reset the timer on every keystroke; only actually save once
+    // the user pauses typing for AUTOSAVE_DEBOUNCE_MS.
+    this.draftSaveStatus = 'saving';
+    if (this.autoSaveDebounceTimer) clearTimeout(this.autoSaveDebounceTimer);
+    this.autoSaveDebounceTimer = setTimeout(() => {
+      this.autoSaveDebounceTimer = null;
+      this._performAutoSave(value).catch(() => {});
+    }, this.AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  private async _performAutoSave(value: any) {
     console.log(value);
     console.log(this.submittedClientForm)
-    
+
+    const myEpoch = ++this.draftSaveEpoch;
+    this.draftSaveStatus = 'saving';
+    this.draftSaveError = null;
+
     try {
       // Process form array values
       let e = 0;
@@ -754,12 +892,34 @@ export class FormtemplateComponent {
 
       // Save to temporary_forms collection using modern Firebase syntax
       const tempFormDocRef = doc(this.firestore, 'temporary_forms', this.draftDocid);
-      await setDoc(tempFormDocRef, this.submittedClientForm, { merge: true });
-      
-      console.log("Temporary form submitted");
+      // Fire the local write (resolves from local cache quickly).
+      setDoc(tempFormDocRef, this.submittedClientForm, { merge: true })
+        .catch(err => {
+          console.error("setDoc failed:", err);
+          if (myEpoch === this.draftSaveEpoch) {
+            this.draftSaveStatus = 'failed';
+            this.draftSaveError = err?.message ?? 'Unknown error';
+          }
+        });
 
-    } catch (error) {
+      // Wait until Firestore has actually acknowledged ALL pending writes from the server.
+      // This is what guarantees the draft is really in the DB, not just queued locally.
+      await waitForPendingWrites(this.firestore);
+
+      // Only the latest autoSave call may flip to 'saved' — stale earlier calls are ignored.
+      if (myEpoch === this.draftSaveEpoch) {
+        this.draftSaveStatus = 'saved';
+        this.draftSavedAt = new Date();
+        console.log("Temporary form submitted (server-acked)");
+      }
+
+    } catch (error: any) {
       console.error("Error during auto save:", error);
+      if (myEpoch === this.draftSaveEpoch) {
+        this.draftSaveStatus = 'failed';
+        this.draftSaveError = error?.message ?? 'Unknown error';
+      }
+      throw error;
     }
   }
 

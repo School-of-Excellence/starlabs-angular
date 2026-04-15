@@ -306,9 +306,10 @@ export class EventOpportunityDashboardV2Component {
     if (!activeMarathonRefs.length) return;
 
     const cohortsSnap = await getDocs(query(
-      collection(this.firestore, 'bigcohorts'),
+      collection(this.firestore, 'big cohorts'),
       where('marathonref', 'in', activeMarathonRefs),
-      where('cohortType', '==', 'event')
+      where('cohortType', '==', 'event'),
+      where('status', '==', 'active')
     ));
 
     const map: { [eventId: string]: Array<{ bigactivity: string, participantidlist: string[] }> } = {};
@@ -395,28 +396,24 @@ export class EventOpportunityDashboardV2Component {
 
       const bigPid = element['participantid'];
       if (!bigPid) continue;
-      const fanout: Record<string, string> = {
-        ...(element['participantsactivity'] || {}),
-        ...(element['bonusactivity'] || {}),
+      const pa = element['participantsactivity'] || {};
+      const ba = element['bonusactivity'] || {};
+      const activityid = pa[bigPid] || ba[bigPid] || Object.values(pa)[0] || Object.values(ba)[0];
+      const document: any = {
+        ...element,
+        participantid: bigPid,
+        profile_id: bigPid,
+        activity: activityid,
+        activitydate: tsRaw,
       };
+      const key = element['id'] || element['docid'];
 
-      for (const profileid in fanout) {
-        const document: any = {
-          ...element,
-          participantid: bigPid,
-          profile_id: profileid,
-          activity: fanout[profileid],
-          activitydate: tsRaw,
-        };
-        const key = `${element['id'] || element['docid']}::${profileid}`;
+      all[queueId][stagename] = all[queueId][stagename] || {};
+      all[queueId][stagename][key] = [document];
 
-        all[queueId][stagename] = all[queueId][stagename] || {};
-        all[queueId][stagename][key] = [document];
-
-        if (inToday) {
-          today[queueId][stagename] = today[queueId][stagename] || {};
-          today[queueId][stagename][key] = [document];
-        }
+      if (inToday) {
+        today[queueId][stagename] = today[queueId][stagename] || {};
+        today[queueId][stagename][key] = [document];
       }
     }
 
@@ -755,22 +752,62 @@ export class EventOpportunityDashboardV2Component {
     return this.mapData[queueid]['studioPreAssign'][studio['docid']];
   }
 
-  isStudioShadowing(queueid: string, studio: any): boolean {
-    const set: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
-    if (!set.size) return false;
-    const pa = studio?.['participantsactivity'] || {};
-    const ba = studio?.['bonusactivity'] || {};
-    for (const k in pa) if (set.has(pa[k])) return true;
-    for (const k in ba) if (set.has(ba[k])) return true;
-    return false;
+  private getShadowCohortParticipants(queueid: string, stage: string): Array<{ profileid: string, bigactivity: string }> {
+    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    if (!cohorts?.length) return [];
+    const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
+    const stageActivityIds = new Set<string>();
+    Object.values(compulsory).forEach((combo: any) => (combo || []).forEach((id: string) => stageActivityIds.add(id)));
+
+    const out: Array<{ profileid: string, bigactivity: string }> = [];
+    const seen = new Set<string>();
+    for (const c of cohorts) {
+      if (!shadowSet.has(c.bigactivity) || !stageActivityIds.has(c.bigactivity)) continue;
+      for (const pid of c.participantidlist) {
+        if (seen.has(pid)) continue;
+        seen.add(pid);
+        out.push({ profileid: pid, bigactivity: c.bigactivity });
+      }
+    }
+    return out;
   }
 
-  getShadowingStudios(queueid: string, stage: string): any[] {
-    return this.getStageStudioLive(queueid, stage).filter(s => this.isStudioShadowing(queueid, s));
+  private findLiveShadowAssignment(queueid: string, profileid: string, bigactivity: string): any | null {
+    const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+    return liveList.find(e => {
+      if (e['status'] !== 'live') return false;
+      const pa = e['participantsactivity'] || {};
+      const ba = e['bonusactivity'] || {};
+      return pa[profileid] === bigactivity || ba[profileid] === bigactivity;
+    }) || null;
   }
 
-  getNotShadowingStudios(queueid: string, stage: string): any[] {
-    return this.getStageStudioLive(queueid, stage).filter(s => !this.isStudioShadowing(queueid, s));
+  private isProfileInLiveShadow(queueid: string, stage: string, profileid: string, bigactivity: string): boolean {
+    return !!this.findLiveShadowAssignment(queueid, profileid, bigactivity);
+  }
+
+  getShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
+    const map = this.mapData[queueid]?.['mapBigActivity'] ?? {};
+    const out: Array<{ profileid: string, activity: string }> = [];
+    for (const p of this.getShadowCohortParticipants(queueid, stage)) {
+      const assignment = this.findLiveShadowAssignment(queueid, p.profileid, p.bigactivity);
+      if (!assignment) continue;
+      const mainPid = assignment['participantid'];
+      const mainActivityId = assignment['participantsactivity']?.[mainPid];
+      const activity = map[mainActivityId] || mainActivityId || map[p.bigactivity] || p.bigactivity;
+      out.push({ profileid: p.profileid, activity });
+    }
+    return out.sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
+  }
+
+  getNotShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
+    const map = this.mapData[queueid]?.['mapBigActivity'] ?? {};
+    return this.getShadowCohortParticipants(queueid, stage)
+      .filter(p => !this.isProfileInLiveShadow(queueid, stage, p.profileid, p.bigactivity))
+      .map(p => ({ profileid: p.profileid, activity: map[p.bigactivity] || p.bigactivity }))
+      .sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
   }
 
   getNoStudioShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
@@ -787,7 +824,7 @@ export class EventOpportunityDashboardV2Component {
     const inStudioProfiles = new Set<string>();
     const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
     liveList.forEach(e => {
-      if (e['stagename'] === stage && e['status'] === 'instudio') {
+      if (e['stagename'] === stage && e['status'] === 'live') {
         Object.keys(e['participantsactivity'] || {}).forEach(p => inStudioProfiles.add(p));
         Object.keys(e['bonusactivity'] || {}).forEach(p => inStudioProfiles.add(p));
         if (e['participantid']) inStudioProfiles.add(e['participantid']);
@@ -821,7 +858,7 @@ export class EventOpportunityDashboardV2Component {
     const inStudioProfiles = new Set<string>();
     const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
     liveList.forEach(e => {
-      if (e['stagename'] === stage && e['status'] === 'instudio') {
+      if (e['stagename'] === stage && e['status'] === 'live') {
         Object.keys(e['participantsactivity'] || {}).forEach(p => inStudioProfiles.add(p));
         Object.keys(e['bonusactivity'] || {}).forEach(p => inStudioProfiles.add(p));
         if (e['participantid']) inStudioProfiles.add(e['participantid']);

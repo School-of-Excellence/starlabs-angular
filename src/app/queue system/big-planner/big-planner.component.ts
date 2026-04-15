@@ -164,6 +164,17 @@ export class BigPlannerComponent {
   cardVisible = false;
   cardTooltipX = 0;
   cardTooltipY = 0;
+  hoverType: 'shadow' | 'studio' | 'pair' | 'duplicate' | null = null;
+  hoverTitle = '';
+  hoverProfileName = '';
+  private hoverHideTimer: any = null;
+
+  private readonly hoverTypeMeta: Record<string, { title: string; icon: string }> = {
+    shadow: { title: 'Shadow sessions', icon: 'visibility' },
+    studio: { title: 'Studio sessions', icon: 'groups' },
+    pair: { title: 'Pair sessions', icon: 'group' },
+    duplicate: { title: 'Duplicate studios', icon: 'content_copy' },
+  };
 
   // edit atc
 
@@ -217,7 +228,7 @@ export class BigPlannerComponent {
             const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
             collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
               let list = [];
-              let participantsList = new Set();
+              let participantsList = new Set<string>();
               console.log('cohorts found :', cohort.length);
 
               if (cohort.length > 0) {
@@ -229,7 +240,8 @@ export class BigPlannerComponent {
                   }
                 }
                 this.eventCohorts = list;
-                this.cohortparticipantsList = Array.from(participantsList.values());
+                this.cohortparticipantsList = Array.from(participantsList.values())
+                  .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
               } else {
                 this.guard.openSnackBar('No Cohorts found', 'OK', 600);
               }
@@ -302,7 +314,8 @@ export class BigPlannerComponent {
             }
           }
           this.eventCohorts = list;
-          this.cohortparticipantsList = participantsList;
+          this.cohortparticipantsList = participantsList
+            .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
         } else {
           this.guard.openSnackBar('No Cohorts found', 'OK', 600);
         }
@@ -456,7 +469,7 @@ export class BigPlannerComponent {
       var checkin = 0
       for (let i = 0; i < this.studioPairingList.length; i++) {
         const studio = this.studioPairingList[i];
-        let isDuplicated = this.isStuidoExist(this.studioPairingList , studio);
+        let isDuplicated = this.isStudioExist(this.studioPairingList , studio);
         const participantsActivityMap = studio['participantsactivity'] || {};
         if (studio["studioin"]) studioin += 1
         if (studio["checkin"]) checkin += 1
@@ -652,7 +665,7 @@ export class BigPlannerComponent {
     return returnData.map((e) => this.mapProfileData[e]);
   }
 
-  getDublicatedStudios() {
+  getDuplicatedStudios() {
     let duplicates = [];
     for (let studio of this.studioPairingList) {
       const participants = studio['participants'] || [];
@@ -674,7 +687,7 @@ export class BigPlannerComponent {
     return duplicates;
   }
 
-  isStuidoExist(studioPairingList , selectedStudio){
+  isStudioExist(studioPairingList , selectedStudio){
     let duplicated = false;
     for (let studio of studioPairingList) {
       
@@ -736,7 +749,7 @@ export class BigPlannerComponent {
   }
 
   assignRoles(){
-    const duplicates = this.getDublicatedStudios();
+    const duplicates = this.getDuplicatedStudios();
     if (duplicates.length > 0) {
       this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : duplicates});
       this.duplicateModelRef.afterClosed().subscribe((data)=>{
@@ -1010,6 +1023,10 @@ export class BigPlannerComponent {
 
   // hover card
   onEnter(event: MouseEvent, profileId: string, type: string) {
+    if (this.hoverHideTimer) {
+      clearTimeout(this.hoverHideTimer);
+      this.hoverHideTimer = null;
+    }
     const cards: CardData[] = [];
 
     switch (type) {
@@ -1057,34 +1074,53 @@ export class BigPlannerComponent {
         break;
     }
 
-    this.activeHoverCard = cards
+    this.activeHoverCard = cards;
+    this.hoverType = type as any;
+    this.hoverTitle = this.hoverTypeMeta[type]?.title || '';
+    this.hoverProfileName = this.mapProfile?.[profileId] || '';
     this.cardVisible = true;
-    this.position(event);
+    this.positionFromAnchor(event.currentTarget as HTMLElement);
   }
 
-  // hover card
-  onMove(event: MouseEvent) {
-    this.position(event);
-  }
-
-  // hover card
   onLeave() {
-    this.cardVisible = false;
-    this.activeHoverCard = null;
+    if (this.hoverHideTimer) clearTimeout(this.hoverHideTimer);
+    this.hoverHideTimer = setTimeout(() => {
+      this.cardVisible = false;
+      this.activeHoverCard = null;
+      this.hoverType = null;
+    }, 160);
   }
 
-  private position(event: MouseEvent) {
-    const gap = 12;
-    const tooltipWidth = 220;
-    const tooltipHeight = 100;
-
-    let x = event.clientX + gap;
-    let y = event.clientY - tooltipHeight / 2;
-
-    if (x + tooltipWidth > window.innerWidth - 8) {
-      x = event.clientX - tooltipWidth - gap;
+  onTooltipEnter() {
+    if (this.hoverHideTimer) {
+      clearTimeout(this.hoverHideTimer);
+      this.hoverHideTimer = null;
     }
-    if (y < 8) y = 8;
+  }
+
+  onTooltipLeave() {
+    this.onLeave();
+  }
+
+  hoverIcon(type: string | null): string {
+    return type ? this.hoverTypeMeta[type]?.icon || 'info' : 'info';
+  }
+
+  private positionFromAnchor(anchor: HTMLElement | null) {
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const gap = 10;
+    const tooltipWidth = 320;
+    const tooltipMaxHeight = 340;
+    const margin = 8;
+
+    let x = rect.left + rect.width / 2 - tooltipWidth / 2;
+    x = Math.max(margin, Math.min(x, window.innerWidth - tooltipWidth - margin));
+
+    let y = rect.bottom + gap;
+    if (y + tooltipMaxHeight > window.innerHeight - margin) {
+      y = Math.max(margin, rect.top - tooltipMaxHeight - gap);
+    }
 
     this.cardTooltipX = x;
     this.cardTooltipY = y;
