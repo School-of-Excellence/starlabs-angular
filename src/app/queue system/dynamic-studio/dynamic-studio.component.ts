@@ -1071,27 +1071,7 @@ export class DynamicStudioComponent {
           status: "live",
         })
         
-        // Create Live Assignment
         var liveassignmentid = doc(collection(this.firestore,'live assignment')).id
-        var liveassignmentData = {
-          docid: liveassignmentid,
-          pairing: result["participants"],
-          participantid: token['profile_id'],
-          stagename: invitation["stage"],
-          atcmodel: atcmodel,
-          // stagetype: diagnosticStage.includes(dropStage) ? "diagnostics" : consultationStage.includes(dropStage) ? "consultation" : ahStage.includes(dropStage) ? "ah" : reviewStage.includes(dropStage) ? "validation" : "changework",
-          status: 'live',
-          queueid: this.ongoingQueue["docid"],
-          created: serverTimestamp(),
-          // shadowperson: result["shadow"] ?? null
-          studioid: result["docid"],
-          participantsactivity: result["participantsactivity"], // From Studio Pairing
-          bonusactivity: result["bonusactivity"] ?? null, // Addition Activities
-          bonusactivityparticipant: result["bonusactivity"] != null && result["bonusactivity"] != undefined ? Object.keys(result["bonusactivity"]) : null
-        }
-        liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
-        await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
-        
         // Update Token
         var data = {
           previousstage: invitation["stage"],
@@ -1113,6 +1093,27 @@ export class DynamicStudioComponent {
         }
         var log = {...token, ...data}
         await this.updateQueueStage(log)
+
+        // Create Live Assignment
+        var liveassignmentData = {
+          docid: liveassignmentid,
+          pairing: result["participants"],
+          participantid: token['profile_id'],
+          stagename: invitation["stage"],
+          atcmodel: atcmodel,
+          // stagetype: diagnosticStage.includes(dropStage) ? "diagnostics" : consultationStage.includes(dropStage) ? "consultation" : ahStage.includes(dropStage) ? "ah" : reviewStage.includes(dropStage) ? "validation" : "changework",
+          status: 'live',
+          queueid: this.ongoingQueue["docid"],
+          created: serverTimestamp(),
+          // shadowperson: result["shadow"] ?? null
+          studioid: result["docid"],
+          participantsactivity: result["participantsactivity"], // From Studio Pairing
+          bonusactivity: result["bonusactivity"] ?? null, // Addition Activities
+          bonusactivityparticipant: result["bonusactivity"] != null && result["bonusactivity"] != undefined ? Object.keys(result["bonusactivity"]) : null
+        }
+        liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
+        await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
+        
         loading.close()
       }
     })
