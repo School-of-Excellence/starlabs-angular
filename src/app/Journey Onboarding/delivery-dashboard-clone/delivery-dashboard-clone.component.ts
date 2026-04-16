@@ -613,7 +613,6 @@ export class DeliveryDashboardCloneComponent {
 
     async applyDateFilter() {
         try {
-
             const groupedAll = {};
             const groupedFiltered = {};
             const groupedThisMonth = {};
@@ -632,15 +631,11 @@ export class DeliveryDashboardCloneComponent {
                 const status = item?.status?.toLowerCase?.() || null;
                 const profileId = item?.profileid;
                 const mode = this.mapMetaData?.[profileId]?.['participantmode']?.toLowerCase?.();
-
                 const totalPaid = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpaid'] ?? '0') || 0;
                 const totalPurchaseValue = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpurchasevalue'] ?? '0') || 0;
-
                 const totalBalance = totalPurchaseValue - totalPaid;
                 const minPayment = parseInt(item?.['minimumpayment']) || 0;
-
                 const isEligible = !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
-
                 const statusdate = item?.statusdate || {};
                 const tentativestart = item?.tentativestart || null;
 
@@ -676,6 +671,11 @@ export class DeliveryDashboardCloneComponent {
                     funnelData[productId].ongoing.push(item);
                 }
 
+                if (status === 'completed') {
+                    const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
+                    if (this.isDateInRange(completedDate)) funnelData[productId].completed.push(item);
+                }
+
                 if (isEligible) {
                     if (!status) {
                         funnelData[productId].awaiting.push(item);
@@ -685,10 +685,7 @@ export class DeliveryDashboardCloneComponent {
                     } else if (status === 'ongoing') {
                         const d = this.getDateFromFieldPublic(statusdate['ongoing']);
                         if (this.isDateInRange(d)) funnelData[productId].started.push(item);
-                    } else if (status === 'completed') {
-                        const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
-                        if (this.isDateInRange(completedDate)) funnelData[productId].completed.push(item);
-                    }
+                    } 
                 }
             }
 
