@@ -60,7 +60,7 @@ export class UpdateDeliveryComponent {
   eventform : FormGroup
   queueform : FormGroup
   fieldworkform : FormGroup
-  
+
   get formarray():FormArray{ return this.formform.get('formarray') as FormArray }
 
   values={
@@ -87,7 +87,7 @@ export class UpdateDeliveryComponent {
   flippingFor = ['MultiSelect','multicheckbox']
 
   keys = Object.keys(this.values)
-  value_f_t = Object.keys(this.values).filter(e => this.values[e])  
+  value_f_t = Object.keys(this.values).filter(e => this.values[e])
 
   // selectable = true;
   // removable = true;
@@ -100,8 +100,8 @@ export class UpdateDeliveryComponent {
   private firestore = inject(Firestore)
   private destroy$ = new Subject<void>()
   constructor(
-    @Inject(MAT_DIALOG_DATA) public dialogdata:any, 
-    public dialogRef: MatDialogRef<any>, 
+    @Inject(MAT_DIALOG_DATA) public dialogdata:any,
+    public dialogRef: MatDialogRef<any>,
     private formbuilder: FormBuilder,
     private _snackBar: MatSnackBar
   ){
@@ -195,13 +195,14 @@ export class UpdateDeliveryComponent {
                   required:[snap.data()['formarray'][i]['flippingquestion']['required'],]
                 }))
               }
-            }else if(snap.data()['formarray'][i].type = 'array'){
+            }else if(snap.data()['formarray'][i].type === 'array'){
               if(snap.data()['formarray'][i].array.length != 0){
                 this.formarray.at(i).patchValue({
                   fieldname : snap.data()['formarray'][i].fieldname,
                   type:snap.data()['formarray'][i].type,
                   fielddescription : [null,undefined].includes(snap.data()['formarray'][i]['fielddescription']) ? null : snap.data()['formarray'][i]['fielddescription'],
                   fieldnotes : [null,undefined].includes(snap.data()['formarray'][i]['fieldnotes']) ? null : snap.data()['formarray'][i]['fieldnotes'],
+                  maxitems: [null,undefined].includes(snap.data()['formarray'][i].maxitems) ? null : snap.data()['formarray'][i].maxitems,
                 })
                 for (let j = 0; j < snap.data()['formarray'][i].array.length; j++) {
                   const element = snap.data()['formarray'][i].array[j];
@@ -232,7 +233,7 @@ export class UpdateDeliveryComponent {
             docid: dialogdata.docid
           })
         })
-      } 
+      }
       else if(this.selectedType == "Events"){
         this.eventform.setValue({
           eventname: dialogdata.deliveryname,
@@ -455,7 +456,7 @@ export class UpdateDeliveryComponent {
       })
     }
   }
-  
+
   // Form Related Function start
 
   onTypeSelect(value,mainindex){
@@ -474,13 +475,14 @@ export class UpdateDeliveryComponent {
       options:[[],],
       maxcount:[null,],
       mincount:[null,],
+      maxitems:[null,],
       flipping:[false,],
       required:[false,],
       array:this.formbuilder.array([])
     })
   }
 
-  addarray(index){ 
+  addarray(index){
     // this.formarray.push(this.createFormarray())
     this.formarray.insert(index+1,this.createFormarray())
   }
@@ -503,12 +505,12 @@ export class UpdateDeliveryComponent {
   remove(i:number,j:number) {
     this.formarray.controls[i].get('options').value.splice(j,1)
   }
-​ 
+​
 
   getSubFormArray(mainindex):FormArray{
     return this.formarray.at(mainindex).get('array') as FormArray;
   }
-  
+
   newSubFormControl():FormGroup{
    return  this.formbuilder.group({
       fieldname:[null,{validators:[Validators.required],updateOn:"change"}],
@@ -594,7 +596,7 @@ export class UpdateDeliveryComponent {
       value['docid'] = docid
       console.log(value);
       const docRef = doc(this.firestore,col,docid)
-      setDoc(docRef,value,{merge:true}).then(()=>{
+      setDoc(docRef, this.stripUndefined(value), {merge:true}).then(()=>{
         console.log("Submitted");
         this.openSnackBar("Form Updated")
         // this.closeDialog()
@@ -603,6 +605,19 @@ export class UpdateDeliveryComponent {
         alert(err)
       })
     }
+  }
+  // Add this method to the class
+  private stripUndefined(obj: any): any {
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.stripUndefined(item));
+    } else if (obj !== null && typeof obj === 'object') {
+      return Object.fromEntries(
+        Object.entries(obj)
+          .filter(([_, v]) => v !== undefined)
+          .map(([k, v]) => [k, this.stripUndefined(v)])
+      );
+    }
+    return obj;
   }
   // Form Related Function End
 
@@ -629,8 +644,8 @@ export class UpdateDeliveryComponent {
       }).catch(err=>{
         this.loading = false
         alert(err)
-      }) 
-    } 
+      })
+    }
   }
   // report Related Function End
 }
