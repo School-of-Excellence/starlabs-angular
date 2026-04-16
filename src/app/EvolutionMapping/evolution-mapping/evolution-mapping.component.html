@@ -78,7 +78,7 @@
                 </ng-container>
                 <ng-container matColumnDef="Date">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Date </th>
-                    <td mat-cell *matCellDef="let row"> {{row.recordeddate.toDate() | date: 'MMM d, yyyy'}} </td>
+                    <td mat-cell *matCellDef="let row"> {{row.recordeddate ? (row.recordeddate.toDate() | date: 'MMM d, yyyy') : '-'}} </td>
                 </ng-container>
                 <ng-container matColumnDef="Edit">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Edit </th>
