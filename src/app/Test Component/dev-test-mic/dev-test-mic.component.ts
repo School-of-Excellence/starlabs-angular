@@ -57,6 +57,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
   rawUrl: string | null = null;
   df3Url: string | null = null;
   koalaUrl: string | null = null;
+  recordingTimestamp = '';
 
   // ── DF3 energy measurement ────────────────────────────────────────────────
   private analysisCtx: AudioContext | null = null;
@@ -188,7 +189,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
   }
 
   /** Resample a Float32Array from srcRate → 48000 Hz using OfflineAudioContext. */
-  private async resampleTo48k(pcm: Float32Array, srcRate: number): Promise<Float32Array> {
+  private async resampleTo48k(pcm: Float32Array<ArrayBuffer>, srcRate: number): Promise<Float32Array<ArrayBuffer>> {
     const targetRate = 48000;
     const targetLength = Math.ceil(pcm.length * targetRate / srcRate);
     const offCtx = new OfflineAudioContext(1, targetLength, targetRate);
@@ -199,7 +200,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     src.connect(offCtx.destination);
     src.start(0);
     const rendered = await offCtx.startRendering();
-    return rendered.getChannelData(0);
+    return rendered.getChannelData(0) as Float32Array<ArrayBuffer>;
   }
 
   /**
@@ -275,12 +276,12 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
       : 'Loading Koala model (~3.8 MB) from GitHub…';
 
     try {
-      // Keep browser echo cancellation ON for live preview — without it the
-      // Audio element playing through speakers feeds directly back into the mic,
-      // creating a feedback loop / echo that never stops. EC is safe here because
-      // DF3 handles the actual noise; we just need the browser to prevent mic↔speaker loop.
+      // Matches JoinOpenviduCallComponent (prepareNoiseCancelledTrack) exactly:
+      // echoCancellation: true  — browser AEC on, prevents mic↔speaker feedback loop
+      // noiseSuppression: false — DF3 handles noise, browser NS disabled
+      // autoGainControl: false  — DF3 uses fixed ×1.5 gainBoost, browser AGC would fight it
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 }
       });
     } catch {
       this.status = 'live-error';
@@ -373,7 +374,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     // 1. Get mic
     try {
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 }
       });
     } catch {
       this.status = 'error';
@@ -420,16 +421,26 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     this.setupAnalysers();
 
     // 7. Set up MediaRecorders for raw + DF3
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    // RAW — prefer PCM (lossless, no codec loss) so the reference track is truly unprocessed.
+    // Falls back to high-bitrate Opus (256 kbps) on browsers that don't support WebM PCM.
+    const rawMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=pcm')
+      ? 'audio/webm;codecs=pcm'
+      : 'audio/webm;codecs=opus';
+    const rawRecorderOptions: MediaRecorderOptions = rawMimeType === 'audio/webm;codecs=opus'
+      ? { mimeType: rawMimeType, audioBitsPerSecond: 256_000 }
+      : { mimeType: rawMimeType };
+
+    // DF3 — Opus is appropriate; compressed delivery matches the LiveKit production path.
+    const df3MimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus' : 'audio/mp4';
 
     this.rawChunks = [];
     this.df3Chunks = [];
 
-    this.rawRecorder = new MediaRecorder(this.micStream, { mimeType });
+    this.rawRecorder = new MediaRecorder(this.micStream, rawRecorderOptions);
     this.rawRecorder.ondataavailable = e => { if (e.data.size > 0) this.rawChunks.push(e.data); };
 
-    this.df3Recorder = new MediaRecorder(this.df3Stream, { mimeType });
+    this.df3Recorder = new MediaRecorder(this.df3Stream, { mimeType: df3MimeType });
     this.df3Recorder.ondataavailable = e => { if (e.data.size > 0) this.df3Chunks.push(e.data); };
 
     const rawDone = new Promise<void>(r => { this.rawRecorder!.onstop = () => r(); });
@@ -449,7 +460,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
       : 'Recording Raw + DF3 simultaneously (Koala skipped)… click Stop when done.';
 
     await Promise.all([rawDone, df3Done]);
-    this.finalizeRecording(mimeType, koalaOk);
+    this.finalizeRecording(rawMimeType, df3MimeType, koalaOk);
   }
 
   stopABCRecording(): void {
@@ -462,14 +473,16 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     this.statusMessage = 'Finalising recordings…';
   }
 
-  private finalizeRecording(mimeType: string, koalaOk: boolean): void {
+  private finalizeRecording(rawMimeType: string, df3MimeType: string, koalaOk: boolean): void {
     const duration = parseFloat(((Date.now() - this.recordingStartTime) / 1000).toFixed(1));
 
-    // Raw player
-    this.rawUrl = URL.createObjectURL(new Blob(this.rawChunks, { type: mimeType }));
+    this.recordingTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-    // DF3 player
-    this.df3Url = URL.createObjectURL(new Blob(this.df3Chunks, { type: mimeType }));
+    // Raw player — PCM or high-bitrate Opus depending on browser support
+    this.rawUrl = URL.createObjectURL(new Blob(this.rawChunks, { type: rawMimeType }));
+
+    // DF3 player — Opus
+    this.df3Url = URL.createObjectURL(new Blob(this.df3Chunks, { type: df3MimeType }));
 
     // Koala player (only if Koala was active)
     this.koalaUrl = koalaOk

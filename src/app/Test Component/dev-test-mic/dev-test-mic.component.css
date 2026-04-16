@@ -391,6 +391,25 @@ audio {
   flex-wrap: wrap;
 }
 
+.btn-download-audio {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: #1d4ed8;
+  border: 1.5px solid #1d4ed8;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-download-audio:hover {
+  background: #1d4ed8;
+  color: #fff;
+}
+
 .btn-download {
   background: #1d4ed8;
   color: #fff;
