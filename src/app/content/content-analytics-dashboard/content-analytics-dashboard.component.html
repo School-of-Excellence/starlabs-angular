@@ -77,14 +77,19 @@
         </div>
 
         <div class="kpi-grid">
-            <div class="kpi-card" (click)="openCards('uniqueusers')">
-                <div class="kpi-label">Unique Users</div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Period</div>
+                <div class="kpi-value" style="color:rgb(7, 233, 222)">{{ totalDays  }} Days</div>
+            </div>
+            <div class="kpi-card" (click)="openDialog('uniqueusers')" style="cursor:pointer">
+                <div class="kpi-label" >Unique Users</div>
                 <div class="kpi-value" style="color:#93C5FD">{{totalUniqueUsers}}
                 </div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Total Hours</div>
-                <div class="kpi-value" style="color:#6EE7B7">{{convertToHours(totalWatchHours)?.toFixed(0)}}h</div>
+                <div class="kpi-label">Content Consumption </div>
+                <div class="kpi-value" style="color:#4ac292">{{convertHoursMins(totalWatchHours)}}</div>
             </div>
             <!-- <div class="kpi-card">
                 <div class="kpi-label">Sessions</div>
@@ -94,17 +99,17 @@
                 <div class="kpi-label">Unique Videos</div>
                 <div class="kpi-value" style="color:#FCD34D">{{totalUniueContents}}</div>
             </div>
-            <div class="kpi-card" (click)="openCards('superfans')">
+            <div class="kpi-card" (click)="openDialog('superfans')" style="cursor:pointer">
                 <div class="kpi-label">SuperFans</div>
                 <div class="kpi-value" style="color:#FCA5A5">{{getSuperFans()?.length}}
                 </div>
             </div>
-            <div class="kpi-card" (click)="openCards('atrisk')">
+            <div class="kpi-card" (click)="openDialog('atrisk')" style="cursor:pointer">
                 <div class="kpi-label">At Risk</div>
                 <div class="kpi-value" style="color:#FCA5A5">
                     {{getAtRiskParticipants()?.length}}</div>
             </div>
-            <div class="kpi-card" (click)="openCards('risingfans')">
+            <div class="kpi-card" (click)="openDialog('risingfans')" style="cursor:pointer">
                 <div class="kpi-label">Rising Fans</div>
                 <div class="kpi-value" style="color:#C4B5FD">
                     {{getRaisingFans()?.length}}</div>
@@ -326,7 +331,7 @@
                 <div class="opp-icon">🎯</div>
                 <div class="opp-title">SolarVoice</div><span class="sm-tag"
                     style="background:rgba(252,211,77,0.18);color:#FCD34D;border:1px solid rgba(252,211,77,0.28)"
-                    (click)="openCards('onlysolarvoice')">{{getProfilesOnlyWatchSolarVoice().length}}</span>
+                    (click)="openDialog('onlysolarvoice')">{{getProfilesOnlyWatchSolarVoice().length}}</span>
                 <!-- <p class="opp-desc">160 SolarVoice users who have never touched Eiflix. Warm, high-intent, already trust
                     the
                     platform.</p>
@@ -338,7 +343,7 @@
                 <div class="opp-icon">🔄</div>
                 <div class="opp-title">Eiflix</div><span class="sm-tag"
                     style="background:rgba(147,197,253,0.18);color:#93C5FD;border:1px solid rgba(147,197,253,0.28)"
-                    (click)="openCards('onlyeiflix')">{{getProfilesOnlyWatchEifilx().length}}</span>
+                    (click)="openDialog('onlyeiflix')">{{getProfilesOnlyWatchEifilx().length}}</span>
                 <!-- <p class="opp-desc">78 Eiflix-only users who have never explored SolarVoice. GONG Trance or Crossover
                     could
                     double their time.</p>
@@ -776,39 +781,32 @@
 
     </div><!-- /dashboard-root -->
 
-    <div class="side-panel">
-        <div class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
-        <div class="rp-side-panel" [class.rp-side-panel-open]="sidePanelOpen">
-            <div class="rp-side-panel-header">
-                <h3 class="rp-side-panel-title">{{ sidePanelTitle }}</h3>
-                <!-- <button mat-icon-button class="close-button" (click)="sendWatti()">
-        <i class="fa-brands fa-whatsapp"></i>
-    </button>
-    <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
-        <mat-icon>notifications_active</mat-icon>
-    </button> -->
-                <div style="display:flex;gap:15px;align-items:center;">
-                    <button mat-stroked-button (click)="exportPanelData()">Export</button>
-                    <button mat-icon-button class="close-button" (click)="closeSidePanel()">
+    <!-- Dialogbox -->
+
+        <div class="dialog" *ngIf="dialogOpen">
+            <div class="dialog-header">
+                <h3 class="dialog-title">{{ dialogTitle }}</h3>
+                <div class="dialog-actions">
+                    <button mat-stroked-button (click)="exportdialogData()">Export</button>
+                    <button mat-icon-button (click)="closedialog()">
                         <mat-icon>close</mat-icon>
                     </button>
                 </div>
             </div>
-            <div class="rp-side-panel-count">{{ sidePanelProfiles.length }} profiles</div>
-            <div class="rp-side-panel-body">
-                <div class="rp-side-panel-item" *ngFor="let p of sidePanelProfiles">
-                    <span class="rp-cell-text">{{ p?.name }}</span>
-                    <!-- <span *ngIf="p.percentage !== undefined" class="rp-chip">
-        {{ p.percentage }}%
-      </span> -->
-                    <!-- <span class="rp-chip" [class.rp-chip-yes]="p.completed" [class.rp-chip-no]="!p.completed">
-        {{ p.completed ? 'Completed' : 'Pending' }}
-      </span> -->
+        
+            <div class="dialog-count">{{ dialogProfiles.length }} profiles</div>
+        
+            <div class="dialog-body">
+                <div class="dialog-item" *ngFor="let p of dialogProfiles">
+                    <div class="dialog-avatar">
+                        {{ p?.name?.charAt(0)?.toUpperCase() }}
+                    </div>
+                    <span class="dialog-name">{{ p?.name }}</span>
                 </div>
-                <div *ngIf="sidePanelProfiles.length === 0" class="rp-empty" style="padding:32px 0;">
+        
+                <div *ngIf="dialogProfiles.length === 0" class="rp-empty">
                     <mat-icon>person_off</mat-icon>
                     <p>No profiles found</p>
                 </div>
             </div>
         </div>
-    </div>

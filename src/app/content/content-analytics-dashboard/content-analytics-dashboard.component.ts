@@ -200,6 +200,12 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   totalRisingFans = 0;
   pickerOpen = false;
   initialLoaded = false;
+  
+  // total content comsumption 
+  uniqueUserContentConsumptionbyhours:any = 0;
+
+  //period
+  totalDays: number = 0;
 
   // tabel columns
   participantTableColumns = ['rank', 'participant', 'type', 'mode', 'source', 'hours', 'days', 'completion', 'sessions', 'playlists']
@@ -211,10 +217,10 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   contentTableDataSource = new MatTableDataSource<ContentMapInterface>();
   playListTableDateSource = new MatTableDataSource<Partial<PlayListMix>>();
 
-  // side panel
-  sidePanelOpen = false;
-  sidePanelTitle = '';
-  sidePanelProfiles = [];
+  // dialog box
+  dialogOpen = false;
+  dialogTitle = '';
+  dialogProfiles = [];
 
   // loading status
   isLoading = true;
@@ -278,6 +284,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     this.startDate.setValue(start);
     this.endDate.setValue(end);
 
+    this.totalDays = this.getTotalDays(start, end);
   }
 
   // function to check loading status of screen
@@ -1240,6 +1247,10 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   }
 
   applyDateRangeFilter() {
+    const start = this.startDate.value;
+    const end = this.endDate.value;
+    this.totalDays = this.getTotalDays(start,end);
+
     this.ngOnDestroy();
     this.fetchContentAnalytics();
     this.fetchRecommendedMixPlayList();
@@ -1497,7 +1508,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   getParticipantActivePlatforms(p: ParticipantContentMapInterface) {
     const platforms = p.activePlatforms;
     return [...platforms.values()]
-  }
+  } 
 
   // getCompletionRateForContent(c: ContentMapInterface): number {
   //   const profiles = Array.from(c.profileid.values());
@@ -1549,8 +1560,18 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     return seconds / 3600
   }
 
+  convertHoursMins(seconds: number){
+    const hours = Math.floor(seconds / 3600);
+    const remainingSecondsAfterHours = seconds % 3600;
+
+    const minutes= Math.floor(remainingSecondsAfterHours / 60);
+    const remainingSeconds = remainingSecondsAfterHours % 60;
+    
+    return `${hours} Hours ${minutes} Mins ${remainingSeconds} Secs`  
+  }
+
   // function to open side panel for cards
-  openCards(type: string) {
+  openDialog(type: string) {
     let data = [];
     let title = ''
 
@@ -1584,7 +1605,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
         break;
     }
 
-    this.openSidePanel(title, data)
+    this.openDialogBox(title, data)
   }
 
   // function to open side panel for platform comaparision
@@ -1599,7 +1620,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
       title = platform;
     }
 
-    this.openSidePanel(title, data)
+    this.openDialogBox(title, data)
   }
 
   // function to open side panel for playlist table
@@ -1607,7 +1628,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     let data: string[] = Array.from(playlist[type]?.values() || []);
     let title = `Playlist ${playlist.title}`;
 
-    this.openSidePanel(title, data);
+    this.openDialogBox(title, data);
   }
 
   // function to open side panel for content table
@@ -1615,12 +1636,16 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     let data: string[] = Array.from(content[type]?.values() || []);
     let title = `Content ${content.contentname}`;
 
-    this.openSidePanel(title, data);
+    this.openDialogBox(title, data);
   }
 
   // function to handle export in side panel
-  exportPanelData() {
-    const exportData = this.sidePanelProfiles.map((p) => ({
+  exportdialogData() {
+    if (this.dialogProfiles.length === 0) {
+    alert('No data');
+    return; 
+  }
+    const exportData = this.dialogProfiles.map((p) => ({
       'Name': p['name'] || 'N/A',
       'Email': p['email'] || 'N/A',
     }))
@@ -1635,15 +1660,15 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
 
   // function to open side panel
-  openSidePanel(title: string, profileid: string[]) {
-    this.sidePanelOpen = true;
-    this.sidePanelTitle = title;
-    this.sidePanelProfiles = profileid.map((p) => this.participantMetaDataMap[p]);
-  }
+  openDialogBox(title: string, profileid: string[]) {
+  this.dialogOpen = true;
+  this.dialogTitle = title;
+  this.dialogProfiles = profileid.map((p) => this.participantMetaDataMap[p]);
+}
 
   // function to close panel
-  closeSidePanel() {
-    this.sidePanelOpen = false;
+  closedialog() {
+    this.dialogOpen = false;
   }
 
   // helper function to get initial for participant
@@ -1774,4 +1799,17 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     this.startDate.reset();
     this.endDate.reset();
   }
+
+  getTotalDays(startDate: Date, endDate: Date): number {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    return diffDays;
+  }
+
 }
+
+

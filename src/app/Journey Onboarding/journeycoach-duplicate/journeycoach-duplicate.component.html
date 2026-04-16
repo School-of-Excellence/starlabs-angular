@@ -51,7 +51,7 @@
 
     <!-- days Filter -->
 
-   <input class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='days'"type="text"placeholder="Enter days(1-60)" [(ngModel)]="daysInput"max="60"(input)="onDaysChange()">
+   <input class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='days'"type="texts"placeholder="Enter days(1-60)" [(ngModel)]="daysInput"max="60"(input)="onDaysChange()">
     <button class="jcd-filter"  [disabled]="!daysInput" (click)="onDateFilterClick('days')"> + </button>
 
 
