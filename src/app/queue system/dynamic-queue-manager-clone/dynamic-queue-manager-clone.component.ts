@@ -213,6 +213,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private liveQueueSubscription = new Subject<void>();
   private storage = inject(Storage);
 
+  pendingInvitationTokenIds: Set<string> = new Set();
+
   showMoveMenu: { [key: string]: boolean } = {};
   showTokenMenu: { [key: string]: boolean } = {};
   showVariationSubmenu = false;
@@ -534,6 +536,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     );
 
     return productNames.join('\n');
+  }
+
+  hasPendingInvitation(token: any): boolean {
+    return !!token?.docid && this.pendingInvitationTokenIds.has(token.docid);
   }
 
   getTokenHighlight(profileId: string): 'orange' | 'none' {
@@ -1713,6 +1719,24 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       if (count >= 6) {
         loading.close()
       }
+    })
+
+    this.pendingInvitationTokenIds = new Set();
+    collectionData(query(
+      collection(this.firestore, "studioinvitation"),
+      where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue["docid"])),
+      where("clientresponse", "==", null)
+    )).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(invitations => {
+      const now = Date.now();
+      this.pendingInvitationTokenIds = new Set(
+        invitations
+          .filter(inv => {
+            const expiry = inv['expirydate']?.toDate ? inv['expirydate'].toDate() : inv['expirydate'];
+            return !expiry || expiry.getTime() >= now;
+          })
+          .map(inv => inv['tokenref']?.id)
+          .filter(id => !!id)
+      );
     })
 
     // collectionData(query(collection(this.firestore, "queue generation", this.selectedQueue['docid'], "stagechat"), where("senderprofileid", '==', this.profileid), where("pinned", '==', true), orderBy("date", "desc")), { idField: 'id' }).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(async snap => {

@@ -328,6 +328,35 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  getSelectedContentUrlIds(): string[] {
+    return this.contentUrls.controls
+      .map(c => c.get('docId')?.value)
+      .filter(Boolean);
+  }
+
+  onTcMultiSelect(ids: string[]): void {
+    const cuArr = this.contentUrls;
+    while (cuArr.length) cuArr.removeAt(0);
+    ids.filter(Boolean).forEach(id => {
+      const opt = this.contentUrlOptions.find(o => o.id === id);
+      cuArr.push(this.newContentUrl({
+        docId: id,
+        path: `content_urls/${id}`,
+        title: opt?.title ?? '',
+        thumbnailUrl: opt?.thumbnailUrl ?? '',
+      }));
+    });
+    this.cdr.markForCheck();
+  }
+
+  dropContentUrls(event: CdkDragDrop<string[]>): void {
+    const arr = this.contentUrls;
+    const ctrl = arr.at(event.previousIndex);
+    arr.removeAt(event.previousIndex);
+    arr.insert(event.currentIndex, ctrl);
+    this.cdr.markForCheck();
+  }
+
   isScreen(name: string): boolean {
     return this.currentScreen === name;
   }

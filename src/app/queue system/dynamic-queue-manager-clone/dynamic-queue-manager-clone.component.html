@@ -1223,7 +1223,8 @@
                     'example-box-defaulted': ['defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true,
                     'example-box': !['locked', 'defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) || (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] != true,
                     'current-match-scroll-target': isCurrentMatch(token),
-                    'priority-orange': getTokenHighlight(token.profile_id) === 'orange'
+                    'priority-orange': getTokenHighlight(token.profile_id) === 'orange',
+                    'token-pending-invitation': column.type === 'Waiting' && hasPendingInvitation(token)
                   }" *ngFor="let token of getDisplayedTokens(column); let tokenIndex = index">
                   <div class="token-content">
                     <!-- Move Menu Wrapper -->
