@@ -162,43 +162,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return 'grid';  // 3+ participants = grid
   });
 
-  spotlightMain = computed(() => {
-    const remotes = this.returnRemoteVideoTracks();
 
-    if (this.screenShareTrack()) {
-      const sharerId = this.screenShareParticipantId();
-      const sharer = remotes.find(r => r.participantIdentity === sharerId);
-      return {
-        type: 'screen' as const,
-        mediaStream: this.screenShareTrack()?.mediaStream || null,
-        participantId: sharerId,
-        participantName: sharer?.participantName || 'Screen'
-      };
-    }
-
-    const remote = remotes[0];
-    if (remote) {
-      return {
-        type: 'remote' as const,
-        mediaStream: remote.trackPublication.videoTrack?.mediaStream || null,
-        participantId: remote.participantIdentity,
-        participantName: remote.participantName
-      };
-    }
-
-    return null;
-  });
-
-  spotlightPip = computed(() => {
-    return {
-      type: 'local' as const,
-      mediaStream: this.localVideoStream(),
-      participantId: 'local',
-      participantName: 'You'
-    };
-  });
-
-  // Filmstrip scroll state
+  // scroll state
   @ViewChild('filmstripContainer') filmstripContainer!: ElementRef<HTMLDivElement>;
   canScrollLeft = false;
   canScrollRight = false;
@@ -1264,8 +1229,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     setTimeout(() => { this.isDragging = false; }, 50);
   }
 
-  togglePipSize() {
-    this.videoLayout.togglePipSize();
+  togglePipSize(): void {
+    if (!this.isDragging) {
+      this.videoLayout.togglePipSize();
+    }
   }
 
   // ── Grid tile click → switch to spotlight ──────────────────────────────
