@@ -171,11 +171,13 @@ export class BigCohortClone2Component {
     return !!this.selectedMarathon
       || (this.selectedAcceleratorEvent?.length || 0) > 0
       || (this.selectedQueueEvent?.length || 0) > 0
+      || (this.selectedZoneEvent?.length || 0) > 0
       || this.statusFilter !== 'all'
       || this.categoryFilter !== 'all'
       || this.typeFilter !== 'all'
       || (this.selectedTags?.length || 0) > 0
   }
+
   clearAllFilters(): void {
     if (this.selectedMarathon) this.toggleMarathonSelection?.(this.selectedMarathon)
     this.clearEventSelection?.()
@@ -183,6 +185,7 @@ export class BigCohortClone2Component {
     this.setStatusFilter?.('all')
     this.setCategoryFilter?.('all')
     this.setTypeFilter?.('all')
+    this.clearZoneSelection?.();
     ;(this as any).clearTagSelection?.()
   }
 
@@ -205,6 +208,15 @@ export class BigCohortClone2Component {
   filteredAcceleratorEventList: any[] = []
   searchableEventList: any[] = []
 
+  zoneEventEventList: any[] = []
+  filteredZoneEventList: any[] = []
+  searchableZoneEventList: any[] = []
+  selectedZoneEvent: string[] = []
+  zoneDropdownOpen: boolean = false
+  zoneSearchQuery: string = ''
+  mapZoneData: { [zoneId: string]: any } = {}
+  zoneMappedCohortIds: Set<string> = new Set()
+
   mapProfile: any = {}
   mapParticipantMetaData = {};
   contentview = 'participants'
@@ -212,7 +224,8 @@ export class BigCohortClone2Component {
   selectedAcceleratorEvent: string[] = []
   mapMarathon: any = {}
   mapAcceleratorEvent: any = {}
-  mapBigCohortsToAssignment: any = {}
+  mapBigCohortsToAssignment: any = {};
+  mapZoneEvent: any = {};
 
   mapBigAssignment: any = {}
   private subscription = new Subject<void>();
@@ -301,6 +314,7 @@ export class BigCohortClone2Component {
   // LocalStorage keys
   private readonly STORAGE_KEY_QUEUE = 'big_cohort_selected_queue';
   private readonly STORAGE_KEY_EVENT = 'big_cohort_selected_event';
+  private readonly STORAGE_KEY_ZONE = 'big_cohort_selected_zone';
 
   private destroy$ = new Subject<void>()
   private storage = inject(Storage)
@@ -362,6 +376,22 @@ export class BigCohortClone2Component {
       // Patch saved event selections
       this.patchSavedEventSelections();
       this.toRunFilterFunctions()
+    });
+
+    getDocs(collection(this.firestore, 'event zones')).then((zones) => {
+      this.zoneEventEventList = zones.docs.map((e) => {
+        let element: any = e.data();
+        element['ref'] = e.ref;
+        element['docid'] = element['docid'] || e.id;
+        this.mapZoneEvent[e.ref.id] = element['name'];
+        this.mapZoneData[e.ref.id] = element;
+        return element;
+      });
+      this.filteredZoneEventList = [...this.zoneEventEventList];
+      this.searchableZoneEventList = [...this.zoneEventEventList];
+
+      // Patch saved zone selections
+      this.patchSavedZoneSelections();
     });
 
     let collectionName = "participant metadata"
@@ -431,12 +461,16 @@ export class BigCohortClone2Component {
     try {
       const savedQueue = localStorage.getItem(this.STORAGE_KEY_QUEUE);
       const savedEvent = localStorage.getItem(this.STORAGE_KEY_EVENT);
-      
+      const savedZone = localStorage.getItem(this.STORAGE_KEY_ZONE);
+
       if (savedQueue) {
         this.selectedQueueEvent = JSON.parse(savedQueue);
       }
       if (savedEvent) {
         this.selectedAcceleratorEvent = JSON.parse(savedEvent);
+      }
+      if (savedZone) {
+        this.selectedZoneEvent = JSON.parse(savedZone);
       }
     } catch (e) {
       console.error('Error loading saved selections:', e);
@@ -1431,6 +1465,11 @@ export class BigCohortClone2Component {
         );
       }
 
+      let zoneMatch = true;
+      if (this.selectedZoneEvent.length > 0) {
+        zoneMatch = this.zoneMappedCohortIds.has(e['docid']);
+      }
+
       let searchMatch = true;
       const cohortSearchTerm = this.cohortSearchQuery?.toLowerCase().trim() || '';
       const participantSearchTerm = this.participantSearchQuery?.toLowerCase().trim() || '';
@@ -1450,7 +1489,7 @@ export class BigCohortClone2Component {
         searchMatch = hasMatchingParticipant;
       }
 
-      return marathonMatch && eventMatch && statusMatch && categoryMatch && typeMatch && temporaryMatch && tagMatch && searchMatch;
+      return marathonMatch && eventMatch && statusMatch && categoryMatch && typeMatch && temporaryMatch && tagMatch && zoneMatch && searchMatch;
     });
 
     this.filteredCohortsList = filtered;
@@ -2432,5 +2471,87 @@ export class BigCohortClone2Component {
     }else{
       console.log('Not Deleted');
     }
+  }
+
+  saveZoneSelection() {
+    try {
+      localStorage.setItem(this.STORAGE_KEY_ZONE, JSON.stringify(this.selectedZoneEvent));
+    } catch (e) {
+      console.error('Error saving zone selection:', e);
+    }
+  }
+
+  patchSavedZoneSelections() {
+    if (this.selectedZoneEvent.length > 0) {
+      this.selectedZoneEvent = this.selectedZoneEvent.filter(id =>
+        this.zoneEventEventList.some(z => z.ref?.id === id || z.docid === id)
+      );
+      if (this.selectedZoneEvent.length > 0) {
+        this.updateZoneMappedCohortIds();
+        this.onFilter();
+      }
+    }
+  }
+
+  updateZoneMappedCohortIds() {
+    this.zoneMappedCohortIds = new Set<string>();
+    this.selectedZoneEvent.forEach(zoneId => {
+      const zone = this.mapZoneData[zoneId];
+      if (zone && Array.isArray(zone['cohorts'])) {
+        zone['cohorts'].forEach((cid: string) => {
+          if (cid) this.zoneMappedCohortIds.add(cid);
+        });
+      }
+    });
+  }
+
+  onZoneSearch() {
+    const query = this.zoneSearchQuery.toLowerCase().trim();
+    if (!query) {
+      this.searchableZoneEventList = [...this.zoneEventEventList];
+    } else {
+      this.searchableZoneEventList = this.zoneEventEventList.filter(z =>
+        (z['name'] || '').toLowerCase().includes(query)
+      );
+    }
+  }
+
+  toggleZoneSelection(zoneId: string) {
+    if (!zoneId) return;
+    const index = this.selectedZoneEvent.indexOf(zoneId);
+    if (index === -1) {
+      this.selectedZoneEvent.push(zoneId);
+    } else {
+      this.selectedZoneEvent.splice(index, 1);
+    }
+    this.saveZoneSelection();
+    this.updateZoneMappedCohortIds();
+    this.onFilter();
+  }
+
+  clearZoneSelection() {
+    this.selectedZoneEvent = [];
+    this.zoneSearchQuery = '';
+    this.searchableZoneEventList = [...this.zoneEventEventList];
+    this.saveZoneSelection();
+    this.updateZoneMappedCohortIds();
+    this.onFilter();
+  }
+
+  onZoneDropdownOpen() {
+    this.zoneSearchQuery = '';
+    this.searchableZoneEventList = [...this.zoneEventEventList];
+  }
+
+  getSelectedZoneNames(): string {
+    if (this.selectedZoneEvent.length === 0) {
+      return 'Select Zone';
+    }
+    const names = this.selectedZoneEvent
+      .map(id => this.mapZoneData[id]?.['name'] || this.mapZoneEvent[id])
+      .filter(Boolean);
+    if (names.length === 1) return names[0];
+    if (names.length > 1) return `${names[0]} +${names.length - 1}`;
+    return 'Select Zone';
   }
 }
