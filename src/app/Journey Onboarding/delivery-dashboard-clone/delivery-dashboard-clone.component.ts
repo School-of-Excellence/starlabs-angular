@@ -2185,6 +2185,8 @@ export class DeliveryDashboardCloneComponent {
                 .subscribe(async (appointmentsSnap: any[]) => {
                     this.allAppointments = [...appointmentsSnap];
 
+                    console.log("all appointments", this.allAppointments);
+
                     if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
 
                     this.loadingStates.appointments = true;
