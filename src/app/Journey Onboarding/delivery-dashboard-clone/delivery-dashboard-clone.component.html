@@ -64,8 +64,8 @@
             <span class="badge-label">Eligible</span>
           </div>
           <div class="badge noteligible clickable"
-            (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
-            <span class="badge-num">{{ notEligible?.length || 0 }}</span>
+            (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
+            <span class="badge-num">{{ getCardGroupedNotEligible(cardId).length | number }}</span>
             <span class="badge-label">Not Eligible</span>
           </div>
         </div>
@@ -269,6 +269,24 @@
               <span>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</span>
               <span class="status-tag" [ngClass]="item['status']?.toLowerCase() || 'na'">{{ item['status'] || 'N/A'
                 }}</span>
+              <span *ngIf="
+  excludedModes.has(
+    (mapMetaData[pid]?.['participantmode'] || '')
+      .trim()
+      .toLowerCase()
+  )
+">
+                Mode: {{ mapMetaData[pid]?.['participantmode'] || pid }}
+              </span>
+
+              <span *ngIf="!(
+              ( (mapMetaData[pid]?.['pp_totalpurchasevalue'] || 0) 
+              - (mapMetaData[pid]?.['pp_totalpaid'] || 0) ) <= 0 
+              || 
+              (mapMetaData[pid]?.['pp_totalpaid'] || 0) >= (item?.['minimumpayment'] || 0)
+            )">
+                Min Payment: {{ item?.['minimumpayment'] || 0 | number:'1.0-0' }}
+              </span>
             </div>
           </div>
         </div>
@@ -571,403 +589,407 @@
             </span>
           </div>
 
-        <div class="col-body">
-          <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
-            <div class="card" *ngFor="let c of filteredCardsMap[i]" [class.card-expanded]="c._expanded">
+          <div class="col-body">
+            <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
+              <div class="card" *ngFor="let c of filteredCardsMap[i]" [class.card-expanded]="c._expanded">
 
-              <!-- Visible Card -->
-              <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
-                <div class="card-info">
-                  <div class="card-name">
-                    {{ mapMetaData[c.profileid]?.name }}
+                <!-- Visible Card -->
+                <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
+                  <div class="card-info">
+                    <div class="card-name">
+                      {{ mapMetaData[c.profileid]?.name }}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- Status -->
-              <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
-                {{ c.status || 'NOT INITIATED' }}
-              </span>
-
-              <!-- Active Appointment Detail -->
-              <div class="detail-row" (click)="toggleExpand(c, i)">
-                <span>
-                  <span class="detail-label">
-                    {{ showActiveStage(c) }}
-                  </span>
-                  <span class="detail-val">
-                    {{ showParticipantActiveDate(c) }}
-                  </span>
+                <!-- Status -->
+                <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
+                  {{ c.status || 'NOT INITIATED' }}
                 </span>
-                <span class="chevron" [class.open]="c._expanded">
-                </span>
-              </div>
 
-              <!-- Expandable Section -->
-              <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
-                <hr class="divider">
-                <ng-container>
-                  <div class="d-flex justify-content-between align-items-center mb-2" *ngFor="let stage of stages">
-                    <ng-container *ngIf="getAppointmentByStage(stage, c?.allappointments) as appointment">
-                      <div>
-                        <div class="detail-stage-label text-muted">
-                          {{ stage }}
-                        </div>
-                        <div class="" *ngIf="appointment?.starttime">
-                          <span class="detail-stage-label">Start: </span>
-                          <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
-                        </div>
-                        <div class="" *ngIf="appointment?.endtime">
-                          <span class="detail-stage-label">End: </span>
-                          <span class="detail-stage-label">{{ formatDateTime(appointment?.endtime) }}</span>
-                        </div>
-                        <div class="" *ngIf="appointment?.date">
-                          <span class="detail-stage-label">Submitted: </span>
-                          <span class="detail-stage-label">{{ formatDateTime(appointment?.date) }}</span>
-                        </div>
-                      </div>
-                      <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
-                        {{ getAppointmentStatus(stage, appointment) }}
-                      </div>
+                <!-- Active Appointment Detail -->
+                <div class="detail-row" (click)="toggleExpand(c, i)">
+                  <span>
+                    <span class="detail-label">
+                      {{ showActiveStage(c) }}
+                    </span>
+                    <span class="detail-val">
+                      {{ showParticipantActiveDate(c) }}
+                    </span>
+                  </span>
+                  <span class="chevron" [class.open]="c._expanded">
+                  </span>
+                </div>
 
-                    </ng-container>
-                    <ng-container *ngIf="!getAppointmentByStage(stage, c?.allappointments)">
-                      <div>
-                        <div class="detail-stage-label text-muted">
-                          {{ stage }}
+                <!-- Expandable Section -->
+                <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
+                  <hr class="divider">
+                  <ng-container>
+                    <div class="d-flex justify-content-between align-items-center mb-2" *ngFor="let stage of stages">
+                      <ng-container *ngIf="getAppointmentByStage(stage, c?.allappointments) as appointment">
+                        <div>
+                          <div class="detail-stage-label text-muted">
+                            {{ stage }}
+                          </div>
+                          <div class="" *ngIf="appointment?.starttime">
+                            <span class="detail-stage-label">Start: </span>
+                            <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
+                          </div>
+                          <div class="" *ngIf="appointment?.endtime">
+                            <span class="detail-stage-label">End: </span>
+                            <span class="detail-stage-label">{{ formatDateTime(appointment?.endtime) }}</span>
+                          </div>
+                          <div class="" *ngIf="appointment?.date">
+                            <span class="detail-stage-label">Submitted: </span>
+                            <span class="detail-stage-label">{{ formatDateTime(appointment?.date) }}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div class="status-badge status-notscheduled">
-                        Not Scheduled
-                      </div>
-                    </ng-container>
-                  </div>
-                </ng-container>
+                        <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
+                          {{ getAppointmentStatus(stage, appointment) }}
+                        </div>
+
+                      </ng-container>
+                      <ng-container *ngIf="!getAppointmentByStage(stage, c?.allappointments)">
+                        <div>
+                          <div class="detail-stage-label text-muted">
+                            {{ stage }}
+                          </div>
+                        </div>
+                        <div class="status-badge status-notscheduled">
+                          Not Scheduled
+                        </div>
+                      </ng-container>
+                    </div>
+                  </ng-container>
+                </div>
               </div>
+            </ng-container>
+            <ng-template #noData>
+              <div class="no-data-card">
+                No Data Yet
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Flow Table -->
+      <div class="flow-table-container" *ngIf="showTable">
+        <table class="flow-search-participant-table">
+          <thead>
+            <tr>
+              <th *ngFor="let header of searchedParticipantHeaders">
+                {{ header }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of filteredData">
+              <td>{{ row.name }}</td>
+              <td>{{ row.email }}</td>
+              <td>{{ row.initiated }}</td>
+              <td>{{ row.welcomeCall }}</td>
+              <td>{{ row.clarityCall }}</td>
+              <td>{{ row.diagnostics }}</td>
+              <td>{{ row.implementation }}</td>
+              <td>{{ row.midReviewDiagnostics }}</td>
+              <td>{{ row.implementationPhase2 }}</td>
+              <td>{{ row.finalReview }}</td>
+              <td>{{ row.completed }}</td>
+              <td>{{ row.needsValidation }}</td>
+            </tr>
+            <tr *ngIf="filteredData.length === 0">
+              <td colspan="12" style="text-align:center;">
+                No participant found
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== PARTICIPANT MANAGEMENT (NEW DESIGN) ========== -->
+    <div class="pm-section">
+      <div class="pm-header">
+        <h2 class="pm-title">Participant Management & Actions</h2>
+        <div class="pm-actions">
+          <form [formGroup]="filterForm" class="pm-search-and-filters">
+            <div class="pm-search-wrap">
+              <span class="pm-search-icon">🔍</span>
+              <input type="text" class="pm-search-input" placeholder="Search by name..." formControlName="search"
+                (input)="filterTableData()" />
+              <button *ngIf="filterForm.value.search" (click)="clearSearch()" class="pm-clear-search"
+                title="Clear search">✕</button>
             </div>
-          </ng-container>
-          <ng-template #noData>
-            <div class="no-data-card">
-              No Data Yet
-            </div>
-          </ng-template>
+            <mat-form-field appearance="outline" class="pm-filter-field">
+              <mat-label>Journey</mat-label>
+              <mat-select placeholder="Select Journey" formControlName="journey" (selectionChange)="filterTableData()"
+                multiple>
+                <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{
+                  journey}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="pm-filter-field"
+              *ngIf="currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity'">
+              <mat-label>Product</mat-label>
+              <mat-select placeholder="Select Product" formControlName="product" (selectionChange)="filterTableData()"
+                multiple>
+                <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product
+                  }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </form>
+          <button class="pm-btn-primary" (click)="exportTableData()">Export List</button>
+          <button class="pm-btn-primary">Bulk Initiate Ready</button>
         </div>
       </div>
-    </ng-container>
 
-    <!-- Flow Table -->
-    <div class="flow-table-container" *ngIf="showTable">
-      <table class="flow-search-participant-table">
-        <thead>
-          <tr>
-            <th *ngFor="let header of searchedParticipantHeaders">
-              {{ header }}
-            </th>
-          </tr>
-        </thead>
+      <mat-tab-group class="pm-tab-group" (selectedTabChange)="onTabChange($event)" #tabGroup
+        [(selectedIndex)]="currentTabIndex">
+        <mat-tab>
+          <ng-template mat-tab-label><span class="pm-tab-text">Awaiting Initiation</span><span class="pm-tab-count">{{
+              originalData['awaitingInitiation'].count }}</span></ng-template>
+          <div *ngIf="isFilterActive()" class="pm-filter-indicator">
+            <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                style="margin-right:8px">
+                <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+              </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
+                getActiveFilterCount() }})</span></span>
+            <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
+          </div>
+          <div class="pm-table-container">
+            <table class="pm-data-table">
+              <thead>
+                <tr>
+                  <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
+                    [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
+                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
+                </tr>
+              </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
+            </table>
+          </div>
+        </mat-tab>
+        <mat-tab>
+          <ng-template mat-tab-label><span class="pm-tab-text">Initiated – Not Consuming</span><span
+              class="pm-tab-count">{{ originalData['currentJourneyInitiated'].count }}</span></ng-template>
+          <div *ngIf="isFilterActive()" class="pm-filter-indicator">
+            <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                style="margin-right:8px">
+                <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+              </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
+                getActiveFilterCount() }})</span></span>
+            <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
+          </div>
+          <div class="pm-table-container">
+            <table class="pm-data-table">
+              <thead>
+                <tr>
+                  <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
+                    [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
+                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
+                </tr>
+              </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
+            </table>
+          </div>
+        </mat-tab>
+        <mat-tab>
+          <ng-template mat-tab-label><span class="pm-tab-text">Stuck Cases</span><span class="pm-tab-count">{{
+              originalData['stuckCases'].count }}</span></ng-template>
+          <div *ngIf="isFilterActive()" class="pm-filter-indicator">
+            <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                style="margin-right:8px">
+                <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+              </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
+                getActiveFilterCount() }})</span></span>
+            <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
+          </div>
+          <div class="pm-table-container">
+            <table class="pm-data-table">
+              <thead>
+                <tr>
+                  <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
+                    [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
+                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
+                </tr>
+              </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
+            </table>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+
+      <ng-template #pmTableBody>
         <tbody>
-          <tr *ngFor="let row of filteredData">
-            <td>{{ row.name }}</td>
-            <td>{{ row.email }}</td>
-            <td>{{ row.initiated }}</td>
-            <td>{{ row.welcomeCall }}</td>
-            <td>{{ row.clarityCall }}</td>
-            <td>{{ row.diagnostics }}</td>
-            <td>{{ row.implementation }}</td>
-            <td>{{ row.midReviewDiagnostics }}</td>
-            <td>{{ row.implementationPhase2 }}</td>
-            <td>{{ row.finalReview }}</td>
-            <td>{{ row.completed }}</td>
-            <td>{{ row.needsValidation }}</td>
-          </tr>
-          <tr *ngIf="filteredData.length === 0">
-            <td colspan="12" style="text-align:center;">
-              No participant found
+          <tr *ngFor="let participant of paginatedData" class="pm-table-row"
+            [ngClass]="{'urgent-row': getWaitingPeriod(participant) >= 14, 'high-row': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14}">
+            <td *ngFor="let header of getCurrentTabHeaders()">
+              <input *ngIf="header.key === 'checkbox'" type="checkbox" class="pm-table-checkbox">
+              <span *ngIf="header.key === 'priority'" class="pm-priority-badge"
+                [ngClass]="{'p-urgent': getWaitingPeriod(participant) >= 14, 'p-high': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14, 'p-medium': getWaitingPeriod(participant) >= 5 && getWaitingPeriod(participant) < 10, 'p-low': getWaitingPeriod(participant) < 5}">{{
+                getPriorityLabel(getWaitingPeriod(participant)) }}</span>
+              <span *ngIf="header.type === 'mapped' && header.key !== 'checkbox' && header.key !== 'priority'"
+                [ngClass]="{'pm-participant-name': header.mapValue === 'name'}">{{
+                mapMetaData[participant[header.key]]?.[header.mapValue] || 'N/A' }}</span>
+              <span *ngIf="header.type === 'date' && header.key !== 'checkbox'" class="pm-date-text">{{
+                participant[header.key]?.toDate ? (participant[header.key].toDate() | date: header.format) :
+                (participant[header.key] | date: header.format) }}</span>
+              <span
+                *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority' && header.key !== 'addnotes' && header.key !== 'waitingperiod'">{{
+                participant[header.key] || 'N/A' }}</span>
+              <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
+                [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
+                participant[header.key] }} DAYS</span>
+              <span *ngIf="header.key === 'addnotes'">
+                <div (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
+              </span>
+              <span *ngIf="header.key === 'generalnotes'" #notesContainer
+                (mouseenter)="showPopup(participant, $event, notesContainer)" (mouseleave)="hidePopupWithDelay()">
+                <div class="pm-notes-container">
+                  <div *ngIf="participant['generalnotes']?.length > 0"><span
+                      (click)="viewNotes(participant, header.key)" class="pm-note-text"
+                      matTooltip="{{ participant['generalnotes'][participant['generalnotes'].length - 1].note }}">{{
+                      participant['generalnotes'][participant['generalnotes'].length - 1].note | slice:0:20 }}...</span>
+                  </div>
+                </div>
+              </span>
+              <span *ngIf="header.key === 'financialdata'" class="pm-status-pill"
+                [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-Not Scheduled': participant[header.key] === 'Not Scheduled'}">{{
+                participant[header.key] === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED' }}</span>
+              <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata'] ===
+                'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up' }}</span>
+              <button *ngIf="header.key === 'action'" class="pm-initiate-btn"
+                (click)="openParticipantPurchase(participant)">INITIATE NOW</button>
             </td>
           </tr>
+          <tr *ngIf="getCurrentTabData().length === 0">
+            <td [attr.colspan]="getCurrentTabHeaders().length" class="pm-no-data">No participants found</td>
+          </tr>
         </tbody>
-      </table>
+      </ng-template>
     </div>
+
+    <!-- Pagination Footer -->
+    <div class="pm-table-footer">
+      <div class="pm-row-info">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage *
+        itemsPerPage, getCurrentTabData().length) }} of {{ getCurrentTabData().length }} entries</div>
+      <div class="pm-pagination">
+        <button class="pm-page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page"><svg
+            width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
+          </svg></button>
+        <button class="pm-page-btn" (click)="previousPage()" [disabled]="currentPage === 1">Previous</button>
+        <div class="pm-page-numbers"><button *ngFor="let page of getPageNumbers()" class="pm-page-number"
+            [class.active]="page === currentPage" (click)="goToPage(page)">{{ page }}</button></div>
+        <button class="pm-page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+        <button class="pm-page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page"><svg
+            width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
+          </svg></button>
+      </div>
+      <div class="pm-items-per-page"><label>Show:</label><select [(ngModel)]="itemsPerPage"
+          (change)="changeItemsPerPage(itemsPerPage)">
+          <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{ option }}</option>
+        </select><span>entries</span></div>
+    </div>
+
+    <!-- ========== COMPLETION HISTORY BY DFU PRODUCT ========== -->
+    <div class="completion-history-container">
+      <div class="ch-header">
+        <h2 class="ch-title">Completion History by DFU Product</h2>
+      </div>
+
+      <!-- Summary Bar (always visible) -->
+      <div class="ch-summary-bar">
+        <div class="ch-summary-item">
+          <div class="ch-sum-num">{{ getCompletionSummary().totalCompleted }}</div>
+          <div class="ch-sum-lbl">Total Completed</div>
+        </div>
+        <div class="ch-summary-sep"></div>
+        <div class="ch-summary-item">
+          <div class="ch-sum-num green">{{ getCompletionSummary().avgStartToDone }}d</div>
+          <div class="ch-sum-lbl">Avg. Days (Start→Done)</div>
+        </div>
+        <div class="ch-summary-sep"></div>
+        <div class="ch-summary-item">
+          <div class="ch-sum-num blue">{{ getCompletionSummary().avgInitToStart }}d</div>
+          <div class="ch-sum-lbl">Avg. Days (Init→Start)</div>
+        </div>
+        <div class="ch-summary-sep"></div>
+        <div class="ch-summary-item">
+          <div class="ch-sum-num purple">{{ getCompletionSummary().productsActive }}</div>
+          <div class="ch-sum-lbl">Products Active</div>
+        </div>
+      </div>
+
+      <!-- VISIBLE Product Cards (always shown) -->
+      <div class="ch-product-grid">
+        <div class="ch-product-card" *ngFor="let product of getCompletionProductsVisible()"
+          [style.--pc]="product.color">
+          <div class="ch-pc-head">
+            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{ product.icon
+              }}</span>
+            <div>
+              <div class="ch-pc-name">{{ product.name }}</div>
+              <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
+            </div>
+          </div>
+          <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
+          <div class="ch-pc-big-lbl">Completed</div>
+          <div class="ch-pc-stats">
+            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong></div>
+            <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
+                }}</strong>
+            </div>
+            <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
+            <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
+                product.avgInitToStart }}d</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
+                product.avgStartToDone }}d</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggle for HIDDEN Product Cards -->
+      <div class="show-more-row" *ngIf="getCompletionProductsHidden().length > 0">
+        <button class="show-more-btn" (click)="showHiddenCompletionProducts = !showHiddenCompletionProducts">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline *ngIf="!showHiddenCompletionProducts" points="6 9 12 15 18 9" />
+            <polyline *ngIf="showHiddenCompletionProducts" points="18 15 12 9 6 15" />
+          </svg>
+          {{ showHiddenCompletionProducts ? 'Hide' : 'Show' }} {{ getCompletionProductsHidden().length }} Hidden
+          Products
+        </button>
+      </div>
+
+      <!-- HIDDEN Product Cards (toggle) -->
+      <div class="ch-product-grid ch-hidden-cards" *ngIf="showHiddenCompletionProducts">
+        <div class="ch-product-card ch-hidden-card" *ngFor="let product of getCompletionProductsHidden()"
+          [style.--pc]="product.color">
+          <div class="ch-pc-head">
+            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{ product.icon
+              }}</span>
+            <div>
+              <div class="ch-pc-name">{{ product.name }}</div>
+              <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
+            </div>
+            <span class="hidden-tag" style="margin-left: auto;">Hidden</span>
+          </div>
+          <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
+          <div class="ch-pc-big-lbl">Completed</div>
+          <div class="ch-pc-stats">
+            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong></div>
+            <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
+                }}</strong>
+            </div>
+            <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
+            <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
+                product.avgInitToStart }}d</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
+                product.avgStartToDone }}d</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
-
-  <!-- ========== PARTICIPANT MANAGEMENT (NEW DESIGN) ========== -->
-  <div class="pm-section">
-    <div class="pm-header">
-      <h2 class="pm-title">Participant Management & Actions</h2>
-      <div class="pm-actions">
-        <form [formGroup]="filterForm" class="pm-search-and-filters">
-          <div class="pm-search-wrap">
-            <span class="pm-search-icon">🔍</span>
-            <input type="text" class="pm-search-input" placeholder="Search by name..." formControlName="search"
-              (input)="filterTableData()" />
-            <button *ngIf="filterForm.value.search" (click)="clearSearch()" class="pm-clear-search"
-              title="Clear search">✕</button>
-          </div>
-          <mat-form-field appearance="outline" class="pm-filter-field">
-            <mat-label>Journey</mat-label>
-            <mat-select placeholder="Select Journey" formControlName="journey" (selectionChange)="filterTableData()"
-              multiple>
-              <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{
-                journey}}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="pm-filter-field"
-            *ngIf="currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity'">
-            <mat-label>Product</mat-label>
-            <mat-select placeholder="Select Product" formControlName="product" (selectionChange)="filterTableData()"
-              multiple>
-              <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product
-                }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </form>
-        <button class="pm-btn-primary" (click)="exportTableData()">Export List</button>
-        <button class="pm-btn-primary">Bulk Initiate Ready</button>
-      </div>
-    </div>
-
-    <mat-tab-group class="pm-tab-group" (selectedTabChange)="onTabChange($event)" #tabGroup
-      [(selectedIndex)]="currentTabIndex">
-      <mat-tab>
-        <ng-template mat-tab-label><span class="pm-tab-text">Awaiting Initiation</span><span class="pm-tab-count">{{
-            originalData['awaitingInitiation'].count }}</span></ng-template>
-        <div *ngIf="isFilterActive()" class="pm-filter-indicator">
-          <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
-              style="margin-right:8px">
-              <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-            </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
-              getActiveFilterCount() }})</span></span>
-          <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
-        </div>
-        <div class="pm-table-container">
-          <table class="pm-data-table">
-            <thead>
-              <tr>
-                <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
-                  [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
-                    class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
-              </tr>
-            </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
-          </table>
-        </div>
-      </mat-tab>
-      <mat-tab>
-        <ng-template mat-tab-label><span class="pm-tab-text">Initiated – Not Consuming</span><span
-            class="pm-tab-count">{{ originalData['currentJourneyInitiated'].count }}</span></ng-template>
-        <div *ngIf="isFilterActive()" class="pm-filter-indicator">
-          <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
-              style="margin-right:8px">
-              <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-            </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
-              getActiveFilterCount() }})</span></span>
-          <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
-        </div>
-        <div class="pm-table-container">
-          <table class="pm-data-table">
-            <thead>
-              <tr>
-                <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
-                  [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
-                    class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
-              </tr>
-            </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
-          </table>
-        </div>
-      </mat-tab>
-      <mat-tab>
-        <ng-template mat-tab-label><span class="pm-tab-text">Stuck Cases</span><span class="pm-tab-count">{{
-            originalData['stuckCases'].count }}</span></ng-template>
-        <div *ngIf="isFilterActive()" class="pm-filter-indicator">
-          <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
-              style="margin-right:8px">
-              <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-            </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
-              getActiveFilterCount() }})</span></span>
-          <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
-        </div>
-        <div class="pm-table-container">
-          <table class="pm-data-table">
-            <thead>
-              <tr>
-                <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
-                  [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
-                    class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
-              </tr>
-            </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
-          </table>
-        </div>
-      </mat-tab>
-    </mat-tab-group>
-
-    <ng-template #pmTableBody>
-      <tbody>
-        <tr *ngFor="let participant of paginatedData" class="pm-table-row"
-          [ngClass]="{'urgent-row': getWaitingPeriod(participant) >= 14, 'high-row': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14}">
-          <td *ngFor="let header of getCurrentTabHeaders()">
-            <input *ngIf="header.key === 'checkbox'" type="checkbox" class="pm-table-checkbox">
-            <span *ngIf="header.key === 'priority'" class="pm-priority-badge"
-              [ngClass]="{'p-urgent': getWaitingPeriod(participant) >= 14, 'p-high': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14, 'p-medium': getWaitingPeriod(participant) >= 5 && getWaitingPeriod(participant) < 10, 'p-low': getWaitingPeriod(participant) < 5}">{{
-              getPriorityLabel(getWaitingPeriod(participant)) }}</span>
-            <span *ngIf="header.type === 'mapped' && header.key !== 'checkbox' && header.key !== 'priority'"
-              [ngClass]="{'pm-participant-name': header.mapValue === 'name'}">{{
-              mapMetaData[participant[header.key]]?.[header.mapValue] || 'N/A' }}</span>
-            <span *ngIf="header.type === 'date' && header.key !== 'checkbox'" class="pm-date-text">{{
-              participant[header.key]?.toDate ? (participant[header.key].toDate() | date: header.format) :
-              (participant[header.key] | date: header.format) }}</span>
-            <span
-              *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority' && header.key !== 'addnotes' && header.key !== 'waitingperiod'">{{
-              participant[header.key] || 'N/A' }}</span>
-            <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
-              [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
-              participant[header.key] }} DAYS</span>
-            <span *ngIf="header.key === 'addnotes'">
-              <div (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
-            </span>
-            <span *ngIf="header.key === 'generalnotes'" #notesContainer
-              (mouseenter)="showPopup(participant, $event, notesContainer)" (mouseleave)="hidePopupWithDelay()">
-              <div class="pm-notes-container">
-                <div *ngIf="participant['generalnotes']?.length > 0"><span (click)="viewNotes(participant, header.key)"
-                    class="pm-note-text"
-                    matTooltip="{{ participant['generalnotes'][participant['generalnotes'].length - 1].note }}">{{
-                    participant['generalnotes'][participant['generalnotes'].length - 1].note | slice:0:20 }}...</span>
-                </div>
-              </div>
-            </span>
-            <span *ngIf="header.key === 'financialdata'" class="pm-status-pill"
-              [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-Not Scheduled': participant[header.key] === 'Not Scheduled'}">{{
-              participant[header.key] === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED' }}</span>
-            <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata'] ===
-              'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up' }}</span>
-            <button *ngIf="header.key === 'action'" class="pm-initiate-btn"
-              (click)="openParticipantPurchase(participant)">INITIATE NOW</button>
-          </td>
-        </tr>
-        <tr *ngIf="getCurrentTabData().length === 0">
-          <td [attr.colspan]="getCurrentTabHeaders().length" class="pm-no-data">No participants found</td>
-        </tr>
-      </tbody>
-    </ng-template>
-  </div>
-
-  <!-- Pagination Footer -->
-  <div class="pm-table-footer">
-    <div class="pm-row-info">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage *
-      itemsPerPage, getCurrentTabData().length) }} of {{ getCurrentTabData().length }} entries</div>
-    <div class="pm-pagination">
-      <button class="pm-page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page"><svg
-          width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
-        </svg></button>
-      <button class="pm-page-btn" (click)="previousPage()" [disabled]="currentPage === 1">Previous</button>
-      <div class="pm-page-numbers"><button *ngFor="let page of getPageNumbers()" class="pm-page-number"
-          [class.active]="page === currentPage" (click)="goToPage(page)">{{ page }}</button></div>
-      <button class="pm-page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
-      <button class="pm-page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page"><svg
-          width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
-        </svg></button>
-    </div>
-    <div class="pm-items-per-page"><label>Show:</label><select [(ngModel)]="itemsPerPage"
-        (change)="changeItemsPerPage(itemsPerPage)">
-        <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{ option }}</option>
-      </select><span>entries</span></div>
-  </div>
-
-  <!-- ========== COMPLETION HISTORY BY DFU PRODUCT ========== -->
-  <div class="completion-history-container">
-    <div class="ch-header">
-      <h2 class="ch-title">Completion History by DFU Product</h2>
-    </div>
-
-    <!-- Summary Bar (always visible) -->
-    <div class="ch-summary-bar">
-      <div class="ch-summary-item">
-        <div class="ch-sum-num">{{ getCompletionSummary().totalCompleted }}</div>
-        <div class="ch-sum-lbl">Total Completed</div>
-      </div>
-      <div class="ch-summary-sep"></div>
-      <div class="ch-summary-item">
-        <div class="ch-sum-num green">{{ getCompletionSummary().avgStartToDone }}d</div>
-        <div class="ch-sum-lbl">Avg. Days (Start→Done)</div>
-      </div>
-      <div class="ch-summary-sep"></div>
-      <div class="ch-summary-item">
-        <div class="ch-sum-num blue">{{ getCompletionSummary().avgInitToStart }}d</div>
-        <div class="ch-sum-lbl">Avg. Days (Init→Start)</div>
-      </div>
-      <div class="ch-summary-sep"></div>
-      <div class="ch-summary-item">
-        <div class="ch-sum-num purple">{{ getCompletionSummary().productsActive }}</div>
-        <div class="ch-sum-lbl">Products Active</div>
-      </div>
-    </div>
-
-    <!-- VISIBLE Product Cards (always shown) -->
-    <div class="ch-product-grid">
-      <div class="ch-product-card" *ngFor="let product of getCompletionProductsVisible()" [style.--pc]="product.color">
-        <div class="ch-pc-head">
-          <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{ product.icon
-            }}</span>
-          <div>
-            <div class="ch-pc-name">{{ product.name }}</div>
-            <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
-          </div>
-        </div>
-        <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
-        <div class="ch-pc-big-lbl">Completed</div>
-        <div class="ch-pc-stats">
-          <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong></div>
-          <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions }}</strong>
-          </div>
-          <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
-          <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
-          <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
-              product.avgInitToStart }}d</strong></div>
-          <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
-              product.avgStartToDone }}d</strong></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Toggle for HIDDEN Product Cards -->
-    <div class="show-more-row" *ngIf="getCompletionProductsHidden().length > 0">
-      <button class="show-more-btn" (click)="showHiddenCompletionProducts = !showHiddenCompletionProducts">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <polyline *ngIf="!showHiddenCompletionProducts" points="6 9 12 15 18 9" />
-          <polyline *ngIf="showHiddenCompletionProducts" points="18 15 12 9 6 15" />
-        </svg>
-        {{ showHiddenCompletionProducts ? 'Hide' : 'Show' }} {{ getCompletionProductsHidden().length }} Hidden Products
-      </button>
-    </div>
-
-    <!-- HIDDEN Product Cards (toggle) -->
-    <div class="ch-product-grid ch-hidden-cards" *ngIf="showHiddenCompletionProducts">
-      <div class="ch-product-card ch-hidden-card" *ngFor="let product of getCompletionProductsHidden()"
-        [style.--pc]="product.color">
-        <div class="ch-pc-head">
-          <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{ product.icon
-            }}</span>
-          <div>
-            <div class="ch-pc-name">{{ product.name }}</div>
-            <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
-          </div>
-          <span class="hidden-tag" style="margin-left: auto;">Hidden</span>
-        </div>
-        <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
-        <div class="ch-pc-big-lbl">Completed</div>
-        <div class="ch-pc-stats">
-          <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong></div>
-          <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions }}</strong>
-          </div>
-          <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
-          <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
-          <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
-              product.avgInitToStart }}d</strong></div>
-          <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
-              product.avgStartToDone }}d</strong></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>

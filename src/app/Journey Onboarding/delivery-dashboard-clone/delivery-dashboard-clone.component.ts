@@ -175,7 +175,7 @@ export class DeliveryDashboardCloneComponent {
     groupedFiltered: { [key: string]: any[] } = {};
     groupedThisMonth: { [key: string]: any[] } = {};
     groupedNextMonth: { [key: string]: any[] } = {};
-    modalType: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' = 'all';
+    modalType: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible' = 'all';
     groupedByProfileAll: { [profileId: string]: any[] } = {};
     groupedByProfileFiltered: { [profileId: string]: any[] } = {};
     bonusPackageIds: Set<string> = new Set();
@@ -425,23 +425,6 @@ export class DeliveryDashboardCloneComponent {
     specialistData: SpecialistRow[] = [];
     private isFiltering = false;
 
-    constructor(
-        private firestore: Firestore,
-        private cdr: ChangeDetectorRef,
-        private dialog: MatDialog,
-        private guard: AuthguardService,
-        private router: Router,
-        private fb: FormBuilder,
-        private injector: Injector,
-        private datepipe: DatePipe,
-    ) {
-        this.filterForm = this.fb.group({
-            search: [''],
-            journey: [[]],
-            product: [[]]
-        });
-    }
-
     currentMonth: number = new Date().getMonth();
     currentYear: number = new Date().getFullYear();
 
@@ -460,10 +443,27 @@ export class DeliveryDashboardCloneComponent {
 
     participantLoading = false;
 
-    async ngOnInit() {
-        // this.isLoading = true;
+    constructor(
+        private firestore: Firestore,
+        private cdr: ChangeDetectorRef,
+        private dialog: MatDialog,
+        private guard: AuthguardService,
+        private router: Router,
+        private fb: FormBuilder,
+        private injector: Injector,
+        private datepipe: DatePipe,
+    ) {
+        this.filterForm = this.fb.group({
+            search: [''],
+            journey: [[]],
+            product: [[]]
+        });
         this.setCurrentMonth();
         this.initializeMonthFilter();
+    }
+
+
+    async ngOnInit() {
 
         try {
             // Fetch all initial data in parallel
@@ -605,14 +605,14 @@ export class DeliveryDashboardCloneComponent {
 
         this.applyDateFilter();
     }
+    excludedModes = new Set([
+        'installation event mode',
+        'event mode',
+        'integration mode',
+    ]);
 
     async applyDateFilter() {
         try {
-            const excludedModes = new Set([
-                'installation event mode',
-                'event mode',
-                'integration mode',
-            ]);
 
             const groupedAll = {};
             const groupedFiltered = {};
@@ -639,7 +639,7 @@ export class DeliveryDashboardCloneComponent {
                 const totalBalance = totalPurchaseValue - totalPaid;
                 const minPayment = parseInt(item?.['minimumpayment']) || 0;
 
-                const isEligible = !excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
+                const isEligible = !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
 
                 const statusdate = item?.statusdate || {};
                 const tentativestart = item?.tentativestart || null;
@@ -665,9 +665,7 @@ export class DeliveryDashboardCloneComponent {
                         } else {
                             (groupedPurchased[productId] ||= []).push(item);
                         }
-                    } else {
-                        (groupedNotEligible[productId] ||= []).push(item);
-                    }
+                    } else (groupedNotEligible[productId] ||= []).push(item);
                 }
 
                 if (!funnelData[productId]) {
@@ -691,7 +689,7 @@ export class DeliveryDashboardCloneComponent {
                         const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
                         if (this.isDateInRange(completedDate)) funnelData[productId].completed.push(item);
                     }
-                } else groupedNotEligible(item);
+                }
             }
 
             // assign
@@ -701,7 +699,7 @@ export class DeliveryDashboardCloneComponent {
             this.groupedNextMonth = groupedNextMonth;
             this.groupedBonus = groupedBonus;
             this.groupedPurchased = groupedPurchased;
-            this.notEligible = groupedNotEligible;
+            this.groupedNotEligible = groupedNotEligible;
             this.funnelData = funnelData;
         } catch (err) {
             console.log("error apply date filter", err);
@@ -729,25 +727,20 @@ export class DeliveryDashboardCloneComponent {
         // this.participantsProductDataSubscription?.unsubscribe();
         // this.appointmentsSubscription?.unsubscribe();
         // this.formsSubscription?.unsubscribe();
+        console.log('comes in')
         this.participantLoading = true;
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         console.log('FROM SELECT PRODUCT')
-        
+
         if (this.allAppointments?.length === 0) {
             await this.filterAppointmentsByType();
-        } 
+        }
         if (this.productData?.reports?.length === 0) {
             await this.FilterReportData(productId);
         }
         await this.filterProductData(product, productId);
         this.participantLoading = false;
-    }
-
-    async updateProduct(product: string) {
-        const productId = this.mapProductGroupId[product];
-        this.selectedProductLabel = product;
-        await this.filterProductData(product, productId);
     }
 
     updateFilteredCards() {
@@ -935,79 +928,79 @@ export class DeliveryDashboardCloneComponent {
         else productData.totalEligible.push(mergedData);
     }
 
-   async FilterReportData(productId: string) {
-    const forms: any[] = [];
+    async FilterReportData(productId: string) {
+        const forms: any[] = [];
 
-    if (this.formsSubscription) {
-        this.formsSubscription.unsubscribe(); 
-    }
+        if (this.formsSubscription) {
+            this.formsSubscription.unsubscribe();
+        }
 
-    const observables: Observable<any[]>[] = [];
+        const observables: Observable<any[]>[] = [];
 
-    for (let i = 0; i < this.allMatchedProductsRaw.length; i += 10) {
+        for (let i = 0; i < this.allMatchedProductsRaw.length; i += 10) {
 
-        const chunk = this.allMatchedProductsRaw
-            .slice(i, i + 10)
-            .map(item => item.docid);
+            const chunk = this.allMatchedProductsRaw
+                .slice(i, i + 10)
+                .map(item => item.docid);
 
-        const q = query(
-            collection(this.firestore, 'formsByClient'),
-            where('participantproductid', 'in', chunk)
-        );
+            const q = query(
+                collection(this.firestore, 'formsByClient'),
+                where('participantproductid', 'in', chunk)
+            );
 
-        const obs$ = runInInjectionContext(this.injector, () =>
-            collectionData(q, { idField: 'id' })
-        );
+            const obs$ = runInInjectionContext(this.injector, () =>
+                collectionData(q, { idField: 'id' })
+            );
 
-        observables.push(obs$);
-    }
+            observables.push(obs$);
+        }
 
-    this.formsSubscription = combineLatest(observables)
-        .subscribe(async (snapshots: any[][]) => {
+        this.formsSubscription = combineLatest(observables)
+            .subscribe(async (snapshots: any[][]) => {
 
-            forms.length = 0; // clear previous data
+                forms.length = 0; // clear previous data
 
-            for (const docs of snapshots) {
+                for (const docs of snapshots) {
 
-                const formResults = await Promise.all(
-                    docs.map(async (data: any) => {
+                    const formResults = await Promise.all(
+                        docs.map(async (data: any) => {
 
-                        let appointments = Array.from(this.allAppointments.values() || [])
-                            .filter((app: any) =>
-                                app.participantproductid === data.participantproductid
-                            );
+                            let appointments = Array.from(this.allAppointments.values() || [])
+                                .filter((app: any) =>
+                                    app.participantproductid === data.participantproductid
+                                );
 
-                        for (let appointment of appointments) {
-                            try {
-                                const appointmenttype = await this.resolveAppointmentType(appointment);
-                                appointment.appointmentTypeName = appointmenttype;
-                            } catch (err) {
-                                console.log("error", err);
+                            for (let appointment of appointments) {
+                                try {
+                                    const appointmenttype = await this.resolveAppointmentType(appointment);
+                                    appointment.appointmentTypeName = appointmenttype;
+                                } catch (err) {
+                                    console.log("error", err);
+                                }
                             }
-                        }
 
-                        appointments = [...appointments, data];
+                            appointments = [...appointments, data];
 
-                        return {
-                            ...data,
-                            status: data?.date ? 'submitted' : 'pending',
-                            appointmentstart: data?.date || null,
-                            productid: productId,
-                            allappointments: appointments || []
-                        };
-                    })
-                );
+                            return {
+                                ...data,
+                                status: data?.date ? 'submitted' : 'pending',
+                                appointmentstart: data?.date || null,
+                                productid: productId,
+                                allappointments: appointments || []
+                            };
+                        })
+                    );
 
-                forms.push(...formResults);
-            }
-            this.allAppointments = [...this.allAppointments, ...forms];
-            this.productData.reports = forms;
+                    forms.push(...formResults);
+                }
+                this.allAppointments = [...this.allAppointments, ...forms];
+                this.productData.reports = forms;
 
-            if (this.selectedProductLabel) {
-                this.updateProduct(this.selectedProductLabel);
-            }
-        });
-}
+                if (this.selectedProductLabel) {
+                    this.selectProduct(this.selectedProductLabel);
+                }
+            });
+    }
 
     cleanProductData(productData: any) {
         if (!productData) return;
@@ -1189,7 +1182,7 @@ export class DeliveryDashboardCloneComponent {
                     await this.applyDateFilter();
 
                     if (this.selectedProductLabel) {
-                        this.updateProduct(this.selectedProductLabel);
+                        this.selectProduct(this.selectedProductLabel);
                     }
                 });
 
@@ -1678,6 +1671,10 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).flatMap((pid) => this.groupedPurchased[pid] || []);
     }
 
+    getCardGroupedNotEligible(cardId: string): any[] {
+        return this.getCardProductIds(cardId).flatMap((pid) => this.groupedNotEligible[pid] || []);
+    };
+
     getCardFunnel(cardId: string): any {
         const pids = this.getCardProductIds(cardId);
         return {
@@ -1729,7 +1726,7 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).reduce((sum, pid) => sum + this.getNonActiveSub(pid), 0);
     }
 
-    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased') {
+    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible') {
         this.selectedProductId = cardId;
         this.modalType = type;
 
@@ -1741,6 +1738,7 @@ export class DeliveryDashboardCloneComponent {
             case 'nextmonth': source = this.getCardGroupedNextMonth(cardId); break;
             case 'bonus': source = this.getCardGroupedBonus(cardId); break;
             case 'purchased': source = this.getCardGroupedPurchased(cardId); break;
+            case 'noteligible': source = this.getCardGroupedNotEligible(cardId); break;
         }
 
         const grouped = {};
@@ -2190,7 +2188,7 @@ export class DeliveryDashboardCloneComponent {
                     console.log('COMES IN')
                     this.allAppointments = [...appointmentsSnap];
 
-                    if (this.selectedProductLabel) this.updateProduct(this.selectedProductLabel);
+                    if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
                     console.log("all appointments", this.allAppointments);
 
                     this.loadingStates.appointments = true;
@@ -3713,14 +3711,35 @@ export class DeliveryDashboardCloneComponent {
         for (const pid of this.profileIds) {
             const items = this.currentGroupedByProfile[pid] || [];
             for (const item of items) {
-                rows.push({
+
+                const totalPaid = parseInt(this.mapMetaData?.[pid]?.['pp_totalpaid'] ?? '0') || 0;
+                const totalPurchaseValue = parseInt(this.mapMetaData?.[pid]?.['pp_totalpurchasevalue'] ?? '0') || 0;
+
+                const totalBalance = totalPurchaseValue - totalPaid;
+                const minPayment = parseInt(item?.['minimumpayment']) || 0;
+
+                const mode = (this.mapMetaData[pid]?.['participantmode'] || '').trim().toLowerCase();
+
+                const isExcludedMode = this.excludedModes.has(mode);
+                const isPaymentEligible = (totalBalance <= 0 || totalPaid >= minPayment);
+
+                const row: any = {
                     '#': index,
                     'DocID': item.id || item['docid'] || '',
                     'ProfileID': pid,
                     'Participant': this.mapMetaData[pid]?.['name'] || pid,
                     'Product': this.mapProductName[item['productref']?.id] || 'Unknown',
                     'Status': item['status'] || 'N/A'
-                });
+                };
+
+                if (isExcludedMode) {
+                    row['Mode'] = this.mapMetaData[pid]?.['participantmode'] || '';
+                }
+                else if (!isPaymentEligible) {
+                    row['Min Payment'] = minPayment;
+                }
+
+                rows.push(row);
             }
             index++;
         }
