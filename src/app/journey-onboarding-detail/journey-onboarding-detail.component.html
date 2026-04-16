@@ -166,44 +166,29 @@
       <div class="loading-hint" *ngIf="contentUrlsLoading">
         <span class="spinner"></span> Loading content_urls…
       </div>
-      <div formArrayName="contenturl">
-        <div class="array-card"
-             *ngFor="let cu of contentUrls.controls; let i = index"
-             [formGroupName]="i">
-          <div class="array-card-header">
-            <span class="array-index">#{{ i }}</span>
-            <button mat-icon-button type="button" color="warn"
-                    (click)="removeContentUrl(i)" *ngIf="contentUrls.length > 1">
-              <mat-icon>close</mat-icon>
-            </button>
-          </div>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Select content</mat-label>
-            <mat-select formControlName="docId"
-                        (selectionChange)="onTcContentUrlSelect($event.value, i)">
-              <mat-option value="">— None —</mat-option>
-              <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
-                <span class="cu-option-wrap">
-                  <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
-                  {{ opt.title }}
-                </span>
-              </mat-option>
-            </mat-select>
-            <mat-error>Required</mat-error>
-          </mat-form-field>
-          <div class="cu-preview" *ngIf="cu.get('title')?.value">
-            <img *ngIf="cu.get('thumbnailUrl')?.value"
-                 [src]="cu.get('thumbnailUrl')?.value" class="cu-preview__thumb" />
-            <div class="cu-preview__body">
-              <span class="cu-preview__title">{{ cu.get('title')?.value }}</span>
-              <span class="cu-preview__path">content_urls / {{ cu.get('docId')?.value }}</span>
-            </div>
-          </div>
+      <!-- Multi-select (mirrors App Locked pattern) -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select content URLs</mat-label>
+        <mat-select [value]="getSelectedContentUrlIds()"
+                    multiple
+                    (selectionChange)="onTcMultiSelect($event.value)">
+          <mat-option value="">— None —</mat-option>
+          <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
+            <span class="cu-option-wrap">
+              <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
+              {{ opt.title }}
+            </span>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="drag-list" cdkDropList (cdkDropListDropped)="dropContentUrls($event)">
+        <div class="drag-item" *ngFor="let cu of contentUrls.controls; let i = index" cdkDrag>
+          ☰ {{ cu.get('title')?.value || cu.get('docId')?.value }}
         </div>
       </div>
-      <button mat-stroked-button type="button" class="add-btn" (click)="addContentUrl()">
+      <!-- <button mat-stroked-button type="button" class="add-btn" (click)="addContentUrl()">
         + Add Content URL
-      </button>
+      </button> -->
 
     </form>
   </div>
