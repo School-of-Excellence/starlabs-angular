@@ -3685,6 +3685,33 @@ button[matMenuTriggerFor] {
   background-color: rgba(255, 165, 0, 0.15) !important;
 }
 
+.token-pending-invitation {
+  border: 2px solid #2e7d32 !important;
+  background-color: rgba(46, 125, 50, 0.12) !important;
+  animation: pendingInvitationPulse 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+.token-pending-invitation::after {
+  content: 'Invitation Pending';
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes pendingInvitationPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(46, 125, 50, 0); }
+}
+
 
 .dfu-chip {
   background-color: rgba(255, 165, 0, 0.15) !important;
