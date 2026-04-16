@@ -727,11 +727,9 @@ export class DeliveryDashboardCloneComponent {
         // this.participantsProductDataSubscription?.unsubscribe();
         // this.appointmentsSubscription?.unsubscribe();
         // this.formsSubscription?.unsubscribe();
-        console.log('comes in')
         this.participantLoading = true;
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
-        console.log('FROM SELECT PRODUCT')
 
         if (this.allAppointments?.length === 0) {
             await this.filterAppointmentsByType();
@@ -2185,11 +2183,9 @@ export class DeliveryDashboardCloneComponent {
 
             const sub = collectionData(q, { idField: 'id' })
                 .subscribe(async (appointmentsSnap: any[]) => {
-                    console.log('COMES IN')
                     this.allAppointments = [...appointmentsSnap];
 
                     if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
-                    console.log("all appointments", this.allAppointments);
 
                     this.loadingStates.appointments = true;
                     this.journeyFlowLoading = false;

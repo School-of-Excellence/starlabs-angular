@@ -269,13 +269,7 @@
               <span>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</span>
               <span class="status-tag" [ngClass]="item['status']?.toLowerCase() || 'na'">{{ item['status'] || 'N/A'
                 }}</span>
-              <span *ngIf="
-  excludedModes.has(
-    (mapMetaData[pid]?.['participantmode'] || '')
-      .trim()
-      .toLowerCase()
-  )
-">
+              <span *ngIf="excludedModes.has((mapMetaData[pid]?.['participantmode'] || '').trim().toLowerCase())">
                 Mode: {{ mapMetaData[pid]?.['participantmode'] || pid }}
               </span>
 
