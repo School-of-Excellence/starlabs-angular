@@ -2145,7 +2145,7 @@ export class DeliveryDashboardCloneComponent {
     appointmentTypes$: any;
     appointmentTypes: any[] = [];
     mappedAppointmentTypes: any[] = [];
-    private appointmentsSubscription: Subscription;
+    private appointmentsSubscription: Subscription | null = null;
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
 
@@ -2155,7 +2155,10 @@ export class DeliveryDashboardCloneComponent {
         this.cdr.detectChanges();
 
         try {
-            this.appointmentsSubscription = new Subscription();
+            // this.appointmentsSubscription = new Subscription();
+            if( this.appointmentsSubscription){
+                 this.appointmentsSubscription.unsubscribe();
+            }
 
             const monthStart = new Date(
                 this.selectedMonth.getFullYear(),
@@ -2191,7 +2194,7 @@ export class DeliveryDashboardCloneComponent {
                     this.journeyFlowLoading = false;
                     this.cdr.detectChanges();
                 });
-            this.appointmentsSubscription.add(sub);
+             this.appointmentsSubscription = sub;
         } catch (error) {
             console.error("Error loading appointments:", error);
             this.loadingStates.appointments = true;
