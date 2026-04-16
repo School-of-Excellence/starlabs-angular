@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 
 @Component({
@@ -22,6 +23,7 @@ import { MatButtonModule } from '@angular/material/button';
     MatTableModule,
     MatFormFieldModule,
     MatIconModule,
+    MatTooltipModule,
     MatPaginatorModule,
     MatInputModule,
     MatButtonModule
@@ -38,6 +40,7 @@ export class DeliverySetComponent {
 
   private destroy$ = new Subject<void>()
   private firestore = inject(Firestore)
+
 
   constructor(public dialog: MatDialog,private router:Router) {
     let apptList = []
@@ -68,12 +71,15 @@ export class DeliverySetComponent {
     const formTypeCollection = collection(this.firestore,"delivery forms")
     const formQ = query(formTypeCollection,orderBy("formname"))
     collectionData(formQ,{idField:"docid"}).pipe(takeUntil(this.destroy$)).subscribe(form => {
-      formList = form.map((formDoc) => ({
-        type: "Form",
-        deliveryname: formDoc["formname"],
-        docid: formDoc.docid,
-        delete: formDoc['delete']
-      }))
+      formList = form.map((formDoc) => {
+        const formarray = formDoc['formarray'] ?? []
+        return {
+          type: "Form",
+          deliveryname: formDoc["formname"],
+          docid: formDoc.docid,
+          delete: formDoc['delete'] ?? false,
+        }
+      })
       var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
       this.deliverySource.data = list
       this.deliverySource.sort = this.sort
@@ -166,6 +172,9 @@ export class DeliverySetComponent {
 
   applyFilter(event){
     this.deliverySource.filter = (event.target as HTMLInputElement).value
+  }
+  addArrayItem(row: any): void {
+    this.editDelivery(row);
   }
 
   addDelivery(){

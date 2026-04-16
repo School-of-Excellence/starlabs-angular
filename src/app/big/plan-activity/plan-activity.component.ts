@@ -137,6 +137,11 @@ export class PlanActivityComponent {
     this.auth.username().then((e) => {
       this.loggedInProfileData = e
     })
+
+    getDocs(collection(this.firestore,"delivery forms")).then(snap => {
+      this.forms = snap.docs.map(e => e.data())
+    });
+
     collectionSnapshots(query(collection(this.firestore,"users_roles"),where('mentor','==',true))).pipe(takeUntil(this.subscription)).subscribe(roles=>{
       console.log(roles.length);
       let list = [];
@@ -249,7 +254,7 @@ export class PlanActivityComponent {
             status : this.data.assignmentdoc.status,
             selectedform : this.data.assignmentdoc.selectedform,
             selectedvideos : this.data.assignmentdoc.selectedvideos
-          })
+          });
           this.filteredOptionalCohorts = this.data.cohortslist.filter((e:string) => !this.data.assignmentdoc.mandatorycohortsid.includes(e['docid']))
         }
       });
@@ -314,9 +319,9 @@ export class PlanActivityComponent {
       };
     });
 
-    getDocs(collection(this.firestore,"delivery forms")).then(snap => {
-      this.forms = snap.docs.map(e => e.data())
-    });
+    // getDocs(collection(this.firestore,"delivery forms")).then(snap => {
+    //   this.forms = snap.docs.map(e => e.data())
+    // });
 
     collectionSnapshots(query(collection(this.firestore,"products"),orderBy("atcmodel"))).pipe(takeUntil(this.subscription)).subscribe(products=>{
       this.productAvailable = products
