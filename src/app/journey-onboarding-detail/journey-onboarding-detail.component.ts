@@ -113,6 +113,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   productSheetOpen = false;
   activeProductType: 'queue' | 'event' | 'others' | null = null;
   productSheetTitle = '';
+  showProcessStepsPage = false;
 
   // ── Detail form ───────────────────────────────────────────────
   detailForm!: FormGroup;
@@ -134,15 +135,22 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     { label: 'Subscription',     screen: 'subscription' },
     { label: 'Experience',       screen: 'journeyExperience' },
     { label: 'Product Overview', screen: 'productOverview' },
-    { label: 'AEL Selection',    screen: 'aelSelection' },
-    { label: 'Onboarding',       screen: 'onboarding' },
-    { label: 'Congratulations',  screen: 'congratulations' },
   ];
-  screenorderTags: string[] = [
-    'intro', 'journeyOverview', 'journeyDescripition', 'subscription',
-    'journeyExperience', 'productOverview', 'aelSelection', 'onboarding', 'congratulations',
+  screenorderTags = [
+    'intro',               // 0
+    'journeyOverview',     // 1
+    'journeyDescripition', // 2
+    'subscription',        // 3
+    'journeyExperience',   // 4
+    'eventDescription',    // 5
+    'otherDescription',    // 6
+    'queueDescription',    // 7
+    'processSteps',
+    'productOverview',     // 8
   ];
+
   readonly productTypeOptions = ['queue', 'event', 'others'] as const;
+  showProductDetailsPage: 'event' | 'queue' | 'others' | null = null;
 
   // ── Tick indicators ───────────────────────────────────────────
   get isOrientationFilled(): boolean { return !!(this.orientationForm?.value?.duration); }
@@ -216,19 +224,26 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.saveAppLocked();
   }
 
+  openPreviewSheet(type: string): void {
+    if (type === 'queue') this.currentScreen = 'queueDescription';
+    else if (type === 'event') this.currentScreen = 'eventDescription';
+    else this.currentScreen = 'otherDescription';
 
-  openProductSheet(type: string, cardTitle: string): void {
-    this.activeProductType = type as 'queue' | 'event' | 'others';
-    this.productSheetTitle = cardTitle || type;
-    this.productSheetOpen = true;
-    if (type === 'queue') {
-      this.detailTabIndex = 7;
-    } else if (type === 'event') {
-      this.detailTabIndex = 0;
-    } else if (type === 'others') {
-      this.detailTabIndex = 6;
-    }
+    // Also open the corresponding sub-page in the form panel
+    this.showProductDetailsPage = type as 'event' | 'queue' | 'others';
+    this.showProcessStepsPage = false;
+    this.detailTabIndex = 4;
     this.cdr.markForCheck();
+  }
+
+  openProduct(type: string) {
+    if (type === 'queue') {
+      this.currentScreen = 'queueDescription';
+    } else if (type === 'event') {
+      this.currentScreen = 'eventDescription';
+    } else {
+      this.currentScreen = 'otherDescription';
+    }
   }
 
   closeProductSheet(): void {
@@ -239,14 +254,29 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  openProcessSteps(): void {
+    this.showProcessStepsPage = true;
+    this.currentScreen = 'processSteps';
+    this.cdr.markForCheck();
+  }
+
+  goBackToQueue(): void {
+    this.showProcessStepsPage = false;
+    this.showFullProcess = false;
+    this.currentScreen = 'queueDescription';
+    this.cdr.markForCheck();
+  }
+
   nextDetailTab(): void {
-    if (this.detailTabIndex < this.detailTabs.length - 1) {
-      this.detailTabIndex++;
-      this.currentScreen = this.detailTabs[this.detailTabIndex].screen;
-      this.productSheetOpen = false;
-      this.activeProductType = null;
+    if (this.detailTabIndex >= this.detailTabs.length - 1) return;
+    if (!this.isTabFilled(this.detailTabIndex)) {
+      this.detailForm.markAllAsTouched();
       this.cdr.markForCheck();
+      return;
     }
+    this.detailTabIndex++;
+    this.currentScreen = this.detailTabs[this.detailTabIndex].screen;
+    this.cdr.markForCheck();
   }
 
   prevDetailTab(): void {
@@ -259,41 +289,86 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     }
   }
 
+  hasProductType(type: string): boolean {
+    return this.productincluded.controls.some(
+      c => c.get('type')?.value === type
+    );
+  }
+
+  // CHANGE TO match new tab order
   isTabFilled(tabIndex: number): boolean {
     const v = this.detailForm?.value;
     if (!v) return false;
     switch (tabIndex) {
-      case 0: return !!(v.eventdescripition?.title && v.eventdescripition?.intro);
-      case 1: return !!(v.subscription?.descripition);
+      case 0: return !!(v.introduction || v.introductionvideo);
+      case 1: return !!(v.overviewdescription || v.overviewvideoDocId);
       case 2: return !!(v.journeydetail?.intro || v.journeydetail?.descripition);
       case 3: return !!(v.subscription?.imageurl || this.imagePreviews['subscription_imageurl']);
       case 4: return (v.productincluded ?? []).some((p: any) => p.title);
-      case 5: return !!(v.journeypath?.intro || v.journeypath?.imageurl);
-      case 6: return !!(v.otherdescripition?.title);
-      case 7: return !!(v.queuedescripition?.descripition);
-      case 8: return false; // no content
+      case 5: return !!(v.journeydetail?.intro || v.journeydetail?.imageurl);
       default: return false;
     }
   }
 
-  currentIndex = 0;
-  get currentScreen(): string {
-    return this.screenorderTags[this.currentIndex];
+  showFullProcess = false;
+
+  toggleFullProcess(): void {
+    this.showFullProcess = !this.showFullProcess;
+    this.cdr.markForCheck();
   }
 
-
-  set currentScreen(screen: string) {
-    const idx = this.screenorderTags.indexOf(screen);
-    if (idx !== -1) this.currentIndex = idx;
+  onTabChange(index: number, tab: any) {
+    this.showFullProcess = false;
+    this.showProductDetailsPage = null;
+    this.showProcessStepsPage = false;
+    this.detailTabIndex = index;
+    this.currentScreen = tab.screen;
+    this.productSheetOpen = false;
+    this.activeProductType = null;
+    this.cdr.markForCheck();
   }
 
+  getSelectedContentUrlIds(): string[] {
+    return this.contentUrls.controls
+      .map(c => c.get('docId')?.value)
+      .filter(Boolean);
+  }
+
+  onTcMultiSelect(ids: string[]): void {
+    const cuArr = this.contentUrls;
+    while (cuArr.length) cuArr.removeAt(0);
+    ids.filter(Boolean).forEach(id => {
+      const opt = this.contentUrlOptions.find(o => o.id === id);
+      cuArr.push(this.newContentUrl({
+        docId: id,
+        path: `content_urls/${id}`,
+        title: opt?.title ?? '',
+        thumbnailUrl: opt?.thumbnailUrl ?? '',
+      }));
+    });
+    this.cdr.markForCheck();
+  }
+
+  dropContentUrls(event: CdkDragDrop<string[]>): void {
+    const arr = this.contentUrls;
+    const ctrl = arr.at(event.previousIndex);
+    arr.removeAt(event.previousIndex);
+    arr.insert(event.currentIndex, ctrl);
+    this.cdr.markForCheck();
+  }
+
+  isScreen(name: string): boolean {
+    return this.currentScreen === name;
+  }
+
+  currentScreen = 'intro';
 
   buildPreview(v: any) {
     this.previewData = {
       intro: {
         name: this.getJourneyName(v.journeyrefDocId),
         intro: v.eventdescripition?.intro || '',
-        video: v.eventdescripition?.introductionvideo
+        video: v.introductionvideo
       },
 
       journeyOverview: {
@@ -302,13 +377,13 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         goalVideo: v.eventdescripition?.goalvideourl
       },
 
-      journeyDescripition: v.journeydetail,
+      journeyDescripition: v.journeydescription,
 
       subscription: v.subscription,
 
       journeyExperience: v.productincluded || [],
 
-      productOverview: v.journeypath
+      productOverview: v.journeydescription
     };
 
     this.cdr.markForCheck();
@@ -324,18 +399,6 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
   getSeriesName(id: string): string {
     return this.seriesOptions.find(x => x.id === id)?.name || id;
-  }
-
-  nextPage() {
-    if (this.currentIndex < this.detailForm.value.screenorder.length - 1) {
-      this.currentIndex++;
-    }
-  }
-
-  prevPage() {
-    if (this.currentIndex > 0) {
-      this.currentIndex--;
-    }
   }
 
   getJourneyName(id: string): string {
@@ -464,7 +527,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           title:        data.title ?? d.id,
           type:         data.type  ?? 'unknown',
           url:          data.url   ?? data.url_download ?? '',
-          thumbnailUrl: data.url_thumbnail ?? data.url_preview ?? data.url_short ?? '',
+          thumbnailUrl: data.thumbnail ?? data.url_thumbnail ?? data.thumbnailhls?.url_preview ?? '',
           path:         `content_urls/${d.id}`,
         } as ContentUrlOption;
       });
@@ -490,6 +553,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   // ─────────────────────────────────────────────────────────────
   openModal(modal: ModalType): void {
     if (modal === 'detail') {
+      this.currentScreen = 'intro';
       this.detailTabIndex = 0;
       this.isEditMode      = false;
       this.buildDetailForm();
@@ -498,6 +562,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.pendingFiles    = {};
       this.selectedRefs    = {};
       this.journeySelected = false;
+      this.showProductDetailsPage = null;
+      this.showProcessStepsPage = false;
     }
     this.activeModal = modal;
     this.cdr.markForCheck();
@@ -534,6 +600,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.activeModal  = null;
     this.editingIndex = null;
     this.isEditMode   = false;
+    this.showProductDetailsPage = null;
+    this.showProcessStepsPage = false;
     this.cdr.markForCheck();
   }
 
@@ -549,37 +617,39 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   //   this.cdr.markForCheck();
   //   this.journeySelected = true;
   // }
-  editRow(row: JourneyOnboardingRow, index: number): void {
-    this.editingIndex    = index;
-    this.isEditMode      = true;
-    this.detailSubmitted = false;
-    this.imagePreviews   = {};
-    this.pendingFiles    = {};
-    this.selectedRefs    = {};
-    this.detailTabIndex = 0;
-    this.currentIndex    = 0;
-    this.buildDetailForm(row.raw);
+  // In editRow(), replace the direct buildDetailForm call:
 
-    // ── Restore image previews from saved URLs so preview renders them ──
-    const raw = row.raw;
-    if (raw?.eventdescripition?.introductionvideo)
-      this.imagePreviews['introductionvideo'] = raw.eventdescripition.introductionvideo;
-    if (raw?.journeydetail?.imageurl)
-      this.imagePreviews['journeydetail_imageurl'] = raw.journeydetail.imageurl;
-    if (raw?.journeypath?.imageurl)
-      this.imagePreviews['journeypath_imageurl'] = raw.journeypath.imageurl;
-    if (raw?.subscription?.imageurl)
-      this.imagePreviews['subscription_imageurl'] = raw.subscription.imageurl;
-    if (raw?.queuedescripition?.processimage)
-      this.imagePreviews['processimage'] = raw.queuedescripition.processimage;
-    (raw?.queuedescripition?.processdetails?.step ?? []).forEach((s: any, i: number) => {
-      if (s?.imageurl) this.imagePreviews[`step_imageurl_${i}`] = s.imageurl;
-    });
+      editRow(row: JourneyOnboardingRow, index: number): void {
+        this.editingIndex    = index;
+        this.isEditMode      = true;
+        this.detailSubmitted = false;
+        this.imagePreviews   = {};
+        this.pendingFiles    = {};
+        this.selectedRefs    = {};
+        this.detailTabIndex  = 0;
+        // this.currentIndex    = 0;
 
-    this.activeModal     = 'detail';
-    this.journeySelected = true;
-    this.cdr.markForCheck();
-  }
+        this.buildDetailForm(row.raw);
+
+        const raw = row.raw;
+        if (raw?.introductionvideo)
+          this.imagePreviews['introductionvideo'] = raw.introductionvideo;
+        if (raw?.journeypath?.imageurl)
+          this.imagePreviews['journeypath_imageurl'] = raw.journeypath.imageurl;
+        if (raw?.journeydetail?.imageurl)
+          this.imagePreviews['journeydetail_imageurl'] = raw.journeydetail.imageurl;
+        if (raw?.subscription?.imageurl)
+          this.imagePreviews['subscription_imageurl'] = raw.subscription.imageurl;
+        if (raw?.queuedescripition?.processimage)
+          this.imagePreviews['processimage'] = raw.queuedescripition.processimage;
+        (raw?.queuedescripition?.processdetails?.step ?? []).forEach((s: any, i: number) => {
+          if (s?.imageurl) this.imagePreviews[`step_imageurl_${i}`] = s.imageurl;
+        });
+
+        this.activeModal     = 'detail';
+        this.journeySelected = true;
+        this.cdr.markForCheck();
+      }
 
   // ─────────────────────────────────────────────────────────────
   // Form builders
@@ -648,61 +718,69 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
 
     this.detailForm = this.fb.group({
-      // ── Internal / display fields ──────────────────────────────
-      docid:          [docid],                            // auto-generated; shown as chip
-      journeyrefDocId:[{ value: journeyDocId, disabled: !!prefill }, Validators.required],// bound to journey dropdown
-      journeyref:     [p.journeyref ?? ''],               // stores resolved path for saving
-
-      // ── Existing fields ────────────────────────────────────────
+      docid:          [docid],
+      journeyrefDocId:[{ value: journeyDocId, disabled: !!prefill }, Validators.required],
+      journeyref:     [p.journeyref ?? ''],
       overviewvideoDocId: [''],
+
       eventdescripition: this.fb.group({
         title:                [p.eventdescripition?.title                ?? '', Validators.required],
         intro:                [p.eventdescripition?.intro                ?? '', Validators.required],
-        overview:             [p.eventdescripition?.overview             ?? ''],
-        overviewdescripition: [p.eventdescripition?.overviewdescripition ?? ''],
+        overview:             [p.eventdescripition?.overview             ?? '', Validators.required],
+        overviewdescripition: [p.eventdescripition?.overviewdescripition ?? '', Validators.required],
         goalvideourlDocId:    [''],
         goalvideourl:         [''],
-        introduction:         [p.introduction         ?? ''],
-        introductionvideo:    [p.introductionvideo    ?? ''],
       }),
-      overviewvideo: [p.overviewvideo ?? ''],
+
+      introduction:        [p.introduction      ?? '', Validators.required],
+      introductionvideo:   [p.introductionvideo ?? '', Validators.required],
+      overviewdescription: [p.overviewdescription ?? '', Validators.required],
+      overviewvideo:       [p.overviewvideo ?? ''],
+
       journeydetail: this.fb.group({
-        intro:        [p.journeydetail?.intro        ?? ''],
-        descripition: [p.journeydetail?.descripition ?? ''],
-        imageurl:     [p.journeydetail?.imageurl     ?? ''],
+        intro:        [p.journeydetail?.intro        ?? '', Validators.required],
+        descripition: [p.journeydetail?.descripition ?? '', Validators.required],
+        imageurl:     [p.journeydetail?.imageurl     ?? '', Validators.required],
       }),
+
       journeypath: this.fb.group({
-        intro:        [p.journeypath?.intro        ?? ''],
-        descripition: [p.journeypath?.descripition ?? ''],
-        imageurl:     [p.journeypath?.imageurl     ?? ''],
+        intro:        [p.journeypath?.intro        ?? '', Validators.required],
+        descripition: [p.journeypath?.descripition ?? '', Validators.required],
+        imageurl:     [p.journeypath?.imageurl     ?? '', Validators.required],
       }),
+
       otherdescripition: this.fb.group({
-        title:        [p.otherdescripition?.title        ?? ''],
-        descripition: [p.otherdescripition?.descripition ?? ''],
+        title:        [p.otherdescripition?.title        ?? '', Validators.required],
+        descripition: [p.otherdescripition?.descripition ?? '', Validators.required],
       }),
+
       subscription: this.fb.group({
-        descripition: [p.subscription?.descripition ?? ''],
-        imageurl:     [p.subscription?.imageurl     ?? ''],
+        descripition: [p.subscription?.descripition ?? '', Validators.required],
+        imageurl:     [p.subscription?.imageurl     ?? '', Validators.required],
       }),
+
       productincluded: this.fb.array(
         (p.productincluded ?? [{}]).map((x: any) => this.newProduct(x))
       ),
+
       queuedescripition: this.fb.group({
-        descripition: [p.queuedescripition?.descripition ?? ''],
+        title:        [p.queuedescripition?.title        ?? '', Validators.required],
+        descripition: [p.queuedescripition?.descripition ?? '', Validators.required],
         atcmodel: this.fb.group({
-          title:        [p.queuedescripition?.atcmodel?.title        ?? ''],
-          descripition: [p.queuedescripition?.atcmodel?.descripition ?? ''],
+          title:        [p.queuedescripition?.atcmodel?.title        ?? '', Validators.required],
+          descripition: [p.queuedescripition?.atcmodel?.descripition ?? '', Validators.required],
+        }),
+        processimage: [p.queuedescripition?.processimage ?? '', Validators.required],
+        processdetails: this.fb.group({
+          title:        [p.queuedescripition?.processdetails?.title        ?? '', Validators.required],
+          descripition: [p.queuedescripition?.processdetails?.descripition ?? '', Validators.required],
+          step: this.fb.array(
+            (p.queuedescripition?.processdetails?.step ?? [{}]).map((x: any) => this.newProcessStep(x))
+          ),
         }),
       }),
-      processdetails: this.fb.group({
-        title:        [p.queuedescripition?.processdetails?.title        ?? ''],
-        descripition: [p.queuedescripition?.processdetails?.descripition ?? ''],
-        processimage: [p.queuedescripition?.processimage                 ?? ''],
-        step: this.fb.array(
-          (p.queuedescripition?.processdetails?.step ?? [{}]).map((x: any) => this.newProcessStep(x))
-        ),
-      }),
     });
+
     // ── Patch reference fields AFTER form is built ──────────────
     if (p.overviewvideo) {
       const id = typeof p.overviewvideo === 'string'
@@ -730,7 +808,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.detailForm.valueChanges.subscribe(v => {
       this.buildPreview(v);
     });
-    if (prefill?.screenorder) this.screenorderTags = [...prefill.screenorder];
+    // if (prefill?.screenorder) this.screenorderTags = [...prefill.screenorder];
+    this.currentScreen = 'intro';
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -747,18 +826,20 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       thumbnailUrl: [v?.thumbnailUrl ?? ''],
     });
   }
+
   newProduct(v?: any): FormGroup {
     return this.fb.group({
-      title:        [v?.title        ?? ''],
-      descripition: [v?.descripition ?? ''],
-      type:         [v?.type         ?? 'queue'],
+      title:        [v?.title        ?? '', Validators.required],
+      descripition: [v?.descripition ?? '', Validators.required],
+      type:         [v?.type         ?? 'queue', Validators.required],
     });
   }
+
   newProcessStep(v?: any): FormGroup {
     return this.fb.group({
-      title:        [v?.title        ?? ''],
-      descripition: [v?.descripition ?? ''],
-      imageurl:     [v?.imageurl     ?? ''],
+      title:        [v?.title        ?? '', Validators.required],
+      descripition: [v?.descripition ?? '', Validators.required],
+      imageurl:     [v?.imageurl     ?? '', Validators.required],
     });
   }
 
@@ -768,8 +849,9 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   get introItems(): FormArray      { return this.orientationForm.get('introduction') as FormArray; }
   get contentUrls(): FormArray     { return this.timeCompressionForm.get('contenturl') as FormArray; }
   get productincluded(): FormArray { return this.detailForm.get('productincluded') as FormArray; }
-  get processSteps(): FormArray    { return this.detailForm.get('processdetails.step') as FormArray; }
-
+  get processSteps(): FormArray {
+    return this.detailForm.get('queuedescripition.processdetails.step') as FormArray;
+  }
   addIntroItem(): void               { this.introItems.push(this.newIntroItem()); }
   removeIntroItem(i: number): void   { this.introItems.removeAt(i); }
   addContentUrl(): void              { this.contentUrls.push(this.newContentUrl()); }
@@ -844,7 +926,11 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     if (!file) return;
     this.pendingFiles[slot] = file;
     const reader = new FileReader();
-    reader.onload = () => { this.imagePreviews[slot] = reader.result as string; this.cdr.markForCheck(); };
+    reader.onload = () => {
+      this.imagePreviews[slot] = reader.result as string;
+      this.detailForm.get(formPath)?.setValue(reader.result as string);
+      this.cdr.markForCheck();
+    };
     reader.readAsDataURL(file);
     (event.target as HTMLInputElement).value = '';
   }
@@ -1000,9 +1086,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   // so the table columns show correct values immediately.
   // ─────────────────────────────────────────────────────────────
   async saveDetail(): Promise<void> {
-    ['journeyrefDocId', 'eventdescripition.title', 'eventdescripition.intro'].forEach(p =>
-      this.detailForm.get(p)?.markAsTouched()
-    );
+    this.detailForm.markAllAsTouched();
     if (this.detailForm.invalid) { this.cdr.markForCheck(); return; }
 
     this.detailLoading = true; this.cdr.markForCheck();
@@ -1012,13 +1096,13 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       const v = this.detailForm.getRawValue();
       const ed = v.eventdescripition;
 
-      const introVideoUrl   = uploadedUrls['introductionvideo']     ?? ed.introductionvideo           ?? '';
-      const jdImageUrl      = uploadedUrls['journeydetail_imageurl'] ?? v.journeydetail?.imageurl      ?? '';
-      const jpImageUrl      = uploadedUrls['journeypath_imageurl']   ?? v.journeypath?.imageurl        ?? '';
+      const introVideoUrl   = uploadedUrls['introductionvideo']     ?? v.introductionvideo             ?? '';
+      const jdImageUrl = uploadedUrls['journeydetail_imageurl'] ?? v.journeydetail?.imageurl ?? '';
+      const jpImageUrl = uploadedUrls['journeypath_imageurl']   ?? v.journeypath?.imageurl   ?? '';
       const subImageUrl     = uploadedUrls['subscription_imageurl']  ?? v.subscription?.imageurl       ?? '';
       const processImageUrl = uploadedUrls['processimage']           ?? v.processdetails?.processimage ?? '';
 
-      const steps = (v.processdetails?.step ?? []).map((s: any, i: number) => ({
+      const steps = (v.queuedescripition?.processdetails?.step ?? []).map((s: any, i: number) => ({
         title:        s.title        ?? '',
         descripition: s.descripition ?? '',
         imageurl:     uploadedUrls[`step_imageurl_${i}`] ?? s.imageurl ?? '',
@@ -1042,8 +1126,9 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           overviewdescripition: ed.overviewdescripition ?? '',
         },
         goalvideourl:      this.toRef(ed.goalvideourl ?? ''),
-        introduction:      ed.introduction ?? '',
+        introduction:      v.introduction ?? '',
         introductionvideo: introVideoUrl,
+        overviewdescription: v.overviewdescription ?? '',
         journeydetail: {
           intro:        v.journeydetail?.intro        ?? '',
           descripition: v.journeydetail?.descripition ?? '',
@@ -1065,14 +1150,15 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           type:         p.type         ?? 'queue',
         })),
         queuedescripition: {
+          title: v.queuedescripition?.title ?? '',
           descripition: v.queuedescripition?.descripition ?? '',
           atcmodel: {
             title:        v.queuedescripition?.atcmodel?.title        ?? '',
             descripition: v.queuedescripition?.atcmodel?.descripition ?? '',
           },
           processdetails: {
-            title:        v.processdetails?.title        ?? '',
-            descripition: v.processdetails?.descripition ?? '',
+            title:        v.queuedescripition?.processdetails?.title        ?? '',
+            descripition: v.queuedescripition?.processdetails?.descripition ?? '',
             step:         steps,
           },
           processimage: processImageUrl,
@@ -1083,6 +1169,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           imageurl:     subImageUrl,
         },
       };
+      console.log('overviewdescription being saved:', v.overviewdescription);
 
       await setDoc(doc(this.firestore, 'journeyonboardingdetail', v.docid), payload, { merge: true ,});
       this.detailSubmitted = true;
@@ -1098,10 +1185,13 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     }
   }
 
-  isVideoUrl(url: string): boolean {
+  isVideoUrl(url: string | null): boolean {
     if (!url) return false;
-    // covers blob previews and Firebase Storage URLs with video extensions
-    return /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url) || url.startsWith('blob:');
+    return url.includes('.mp4')
+      || url.includes('.webm')
+      || url.includes('.mov')
+      || url.includes('video/')
+      || (url.includes('video') && !url.includes('image'));
   }
 
   async fixUpdatedBy(): Promise<void> {
@@ -1114,6 +1204,30 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     }
 
     console.log('Updated all documents');
+  }
+
+  goToProductDetailsTab(type: string): void {
+    if (!type) return;
+    this.showProductDetailsPage = type as 'event' | 'queue' | 'others';
+    this.showProcessStepsPage = false;
+    this.detailTabIndex = 4; // ← always switch to Experience tab first
+    if (type === 'queue') this.currentScreen = 'queueDescription';
+    else if (type === 'event') this.currentScreen = 'eventDescription';
+    else this.currentScreen = 'otherDescription';
+    this.cdr.markForCheck();
+  }
+
+  goBackToExperience(): void {
+    this.showFullProcess = false;
+    this.currentScreen = 'journeyExperience';
+    this.cdr.markForCheck();
+  }
+  goBackToExperienceTab(): void {
+    this.showProductDetailsPage = null;
+    this.showProcessStepsPage = false;
+    this.currentScreen = 'journeyExperience';
+    this.detailTabIndex = 4;
+    this.cdr.markForCheck();
   }
 
   private toRef(path: any): DocumentReference | null {

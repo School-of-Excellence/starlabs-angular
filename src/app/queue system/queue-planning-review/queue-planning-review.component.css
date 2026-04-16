@@ -4220,3 +4220,146 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+/* Participant Actions */
+.participant-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.revert-btn {
+  color: #e53935;
+}
+
+.revert-btn:hover {
+  background: rgba(229, 57, 53, 0.1);
+}
+
+.book-btn {
+  color: #43a047;
+}
+
+.book-btn:hover {
+  background: rgba(67, 160, 71, 0.1);
+}
+
+/* Book Slot Dialog Overlay */
+.book-slot-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.book-slot-dialog {
+  background: white;
+  border-radius: 12px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.book-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  background: #f8f9fa;
+}
+
+.book-slot-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.book-slot-participant-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #e3f2fd;
+  font-weight: 500;
+}
+
+.book-slot-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.book-slot-label {
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.book-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.book-slot-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.book-slot-item:hover {
+  background: #f5f5f5;
+  border-color: #bdbdbd;
+}
+
+.book-slot-selected {
+  background: #e3f2fd !important;
+  border-color: #1976d2 !important;
+}
+
+.book-slot-radio {
+  color: #1976d2;
+}
+
+.book-slot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.book-slot-time {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.book-slot-capacity {
+  font-size: 12px;
+  color: #666;
+}
+
+.book-slot-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+}

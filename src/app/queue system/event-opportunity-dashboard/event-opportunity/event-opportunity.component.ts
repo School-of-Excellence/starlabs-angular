@@ -52,6 +52,7 @@ export class EventOpportunityComponent {
   bigActivitySubcription: Subscription // in
   bigActivityList = [] // in
   mapBigActivity = {} //in
+  shadowActivityIds: Set<string> = new Set<string>()
 
   // Shadow Property
   profileShadowCount = {}
@@ -102,8 +103,10 @@ export class EventOpportunityComponent {
     })
     collectionData(collection(this.firestore, 'bigactivity')).pipe(takeUntil(this.subscription)).subscribe(snap => {
         this.bigActivityList = snap
+        this.shadowActivityIds = new Set<string>()
         this.bigActivityList.forEach(e => {
           this.mapBigActivity[e["docid"]] = e["activity"]
+          if (e["shadow"] === true) this.shadowActivityIds.add(e["docid"])
         })
       })
   }
@@ -342,6 +345,12 @@ export class EventOpportunityComponent {
         var lastStage = this.selectedQueue["stages"][this.selectedQueue["stages"].length - 1]
         this.queueTokenList = token.sort((a, b) => (a["profile_name"] ?? "").localeCompare(b["profile_name"] ?? ""))
         this.completedToken = this.queueTokenList.filter(e => e["currentstage"] == lastStage).length
+        const stagesWithCompulsory = new Set<string>(
+          ((this.selectedQueue["stages"] ?? []) as string[]).filter((s: string) => {
+            const sp = this.selectedQueue["stageproperty"]?.[s];
+            return sp && Object.keys(sp["compulsoryactivity"] ?? {}).length > 0;
+          })
+        );
         var localPreAssign = {}
         // Group token by Stage
         this.stageTokenMap = this.queueTokenList.reduce(function(r, a){
@@ -361,14 +370,16 @@ export class EventOpportunityComponent {
           r[a["currentstage"]]["total"] = (r[a["currentstage"]]["total"] ?? 0) + 1
           r[a["currentstage"]]["tokenlist"] = r[a["currentstage"]]["tokenlist"] ?? []
           r[a["currentstage"]]["tokenlist"].push(a)
-          if(a["status"] == "ready"){
-            r[a["currentstage"]]["waiting"] += 1
-          }
-          else if(a["status"] == null || a["status"] == "queued" || a["status"] == "invited"){
-            r[a["currentstage"]]["queued"] += 1
-          }
-          else if(a["status"] == "instudio"){
-            r[a["currentstage"]]["instudio"] += 1
+          if(stagesWithCompulsory.has(a["currentstage"])){
+            if(a["status"] == "ready"){
+              r[a["currentstage"]]["waiting"] += 1
+            }
+            else if(a["status"] == null || a["status"] == "queued" || a["status"] == "invited"){
+              r[a["currentstage"]]["queued"] += 1
+            }
+            else if(a["status"] == "instudio"){
+              r[a["currentstage"]]["instudio"] += 1
+            }
           }
           return r
         }, {})
@@ -377,7 +388,7 @@ export class EventOpportunityComponent {
         
         this.stages = []
         for (const stage in this.stageTokenMap) {
-          if(this.stageTokenMap[stage]['waiting'] > 0 || this.stageTokenMap[stage]['instudio'] > 0){
+          if(this.stageTokenMap[stage]['waiting'] > 0 || this.stageTokenMap[stage]['queued'] > 0 || this.stageTokenMap[stage]['instudio'] > 0){
             this.stages.push(stage)
           }
         }
@@ -398,7 +409,9 @@ export class EventOpportunityComponent {
         studioPreAssign : this.studioPreAssign,
         studioAssignmentMap : this.studioAssignmentMap,
         liveStudioMap :this.liveStudioMap,
-        studioMap: this.studioMap
+        studioMap: this.studioMap,
+        liveAssignmentList: this.liveAssignmentList,
+        shadowActivityIds: this.shadowActivityIds
       });
     }
 }
