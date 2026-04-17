@@ -17,7 +17,7 @@ jobs:
           FIREBASE_PROD_CONFIG: ${{ secrets.FIREBASE_PROD_CONFIG }}
           WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
           WATSON_PROD_CONFIG: ${{ secrets.WATSON_PROD_CONFIG }}
-          PICOVOICE_ACCESS_KEY: ${{ PICOVOICE_ACCESS_KEY }}
+          PICOVOICE_ACCESS_KEY: ${{ secrets.PICOVOICE_ACCESS_KEY }}
         run: |
           mkdir -p src/environments
           
