@@ -1,3 +1,4 @@
+import { PicoKoalaService } from './../../Service/PicoVoice Koala/pico-koala.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
@@ -17,14 +18,8 @@ import { LoadingProgressComponent } from '../../loading-progress/loading-progres
 import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
-// import { DeepAudioFilterService } from '../../Service/Deep Audio Filter/deep-audio-filter.service';
-// ── [DF3] DeepFilterNet3 noise cancellation service (ONNX · AudioWorklet · no API key needed)
-// Replaces Amazon Voice Focus as the active filter. VoiceFocus import + service kept intact below
-// so it can be re-enabled by swapping the method body back.
-import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
 import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-layout.service';
-import { PicoVoiceKoalaService } from '../../Service/PicoVoice Koala/PicoVoice-Koala.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -61,17 +56,6 @@ interface OpenViduCallQualitySnapshot {
     packetLoss: number; // % of outbound audio packets lost; above 3% causes audible cut-outs, more perceptible than video loss.
     jitter: number;     // ms of variation in incoming audio packet arrival timing; high jitter causes glitches and adds buffer delay.
     mute: boolean;      // Mic Muted/Unmuted
-  };
-  noiseCancellation: {
-    df3Active: boolean;       // True if the DeepFilterNet3 ONNX pipeline is running; false means raw unfiltered audio is being published.
-    echoCancellation: boolean; // True if browser AEC is removing speaker output from mic input; should always be true.
-    noiseSuppression: boolean; // True if DF3 noise suppression is actively running; source of truth is DeepFilter3Service.isActive().
-    agc: boolean;              // Browser AGC state; should always be false since DF3 uses a fixed ×1.5 gain boost instead.
-  };
-  mic: {
-    levelDb: number;                  // Mic input level in dBFS (negative scale); sweet spot −20 to −10, below −30 too quiet, above −5 clips.
-    vadState: 'speech' | 'silence';   // DF3 VAD decision at snapshot time; speech triggers suppression level 30, silence triggers 80.
-    suppressionLevel: number;         // Active DF3 suppression strength — 30 gentle during speech to preserve consonants, 80 strong during silence.
   };
   network: {
     rtt: number;                 // ms round-trip time to the LiveKit server; one-way lag is roughly rtt ÷ 2, above 200 ms feels laggy.
@@ -117,7 +101,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   localNetworkQuality = signal<ConnectionQuality>(ConnectionQuality.Unknown);
   isMicMuted = signal<boolean>(false);
   activeSpeakers:Array<string> = [];
-  
+
 
   // Meta Data
   roomDetail: RoomInfo | undefined | null;
@@ -133,7 +117,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   // Fullscreen Enable
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
-  
+
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
@@ -150,13 +134,13 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   screenShareParticipantId = signal<string | null>(null);
   localVideoStream = signal<MediaStream | null>(null);
 
-  
+
 
   // Layout mode computed from participant count and screen share state
   layoutMode = computed<LayoutMode>(() => {
     const remoteVideoCount = this.getRemoteVideoCount();
     const hasScreenShare = this.getActiveScreenShare() !== null;
-    
+
     if (hasScreenShare) return 'screen-share';  // Screen share layout
     if (remoteVideoCount === 0) return 'grid';   // 1 participant = grid (not solo)
     if (remoteVideoCount === 1) return 'spotlight'; // 2 participants = spotlight
@@ -199,24 +183,13 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     public guard: AuthguardService,
     public dialog: MatDialog,
     private infraService: InstanceStatusService,
-    // private audiofilterservice : DeepAudioFilterService, // kept — not removed, used in debugAudioLevels()
-    private deepFilter3: DeepFilter3Service,              // [DF3] active noise cancellation filter
     private adaptiveQuality: AdaptiveQualityService,
     public videoLayout: VideoLayoutService,
-    private koala: PicoVoiceKoalaService
+    public picoKoalaService : PicoKoalaService
   ){}
 
   ngAfterViewInit(): void {
-    // Pre-warm DF3 — downloads ONNX model (~7.7 MB) in background so it is ready
-    // before the user clicks Join. By the time enableMicrophoneWithNoiseCancellation()
-    // runs, init() will already be done and audio starts with zero delay.
-    // this.deepFilter3.init(80).then(ok => {
-    //   if (!ok) console.warn('⚠️ DF3 pre-warm failed — will retry when joining call');
-    // });
 
-    this.koala.init(environment['picovoiceAccessKey']).then(ok => {
-      if (!ok) console.warn('⚠️ Koala pre-warm failed — will retry when joining call');
-    });
 
     var id = this.route.snapshot.paramMap.get("roomid")
     console.log("Router ID", id)
@@ -316,28 +289,28 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   async prepareParticipant() {
     this.isRequesting = true;
     this.meetingRoomStatus = null;
- 
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
- 
+
       // Store the full stream so joinCall() can stop the audio track later
       this.previewStream = stream;
- 
+
       // Only use video for the preview tile — audio is not played back
       const videoTrack = new LocalVideoTrack(stream.getVideoTracks()[0]);
       this.localParticipant.set(videoTrack);
- 
+
       this.cameraStatus = 'granted';
       this.micStatus = 'granted';
       this.isRequesting = false;
       return true;
     } catch (err: any) {
       console.error('Permission error:', err);
- 
+
       const isHardBlock =
         err.name === 'NotAllowedError' &&
         err.message?.includes('Permission dismissed') === false;
- 
+
       if (isHardBlock) {
         this.cameraStatus = 'denied';
         this.micStatus = 'denied';
@@ -345,7 +318,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         this.cameraStatus = 'prompt';
         this.micStatus = 'prompt';
       }
- 
+
       this.isRequesting = false;
       return false;
     }
@@ -509,12 +482,12 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       const response = await this.getTokenWithRetry();
       console.log('Token received:', response);
 
+      // ── KOALA: Init BEFORE room.connect() so it's ready the moment we join ──
+      // This captures mic, runs the noise suppression pipeline, and produces
+      // a clean MediaStreamTrack — all before the room handshake begins.
+      await this.picoKoalaService.init();
+      await this.picoKoalaService.start();
 
-      // ── Pre-call: start DF3 BEFORE connecting so VAD calibrates during room handshake ──
-      // getUserMedia + processStream happen here. By the time room.connect() finishes
-      // (~1-3 s), the VAD has already measured the noise floor and the AudioContext is
-      // fully running. The cleanAudioTrack is ready to publish the moment we're in the room.
-      const cleanAudioTrack = await this.prepareNoiseCancelledTrack();
 
       // Connect to the LiveKit room
       // await ensures we wait until initial signaling is done
@@ -587,41 +560,18 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       // Start adaptive quality monitoring
       this.adaptiveQuality.startMonitoring(room);
 
-      // ── OffscreenCanvas pipeline (optional) ────────────────────────────────
-      // Enforces exact 20fps draw rate independent of camera hardware.
-      // Disabled by default — uncomment to activate. Note: if BackgroundProcessor
-      // (blur) is active, it already controls frame processing. Enable this only
-      // if you need frame-rate clamping WITHOUT blur, or for future per-frame
-      // processing (watermarks, overlays).
-      // this.canvasPipelineCleanup = this.startCanvasProcessingPipeline(room, 20);
 
-      await this.enableMicrophoneWithNoiseCancellation(room, cleanAudioTrack);
-
-      // await room.localParticipant.setMicrophoneEnabled(true, {
-      //   noiseSuppression: true,
-      //   echoCancellation: true
-      // });
-
-      // Enable camera and microphone for publishing - Default
-      /*
-      await room.localParticipant.enableCameraAndMicrophone();
-      this.localParticipant.set(room.localParticipant.videoTracks.values().next().value?.track); // Set Local Participant Video Track
-      */
-
-      // RNNoise Attempt
-      /*
       try {
-        // Get noise-suppressed audio track
-        const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack();
-        // Publish clean audio to LiveKit
-        await room.localParticipant.publishTrack(cleanAudioTrack);
-
-        console.log("Rnnoise successfull")
-      } catch (audioCatch) { 
-        console.log("Audio Catch", audioCatch) 
-        console.log("Default Audio successfull")
+        await this.picoKoalaService.publishToRoom(room);
+        console.log('🎙️ Koala noise-suppressed audio published');
+      } catch (koalaPublishError) {
+        // Fallback: if Koala publish fails, use standard mic
+        console.warn('Koala publish failed, falling back to standard mic:', koalaPublishError);
+        await room.localParticipant.setMicrophoneEnabled(true, {
+          noiseSuppression: true,
+          echoCancellation: true,
+        });
       }
-      */
     } catch (error: any) {
       // Handle connection errors gracefully
       console.log(error)
@@ -634,7 +584,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     const roomName = this.roomDetail.roomId;
     const participantId = this.loggedinProfileid || `user-${Date.now()}`;
     const participantName = this.loggedinProfileRole["name"] || 'Guest';
-    
+
     let retryCount = 0;
 
     while (retryCount <= 3) {
@@ -650,7 +600,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
           retryCount++;
           if (retryCount > 3) throw new Error('System at capacity');
-          
+
           const wait = error.error?.retryAfter || 60;
           console.log(`Scaling... retry in ${wait}s`);
           await new Promise(r => setTimeout(r, wait * 1000));
@@ -680,10 +630,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     currentRoom?.removeAllListeners();
     await currentRoom?.disconnect();
 
-    // Tear down DF3 — stops AudioWorklet, closes AudioContext, frees WASM memory
-    // this.deepFilter3.destroy();
-    this.koala.destroy();
-
     // Reset all variables
     this.room.set(undefined);
     this.localParticipant.set(undefined);
@@ -696,6 +642,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.screenShareTrack.set(null);
     this.screenShareParticipantId.set(null);
     this.meetingRoomStatus = "left"
+
+    // 3. Cleanup when leaving
+    await this.picoKoalaService.stop();
+    await this.picoKoalaService.release();
   }
 
   // Close the Room and disconnect everyone
@@ -934,7 +884,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         console.log("No Egress ID Found")
         this.roomDetail.recordingstatus = existingStatus;
       }
-    } catch (error) { 
+    } catch (error) {
       console.log(error)
       this.roomDetail.recordingstatus = existingStatus;
     }
@@ -1290,417 +1240,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return 'Someone';
   }
 
-  
-
-  // /**
-  // * Enable microphone with RNNoise noise cancellation
-  // */
-  // async enableMicrophoneWithNoiseCancellation(room: Room) {
-  //   try {
-  //     console.log('🎙️ Enabling microphone with RNNoise...');
- 
-  //     // ✅ Stop the preview audio track before opening the RNNoise stream.
-  //     // If the preview audio track is still running when we open a second
-  //     // getUserMedia call, both captures are active simultaneously and their
-  //     // AEC contexts are independent — causing echo on both sides.
-  //     if (this.previewStream) {
-  //       this.previewStream.getAudioTracks().forEach(t => t.stop());
-  //     }
- 
-  //     // Open a fresh mic stream. echoCancellation is the browser's native AEC
-  //     // — it runs at the OS driver level, before any Web Audio processing.
-  //     // This is the correct layer to handle echo. RNNoise then handles
-  //     // background noise on top of an already echo-cancelled signal.
-  //     const rawStream = await navigator.mediaDevices.getUserMedia({
-  //       audio: {
-  //         echoCancellation: true,   // ← native AEC at OS level, handles echo
-  //         noiseSuppression: false,  // ← RNNoise handles this instead
-  //         autoGainControl: false,   // ← disabled; outputGain in service handles level
-  //         sampleRate: 48000,
-  //         channelCount: 1
-  //       }
-  //     });
- 
-  //     const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
- 
-  //     await room.localParticipant.publishTrack(cleanAudioTrack, {
-  //       source: Track.Source.Microphone,
-  //       name: 'microphone'
-  //     });
- 
-  //     console.log('✅ Microphone enabled with RNNoise');
- 
-  //   } catch (error) {
-  //     console.error('❌ RNNoise failed, falling back to WebRTC:', error);
- 
-  //     // Fallback: stop preview audio track here too before re-opening mic
-  //     if (this.previewStream) {
-  //       this.previewStream.getAudioTracks().forEach(t => t.stop());
-  //     }
- 
-  //     await room.localParticipant.setMicrophoneEnabled(true, {
-  //       echoCancellation: true,
-  //       noiseSuppression: true,
-  //       autoGainControl: true,
-  //       sampleRate: 48000,
-  //       channelCount: 1
-  //     });
- 
-  //     console.log('✅ Microphone enabled with WebRTC fallback');
-  //   }
-  // }
-
-  /**
-   * OffscreenCanvas video pre-processing pipeline.
-   *
-   * Decouples the camera capture rate from the encode rate by drawing frames
-   * onto an OffscreenCanvas at exactly `targetFps`. This gives precise frame-rate
-   * control even when the camera hardware returns a higher native rate.
-   *
-   * The processed canvas stream replaces the raw camera track on the local
-   * participant — the original audio track is merged back into the new stream.
-   *
-   * ── Why OffscreenCanvas instead of regular Canvas? ────────────────────────
-   * OffscreenCanvas.getContext('2d') doesn't trigger main-thread reflow/repaint,
-   * reducing jank when DF3 WASM is also running on the main thread.
-   *
-   * ── Browser support ───────────────────────────────────────────────────────
-   * Chrome 69+, Edge 79+, Firefox 105+.  Safari 16.4+ supports OffscreenCanvas
-   * but NOT captureStream() on it — falls back to regular <canvas> for Safari.
-   *
-   * @returns cleanup function to stop the pipeline
-   */
-  private startCanvasProcessingPipeline(
-    room: Room,
-    targetFps: number = 20,
-  ): (() => void) | null {
-    const cameraPub = Array.from(room.localParticipant.videoTracks.values())
-      .find(pub => pub.source === Track.Source.Camera);
-    if (!cameraPub?.track) {
-      console.warn('Canvas pipeline: no camera track to process');
-      return null;
-    }
-
-    const srcTrack = cameraPub.track.mediaStreamTrack;
-    const settings = srcTrack.getSettings();
-    const w = settings.width  || 640;
-    const h = settings.height || 480;
-
-    // Safari doesn't support captureStream() on OffscreenCanvas — use regular canvas
-    const usesOffscreen = typeof OffscreenCanvas !== 'undefined';
-    let canvas: OffscreenCanvas | HTMLCanvasElement;
-    let ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
-
-    if (usesOffscreen) {
-      canvas = new OffscreenCanvas(w, h);
-      ctx = canvas.getContext('2d');
-    } else {
-      canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      ctx = canvas.getContext('2d');
-    }
-
-    if (!ctx) {
-      console.warn('Canvas pipeline: could not get 2d context');
-      return null;
-    }
-
-    // Create a hidden <video> element to feed frames from the raw camera track
-    const video = document.createElement('video');
-    video.srcObject = new MediaStream([srcTrack]);
-    video.muted = true;
-    video.playsInline = true;
-    video.play();
-
-    const intervalMs = 1000 / targetFps;
-    let stopped = false;
-
-    const drawLoop = setInterval(() => {
-      if (stopped || video.readyState < 2) return;
-      (ctx as CanvasRenderingContext2D).drawImage(video, 0, 0, w, h);
-    }, intervalMs);
-
-    // Get the output stream from the canvas
-    let processedStream: MediaStream;
-    if (canvas instanceof HTMLCanvasElement) {
-      processedStream = canvas.captureStream(targetFps);
-    } else {
-      // OffscreenCanvas doesn't have captureStream — transfer to regular canvas
-      // This path is a progressive enhancement; we fall back safely
-      console.log('Canvas pipeline: using OffscreenCanvas draw loop (no captureStream)');
-      const fallbackCanvas = document.createElement('canvas');
-      fallbackCanvas.width = w;
-      fallbackCanvas.height = h;
-      const fallbackCtx = fallbackCanvas.getContext('2d')!;
-
-      // Override the draw loop to also copy to fallback canvas
-      clearInterval(drawLoop);
-      const dualDrawLoop = setInterval(() => {
-        if (stopped || video.readyState < 2) return;
-        (ctx as OffscreenCanvasRenderingContext2D).drawImage(video, 0, 0, w, h);
-        fallbackCtx.drawImage(video, 0, 0, w, h);
-      }, intervalMs);
-
-      processedStream = fallbackCanvas.captureStream(targetFps);
-
-      // Replace cleanup for the dual loop
-      const cleanup = () => {
-        stopped = true;
-        clearInterval(dualDrawLoop);
-        video.srcObject = null;
-      };
-
-      // Publish the processed video track, keeping original audio
-      const processedVideoTrack = processedStream.getVideoTracks()[0];
-      room.localParticipant.publishTrack(processedVideoTrack, {
-        source: Track.Source.Camera,
-        name: 'canvas-camera',
-      }).then(() => {
-        console.log(`Canvas pipeline (OffscreenCanvas fallback): ${w}x${h}@${targetFps}fps`);
-      }).catch(err => {
-        console.warn('Canvas pipeline: failed to publish processed track:', err);
-      });
-
-      return cleanup;
-    }
-
-    // Publish the canvas-processed video track
-    const processedVideoTrack = processedStream.getVideoTracks()[0];
-    room.localParticipant.publishTrack(processedVideoTrack, {
-      source: Track.Source.Camera,
-      name: 'canvas-camera',
-    }).then(() => {
-      console.log(`Canvas pipeline active: ${w}x${h}@${targetFps}fps`);
-    }).catch(err => {
-      console.warn('Canvas pipeline: failed to publish processed track:', err);
-    });
-
-    return () => {
-      stopped = true;
-      clearInterval(drawLoop);
-      video.srcObject = null;
-    };
-  }
-
-  /**
-   * Enable microphone with DeepFilterNet3 noise cancellation.
-   *
-   * ── Audio pipeline ────────────────────────────────────────────────────────
-   *
-   *   getUserMedia (raw mic, 48 kHz)
-   *       │
-   *       ▼
-   *   DeepFilter3Service.init()          — loads ONNX model + AudioWorklet
-   *       │                                (~7.7 MB, one-time per session)
-   *       ▼
-   *   DeepFilter3Service.processStream() — wires audio graph:
-   *       │   MediaStreamSource
-   *       │       → AudioWorkletNode (deepfilternet3-noise-filter)
-   *       │           → MediaStreamDestination
-   *       ▼
-   *   cleanStream (MediaStream)          — background noise removed
-   *       │
-   *       ▼
-   *   room.localParticipant.publishTrack — LiveKit publishes clean audio
-   *
-   * ── Fallback ─────────────────────────────────────────────────────────────
-   *   If DeepFilterNet3 is not supported (non-Chromium browsers without
-   *   AudioWorklet) → native WebRTC noiseSuppression:true is used instead.
-   *
-   * ── Previous filter (Amazon Voice Focus) ─────────────────────────────────
-   *   The original Voice Focus implementation is preserved below, commented
-   *   out. To revert: comment the DF3 block, uncomment the Voice Focus block.
-   * ─────────────────────────────────────────────────────────────────────────
-   */
-  /**
-   * Prepares the noise-cancelled audio track BEFORE joining the room.
-   * Called pre-connect so the VAD has time to calibrate during the room handshake.
-   */
-  /*
-  async prepareNoiseCancelledTrack(): Promise<MediaStreamTrack> {
-    // Stop any existing preview track
-    if (this.previewStream) {
-      this.previewStream.getAudioTracks().forEach(t => {
-        t.stop();
-        console.log('Stopped preview audio track');
-      });
-    }
-
-    // Capture raw mic — autoGainControl OFF to avoid fighting DF3's gainBoost node.
-    // echoCancellation ON — browser AEC removes speaker echo before DF3 sees the signal.
-    const rawStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: false,   // DF3 handles noise
-        autoGainControl: false,    // OFF — prevents browser AGC fighting our gainBoost
-        sampleRate: 48000,
-        channelCount: 1
-      }
-    });
-
-    console.log('🎙️ Raw mic stream obtained:', rawStream.getAudioTracks()[0].getSettings());
-
-    // Init DF3 — skip if already pre-warmed in ngAfterViewInit
-    let df3Supported: boolean;
-    if (this.deepFilter3.isInitialized()) {
-      console.log('✅ DeepFilterNet3 already pre-warmed — skipping init');
-      df3Supported = true;
-    } else {
-      console.log('🔄 DeepFilterNet3 not yet ready — initialising now…');
-      df3Supported = await this.deepFilter3.init(80);
-    }
-
-    if (df3Supported) {
-      const cleanStream = await this.deepFilter3.processStream(rawStream);
-      console.log(
-        `✅ DeepFilterNet3 active — init: ${this.deepFilter3.initTimeMs}ms,`,
-        `graph: ${this.deepFilter3.processingLatencyMs}ms (VAD calibrating pre-connect…)`
-      );
-      return cleanStream.getAudioTracks()[0];
-    }
-
-    // Fallback — browser handles noise suppression
-    console.warn('⚠️ DeepFilterNet3 not supported — using raw stream.');
-    return rawStream.getAudioTracks()[0];
-  }
-  */
-
-  async prepareNoiseCancelledTrack(): Promise<MediaStreamTrack> {
-    // Stop preview audio — WebVoiceProcessor opens its own mic
-    if (this.previewStream) {
-      this.previewStream.getAudioTracks().forEach(t => t.stop());
-    }
-
-    let koalaReady = this.koala.isInitialized()
-      || await this.koala.init(environment['picovoiceAccessKey']);
-
-    if (koalaReady) {
-      const cleanStream = await this.koala.processStream();
-      console.log(`✅ Koala active — init: ${this.koala.initTimeMs}ms`);
-      return cleanStream.getAudioTracks()[0];
-    }
-
-    // Fallback — browser native
-    console.warn('⚠️ Koala failed — using browser fallback');
-    const fallback = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000, channelCount: 1 }
-    });
-    return fallback.getAudioTracks()[0];
-  }
-
-  /*
-  async enableMicrophoneWithNoiseCancellation(room: Room, cleanAudioTrack: MediaStreamTrack) {
-    try {
-
-      // ── Publish the pre-built clean track to LiveKit ─────────────────────
-      // dtx: false — disables Opus Discontinuous Transmission. Without this,
-      // when VAD sets suppression level high (silence), signal energy drops
-      // near zero and Opus stops sending packets → remote participants hear
-      // silence/breaks. With dtx: false packets flow continuously.
-      await room.localParticipant.publishTrack(cleanAudioTrack, {
-        source: Track.Source.Microphone,
-        name: 'microphone',
-        dtx: false
-      });
-
-      if (this.debugAudioLevels) this.debugAudioLevels();
-      console.log('✅ Microphone published with DeepFilterNet3 noise cancellation (dtx: false)');
-
-      // ── [DISABLED] Amazon Voice Focus — original implementation ──────────
-      // Kept intact for easy revert. To re-enable:
-      //   1. Comment the DF3 block above (Steps 3–4b)
-      //   2. Uncomment this block
-      //
-      // console.log('🎙️ Enabling microphone with Amazon Voice Focus...');
-      //
-      // // Step 2 — Init Voice Focus
-      // const supported = await this.audiofilterservice.init();
-      //
-      // let cleanAudioTrack: MediaStreamTrack;
-      //
-      // if (supported) {
-      //   // Step 3a — Apply Voice Focus
-      //   const cleanStream = await this.audiofilterservice.processStream(rawStream);
-      //   cleanAudioTrack = cleanStream.getAudioTracks()[0];
-      //   console.log('✅ Amazon Voice Focus active');
-      // }
-      // ─────────────────────────────────────────────────────────────────────
-
-    } catch (error) {
-      console.error('❌ DeepFilterNet3 failed, falling back to native WebRTC:', error);
-
-      // Destroy DF3 instance if it was partially initialised
-      this.deepFilter3.destroy();
-
-      // Stop preview audio
-      if (this.previewStream) {
-        this.previewStream.getAudioTracks().forEach(t => t.stop());
-      }
-
-      // ── Native browser fallback — always works on all browsers ───────────
-      await room.localParticipant.setMicrophoneEnabled(true, {
-        echoCancellation: true,
-        noiseSuppression: true,   // WebRTC built-in suppression as last resort
-        autoGainControl: true,
-        sampleRate: 48000,
-        channelCount: 1
-      });
-
-      if (this.debugAudioLevels) this.debugAudioLevels();
-      console.log('✅ Microphone enabled with WebRTC native fallback');
-    }
-  }
-  */
-  async enableMicrophoneWithNoiseCancellation(room: Room, cleanAudioTrack: MediaStreamTrack) {
-    try {
-      await room.localParticipant.publishTrack(cleanAudioTrack, {
-        source: Track.Source.Microphone,
-        name: 'microphone',
-        dtx: false
-      });
-
-      console.log('✅ Microphone published with Koala noise suppression');
-
-    } catch (error) {
-      console.error('❌ Koala failed, falling back to native WebRTC:', error);
-
-      this.koala.destroy();
-
-      if (this.previewStream) {
-        this.previewStream.getAudioTracks().forEach(t => t.stop());
-      }
-
-      await room.localParticipant.setMicrophoneEnabled(true, {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 48000,
-        channelCount: 1
-      });
-
-      console.log('✅ Microphone enabled with WebRTC fallback');
-    }
-  }
-
-  // Keep your existing debugAudioLevels as-is
-  debugAudioLevels() {
-    const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
-    if (micPub?.audioTrack) {
-      const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
-      console.log('📊 Audio Track Settings:', {
-        sampleRate: settings.sampleRate,
-        channelCount: settings.channelCount,
-        echoCancellation: settings.echoCancellation,
-        noiseSuppression: settings.noiseSuppression,
-        autoGainControl: settings.autoGainControl,
-        // voiceFocusActive: this.audiofilterservice.isActive()
-      });
-    }
-  }
-
-  
-
   /**
   *remove a participant from the room
   */
@@ -1728,10 +1267,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       );
 
       console.log('Participant kicked successfully:', response.message);
-      
+
     } catch (error: any) {
       console.error('Failed to kick participant:', error);
-      
+
       let errorMessage = 'Failed to remove participant. Please try again.';
       if (error.status === 403) {
         errorMessage = 'Only hosts can remove participants';
@@ -1740,7 +1279,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       } else if (error.error?.message) {
         errorMessage = error.error.message;
       }
-      
+
       alert(errorMessage);
     }
   }
@@ -1759,7 +1298,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (!confirmed) return;
 
     try {
-      
+
       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/muteParticipant`;
 
       const response = await firstValueFrom(
@@ -1775,10 +1314,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       );
 
       console.log(`Participant ${action}d:`, response.message);
-      
+
     } catch (error: any) {
       console.error(`Failed to ${action} participant:`, error);
-      
+
       let errorMessage = `Failed to ${action} participant. Please try again.`;
       if (error.status === 403) {
         errorMessage = 'Only hosts can mute/unmute participants';
@@ -1787,7 +1326,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       } else if (error.error?.message) {
         errorMessage = error.error.message;
       }
-      
+
       alert(errorMessage);
     }
   }
@@ -1987,18 +1526,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         mute: this.isAudioMuted()
       },
 
-      noiseCancellation: {
-        df3Active: this.deepFilter3.isActive(),
-        echoCancellation: (trackSettings as any)['echoCancellation'] ?? true,
-        noiseSuppression: this.deepFilter3.isActive(),
-        agc: (trackSettings as any)['autoGainControl'] ?? false
-      },
-
-      mic: {
-        levelDb: this.deepFilter3.getMicLevelDb(),
-        vadState: this.deepFilter3.getVadState(),
-        suppressionLevel: this.deepFilter3.getCurrentSuppressionLevel()
-      },
 
       network: {
         rtt: network.rtt,

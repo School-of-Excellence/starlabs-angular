@@ -35,11 +35,6 @@
                 "glob": "**/*",
                 "input": "node_modules/@ai-coustics/aic-sdk/dist/assets",
                 "output": "/assets/aic/"
-              },
-              {
-                "glob": "koala_params.pv",
-                "input": "src/assets/PicoVoice",
-                "output": "assets/PicoVoice"
               }
             ],
             "styles": [
