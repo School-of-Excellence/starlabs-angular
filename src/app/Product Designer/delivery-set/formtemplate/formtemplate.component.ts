@@ -404,19 +404,24 @@ export class FormtemplateComponent {
     
     if (this.deliveryForm.invalid) {
       this.deliveryForm.markAllAsTouched();
-      const firstInvalidControl = Object.keys(this.deliveryForm.controls).find(
-        key => this.deliveryForm.controls[key].invalid
-      );
-      // scrolling to not filled quention in form
-      if (firstInvalidControl) {
-        const el = document.querySelector(
-          `[formcontrolname="${firstInvalidControl}"], [ng-reflect-name="${firstInvalidControl}"]`
+      // ng-reflect-* attrs are stripped in prod, and .ng-invalid is also on the <form>/group
+      // containers, so find the innermost invalid element (the actual field).
+      setTimeout(() => {
+        const invalids = Array.from(
+          document.querySelectorAll<HTMLElement>('.ng-invalid')
+        );
+        const el = invalids.find(
+          e => e.tagName !== 'FORM' && !e.querySelector('.ng-invalid')
         );
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          (el as HTMLElement).focus?.();
+          const focusable =
+            el.matches('input, textarea, select')
+              ? el
+              : el.querySelector<HTMLElement>('input, textarea, select, [tabindex]');
+          focusable?.focus?.();
         }
-      }
+      });
       return;
     }
     const previewRef = this.dialog.open(FormTemplatePreviewComponent, {
