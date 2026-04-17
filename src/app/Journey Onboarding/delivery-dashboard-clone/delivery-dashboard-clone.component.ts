@@ -3734,10 +3734,8 @@ export class DeliveryDashboardCloneComponent {
                     'Status': item['status'] || 'N/A'
                 };
 
-                if (isExcludedMode) {
+                if (isExcludedMode || isPaymentEligible) {
                     row['Mode'] = this.mapMetaData[pid]?.['participantmode'] || '';
-                }
-                if (!isPaymentEligible) {
                     row['Total Paid'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
                     row['Minimum Payment'] = item?.['minimumpayment'] || '';
                     row['Remaining Payment'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
