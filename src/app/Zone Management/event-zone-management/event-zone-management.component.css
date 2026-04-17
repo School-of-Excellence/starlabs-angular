@@ -223,6 +223,8 @@
   font-size: 0.625rem;
   font-weight: 700;
   width: fit-content;
+  background: #94a3b8;
+  color: white;
 }
 
 .cohort-badge.badge-operational {
@@ -233,6 +235,28 @@
 .cohort-badge.badge-educational {
   background: #f093fb;
   color: white;
+}
+
+.cohort-category-section {
+  margin-bottom: 0.75rem;
+}
+
+.cohort-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.25rem;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.cohort-category-count {
+  font-size: 0.75rem;
+  color: #718096;
+  font-weight: 600;
 }
 
 .cohort-count {

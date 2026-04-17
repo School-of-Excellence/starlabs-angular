@@ -1,6 +1,5 @@
 import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, ViewChildren, QueryList, ElementRef, signal } from '@angular/core';
-import { ConnectivityAlertComponent } from './connectivity-alert.component';
-import { MatDialogRef } from '@angular/material/dialog';
+import { ConnectivityGuardService } from '../../../shared/connectivity-guard.service';
 import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -108,15 +107,9 @@ export class FormtemplateComponent {
   private autoSaveDebounceTimer: any = null;
   private readonly AUTOSAVE_DEBOUNCE_MS = 600;
 
-  // --- Connectivity monitoring ---
-  connectivityDialogRef: MatDialogRef<ConnectivityAlertComponent> | null = null;
-  private connectivityPingTimer: any = null;
-  private connectivityState: 'good' | 'bad' = 'good';
-  private badSince: number | null = null;
-  private readonly BAD_DEBOUNCE_MS = 3000;
-  private onlineHandler = () => this.evaluateConnectivity();
-  private offlineHandler = () => this.evaluateConnectivity(true);
-  private connectionChangeHandler = () => this.evaluateConnectivity();
+  // --- Connectivity monitoring (handled by ConnectivityGuardService) ---
+  private connectivity = inject(ConnectivityGuardService);
+  private unregisterConnectivity: (() => void) | null = null;
 
   constructor(
     private route : ActivatedRoute,
@@ -134,109 +127,21 @@ export class FormtemplateComponent {
   }
 
   ngOnDestroy() {
-    window.removeEventListener('online', this.onlineHandler);
-    window.removeEventListener('offline', this.offlineHandler);
-    const conn = (navigator as any).connection;
-    conn?.removeEventListener?.('change', this.connectionChangeHandler);
-    if (this.connectivityPingTimer) clearInterval(this.connectivityPingTimer);
-    this.connectivityDialogRef?.close();
-  }
-
-  private startConnectivityMonitoring() {
-    window.addEventListener('online', this.onlineHandler);
-    window.addEventListener('offline', this.offlineHandler);
-    const conn = (navigator as any).connection;
-    conn?.addEventListener?.('change', this.connectionChangeHandler);
-    this.connectivityPingTimer = setInterval(() => this.pingConnectivity(), 15000);
-    this.evaluateConnectivity();
-  }
-
-  private async pingConnectivity() {
-    if (!navigator.onLine) {
-      this.evaluateConnectivity(true);
-      return;
-    }
-    const started = Date.now();
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 5000);
-      await fetch('https://www.gstatic.com/generate_204?ts=' + started, {
-        method: 'GET', cache: 'no-store', mode: 'no-cors', signal: ctrl.signal
-      });
-      clearTimeout(t);
-      const rtt = Date.now() - started;
-      this.evaluateConnectivity(false, rtt);
-    } catch {
-      this.evaluateConnectivity(true);
-    }
-  }
-
-  private isBadConnection(forceOffline = false, rtt?: number): boolean {
-    if (forceOffline || !navigator.onLine) return true;
-    const conn = (navigator as any).connection;
-    if (conn?.effectiveType && ['slow-2g', '2g'].includes(conn.effectiveType)) return true;
-    if (conn?.downlink != null && conn.downlink > 0 && conn.downlink < 0.3) return true;
-    if (rtt != null && rtt > 4000) return true;
-    return false;
-  }
-
-  private evaluateConnectivity(forceOffline = false, rtt?: number) {
-    const bad = this.isBadConnection(forceOffline, rtt);
-    if (bad) {
-      if (this.badSince == null) this.badSince = Date.now();
-      const sustained = Date.now() - this.badSince >= this.BAD_DEBOUNCE_MS || forceOffline || !navigator.onLine;
-      if (sustained && this.connectivityState !== 'bad') {
-        this.connectivityState = 'bad';
-        this.handleBadConnection();
-      }
-    } else {
-      this.badSince = null;
-      if (this.connectivityState !== 'good') {
-        this.connectivityState = 'good';
-        this.connectivityDialogRef?.close();
-        this.connectivityDialogRef = null;
-      }
-    }
-  }
-
-  private async handleBadConnection() {
-    if (this.formpatch) return; // preview/patch mode - no drafts
-    if (this.connectivityDialogRef) return;
-
-    const offline = !navigator.onLine;
-    this.connectivityDialogRef = this.dialog.open(ConnectivityAlertComponent, {
-      disableClose: true,
-      width: '420px',
-      data: { offline, draftStatus: 'saving' }
-    });
-
-    const inst = this.connectivityDialogRef.componentInstance;
-    inst.setOffline(offline);
-
-    if (this.showcontent && this.deliveryForm) {
-      inst.setDraftStatus('saving');
-      try {
-        // Cancel any pending debounced save; force an immediate one so the draft
-        // is guaranteed in-flight before we block the UI.
-        if (this.autoSaveDebounceTimer) {
-          clearTimeout(this.autoSaveDebounceTimer);
-          this.autoSaveDebounceTimer = null;
-        }
-        await this._performAutoSave(this.deliveryForm.getRawValue());
-        inst.setDraftStatus('saved');
-      } catch (err) {
-        console.error('Draft save failed during bad connection:', err);
-        inst.setDraftStatus('failed');
-      }
-    } else {
-      inst.setDraftStatus('idle');
-    }
-
-    inst.setOffline(!navigator.onLine);
+    this.unregisterConnectivity?.();
   }
 
   async ngOnInit() {
-    this.startConnectivityMonitoring();
+    // Register with the shared connectivity guard. The service will open a
+    // blocking dialog on bad connection and call this save callback first.
+    this.unregisterConnectivity = this.connectivity.register(async () => {
+      if (this.formpatch) return; // preview/patch mode - no drafts
+      if (!this.showcontent || !this.deliveryForm) return;
+      if (this.autoSaveDebounceTimer) {
+        clearTimeout(this.autoSaveDebounceTimer);
+        this.autoSaveDebounceTimer = null;
+      }
+      await this._performAutoSave(this.deliveryForm.getRawValue());
+    });
      // Get queue ID from route params
     this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.formpatch = ![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null,undefined].includes(this.participantformtemplateid) ? true : false)
