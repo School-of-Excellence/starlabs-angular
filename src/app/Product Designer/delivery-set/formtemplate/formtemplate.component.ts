@@ -401,11 +401,13 @@ export class FormtemplateComponent {
   }
 
   async onSubmit(value: any) {
+    
     if (this.deliveryForm.invalid) {
       this.deliveryForm.markAllAsTouched();
       const firstInvalidControl = Object.keys(this.deliveryForm.controls).find(
         key => this.deliveryForm.controls[key].invalid
       );
+      // scrolling to not filled quention in form
       if (firstInvalidControl) {
         const el = document.querySelector(
           `[formcontrolname="${firstInvalidControl}"], [ng-reflect-name="${firstInvalidControl}"]`
