@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "breakthroughs-test",
+    "site": "starlabs-test",
     "public": "dist/atctranscription/browser",
     "ignore": [
       "firebase.json",
@@ -46,6 +46,10 @@
           {
             "key": "Cross-Origin-Opener-Policy",
             "value": "same-origin"
+          },
+          {
+            "key": "Cross-Origin-Embedder-Policy",
+            "value": "require-corp"
           }
         ]
       },

@@ -24,6 +24,7 @@ jobs:
           FIREBASE_PROD_CONFIG: ${{ secrets.FIREBASE_PROD_CONFIG }}
           WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
           WATSON_PROD_CONFIG: ${{ secrets.WATSON_PROD_CONFIG }}
+          PICOVOICE_ACCESS_KEY: ${{ PICOVOICE_ACCESS_KEY }}
         run: |
           mkdir -p src/environments
           
@@ -34,7 +35,8 @@ jobs:
             production: true,
             firebase: $FIREBASE_TEST_CONFIG,
             watson: $WATSON_TEST_CONFIG,
-            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3'
+            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
+            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
             
@@ -43,7 +45,8 @@ jobs:
             production: true,
             firebase: $FIREBASE_TEST_CONFIG,
             watson: $WATSON_TEST_CONFIG,
-            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3'
+            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
+            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
             cat > src/firebase-messaging-sw.js << EOF
@@ -60,7 +63,8 @@ jobs:
             production: true,
             firebase: $FIREBASE_PROD_CONFIG,
             watson: $WATSON_PROD_CONFIG,
-            df3CdnUrl: 'https://breakthroughs.app/assets/df3'
+            df3CdnUrl: 'https://breakthroughs.app/assets/df3',
+            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
             
@@ -69,7 +73,8 @@ jobs:
             production: true,
             firebase: $FIREBASE_PROD_CONFIG,
             watson: $WATSON_PROD_CONFIG,
-            df3CdnUrl: 'https://breakthroughs.app/assets/df3'
+            df3CdnUrl: 'https://breakthroughs.app/assets/df3',
+            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
             cat > src/firebase-messaging-sw.js << EOF
