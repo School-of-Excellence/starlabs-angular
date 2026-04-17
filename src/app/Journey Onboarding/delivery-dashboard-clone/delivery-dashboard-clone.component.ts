@@ -3734,11 +3734,13 @@ export class DeliveryDashboardCloneComponent {
                     'Status': item['status'] || 'N/A'
                 };
 
-                if (isExcludedMode || isPaymentEligible) {
+                if (isExcludedMode) {
                     row['Mode'] = this.mapMetaData[pid]?.['participantmode'] || '';
-                    row['Total Paid'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
+                }
+                if (!isPaymentEligible) {
                     row['Minimum Payment'] = item?.['minimumpayment'] || '';
-                    row['Remaining Payment'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
+                    row['Total Paid'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
+                    row['Remaining Payable'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
                 }
 
                 rows.push(row);
