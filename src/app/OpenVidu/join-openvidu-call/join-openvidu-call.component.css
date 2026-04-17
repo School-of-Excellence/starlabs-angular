@@ -432,94 +432,249 @@
   }
 }
 
+
 /* ============================ */
-/* SCREEN SHARE LAYOUT (ZOOM-STYLE) */
+/* SPOTLIGHT LAYOUT (2 participants) */
 /* ============================ */
 
-.screen-share-layout {
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  background: #000;
-  
+.spotlight-layout {
+  position: relative;
   margin-top: 40px;
   margin-bottom: 80px;
   height: calc(100vh - 40px - 80px);
+  background: #000;
   overflow: hidden;
 }
 
-/* Main screen share area (left side, 80% width) */
-.screen-share-main {
-  flex: 1;
-  position: relative;
-  background: #1a1a1a;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.screen-share-main app-openvidu-video-element,
-.screen-share-main video {
+/* Main video fills the entire spotlight area */
+.main-video {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain; /* contain for screen share, not cover */
-}
-
-/* Participants sidebar (right side, 20% width) */
-.participants-sidebar {
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* Small tiles for sidebar */
-.zoom-video-tile-small {
-  position: relative;
-  background: #1a1a1a;
-  border-radius: 8px;
-  overflow: hidden;
+  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 16 / 9;
-  min-height: 120px;
 }
 
-.zoom-video-tile-small app-openvidu-video-element,
-.zoom-video-tile-small video {
+.main-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.main-video video.mirror {
+  transform: scaleX(-1);
+}
+
+.main-video video.screen-share-video {
+  object-fit: contain;
+  background: #1a1a1a;
+}
+
+.main-video .participant-label {
+  position: absolute;
+  bottom: 100px;
+  left: 24px;
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+}
+
+.main-video .video-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+}
+
+.main-video .video-placeholder .avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 48px;
+  font-weight: 600;
+}
+
+.main-video .participant-options-btn {
+  display: none;
+}
+
+.main-video:hover .participant-options-btn {
+  display: flex;
+}
+
+/* PiP video placeholder */
+.pip-video .video-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+.pip-video .video-placeholder .avatar.small,
+.main-video .video-placeholder .avatar.small {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.avatar-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.avatar-circle.small {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+}
+
+/* ============================ */
+/* PiP VIDEO (Draggable)        */
+/* ============================ */
+
+.pip-video {
+  position: absolute;
+  width: 200px;
+  height: 150px;
+  border-radius: 12px;
+  background: #1a1a1a;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  cursor: grab;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              right 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.pip-video:active {
+  cursor: grabbing;
+}
+
+/* Corner positions */
+.pip-video.bottom-right { bottom: 24px; right: 24px; }
+.pip-video.bottom-left { bottom: 24px; left: 24px; }
+.pip-video.top-right { top: 24px; right: 24px; }
+.pip-video.top-left { top: 24px; left: 24px; }
+
+/* Minimized state */
+.pip-video.minimized {
+  width: 120px;
+  height: 90px;
+}
+
+.pip-video.minimized .pip-label {
+  display: none;
+}
+
+/* Hover effects */
+.pip-video:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.pip-video:hover .pip-controls {
+  opacity: 1;
+}
+
+/* While dragging */
+.pip-video.cdk-drag-dragging {
+  cursor: grabbing;
+  border-color: #4CAF50;
+  box-shadow: 0 16px 48px rgba(76, 175, 80, 0.4);
+  transition: none;
+  z-index: 1000;
+}
+
+.pip-video app-openvidu-video-element,
+.pip-video video {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.mirrorsharing{
-  transform: scaleX(-1);
+.pip-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .screen-share-layout {
-    flex-direction: column;
-  }
-
-  .participants-sidebar {
-    width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    max-height: 140px;
-  }
-
-  .zoom-video-tile-small {
-    min-width: 160px;
-    flex-shrink: 0;
-  }
+.pip-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
+
+.pip-controls button {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.pip-controls button .material-icons {
+  font-size: 16px;
+}
+
+.pip-controls button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+
+
 
 /* Tile Overlay */
 .tile-overlay {
@@ -682,4 +837,221 @@
 
 .blur-menu-trigger.blur-active:hover {
   background: #0d47a1;
+}
+
+/* ============== VIDEO INDICATORS ============== */
+.video-indicators {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.main-indicators {
+  top: 16px;
+  right: 16px;
+}
+
+.pip-indicators {
+  top: 6px;
+  right: 6px;
+}
+
+.indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+
+.main-indicators .indicator {
+  width: 36px;
+  height: 36px;
+}
+
+.pip-indicators .indicator {
+  width: 24px;
+  height: 24px;
+}
+
+.indicator-icon {
+  fill: currentColor;
+}
+
+.main-indicators .indicator-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.pip-indicators .indicator-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.network-indicator.excellent {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.network-indicator.good {
+  color: #8bc34a;
+  background: rgba(139, 195, 74, 0.2);
+}
+
+.network-indicator.poor {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.2);
+}
+
+.network-indicator.lost {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.2);
+}
+
+.network-indicator.unknown {
+  color: #9e9e9e;
+  background: rgba(158, 158, 158, 0.2);
+}
+
+.mute-indicator {
+  color: #ffffff;
+  background: rgba(244, 67, 54, 0.85);
+}
+
+.main-video.active-speaker .main-indicators .network-indicator {
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+/* ============================ */
+/* SCREEN SHARE LAYOUT          */
+/* ============================ */
+.screen-share-layout {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: #000;
+  margin-top: 40px;
+  margin-bottom: 80px;
+  height: calc(100vh - 40px - 80px);
+  overflow: hidden;
+}
+
+/* Main screen share area (left side) */
+.screen-share-main {
+  flex: 1;
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen-share-main app-openvidu-video-element,
+.screen-share-main video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Participants sidebar (right side - SCROLLABLE) */
+.participants-sidebar {
+  width: 280px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;      /* ⬅️ Vertical scroll */
+  overflow-x: hidden;
+  padding: 6px;
+  max-height: 100%;
+}
+
+/* Custom scrollbar for sidebar */
+.participants-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.participants-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.participants-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.participants-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Small tiles for sidebar */
+.zoom-video-tile-small {
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  min-height: 120px;
+  flex-shrink: 0;        /* ⬅️ Prevents squishing */
+}
+
+.zoom-video-tile-small app-openvidu-video-element,
+.zoom-video-tile-small video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.zoom-video-tile-small .zoom-name-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.zoom-video-tile-small .network-bars {
+  height: 10px;
+}
+
+.zoom-video-tile-small .network-bars .bar {
+  width: 2px;
+}
+
+.zoom-video-tile-small .network-bars .bar:nth-child(1) { height: 3px; }
+.zoom-video-tile-small .network-bars .bar:nth-child(2) { height: 5px; }
+.zoom-video-tile-small .network-bars .bar:nth-child(3) { height: 7px; }
+.zoom-video-tile-small .network-bars .bar:nth-child(4) { height: 9px; }
+
+/* ============================ */
+/* RESPONSIVE: SCREEN SHARE     */
+/* ============================ */
+@media (max-width: 768px) {
+  .screen-share-layout {
+    flex-direction: column;
+  }
+
+  .participants-sidebar {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: 140px;
+    padding: 6px;
+  }
+
+  .zoom-video-tile-small {
+    min-width: 160px;
+    min-height: 90px;
+    flex-shrink: 0;
+  }
 }
