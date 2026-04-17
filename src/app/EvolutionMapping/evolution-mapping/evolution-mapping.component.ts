@@ -1,17 +1,15 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { Firestore, collection, collectionData,query, where, getDocs,doc, updateDoc, deleteDoc } from '@angular/fire/firestore';
-
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage, ref as afRef, uploadBytes as afUploadBytes, getDownloadURL as afGetDownloadURL } from '@angular/fire/storage';
 import { inject } from '@angular/core';
-  import { MatDialog } from '@angular/material/dialog';
-  import { Router } from '@angular/router';
-
-  import { MatSort } from '@angular/material/sort';
-  import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-  import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
-  import { MatSnackBar } from '@angular/material/snack-bar';
-  import { DomSanitizer } from '@angular/platform-browser';
+import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
+import { MatSort } from '@angular/material/sort';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { DomSanitizer } from '@angular/platform-browser';
 import { LiveEvolutionMappingComponent } from './live-evolution-mapping/live-evolution-mapping.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { CommonModule } from '@angular/common';
@@ -40,7 +38,7 @@ interface LiveEvolutionMapping {
   styleUrl: './evolution-mapping.component.css'
 })
 export class EvolutionMappingComponent {
-      mapProfile = {};
+    mapProfile = {};
     mapVideoTitle: {} = {};
     tabledata: any[] = [];
     profileOptions: any[] = [];
@@ -62,6 +60,7 @@ export class EvolutionMappingComponent {
     searchTitleTab1:string ='';
     globalSearchTab1: string = '';
     globalSearchTab2: string = '';
+    
     constructor(
       public firestore: Firestore,
       private guard: AuthguardService,
@@ -72,15 +71,14 @@ export class EvolutionMappingComponent {
       private sanitizer: DomSanitizer,  
     ) { 
       this.dataSource = new MatTableDataSource();
-      // this.dataSource2 = new MatTableDataSource();
-      this.guard.getProfileMap().then(e => {
-        this.mapProfile = e.map;
-      });
     }
 
     ngOnInit(): void {
-      this.getEvolutionMapping();
-      this.getLiveEvolutionMapping()
+      this.guard.getProfileMap().then(e => {
+        this.mapProfile = e.map;
+        this.getEvolutionMapping();
+        this.getLiveEvolutionMapping();
+      });
     }
 
     ngAfterViewInit() {
@@ -89,41 +87,43 @@ export class EvolutionMappingComponent {
       // this.dataSource2.paginator = this.paginator;
       // this.dataSource2.sort = this.sort;
     }
+
     isSelected(row: any): boolean {
       return Array.from(this.selection).some(item => item.docid === row.docid);
     }
-toggleSelection(event: any, row: any): boolean {
-  const existingSelection = Array.from(this.selection).find(item => item.docid === row.docid);
-  const firstSelectedProfileId = this.selection.size > 0 ? Array.from(this.selection)[0].profileid : null;
 
-  if (existingSelection) {
-    this.selection.delete(existingSelection);
-    return true;
-  } else {
-    if (!firstSelectedProfileId || row.profileid === firstSelectedProfileId) {
-      this.selection.add({
-        docid: row.docid,
-        profileid: row.profileid,
-        title: row.title,
-        videourl: row.videourl,
-        recordeddate: row.recordeddate,
-        created: row.created,
-        name: this.mapProfile[row.profileid]
-      });
-      return true;
-    } else {
-      event.source.checked = false;
-      setTimeout(() => {
-        event.source.checked = false;
-      });
+    toggleSelection(event: any, row: any): boolean {
+      const existingSelection = Array.from(this.selection).find(item => item.docid === row.docid);
+      const firstSelectedProfileId = this.selection.size > 0 ? Array.from(this.selection)[0].profileid : null;
 
-      this.snackBar.open('You can only select rows with the same participant.', 'Close', {
-        duration: 2000,
-      });
-      return false;
+      if (existingSelection) {
+        this.selection.delete(existingSelection);
+        return true;
+      } else {
+        if (!firstSelectedProfileId || row.profileid === firstSelectedProfileId) {
+          this.selection.add({
+            docid: row.docid,
+            profileid: row.profileid,
+            title: row.title,
+            videourl: row.videourl,
+            recordeddate: row.recordeddate,
+            created: row.created,
+            name: this.mapProfile[row.profileid]
+          });
+          return true;
+        } else {
+          event.source.checked = false;
+          setTimeout(() => {
+            event.source.checked = false;
+          });
+
+          this.snackBar.open('You can only select rows with the same participant.', 'Close', {
+            duration: 2000,
+          });
+          return false;
+        }
+      }
     }
-  }
-}
 
     // toggleSelection(event: any, row: any) {
     //   const existingSelection = Array.from(this.selection).find(item => item.docid === row.docid);
@@ -157,6 +157,7 @@ toggleSelection(event: any, row: any): boolean {
     //   console.log('Selected Row:', row);
     //   console.log('All Selected Rows:', Array.from(this.selection));
     // }
+
     async getEvolutionMapping() {
       this.mapVideoTitle = {};
       const evolutionRef = collection(this.firestore, 'evolutionmappingvideo');
@@ -178,15 +179,21 @@ toggleSelection(event: any, row: any): boolean {
         });
       });
 
-      mapData.sort((a, b) => b.created.toDate() - a.created.toDate());
+      mapData.sort((a, b) => {
+        const dateA = a.created ? a.created.toDate() : new Date(0);
+        const dateB = b.created ? b.created.toDate() : new Date(0);
+        return dateB - dateA;
+      });
       this.originalData = [...mapData];
       this.dataSource.data = mapData;
 
       const uniqueProfiles = Array.from(new Set(mapData.map(i => i.profileid)));
       this.profileOptions = uniqueProfiles.map(id => ({
         id,
-        name: this.mapProfile[id],
-      })).sort((a, b) => a.name.localeCompare(b.name));
+        name: this.mapProfile[id] || '',
+      }))
+      .filter(p => p.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
     }
 
     // getEvolutionMapping() {
@@ -244,7 +251,8 @@ toggleSelection(event: any, row: any): boolean {
     //     })).sort((a, b) => a.name.localeCompare(b.name));
     //   });  
     // }
-    async getLiveEvolutionMapping() {
+  
+  async getLiveEvolutionMapping() {
   // Initialize empty maps
   const mapLiveData: any[] = [];
 
@@ -278,10 +286,8 @@ toggleSelection(event: any, row: any): boolean {
   // Build unique profile dropdown
   const uniqueProfiles = Array.from(new Set(mapLiveData.map(item => item.profileid)));
   this.profileOptionsLive = uniqueProfiles
-    .map(id => ({
-      id,
-      name: this.mapProfile[id]
-    }))
+    .map(id => ({ id, name: this.mapProfile[id] || '' }))
+    .filter(p => p.name)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
     // applyProfileFilter() {
@@ -335,6 +341,7 @@ toggleSelection(event: any, row: any): boolean {
 
         this.dataSource.data = filteredData;
     }
+
     applyProfileFilterLive() {
         let filteredData = [...this.originalLiveData];
         
@@ -429,6 +436,7 @@ toggleSelection(event: any, row: any): boolean {
     //     this.dataSource2.data = [...this.originalLiveData];
     //   }
     // }
+    
     addEvolution() {
       var dialogRef = this.dialog.open(EvolutiomMappingAddComponent, { 
         disableClose: true,

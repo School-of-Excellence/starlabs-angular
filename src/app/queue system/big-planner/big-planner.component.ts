@@ -1,6 +1,6 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogActions, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, Subscription } from 'rxjs';
@@ -11,7 +11,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { environment } from '../../../environments/environment';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { takeUntil } from 'rxjs/operators';
+import { retry, takeUntil } from 'rxjs/operators';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -27,6 +27,13 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
+
+interface CardData {
+  participants: string[];
+  activities: string[];
+  atcModel: string[];
+}
 
 @Component({
   selector: 'app-big-planner',
@@ -48,7 +55,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     MatSortModule,
     MatListModule,
     MatButtonModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    MatTooltipModule,
+    MatDialogModule
   ],
   templateUrl: './big-planner.component.html',
   styleUrl: './big-planner.component.css',
@@ -64,6 +73,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 export class BigPlannerComponent {
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
+  @ViewChild('duplicateStudiosModel') duplicateStudiosModel : TemplateRef<ElementRef>;
   loggedinProfileRoles = {}
   mapProfile = {};
   mapProfileData = {};
@@ -75,7 +85,14 @@ export class BigPlannerComponent {
   viewOnly = true
   private unsubscribe$ = new Subject<void>();
   // Create Studio
-  newStudioPairing = []
+  newStudioPairing = [];
+  overallAtcModel: any[] = [];
+  overallMandatoryActivities: string[] = [];
+  editMandatoryActivities: string | null = null;
+  editMandatoryActivitiesData: string[] = [];
+  atcModel: Array<any> = [];
+  duplicatedStudios: Array<any>  | null= [];
+  duplicateModelRef !: MatDialogRef<any>
 
   // big Activity Property
   bigActivitySubcription: Subscription
@@ -96,6 +113,8 @@ export class BigPlannerComponent {
   studioPairingSubscription: Subscription
   studioPairingList = []
   profileStudioCount = {}
+  profilePairCount = {};
+  duplicateStuidoMap = {};
   studioPreAssign = {}
   studioinStudio = 0
 
@@ -125,20 +144,42 @@ export class BigPlannerComponent {
   filterActivityValue = '';
   filterAtcModelValue = '';
   filterStatusValue = '';
-  displayedColumns: string[] = ['status', 'participants', 'preassign', 'activities', 'atcModel', 'actions'];
+  displayedColumns: string[] = ['status', 'participants', 'preassign', 'activities', 'atcModel', 'mandatoryActivities', 'actions'];
   showFilters: boolean = false;
 
   openViduEnabled = false;
 
   // Events
   selectedEvent: string = null;
-  filterEvent : string = '';
+  filterEvent: string = '';
   eventList: any[] = [];
 
   cohortparticipantsList = [];
   eventCohorts = [];
 
   private allProfilesMap = new Map<string, any>();
+
+  // Hover card
+  activeHoverCard: CardData[] | null = null;
+  cardVisible = false;
+  cardTooltipX = 0;
+  cardTooltipY = 0;
+  hoverType: 'shadow' | 'studio' | 'pair' | 'duplicate' | null = null;
+  hoverTitle = '';
+  hoverProfileName = '';
+  private hoverHideTimer: any = null;
+
+  private readonly hoverTypeMeta: Record<string, { title: string; icon: string }> = {
+    shadow: { title: 'Shadow sessions', icon: 'visibility' },
+    studio: { title: 'Studio sessions', icon: 'groups' },
+    pair: { title: 'Pair sessions', icon: 'group' },
+    duplicate: { title: 'Duplicate studios', icon: 'content_copy' },
+  };
+
+  // edit atc
+
+  editAtcModel : string | null = null; 
+  editAtcModelData : Array<string> = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -171,50 +212,51 @@ export class BigPlannerComponent {
         this.deleteOption = true
       } else { this.deleteOption = false }
       // if (roleData["ah"] || roleData["admin"] || roleData["mentor"] || roleData["developer"]) {
-        await getDocs(query(collection(this.firestore, 'queue generation'), orderBy("queueenddate", "desc"))).then(async queueData => {
-          for (let i = 0; i < queueData.docs.length; i++) {
-            const queue = queueData.docs[i].data();
-            this.queuelist.push(queue)
-          }
-          this.route.queryParams.subscribe(data => {
-            var queueid = data["queueid"]
-            this.selectedQueue = this.queuelist.find(e => e["docid"] == queueid) ?? null
-            if (this.selectedQueue != null) this.onQueueSelect();
-            if (this.selectedQueue != null) {
+      await getDocs(query(collection(this.firestore, 'queue generation'), orderBy("queueenddate", "desc"))).then(async queueData => {
+        for (let i = 0; i < queueData.docs.length; i++) {
+          const queue = queueData.docs[i].data();
+          this.queuelist.push(queue)
+        }
+        this.route.queryParams.subscribe(data => {
+          var queueid = data["queueid"]
+          this.selectedQueue = this.queuelist.find(e => e["docid"] == queueid) ?? null
+          if (this.selectedQueue != null) this.onQueueSelect();
+          if (this.selectedQueue != null) {
 
-              this.selectedEvent = this.selectedQueue['eventid'];
+            this.selectedEvent = this.selectedQueue['eventid'];
 
-              const eventRef = doc(this.firestore, 'event collection',this.selectedEvent);
-              collectionData(query(collection(this.firestore, 'big cohorts'),where('eventref','==',eventRef),where('status','==','active'))).subscribe((cohort)=>{
-                let list = [];
-                let participantsList = [];
-                console.log('cohorts found :',cohort.length);
-                
-                if(cohort.length > 0){
-                  for (let i = 0; i < cohort.length; i++) {
-                    const cohortData = cohort[i];
-                    list.push(cohortData);
-                    if (Array.isArray(cohortData['participantidlist'])) {
-                      participantsList.push(...cohortData['participantidlist']);
-                    }
+            const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+            collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
+              let list = [];
+              let participantsList = new Set<string>();
+              console.log('cohorts found :', cohort.length);
+
+              if (cohort.length > 0) {
+                for (let i = 0; i < cohort.length; i++) {
+                  const cohortData = cohort[i];
+                  list.push(cohortData);
+                  if (Array.isArray(cohortData['participantidlist'])) {
+                    cohortData['participantidlist'].forEach((p) => participantsList.add(p));
                   }
-                  this.eventCohorts = list;
-                  this.cohortparticipantsList = participantsList;
-                }else{
-                  this.guard.openSnackBar('No Cohorts found', 'OK',600);
                 }
-                console.log('totalParticipants',participantsList.length);
-              });              
-            };
-          })
-          loading.close()
+                this.eventCohorts = list;
+                this.cohortparticipantsList = Array.from(participantsList.values())
+                  .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
+              } else {
+                this.guard.openSnackBar('No Cohorts found', 'OK', 600);
+              }
+              console.log('totalParticipants', participantsList.size);
+            });
+          };
         })
+        loading.close()
+      })
       // }
     })
   }
 
   ngOnInit(): void {
-    
+
     collectionData(collection(this.firestore, 'profile_data'), { idField: 'docid' }).pipe(takeUntil(this.unsubscribe$)).subscribe(profiles => {
       this.allProfilesMap.clear();
       profiles.forEach((p: any) => {
@@ -224,7 +266,7 @@ export class BigPlannerComponent {
       });
     });
 
-    getDocs(query(collection(this.firestore, 'event collection'),orderBy('end_date','desc'))).then(event => {
+    getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc'))).then(event => {
       for (let i = 0; i < event.docs.length; i++) {
         const element = event.docs[i].data();
         element['docid'] = event.docs[i].id;
@@ -251,19 +293,19 @@ export class BigPlannerComponent {
 
   }
 
-  async eventSelected(){
+  async eventSelected() {
     const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
-    await updateDoc(queueRef,{
-      eventid:this.selectedEvent
-    }).then(()=>{
+    await updateDoc(queueRef, {
+      eventid: this.selectedEvent
+    }).then(() => {
       console.log('Event Updated In Queue');
-      this.guard.openSnackBar('Event Updated in Queue', 'OK',600);
-      
-      const eventRef = doc(this.firestore, 'event collection',this.selectedEvent);
-      collectionData(query(collection(this.firestore, 'big cohorts'),where('eventref','==',eventRef),where('status','==','active'))).subscribe((cohort)=>{
+      this.guard.openSnackBar('Event Updated in Queue', 'OK', 600);
+
+      const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+      collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
         let list = [];
         let participantsList = [];
-        if(cohort.length > 0){
+        if (cohort.length > 0) {
           for (let i = 0; i < cohort.length; i++) {
             const cohortData = cohort[i];
             list.push(cohortData);
@@ -272,19 +314,20 @@ export class BigPlannerComponent {
             }
           }
           this.eventCohorts = list;
-          this.cohortparticipantsList = participantsList;
-        }else{
-          this.guard.openSnackBar('No Cohorts found', 'OK',600);
+          this.cohortparticipantsList = participantsList
+            .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
+        } else {
+          this.guard.openSnackBar('No Cohorts found', 'OK', 600);
         }
       });
 
-    }).catch((error)=>{
-      console.log('Error While Updating Event',error,'ok');
-      this.guard.openSnackBar('Error While Updating Event', 'OK',600);
+    }).catch((error) => {
+      console.log('Error While Updating Event', error, 'ok');
+      this.guard.openSnackBar('Error While Updating Event', 'OK', 600);
     });
   }
 
-  filterEvents(){
+  filterEvents() {
     return this.eventList.filter(e => e["name"].toLowerCase().includes(this.filterEvent.toLowerCase()))
   }
 
@@ -330,7 +373,7 @@ export class BigPlannerComponent {
     //   return true;
     // });
 
-    const arenaEventsSnap = await getDocs(query(collection(this.firestore, 'arena events'),where('docid', 'in', this.selectedQueue['arenaeventidlist'])));
+    const arenaEventsSnap = await getDocs(query(collection(this.firestore, 'arena events'), where('docid', 'in', this.selectedQueue['arenaeventidlist'])));
     const productIds = arenaEventsSnap.docs.map(doc => doc.data()?.['productref']?.id).filter(Boolean);
     const seenAtcModels = new Set<string>();
 
@@ -342,7 +385,7 @@ export class BigPlannerComponent {
       return true;
     });
 
-    collectionData(query(collection(this.firestore, 'biginvitation'),where('eventref','==',doc(this.firestore, 'queue generation', this.selectedQueue['docid'])))).pipe(takeUntil(this.unsubscribe$)).subscribe((list: any[]) => {
+    collectionData(query(collection(this.firestore, 'biginvitation'), where('eventref', '==', doc(this.firestore, 'queue generation', this.selectedQueue['docid'])))).pipe(takeUntil(this.unsubscribe$)).subscribe((list: any[]) => {
 
       this.bigInvitationList = list;
 
@@ -350,7 +393,7 @@ export class BigPlannerComponent {
 
       const invitedProfiles = profileIds.map(id => this.allProfilesMap.get(id)).filter(Boolean);
 
-      invitedProfiles.sort((a, b) =>(a.name || '').localeCompare(b.name || ''));
+      invitedProfiles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
       this.invitedParticipant = invitedProfiles;
       this.waitingParticipant = invitedProfiles.filter(p => p.waitinglist === true);
@@ -419,28 +462,41 @@ export class BigPlannerComponent {
       this.filteredStudioPairingList = new MatTableDataSource(this.studioPairingList);
       this.filteredStudioPairingList.paginator = this.paginator;
       var profileCount = {}
-      var localMap = {}
+      var pairMap = {};
+      var duplicatedStudiosMap = {};
+      var localMap = {};
       var studioin = 0
       var checkin = 0
       for (let i = 0; i < this.studioPairingList.length; i++) {
         const studio = this.studioPairingList[i];
+        let isDuplicated = this.isStudioExist(this.studioPairingList , studio);
+        const participantsActivityMap = studio['participantsactivity'] || {};
         if (studio["studioin"]) studioin += 1
         if (studio["checkin"]) checkin += 1
-        var participants = studio["participants"] ?? []
+        var participants = studio["participants"] ?? [];
+               
         participants.forEach(id => {
-          profileCount[id] = profileCount[id] ?? []
-          if (studio["studioin"]) profileCount[id].push(studio)
+          profileCount[id] = profileCount[id] ?? [];
+          pairMap[id] = pairMap[id] ?? [];
+          duplicatedStudiosMap[id] = duplicatedStudiosMap[id] ?? [];
+          if (studio["studioin"]) profileCount[id].push(studio);
+          if (participants.length > 1) pairMap[id].push(studio);
+          if (isDuplicated)  duplicatedStudiosMap[id].push(studio);
         })
         var studioActivity = Object.values(studio["participantsactivity"]).sort((a, b) => a.toString().localeCompare(b.toString())).join(",");
         (stageActivityParse[studioActivity] ?? []).forEach(stage => {
           localMap[stage] = localMap[stage] ?? []
           if (localMap[stage].filter((e: { [key: string]: any }) => e["docid"] == studio["docid"]).length == 0) localMap[stage].push(studio)
-        })
+        });
+
       }
       this.studioinStudio = studioin
-      this.profileStudioCount = profileCount
+      this.profileStudioCount = profileCount;
+      this.duplicateStuidoMap = duplicatedStudiosMap;
+      this.profilePairCount = pairMap;
       this.stageStudioMap = localMap
       this.sortStudioAssignment();
+      this.filterStudios()
       // let studioInCount:any[] = Object.values(this.profileStudioCount).flat()
       // console.log("studioin count" ,studioInCount.filter((e:any) => e['studioin'] && e['checkin']).length,checkin);
       // console.log("live count" ,studioInCount.filter(e => e['studioin'] && e['checkin'] && e['status'] == 'live').length,checkin);
@@ -571,18 +627,100 @@ export class BigPlannerComponent {
 
   filterInvitedParticipant(index) {
     let filteredParticipants = [];
-    
-    let filteredCohorts = this.eventCohorts.filter((e)=>e['bigactivity'] == this.newStudioPairing[index]['activity']);
-    
+
+    let filteredCohorts = this.eventCohorts.filter((e) => e['bigactivity'] == this.newStudioPairing[index]['activity']);
+
     filteredCohorts.forEach(cohort => {
       if (Array.isArray(cohort['participantidlist'])) {
         filteredParticipants.push(...cohort['participantidlist']);
       }
     });
-    
+
+    // if (this.atcModel.length > 0) {
+    //   filteredParticipants = filteredParticipants.filter((id) => {
+    //     const key = `${id}-${this.newStudioPairing[index]['activity']}`;
+    //     let match1 = false;
+    //     let match2 = false;
+
+    //     if(Object.hasOwn(this.mapParticipantToStuido, key)){
+    //       match1 = this.mapParticipantToStuido[key]?.some((atcmodel : string)=>{
+    //         return this.atcModel.includes(atcmodel);
+    //       });
+    //     }
+
+    //     match2 = this.newStudioPairing.some((data , i)=>{
+    //       if(i !== index){
+    //         const dataKey = `${data.profileid}-${data.activity}`;
+    //         return key === dataKey
+    //       }
+    //       return false;
+    //     });
+
+    //     return !(match1 || match2)
+    //   })
+    // }
+
     let returnData = filteredParticipants.filter(e => this.mapProfile[e].toLowerCase().includes(this.filterText.toLowerCase()));
+
+    return returnData.map((e) => this.mapProfileData[e]);
+  }
+
+  getDuplicatedStudios() {
+    let duplicates = [];
+    for (let studio of this.studioPairingList) {
+      const participants = studio['participants'] || [];
+      const activityMap = studio['participantsactivity'] || {};
+      if (participants.length === this.newStudioPairing.length) {
+        const doesMatch = this.newStudioPairing.every((pair) => {
+          const profile = pair.profileid;
+          const activity = pair.activity;
+          if (activityMap[profile] && activityMap[profile] === activity) {
+            return true;
+          }
+          return false;
+        });
+        if (doesMatch) {
+          duplicates.push(studio);
+        }
+      }
+    }
+    return duplicates;
+  }
+
+  isStudioExist(studioPairingList , selectedStudio){
+    let duplicated = false;
+    for (let studio of studioPairingList) {
+      
+      if (studio['docid'] === selectedStudio['docid']) {
+        continue
+      }
+
+      const participants = studio['participants'] || [];
+      const activityMap = studio['participantsactivity'] || {};
+
+      const selectedStudioParticipants = selectedStudio['participants'] || [];
+      const selectedStudioActivityMap = selectedStudio['participantsactivity'] || {};
     
-    return returnData.map((e)=>this.mapProfileData[e]);
+      if (participants.length === selectedStudioParticipants.length) {
+        const doesMatch = Object.keys(selectedStudioActivityMap).every((profileId) => {
+          const activity = selectedStudioActivityMap[profileId];
+          if (activityMap[profileId] && activityMap[profileId] === activity) {
+            return true;
+          }
+          return false;
+        });
+        if (doesMatch) {
+          return true
+        }
+      }
+    }
+    return duplicated;
+  }
+
+  showAtcModel() {
+    return this.newStudioPairing.every((pair) => {
+      return pair.activity && pair.profileid;
+    })
   }
 
   filterTokenParticipant() {
@@ -590,38 +728,51 @@ export class BigPlannerComponent {
   }
 
   filterActivityfunction() {
-    return this.bigActivityList.filter(e =>
+    const data = this.bigActivityList.filter(e =>
       e["activity"].toLowerCase().includes(this.filterActivity.toLowerCase())
     );
+
+    data.sort((a, b) => a["activity"].localeCompare(b["activity"]));
+    return data
   }
 
   addPair() {
     this.newStudioPairing.push({
       profileid: null,
       activity: null,
-      atcmodel: null
-    })
+    });
   }
 
   removePair(index) {
     // console.log(index)
-    this.newStudioPairing.splice(index, 1)
+    this.newStudioPairing.splice(index, 1);
+  }
+
+  assignRoles(){
+    const duplicates = this.getDuplicatedStudios();
+    if (duplicates.length > 0) {
+      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : duplicates});
+      this.duplicateModelRef.afterClosed().subscribe((data)=>{
+       if (data) {
+        this.createStudioPairing();
+       }
+
+      })
+    } else {
+      this.createStudioPairing();
+    }
   }
 
   async createStudioPairing() {
     let validation = true;
     const participants: string[] = [];
     const participantsactivity: any = {};
-    let atcmodel: any = null;
+    const atcmodel: any = (this.overallAtcModel && !this.overallAtcModel.includes(null))
+      ? this.overallAtcModel
+      : [];
 
     // 1️⃣ Validation + data preparation
     for (const element of this.newStudioPairing) {
-
-      // atcmodel handling
-      if (element?.atcmodel && !element.atcmodel.includes?.(null)) {
-        atcmodel = element.atcmodel;
-      }
-
       // required fields check
       if (element?.profileid && element?.activity) {
         participants.push(element.profileid);
@@ -652,6 +803,7 @@ export class BigPlannerComponent {
         queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
         studioin: false,
         atcmodel,
+        mandatoryactivities: this.overallMandatoryActivities ?? [],
         openvidu: this.openViduEnabled ?? false
       });
 
@@ -664,6 +816,8 @@ export class BigPlannerComponent {
       });
 
       this.newStudioPairing = [];
+      this.overallAtcModel = [];
+      this.overallMandatoryActivities = [];
       this.addPair();
 
     } catch (error) {
@@ -671,6 +825,12 @@ export class BigPlannerComponent {
       this.snackBar.open('Failed to create studio', null, {
         duration: 3000
       });
+    }
+  }
+
+  closeDuplicateStuioModel(data : boolean = false){
+    if (this.duplicateModelRef) {
+      this.duplicateModelRef.close(data);
     }
   }
 
@@ -861,5 +1021,165 @@ export class BigPlannerComponent {
     this.displayParticipantRole = !this.displayParticipantRole;
   }
 
+  // hover card
+  onEnter(event: MouseEvent, profileId: string, type: string) {
+    if (this.hoverHideTimer) {
+      clearTimeout(this.hoverHideTimer);
+      this.hoverHideTimer = null;
+    }
+    const cards: CardData[] = [];
 
+    switch (type) {
+      case 'shadow':
+        this.profileShadowCount[profileId].forEach((studioLog)=>{
+           const c: CardData = {
+            participants: [studioLog['participantid'] ].map((p) => this.mapProfileData[p]?.name),
+            activities: [studioLog['activity']].map((a: string) => this.mapBigActivity[a] ?? ''),
+            atcModel: [ studioLog['atcmodel'] ]
+          }
+          cards.push(c);
+        })
+        break;
+      case 'studio':
+        this.profileStudioCount[profileId]?.forEach((studio) => {
+          const c: CardData = {
+            participants: (studio['participants'] || []).map((p) => this.mapProfileData[p]?.name),
+            activities: (Object.values(studio['participantsactivity']) || []).map((a: string) => this.mapBigActivity[a] ?? ''),
+            atcModel: studio['atcmodel'] || []
+          }
+          cards.push(c);
+        })
+        break
+      case 'pair':
+        this.profilePairCount[profileId]?.forEach((studio) => {
+          const c: CardData = {
+            participants: (studio['participants'] || []).map((p) => this.mapProfileData[p]?.name),
+            activities: (Object.values(studio['participantsactivity']) || []).map((a: string) => this.mapBigActivity[a] ?? ''),
+            atcModel: studio['atcmodel'] || []
+          }
+          cards.push(c);
+        })
+        break
+      case 'duplicate':
+        this.duplicateStuidoMap[profileId]?.forEach((studio) => {
+          const c: CardData = {
+            participants: (studio['participants'] || []).map((p) => this.mapProfileData[p]?.name),
+            activities: (Object.values(studio['participantsactivity']) || []).map((a: string) => this.mapBigActivity[a] ?? ''),
+            atcModel: studio['atcmodel'] || []
+          }
+          cards.push(c);
+        })
+        break
+      default:
+        break;
+    }
+
+    this.activeHoverCard = cards;
+    this.hoverType = type as any;
+    this.hoverTitle = this.hoverTypeMeta[type]?.title || '';
+    this.hoverProfileName = this.mapProfile?.[profileId] || '';
+    this.cardVisible = true;
+    this.positionFromAnchor(event.currentTarget as HTMLElement);
+  }
+
+  onLeave() {
+    if (this.hoverHideTimer) clearTimeout(this.hoverHideTimer);
+    this.hoverHideTimer = setTimeout(() => {
+      this.cardVisible = false;
+      this.activeHoverCard = null;
+      this.hoverType = null;
+    }, 160);
+  }
+
+  onTooltipEnter() {
+    if (this.hoverHideTimer) {
+      clearTimeout(this.hoverHideTimer);
+      this.hoverHideTimer = null;
+    }
+  }
+
+  onTooltipLeave() {
+    this.onLeave();
+  }
+
+  hoverIcon(type: string | null): string {
+    return type ? this.hoverTypeMeta[type]?.icon || 'info' : 'info';
+  }
+
+  private positionFromAnchor(anchor: HTMLElement | null) {
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const gap = 10;
+    const tooltipWidth = 320;
+    const tooltipMaxHeight = 340;
+    const margin = 8;
+
+    let x = rect.left + rect.width / 2 - tooltipWidth / 2;
+    x = Math.max(margin, Math.min(x, window.innerWidth - tooltipWidth - margin));
+
+    let y = rect.bottom + gap;
+    if (y + tooltipMaxHeight > window.innerHeight - margin) {
+      y = Math.max(margin, rect.top - tooltipMaxHeight - gap);
+    }
+
+    this.cardTooltipX = x;
+    this.cardTooltipY = y;
+  }
+
+  // function to open atc edit form
+  openAtcEditMode(docId : string){
+    const studio = this.filteredStudioPairingList.data.find((studio)=>studio['docid'] === docId);
+
+    if (!studio) {
+      return
+    }
+    this.editAtcModel = docId;
+    this.editAtcModelData = studio['atcmodel'] || [];
+
+  }
+
+  // function to cancel atc edit
+  cancelAtcEdit(){
+    this.editAtcModel = null;
+    this.editAtcModelData = [];
+  }
+
+  onDuplicateClick(profileId : string){
+    this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : this.duplicateStuidoMap[profileId] || []});
+  }
+
+  // function to update atc model
+  applyAtcEdit(){
+    const studio = this.filteredStudioPairingList.data.find((studio)=>studio['docid'] === this.editAtcModel);
+    if (!studio) {
+      return
+    }
+    updateDoc(doc(this.firestore, "queue studio pairing", studio["docid"]), {
+      atcmodel : this.editAtcModelData
+    })
+    this.filterStudios();
+    this.cancelAtcEdit();
+  }
+
+  openMandatoryEditMode(docId: string) {
+    const studio = this.filteredStudioPairingList.data.find((s) => s['docid'] === docId);
+    if (!studio) return;
+    this.editMandatoryActivities = docId;
+    this.editMandatoryActivitiesData = studio['mandatoryactivities'] || [];
+  }
+
+  cancelMandatoryEdit() {
+    this.editMandatoryActivities = null;
+    this.editMandatoryActivitiesData = [];
+  }
+
+  applyMandatoryEdit() {
+    const studio = this.filteredStudioPairingList.data.find((s) => s['docid'] === this.editMandatoryActivities);
+    if (!studio) return;
+    updateDoc(doc(this.firestore, "queue studio pairing", studio["docid"]), {
+      mandatoryactivities: this.editMandatoryActivitiesData
+    });
+    this.filterStudios();
+    this.cancelMandatoryEdit();
+  }
 }

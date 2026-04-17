@@ -3,6 +3,16 @@
   "index": "/index.html",
   "assetGroups": [
     {
+      "name": "deepfilter3-assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/deepfilter3/**"
+        ]
+      }
+    },
+    {
       "name": "app",
       "installMode": "prefetch",
       "resources": {
@@ -26,5 +36,6 @@
         ]
       }
     }
-  ]
+  ],
+  "navigationRequestStrategy": "freshness"
 }

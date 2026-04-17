@@ -51,6 +51,10 @@ export class DynamicStudioComponent {
   ongoingQueueList = []
   ongoingQueue = {}
   selectedQueue = {}
+  queueStudioCounts: { [queueid: string]: number } = {}
+  queuesWithStudios: any[] = []
+  noStudioInAnyQueue = false
+  queueStudioCountSubscriptions: Subscription[] = []
   mapVariationName = {}
   queueVariation = {}
   mapQueue = {}
@@ -181,8 +185,11 @@ export class DynamicStudioComponent {
           })
           this.ongoingQueueList = live
           if(this.ongoingQueueList.length != 0){
-            this.ongoingQueue = this.ongoingQueueList[0]
-            this.selectedQueue = this.ongoingQueueList[0]
+            await this.loadQueueStudioCounts()
+            const firstWithStudios = this.ongoingQueueList.find(q => (this.queueStudioCounts[q['docid']] || 0) > 0)
+            this.noStudioInAnyQueue = !firstWithStudios
+            this.ongoingQueue = firstWithStudios || this.ongoingQueueList[0]
+            this.selectedQueue = this.ongoingQueue
             await this.onQueueSelect()
             this.mapProfile = (await guard.getProfileMap()).map
           }
@@ -266,6 +273,84 @@ export class DynamicStudioComponent {
     return c1 && c2 ? c1.docid === c2.docid : c1 === c2;
   }
 
+
+  async loadQueueStudioCounts(){
+    // Cleanup any previous subscriptions
+    this.queueStudioCountSubscriptions.forEach(s => s?.unsubscribe())
+    this.queueStudioCountSubscriptions = []
+    this.queueStudioCounts = {}
+    this.queuesWithStudios = []
+
+    const refs = this.ongoingQueueList.map(q => doc(this.firestore, 'queue generation', q['docid']))
+    const chunks: DocumentReference[][] = []
+    for (let i = 0; i < refs.length; i += 30) chunks.push(refs.slice(i, i + 30))
+    if (chunks.length === 0) return
+
+    const chunkResults: { [qid: string]: number }[] = chunks.map(() => ({}))
+    let firstEmitCount = 0
+    const resolveFirst: { resolve?: () => void } = {}
+    const firstEmitPromise = new Promise<void>(res => (resolveFirst.resolve = res))
+
+    chunks.forEach((chunk, idx) => {
+      const sub = collectionData(query(
+        collection(this.firestore, 'queue studio pairing'),
+        where('studioin', '==', true),
+        where('participants', 'array-contains', this.profileid),
+        where('queueref', 'in', chunk)
+      )).pipe(takeUntil(this.subscriptionHandle)).subscribe((studios: any[]) => {
+        const local: { [qid: string]: number } = {}
+        studios.forEach(s => {
+          if (s['delete']) return
+          const qid = s['queueref']?.id
+          if (!qid) return
+          local[qid] = (local[qid] || 0) + 1
+        })
+        const isFirst = Object.keys(chunkResults[idx]).length === 0 && !(chunkResults[idx] as any).__seeded
+        ;(chunkResults[idx] as any).__seeded = true
+        chunkResults[idx] = local
+        this.recomputeQueueStudioCounts(chunkResults)
+        if (isFirst) {
+          firstEmitCount += 1
+          if (firstEmitCount === chunks.length) resolveFirst.resolve?.()
+        }
+      })
+      this.queueStudioCountSubscriptions.push(sub)
+    })
+
+    await firstEmitPromise
+  }
+
+  private recomputeQueueStudioCounts(chunkResults: { [qid: string]: number }[]){
+    const merged: { [qid: string]: number } = {}
+    chunkResults.forEach(chunk => {
+      Object.keys(chunk).forEach(qid => {
+        if (qid === '__seeded') return
+        merged[qid] = (merged[qid] || 0) + chunk[qid]
+      })
+    })
+    this.queueStudioCounts = merged
+    this.queuesWithStudios = this.ongoingQueueList.filter(q => (merged[q['docid']] || 0) > 0)
+    this.noStudioInAnyQueue = this.queuesWithStudios.length === 0
+    // If currently selected queue lost all studios, pick another (but don't interrupt a live session)
+    const currentId = this.ongoingQueue?.['docid']
+    const currentStillHas = currentId && (merged[currentId] || 0) > 0
+    if (!currentStillHas && this.liveStudio.length === 0 && this.queuesWithStudios.length > 0) {
+      const next = this.queuesWithStudios[0]
+      if (next && next['docid'] !== currentId) {
+        this.ongoingQueue = next
+        this.selectedQueue = next
+        this.onQueueSelect()
+      }
+    }
+  }
+
+  selectQueueCard(queue: any){
+    if (queue['docid'] === this.ongoingQueue['docid']) return
+    this.checkoutQueue()
+    this.ongoingQueue = queue
+    this.selectedQueue = queue
+    this.onQueueSelect()
+  }
 
   async onQueueSelect(){
     this.resetSubscription()
@@ -367,7 +452,6 @@ export class DynamicStudioComponent {
       console.log("Live Studio", this.liveStudio)
       this.isLoadingStudios = false;
       if(this.studioList.length == 0 && !this.isLoadingStudios){
-        alert("No studio(s) currently available.")
         this.selectedStudio = {}
         this.liveAssignment = null
         this.stageTokenList = []
@@ -987,27 +1071,7 @@ export class DynamicStudioComponent {
           status: "live",
         })
         
-        // Create Live Assignment
         var liveassignmentid = doc(collection(this.firestore,'live assignment')).id
-        var liveassignmentData = {
-          docid: liveassignmentid,
-          pairing: result["participants"],
-          participantid: token['profile_id'],
-          stagename: invitation["stage"],
-          atcmodel: atcmodel,
-          // stagetype: diagnosticStage.includes(dropStage) ? "diagnostics" : consultationStage.includes(dropStage) ? "consultation" : ahStage.includes(dropStage) ? "ah" : reviewStage.includes(dropStage) ? "validation" : "changework",
-          status: 'live',
-          queueid: this.ongoingQueue["docid"],
-          created: serverTimestamp(),
-          // shadowperson: result["shadow"] ?? null
-          studioid: result["docid"],
-          participantsactivity: result["participantsactivity"], // From Studio Pairing
-          bonusactivity: result["bonusactivity"] ?? null, // Addition Activities
-          bonusactivityparticipant: result["bonusactivity"] != null && result["bonusactivity"] != undefined ? Object.keys(result["bonusactivity"]) : null
-        }
-        liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
-        await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
-        
         // Update Token
         var data = {
           previousstage: invitation["stage"],
@@ -1029,6 +1093,27 @@ export class DynamicStudioComponent {
         }
         var log = {...token, ...data}
         await this.updateQueueStage(log)
+
+        // Create Live Assignment
+        var liveassignmentData = {
+          docid: liveassignmentid,
+          pairing: result["participants"],
+          participantid: token['profile_id'],
+          stagename: invitation["stage"],
+          atcmodel: atcmodel,
+          // stagetype: diagnosticStage.includes(dropStage) ? "diagnostics" : consultationStage.includes(dropStage) ? "consultation" : ahStage.includes(dropStage) ? "ah" : reviewStage.includes(dropStage) ? "validation" : "changework",
+          status: 'live',
+          queueid: this.ongoingQueue["docid"],
+          created: serverTimestamp(),
+          // shadowperson: result["shadow"] ?? null
+          studioid: result["docid"],
+          participantsactivity: result["participantsactivity"], // From Studio Pairing
+          bonusactivity: result["bonusactivity"] ?? null, // Addition Activities
+          bonusactivityparticipant: result["bonusactivity"] != null && result["bonusactivity"] != undefined ? Object.keys(result["bonusactivity"]) : null
+        }
+        liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
+        await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
+        
         loading.close()
       }
     })

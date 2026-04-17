@@ -200,28 +200,23 @@
             
             <!-- Sidebar Header -->
             <div class="sidebar-header">
-              <h3 class="sidebar-title">Available Cohorts ({{ getUnassignedCohorts().length }}/{{ operationalCohortList.length + educationalCohortList.length }})</h3>
+              <h3 class="sidebar-title">Available Cohorts ({{ getUnassignedCohorts().length }}/{{ allCohorts.length }})</h3>
             </div>
 
-            <!-- Filter Tabs -->
+            <!-- Filter Tabs (rendered dynamically from whatever categories exist) -->
             <div class="cohort-filters">
-              <button 
+              <button
                 class="filter-btn"
                 [class.active]="cohortFilter === 'all'"
                 (click)="setCohortFilter('all')">
                 All
               </button>
-              <button 
+              <button
+                *ngFor="let category of cohortCategories"
                 class="filter-btn"
-                [class.active]="cohortFilter === 'operational'"
-                (click)="setCohortFilter('operational')">
-                Operational <!-- ({{ operationalCohortList.length }}) -->
-              </button>
-              <button 
-                class="filter-btn"
-                [class.active]="cohortFilter === 'educational'"
-                (click)="setCohortFilter('educational')">
-                Educational <!-- ({{ educationalCohortList.length }}) -->
+                [class.active]="cohortFilter === category"
+                (click)="setCohortFilter(category)">
+                {{ category | titlecase }}
               </button>
             </div>
 
@@ -252,46 +247,49 @@
               </mat-form-field>
             </div>
 
-            <!-- Cohorts List -->
+            <!-- Cohorts List (grouped dynamically by category) -->
             <div class="available-cohorts-list">
-              
+
               <!-- Empty State: No unassigned cohorts -->
               <div class="empty-state" *ngIf="getUnassignedCohorts().length === 0">
                 <mat-icon>check_circle</mat-icon>
                 <p>All cohorts have been assigned!</p>
               </div>
 
-              <!-- Cohort Item (repeated for each unassigned cohort) -->
-              <div 
-                class="cohort-item"
-                *ngFor="let cohort of getUnassignedCohorts()"
-                [class.selected]="isCohortSelected(cohort['docid'])"
-                (click)="toggleCohortSelection(cohort['docid'])">
-                
-                <!-- Checkbox -->
-                <mat-checkbox 
-                  [checked]="isCohortSelected(cohort['docid'])"
-                  (change)="toggleCohortSelection(cohort['docid'])"
-                  (click)="$event.stopPropagation()">
-                </mat-checkbox>
-
-                <!-- Cohort Icon -->
-                <div class="cohort-item-icon">
-                  <mat-icon>groups</mat-icon>
+              <!-- One section per category present in the unassigned list -->
+              <div class="cohort-category-section" *ngFor="let group of getUnassignedCohortsGrouped()">
+                <div class="cohort-category-header">
+                  <span
+                    class="cohort-badge"
+                    [ngClass]="getCategoryBadgeClass(group.category)">
+                    {{ group.category | uppercase }}
+                  </span>
+                  <span class="cohort-category-count">{{ group.cohorts.length }}</span>
                 </div>
 
-                <!-- Cohort Details -->
-                <div class="cohort-item-details">
-                  <div class="cohort-item-name">{{ cohort["name"] }}</div>
-                  <div class="cohort-item-meta">
-                    <span 
-                      class="cohort-badge"
-                      [ngClass]="getCategoryBadgeClass(cohort['cohortCategory'])">
-                      {{ cohort["cohortCategory"] | uppercase }}
-                    </span>
-                    <span class="cohort-item-count">
-                      {{ getCohortParticipantCount(cohort) }} participants
-                    </span>
+                <div
+                  class="cohort-item"
+                  *ngFor="let cohort of group.cohorts"
+                  [class.selected]="isCohortSelected(cohort['docid'])"
+                  (click)="toggleCohortSelection(cohort['docid'])">
+
+                  <mat-checkbox
+                    [checked]="isCohortSelected(cohort['docid'])"
+                    (change)="toggleCohortSelection(cohort['docid'])"
+                    (click)="$event.stopPropagation()">
+                  </mat-checkbox>
+
+                  <div class="cohort-item-icon">
+                    <mat-icon>groups</mat-icon>
+                  </div>
+
+                  <div class="cohort-item-details">
+                    <div class="cohort-item-name">{{ cohort["name"] }}</div>
+                    <div class="cohort-item-meta">
+                      <span class="cohort-item-count">
+                        {{ getCohortParticipantCount(cohort) }} participants
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

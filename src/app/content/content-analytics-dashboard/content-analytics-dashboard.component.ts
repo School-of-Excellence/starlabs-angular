@@ -1,12 +1,4 @@
-import {
-  Component,
-  OnInit,
-  AfterViewInit,
-  ViewChild,
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-  OnDestroy,
-} from '@angular/core';
+import { Component, OnInit, AfterViewInit, ViewChild, ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy, } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,9 +17,9 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSortModule } from '@angular/material/sort';
 import { Subject, takeUntil } from 'rxjs';
-import { collectionData, limit, onSnapshot, orderBy, query, where } from '@angular/fire/firestore';
+import { collectionData, onSnapshot, orderBy, query, where } from '@angular/fire/firestore';
 import { Firestore } from '@angular/fire/firestore';
-import { collection, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, DocumentReference, getDocs, Timestamp, Unsubscribe } from 'firebase/firestore';
 import { catchError, of, finalize } from 'rxjs';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort } from '@angular/material/sort';
@@ -45,6 +37,9 @@ import {
 } from "ng-apexcharts";
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import * as XLSX from 'xlsx';
+import { secondsInMinute } from 'date-fns/constants';
+import { Router,RouterLink,RouterModule } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 interface ParticipantContentMapInterface {
   rank?: number;
@@ -54,12 +49,17 @@ interface ParticipantContentMapInterface {
   activePlatforms: Set<string>;
   sessions: number;
   type: participantType;
+  contentid: Set<string>;
   days: number;
+  maxContWatchDates: Array<Date>,
+  maxWatch: number,
   playlist: Set<string>;
+  recommendedPlaylist: Set<string>;
   completedPlayList: Set<string>;
   completedContents: Set<string>
   watchedContentsMap: { [key: string]: { completion: number, watchHours: number } };
   contents: { [key: string]: Array<any> };
+  lastSeen: Date;
 }
 
 type participantType = 'superfan' | 'risingfan' | 'guest';
@@ -79,14 +79,6 @@ interface ContentMapInterface {
   rewatchedProfiles: Set<string>
 }
 
-interface PlayList {
-  started: Array<string>,
-  ongoing: Array<string>,
-  completed: Array<string>,
-  notStarted: Array<string>,
-  avgWatchTime: number
-}
-
 export interface ChartOptions {
   series: ApexAxisChartSeries;
   chart: ApexChart;
@@ -99,12 +91,6 @@ export interface ChartOptions {
   colors: string[];
 }
 
-export enum participantRankType {
-  superfan = 0,
-  risingfan = 1,
-  fan = 2
-}
-
 export interface ContentType {
   content: string;
   profileid: Set<string>;
@@ -112,14 +98,6 @@ export interface ContentType {
   watchHours: number;
 }
 
-export interface participantTypeCheck {
-  next: Date;
-  count: number;
-  maxDates: Array<string>;
-  watchHours: number;
-  preDate: Date
-
-}
 
 export interface PlayListMix {
   title: string;
@@ -161,7 +139,9 @@ export interface PlayListMix {
     MatFormFieldModule,
     MatDatepickerModule,
     ReactiveFormsModule,
-    MatSortModule
+    MatSortModule,
+    RouterModule,
+    RouterLink 
   ],
   templateUrl: './content-analytics-dashboard.component.html',
   styleUrl: './content-analytics-dashboard.component.css',
@@ -182,14 +162,15 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   public watchHoursChartOptions!: ChartOptions;
 
   destroy$ = new Subject<void>();
+  analyticsSubscribe: Unsubscribe;
+  isInitialLoaded = false;
 
   // objects
   participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
   contentMap: { [key: string]: ContentMapInterface } = {};
   participantMetaDataMap: { [key: string]: any } = {};
-  recommendedMixPlaylistMap: { [key: string]: { [key: string]: { [key: string]: any } } } = {};
+  journeyMap: { [key: string]: any } = {};
   playListMixMap: { [key: string]: Partial<PlayListMix> } = {};
-  playListMap: { [key: string]: Partial<PlayList> } = {};
   contentTypeMap: { [key: string]: ContentType } = {};
 
   // number
@@ -208,7 +189,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   totalDays: number = 0;
 
   // tabel columns
-  participantTableColumns = ['rank', 'participant', 'type', 'mode', 'source', 'hours', 'days', 'completion', 'sessions', 'playlists']
+  participantTableColumns = ['rank', 'participant', 'type', 'mode', 'source', 'hours', 'days', 'completion', 'sessions', 'playlists', 'lastseen']
   contentTableColumns = ['rank', 'content', 'source', 'watchhours', 'viewers', 'hviewer', 'completion', 'rewatches']
   playListTableColumns = ['title', 'assigned', 'started', 'ongoing', 'completed', 'notstarted', 'avgwatchtime']
 
@@ -227,15 +208,17 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   loadingStatus = {
     contentanalytics: true,
     recommendedMixPlaylist: true,
-    bufferMixArchive: false
   }
 
   // date range filter
   startDate = new FormControl<Date | null>(null);
   endDate = new FormControl<Date | null>(null);
+  // pickerOpen = false;
+
 
   constructor(
     public cdr: ChangeDetectorRef,
+     private router: Router,
     private firestore: Firestore) {
     this.setDateRange();
     this.initActiveUsersChart();
@@ -245,6 +228,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   ngOnInit(): void {
     this.fetchParticipantMetaData();
     this.fetchContentAnalytics();
+    this.fetchjourney();
     this.fetchRecommendedMixPlayList();
 
   }
@@ -264,9 +248,6 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     this.playListTableDateSource.paginator = this.playlistPagination;
     this.playListTableDateSource.filterPredicate = this.filterPredicatePlayList;
     this.playListTableDateSource.sortingDataAccessor = this.playListCustomSorting;
-
-    console.log('sorting : ', this.participantSort)
-    // this.participantSort.sortChange.subscribe((d)=>console.log('changes'))
   }
 
   ngOnDestroy(): void {
@@ -318,7 +299,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
           borderRadius: 6,
           columnWidth: "60%",
           dataLabels: {
-            position: "center"   // 🔥 label inside bar
+            position: "center"
           }
         }
       },
@@ -326,9 +307,9 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
       dataLabels: {
         enabled: true,
-        formatter: (val: number): string => val > 0 ? `${val}` : '', // hide 0
+        formatter: (val: number): string => val > 0 ? `${val}` : '',
         style: {
-          colors: ["#ffffff"],   // white text
+          colors: ["#ffffff"],
           fontSize: "12px",
           fontWeight: "600"
         }
@@ -389,7 +370,6 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
       const dateSplit = d.split(' ');
       return `${dateSplit[1]} ${dateSplit[2]}`;
     });
-    console.log(dates)
     const uniqueProfiles = Array.from(datesMap.values());
 
     this.activeUserChart.updateOptions({
@@ -452,16 +432,16 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
           borderRadius: 6,
           columnWidth: "60%",
           dataLabels: {
-            position: "center"   // 🔥 label inside bar
+            position: "center"
           }
         }
       },
 
       dataLabels: {
         enabled: true,
-        formatter: (val: number): string => val > 0 ? `${val}` : '', // hide 0
+        formatter: (val: number): string => val > 0 ? `${val}` : '',
         style: {
-          colors: ["#ffffff"],   // white text
+          colors: ["#ffffff"],
           fontSize: "12px",
           fontWeight: "600"
         }
@@ -524,7 +504,6 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
       return `${dateSplit[1]} ${dateSplit[2]}`;
     });
     const values = Array.from(datesMap.values()).map((v) => Number.parseFloat(this.convertToHours(v).toFixed(1)));
-    console.log(values)
     this.watchHoursChart.updateOptions({
       xaxis: {
         categories: dates,
@@ -581,266 +560,227 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
   //   const q = query(collection(this.firestore, 'content analytics'), ...constrains);
 
-  //   onSnapshot(q, (contentSnap) => {
-  //     if (!this.initialLoaded) {
-  //       this.initialLoaded = true;
-  //       const participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
-  //       const contentMap: { [key: string]: ContentMapInterface } = {};
-  //       const contentTypeMap: { [key: string]: ContentType } = {};
-  //       const participantTypeMap: Map<string, participantTypeCheck> = new Map();
+  //   // const contentSnap = await getDocs(q);
+  //   collectionData(q).pipe(takeUntil(this.destroy$)).subscribe((contentSnap) => {
+  //     const participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
+  //     const contentMap: { [key: string]: ContentMapInterface } = {};
+  //     const contentTypeMap: { [key: string]: ContentType } = {};
+  //     const participantTypeMap: Map<string, participantTypeCheck> = new Map();
 
-  //       let totalUniqueUsers = 0;
-  //       let totalUniueContents = 0;
-  //       let totalWatchHours = 0;
-  //       let totalSuperFans = 0;
-  //       let totalRisingFans = 0;
+  //     let totalUniqueUsers = 0;
+  //     let totalUniueContents = 0;
+  //     let totalWatchHours = 0;
+  //     let totalSuperFans = 0;
+  //     let totalRisingFans = 0;
 
-  //       contentSnap.forEach((contSnap) => {
-  //         const content = contSnap.data();
-  //         const profileId = content['profileid'] || 'UnKnown';
-  //         const contentId = content['videoid'] || 'Unknown';
-  //         const contentname = content['videoname'] || 'Unknown';
-  //         const platform = content['platform_name'] || 'UnKnown';
-  //         const totalRunTime = content['totalruntime'] || 0;
-  //         const totalTimeSpend = content['totaltimespend'] || 0;
-  //         const playlistId = content['playlistid'] || '';
-  //         const logDate = this.formatDate(content['logdate']);
-  //         const dateKey = logDate?.toDateString();
-  //         const status = content['status']
-  //         const contentType = content['type'] || 'Unknown';
+  //     contentSnap.forEach((content) => {
+  //       // const content = contSnap.data();
+  //       const profileId = content['profileid'] || 'UnKnown';
+  //       const contentId = content['videoid'] || 'Unknown';
+  //       const contentname = content['videoname'] || 'Unknown';
+  //       const platform = content['platform_name'] || 'UnKnown';
+  //       const totalRunTime = content['totalruntime'] || 0;
+  //       const totalTimeSpend = content['totaltimespend'] || 0;
+  //       const playlistId = content['playlistid'] || '';
+  //       const logDate = this.formatDate(content['logdate']);
+  //       const dateKey = logDate?.toDateString();
+  //       const status = content['status']
+  //       const contentType = content['type'] || 'Unknown';
 
-  //         if (!logDate) {
-  //           return
+  //       if (!logDate) {
+  //         return
+  //       }
+
+  //       if (!Object.hasOwn(participantContentMap, profileId)) {
+  //         participantContentMap[profileId] = {
+  //           profileid: profileId,
+  //           totalWatchHours: 0,
+  //           activePlatforms: new Set(),
+  //           watchedContentsMap: {},
+  //           playlist: new Set(),
+  //           recommendedPlaylist: new Set(),
+  //           completedPlayList: new Set(),
+  //           sessions: 0,
+  //           completedContents: new Set(),
+  //           days: 1,
+  //           contentid: new Set(),
+  //           live: false,
+  //           type: 'guest',
+  //           contents: {}
   //         }
+  //         totalUniqueUsers++
+  //       }
 
-  //         if (!Object.hasOwn(participantContentMap, profileId)) {
-  //           participantContentMap[profileId] = {
-  //             profileid: profileId,
-  //             totalWatchHours: 0,
-  //             activePlatforms: new Set(),
-  //             watchedContentsMap: {},
-  //             playlist: new Set(),
-  //             completedPlayList: new Set(),
-  //             sessions: 0,
-  //             completedContents: new Set(),
-  //             days: 1,
-  //             live: false,
-  //             type: 'guest',
-  //             contents: {}
-  //           }
-  //           totalUniqueUsers++
+  //       if (!Object.hasOwn(contentMap, contentId)) {
+  //         contentMap[contentId] = {
+  //           contentid: contentId,
+  //           contentname: contentname,
+  //           platform: platform,
+  //           from: content['from'] || '',
+  //           playlistid: playlistId,
+  //           totalRunTime: totalRunTime,
+  //           type: content['type'] || '',
+  //           profileid: new Set(),
+  //           totalWatchHours: 0,
+  //           completedProfiles: new Set(),
+  //           rewatchedProfiles: new Set()
+
   //         }
+  //         totalUniueContents++
+  //       }
 
-  //         if (!Object.hasOwn(contentMap, contentId)) {
-  //           contentMap[contentId] = {
-  //             contentid: contentId,
-  //             contentname: contentname,
-  //             platform: platform,
-  //             from: content['from'] || '',
-  //             playlistid: playlistId,
-  //             totalRunTime: totalRunTime,
-  //             type: content['type'] || '',
-  //             profileid: new Set(),
-  //             totalWatchHours: 0,
-  //             completedProfiles: new Set(),
-  //             rewatchedProfiles: new Set()
-
-  //           }
-  //           totalUniueContents++
-  //         }
-
-  //         if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
-  //           participantContentMap[profileId]['watchedContentsMap'][contentId] = {
-  //             completion: 0,
-  //             watchHours: 0
-  //           }
-  //         }
-
-  //         if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
-  //           participantContentMap[profileId].contents[dateKey] = [];
-  //         }
-
-  //         if (!Object.hasOwn(contentTypeMap, contentType)) {
-  //           contentTypeMap[contentType] = {
-  //             content: contentType,
-  //             profileid: new Set(),
-  //             completed: new Set(),
-  //             watchHours: 0
-  //           }
-  //         }
-
-  //         if (!participantTypeMap.has(profileId)) {
-  //           const log = new Date(logDate);
-  //           log.setDate(log.getDate() - 1)
-  //           participantTypeMap.set(profileId, {
-  //             next: log,
-  //             count: 1,
-  //             preDate: new Date(logDate),
-  //             watchHours: totalTimeSpend,
-  //             maxDates: [log.toDateString()],
-  //           });
-  //         } else {
-  //           if (logDate.toDateString() === participantTypeMap.get(profileId)?.next.toDateString()) {
-  //             const map = participantTypeMap.get(profileId);
-  //             const type = participantContentMap[profileId].type;
-  //             map.count++;
-  //             map.watchHours += totalTimeSpend;
-  //             map.next.setDate(logDate.getDate() - 1)
-  //             map.maxDates.push(map.next.toDateString());
-
-  //             participantTypeMap.set(profileId, map);
-
-  //             if (type !== 'superfan' && map.count >= 5 && map.watchHours >= 18000) {
-  //               participantContentMap[profileId].type = 'risingfan';
-  //             } else if (map.count >= 10 && map.watchHours >= 36000) {
-  //               participantContentMap[profileId].type = 'superfan';
-  //             }
-
-  //           } else if (logDate.toDateString() === participantTypeMap.get(profileId)?.preDate.toDateString()) {
-  //             const map = participantTypeMap.get(profileId);
-  //             map.watchHours += totalTimeSpend;
-  //             participantTypeMap.set(profileId, map);
-  //           } else {
-  //             const map = participantTypeMap.get(profileId);
-  //             participantContentMap[profileId].days = Math.max(participantContentMap[profileId]?.days, map.count)
-  //             const log = new Date(logDate);
-  //             log.setDate(log.getDate() - 1)
-  //             participantTypeMap.set(profileId, {
-  //               next: log,
-  //               count: 1,
-  //               preDate: new Date(logDate),
-  //               watchHours: totalTimeSpend,
-  //               maxDates: [log.toDateString()],
-  //             })
-  //           }
-  //         }
-
-  //         totalWatchHours += totalTimeSpend
-  //         participantContentMap[profileId].totalWatchHours += totalTimeSpend;
-  //         participantContentMap[profileId].contents[dateKey].push(content);
-  //         // participantContentMap[profileId].activePlatforms.add(contentType);
-  //         participantContentMap[profileId]['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
-  //         participantContentMap[profileId].sessions += 1
-
-  //         if (contentType !== 'Unknown') {
-  //           participantContentMap[profileId].activePlatforms.add(contentType);
-  //         }
-
-  //         if (status === "complete") {
-  //           participantContentMap[profileId].completedContents.add(contentId)
-  //           participantContentMap[profileId]['watchedContentsMap'][contentId].completion += 1;
-  //           contentTypeMap[contentType].completed.add(profileId);
-
-  //           if (contentMap[contentId].completedProfiles.has(profileId)) {
-  //             contentMap[contentId].rewatchedProfiles.add(profileId);
-  //           } else {
-  //             contentMap[contentId].completedProfiles.add(profileId);
-  //           }
-  //         }
-
-  //         contentMap[contentId].profileid.add(profileId);
-  //         contentMap[contentId].totalWatchHours += totalTimeSpend;
-
-  //         contentTypeMap[contentType].profileid.add(profileId);
-  //         contentTypeMap[contentType].watchHours += totalTimeSpend;
-
-  //       })
-
-  //       this.totalUniqueUsers = totalUniqueUsers
-  //       this.totalUniueContents = totalUniueContents;
-  //       this.totalWatchHours = totalWatchHours;
-  //       this.totalSuperFans = totalSuperFans;
-  //       this.totalRisingFans = totalRisingFans;
-
-  //       this.participantContentMap = participantContentMap;
-  //       this.contentMap = contentMap;
-  //       this.contentTypeMap = contentTypeMap;
-
-  //       const superFans: ParticipantContentMapInterface[] = [];
-  //       const raisingFans: ParticipantContentMapInterface[] = [];
-  //       const fans: ParticipantContentMapInterface[] = [];
-
-  //       Object.values(participantContentMap).forEach((p) => {
-  //         const data = { ...p, type: this.getParicipantType(p) };
-  //         if (data.type === 'superfan') {
-  //           superFans.push(data);
-  //         } else if (data.type === 'risingfan') {
-  //           raisingFans.push(data)
-  //         } else {
-  //           fans.push(data);
+  //       if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
+  //         participantContentMap[profileId]['watchedContentsMap'][contentId] = {
+  //           completion: 0,
+  //           watchHours: 0
   //         }
   //       }
-  //       );
-  //       superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       const dataSource = [...superFans, ...raisingFans, ...fans];
-  //       // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
-  //       this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
 
-  //       const contentDataSoruce = Object.values(contentMap)
-  //       contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
+  //       if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
+  //         participantContentMap[profileId].contents[dateKey] = [];
+  //       }
 
-  //       this.ngAfterViewInit();
-  //       this.updateDaliyActiveUsersChart();
-  //       this.updateDailyWatchHoursChart();
-  //       this.loadingStatus.contentanalytics = false;
-  //       this.checkIsAllLoaded();
-  //     } else {
-  //       contentSnap.docChanges().forEach((content) => {
-  //         if (content.type === 'modified') {
-  //           console.log(content.doc.data())
-  //           const c = content.doc.data();
-  //           const profileid = c['profileid'];
-  //           const contentId = c['videoid'];
-  //           if (Object.hasOwn(this.participantContentMap, profileid)) {
-  //             this.participantContentMap[profileid].live = true;
-  //             this.participantContentMap[profileid].totalWatchHours += c['totaltimespend'];
-  //             this.participantContentMap[profileid].sessions += 1;
-
-  //             this.contentMap[contentId].totalWatchHours += c['totaltimespend'];
-  //           }
-  //         }
-  //       })
-
-  //       const superFans: ParticipantContentMapInterface[] = [];
-  //       const raisingFans: ParticipantContentMapInterface[] = [];
-  //       const fans: ParticipantContentMapInterface[] = [];
-
-  //       Object.values(this.participantContentMap).forEach((p) => {
-  //         const data = { ...p, type: this.getParicipantType(p) };
-  //         if (data.type === 'superfan') {
-  //           superFans.push(data);
-  //         } else if (data.type === 'risingfan') {
-  //           raisingFans.push(data)
-  //         } else {
-  //           fans.push(data);
+  //       if (!Object.hasOwn(contentTypeMap, contentType)) {
+  //         contentTypeMap[contentType] = {
+  //           content: contentType,
+  //           profileid: new Set(),
+  //           completed: new Set(),
+  //           watchHours: 0
   //         }
   //       }
-  //       );
-  //       superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       const dataSource = [...superFans, ...raisingFans, ...fans];
-  //       // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
-  //       this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
 
-  //       const contentDataSoruce = Object.values(this.contentMap)
-  //       contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-  //       this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
+  //       if (!participantTypeMap.has(profileId)) {
+  //         const log = new Date(logDate);
+  //         log.setHours(0, 0, 0, 0);
+  //         participantTypeMap.set(profileId, {
+  //           watchHours: totalTimeSpend,
+  //           maxDates: [log],
+  //         });
+  //       } else {
+  //         const map = participantTypeMap.get(profileId);
+  //         const type = participantContentMap[profileId].type;
+  //         const contDate = new Date(logDate);
+  //         contDate.setHours(0, 0, 0, 0);
+  //         const timeDelay = map.maxDates.at(-1).getTime() - contDate.getTime();
+  //         if (timeDelay / 86400000 === 1) {
+  //           map.maxDates.push(contDate);
+  //           map.watchHours += totalTimeSpend;
+  //         } else if (timeDelay !== 0) {
+  //           map.maxDates = [contDate];
+  //           map.watchHours = 0
+  //         }
+  //         map.watchHours += totalTimeSpend;
+  //         if (map.maxDates.length >= 10 && map.watchHours >= 36000) {
+  //           participantContentMap[profileId].type = 'superfan';
+  //         } else if (type !== 'superfan' && map.maxDates.length >= 5 && map.watchHours >= 18000) {
+  //           participantContentMap[profileId].type = 'risingfan';
+  //         }
+  //         participantContentMap[profileId].days = Math.max(participantContentMap[profileId].days, map.maxDates.length)
+  //         participantTypeMap.set(profileId, map);
+  //       }
 
-  //       const data = Object.values(this.participantContentMap)
-  //       data.sort((a, b) => Number(a.live) - Number(b.live))
-  //       this.participantTableDataSource.data = data;
-  //       this.ngAfterViewInit();
+  //       totalWatchHours += totalTimeSpend
+  //       participantContentMap[profileId].totalWatchHours += totalTimeSpend;
+  //       participantContentMap[profileId].contents[dateKey].push(content);
+  //       participantContentMap[profileId]['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
+  //       participantContentMap[profileId].contentid.add(contentId)
+  //       participantContentMap[profileId].sessions += 1
+
+  //       if (![null, undefined, ''].includes(playlistId)) {
+  //         participantContentMap[profileId].playlist.add(playlistId);
+  //       }
+
+  //       if (contentType !== 'Unknown') {
+  //         participantContentMap[profileId].activePlatforms.add(contentType);
+  //       }
+
+  //       if (status === "complete") {
+  //         participantContentMap[profileId].completedContents.add(contentId)
+  //         participantContentMap[profileId]['watchedContentsMap'][contentId].completion += 1;
+  //         contentTypeMap[contentType].completed.add(profileId);
+
+  //         if (contentMap[contentId].completedProfiles.has(profileId)) {
+  //           contentMap[contentId].rewatchedProfiles.add(profileId);
+  //         } else {
+  //           contentMap[contentId].completedProfiles.add(profileId);
+  //         }
+  //       }
+
+  //       contentMap[contentId].profileid.add(profileId);
+  //       contentMap[contentId].totalWatchHours += totalTimeSpend;
+
+  //       contentTypeMap[contentType].profileid.add(profileId);
+  //       contentTypeMap[contentType].watchHours += totalTimeSpend;
+
+  //     })
+
+  //     // Array.from(participantTypeMap.keys()).forEach((p) => {
+  //     //   if (this.participantMetaDataMap[p]?.name === 'Sumit Malik') {
+  //     //     console.log(participantTypeMap.get(p))
+  //     //   }
+  //     // })
+  //     this.totalUniqueUsers = totalUniqueUsers
+  //     this.totalUniueContents = totalUniueContents;
+  //     this.totalWatchHours = totalWatchHours;
+  //     this.totalSuperFans = totalSuperFans;
+  //     this.totalRisingFans = totalRisingFans;
+
+  //     this.participantContentMap = participantContentMap;
+  //     this.contentMap = contentMap;
+  //     this.contentTypeMap = contentTypeMap;
+
+  //     const superFans: ParticipantContentMapInterface[] = [];
+  //     const raisingFans: ParticipantContentMapInterface[] = [];
+  //     const fans: ParticipantContentMapInterface[] = [];
+
+  //     Object.values(participantContentMap).forEach((p) => {
+  //       const data = { ...p };
+  //       if (data.type === 'superfan') {
+  //         superFans.push(data);
+  //       } else if (data.type === 'risingfan') {
+  //         raisingFans.push(data)
+  //       } else {
+  //         fans.push(data);
+  //       }
   //     }
+  //     );
+  //     superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //     raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //     fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //     const dataSource = [...superFans, ...raisingFans, ...fans];
+  //     // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
+  //     this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
+
+  //     const contentDataSoruce = Object.values(contentMap)
+  //     contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
+  //     this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
+
+  //     this.ngAfterViewInit();
+  //     this.updateDaliyActiveUsersChart();
+  //     this.updateDailyWatchHoursChart();
+  //     this.loadingStatus.contentanalytics = false;
+  //     this.checkIsAllLoaded()
   //   })
   // }
 
+  // async fetchParticipantMetaData() {
+  //   const participantMetaDataMap: { [key: string]: any } = {};
+  //   const snap = await getDocs(collection(this.firestore, 'participant metadata'))
+  //   snap.docs.forEach((p) => {
+  //     const data = p.data();
+  //     participantMetaDataMap[data['profileid']] = data;
+  //   })
+  //   this.participantMetaDataMap = participantMetaDataMap;
+  // }
+
+  // function to fetch and process content analytics logs
   async fetchContentAnalytics() {
     this.isLoading = true;
     this.loadingStatus.contentanalytics = true;
+    this.isInitialLoaded = false;
+    if (this.analyticsSubscribe) {
+      this.analyticsSubscribe();
+    }
 
     const constrains: any = [orderBy('logdate', 'desc')];
     if (this.startDate.value && this.endDate.value) {
@@ -856,214 +796,228 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
     const q = query(collection(this.firestore, 'content analytics'), ...constrains);
 
-    // const contentSnap = await getDocs(q);
-    collectionData(q).pipe(takeUntil(this.destroy$)).subscribe((contentSnap) => {
-      const participantContentMap: { [key: string]: ParticipantContentMapInterface } = {};
-      const contentMap: { [key: string]: ContentMapInterface } = {};
-      const contentTypeMap: { [key: string]: ContentType } = {};
-      const participantTypeMap: Map<string, participantTypeCheck> = new Map();
+    this.participantContentMap = {};
+    this.contentMap = {};
+    this.contentTypeMap = {};
 
-      let totalUniqueUsers = 0;
-      let totalUniueContents = 0;
-      let totalWatchHours = 0;
-      let totalSuperFans = 0;
-      let totalRisingFans = 0;
+    this.analyticsSubscribe = onSnapshot(q, (contentSnap) => {
 
-      contentSnap.forEach((content) => {
-        // const content = contSnap.data();
-        const profileId = content['profileid'] || 'UnKnown';
-        const contentId = content['videoid'] || 'Unknown';
-        const contentname = content['videoname'] || 'Unknown';
-        const platform = content['platform_name'] || 'UnKnown';
-        const totalRunTime = content['totalruntime'] || 0;
-        const totalTimeSpend = content['totaltimespend'] || 0;
-        const playlistId = content['playlistid'] || '';
-        const logDate = this.formatDate(content['logdate']);
-        const dateKey = logDate?.toDateString();
-        const status = content['status']
-        const contentType = content['type'] || 'Unknown';
+      if (contentSnap.metadata.fromCache) {
+        return
+      }
+      const participantContentMap: { [key: string]: ParticipantContentMapInterface } = Object.assign({}, this.participantContentMap);
+      const contentMap: { [key: string]: ContentMapInterface } = Object.assign({}, this.contentMap);
+      const contentTypeMap: { [key: string]: ContentType } = Object.assign({}, this.contentTypeMap);
 
-        if (!logDate) {
-          return
-        }
+      let totalUniqueUsers = this.totalUniqueUsers;
+      let totalUniueContents = this.totalUniueContents;
+      let totalWatchHours = this.totalWatchHours;
 
-        if (!Object.hasOwn(participantContentMap, profileId)) {
-          participantContentMap[profileId] = {
-            profileid: profileId,
-            totalWatchHours: 0,
-            activePlatforms: new Set(),
-            watchedContentsMap: {},
-            playlist: new Set(),
-            completedPlayList: new Set(),
-            sessions: 0,
-            completedContents: new Set(),
-            days: 1,
-            live: false,
-            type: 'guest',
-            contents: {}
+      contentSnap.docChanges().forEach((contentDoc) => {
+        const content = contentDoc.doc.data();
+        if (['added', 'modified'].includes(contentDoc.type)) {
+          const profileId = content['profileid'] || 'UnKnown';
+          const contentId = content['videoid'] || 'Unknown';
+          const contentname = content['videoname'] || 'Unknown';
+          const platform = content['platform_name'] || 'UnKnown';
+          const totalRunTime = content['totalruntime'] || 0;
+          const totalTimeSpend = content['totaltimespend'] || 0;
+          const playlistId = content['playlistid'] || '';
+          const logDate = this.formatDate(content['logdate']);
+          const dateKey = logDate?.toDateString();
+          const status = content['status']
+          const contentType = content['type'] || 'Unknown';
+
+          if (!logDate) {
+            return
           }
-          totalUniqueUsers++
-        }
 
-        if (!Object.hasOwn(contentMap, contentId)) {
-          contentMap[contentId] = {
-            contentid: contentId,
-            contentname: contentname,
-            platform: platform,
-            from: content['from'] || '',
-            playlistid: playlistId,
-            totalRunTime: totalRunTime,
-            type: content['type'] || '',
-            profileid: new Set(),
-            totalWatchHours: 0,
-            completedProfiles: new Set(),
-            rewatchedProfiles: new Set()
-
-          }
-          totalUniueContents++
-        }
-
-        if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
-          participantContentMap[profileId]['watchedContentsMap'][contentId] = {
-            completion: 0,
-            watchHours: 0
-          }
-        }
-
-        if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
-          participantContentMap[profileId].contents[dateKey] = [];
-        }
-
-        if (!Object.hasOwn(contentTypeMap, contentType)) {
-          contentTypeMap[contentType] = {
-            content: contentType,
-            profileid: new Set(),
-            completed: new Set(),
-            watchHours: 0
-          }
-        }
-
-        if (!participantTypeMap.has(profileId)) {
-          const log = new Date(logDate);
-          log.setDate(log.getDate() - 1)
-          participantTypeMap.set(profileId, {
-            next: log,
-            count: 1,
-            preDate: new Date(logDate),
-            watchHours: totalTimeSpend,
-            maxDates: [log.toDateString()],
-          });
-        } else {
-          if (logDate.toDateString() === participantTypeMap.get(profileId)?.next.toDateString()) {
-            const map = participantTypeMap.get(profileId);
-            const type = participantContentMap[profileId].type;
-            map.count++;
-            map.watchHours += totalTimeSpend;
-            map.next.setDate(logDate.getDate() - 1)
-            map.maxDates.push(map.next.toDateString());
-
-            participantTypeMap.set(profileId, map);
-
-            if (type !== 'superfan' && map.count >= 5 && map.watchHours >= 18000) {
-              participantContentMap[profileId].type = 'risingfan';
-            } else if (map.count >= 10 && map.watchHours >= 36000) {
-              participantContentMap[profileId].type = 'superfan';
-            }
-
-          } else if (logDate.toDateString() === participantTypeMap.get(profileId)?.preDate.toDateString()) {
-            const map = participantTypeMap.get(profileId);
-            map.watchHours += totalTimeSpend;
-            participantTypeMap.set(profileId, map);
-          } else {
-            const map = participantTypeMap.get(profileId);
-            participantContentMap[profileId].days = Math.max(participantContentMap[profileId]?.days, map.count)
+          if (!Object.hasOwn(participantContentMap, profileId)) {
             const log = new Date(logDate);
-            log.setDate(log.getDate() - 1)
-            participantTypeMap.set(profileId, {
-              next: log,
-              count: 1,
-              preDate: new Date(logDate),
-              watchHours: totalTimeSpend,
-              maxDates: [log.toDateString()],
-            })
+            log.setHours(0, 0, 0, 0);
+            participantContentMap[profileId] = {
+              profileid: profileId,
+              totalWatchHours: 0,
+              activePlatforms: new Set(),
+              watchedContentsMap: {},
+              playlist: new Set(),
+              recommendedPlaylist: new Set(),
+              completedPlayList: new Set(),
+              sessions: 0,
+              completedContents: new Set(),
+              days: 1,
+              maxWatch: totalTimeSpend,
+              maxContWatchDates: [log],
+              contentid: new Set(),
+              live: false,
+              type: 'guest',
+              contents: {},
+              lastSeen: logDate
+            }
+            totalUniqueUsers++
           }
-        }
 
-        totalWatchHours += totalTimeSpend
-        participantContentMap[profileId].totalWatchHours += totalTimeSpend;
-        participantContentMap[profileId].contents[dateKey].push(content);
-        // participantContentMap[profileId].activePlatforms.add(contentType);
-        participantContentMap[profileId]['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
-        participantContentMap[profileId].sessions += 1
+          if (!Object.hasOwn(contentMap, contentId)) {
+            contentMap[contentId] = {
+              contentid: contentId,
+              contentname: contentname,
+              platform: platform,
+              from: content['from'] || '',
+              playlistid: playlistId,
+              totalRunTime: totalRunTime,
+              type: content['type'] || '',
+              profileid: new Set(),
+              totalWatchHours: 0,
+              completedProfiles: new Set(),
+              rewatchedProfiles: new Set()
 
-        if (contentType !== 'Unknown') {
-          participantContentMap[profileId].activePlatforms.add(contentType);
-        }
-
-        if (status === "complete") {
-          participantContentMap[profileId].completedContents.add(contentId)
-          participantContentMap[profileId]['watchedContentsMap'][contentId].completion += 1;
-          contentTypeMap[contentType].completed.add(profileId);
-
-          if (contentMap[contentId].completedProfiles.has(profileId)) {
-            contentMap[contentId].rewatchedProfiles.add(profileId);
-          } else {
-            contentMap[contentId].completedProfiles.add(profileId);
+            }
+            totalUniueContents++
           }
+
+          if (!Object.hasOwn(participantContentMap[profileId]['watchedContentsMap'], contentId)) {
+            participantContentMap[profileId]['watchedContentsMap'][contentId] = {
+              completion: 0,
+              watchHours: 0
+            }
+          }
+
+          if (!Object.hasOwn(participantContentMap[profileId].contents, dateKey)) {
+            participantContentMap[profileId].contents[dateKey] = [];
+          }
+
+          if (!Object.hasOwn(contentTypeMap, contentType)) {
+            contentTypeMap[contentType] = {
+              content: contentType,
+              profileid: new Set(),
+              completed: new Set(),
+              watchHours: 0
+            }
+          }
+
+
+          const participant: ParticipantContentMapInterface = participantContentMap[profileId];
+          const contentData: ContentMapInterface = contentMap[contentId];
+          const contentTypeData: ContentType = contentTypeMap[contentType];
+
+          // set participant type
+          const contDate = new Date(logDate);
+          contDate.setHours(0, 0, 0, 0);
+          const timeDelay = participant.maxContWatchDates.at(-1).getTime() - contDate.getTime();
+          if (timeDelay / 86400000 === 1) {
+            participant.maxContWatchDates.push(contDate);
+            participant.maxWatch += totalTimeSpend;
+          } else if (timeDelay !== 0) {
+            participant.maxContWatchDates = [contDate];
+            participant.maxWatch = 0
+          }
+          participant.maxWatch += totalTimeSpend;
+          if (participant.maxContWatchDates.length >= 10 && participant.maxWatch >= 36000) {
+            participant.type = 'superfan';
+          } else if (participant.type !== 'superfan' && participant.maxContWatchDates.length >= 5 && participant.maxWatch >= 18000) {
+            participant.type = 'risingfan';
+          }
+          participant.days = Math.max(participant.days, participant.maxContWatchDates.length)
+
+          // sets participant data
+          totalWatchHours += totalTimeSpend
+          participant.totalWatchHours += totalTimeSpend;
+          participant.contents[dateKey].push(content);
+          participant['watchedContentsMap'][contentId].watchHours += totalTimeSpend;
+          participant.contentid.add(contentId);
+          participant.sessions += 1;
+          participant.live = this.isInitialLoaded;
+          if (this.isInitialLoaded) {
+            participant.lastSeen = logDate;
+          }
+
+          if (![null, undefined, ''].includes(playlistId)) {
+            participant.playlist.add(playlistId);
+          }
+
+          if (contentType !== 'Unknown') {
+            participant.activePlatforms.add(contentType);
+          }
+
+          if (status === "complete") {
+            participant.completedContents.add(contentId)
+            participant['watchedContentsMap'][contentId].completion += 1;
+            contentTypeData.completed.add(profileId);
+
+            if (contentData.completedProfiles.has(profileId)) {
+              contentData.rewatchedProfiles.add(profileId);
+            } else {
+              contentData.completedProfiles.add(profileId);
+            }
+          }
+
+          contentData.profileid.add(profileId);
+          contentData.totalWatchHours += totalTimeSpend;
+
+          contentTypeData.profileid.add(profileId);
+          contentTypeData.watchHours += totalTimeSpend;
+
+          participantContentMap[profileId] = participant;
+          contentMap[contentId] = contentData;
+          contentTypeMap[contentType] = contentTypeData;
+
         }
-
-        contentMap[contentId].profileid.add(profileId);
-        contentMap[contentId].totalWatchHours += totalTimeSpend;
-
-        contentTypeMap[contentType].profileid.add(profileId);
-        contentTypeMap[contentType].watchHours += totalTimeSpend;
-
       })
-
-      this.totalUniqueUsers = totalUniqueUsers
-      this.totalUniueContents = totalUniueContents;
-      this.totalWatchHours = totalWatchHours;
-      this.totalSuperFans = totalSuperFans;
-      this.totalRisingFans = totalRisingFans;
-
-      this.participantContentMap = participantContentMap;
-      this.contentMap = contentMap;
-      this.contentTypeMap = contentTypeMap;
 
       const superFans: ParticipantContentMapInterface[] = [];
       const raisingFans: ParticipantContentMapInterface[] = [];
-      const fans: ParticipantContentMapInterface[] = [];
+      const guest: ParticipantContentMapInterface[] = [];
+      
+      const participantData = Object.values(participantContentMap);
+      participantData.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
 
-      Object.values(participantContentMap).forEach((p) => {
-        const data = { ...p, type: this.getParicipantType(p) };
+      participantData.forEach((p) => {
+        const data = { ...p };
         if (data.type === 'superfan') {
           superFans.push(data);
         } else if (data.type === 'risingfan') {
           raisingFans.push(data)
         } else {
-          fans.push(data);
+          guest.push(data);
         }
       }
       );
-      superFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-      raisingFans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-      fans.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
-      const dataSource = [...superFans, ...raisingFans, ...fans];
-      // dataSource.sort((a, b) => participantRankType[a.type] - participantRankType[b.type]);
-      this.participantTableDataSource.data = dataSource.map((p, index) => ({ ...p, rank: index + 1 }));
+
+      const liveParticipants: ParticipantContentMapInterface[] = [];
+      const dataSource = [...superFans, ...raisingFans, ...guest].map((p, index) => ({ ...p, rank: index + 1 })).filter((p) => {
+        if (p.live) {
+          liveParticipants.push(p);
+        }
+        return !p.live;
+      });
+
+      liveParticipants.sort((a, b) => b.lastSeen.getTime() - a.lastSeen.getTime());
+      this.participantTableDataSource.data = [...liveParticipants, ...dataSource];
 
       const contentDataSoruce = Object.values(contentMap)
       contentDataSoruce.sort((a, b) => b.totalWatchHours - a.totalWatchHours);
       this.contentTableDataSource.data = contentDataSoruce.map((c, index) => ({ ...c, rank: index + 1 }));
 
+      this.totalUniqueUsers = totalUniqueUsers
+      this.totalUniueContents = totalUniueContents;
+      this.totalWatchHours = totalWatchHours;
+      this.totalSuperFans = superFans.length;
+      this.totalRisingFans = raisingFans.length;
+
+      this.participantContentMap = participantContentMap;
+      this.contentMap = contentMap;
+      this.contentTypeMap = contentTypeMap;
+
       this.ngAfterViewInit();
       this.updateDaliyActiveUsersChart();
       this.updateDailyWatchHoursChart();
       this.loadingStatus.contentanalytics = false;
+      this.isInitialLoaded = true;
       this.checkIsAllLoaded()
     })
   }
 
+  // function to fetch participant data
   async fetchParticipantMetaData() {
     const participantMetaDataMap: { [key: string]: any } = {};
     const snap = await getDocs(collection(this.firestore, 'participant metadata'))
@@ -1074,61 +1028,49 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     this.participantMetaDataMap = participantMetaDataMap;
   }
 
-  // async fetchRecommendedMixPlayList() {
-  //   this.loadingStatus.recommendedMixPlaylist = true;
-  //   const colRef = collection(this.firestore, 'recommended mix playlist');
-  //   const constrains = [];
-  //   if (this.startDate.value && this.endDate.value) {
-  //     const start = new Date(this.startDate.value);
-  //     const end = new Date(this.endDate.value);
+  async fetchjourney() {
+    const snap = await getDocs(collection(this.firestore, 'journey'));
+    snap.docs.forEach((doc) => {
+      this.journeyMap[doc.id] = doc.data(); 
+    });
+  }
+ 
+  getJourneyDetails(profileId: string): { active: string; last: string; status: string; financeStatus:string } {
+  const data = this.participantMetaDataMap[profileId];
 
-  //     start.setHours(0, 0, 0, 0);
-  //     end.setHours(23, 59, 59, 999);
+    if (!data) {
+      return {
+        active: 'No Journey',
+        last: 'No Journey',
+        status: 'No Status',
+        financeStatus :''
+      };
+    }
 
-  //     constrains.push(where('date', '>=', Timestamp.fromDate(start)))
-  //     constrains.push(where('date', '<=', Timestamp.fromDate(end)))
-  //   }
+      const activeId = data.activejourney;
+      const lastId = data.lastcompletedjourney;
 
-  //   const q = query(colRef, ...constrains);
+      let active = '';
+      let last = '';
 
-  //   const pipe = []
-  //   collectionData(q)
-  //     .pipe(
-  //       takeUntil(this.destroy$),
-  //       catchError((err) => {
-  //         console.log(err);
-  //         return of([]);
-  //       }),
-  //       finalize(() => { this.loadingStatus.recommendedMixPlaylist = false }))
-  //     .subscribe((snap) => {
-  //       const recommendedMixPlaylistMap: { [key: string]: { [key: string]: { [key: string]: any } } } = {};
-  //       snap.forEach((mix) => {
-  //         const type = mix['type'] || 'Unknown';
-  //         const profileId = mix['profileid'] || 'Unknown';
-  //         const recommandedPlaylistId = mix['bufferdocref']?.id || 'Unknown';
+      if (activeId && this.journeyMap[activeId]) {
+        active = this.journeyMap[activeId].journey;
+        last = '';
+      } else if(lastId && this.journeyMap[lastId]) {
+        active = '';
+        last = this.journeyMap[lastId].journey;
+      }
 
-  //         if (!Object.hasOwn(recommendedMixPlaylistMap, profileId)) {
-  //           recommendedMixPlaylistMap[profileId] = {
-  //             [recommandedPlaylistId]: {
-  //               [type]: mix
-  //             }
-  //           }
-  //         } else if (!Object.hasOwn(recommendedMixPlaylistMap[profileId], recommandedPlaylistId)) {
-  //           recommendedMixPlaylistMap[profileId][recommandedPlaylistId] = {
-  //             [type]: mix
-  //           }
-  //         } else {
-  //           recommendedMixPlaylistMap[profileId][recommandedPlaylistId][type] = mix
-  //         }
+      const status = data.customerstatus || 'No Status';
+      const financeStatus = data.financialstatus || '';
 
-  //       })
-  //       this.recommendedMixPlaylistMap = recommendedMixPlaylistMap;
-  //       this.loadingStatus.recommendedMixPlaylist = false;
-  //       this.checkIsAllLoaded();
-  //     });
-  // }
+  return { active, last, status , financeStatus};
+}
+ 
+  
+  // function to fetch participant data
 
-
+  // function to fetch and process playlist data
   async fetchRecommendedMixPlayList() {
     this.loadingStatus.recommendedMixPlaylist = true;
     const colRef = collection(this.firestore, 'recommended mix playlist');
@@ -1146,7 +1088,6 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
     const q = query(colRef, ...constrains);
 
-    const pipe = []
     collectionData(q)
       .pipe(
         takeUntil(this.destroy$),
@@ -1156,7 +1097,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
         }),
         finalize(() => { this.loadingStatus.recommendedMixPlaylist = false }))
       .subscribe((snap) => {
-        const recommendedMixPlaylistMap: { [key: string]: { [key: string]: { [key: string]: any } } } = {};
+
         const playListMixMap: { [key: string]: Partial<PlayListMix> } = {};
         snap.forEach((mix) => {
           const type = mix['type'] || 'Unknown';
@@ -1165,22 +1106,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
           const title = mix['title'] || 'Unknown'
           const status = mix['status'];
           const completedContents = mix['completedcontent'] || [];
-
-          if (!Object.hasOwn(recommendedMixPlaylistMap, profileId)) {
-            recommendedMixPlaylistMap[profileId] = {
-              [recommandedPlaylistId]: {
-                [type]: mix
-              }
-            }
-          } else if (!Object.hasOwn(recommendedMixPlaylistMap[profileId], recommandedPlaylistId)) {
-            recommendedMixPlaylistMap[profileId][recommandedPlaylistId] = {
-              [type]: mix
-            }
-          } else {
-            recommendedMixPlaylistMap[profileId][recommandedPlaylistId][type] = mix
-          }
-
-          // new codes
+          const mixPlayList = (mix['list'] || []).map((d: DocumentReference) => d.id)
 
           if (!Object.hasOwn(playListMixMap, recommandedPlaylistId)) {
             playListMixMap[recommandedPlaylistId] = {
@@ -1199,53 +1125,63 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
           }
 
           if (!Object.hasOwn(playListMixMap[recommandedPlaylistId], profileId)) {
-            playListMixMap[recommandedPlaylistId][profileId] = {}
+            playListMixMap[recommandedPlaylistId][profileId] = {};
+            if (status === 'completed') {
+              playListMixMap[recommandedPlaylistId].completedProfiles.add(profileId);
+            }
           }
 
-          playListMixMap[recommandedPlaylistId][profileId][type] = mix;
+          const playlist = playListMixMap[recommandedPlaylistId];
+          const participant = playListMixMap[recommandedPlaylistId][profileId];
 
-          if (!playListMixMap[recommandedPlaylistId].contentTypes.has(type)) {
-            playListMixMap[recommandedPlaylistId].contentTypes.add(type);
-            playListMixMap[recommandedPlaylistId][type] = mix['list'] || [];
+          participant[type] = mix;
+
+          if (!playlist.contentTypes.has(type)) {
+            playlist.contentTypes.add(type);
+            playlist[type] = mix['list'] || [];
           }
 
-          if (!playListMixMap[recommandedPlaylistId].profileid.has(profileId)) {
-            playListMixMap[recommandedPlaylistId].profileid.add(profileId);
-            playListMixMap[recommandedPlaylistId].notStartedProfiles.add(profileId);
+          if (!playlist.profileid.has(profileId)) {
+            playlist.profileid.add(profileId);
+            playlist.notStartedProfiles.add(profileId);
           }
 
-          if ((!playListMixMap[recommandedPlaylistId].ongoingProfiles.has(profileId) && status === 'completed') && !playListMixMap[recommandedPlaylistId].completedProfiles.has(profileId)) {
-            playListMixMap[recommandedPlaylistId].notStartedProfiles.delete(profileId);
-            playListMixMap[recommandedPlaylistId].completedProfiles.add(profileId);
+          if ((status === 'completed') && playlist.completedProfiles.has(profileId)) {
 
+            playlist.notStartedProfiles.delete(profileId);
+            playlist.completedProfiles.add(profileId);
             this.participantContentMap[profileId]?.completedPlayList.add(recommandedPlaylistId)
 
-          } else if ((playListMixMap[recommandedPlaylistId].completedProfiles.has(profileId) || completedContents.length > 0) && !playListMixMap[recommandedPlaylistId].ongoingProfiles.has(profileId)) {
-            if (playListMixMap[recommandedPlaylistId].completedProfiles.has(profileId)) {
-              playListMixMap[recommandedPlaylistId].completedProfiles.delete(profileId);
-              this.participantContentMap[profileId]?.completedPlayList.delete(profileId)
-            } else {
-              playListMixMap[recommandedPlaylistId].notStartedProfiles.delete(profileId);
+          } else if (playListMixMap[recommandedPlaylistId].completedProfiles.has(profileId) || completedContents.length > 0) {
+
+            playlist?.completedProfiles.delete(profileId);
+            this.participantContentMap[profileId]?.completedPlayList.delete(profileId);
+            playlist?.notStartedProfiles.delete(profileId);
+            playlist?.ongoingProfiles.add(profileId);
+
+          } else if (playlist.notStartedProfiles.has(profileId)) {
+            const matches = mixPlayList.some((cId: string) => (this.participantContentMap[profileId]?.playlist.has(cId) || this.participantContentMap[profileId]?.contentid.has(cId)));
+            if (matches) {
+              playlist.notStartedProfiles.delete(profileId);
+              playlist.startedProfiles.add(profileId);
             }
-            playListMixMap[recommandedPlaylistId].ongoingProfiles.add(profileId);
           }
 
-
-          if (!this.participantContentMap[profileId]?.playlist.has(recommandedPlaylistId)) {
-            this.participantContentMap[profileId]?.playlist.add(recommandedPlaylistId)
+          if (!this.participantContentMap[profileId]?.recommendedPlaylist.has(recommandedPlaylistId)) {
+            this.participantContentMap[profileId]?.recommendedPlaylist.add(recommandedPlaylistId)
           }
 
         })
 
         this.playListMixMap = playListMixMap;
         this.playListTableDateSource.data = Object.values(playListMixMap)
-        this.recommendedMixPlaylistMap = recommendedMixPlaylistMap;
         this.loadingStatus.recommendedMixPlaylist = false;
         this.ngAfterViewInit()
         this.checkIsAllLoaded();
       });
   }
 
+  // function to fetch dashboard data based on date range
   applyDateRangeFilter() {
     const start = this.startDate.value;
     const end = this.endDate.value;
@@ -1256,120 +1192,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     this.fetchRecommendedMixPlayList();
   }
 
-  // fetchBufferMixArchive() {
-  //   this.loadingStatus.bufferMixArchive = true;
-  //   const colRef = collection(this.firestore, 'buffermix archive');
-
-  //   const constrains: any = [orderBy('date', 'desc')];
-  //   if (this.startDate.value && this.endDate.value) {
-  //     const start = new Date(this.startDate.value);
-  //     const end = new Date(this.endDate.value);
-
-  //     start.setHours(0, 0, 0, 0);
-  //     end.setHours(23, 59, 59, 999);
-
-  //     constrains.push(where('date', '>=', Timestamp.fromDate(start)))
-  //     constrains.push(where('date', '<=', Timestamp.fromDate(end)))
-  //   }
-
-  //   const q = query(colRef, ...constrains);
-
-
-  //   collectionData(q).pipe(
-  //     takeUntil(this.destroy$),
-  //     catchError((err) => {
-  //       console.log(err);
-  //       return of([]);
-  //     }),
-  //     finalize(() => { this.loadingStatus.bufferMixArchive = false }))
-  //     .subscribe((snap) => {
-  //       const playListMap: { [key: string]: Partial<PlayList> } = {};
-
-  //       snap.forEach((playList) => {
-  //         const playListId = playList['docid'];
-  //         const profiles = playList['profileid'] || [];
-  //         const eiflix = playList['eiflix'] || [];
-  //         const solarVoice = playList['solarvoice'] || [];
-  //         const generalContent = playList['generalcontent'] || [];
-  //         const date = playList['date']?.toDate ? playList['date']?.toDate() : playList['date']?.toDateString ? playList['date'] : null;
-
-  //         const playListContents = [...eiflix, ...solarVoice, ...generalContent].map((doc) => doc.id);
-
-  //         const started = [];
-  //         const completed = [];
-  //         const ongoing = [];
-  //         const notStarted = [];
-
-  //         profiles.forEach((p: string) => {
-  //           const participant = this.participantContentMap[p];
-
-  //           const generalContent = this.recommendedMixPlaylistMap[p][playListId]['generalcontent'] ?? {};
-  //           const eiflixContent = this.recommendedMixPlaylistMap[p][playListId]['eiflix'] ?? {};
-  //           const solarVoiceContent = this.recommendedMixPlaylistMap[p][playListId]['solarvoice'] ?? {};
-
-  //           const completedList = [generalContent, eiflixContent, solarVoiceContent].map((content) => {
-  //             return content['completedcontent'] || [];
-  //           }).flat().map((doc) => doc.id);
-
-  //           const completedPlaylistId = [generalContent, eiflixContent, solarVoiceContent].map((content) => {
-  //             if (content['type'] === 'generalcontent') {
-  //               return content['completedcontent'] || [];
-  //             }
-  //             return content['completedplaylist'] || []
-  //           }).flat().map((doc) => doc.id);
-
-  //           const completedSet = new Set([...playListContents, ...completedPlaylistId]);
-
-  //           // console.log('completed list ',completedList , playListContents , completedSet)
-
-  //           if (completedPlaylistId.length === playListContents.length && completedSet.size === playListContents.length) {
-  //             completed.push(p);
-  //             return
-  //           } else if (completedList.length > 0) {
-  //             ongoing.push(p);
-  //             return
-  //           } else if (this.isParticipantStartedPlayList(playListContents, p, date, playList)) {
-  //             started.push(p);
-  //             return
-  //           } else {
-  //             notStarted.push(p);
-  //           }
-  //         });
-
-  //         const totalWatchHours = this.getTotalWatchTimeForPlayList(playListContents, profiles, date, playList)
-  //         playListMap[playListId] = { ...playList, started, notStarted, ongoing, completed, avgWatchTime: totalWatchHours }
-  //       });
-
-  //       this.playListMap = playListMap;
-  //       this.playListTableDateSource.data = Object.values(playListMap);
-  //       this.loadingStatus.bufferMixArchive = false;
-  //       this.checkIsAllLoaded();
-  //     });
-  // }
-
-  isParticipantStartedPlayList(contentId: string[], profileId: string, date: Date, playList) {
-    const participant = this.participantContentMap[profileId]?.contents;
-    if (!date || !participant) {
-      return false;
-    }
-    const seconds = new Date(date.toDateString()).getTime();
-
-    return Object.keys(participant).some((dateString: string) => {
-      const contentDate = new Date(dateString).getTime();
-      if (seconds <= contentDate) {
-        return participant[dateString].some((content) => {
-          const cId = content['videoid'];
-          const playListId = content['playlistid'];
-          if (!cId && !playListId) {
-            return false;
-          }
-          return contentId.includes(cId) || contentId.includes(playListId);
-        });
-      }
-      return false
-    });
-  }
-
+  // function to get total watch time for playlist
   getTotalWatchTimeForPlayList(playListContents: string[], profiles: string[], playListDate: Date, playList) {
     if (!playListDate) {
       return 0;
@@ -1399,16 +1222,6 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     return totalWatchHours;
   }
 
-  // getParticipantStatusForPlayList(playListId : string , profileId : string ){
-  //   const participant = this.participantContentMap[profileId];
-  //   const participantDataForPlaylist = this.recommendedMixPlaylistMap[profileId][playListId];
-
-  //   Object.values(participantDataForPlaylist).forEach((content)=>{
-  //     const totalContent = content?.completedcontent;
-
-  //   })
-  // }
-
   getUniqueUsers(): string[] {
     return Object.keys(this.participantContentMap);
   }
@@ -1432,16 +1245,25 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     }).map((d) => d.profileid);
   }
 
+  // function to get participant who not watching no content during date range
   getAtRiskParticipants(): string[] {
     return Object.keys(this.participantMetaDataMap).filter((pId) => !Object.hasOwn(this.participantContentMap, pId) && this.participantMetaDataMap[pId]?.customerstatus === 'active');
   }
 
+  // function to get participant only wwatch solar voice
   getProfilesOnlyWatchSolarVoice(): string[] {
     return Object.values(this.participantContentMap).filter((p) => p.activePlatforms.size === 1 && p.activePlatforms.has('solarvoice')).map((d) => d.profileid)
   }
 
+  // function to get participant only wwatch eiflix
   getProfilesOnlyWatchEifilx(): string[] {
     return Object.values(this.participantContentMap).filter((p) => p.activePlatforms.size === 1 && p.activePlatforms.has('eiflixcontent')).map((d) => d.profileid)
+  }
+
+  // function to get active platforms for participant
+  getParticipantActivePlatforms(p: ParticipantContentMapInterface) {
+    const platforms = p.activePlatforms;
+    return [...platforms.values()]
   }
 
   // function to get loading progress
@@ -1450,112 +1272,8 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     const total = Object.keys(this.loadingStatus).length;
     return (loaded / total) * 100;
   }
-  getMaxConsistentWatchDays(p: ParticipantContentMapInterface): string[] {
-    const contents = p.contents;
-    // console.log(Object.keys(contents))
-    const dates = Object.keys(contents).map((d) => new Date(d));
-    dates.sort((a, b) => a.getTime() - b.getTime());
-    let max = [dates[0].toDateString()];
-    let tempMax = [dates[0].toDateString()];
 
-    for (let i = 1; i < dates.length; i++) {
-      const timeDelay = dates[i].getTime() - dates[i - 1].getTime();
-      if (timeDelay / 86400000 === 1) {
-        tempMax.push(dates[i].toDateString());
-      } else {
-        tempMax = [dates[i].toDateString()];
-      }
-      if (max.length < tempMax.length) {
-        max = [...tempMax];
-      }
-    }
-
-    return max;
-
-  }
-
-
-  // getWatchHours(profileId : string){
-  //   const participant = this.participantContentMap[profileId];
-  //   if (!participant) {
-  //     return [];
-  //   }
-  //   const contents = Object.values(participant.contents);
-
-  // }
-
-  getWatchHoursForType(p: ParticipantContentMapInterface): number {
-    const contents = p.contents;
-    const dates = this.getMaxConsistentWatchDays(p);
-    const watchHours = dates.reduce((wholeTotal, date) => wholeTotal + contents[date].reduce((total, content) => content.totaltimespend + total, 0), 0);
-    return watchHours;
-  }
-
-
-  getParicipantType(p: ParticipantContentMapInterface): participantType {
-    const dates = this.getMaxConsistentWatchDays(p);
-    const watchHours = this.getWatchHoursForType(p);
-    // console.log(dates , watchHours)
-    if (dates.length >= 10 && watchHours >= 36000) {
-      return 'superfan';
-    } else if (dates.length >= 5 && watchHours >= 10800) {
-      return 'risingfan';
-    } else {
-      return 'guest'
-    }
-  }
-
-  getParticipantActivePlatforms(p: ParticipantContentMapInterface) {
-    const platforms = p.activePlatforms;
-    return [...platforms.values()]
-  } 
-
-  // getCompletionRateForContent(c: ContentMapInterface): number {
-  //   const profiles = Array.from(c.profileid.values());
-  //   const completedProfiles = profiles.filter((p: string) => {
-  //     const participant = this.participantContentMap[p]?.watchedContentsMap[c.contentid];
-  //     if (participant.completion > 0) return true;
-  //     return false
-  //   });
-
-  //   return Math.floor(completedProfiles.length / profiles.length)
-  // }
-
-  // getReWatchersCountForContent(c: ContentMapInterface): number {
-  //   const profiles = Array.from(c.profileid.values());
-  //   return profiles.filter((p: string) => {
-  //     const participant = this.participantContentMap[p]?.watchedContentsMap[c.contentid];
-  //     if (!participant) {
-  //       return false;
-  //     }
-  //     if (participant.completion > 0 && participant.watchHours > c.totalRunTime) return true
-  //     return false;
-  //   }).length
-  // }
-
-  // getTotalPlayListForParticipant(p: ParticipantContentMapInterface): number {
-  //   const playlist = this.recommendedMixPlaylistMap[p.profileid];
-  //   if (!playlist) {
-  //     return 0
-  //   }
-  //   return Object.keys(playlist).length;
-  // }
-
-  // getPlayListCompletedForParticipant(p: ParticipantContentMapInterface): number {
-  //   const participantPlaylist = this.recommendedMixPlaylistMap[p.profileid];
-  //   if (!participantPlaylist) {
-  //     return 0
-  //   }
-  //   const playListId = Object.keys(participantPlaylist);
-  //   return playListId.filter((pl: string) => {
-  //     const playList = this.playListMap[pl];
-  //     if (!playList) {
-  //       return false;
-  //     }
-  //     return playList.completed.includes(p.profileid);
-  //   }).length
-  // }
-
+  // function to convert seconds to hours
   convertToHours(seconds: number): number {
     return seconds / 3600
   }
@@ -1591,7 +1309,6 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
       case 'atrisk':
         title = 'At Risk Participants'
         data = this.getAtRiskParticipants();
-        console.log(this.getAtRiskParticipants())
         break
       case 'onlysolarvoice':
         title = 'Participant only uses Solar voice'
@@ -1682,19 +1399,24 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
       .toUpperCase();
   }
 
+  // filter predicate function for participant table
   filterParticipants = (p: ParticipantContentMapInterface, filter: string) => {
-    console.log(this.participantMetaDataMap)
     const name = (this.participantMetaDataMap[p.profileid]?.name || '')?.toLocaleLowerCase()?.trim();
+    const journey = (this.participantMetaDataMap[p.profileid]?.activejourney || '')?.toLocaleLowerCase()?.trim();
+
     if (!name) {
-      return false
-    }
+    return false;
+  }
     return name.includes(filter?.toLocaleLowerCase()?.trim())
+        
   };
 
-  filterParticipantTabel(search: string) {
+  // filter function for participant table
+  filterParticipantTable(search: string) {
     this.participantTableDataSource.filter = search;
   }
 
+  // filter predicate function for playlist table
   filterPredicatePlayList = (p: PlayListMix, filter: string) => {
     const title = (p.title || '')?.toLocaleLowerCase();
     if (!title) {
@@ -1703,10 +1425,12 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     return title.includes(filter?.toLocaleLowerCase()?.trim())
   };
 
-  filterPlayListTabel(search: string) {
+  // filter function for playlist table
+  filterPlayListTable(search: string) {
     this.playListTableDateSource.filter = search;
   }
 
+  // filter predicate function for content table
   filterPredicateContent = (p: ContentMapInterface, filter: string) => {
     const title = (p.contentname || '')?.toLocaleLowerCase();
     if (!title) {
@@ -1715,10 +1439,12 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     return title.includes(filter?.toLocaleLowerCase()?.trim())
   };
 
-  filterContentTabel(search: string) {
+  // filter function for content table
+  filterContentTable(search: string) {
     this.contentTableDataSource.filter = search;
   }
 
+  // custom sorting function to paricipant table
   participantCustomSorting = (item: ParticipantContentMapInterface, property: string): any => {
     switch (property) {
       case 'rank':
@@ -1746,6 +1472,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     }
   };
 
+  // custom sorting function for content table
   contentCustomSorting = (item: ContentMapInterface, property: string): any => {
     switch (property) {
       case 'rank':
@@ -1769,6 +1496,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     }
   };
 
+  // custom sorting function for playlist table
   playListCustomSorting = (item: PlayListMix, property: string): any => {
     switch (property) {
       case 'title':
@@ -1790,10 +1518,12 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     }
   };
 
+  // function to toggle date picker
   togglePicker() {
     this.pickerOpen = !this.pickerOpen;
   }
 
+  // function to clear date in date range picker
   clearDates(event: Event) {
     event.stopPropagation();
     this.startDate.reset();
@@ -1808,6 +1538,16 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
     return diffDays;
+  }
+
+  profiledetails(profileid) {
+    if (window.location.port.includes('4200')) {
+      window.open(`http://localhost:4200/userprofile/${profileid}`, '_blank');
+    } else if (environment.firebase.projectId == 'starlabs-test') {
+      window.open(`https://starlabs-test-19.web.app/userprofile/${profileid}`, '_blank');
+    } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+      window.open(`https://breakthroughs.app/userprofile/${profileid}`, '_blank');
+    }
   }
 
 }

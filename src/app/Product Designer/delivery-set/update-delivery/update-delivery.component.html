@@ -89,8 +89,8 @@
         </mat-form-field>
         <div formArrayName="formarray">
           <ul>
-            <li style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded" 
-              *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i" 
+            <li style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded"
+              *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i"
             >
               <mat-form-field class="formfield2" appearance="fill">
                 <mat-label>Field Name</mat-label>
@@ -113,6 +113,14 @@
                   <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
                 </mat-select>
               </mat-form-field><br>
+              <mat-form-field
+                *ngIf="formarray.controls[i].get('type')?.value === 'array'"
+                class="formfield2"
+                appearance="fill">
+                <mat-label>Max Items (max entries user can add)</mat-label>
+                <input type="number" matInput formControlName="maxitems" min="1">
+                <mat-hint>Leave empty for no limit</mat-hint>
+              </mat-form-field><br>
 
               <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true && maxMinFor.includes(formarray.controls[i].get('type')?.value)" class="formfield2" appearance="fill">
                 <mat-label>Maximum Count (ex:maximum how many options user can select)</mat-label>
@@ -127,10 +135,10 @@
               <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true" class="formfield2" appearance="fill">
                 <mat-label>Options for {{formarray.controls[i].get('type')?.value}}</mat-label>
                 <mat-chip-grid #chipList formControlName="options">
-                  <mat-chip-row 
-                    *ngFor="let Options of formarray.controls[i].get('options').value;let j =index" 
-                    [value]="Options" 
-                    [editable]="editable" 
+                  <mat-chip-row
+                    *ngFor="let Options of formarray.controls[i].get('options').value;let j =index"
+                    [value]="Options"
+                    [editable]="editable"
                     (removed)="remove(i,j )"
                   >
                     {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
@@ -173,9 +181,9 @@
                     <mat-label>Options </mat-label>
                     <mat-chip-grid #chipList2 formControlName="options">
                       <mat-chip-row
-                        *ngFor="let Options of formarray.controls[i].get('flippingquestion').get('options').value;let j =index" 
-                        [value]="Options" 
-                        [editable]="editable" 
+                        *ngFor="let Options of formarray.controls[i].get('flippingquestion').get('options').value;let j =index"
+                        [value]="Options"
+                        [editable]="editable"
                         (removed)="removeFlippingQuestionOption(i,j )"
                       >
                         {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
@@ -210,10 +218,10 @@
                       <mat-form-field *ngIf="values[getSubFormArray(i).controls[subindex].get('type')?.value] == true" class="formfield2" appearance="fill">
                         <mat-label>Options for {{getSubFormArray(i).controls[subindex].get('type')?.value}}</mat-label>
                         <mat-chip-grid #chipList3 formControlName="options">
-                          <mat-chip-row 
-                            *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k =index" 
-                            [value]="Options" 
-                            [editable]="editable" 
+                          <mat-chip-row
+                            *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k =index"
+                            [value]="Options"
+                            [editable]="editable"
                             (removed)="removeSubFormOption(i,subindex,k )"
                           >
                             {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
@@ -226,8 +234,23 @@
 
                       <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
 
-                      &nbsp;&nbsp;&nbsp;<button *ngIf="subindex == (getSubFormArray(i).length -1)" mat-mini-fab color="primary" class="formfield ml10" (click)=" addSubFormControl(i)" type="button"> <mat-icon>add</mat-icon></button>
-                      &nbsp;&nbsp;&nbsp;<button *ngIf="subindex == (getSubFormArray(i).length -1)" mat-mini-fab class="formfield ml10" (click)="removeSubFormControl(i,subindex)" type="button"> <mat-icon>remove</mat-icon></button>
+                      &nbsp;&nbsp;&nbsp;<button
+                        *ngIf="subindex == (getSubFormArray(i).length - 1)"
+                        mat-mini-fab
+                        color="primary"
+                        class="formfield ml10"
+                        type="button"
+                        (click)="addSubFormControl(i)">
+                        <mat-icon>add</mat-icon>
+                      </button>
+                      &nbsp;&nbsp;&nbsp;<button
+                        *ngIf="subindex == (getSubFormArray(i).length - 1)"
+                        mat-mini-fab
+                        class="formfield ml10"
+                        type="button"
+                        (click)="removeSubFormControl(i, subindex)">
+                        <mat-icon>remove</mat-icon>
+                      </button>
                     </li>
                   </ul>
                 </div>
@@ -256,7 +279,7 @@
           </mat-error>
         </mat-form-field>
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
           <button type="submit" mat-stroked-button class="successbtn" (click)="submitReport(reportform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
@@ -282,7 +305,7 @@
           </mat-error>
         </mat-form-field> -->
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
           <button type="submit" mat-stroked-button class="successbtn" (click)="submitEvents(eventform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
@@ -319,7 +342,7 @@
         </mat-form-field> -->
 
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
           <button type="submit" mat-stroked-button class="successbtn" (click)="submitQueue(queueform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
@@ -336,7 +359,7 @@
           </mat-error>
         </mat-form-field>
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button> 
+          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
           <button type="submit" mat-stroked-button class="successbtn" (click)="submitFieldwork(fieldworkform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>

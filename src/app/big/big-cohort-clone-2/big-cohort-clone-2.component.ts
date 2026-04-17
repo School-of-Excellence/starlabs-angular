@@ -22,6 +22,7 @@ import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
 
 @Component({
   selector: 'app-big-cohort-clone-2',
@@ -40,6 +41,161 @@ import { AhNotificationComponent } from '../../Participants Profile Management/p
 })
 export class BigCohortClone2Component {
 
+  // ==== Design B additions ====
+  selectMode = false
+  selectedCohortIds = new Set<string>()
+  mobileSheetOpen = false
+  private _sheetOpenedAt = 0
+
+  openMobileSheet(ev: Event): void {
+    ev.stopPropagation()
+    this.mobileSheetOpen = true
+    this._sheetOpenedAt = Date.now()
+  }
+  closeMobileSheet(ev: Event): void {
+    // Guard against ghost/touch-through clicks within 350ms of opening
+    if (Date.now() - this._sheetOpenedAt < 350) return
+    const t = ev.target as HTMLElement
+    if (!t.classList.contains('scrim')) return
+    this.mobileSheetOpen = false
+  }
+
+  toggleSelectMode(): void {
+    this.selectMode = !this.selectMode
+    if (!this.selectMode) this.selectedCohortIds.clear()
+  }
+  isCohortSelected(id: string): boolean {
+    return this.selectedCohortIds.has(id)
+  }
+  toggleCohortSelected(id: string): void {
+    if (!id) return
+    if (this.selectedCohortIds.has(id)) this.selectedCohortIds.delete(id)
+    else this.selectedCohortIds.add(id)
+  }
+  selectAllCohorts(): void {
+    const allIds = (this.filteredCohortsList || []).map((c: any) => c.docid).filter(Boolean)
+    const anyUnchecked = allIds.some((id: string) => !this.selectedCohortIds.has(id))
+    if (anyUnchecked) allIds.forEach((id: string) => this.selectedCohortIds.add(id))
+    else this.selectedCohortIds.clear()
+  }
+  private mergedCohortForSelection(): any {
+    const ids = Array.from(this.selectedCohortIds)
+    const cohorts = (this.filteredCohortsList || []).filter((c: any) => ids.includes(c.docid))
+    const participantidlist: string[] = []
+    const mentors: string[] = []
+    const seen = new Set<string>()
+    cohorts.forEach((c: any) => {
+      (c.participantidlist || []).forEach((p: string) => { if (!seen.has(p)) { seen.add(p); participantidlist.push(p) } })
+      ;(c.mentors || []).forEach((m: string) => { if (!seen.has(m)) { seen.add(m); mentors.push(m) } })
+    })
+    return { name: `${cohorts.length} cohort(s)`, participantidlist, mentors }
+  }
+  sendSelectedCohortsNotification(): void {
+    if (this.selectedCohortIds.size === 0) return
+    ;(this as any).sendCohortNotification?.(this.mergedCohortForSelection())
+  }
+  sendSelectedCohortsEmail(): void {
+    if (this.selectedCohortIds.size === 0) return
+    ;(this as any).sendCohortEmail?.(this.mergedCohortForSelection())
+  }
+  sendSelectedCohortsWhatsapp(): void {
+    if (this.selectedCohortIds.size === 0) return
+    ;(this as any).sendCohortWhatsapp?.(this.mergedCohortForSelection())
+  }
+
+  sendSelectedCohortsPlaylist(): void {
+    if (this.selectedCohortIds.size === 0) return
+    ;(this as any).sendCohortRecommendedPlaylist?.(this.mergedCohortForSelection())
+  }
+
+  exportSelectedCohorts(): void {
+    if (this.selectedCohortIds.size === 0) return
+    // Temporarily narrow filteredCohortsList to the selected set, reuse existing export, then restore.
+    const full = this.filteredCohortsList
+    const subset = full.filter((c: any) => this.selectedCohortIds.has(c.docid))
+    this.filteredCohortsList = subset
+    try { (this as any).exportCohortsData?.() } finally { this.filteredCohortsList = full }
+  }
+  // ==== Participant multi-select (per cohort) ====
+  participantSelectCohortId: string | null = null
+  selectedParticipantIds = new Set<string>()
+
+  toggleParticipantSelectMode(cohortId: string): void {
+    if (this.participantSelectCohortId === cohortId) {
+      this.participantSelectCohortId = null
+      this.selectedParticipantIds.clear()
+    } else {
+      this.participantSelectCohortId = cohortId
+      this.selectedParticipantIds.clear()
+    }
+  }
+  isParticipantSelectActive(cohortId: string): boolean {
+    return this.participantSelectCohortId === cohortId
+  }
+  isParticipantChecked(pid: string): boolean {
+    return this.selectedParticipantIds.has(pid)
+  }
+  toggleParticipantChecked(pid: string, ev?: Event): void {
+    if (ev) ev.stopPropagation()
+    if (this.selectedParticipantIds.has(pid)) this.selectedParticipantIds.delete(pid)
+    else this.selectedParticipantIds.add(pid)
+  }
+  private cohortForSelected(cohort: any): any {
+    const ids = Array.from(this.selectedParticipantIds)
+    return { ...cohort, participantidlist: ids, mentors: [] }
+  }
+  sendSelectedNotification(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortNotification?.(this.cohortForSelected(cohort))
+  }
+  sendSelectedEmail(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortEmail?.(this.cohortForSelected(cohort))
+  }
+  sendSelectedWhatsapp(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortWhatsapp?.(this.cohortForSelected(cohort))
+  }
+
+  async moveSelectedParticipantsTo(sourceCohort: any, targetCohort: any): Promise<void> {
+    const ids = Array.from(this.selectedParticipantIds)
+    for (const pid of ids) {
+      // Await each move so the isMovingParticipant guard releases between calls
+      await (this as any).moveParticipantToCohort?.(pid, sourceCohort, targetCohort)
+    }
+    this.selectedParticipantIds.clear()
+    this.participantSelectCohortId = null
+  }
+
+  hasActiveFilters(): boolean {
+    return !!this.selectedMarathon
+      || (this.selectedAcceleratorEvent?.length || 0) > 0
+      || (this.selectedQueueEvent?.length || 0) > 0
+      || (this.selectedZoneEvent?.length || 0) > 0
+      || this.statusFilter !== 'all'
+      || this.categoryFilter !== 'all'
+      || this.typeFilter !== 'all'
+      || (this.selectedTags?.length || 0) > 0
+  }
+
+  clearAllFilters(): void {
+    if (this.selectedMarathon) this.toggleMarathonSelection?.(this.selectedMarathon)
+    this.clearEventSelection?.()
+    this.clearQueueSelection?.()
+    this.setStatusFilter?.('all')
+    this.setCategoryFilter?.('all')
+    this.setTypeFilter?.('all')
+    this.clearZoneSelection?.();
+    ;(this as any).clearTagSelection?.()
+  }
+
+  onCardClick(event: MouseEvent, cohort: any): void {
+    if (!this.selectMode) return
+    const target = event.target as HTMLElement
+    if (target.closest('button, .card-menu, .row-action, .foot-btn, .seg button, mat-menu, .mat-menu-content')) return
+    this.toggleCohortSelected(cohort.docid)
+  }
+
   cohortsList: any[] = []
   filteredCohortsList: any[] = []
   groupedCohorts: { [key: string]: any[] } = {}
@@ -52,6 +208,15 @@ export class BigCohortClone2Component {
   filteredAcceleratorEventList: any[] = []
   searchableEventList: any[] = []
 
+  zoneEventEventList: any[] = []
+  filteredZoneEventList: any[] = []
+  searchableZoneEventList: any[] = []
+  selectedZoneEvent: string[] = []
+  zoneDropdownOpen: boolean = false
+  zoneSearchQuery: string = ''
+  mapZoneData: { [zoneId: string]: any } = {}
+  zoneMappedCohortIds: Set<string> = new Set()
+
   mapProfile: any = {}
   mapParticipantMetaData = {};
   contentview = 'participants'
@@ -59,7 +224,8 @@ export class BigCohortClone2Component {
   selectedAcceleratorEvent: string[] = []
   mapMarathon: any = {}
   mapAcceleratorEvent: any = {}
-  mapBigCohortsToAssignment: any = {}
+  mapBigCohortsToAssignment: any = {};
+  mapZoneEvent: any = {};
 
   mapBigAssignment: any = {}
   private subscription = new Subject<void>();
@@ -84,7 +250,7 @@ export class BigCohortClone2Component {
   eventSearchQuery: string = ''
 
   // View Mode
-  viewMode: 'horizontal' | 'vertical' = 'horizontal'
+  viewMode: 'horizontal' | 'vertical' = 'vertical'
 
   // Filter States
   statusFilter: 'all' | 'active' | 'nonactive' = 'all'
@@ -148,6 +314,7 @@ export class BigCohortClone2Component {
   // LocalStorage keys
   private readonly STORAGE_KEY_QUEUE = 'big_cohort_selected_queue';
   private readonly STORAGE_KEY_EVENT = 'big_cohort_selected_event';
+  private readonly STORAGE_KEY_ZONE = 'big_cohort_selected_zone';
 
   private destroy$ = new Subject<void>()
   private storage = inject(Storage)
@@ -209,6 +376,22 @@ export class BigCohortClone2Component {
       // Patch saved event selections
       this.patchSavedEventSelections();
       this.toRunFilterFunctions()
+    });
+
+    getDocs(collection(this.firestore, 'event zones')).then((zones) => {
+      this.zoneEventEventList = zones.docs.map((e) => {
+        let element: any = e.data();
+        element['ref'] = e.ref;
+        element['docid'] = element['docid'] || e.id;
+        this.mapZoneEvent[e.ref.id] = element['name'];
+        this.mapZoneData[e.ref.id] = element;
+        return element;
+      });
+      this.filteredZoneEventList = [...this.zoneEventEventList];
+      this.searchableZoneEventList = [...this.zoneEventEventList];
+
+      // Patch saved zone selections
+      this.patchSavedZoneSelections();
     });
 
     let collectionName = "participant metadata"
@@ -278,12 +461,16 @@ export class BigCohortClone2Component {
     try {
       const savedQueue = localStorage.getItem(this.STORAGE_KEY_QUEUE);
       const savedEvent = localStorage.getItem(this.STORAGE_KEY_EVENT);
-      
+      const savedZone = localStorage.getItem(this.STORAGE_KEY_ZONE);
+
       if (savedQueue) {
         this.selectedQueueEvent = JSON.parse(savedQueue);
       }
       if (savedEvent) {
         this.selectedAcceleratorEvent = JSON.parse(savedEvent);
+      }
+      if (savedZone) {
+        this.selectedZoneEvent = JSON.parse(savedZone);
       }
     } catch (e) {
       console.error('Error loading saved selections:', e);
@@ -684,11 +871,11 @@ export class BigCohortClone2Component {
     this.cohortsList.forEach(cohort => {
       const eventRefId = cohort['eventref']?.id;
       const marathonRefId = cohort['marathonref']?.id;
-      
-      const matchesEvent = this.selectedAcceleratorEvent.length > 0 && 
+
+      const matchesEvent = this.selectedAcceleratorEvent.length > 0 &&
         this.selectedAcceleratorEvent.includes(eventRefId);
       const matchesMarathon = this.selectedMarathon && marathonRefId === this.selectedMarathon;
-      
+
       if (matchesEvent) {
         (cohort['participantidlist'] || []).forEach((id: string) => {
           assignedParticipantIds.add(id);
@@ -705,11 +892,11 @@ export class BigCohortClone2Component {
       this.eventParticipationList.forEach(request => {
         const eventRefId = request['eventref']?.id;
         const participantId = request['participantid'] || request['profileid'];
-        
+
         if (!participantId || assignedParticipantIds.has(participantId)) return;
         if (!this.selectedAcceleratorEvent.includes(eventRefId)) return;
         const key = `${participantId}_${eventRefId}`;
-        
+
         participantMap.set(key, {
           ...request,
           participantId: participantId,
@@ -726,9 +913,9 @@ export class BigCohortClone2Component {
       this.bigInvitationList.forEach(invitation => {
         const eventRefId = invitation['eventref']?.id;
         const participantId = invitation['participantid'] || invitation['profileid'];
-        
+
         if (!participantId || assignedParticipantIds.has(participantId)) return;
-        
+
         if (this.selectedAcceleratorEvent.length > 0) {
           if (!this.selectedAcceleratorEvent.includes(eventRefId)) return;
         }
@@ -759,7 +946,8 @@ export class BigCohortClone2Component {
   }
 
   showUnassignedParticipants() {
-    this.dialog.open(UnassignedParticipantsDialogComponent, {
+    this.calculateUnassignedParticipants();
+    const ref = this.dialog.open(UnassignedParticipantsDialogComponent, {
       width: '700px',
       maxWidth: '95vw',
       maxHeight: '80vh',
@@ -771,11 +959,34 @@ export class BigCohortClone2Component {
         mapAcceleratorEvent: this.mapAcceleratorEvent,
         selectedEvents: this.selectedAcceleratorEvent,
         selectedQueues: this.selectedQueueEvent,
-        cohortsList: this.filteredCohortsList.filter(c => 
-          c['eventref'] && this.selectedAcceleratorEvent.includes(c['eventref'].id)
-        )
+        cohortsList: this.selectedAcceleratorEvent.length > 0
+          ? this.filteredCohortsList.filter(c => c['eventref'] && this.selectedAcceleratorEvent.includes(c['eventref'].id))
+          : (this.filteredCohortsList.length > 0 ? this.filteredCohortsList : this.cohortsList)
       }
     });
+    ref.afterClosed().subscribe((result: any) => {
+      if (!result || result.action !== 'assign' || !result.cohort) return;
+      this.assignUnassignedToCohort(result.participantIds || [], result.cohort);
+    });
+  }
+
+  async assignUnassignedToCohort(participantIds: string[], targetCohort: any): Promise<void> {
+    if (!participantIds?.length || !targetCohort?.docid) return;
+    const targetRef = doc(this.firestore, 'big cohorts', targetCohort.docid);
+    try {
+      await updateDoc(targetRef, { participantidlist: arrayUnion(...participantIds) });
+      if (!targetCohort.participantidlist) targetCohort.participantidlist = [];
+      participantIds.forEach(pid => {
+        if (!targetCohort.participantidlist.includes(pid)) targetCohort.participantidlist.push(pid);
+      });
+      this.unassignedParticipants = (this.unassignedParticipants || []).filter(
+        (p: any) => !participantIds.includes(p.participantId || p.id)
+      );
+      alert(`Assigned ${participantIds.length} participant(s) to ${targetCohort.name}`);
+    } catch (err) {
+      console.error('Error assigning participants:', err);
+      alert('Error assigning participants. Please try again.');
+    }
   }
   
   openCohortChat(cohort: any) {
@@ -783,9 +994,7 @@ export class BigCohortClone2Component {
     window.open(window.location.origin + '/group-chat');
   }
 
-  sendCohortNotification(cohorts){
-    console.log(cohorts);
-    
+  sendCohortNotification(cohorts){    
     let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
     const selectedParticipants = selected.map((e)=>this.mapParticipantMetaData[e])
     let dialogRef = this.dialog.open(AhNotificationComponent,{
@@ -932,6 +1141,31 @@ export class BigCohortClone2Component {
     });
   };
 
+  sendCohortRecommendedPlaylist(cohorts){
+    let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
+    const selectedParticipants = selected.map((e)=>this.mapParticipantMetaData[e]);
+
+    let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
+      data: {
+        participantlist: selectedParticipants,
+        // personalised : personalised
+      },
+      minWidth: "500px",
+      disableClose: true
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
+      if (result != null && result != undefined) {
+        let docid = doc(collection(this.firestore, "buffermix archive")).id
+        result['docid'] = docid
+        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
+          console.log("buffer document created");
+        }).catch(err => {
+          console.log(err);
+        })
+      }
+    });
+  }
+
   moveMenuSearchQuery: string = '';
   moveMenuFilteredCohorts: any[] = [];
   isMovingParticipant: boolean = false;
@@ -1024,17 +1258,9 @@ export class BigCohortClone2Component {
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event) {
     const target = event.target as HTMLElement;
-    if (!target.closest('.filter-dropdown')) {
-      this.marathonDropdownOpen = false;
-      this.eventDropdownOpen = false;
-      this.queueDropdownOpen = false;
-    }
-    if (!target.closest('.filter-tab')) {
-      this.statusDropdownOpen = false;
-      this.categoryDropdownOpen = false;
-      this.typeDropdownOpen = false;
-      this.taggingDropdownOpen = false;
-    }
+    // Dialogs, the mobile sheet, and filter pills themselves are safe zones —
+    // their own click handlers (scrim click / explicit close) control closing.
+    if (target.closest('.dialog, .dialog-scrim, .sheet, .scrim, .fi, .fg, .mat-mdc-menu-panel')) return;
   }
 
   toggleViewMode() {
@@ -1239,6 +1465,11 @@ export class BigCohortClone2Component {
         );
       }
 
+      let zoneMatch = true;
+      if (this.selectedZoneEvent.length > 0) {
+        zoneMatch = this.zoneMappedCohortIds.has(e['docid']);
+      }
+
       let searchMatch = true;
       const cohortSearchTerm = this.cohortSearchQuery?.toLowerCase().trim() || '';
       const participantSearchTerm = this.participantSearchQuery?.toLowerCase().trim() || '';
@@ -1258,7 +1489,7 @@ export class BigCohortClone2Component {
         searchMatch = hasMatchingParticipant;
       }
 
-      return marathonMatch && eventMatch && statusMatch && categoryMatch && typeMatch && temporaryMatch && tagMatch && searchMatch;
+      return marathonMatch && eventMatch && statusMatch && categoryMatch && typeMatch && temporaryMatch && tagMatch && zoneMatch && searchMatch;
     });
 
     this.filteredCohortsList = filtered;
@@ -1530,19 +1761,19 @@ export class BigCohortClone2Component {
   }
 
   onEditAssignment(cohorts: any, assignment: any) {
-    console.log(this.cohortsList.map((e)=> e.marathonref.id || null));
+    console.log(this.cohortsList.map((e)=> e?.marathonref?.id || null));
     console.log(this.selectedMarathon);
     let dialogref = this.dialog.open(PlanActivityComponent, {
       data: {
         type: 'edit',
         doc: cohorts,
-        cohortslist: this.cohortsList.filter(e => this.selectedMarathon === e['marathonref'].id),
+        cohortslist: this.cohortsList.filter(e => this.selectedMarathon === e['marathonref']?.id),
         assignmentdoc: assignment,
         mapProfile: this.mapProfile,
       },
       disableClose: true,
-      width: '100%',
-      height: '100%',
+      width: '95vw',
+      height: '90vh',
       panelClass: 'full-width-dialog',
     })
     dialogref.afterClosed().subscribe((result) => {
@@ -1622,10 +1853,12 @@ export class BigCohortClone2Component {
     window.open(url.toString(), "_blank")
   }
 
-  onValidateParticipantAssignment(assignmentDocId: string) {
+  onValidateParticipantAssignment(assignmentDocId: string, cohortId?: string) {
     let url = this.router.createUrlTree(['/validateParticipantAssignments/'], {
       queryParams: {
         assignmentid: assignmentDocId,
+        marathonid: this.selectedMarathon || null,
+        cohortid: cohortId || null,
       }
     })
     window.open(url.toString(), "_blank")
@@ -1779,7 +2012,18 @@ export class BigCohortClone2Component {
   }
 
   getUnassignedCount(): number {
-    return this.unassignedParticipants.length;
+    if (this.unassignedParticipants.length > 0) return this.unassignedParticipants.length;
+    // Live fallback: count big invitations whose participant isn't in any cohort.
+    const assigned = new Set<string>();
+    (this.cohortsList || []).forEach((c: any) => {
+      (c.participantidlist || []).forEach((id: string) => assigned.add(id));
+    });
+    let count = 0;
+    (this.bigInvitationList || []).forEach((inv: any) => {
+      const pid = inv['participantid'] || inv['profileid'];
+      if (pid && !assigned.has(pid)) count++;
+    });
+    return count;
   }
 
   getStatusFilterLabel(): string {
@@ -1955,9 +2199,48 @@ export class BigCohortClone2Component {
       }
     });
 
+    // ==== Activities sheet ====
+    const activitiesData: any[] = [];
+    this.filteredCohortsList.forEach(cohort => {
+      const assignments = this.mapParticiantsAssignments[cohort['docid']] || {};
+      const keys = Object.keys(assignments);
+      if (keys.length === 0) {
+        activitiesData.push({
+          'Cohort Name': cohort['name'] || '',
+          'Activity Title': '(no activities)',
+          'Mode': '',
+          'Created Date': '',
+          'Total Assigned': 0,
+          'Ongoing': 0,
+          'Completed': 0,
+          'Has Zoom': '',
+          'Activity ID': ''
+        });
+      } else {
+        keys.forEach((assignmentId, idx) => {
+          const meta = this.mapBigAssignment[assignmentId];
+          const total = (assignments[assignmentId] || []).length;
+          const ongoing = this.mapOngoingAssignments[assignmentId]?.length || 0;
+          const completed = this.mapCompletedAssignments[assignmentId]?.length || 0;
+          activitiesData.push({
+            'Cohort Name': idx === 0 ? (cohort['name'] || '') : '',
+            'Activity Title': meta?.['title'] || '(deleted)',
+            'Mode': meta?.['selectionMode'] ? String(meta['selectionMode']).toUpperCase() : '',
+            'Created Date': meta?.['createddate']?.toDate ? meta['createddate'].toDate().toLocaleString() : '',
+            'Total Assigned': total,
+            'Ongoing': ongoing,
+            'Completed': completed,
+            'Has Zoom': meta?.['zoomdata']?.['start_url'] ? 'Yes' : 'No',
+            'Activity ID': assignmentId
+          });
+        });
+      }
+    });
+
     const summaryData = [
       { 'Metric': 'Total Cohorts', 'Value': this.filteredCohortsList.length },
       { 'Metric': 'Total Participants', 'Value': this.totalParticipantsInCohorts.length },
+      { 'Metric': 'Total Activities', 'Value': activitiesData.filter(a => a['Activity Title'] !== '(no activities)').length },
       { 'Metric': 'Active Cohorts', 'Value': this.filteredCohortsList.filter(c => c['status'] !== 'nonactive').length },
       { 'Metric': 'Non-Active Cohorts', 'Value': this.filteredCohortsList.filter(c => c['status'] === 'nonactive').length },
       { 'Metric': 'Studio Groups', 'Value': this.filteredCohortsList.filter(c => c['cohortCategory'] !== 'readiness').length },
@@ -1969,10 +2252,10 @@ export class BigCohortClone2Component {
       { 'Metric': 'Export Date', 'Value': new Date().toLocaleString() }
     ];
 
-    this.downloadExcel(exportData, summaryData);
+    this.downloadExcel(exportData, summaryData, activitiesData);
   }
 
-  downloadExcel(cohortsData: any[], summaryData: any[]) {
+  downloadExcel(cohortsData: any[], summaryData: any[], activitiesData: any[] = []) {
     import('xlsx').then(XLSX => {
       const wb = XLSX.utils.book_new();
 
@@ -1998,6 +2281,22 @@ export class BigCohortClone2Component {
       ];
 
       XLSX.utils.book_append_sheet(wb, ws1, 'Cohorts & Participants');
+
+      if (activitiesData && activitiesData.length > 0) {
+        const ws3 = XLSX.utils.json_to_sheet(activitiesData);
+        ws3['!cols'] = [
+          { wch: 25 },
+          { wch: 30 },
+          { wch: 12 },
+          { wch: 22 },
+          { wch: 14 },
+          { wch: 10 },
+          { wch: 12 },
+          { wch: 10 },
+          { wch: 28 }
+        ];
+        XLSX.utils.book_append_sheet(wb, ws3, 'Activities');
+      }
 
       const ws2 = XLSX.utils.json_to_sheet(summaryData);
       ws2['!cols'] = [
@@ -2172,5 +2471,87 @@ export class BigCohortClone2Component {
     }else{
       console.log('Not Deleted');
     }
+  }
+
+  saveZoneSelection() {
+    try {
+      localStorage.setItem(this.STORAGE_KEY_ZONE, JSON.stringify(this.selectedZoneEvent));
+    } catch (e) {
+      console.error('Error saving zone selection:', e);
+    }
+  }
+
+  patchSavedZoneSelections() {
+    if (this.selectedZoneEvent.length > 0) {
+      this.selectedZoneEvent = this.selectedZoneEvent.filter(id =>
+        this.zoneEventEventList.some(z => z.ref?.id === id || z.docid === id)
+      );
+      if (this.selectedZoneEvent.length > 0) {
+        this.updateZoneMappedCohortIds();
+        this.onFilter();
+      }
+    }
+  }
+
+  updateZoneMappedCohortIds() {
+    this.zoneMappedCohortIds = new Set<string>();
+    this.selectedZoneEvent.forEach(zoneId => {
+      const zone = this.mapZoneData[zoneId];
+      if (zone && Array.isArray(zone['cohorts'])) {
+        zone['cohorts'].forEach((cid: string) => {
+          if (cid) this.zoneMappedCohortIds.add(cid);
+        });
+      }
+    });
+  }
+
+  onZoneSearch() {
+    const query = this.zoneSearchQuery.toLowerCase().trim();
+    if (!query) {
+      this.searchableZoneEventList = [...this.zoneEventEventList];
+    } else {
+      this.searchableZoneEventList = this.zoneEventEventList.filter(z =>
+        (z['name'] || '').toLowerCase().includes(query)
+      );
+    }
+  }
+
+  toggleZoneSelection(zoneId: string) {
+    if (!zoneId) return;
+    const index = this.selectedZoneEvent.indexOf(zoneId);
+    if (index === -1) {
+      this.selectedZoneEvent.push(zoneId);
+    } else {
+      this.selectedZoneEvent.splice(index, 1);
+    }
+    this.saveZoneSelection();
+    this.updateZoneMappedCohortIds();
+    this.onFilter();
+  }
+
+  clearZoneSelection() {
+    this.selectedZoneEvent = [];
+    this.zoneSearchQuery = '';
+    this.searchableZoneEventList = [...this.zoneEventEventList];
+    this.saveZoneSelection();
+    this.updateZoneMappedCohortIds();
+    this.onFilter();
+  }
+
+  onZoneDropdownOpen() {
+    this.zoneSearchQuery = '';
+    this.searchableZoneEventList = [...this.zoneEventEventList];
+  }
+
+  getSelectedZoneNames(): string {
+    if (this.selectedZoneEvent.length === 0) {
+      return 'Select Zone';
+    }
+    const names = this.selectedZoneEvent
+      .map(id => this.mapZoneData[id]?.['name'] || this.mapZoneEvent[id])
+      .filter(Boolean);
+    if (names.length === 1) return names[0];
+    if (names.length > 1) return `${names[0]} +${names.length - 1}`;
+    return 'Select Zone';
   }
 }

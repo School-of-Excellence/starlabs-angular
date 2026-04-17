@@ -1,5 +1,6 @@
-import { Component, inject, Input, OnInit, Output, EventEmitter, ViewChildren, QueryList, ElementRef } from '@angular/core';
-import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot} from '@angular/fire/firestore';
+import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, ViewChildren, QueryList, ElementRef, signal } from '@angular/core';
+import { ConnectivityGuardService } from '../../../shared/connectivity-guard.service';
+import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { FormGroup,FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule}from'@angular/forms';
@@ -21,6 +22,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { provideNativeDateAdapter } from '@angular/material/core';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 
@@ -61,7 +63,8 @@ export interface FlippingQuestionValue {
     MatButtonModule,
     MatInputModule,
     MatCheckboxModule,
-    MatTimepickerModule
+    MatTimepickerModule,
+    MatTooltipModule
   ],
   providers: [
     provideNativeDateAdapter()
@@ -89,12 +92,24 @@ export class FormtemplateComponent {
   userProfile:any
   queueData:any
   participantQueueToken:any
-  // form submit 
+  // form submit
   submissionComplete: boolean = false;
   submittedFormName: string = '';
-  
+
   @Input() isInline: boolean = false;
   @Output() formSubmitted = new EventEmitter<void>();
+
+  // --- Draft save status (shown in form header) ---
+  draftSaveStatus: 'idle' | 'saving' | 'saved' | 'failed' = 'idle';
+  draftSavedAt: Date | null = null;
+  draftSaveError: string | null = null;
+  private draftSaveEpoch = 0;
+  private autoSaveDebounceTimer: any = null;
+  private readonly AUTOSAVE_DEBOUNCE_MS = 600;
+
+  // --- Connectivity monitoring (handled by ConnectivityGuardService) ---
+  private connectivity = inject(ConnectivityGuardService);
+  private unregisterConnectivity: (() => void) | null = null;
 
   constructor(
     private route : ActivatedRoute,
@@ -111,14 +126,29 @@ export class FormtemplateComponent {
     window.close();
   }
 
+  ngOnDestroy() {
+    this.unregisterConnectivity?.();
+  }
+
   async ngOnInit() {
+    // Register with the shared connectivity guard. The service will open a
+    // blocking dialog on bad connection and call this save callback first.
+    this.unregisterConnectivity = this.connectivity.register(async () => {
+      if (this.formpatch) return; // preview/patch mode - no drafts
+      if (!this.showcontent || !this.deliveryForm) return;
+      if (this.autoSaveDebounceTimer) {
+        clearTimeout(this.autoSaveDebounceTimer);
+        this.autoSaveDebounceTimer = null;
+      }
+      await this._performAutoSave(this.deliveryForm.getRawValue());
+    });
      // Get queue ID from route params
     this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.formpatch = ![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null,undefined].includes(this.participantformtemplateid) ? true : false)
-    
+
     // Get user ID and roles in constructor
     await this.initializeUserData();
-    
+
     // If queue ID exists, fetch queue data
     if (this.queueId) {
       await this.initializeQueueData();
@@ -127,7 +157,7 @@ export class FormtemplateComponent {
 
   ngAfterViewInit(){
     // console.log(" ngAfterViewInit participantformtemplateid",this.participantformtemplateid);
-    
+
     // console.log(this.formpatch);
     // this.queueId = this.route.snapshot.queryParams['queueid'] ?? null
     this.patchformid = this.inlineFormId ?? this.route.snapshot.queryParams['id']
@@ -196,7 +226,7 @@ export class FormtemplateComponent {
             }
           }
           //form setup ended and form patch started
-          n = 0 
+          n = 0
           for (let i = 0; i < this.submittedClientForm['formarray'].length; i++) {
             const element = this.submittedClientForm['formarray'][i];
             if(!['label','video','audio'].includes(element['type'])){
@@ -234,7 +264,7 @@ export class FormtemplateComponent {
           let url = form.options[0];
           url += (url.includes('?')?'&':'?') + 'ngsw-bypass';
           form.options = [url]
-        } 
+        }
         return form
       })
       // console.log('modified : ',this.submittedClientForm)
@@ -258,7 +288,7 @@ export class FormtemplateComponent {
       // Get queue document
       const queueDocRef = doc(this.firestore, 'queue generation', this.queueId!);
       const queueDoc = await getDoc(queueDocRef);
-      
+
       if (queueDoc.exists()) {
         this.queueData = queueDoc.data();
       }
@@ -407,7 +437,7 @@ export class FormtemplateComponent {
 
    private async processFormSubmission(value: any) {
     this.deliveryForm.reset();
-    
+
     const loadingRef = this.dialog.open(LoadingProgressComponent, {
       data: { msg: "Submitting Please Wait ..." },
       disableClose: true
@@ -416,7 +446,7 @@ export class FormtemplateComponent {
     try {
       // Process form array values
       this.processFormArrayValues(value);
-      
+
       // Process array type controls
       this.processArrayTypeControls();
 
@@ -441,7 +471,7 @@ export class FormtemplateComponent {
 
       // Submit the form
       await this.submitFormData(nextstage);
-      
+
       loadingRef.close();
       if (this.queueId) {
         this.submittedFormName = this.submittedClientForm['formname'];
@@ -466,7 +496,7 @@ export class FormtemplateComponent {
     for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
       const element = this.submittedClientForm.formarray[i];
       if (!['label', 'video', 'audio'].includes(element['type'])) {
-        element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null) 
+        element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
           ? value[`control${n}`] : null;
         n++;
       }
@@ -476,18 +506,18 @@ export class FormtemplateComponent {
   private processArrayTypeControls() {
     for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
       const formelement = this.submittedClientForm.formarray[i];
-      
-      if (formelement['type'] === 'array' && 
+
+      if (formelement['type'] === 'array' &&
           ![null, undefined].includes(this.submittedClientForm.formarray[i]['value'])) {
-        
+
         // Map arraycontrol keys to field names
         for (let j = 0; j < this.submittedClientForm.formarray[i]['value'].length; j++) {
           const valueObj = this.submittedClientForm.formarray[i]['value'][j];
-          
+
           for (const key in valueObj) {
             const index = Object.keys(valueObj).indexOf(key);
             const formcontrol = `arraycontrol${index}`;
-            
+
             if (formelement['array'][index] && formelement['array'][index]['fieldname']) {
               valueObj[formelement['array'][index]['fieldname']] = valueObj[formcontrol];
             }
@@ -497,7 +527,7 @@ export class FormtemplateComponent {
         // Remove arraycontrol keys
         for (let j = 0; j < this.submittedClientForm.formarray[i]['value'].length; j++) {
           const valueObj = this.submittedClientForm.formarray[i]['value'][j];
-          
+
           for (const key in valueObj) {
             const index = Object.keys(valueObj).indexOf(key);
             const formcontrol = `arraycontrol${index}`;
@@ -512,7 +542,7 @@ export class FormtemplateComponent {
     if (this.queueId) {
       const queueDocRef = doc(this.firestore, 'queue generation', this.queueId);
       this.submittedClientForm['queueref'] = queueDocRef;
-      
+
       if (this.participantQueueToken) {
         this.submittedClientForm['queuetokenref'] = this.participantQueueToken.ref;
         this.submittedClientForm['stagename'] = this.participantQueueToken['currentstage'];
@@ -532,18 +562,18 @@ export class FormtemplateComponent {
       // Get next stage from variation
       const variationDocRef = doc(this.firestore, 'queue variation', variationId);
       const variationDoc = await getDoc(variationDocRef);
-      
+
       if (variationDoc.exists()) {
         const stages = variationDoc.data()['stages'];
         const currentIndex = stages.indexOf(currentStage);
-        return currentIndex !== -1 && currentIndex < stages.length - 1 
+        return currentIndex !== -1 && currentIndex < stages.length - 1
           ? stages[currentIndex + 1] : null;
       }
     } else if (this.queueData) {
       // Get next stage from queue data
       const stages = this.queueData['stages'];
       const currentIndex = stages.indexOf(currentStage);
-      return currentIndex !== -1 && currentIndex < stages.length - 1 
+      return currentIndex !== -1 && currentIndex < stages.length - 1
         ? stages[currentIndex + 1] : null;
     }
 
@@ -571,7 +601,7 @@ export class FormtemplateComponent {
         status: "completed"
       });
       await this.auth.updateDeliveryStatus(formDocRef.path, "completed");
-      
+
     } else if (this.participantQueueToken && nextstage) {
       // Update queue token for queue submissions
       await this.updateQueueToken(nextstage);
@@ -639,7 +669,7 @@ export class FormtemplateComponent {
           const patchDataPath = this.route.snapshot.queryParams['patchdata'];
           const existingFormDocRef = doc(this.firestore, patchDataPath);
           const existingFormDoc = await getDoc(existingFormDocRef);
-          
+
           if (existingFormDoc.exists()) {
             // Create log entry in formsByClient log collection
             const logDocRef = doc(this.firestore, 'formsByClient log', this.draftDocid);
@@ -651,7 +681,7 @@ export class FormtemplateComponent {
           for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
             const element = this.submittedClientForm.formarray[i];
             if (!['label', 'video', 'audio'].includes(element['type'])) {
-              element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null) 
+              element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
                 ? value[`control${n}`] : null;
               n++;
             }
@@ -662,18 +692,18 @@ export class FormtemplateComponent {
           // Process array type controls - same logic as before
           for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
             const formelement = this.submittedClientForm.formarray[i];
-            
-            if (formelement['type'] === 'array' && 
+
+            if (formelement['type'] === 'array' &&
                 ![null, undefined].includes(this.submittedClientForm.formarray[i]['value'])) {
-              
+
               // Map arraycontrol keys to field names
               for (let j = 0; j < this.submittedClientForm.formarray[i]['value'].length; j++) {
                 const valueObj = this.submittedClientForm.formarray[i]['value'][j];
-                
+
                 for (const key in valueObj) {
                   const index = Object.keys(valueObj).indexOf(key);
                   const formcontrol = `arraycontrol${index}`;
-                  
+
                   if (formelement['array'][index] && formelement['array'][index]['fieldname']) {
                     valueObj[formelement['array'][index]['fieldname']] = valueObj[formcontrol];
                   }
@@ -683,7 +713,7 @@ export class FormtemplateComponent {
               // Remove arraycontrol keys
               for (let j = 0; j < this.submittedClientForm.formarray[i]['value'].length; j++) {
                 const valueObj = this.submittedClientForm.formarray[i]['value'][j];
-                
+
                 for (const key in valueObj) {
                   const index = Object.keys(valueObj).indexOf(key);
                   const formcontrol = `arraycontrol${index}`;
@@ -697,11 +727,11 @@ export class FormtemplateComponent {
 
           // Set form metadata
           this.submittedClientForm['docid'] = this.draftDocid;
-          
+
           // Get user roles for editedby field
           const roles = await this.auth.getRoles();
           this.submittedClientForm["editedby"] = roles.profile_ref.id;
-          
+
           this.submittedClientForm['date'] = new Date();
           this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
           this.submittedClientForm["submittedin"] = "starlabs";
@@ -710,7 +740,7 @@ export class FormtemplateComponent {
 
           // Update the document using merge option
           await setDoc(existingFormDocRef, this.submittedClientForm, { merge: true });
-          
+
           loadingRef.close();
 
         } catch (error) {
@@ -721,19 +751,34 @@ export class FormtemplateComponent {
     });
   }
 
-  async autoSave(value: any) {
+  autoSave(value: any) {
+    // Debounce: reset the timer on every keystroke; only actually save once
+    // the user pauses typing for AUTOSAVE_DEBOUNCE_MS.
+    this.draftSaveStatus = 'saving';
+    if (this.autoSaveDebounceTimer) clearTimeout(this.autoSaveDebounceTimer);
+    this.autoSaveDebounceTimer = setTimeout(() => {
+      this.autoSaveDebounceTimer = null;
+      this._performAutoSave(value).catch(() => {});
+    }, this.AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  private async _performAutoSave(value: any) {
     console.log(value);
     console.log(this.submittedClientForm)
-    
+
+    const myEpoch = ++this.draftSaveEpoch;
+    this.draftSaveStatus = 'saving';
+    this.draftSaveError = null;
+
     try {
       // Process form array values
       let e = 0;
       for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
         const element = this.submittedClientForm.formarray[i];
-        
+
         if (!['label', 'video', 'audio'].includes(element['type'])) {
           console.log(value[`control${e}`]);
-          element["value"] = (value[`control${e}`] !== undefined && value[`control${e}`] !== null) 
+          element["value"] = (value[`control${e}`] !== undefined && value[`control${e}`] !== null)
             ? value[`control${e}`] : null;
           e++;
         }
@@ -754,12 +799,34 @@ export class FormtemplateComponent {
 
       // Save to temporary_forms collection using modern Firebase syntax
       const tempFormDocRef = doc(this.firestore, 'temporary_forms', this.draftDocid);
-      await setDoc(tempFormDocRef, this.submittedClientForm, { merge: true });
-      
-      console.log("Temporary form submitted");
+      // Fire the local write (resolves from local cache quickly).
+      setDoc(tempFormDocRef, this.submittedClientForm, { merge: true })
+        .catch(err => {
+          console.error("setDoc failed:", err);
+          if (myEpoch === this.draftSaveEpoch) {
+            this.draftSaveStatus = 'failed';
+            this.draftSaveError = err?.message ?? 'Unknown error';
+          }
+        });
 
-    } catch (error) {
+      // Wait until Firestore has actually acknowledged ALL pending writes from the server.
+      // This is what guarantees the draft is really in the DB, not just queued locally.
+      await waitForPendingWrites(this.firestore);
+
+      // Only the latest autoSave call may flip to 'saved' — stale earlier calls are ignored.
+      if (myEpoch === this.draftSaveEpoch) {
+        this.draftSaveStatus = 'saved';
+        this.draftSavedAt = new Date();
+        console.log("Temporary form submitted (server-acked)");
+      }
+
+    } catch (error: any) {
       console.error("Error during auto save:", error);
+      if (myEpoch === this.draftSaveEpoch) {
+        this.draftSaveStatus = 'failed';
+        this.draftSaveError = error?.message ?? 'Unknown error';
+      }
+      throw error;
     }
   }
 
@@ -769,11 +836,11 @@ export class FormtemplateComponent {
       return
     }
     console.log("Forms Draft");
-    
+
     try {
       const draftforms: QueryDocumentSnapshot[] = [];
       console.log(this.profileid);
-      
+
       // Query temporary_forms collection with modern Firebase syntax
       const tempFormsCollectionRef = collection(this.firestore, 'temporary_forms');
       const draftQuery = query(
@@ -781,10 +848,10 @@ export class FormtemplateComponent {
         where('formid', '==', this.patchformid),
         where('profileid', '==', this.profileid)
       );
-      
+
       const draftSnapshot = await getDocs(draftQuery);
       console.log(draftSnapshot.docs.length);
-      
+
       if (!draftSnapshot.empty) {
         draftSnapshot.docs.forEach(draftDoc => {
           draftforms.push(draftDoc);
@@ -856,31 +923,31 @@ export class FormtemplateComponent {
       for (let k = 0; k < element['array'].length; k++) {
         const arrayelement = element['array'][k];
         arrayelement['formarraycontrol'] = `arraycontrol${k}`;
-        
+
         const formArrayControl = this.deliveryForm.get(element['formcontrol']) as FormArray;
         const arrayGroup = formArrayControl.at(j);
 
         if (!['date', 'label', 'array'].includes(arrayelement['type'])) {
           // Regular array form controls
-          const value = element['value'][j][arrayelement['fieldname']] 
-            ?? element['value'][j][arrayelement['formarraycontrol']] 
+          const value = element['value'][j][arrayelement['fieldname']]
+            ?? element['value'][j][arrayelement['formarraycontrol']]
             ?? null;
           arrayGroup?.get(arrayelement['formarraycontrol'])?.patchValue(value);
-          
+
         } else if (arrayelement['type'] === 'date') {
           // Date array form controls
           let dateValue = null;
-          
+
           if (element['value'][j][arrayelement['fieldname']] !== undefined) {
             dateValue = element['value'][j][arrayelement['fieldname']]?.toDate();
           } else if (element['value'][j][arrayelement['formarraycontrol']]) {
             dateValue = element['value'][j][arrayelement['formarraycontrol']]?.toDate();
           }
-          
+
           arrayGroup?.get(arrayelement['formarraycontrol'])?.patchValue(dateValue);
         }
       }
     }
   }
-  
+
 }
