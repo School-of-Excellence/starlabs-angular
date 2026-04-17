@@ -734,6 +734,7 @@ export class DeliveryDashboardCloneComponent {
         if (this.productData?.reports?.length === 0) {
             await this.FilterReportData(productId);
         }
+        console.log("going to filter the product data");
         await this.filterProductData(product, productId);
         this.participantLoading = false;
     }
@@ -803,6 +804,8 @@ export class DeliveryDashboardCloneComponent {
                     let mergedData;
                     let appointments = Array.from(this.allAppointments.values() || [])
                         .filter((app: any) => app.participantproductid === data.docid);
+
+                        console.log("appointments for this product", appointments);
 
                     for (let appointment of appointments) {
                         try {
@@ -889,6 +892,7 @@ export class DeliveryDashboardCloneComponent {
                 productData.celebrationCall.push(data);
             }
 
+            console.log("product data filtered", productData);
             this.cleanProductData(productData);
             this.productData = productData;
             this.updateFilteredCards();
@@ -1092,6 +1096,7 @@ export class DeliveryDashboardCloneComponent {
         // Normal appointment flow
         const id = appointment?.appointment?.id;
         const match = this.mappedAppointmentTypes.find(x => x.id === id);
+        console.log("appointment type mapping", match);
 
         return match?.appointmenttype;
     }
@@ -1942,7 +1947,7 @@ export class DeliveryDashboardCloneComponent {
         const excludedModes = new Set([
             'installation event mode',
             'event mode',
-            'priority mode',
+            // 'priority mode',
             'integration mode',
         ]);
 
@@ -2146,16 +2151,15 @@ export class DeliveryDashboardCloneComponent {
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
 
-
     async filterAppointmentsByType() {
         this.journeyFlowLoading = true;
         this.cdr.detectChanges();
 
         try {
-            // this.appointmentsSubscription = new Subscription();
-            if( this.appointmentsSubscription){
-                 this.appointmentsSubscription.unsubscribe();
-            }
+            this.appointmentsSubscription = new Subscription();
+            // if( this.appointmentsSubscription){
+            //      this.appointmentsSubscription.unsubscribe();
+            // }
 
             const monthStart = new Date(
                 this.selectedMonth.getFullYear(),
@@ -2193,7 +2197,7 @@ export class DeliveryDashboardCloneComponent {
                     this.journeyFlowLoading = false;
                     this.cdr.detectChanges();
                 });
-             this.appointmentsSubscription = sub;
+             this.appointmentsSubscription.add(sub);
         } catch (error) {
             console.error("Error loading appointments:", error);
             this.loadingStates.appointments = true;
@@ -3563,7 +3567,7 @@ export class DeliveryDashboardCloneComponent {
         if (!selectedDate) return;
         this.selectedMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         this.updateDisplayMonth();
-        this.filterAppointmentsByType();
+        // this.filterAppointmentsByType();
     }
 
     onJourneyMonthSelected(event: Date, picker: any) {
@@ -3571,7 +3575,7 @@ export class DeliveryDashboardCloneComponent {
         this.journeyMonthPicker.setValue(this.selectedMonth);
         this.updateDisplayMonth();
         picker.close();
-        this.filterAppointmentsByType();
+        // this.filterAppointmentsByType();
     }
 
     getCompletionSummary(): CompletionSummary {
@@ -3733,8 +3737,10 @@ export class DeliveryDashboardCloneComponent {
                 if (isExcludedMode) {
                     row['Mode'] = this.mapMetaData[pid]?.['participantmode'] || '';
                 }
-                else if (!isPaymentEligible) {
-                    row['Min Payment'] = minPayment;
+                if (!isPaymentEligible) {
+                    row['Total Paid'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
+                    row['Minimum Payment'] = item?.['minimumpayment'] || '';
+                    row['Remaining Payment'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
                 }
 
                 rows.push(row);
