@@ -270,19 +270,14 @@
               <span>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</span>
               <span class="status-tag" [ngClass]="item['status']?.toLowerCase() || 'na'">{{ item['status'] || 'N/A'
                 }}</span>
-              <span *ngIf="excludedModes.has((mapMetaData[pid]?.['participantmode'] || '').trim().toLowerCase())">
-                Mode: {{ mapMetaData[pid]?.['participantmode'] || pid }}
-              </span>
-
-              <span *ngIf="!(
-                ((mapMetaData[pid]?.['pp_totalpurchasevalue'] || 0) 
-                - (mapMetaData[pid]?.['pp_totalpaid'] || 0)) <= 0 
-                || 
-                (mapMetaData[pid]?.['pp_totalpaid'] || 0) >= (item?.['minimumpayment'] || 0)
-              )">
-                Remaining Payment: {{ ((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0))
-                | number:'1.0-0'
-                }}
+              <span *ngIf="!isParticipantEligible(pid, item)">
+                <span>
+                  Mode: {{ mapMetaData[pid]?.['participantmode'] || pid }}
+                </span>
+                <span *ngIf="(((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0))) >= 0">
+                  Remaining Payable: {{ ((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0))
+                  }}
+                </span>
               </span>
             </div>
           </div>

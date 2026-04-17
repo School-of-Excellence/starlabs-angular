@@ -685,7 +685,7 @@ export class DeliveryDashboardCloneComponent {
                     } else if (status === 'ongoing') {
                         const d = this.getDateFromFieldPublic(statusdate['ongoing']);
                         if (this.isDateInRange(d)) funnelData[productId].started.push(item);
-                    } 
+                    }
                 }
             }
 
@@ -805,7 +805,7 @@ export class DeliveryDashboardCloneComponent {
                     let appointments = Array.from(this.allAppointments.values() || [])
                         .filter((app: any) => app.participantproductid === data.docid);
 
-                        console.log("appointments for this product", appointments);
+                    console.log("appointments for this product", appointments);
 
                     for (let appointment of appointments) {
                         try {
@@ -1907,7 +1907,7 @@ export class DeliveryDashboardCloneComponent {
         return Object.keys(this.currentGroupedByProfile);
     }
 
-    openModal(productId: string, type: 'all' | 'filtered' | 'bonus' | 'purchased') {
+    openModal(productId: string, type: 'all' | 'filtered' | 'bonus' | 'purchased' | 'noteligible') {
         this.selectedProductId = productId;
         this.modalType = type;
 
@@ -1917,6 +1917,7 @@ export class DeliveryDashboardCloneComponent {
             case 'filtered': source = this.groupedFiltered[productId]; break;
             case 'bonus': source = this.groupedBonus[productId]; break;
             case 'purchased': source = this.groupedPurchased[productId]; break;
+            case 'noteligible': source = this.groupedNotEligible[productId]; break;
         }
 
         const grouped = {};
@@ -2197,7 +2198,7 @@ export class DeliveryDashboardCloneComponent {
                     this.journeyFlowLoading = false;
                     this.cdr.detectChanges();
                 });
-             this.appointmentsSubscription.add(sub);
+            this.appointmentsSubscription.add(sub);
         } catch (error) {
             console.error("Error loading appointments:", error);
             this.loadingStates.appointments = true;
@@ -3706,6 +3707,18 @@ export class DeliveryDashboardCloneComponent {
         return [...visibleProducts, ...hiddenProducts];
     }
 
+    isParticipantEligible(pid, item) {
+        const totalPaid = parseInt(this.mapMetaData?.[pid]?.['pp_totalpaid'] ?? '0') || 0;
+        const totalPurchaseValue = parseInt(this.mapMetaData?.[pid]?.['pp_totalpurchasevalue'] ?? '0') || 0;
+
+        const totalBalance = totalPurchaseValue - totalPaid;
+        const minPayment = parseInt(item?.['minimumpayment']) || 0;
+
+        const mode = (this.mapMetaData[pid]?.['participantmode'] || '').trim().toLowerCase();
+
+        return !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
+    }
+
     exportProfileModal(): void {
         const rows: any[] = [];
         let index = 1;
@@ -3714,16 +3727,7 @@ export class DeliveryDashboardCloneComponent {
             const items = this.currentGroupedByProfile[pid] || [];
             for (const item of items) {
 
-                const totalPaid = parseInt(this.mapMetaData?.[pid]?.['pp_totalpaid'] ?? '0') || 0;
-                const totalPurchaseValue = parseInt(this.mapMetaData?.[pid]?.['pp_totalpurchasevalue'] ?? '0') || 0;
-
-                const totalBalance = totalPurchaseValue - totalPaid;
-                const minPayment = parseInt(item?.['minimumpayment']) || 0;
-
-                const mode = (this.mapMetaData[pid]?.['participantmode'] || '').trim().toLowerCase();
-
-                const isExcludedMode = this.excludedModes.has(mode);
-                const isPaymentEligible = (totalBalance <= 0 || totalPaid >= minPayment);
+                const isEligible = this.isParticipantEligible(pid, item);
 
                 const row: any = {
                     '#': index,
@@ -3734,13 +3738,13 @@ export class DeliveryDashboardCloneComponent {
                     'Status': item['status'] || 'N/A'
                 };
 
-                if (isExcludedMode) {
+                if (!isEligible) {
                     row['Mode'] = this.mapMetaData[pid]?.['participantmode'] || '';
-                }
-                if (!isPaymentEligible) {
-                    row['Minimum Payment'] = item?.['minimumpayment'] || '';
-                    row['Total Payable'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
-                    row['Remaining Payment'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
+                    if ((((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0))) >= 0) {
+                        row['Minimum Payment'] = item?.['minimumpayment'] || '';
+                        row['Total Payable'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
+                        row['Remaining Payment'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
+                    }
                 }
 
                 rows.push(row);
