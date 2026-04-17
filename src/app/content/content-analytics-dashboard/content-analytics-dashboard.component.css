@@ -1,8 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
-
 .dashboard-root {
   min-height: 100vh;
   background: #0a0e1a;
@@ -1344,7 +1339,7 @@ td {
 .user-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .user-avatar {
@@ -3259,6 +3254,58 @@ td {
   display: flex;
 }
 
+/* particpant tabel name cell */
+.avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #fff;
+  display: block;
+  animation: ripple 1.6s ease-out infinite;
+}
+
+.live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+  display: inline-block;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+@keyframes ripple {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  100% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+}
+
+
 
 /* Dialog box */
 
@@ -3271,7 +3318,7 @@ td {
     background: #f4f5f8;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 14px;
-    width: 500px;
+    width: 900px;
     max-height: 75vh;
     z-index: 1000;
     flex-direction: column;
@@ -3325,21 +3372,7 @@ td {
     border: 1px solid rgba(12, 4, 4, 0.06);
 }
 
-.dialog-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: rgba(6, 107, 221, 0.15);
-    color: #0475f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.dialog-name {
+.dialog-value {
     font-size: 14px;
     color: #010203;
 }
@@ -3352,4 +3385,13 @@ td {
     padding: 40px 0;
     color: #6B7280;
     gap: 8px;
+}
+
+.table-header th {
+    position: sticky;
+    background-color: #8db3e6;
+    color: #1a202c;
+    padding: 12px;
+    text-align: left;
+    font-size: 11px;
 }

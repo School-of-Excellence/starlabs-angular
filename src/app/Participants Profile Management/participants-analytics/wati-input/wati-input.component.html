@@ -2,9 +2,7 @@
 
   <div class="composer-header">
     <div class="header-left">
-      <div class="header-icon-wrap">
-        <mat-icon>whatsapp</mat-icon>
-      </div>
+      <div class="header-icon-wrap"><mat-icon>whatsapp</mat-icon></div>
       <div>
         <h2>WhatsApp Campaign Composer</h2>
         <p class="header-subtitle">Configure and send WhatsApp template messages</p>
@@ -16,13 +14,10 @@
         <span>{{getRecipientCount()}} Recipient{{getRecipientCount() > 1 ? 's' : ''}}</span>
         <mat-icon>{{showRecipients ? 'expand_less' : 'expand_more'}}</mat-icon>
       </button>
-      <button mat-icon-button class="close-btn" (click)="closeDialog()">
-        <mat-icon>close</mat-icon>
-      </button>
+      <button mat-icon-button class="close-btn" (click)="closeDialog()"><mat-icon>close</mat-icon></button>
     </div>
   </div>
 
-  <!-- Recipients Panel -->
   <div class="recipients-panel" *ngIf="showRecipients && getRecipientCount() > 0">
     <div class="recipients-panel-title">
       <mat-icon>group</mat-icon>
@@ -35,15 +30,11 @@
           <img *ngIf="recipient.profile" [src]="recipient.profile" [alt]="recipient.name">
           <mat-icon *ngIf="!recipient.profile">account_circle</mat-icon>
         </div>
-        <div>
-          <div class="rc-name">{{recipient.name || 'Unknown'}}</div>
-          <div class="rc-email">{{recipient.email}}</div>
-        </div>
+        <div><div class="rc-name">{{recipient.name || 'Unknown'}}</div><div class="rc-email">{{recipient.email}}</div></div>
       </div>
     </div>
   </div>
 
-  <!-- Broadcast name row -->
   <div class="broadcast-row">
     <mat-form-field appearance="outline" class="broadcast-field">
       <mat-label>Broadcast Name</mat-label>
@@ -52,13 +43,9 @@
     </mat-form-field>
   </div>
 
-  <!-- ══════════════════════════════════════════════ -->
-  <!-- FAVOURITES STRIP — shown above tabs when set  -->
-  <!-- ══════════════════════════════════════════════ -->
   <div class="favourites-strip" *ngIf="favouriteTemplates.length > 0">
     <div class="fav-strip-header">
-      <mat-icon class="fav-star-icon">star</mat-icon>
-      <span>Favourites</span>
+      <mat-icon class="fav-star-icon">star</mat-icon><span>Favourites</span>
       <span class="fav-count-badge">{{favouriteTemplates.length}}</span>
     </div>
     <div class="fav-cards-row">
@@ -71,166 +58,80 @@
             <div class="fav-card-name" [title]="t.elementName">{{t.elementName}}</div>
             <div class="fav-card-server">{{t.servername ?? t.serverid}}</div>
           </div>
-          <button mat-icon-button class="fav-remove-btn" (click)="toggleFavourite($event, t)"
-            matTooltip="Remove from favourites">
-            <mat-icon>star</mat-icon>
-          </button>
+          <button mat-icon-button class="fav-remove-btn" (click)="toggleFavourite($event, t)" matTooltip="Remove"><mat-icon>star</mat-icon></button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- ═══════ STEP 1 ═══════ -->
   <div class="step-card">
-    <div class="step-header">
-      <div class="step-badge">1</div>
-      <span>Select a Template</span>
-    </div>
-
+    <div class="step-header"><div class="step-badge">1</div><span>Select a Template</span></div>
     <mat-tab-group class="template-tabs" animationDuration="200ms">
-
-      <!-- ── RECENT tab ──────────────────────────── -->
       <mat-tab>
-        <ng-template mat-tab-label="recent">
-          <mat-icon class="tab-icon">history</mat-icon> Recent
-        </ng-template>
+        <ng-template mat-tab-label><mat-icon class="tab-icon">history</mat-icon> Recent</ng-template>
         <div class="tab-body">
-          <!-- Search bar for recent -->
           <mat-form-field appearance="outline" class="full-width recent-search-field">
-            <mat-label>Search recent templates</mat-label>
-            <mat-icon matPrefix>search</mat-icon>
-            <input matInput [(ngModel)]="searchRecent" (ngModelChange)="onSearchRecent()"
-              placeholder="Name, broadcast, server…">
-            <button *ngIf="searchRecent" matSuffix mat-icon-button (click)="searchRecent = ''; onSearchRecent()">
-              <mat-icon>close</mat-icon>
-            </button>
+            <mat-label>Search recent</mat-label><mat-icon matPrefix>search</mat-icon>
+            <input matInput [(ngModel)]="searchRecent" (ngModelChange)="onSearchRecent()" placeholder="Name, broadcast, server…">
+            <button *ngIf="searchRecent" matSuffix mat-icon-button (click)="searchRecent = ''; onSearchRecent()"><mat-icon>close</mat-icon></button>
           </mat-form-field>
-
-          <div *ngIf="filteredRecentTemplates.length === 0" class="empty-state">
-            <mat-icon>{{searchRecent ? 'search_off' : 'inbox'}}</mat-icon>
-            <p>{{searchRecent ? 'No matches for "' + searchRecent + '"' : 'No recent templates'}}</p>
-          </div>
+          <div *ngIf="filteredRecentTemplates.length === 0" class="empty-state"><mat-icon>{{searchRecent ? 'search_off' : 'inbox'}}</mat-icon><p>{{searchRecent ? 'No matches' : 'No recent templates'}}</p></div>
           <div class="tpl-list">
-            <div *ngFor="let t of filteredRecentTemplates" class="tpl-card"
-              [class.tpl-card-selected]="selectedTemplate?.['elementName'] === t.watitemplateid"
-              (click)="selectRecentTemplate(t)">
-              <div class="tpl-card-left">
-                <div class="tpl-card-name">{{t.watitemplateid}}</div>
-                <div class="tpl-card-sub">{{t.broadcastname}} · {{t.serverid}}</div>
-              </div>
+            <div *ngFor="let t of filteredRecentTemplates" class="tpl-card" [class.tpl-card-selected]="selectedTemplate?.['elementName'] === t.watitemplateid" (click)="selectRecentTemplate(t)">
+              <div class="tpl-card-left"><div class="tpl-card-name">{{t.watitemplateid}}</div><div class="tpl-card-sub">{{t.broadcastname}} · {{t.serverid}}</div></div>
               <div class="tpl-card-date">{{t.date?.toDate() | date:'d MMM'}}</div>
             </div>
           </div>
         </div>
       </mat-tab>
-
-      <!-- ── ALL TEMPLATES tab ──────────────────── -->
       <mat-tab>
-        <ng-template mat-tab-label="templated">
-          <mat-icon class="tab-icon">grid_view</mat-icon> All Templates
-        </ng-template>
+        <ng-template mat-tab-label><mat-icon class="tab-icon">grid_view</mat-icon> All Templates</ng-template>
         <div class="tab-body">
-          <div *ngIf="isLoading" class="loading-state">
-            <mat-progress-spinner diameter="48" mode="indeterminate"></mat-progress-spinner>
-            <p>Loading templates from all servers…</p>
-          </div>
+          <div *ngIf="isLoading" class="loading-state"><mat-progress-spinner diameter="48" mode="indeterminate"></mat-progress-spinner><p>Loading…</p></div>
           <div *ngIf="!isLoading">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Search templates</mat-label>
-              <mat-icon matPrefix>search</mat-icon>
+            <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
               <mat-select (selectionChange)="onTemplateChange($event)">
-                <mat-option>
-                  <ngx-mat-select-search [(ngModel)]="searchTemplate" [ngModelOptions]="{standalone: true}"
-                    placeholderLabel="Search by name, body, server…" noEntriesFoundLabel="No templates found"
-                    (ngModelChange)="onSearchTemplate()" ngDefaultControl>
-                  </ngx-mat-select-search>
-                </mat-option>
-                <mat-option disabled *ngIf="displayTemplates.length > 0">
-                  <small class="count-label">{{getTemplatesCountInfo()}}</small>
-                </mat-option>
+                <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="None found" (ngModelChange)="onSearchTemplate()" ngDefaultControl></ngx-mat-select-search></mat-option>
+                <mat-option disabled *ngIf="displayTemplates.length > 0"><small class="count-label">{{getTemplatesCountInfo()}}</small></mat-option>
                 <mat-option *ngFor="let t of displayTemplates" [value]="t">
                   <div class="tpl-option-top-favourites">
-                    <div class="tpl-option">
-                      <div class="tpl-option-top">
-                        <div class="tpl-name">{{t.elementName}}</div>
-                      </div>
-                      <div class="tpl-meta">
-                        <span class="tpl-server-tag">{{t.servername}}</span>
-                        <span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)"
-                        (click)="toggleFavourite($event, t)"
-                        [matTooltip]="isFavourite(t) ? 'Remove from favourites' : 'Add to favourites'">
-                        <mat-icon>{{isFavourite(t) ? 'star' : 'star_border'}}</mat-icon>
-                      </button>
-                    </div>
+                    <div class="tpl-option"><div class="tpl-option-top"><div class="tpl-name">{{t.elementName}}</div></div><div class="tpl-meta"><span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span></div></div>
+                    <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t) ? 'star' : 'star_border'}}</mat-icon></button>
                   </div>
                 </mat-option>
-                <mat-option disabled *ngIf="hasMoreTemplates">
-                  <button mat-stroked-button class="load-more-btn"
-                    (click)="loadMoreTemplates(); $event.stopPropagation();">
-                    Load {{filteredTemplates.length - displayTemplates.length}} more…
-                  </button>
-                </mat-option>
-                <mat-option disabled *ngIf="displayTemplates.length === 0 && !isLoading && !isSearching">
-                  <span class="empty-label">No templates match your search</span>
-                </mat-option>
+                <mat-option disabled *ngIf="hasMoreTemplates"><button mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
+                <mat-option disabled *ngIf="displayTemplates.length === 0 && !isLoading && !isSearching"><span class="empty-label">No matches</span></mat-option>
               </mat-select>
             </mat-form-field>
           </div>
         </div>
       </mat-tab>
-
-      <!-- ── QUEUED tab ──────────────────────────── -->
       <mat-tab>
-        <ng-template mat-tab-label="queued">
-          <mat-icon class="tab-icon">schedule</mat-icon> Queued
-          <span class="tab-badge" *ngIf="queuedTemplates.length > 0">{{queuedTemplates.length}}</span>
-        </ng-template>
+        <ng-template mat-tab-label><mat-icon class="tab-icon">schedule</mat-icon> Queued<span class="tab-badge" *ngIf="queuedTemplates.length > 0">{{queuedTemplates.length}}</span></ng-template>
         <div class="tab-body">
-          <div *ngIf="isLoadingQueued" class="loading-state">
-            <mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner>
-            <p>Loading queue…</p>
-          </div>
-          <div *ngIf="!isLoadingQueued && queuedTemplates.length === 0" class="empty-state">
-            <mat-icon>queue</mat-icon>
-            <p>Queue is empty</p>
-          </div>
+          <div *ngIf="isLoadingQueued" class="loading-state"><mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner><p>Loading…</p></div>
+          <div *ngIf="!isLoadingQueued && queuedTemplates.length === 0" class="empty-state"><mat-icon>queue</mat-icon><p>Queue is empty</p></div>
           <div class="tpl-list" *ngIf="!isLoadingQueued">
-            <div *ngFor="let t of queuedTemplates" class="tpl-card tpl-card-queued"
-              [class.tpl-card-selected]="selectedTemplate?.['elementName'] === t.templateData?.elementName"
-              (click)="selectQueuedTemplate(t)">
-              <div class="tpl-card-left">
-                <div class="tpl-card-name">{{t.templateData?.elementName || t.watitemplateid}}</div>
-                <div class="tpl-card-sub">{{t.broadcastname}} · {{t.profileid?.length || 0}} recipients</div>
-              </div>
+            <div *ngFor="let t of queuedTemplates" class="tpl-card tpl-card-queued" [class.tpl-card-selected]="selectedTemplate?.['elementName'] === t.templateData?.elementName" (click)="selectQueuedTemplate(t)">
+              <div class="tpl-card-left"><div class="tpl-card-name">{{t.templateData?.elementName || t.watitemplateid}}</div><div class="tpl-card-sub">{{t.broadcastname}} · {{t.profileid?.length || 0}} recipients</div></div>
               <div class="queue-pill"><mat-icon>schedule</mat-icon> Queued</div>
             </div>
           </div>
         </div>
       </mat-tab>
-
     </mat-tab-group>
-  </div><!-- /step-card -->
+  </div>
 
-  <!-- ══════════════════════════════════════════════ -->
-  <!-- STEP 2 — PREVIEW + PARAMETERS                   -->
-  <!-- ══════════════════════════════════════════════ -->
-  <div class="step-card" *ngIf="isTemplatePresent()">
+  <!-- ═══════ STEP 2 — PARAMS ═══════ -->
+  <div class="step-card" *ngIf="isTemplatePresent()" id="configure-params-section">
     <div class="step-header">
-      <div class="step-badge">2</div>
+      <div class="step-badge" [class.step-badge-active]="isTemplatePresent()">2</div>
       <span>{{isQueuedTemplate ? 'Preview Queued Template' : 'Configure Parameters'}}</span>
-      <span class="step-hint" *ngIf="templateParams.length === 0 && !isQueuedTemplate">This template has no dynamic
-        parameters</span>
-      <div class="queued-preview-badge" *ngIf="isQueuedTemplate">
-        <mat-icon>schedule</mat-icon> Queued
-      </div>
+      <span class="step-hint" *ngIf="templateParams.length === 0 && !isQueuedTemplate">No dynamic parameters</span>
+      <div class="queued-preview-badge" *ngIf="isQueuedTemplate"><mat-icon>schedule</mat-icon> Queued</div>
     </div>
-
     <div class="composer-split">
-
-      <!-- ── LEFT: WhatsApp phone preview ────────── -->
       <div class="phone-col">
         <div class="phone-wrap">
           <div class="phone-frame">
@@ -238,410 +139,192 @@
             <div class="phone-chat-header">
               <mat-icon class="ph-back">arrow_back</mat-icon>
               <div class="ph-avatar">A</div>
-              <div class="ph-contact">
-                <div class="ph-name">A&amp;H <mat-icon class="ph-verified">verified</mat-icon></div>
-                <div class="ph-status">online</div>
-              </div>
-              <div class="ph-actions">
-                <mat-icon>videocam</mat-icon>
-                <mat-icon>call</mat-icon>
-                <mat-icon>more_vert</mat-icon>
-              </div>
+              <div class="ph-contact"><div class="ph-name">A&amp;H <mat-icon class="ph-verified">verified</mat-icon></div><div class="ph-status">online</div></div>
+              <div class="ph-actions"><mat-icon>videocam</mat-icon><mat-icon>call</mat-icon><mat-icon>more_vert</mat-icon></div>
             </div>
             <div class="phone-chat-body">
               <div class="chat-date-pill">Today</div>
-              <div class="chat-msg-row">
-                <div class="chat-bubble">
-                  <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml()"></div>
-                  <div class="bubble-tail"></div>
-                  <div class="bubble-meta">
-                    <span class="bubble-time">{{bufferDoc.date | date:'h:mm a'}}</span>
-                    <mat-icon class="bubble-tick">done_all</mat-icon>
-                  </div>
-                </div>
-              </div>
+              <div class="chat-msg-row"><div class="chat-bubble"><div class="bubble-content" [innerHTML]="getFormattedPreviewHtml()"></div><div class="bubble-meta"><span class="bubble-time">{{bufferDoc.date | date:'h:mm a'}}</span><mat-icon class="bubble-tick">done_all</mat-icon></div></div></div>
             </div>
-            <div class="phone-input-bar">
-              <mat-icon>sentiment_satisfied_alt</mat-icon>
-              <div class="ph-input-pill">Message</div>
-              <mat-icon>attach_file</mat-icon>
-              <div class="ph-mic"><mat-icon>mic</mat-icon></div>
-            </div>
+            <div class="phone-input-bar"><mat-icon>sentiment_satisfied_alt</mat-icon><div class="ph-input-pill">Message</div><mat-icon>attach_file</mat-icon><div class="ph-mic"><mat-icon>mic</mat-icon></div></div>
           </div>
         </div>
-
-        <!-- legend -->
         <div class="param-legend" *ngIf="templateParams.length > 0">
-          <div class="legend-row">
-            <span class="chip-static sample">Value</span><span>Static text</span>
-          </div>
-          <div class="legend-row">
-            <span class="chip-metadata sample">[field]</span><span>From Metadata</span>
-          </div>
-          <div class="legend-row">
-            <span class="chip-excel sample">[col]</span><span>From Excel</span>
-          </div>
+          <div class="legend-row"><span class="chip-static sample">Value</span><span>Static</span></div>
+          <div class="legend-row"><span class="chip-metadata sample">[field]</span><span>Metadata</span></div>
+          <div class="legend-row"><span class="chip-excel sample">[col]</span><span>Excel</span></div>
         </div>
-      </div><!-- /phone-col -->
-
-      <!-- ── RIGHT: Param config or queued info ─── -->
+      </div>
       <div class="params-col">
-        <div class="server-info-bar">
-          <mat-icon>dns</mat-icon>
-          <span><strong>{{selectedTemplate['servername']}}</strong></span>
-          <span class="server-id">{{selectedTemplate['serverid']}}</span>
+        <div class="server-info-bar"><mat-icon>dns</mat-icon><span><strong>{{selectedTemplate['servername']}}</strong></span><span class="server-id">{{selectedTemplate['serverid']}}</span></div>
+        <!-- PRESETS -->
+        <div class="presets-bar" *ngIf="templateParams.length > 0 && !isQueuedTemplate">
+          <div class="presets-header"><mat-icon>bookmark</mat-icon><span>Parameter Presets</span>
+            <button mat-stroked-button class="preset-save-toggle-btn" (click)="showPresetSaveInput = !showPresetSaveInput"><mat-icon>{{showPresetSaveInput ? 'close' : 'save'}}</mat-icon> {{showPresetSaveInput ? 'Cancel' : 'Save Current'}}</button>
+          </div>
+          <div class="preset-save-row" *ngIf="showPresetSaveInput">
+            <mat-form-field appearance="outline" class="preset-name-field"><mat-label>Preset name</mat-label><input matInput [(ngModel)]="newPresetName" (keydown.enter)="saveCurrentParamsAsPreset()"></mat-form-field>
+            <button mat-raised-button color="primary" (click)="saveCurrentParamsAsPreset()" [disabled]="!newPresetName.trim()"><mat-icon>save</mat-icon> Save</button>
+          </div>
+          <div class="preset-chips" *ngIf="savedPresets.length > 0">
+            <div *ngFor="let preset of savedPresets" class="preset-chip" [class.preset-chip-active]="selectedPresetName === preset.name" (click)="applyPreset(preset)">
+              <mat-icon class="preset-chip-icon">{{selectedPresetName === preset.name ? 'check_circle' : 'bookmark_border'}}</mat-icon>
+              <span class="preset-chip-name">{{preset.name}}</span>
+              <button class="preset-chip-delete" (click)="deletePreset($event, preset)"><mat-icon>close</mat-icon></button>
+            </div>
+          </div>
+          <div class="preset-empty" *ngIf="savedPresets.length === 0 && !showPresetSaveInput"><mat-icon>lightbulb_outline</mat-icon><small>No presets. Save current values for quick reuse.</small></div>
         </div>
-
-        <!-- Queued template info panel -->
+        <!-- QUEUED INFO -->
         <div class="queued-info-panel" *ngIf="isQueuedTemplate && selectedQueuedTemplate">
-          <div class="qi-row">
-            <mat-icon>campaign</mat-icon>
-            <div>
-              <div class="qi-label">Broadcast Name</div>
-              <div class="qi-value">{{selectedQueuedTemplate.broadcastname}}</div>
-            </div>
-          </div>
-          <div class="qi-row" *ngIf="selectedQueuedTemplate.notes">
-            <mat-icon>note</mat-icon>
-            <div>
-              <div class="qi-label">Notes</div>
-              <div class="qi-value">{{selectedQueuedTemplate.notes}}</div>
-            </div>
-          </div>
-          <div class="qi-row">
-            <mat-icon>people</mat-icon>
-            <div>
-              <div class="qi-label">Recipients</div>
-              <div class="qi-value">{{selectedQueuedTemplate.profileid?.length || 0}} participants</div>
-            </div>
-          </div>
-          <div class="qi-row" *ngIf="selectedQueuedTemplate.parameterConfig?.length">
-            <mat-icon>settings</mat-icon>
-            <div>
-              <div class="qi-label">Parameters</div>
-              <div class="qi-params-summary">
-                <div *ngFor="let p of selectedQueuedTemplate.parameterConfig" class="qi-param-row">
-                  <span class="qi-param-name">{{'{{' + p.name + '}}'}}</span>
-                  <mat-icon class="qi-arrow">arrow_forward</mat-icon>
-                  <span class="qi-param-val" *ngIf="p.fillType === 'static'">{{p.staticValue || '(empty)'}}</span>
-                  <span class="qi-param-val meta" *ngIf="p.fillType === 'metadata'">
-                    <mat-icon>person_search</mat-icon> {{p.metadataField}}
-                  </span>
-                  <span class="qi-param-val excel" *ngIf="p.fillType === 'excel'">
-                    <mat-icon>table_chart</mat-icon> {{p.excelColumn}}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div class="qi-row"><mat-icon>campaign</mat-icon><div><div class="qi-label">Broadcast</div><div class="qi-value">{{selectedQueuedTemplate.broadcastname}}</div></div></div>
+          <div class="qi-row" *ngIf="selectedQueuedTemplate.notes"><mat-icon>note</mat-icon><div><div class="qi-label">Notes</div><div class="qi-value">{{selectedQueuedTemplate.notes}}</div></div></div>
+          <div class="qi-row"><mat-icon>people</mat-icon><div><div class="qi-label">Recipients</div><div class="qi-value">{{selectedQueuedTemplate.profileid?.length || 0}}</div></div></div>
         </div>
-
-        <!-- No params notice (non-queued) -->
-        <div class="no-params-box" *ngIf="templateParams.length === 0 && !isQueuedTemplate">
-          <mat-icon>check_circle</mat-icon>
-          <p>No parameters needed. This template is ready to send.</p>
-        </div>
-
-        <!-- Params list (non-queued) -->
+        <div class="no-params-box" *ngIf="templateParams.length === 0 && !isQueuedTemplate"><mat-icon>check_circle</mat-icon><p>No parameters needed. Ready to send.</p></div>
+        <!-- PARAMS LIST -->
         <div class="params-list" *ngIf="templateParams.length > 0 && !isQueuedTemplate">
-          <div *ngFor="let param of templateParams; let i = index" class="param-item">
+          <div *ngFor="let param of templateParams" class="param-item">
             <div class="param-top-row">
               <div class="param-token">{{ '{' }}{{ '{' }}{{param.name}}{{ '}' }}{{ '}' }}</div>
               <div class="mode-pills">
-                <button class="mode-pill" [class.active-static]="param.fillType === 'static'"
-                  (click)="setParamFillType(param, 'static')" matTooltip="Enter a fixed value for all recipients">
-                  <mat-icon>edit</mat-icon> Static
-                </button>
-                <button class="mode-pill" [class.active-metadata]="param.fillType === 'metadata'"
-                  (click)="setParamFillType(param, 'metadata')"
-                  matTooltip="Pull value from participant metadata per recipient">
-                  <mat-icon>person_search</mat-icon> Metadata
-                </button>
-                <button class="mode-pill" [class.active-excel]="param.fillType === 'excel'"
-                  (click)="setParamFillType(param, 'excel')" matTooltip="Read value from an Excel column per recipient">
-                  <mat-icon>table_chart</mat-icon> Excel
-                </button>
+                <button class="mode-pill" [class.active-static]="param.fillType === 'static'" (click)="setParamFillType(param, 'static')"><mat-icon>edit</mat-icon> Static</button>
+                <button class="mode-pill" [class.active-metadata]="param.fillType === 'metadata'" (click)="setParamFillType(param, 'metadata')"><mat-icon>person_search</mat-icon> Metadata</button>
+                <button class="mode-pill" [class.active-excel]="param.fillType === 'excel'" (click)="setParamFillType(param, 'excel')"><mat-icon>table_chart</mat-icon> Excel</button>
               </div>
             </div>
-
             <div class="param-body" *ngIf="param.fillType === 'static'">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Value for {{param.name}}</mat-label>
-                <input matInput [(ngModel)]="param.staticValue" (ngModelChange)="onParamValueChange()"
-                  placeholder="e.g. 25th July 2025">
-                <mat-icon matSuffix>text_fields</mat-icon>
-              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width"><mat-label>Value for {{param.name}}</mat-label><input matInput [(ngModel)]="param.staticValue" (ngModelChange)="onParamValueChange()"><mat-icon matSuffix>text_fields</mat-icon></mat-form-field>
             </div>
-
             <div class="param-body" *ngIf="param.fillType === 'metadata'">
-              <div *ngIf="isLoadingMetadataFields" class="inline-loading">
-                <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
-                <small>Loading fields…</small>
-              </div>
-              <mat-form-field appearance="outline" class="full-width" *ngIf="!isLoadingMetadataFields">
-                <mat-label>Metadata field → {{param.name}}</mat-label>
-                <mat-select [(ngModel)]="param.metadataField" (ngModelChange)="onParamValueChange()">
-                  <mat-option *ngFor="let field of metadataFields" [value]="field">
-                    <span class="field-opt">{{field}}</span>
-                  </mat-option>
-                </mat-select>
-                <mat-icon matSuffix>person_search</mat-icon>
-              </mat-form-field>
-              <div class="param-hint" *ngIf="!isLoadingMetadataFields">
-                <mat-icon>info</mat-icon>
-                Fetched from <strong>participant metadata</strong> collection per recipient at send time.
-              </div>
+              <div *ngIf="isLoadingMetadataFields" class="inline-loading"><mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner><small>Loading…</small></div>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="!isLoadingMetadataFields"><mat-label>Field → {{param.name}}</mat-label><mat-select [(ngModel)]="param.metadataField" (ngModelChange)="onParamValueChange()"><mat-option *ngFor="let f of metadataFields" [value]="f">{{f}}</mat-option></mat-select></mat-form-field>
             </div>
-
             <div class="param-body" *ngIf="param.fillType === 'excel'">
-              <div class="excel-prompt" *ngIf="!uploadedFile">
-                <mat-icon>upload_file</mat-icon>
-                <div>
-                  <p>Upload an Excel file below to map a column to <strong>{{param.name}}</strong></p>
-                  <button mat-stroked-button color="primary" (click)="scrollToExcelUpload()">
-                    <mat-icon>arrow_downward</mat-icon> Go to Excel Upload
-                  </button>
-                </div>
-              </div>
+              <div class="excel-prompt" *ngIf="!uploadedFile"><mat-icon>upload_file</mat-icon><div><p>Upload Excel to map <strong>{{param.name}}</strong></p><button mat-stroked-button color="primary" (click)="scrollToExcelUpload()"><mat-icon>arrow_downward</mat-icon> Upload</button></div></div>
               <div *ngIf="uploadedFile">
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Excel column → {{param.name}}</mat-label>
-                  <mat-select [(ngModel)]="param.excelColumn" (ngModelChange)="onParamValueChange()">
-                    <mat-option *ngFor="let h of excelHeaders" [value]="h">
-                      <span class="field-opt">{{h}}</span>
-                    </mat-option>
-                  </mat-select>
-                  <mat-icon matSuffix>table_chart</mat-icon>
-                </mat-form-field>
-                <div class="param-hint ok" *ngIf="param.excelColumn">
-                  <mat-icon>check_circle</mat-icon>
-                  Mapped to column <strong>"{{param.excelColumn}}"</strong> in {{uploadedFile.name}}
-                </div>
-                <div class="param-hint warn" *ngIf="!param.excelColumn">
-                  <mat-icon>warning</mat-icon>
-                  Select which column contains values for <strong>{{param.name}}</strong>
-                </div>
+                <mat-form-field appearance="outline" class="full-width"><mat-label>Column → {{param.name}}</mat-label><mat-select [(ngModel)]="param.excelColumn" (ngModelChange)="onParamValueChange()"><mat-option *ngFor="let h of excelHeaders" [value]="h">{{h}}</mat-option></mat-select></mat-form-field>
+                <div class="param-hint ok" *ngIf="param.excelColumn"><mat-icon>check_circle</mat-icon> Mapped to "{{param.excelColumn}}"</div>
+                <div class="param-hint warn" *ngIf="!param.excelColumn"><mat-icon>warning</mat-icon> Select column for {{param.name}}</div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- Notes for new (un-registered) templates -->
         <div *ngIf="!isTemplateAvailable && !isQueuedTemplate" class="mt-3">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Notes (new template)</mat-label>
-            <textarea matInput rows="3" [(ngModel)]="notes"></textarea>
-          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width"><mat-label>Notes</mat-label><textarea matInput rows="3" [(ngModel)]="notes"></textarea></mat-form-field>
         </div>
-
-      </div><!-- /params-col -->
-    </div><!-- /composer-split -->
+      </div>
+    </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════ -->
-  <!-- STEP 3 — Excel upload (non-queued only)        -->
-  <!-- ══════════════════════════════════════════════ -->
-  <div class="step-card" *ngIf="isTemplatePresent() && !isQueuedTemplate && (hasExcelParam() || uploadedFile)"
-    id="excel-upload-section">
-    <div class="step-header">
-      <div class="step-badge excel-badge">
-        <mat-icon>table_chart</mat-icon>
-      </div>
-      <div>
-        <span>Upload Excel File</span>
-        <span class="step-hint">Required for parameters mapped to Excel columns</span>
-      </div>
-    </div>
-
+  <!-- ═══════ EXCEL UPLOAD ═══════ -->
+  <div class="step-card" *ngIf="isTemplatePresent() && !isQueuedTemplate && (hasExcelParam() || uploadedFile)" id="excel-upload-section">
+    <div class="step-header"><div class="step-badge excel-badge"><mat-icon>table_chart</mat-icon></div><div><span>Upload Excel</span><span class="step-hint">For Excel-mapped params</span></div></div>
     <div class="excel-format-guide">
-      <div class="format-guide-header" (click)="showFormatGuide = !showFormatGuide">
-        <mat-icon>help_outline</mat-icon>
-        <span>How to format your Excel file</span>
-        <mat-icon class="chevron">{{showFormatGuide ? 'expand_less' : 'expand_more'}}</mat-icon>
-      </div>
-
+      <div class="format-guide-header" (click)="showFormatGuide = !showFormatGuide"><mat-icon>help_outline</mat-icon><span>Format guide</span><mat-icon class="chevron">{{showFormatGuide ? 'expand_less' : 'expand_more'}}</mat-icon></div>
       <div class="format-guide-body" *ngIf="showFormatGuide">
-        <div class="format-cols">
-          <div class="format-section">
-            <h4><mat-icon>table_rows</mat-icon> Required Structure</h4>
-            <ul>
-              <li>Row 1 must be <strong>column headers</strong></li>
-              <li>Each row after = one recipient</li>
-              <li>One column must be named <code>phone</code>, <code>number</code>, or <code>mobile</code></li>
-              <li>Phone numbers: with <code>+91</code> prefix or 10-digit (auto-prefixed)</li>
-            </ul>
-          </div>
-
-          <div class="format-section">
-            <h4><mat-icon>view_column</mat-icon> Example for this template</h4>
-            <div class="excel-preview-table" *ngIf="templateParams.length > 0">
-              <table>
-                <thead>
-                  <tr>
-                    <th>phone</th>
-                    <th *ngFor="let p of templateParams">{{p.name}}</th>
-                    <th>name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>+919876543210</td>
-                    <td *ngFor="let p of templateParams">{{getSampleValue(p.name)}}</td>
-                    <td>Rahul Sharma</td>
-                  </tr>
-                  <tr>
-                    <td>+918765432109</td>
-                    <td *ngFor="let p of templateParams">{{getSampleValue2(p.name)}}</td>
-                    <td>Priya Patel</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p class="format-note" *ngIf="templateParams.length === 0">
-              Add at least <code>phone</code> and any custom columns you want to map as parameters.
-            </p>
-          </div>
-
-          <div class="format-section">
-            <h4><mat-icon>warning_amber</mat-icon> Common Mistakes</h4>
-            <ul class="mistakes-list">
-              <li><mat-icon class="err-icon">close</mat-icon> Phone number without country code</li>
-              <li><mat-icon class="err-icon">close</mat-icon> Column name doesn't match selected mapping</li>
-              <li><mat-icon class="err-icon">close</mat-icon> Empty rows in the middle of data</li>
-              <li><mat-icon class="err-icon">close</mat-icon> Extra spaces in header names</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="download-sample-row">
-          <button mat-raised-button color="accent" (click)="downloadSampleExcel()">
-            <mat-icon>download</mat-icon> Download Sample Excel
-          </button>
-          <small>Pre-filled with headers matching your current template parameters</small>
-        </div>
+        <div class="download-sample-row"><button mat-raised-button color="accent" (click)="downloadSampleExcel()"><mat-icon>download</mat-icon> Download Sample</button></div>
       </div>
     </div>
-
     <div class="upload-zone-wrap">
       <div class="upload-dropzone" *ngIf="!uploadedFile" (click)="fileInput.click()">
         <input type="file" #fileInput (change)="onFileSelected($event)" accept=".xlsx,.xls" style="display:none">
         <mat-icon class="upload-cloud-icon">cloud_upload</mat-icon>
-        <p class="upload-main-text"><strong>Click to upload</strong> or drag &amp; drop</p>
-        <p class="upload-sub-text">Excel files only (.xlsx, .xls)</p>
-        <div class="upload-requirements-pills">
-          <span class="req-pill"><mat-icon>phone</mat-icon> phone column required</span>
-          <span class="req-pill"><mat-icon>table_chart</mat-icon> data in rows below header</span>
-        </div>
+        <p class="upload-main-text"><strong>Click to upload</strong></p><p class="upload-sub-text">.xlsx or .xls</p>
       </div>
-
       <div class="file-uploaded-card" *ngIf="uploadedFile && !isValidatingNumbers">
         <div class="file-uploaded-top">
-          <div class="file-icon-wrap">
-            <mat-icon>description</mat-icon>
-          </div>
-          <div class="file-details">
-            <div class="file-name">{{uploadedFile.name}}</div>
-            <div class="file-size">{{(uploadedFile.size / 1024 / 1024).toFixed(2)}} MB · {{phoneNumbers.length}} rows
-            </div>
-          </div>
-          <button mat-icon-button color="warn" (click)="removeUploadedFile()" [disabled]="isUploadingFile"
-            matTooltip="Remove file">
-            <mat-icon>delete_outline</mat-icon>
-          </button>
+          <div class="file-icon-wrap"><mat-icon>description</mat-icon></div>
+          <div class="file-details"><div class="file-name">{{uploadedFile.name}}</div><div class="file-size">{{phoneNumbers.length}} rows</div></div>
+          <button mat-icon-button color="warn" (click)="removeUploadedFile()" [disabled]="isUploadingFile"><mat-icon>delete_outline</mat-icon></button>
         </div>
-
         <div class="detected-columns" *ngIf="excelHeaders.length > 0">
-          <span class="dc-label">Detected columns:</span>
-          <div class="dc-chips">
-            <span *ngFor="let h of excelHeaders" class="dc-chip" [class.dc-chip-phone]="isPhoneColumn(h)"
-              [class.dc-chip-mapped]="isColumnMapped(h)">
-              <mat-icon *ngIf="isPhoneColumn(h)" class="dc-chip-icon">phone</mat-icon>
-              <mat-icon *ngIf="isColumnMapped(h) && !isPhoneColumn(h)" class="dc-chip-icon">link</mat-icon>
-              {{h}}
-            </span>
-          </div>
-        </div>
-
-        <div class="param-mapping-summary" *ngIf="getExcelMappedParams().length > 0">
-          <div class="pms-title"><mat-icon>route</mat-icon> Parameter Mappings</div>
-          <div class="pms-row" *ngFor="let p of getExcelMappedParams()">
-            <span class="pms-param">{{p.name}}&#125;&#125;</span>
-            <mat-icon class="pms-arrow">arrow_forward</mat-icon>
-            <span class="pms-col" *ngIf="p.excelColumn">
-              <mat-icon>table_chart</mat-icon> {{p.excelColumn}}
-            </span>
-            <span class="pms-unmapped" *ngIf="!p.excelColumn">
-              <mat-icon>warning</mat-icon> Not mapped yet
-            </span>
-          </div>
+          <span class="dc-label">Columns:</span>
+          <div class="dc-chips"><span *ngFor="let h of excelHeaders" class="dc-chip" [class.dc-chip-phone]="isPhoneColumn(h)" [class.dc-chip-mapped]="isColumnMapped(h)">{{h}}</span></div>
         </div>
       </div>
-
-      <div class="validating-state" *ngIf="isValidatingNumbers">
-        <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
-        <p>Validating phone numbers…</p>
-      </div>
-
+      <div class="validating-state" *ngIf="isValidatingNumbers"><mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner><p>Validating…</p></div>
       <div class="validation-results-card" *ngIf="showValidationResults && !isValidatingNumbers">
         <div class="vr-stats">
-          <div class="vr-stat valid">
-            <div class="vr-num">{{validNumbers.length}}</div>
-            <div class="vr-lbl"><mat-icon>check_circle</mat-icon> Valid</div>
-          </div>
-          <div class="vr-stat invalid">
-            <div class="vr-num">{{invalidNumbers.length}}</div>
-            <div class="vr-lbl"><mat-icon>cancel</mat-icon> Not found</div>
-          </div>
-          <div class="vr-stat total">
-            <div class="vr-num">{{phoneNumbers.length}}</div>
-            <div class="vr-lbl"><mat-icon>format_list_numbered</mat-icon> Total</div>
-          </div>
-        </div>
-        <div class="invalid-list" *ngIf="invalidNumbers.length > 0">
-          <p class="invalid-list-label"><mat-icon>warning</mat-icon> Numbers not found in database (will be skipped):
-          </p>
-          <div class="invalid-chips">
-            <span *ngFor="let n of invalidNumbers.slice(0,20)" class="invalid-chip">{{n}}</span>
-            <span *ngIf="invalidNumbers.length > 20" class="invalid-chip more">+{{invalidNumbers.length - 20}}
-              more</span>
-          </div>
+          <div class="vr-stat valid"><div class="vr-num">{{validNumbers.length}}</div><div class="vr-lbl"><mat-icon>check_circle</mat-icon> Valid</div></div>
+          <div class="vr-stat invalid"><div class="vr-num">{{invalidNumbers.length}}</div><div class="vr-lbl"><mat-icon>cancel</mat-icon> Missing</div></div>
+          <div class="vr-stat total"><div class="vr-num">{{phoneNumbers.length}}</div><div class="vr-lbl"><mat-icon>format_list_numbered</mat-icon> Total</div></div>
         </div>
       </div>
-
-      <div class="upload-progress" *ngIf="isUploadingFile">
-        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
-        <p>Uploading file to storage…</p>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Queued notice bar -->
-  <div class="queued-notice-bar" *ngIf="isQueuedTemplate">
-    <mat-icon>schedule</mat-icon>
-    <div>
-      <strong>Queued template selected</strong>
-      <p>Ready to send to {{getRecipientCount()}} queued recipient(s) via Cloud Function.</p>
+      <div class="upload-progress" *ngIf="isUploadingFile"><mat-progress-bar mode="indeterminate"></mat-progress-bar><p>Uploading…</p></div>
     </div>
   </div>
 
+  <div class="queued-notice-bar" *ngIf="isQueuedTemplate"><mat-icon>schedule</mat-icon><div><strong>Queued template</strong><p>Ready to send to {{getRecipientCount()}} recipient(s).</p></div></div>
+
+  <!-- ═══════ SCHEDULE ═══════ -->
+  <div class="step-card schedule-card" *ngIf="isTemplatePresent() && !isQueuedTemplate">
+    <div class="schedule-header" [class.schedule-header-active]="isScheduled" (click)="isScheduled = !isScheduled; onScheduleToggle()">
+      <div class="schedule-header-left">
+        <div class="schedule-icon-ring" [class.schedule-icon-ring-active]="isScheduled"><mat-icon>schedule_send</mat-icon></div>
+        <div class="schedule-header-text"><span class="schedule-title">Schedule Message</span><span class="schedule-subtitle">Deliver at a specific date &amp; time via WATI</span></div>
+      </div>
+      <div class="toggle-pill" [class.toggle-pill-on]="isScheduled" (click)="$event.stopPropagation(); isScheduled = !isScheduled; onScheduleToggle()">
+        <div class="toggle-pill-knob"></div><span class="toggle-pill-label">{{isScheduled ? 'ON' : 'OFF'}}</span>
+      </div>
+    </div>
+    <div class="schedule-body-wrap" *ngIf="isScheduled">
+      <div class="schedule-grid">
+        <div class="schedule-cell date-cell">
+          <div class="cell-label-row"><div class="cell-icon-circle date-icon-circle"><mat-icon>calendar_today</mat-icon></div><span class="cell-label">Date</span></div>
+          <mat-form-field appearance="outline" class="schedule-form-field">
+            <mat-label>Choose a date</mat-label>
+            <input matInput [matDatepicker]="schedulePicker" [(ngModel)]="scheduleDate" [matDatepickerFilter]="dateFilter" readonly (click)="schedulePicker.open()">
+            <mat-datepicker-toggle matSuffix [for]="schedulePicker"></mat-datepicker-toggle>
+            <mat-datepicker #schedulePicker></mat-datepicker>
+          </mat-form-field>
+          <div class="date-quick-chips">
+            <button class="quick-chip" (click)="setQuickDate('today')" [class.quick-chip-active]="isQuickDate('today')">Today</button>
+            <button class="quick-chip" (click)="setQuickDate('tomorrow')" [class.quick-chip-active]="isQuickDate('tomorrow')">Tomorrow</button>
+            <button class="quick-chip" (click)="setQuickDate('nextWeek')" [class.quick-chip-active]="isQuickDate('nextWeek')">Next Week</button>
+          </div>
+        </div>
+        <div class="schedule-cell time-cell">
+          <div class="cell-label-row"><div class="cell-icon-circle time-icon-circle"><mat-icon>access_time</mat-icon></div><span class="cell-label">Time</span></div>
+          <div class="time-picker-row">
+            <mat-form-field appearance="outline" class="time-field"><mat-label>Hr</mat-label><mat-select [(ngModel)]="scheduleHour"><mat-option *ngFor="let h of hours" [value]="h">{{h}}</mat-option></mat-select></mat-form-field>
+            <div class="time-separator"><span class="colon-dot"></span><span class="colon-dot"></span></div>
+            <mat-form-field appearance="outline" class="time-field"><mat-label>Min</mat-label><mat-select [(ngModel)]="scheduleMinute"><mat-option *ngFor="let m of minutes" [value]="m">{{m}}</mat-option></mat-select></mat-form-field>
+            <div class="ampm-selector">
+              <button class="ampm-btn" [class.ampm-btn-active]="schedulePeriod === 'AM'" (click)="schedulePeriod = 'AM'">AM</button>
+              <button class="ampm-btn" [class.ampm-btn-active]="schedulePeriod === 'PM'" (click)="schedulePeriod = 'PM'">PM</button>
+            </div>
+          </div>
+          <div class="time-display" *ngIf="scheduleHour && scheduleMinute">
+            <span class="time-display-value">{{scheduleHour}}</span><span class="time-display-colon">:</span>
+            <span class="time-display-value">{{scheduleMinute}}</span><span class="time-display-period">{{schedulePeriod}}</span>
+          </div>
+        </div>
+      </div>
+      <div class="schedule-preview-strip" *ngIf="getScheduledDateTime()">
+        <div class="preview-strip-inner" [class.preview-strip-invalid]="!isScheduleValid()">
+          <div class="preview-strip-icon-wrap"><mat-icon>{{isScheduleValid() ? 'event_available' : 'event_busy'}}</mat-icon></div>
+          <div class="preview-strip-content">
+            <div class="preview-strip-main" *ngIf="isScheduleValid()">{{getSchedulePreviewText()}}</div>
+            <div class="preview-strip-main preview-strip-error" *ngIf="!isScheduleValid()">Time is in the past — pick a future time</div>
+            <div class="preview-strip-sub" *ngIf="isScheduleValid()">WATI delivers at this time</div>
+          </div>
+        </div>
+      </div>
+      <div class="schedule-footer-info"><mat-icon>tips_and_updates</mat-icon><span>Submitted to WATI schedule API. Track in broadcast analytics.</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════ FOOTER ═══════ -->
   <div class="footer-actions" *ngIf="isTemplatePresent()">
-    <button mat-stroked-button (click)="dialogRef.close()" class="cancel-btn">
-      Cancel
-    </button>
+    <button mat-stroked-button (click)="dialogRef.close()" class="cancel-btn">Cancel</button>
     <div class="footer-right">
-      <button mat-stroked-button color="primary" [disabled]="isQueuedTemplate || isUploadingFile"
-        (click)="addtoQueueFunction()" class="queue-btn">
-        <mat-icon>playlist_add</mat-icon> Add to Queue
-      </button>
-      <button mat-raised-button color="primary"
-        [disabled]="!isTemplatePresent() || isUploadingFile || (!isQueuedTemplate && !isParamConfigValid()) || isSendingQueued"
-        (click)="onSubmit()" class="send-btn">
-        <mat-progress-spinner *ngIf="isSendingQueued" diameter="18" mode="indeterminate" color="accent"
-          style="display:inline-flex;margin-right:8px;"></mat-progress-spinner>
-        <mat-icon *ngIf="!isSendingQueued">send</mat-icon>
-        {{ isQueuedTemplate ? (isSendingQueued ? 'Sending…' : 'Send to Recipients') : 'Send Now' }}
+      <button mat-stroked-button color="primary" *ngIf="!isScheduled" [disabled]="isQueuedTemplate || isUploadingFile" (click)="addtoQueueFunction()" class="queue-btn"><mat-icon>playlist_add</mat-icon> Add to Queue</button>
+      <button mat-raised-button class="schedule-send-btn" *ngIf="isScheduled && !isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || !isScheduleValid() || !isParamConfigValid()" (click)="onScheduleSubmit()"><mat-icon>schedule_send</mat-icon> Schedule for {{scheduleHour}}:{{scheduleMinute}} {{schedulePeriod}}</button>
+      <button mat-raised-button color="primary" *ngIf="!isScheduled || isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || (!isQueuedTemplate && !isParamConfigValid()) || isSendingQueued" (click)="onSubmit()" class="send-btn">
+        <mat-progress-spinner *ngIf="isSendingQueued" diameter="18" mode="indeterminate" color="accent" style="display:inline-flex;margin-right:8px;"></mat-progress-spinner>
+        <mat-icon *ngIf="!isSendingQueued">send</mat-icon> {{isQueuedTemplate ? (isSendingQueued ? 'Sending…' : 'Send to Recipients') : 'Send Now'}}
       </button>
     </div>
   </div>
-
 </div>

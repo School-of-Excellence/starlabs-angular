@@ -55,11 +55,65 @@
     </div>
   </div>
 
+  <!-- ── File Comparison Mode (Mode 1) ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="section-icon">📂</span>
+      Mode 1 — File Comparison
+      <span class="section-hint">Feed an audio file through DeepFilterNet3 — compare input vs output</span>
+    </div>
+
+    <div class="config-row" *ngIf="fileStatus !== 'loading'">
+      <label class="config-label">Select audio file (e.g. Raw.webm)</label>
+      <input type="file" accept="audio/*,video/webm,video/mp4"
+        (change)="onFileSelected($event)"
+        [disabled]="isFileProcessing || isBusy || isRecording || isLive"
+        class="file-input" />
+    </div>
+
+    <!-- Progress / status -->
+    <div class="status-banner"
+      [class.loading]="fileStatus === 'loading'"
+      [class.done]="fileStatus === 'done'"
+      [class.error]="fileStatus === 'error'"
+      *ngIf="fileStatusMsg">
+      <span class="dot" [class.pulse]="fileStatus === 'loading'"></span>
+      {{ fileStatusMsg }}
+      <span *ngIf="fileStatus === 'loading'" class="progress-pct"> {{ fileProgress }}%</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-bar-wrap" *ngIf="fileStatus === 'loading'">
+      <div class="progress-bar-fill" [style.width.%]="fileProgress"></div>
+    </div>
+
+    <!-- Result players -->
+    <div class="players-three" *ngIf="fileStatus === 'done'">
+
+      <div class="player-card raw">
+        <div class="player-label"><span>🔴</span> Input (Raw)</div>
+        <div class="player-sub">Original file — no processing</div>
+        <audio [src]="fileInputUrl!" controls *ngIf="fileInputUrl"></audio>
+      </div>
+
+      <div class="player-card df3">
+        <div class="player-label"><span>🟢</span> DeepFilterNet3 Output</div>
+        <div class="player-sub">Processed WAV · {{ suppressionLevel }}/100 suppression · {{ (fileProcessingMs / 1000).toFixed(1) }}s to process</div>
+        <audio [src]="fileOutputUrl!" controls *ngIf="fileOutputUrl"></audio>
+      </div>
+
+    </div>
+
+    <div class="info-hint" *ngIf="fileStatus === 'idle'">
+      <p>Tip: use <strong>Raw.webm</strong> as input and compare the DF3 output against <strong>Processed.webm</strong> — the Krisp-quality reference. Both files are in <code>/assets/</code>.</p>
+    </div>
+  </div>
+
   <!-- ── Live Preview ── -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎧</span>
-      Mode 1 — Live Preview
+      Mode 2 — Live Preview
       <span class="section-hint">Hear one filter at a time through headphones</span>
     </div>
 
@@ -96,7 +150,7 @@
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎙️</span>
-      Mode 2 — A/B/C Comparison Recording
+      Mode 3 — A/B/C Comparison Recording
       <span class="section-hint">Records Raw + DeepFilterNet3 + Koala simultaneously from the same mic</span>
     </div>
 
@@ -143,7 +197,7 @@
   </div>
 
   <!-- ── Comparison Report ── -->
-  <div class="section report-section" *ngIf="df3Metrics && koalaMetrics">
+  <div class="section report-section" *ngIf="df3Metrics">
     <div class="section-title">
       <span class="section-icon">📊</span>
       Comparison Report
@@ -177,43 +231,44 @@
         </table>
       </div>
 
-      <!-- VS divider -->
-      <div class="vs-col">
-        <div class="vs-badge">VS</div>
-      </div>
+      <!-- VS divider + Koala metrics (only when Koala was active) -->
+      <ng-container *ngIf="koalaMetrics">
+        <div class="vs-col">
+          <div class="vs-badge">VS</div>
+        </div>
 
-      <!-- Koala metrics -->
-      <div class="metrics-col">
-        <div class="metrics-header koala-header">🔵 Koala (Picovoice)</div>
-        <table class="metrics-table">
-          <tbody>
-            <tr><td class="ml">Init Time</td><td class="mv">{{ koalaMetrics.initTimeMs }} ms</td></tr>
-            <tr><td class="ml">Capture Setup</td><td class="mv">{{ koalaMetrics.setupMs }} ms</td></tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr><td class="ml">Raw Energy</td><td class="mv">{{ koalaMetrics.rawEnergyDb }} dBFS</td></tr>
-            <tr><td class="ml">Clean Energy</td><td class="mv">{{ koalaMetrics.cleanEnergyDb }} dBFS</td></tr>
-            <tr>
-              <td class="ml">Noise Reduction</td>
-              <td class="mv">
-                <span class="nr-value" [class.nr-positive]="koalaMetrics.noiseReductionDb > 0" [class.nr-negative]="koalaMetrics.noiseReductionDb <= 0">
-                  {{ koalaMetrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ koalaMetrics.noiseReductionDb }} dB
-                </span>
-              </td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr><td class="ml">Sample Rate</td><td class="mv">{{ koalaMetrics.sampleRate }} Hz</td></tr>
-            <tr><td class="ml">Config</td><td class="mv">{{ koalaMetrics.extraInfo }}</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <div class="metrics-col">
+          <div class="metrics-header koala-header">🔵 Koala (Picovoice)</div>
+          <table class="metrics-table">
+            <tbody>
+              <tr><td class="ml">Init Time</td><td class="mv">{{ koalaMetrics.initTimeMs }} ms</td></tr>
+              <tr><td class="ml">Capture Setup</td><td class="mv">{{ koalaMetrics.setupMs }} ms</td></tr>
+              <tr><td class="ml separator" colspan="2"></td></tr>
+              <tr><td class="ml">Raw Energy</td><td class="mv">{{ koalaMetrics.rawEnergyDb }} dBFS</td></tr>
+              <tr><td class="ml">Clean Energy</td><td class="mv">{{ koalaMetrics.cleanEnergyDb }} dBFS</td></tr>
+              <tr>
+                <td class="ml">Noise Reduction</td>
+                <td class="mv">
+                  <span class="nr-value" [class.nr-positive]="koalaMetrics.noiseReductionDb > 0" [class.nr-negative]="koalaMetrics.noiseReductionDb <= 0">
+                    {{ koalaMetrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ koalaMetrics.noiseReductionDb }} dB
+                  </span>
+                </td>
+              </tr>
+              <tr><td class="ml separator" colspan="2"></td></tr>
+              <tr><td class="ml">Sample Rate</td><td class="mv">{{ koalaMetrics.sampleRate }} Hz</td></tr>
+              <tr><td class="ml">Config</td><td class="mv">{{ koalaMetrics.extraInfo }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
     </div>
 
-    <!-- Winner banner -->
-    <div class="winner-banner">
+    <!-- Winner banner (only when both filters ran) -->
+    <div class="winner-banner" *ngIf="koalaMetrics">
       <span class="winner-label">📈 Higher Noise Reduction:</span>
       <span class="winner-name">
-        {{ df3Metrics.noiseReductionDb >= koalaMetrics.noiseReductionDb ? '🟢 DeepFilterNet3' : '🔵 Koala' }}
-        ({{ (df3Metrics.noiseReductionDb >= koalaMetrics.noiseReductionDb ? df3Metrics.noiseReductionDb : koalaMetrics.noiseReductionDb) }} dB)
+        {{ df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? '🟢 DeepFilterNet3' : '🔵 Koala' }}
+        ({{ (df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? df3Metrics!.noiseReductionDb : koalaMetrics.noiseReductionDb) }} dB)
       </span>
     </div>
 

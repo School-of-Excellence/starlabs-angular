@@ -1,12 +1,13 @@
+<!-- ══════════════════════════════════════════════════════
+     HOME SCREEN
+══════════════════════════════════════════════════════════ -->
 <div class="dashboard-shell">
 
-  <!-- ══════════════════════════════════════════════════════
-       HOME SCREEN
-  ══════════════════════════════════════════════════════════ -->
   <div class="dash-header">
     <h2>Journey Onboarding</h2>
   </div>
 
+  <!-- 3 Nav Cards -->
   <div class="nav-btn-row">
 
     <button class="nav-card nav-card--blue">
@@ -30,15 +31,11 @@
       <span class="nav-card__sub">classify / applockedcontent</span>
     </button>
 
-
   </div>
+
   <button class="add-btn" (click)="openModal('detail')">
-      <!-- <span class="nav-card__status" [class.filled]="isDetailFilled">
-        <span *ngIf="isDetailFilled" class="tick-icon">✓</span>
-      </span> -->
-      <span class="nav-card__title">+ Add Onboarding Detail</span>
-      <!-- <span class="nav-card__sub">journeyonboardingdetail</span> -->
-    </button>
+    <span class="nav-card__title">+ Add Onboarding Detail</span>
+  </button>
 
   <div class="section-label">All entries</div>
   <div class="table-card">
@@ -55,26 +52,19 @@
         <th mat-header-cell *matHeaderCellDef>Last time updated</th>
         <td mat-cell *matCellDef="let row" class="muted-cell">{{ row.lastUpdated }}</td>
       </ng-container>
-<!--
-      <ng-container matColumnDef="updatedBy">
-        <th mat-header-cell *matHeaderCellDef>Updated by</th>
-        <td mat-cell *matCellDef="let row">
-          <span class="badge-blue">{{ row.updatedBy }}</span>
-        </td>
-      </ng-container> -->
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="dash-row"></tr>
     </table>
     <div class="empty-table" *ngIf="tableRows.length === 0">
-      No entries yet. Click <strong>Journey Onboarding Detail</strong> above to add one.
+      No entries yet. Click <strong>+ Add Onboarding Detail</strong> above to add one.
     </div>
   </div>
 
 </div>
 
 <!-- BACKDROP -->
-<div class="modal-backdrop" *ngIf="activeModal" (click)="closeModal()"></div>
+<div class="modal-backdrop" *ngIf="activeModal && activeModal !== 'detail'" (click)="closeModal()"></div>
 
 
 <!-- ══════════════════════════════════════════════════════
@@ -113,11 +103,12 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>title</mat-label>
             <input matInput formControlName="title" placeholder="Personalized Insights" />
+              <mat-error>Required</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>description</mat-label>
-            <textarea matInput formControlName="description" rows="3"
-                      placeholder="Tailored content and exercises..."></textarea>
+            <textarea matInput formControlName="description" rows="3" placeholder="Tailored content and exercises..."></textarea>
+            <mat-error>Required</mat-error>
           </mat-form-field>
         </div>
       </div>
@@ -155,62 +146,49 @@
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>intro <span class="req">*</span></mat-label>
-        <textarea matInput formControlName="tc_intro" rows="3"
-                  placeholder="Time compression is the outcome of ATC thinking..."></textarea>
+        <textarea matInput formControlName="tc_intro" rows="3" placeholder="Time compression is the outcome of ATC thinking..."></textarea>
         <mat-error *ngIf="isInvalid(timeCompressionForm, 'tc_intro')">Required</mat-error>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>description</mat-label>
         <textarea matInput formControlName="tc_description" rows="3"></textarea>
+        <mat-error>Required</mat-error>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>content description</mat-label>
         <textarea matInput formControlName="tc_contentdescription" rows="3"></textarea>
+        <mat-error>Required</mat-error>
       </mat-form-field>
 
       <div class="array-label">content URL <span class="arr-badge">array of references</span></div>
       <div class="loading-hint" *ngIf="contentUrlsLoading">
         <span class="spinner"></span> Loading content_urls…
       </div>
-      <div formArrayName="contenturl">
-        <div class="array-card"
-             *ngFor="let cu of contentUrls.controls; let i = index"
-             [formGroupName]="i">
-          <div class="array-card-header">
-            <span class="array-index">#{{ i }}</span>
-            <button mat-icon-button type="button" color="warn"
-                    (click)="removeContentUrl(i)" *ngIf="contentUrls.length > 1">
-              <mat-icon>close</mat-icon>
-            </button>
-          </div>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Select content</mat-label>
-            <mat-select formControlName="docId"
-                        (selectionChange)="onTcContentUrlSelect($event.value, i)">
-              <mat-option value="">— None —</mat-option>
-              <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
-                <span class="cu-option-wrap">
-                  <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
-                  {{ opt.title }}
-                </span>
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
-          <div class="cu-preview" *ngIf="cu.get('title')?.value">
-            <img *ngIf="cu.get('thumbnailUrl')?.value"
-                 [src]="cu.get('thumbnailUrl')?.value" class="cu-preview__thumb" />
-            <div class="cu-preview__body">
-              <span class="cu-preview__title">{{ cu.get('title')?.value }}</span>
-              <span class="cu-preview__path">content_urls / {{ cu.get('docId')?.value }}</span>
-            </div>
-          </div>
+      <!-- Multi-select (mirrors App Locked pattern) -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select content URLs</mat-label>
+        <mat-select [value]="getSelectedContentUrlIds()"
+                    multiple
+                    (selectionChange)="onTcMultiSelect($event.value)">
+          <mat-option value="">— None —</mat-option>
+          <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
+            <span class="cu-option-wrap">
+              <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
+              {{ opt.title }}
+            </span>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="drag-list" cdkDropList (cdkDropListDropped)="dropContentUrls($event)">
+        <div class="drag-item" *ngFor="let cu of contentUrls.controls; let i = index" cdkDrag>
+          ☰ {{ cu.get('title')?.value || cu.get('docId')?.value }}
         </div>
       </div>
-      <button mat-stroked-button type="button" class="add-btn" (click)="addContentUrl()">
+      <!-- <button mat-stroked-button type="button" class="add-btn" (click)="addContentUrl()">
         + Add Content URL
-      </button>
+      </button> -->
 
     </form>
   </div>
@@ -225,60 +203,69 @@
   </div>
 </div>
 
-<div class="modal-panel" [class.modal-panel--open]="activeModal === 'applocked'">
 
+<!-- ══════════════════════════════════════════════════════
+     APP LOCKED CONTENT MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="modal-panel" [class.modal-panel--open]="activeModal === 'applocked'">
   <div class="modal-header">
-    <h2>App Locked Content</h2>
-    <button (click)="closeModal()">✕</button>
+    <div class="modal-title-group">
+      <h2>App Locked Content</h2>
+      <span class="collection-tag">classify / applockedcontent</span>
+    </div>
+    <button class="modal-close-btn" (click)="closeModal()">✕</button>
   </div>
 
   <div class="modal-body" [formGroup]="appLockedForm">
 
     <!-- Solar Voice -->
-    <mat-form-field class="full-width">
+    <div class="field-section-label">Solar Voice Playlist</div>
+    <mat-form-field appearance="outline" class="full-width">
       <mat-label>Solar Voice Playlist</mat-label>
       <mat-select formControlName="solarvoiceplaylist" multiple>
         <mat-option *ngFor="let item of solarVoiceOptions" [value]="item.id">
           {{ item.name }}
         </mat-option>
       </mat-select>
-
+      <mat-error>Required</mat-error>
     </mat-form-field>
     <div class="drag-list" cdkDropList (cdkDropListDropped)="drop($event, 'solarvoiceplaylist')">
       <div class="drag-item" *ngFor="let id of appLockedForm.value.solarvoiceplaylist" cdkDrag>
-        {{ getSolarVoiceName(id) }}
+        ☰ {{ getSolarVoiceName(id) }}
       </div>
     </div>
 
     <!-- General Content -->
-    <mat-form-field class="full-width">
+    <div class="field-section-label">General Content Playlist</div>
+    <mat-form-field appearance="outline" class="full-width">
       <mat-label>General Content Playlist</mat-label>
       <mat-select formControlName="generalcontentplaylist" multiple>
         <mat-option *ngFor="let item of contentUrlOptions" [value]="item.id">
           {{ item.title }}
         </mat-option>
       </mat-select>
-
+      <mat-error>Required</mat-error>
     </mat-form-field>
     <div class="drag-list" cdkDropList (cdkDropListDropped)="drop($event, 'generalcontentplaylist')">
       <div class="drag-item" *ngFor="let id of appLockedForm.value.generalcontentplaylist" cdkDrag>
-        {{ getContentTitle(id) }}
+        ☰ {{ getContentTitle(id) }}
       </div>
     </div>
 
     <!-- Eiflix -->
-    <mat-form-field class="full-width">
+    <div class="field-section-label">Eiflix Playlist</div>
+    <mat-form-field appearance="outline" class="full-width">
       <mat-label>Eiflix Playlist</mat-label>
       <mat-select formControlName="eiflixplaylist" multiple>
         <mat-option *ngFor="let item of seriesOptions" [value]="item.id">
           {{ item.name }}
         </mat-option>
       </mat-select>
-
+      <mat-error>Required</mat-error>
     </mat-form-field>
     <div class="drag-list" cdkDropList (cdkDropListDropped)="drop($event, 'eiflixplaylist')">
       <div class="drag-item" *ngFor="let id of appLockedForm.value.eiflixplaylist" cdkDrag>
-        {{ getSeriesName(id) }}
+        ☰ {{ getSeriesName(id) }}
       </div>
     </div>
 
@@ -286,18 +273,23 @@
 
   <div class="modal-footer">
     <button mat-button (click)="closeModal()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="saveAppLocked()">
-      Save
-    </button>
+    <button mat-raised-button color="primary" (click)="saveAppLocked()">Save</button>
   </div>
-
 </div>
 
-  <!-- Preview + Detail Modal Layout -->
+
+<!-- ══════════════════════════════════════════════════════
+     JOURNEY ONBOARDING DETAIL — Full Layout
+     Left: Mobile Preview  |  Right: Modal Panel
+══════════════════════════════════════════════════════════ -->
 <div class="detail-layout" [class.detail-layout--open]="activeModal === 'detail'">
 
-  <!-- LEFT: Mobile Preview -->
+  <!-- ═══════════════════════════════════════
+       LEFT — MOBILE PREVIEW
+  ═══════════════════════════════════════════ -->
   <div class="preview-page">
+
+    <!-- Empty state before journey selected -->
     <div class="preview-empty" *ngIf="!journeySelected && !isEditMode">
       <mat-icon>phone_iphone</mat-icon>
       <p>Select a journey to see the preview</p>
@@ -306,358 +298,601 @@
     <div class="mobile-frame" *ngIf="journeySelected || isEditMode">
       <div class="mobile-screen">
 
-        <!-- 1: intro -->
-        <ng-container *ngIf="currentScreen === 'intro'">
-          <div class="screen-hero" style="position:absolute;inset:0;height:100%">
+        <!-- ── PAGE 1: INTRO ─────────────────────────── -->
+        <ng-container *ngIf="isScreen('intro')">
+          <div style="position:absolute;inset:0;height:100%">
             <video
-              *ngIf="isVideoUrl(imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value)"
-              class="screen-hero__media"
-              [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value"
+              *ngIf="isVideoUrl(detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo'])"
+              [src]="detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo']"
               autoplay muted loop playsinline>
             </video>
             <img
-              *ngIf="!isVideoUrl(imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value)"
-              class="screen-hero__media"
-              [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value" />
-            <div class="screen-hero__overlay">
-              <h2 class="screen-title" style="color:#000">{{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }}</h2>
-              <p class="screen-body" style="color:#000">{{ detailForm.get('eventdescripition.introduction')?.value }}</p>
+              *ngIf="!isVideoUrl(detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo'])"
+              [src]="detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo']" />
+            <!-- Placeholder when no media -->
+            <div *ngIf="!imagePreviews['introductionvideo'] && !detailForm.get('introductionvideo')?.value"
+                 style="position:absolute;inset:0;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center">
+              <span style="color:rgba(255,255,255,0.3);font-size:11px">9:16 Background Video/Image</span>
+            </div>
+            <!-- Gradient overlay -->
+            <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.7) 100%)"></div>
+            <!-- Content overlay -->
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:24px 16px 28px">
+              <h2 style="font-size:18px;font-weight:700;color:#fff;margin:0 0 8px;line-height:1.3">
+                {{ getJourneyName(detailForm.get('journeyrefDocId')?.value) || 'Journey Name' }}
+              </h2>
+              <p style="font-size:13px;color:rgba(255,255,255,0.88);margin:0;line-height:1.6">
+                {{ detailForm.get('introduction')?.value || 'Introduction text will appear here…' }}
+              </p>
             </div>
           </div>
         </ng-container>
 
-        <!-- 2: journeyOverview -->
-        <ng-container *ngIf="currentScreen === 'journeyOverview'">
+        <!-- ── PAGE 2: JOURNEY OVERVIEW ──────────────── -->
+        <ng-container *ngIf="isScreen('journeyOverview')">
           <div class="screen-pad">
-            <h2 class="screen-title">{{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }} Journey</h2>
-            <div class="screen-video-placeholder">
-              <mat-icon>play_circle_filled</mat-icon>
-              <span>{{ selectedRefs['overviewvideo']?.title || 'Overview Video' }}</span>
-            </div>
-            <p class="screen-body-sm">{{ detailForm.get('subscription.descripition')?.value }}</p>
-          </div>
-        </ng-container>
-
-        <!-- 3: journeyDescripition -->
-        <ng-container *ngIf="currentScreen === 'journeyDescripition'">
-          <div class="screen-pad">
-            <h2 class="screen-title" style="color:#C6168D">
-              What Awaits You on the {{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }} Journey
+            <h2 class="screen-title">
+              {{ getJourneyName(detailForm.get('journeyrefDocId')?.value) || 'Journey Name' }} Journey
             </h2>
-            <p class="screen-body-sm">{{ detailForm.get('journeydetail.intro')?.value }}</p>
-            <img *ngIf="detailForm.get('journeydetail.imageurl')?.value || imagePreviews['journeydetail_imageurl']"
-                [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
-                class="screen-img" />
-            <p class="screen-body-sm">{{ detailForm.get('journeydetail.descripition')?.value }}</p>
-          </div>
-        </ng-container>
 
-        <!-- 4: subscription -->
-        <ng-container *ngIf="currentScreen === 'subscription'">
-          <div class="screen-pad">
-            <p style="color:#C6168D;font-size:13px;font-weight:500;margin-bottom:2px">Explore Your Journey</p>
-            <p style="color:#C6168D;font-size:15px;font-weight:700;margin-bottom:12px">Subscription and Products</p>
-            <div style="background:rgba(198,22,141,0.1);border-radius:8px;padding:12px">
-              <img *ngIf="detailForm.get('subscription.imageurl')?.value || imagePreviews['subscription_imageurl']"
-                  [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
-                  class="screen-img" />
-              <h2 class="screen-title">{{ getJourneyName(detailForm.get('journeyrefDocId')?.value) }} Journey</h2>
-              <p class="screen-body-sm">{{ detailForm.get('subscription.descripition')?.value }}</p>
-            </div>
-          </div>
-        </ng-container>
+            <!-- Video area -->
+            <div style="border-radius:10px;height:160px;position:relative;overflow:hidden;margin-bottom:12px;background:#1a1a2e">
 
-        <!-- 5: journeyExperience -->
-        <ng-container *ngIf="currentScreen === 'journeyExperience'">
-          <div class="screen-pad" style="height:100%;overflow-y:auto">
-            <p style="color:#C6168D;font-size:11px;font-weight:500;margin-bottom:4px">What's Included in</p>
-            <p style="color:#C6168D;font-size:13px;font-weight:700;margin-bottom:12px">Your Journey to Experience</p>
-            <div *ngFor="let prod of productincluded.controls; let i = index"
-                (click)="openProductSheet(prod.get('type')?.value, prod.get('title')?.value)"
-                style="cursor:pointer;margin-bottom:10px;background:#e3f7fd;border-radius:8px;padding:10px 12px">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                <div style="flex:1">
-                  <h4 style="font-size:12px;font-weight:700;color:#000;margin:0 0 4px">
-                    {{ prod.get('title')?.value || 'Product title' }}
-                  </h4>
-                  <p style="font-size:10px;color:#C6168D;margin:0">
-                    {{ prod.get('descripition')?.value }}
-                  </p>
+              <!-- Thumbnail when video selected -->
+              <img *ngIf="selectedRefs['overviewvideo']?.thumbnailUrl"
+                  [src]="selectedRefs['overviewvideo']?.thumbnailUrl"
+                  style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.85"/>
+
+              <!-- Dark overlay -->
+              <div style="position:absolute;inset:0;background:rgba(0,0,0,0.35)"></div>
+
+              <!-- Play button icon -->
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+                <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center">
+                  <span style="font-size:16px;margin-left:3px">▶</span>
                 </div>
-                <div style="width:20px;height:20px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <mat-icon style="font-size:10px;width:10px;height:10px;color:#00AEEF;line-height:1">arrow_forward_ios</mat-icon>
-                </div>
+                <span *ngIf="selectedRefs['overviewvideo']"
+                      style="font-size:9px;color:#fff;font-weight:600;text-align:center;padding:0 8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                  {{ selectedRefs['overviewvideo']?.title }}
+                </span>
+                <span *ngIf="!selectedRefs['overviewvideo']"
+                      style="font-size:10px;color:rgba(255,255,255,0.5)">Overview Video</span>
               </div>
-            </div>
-          </div>
-        </ng-container>
 
-        <!-- 6: productOverview -->
-        <ng-container *ngIf="currentScreen === 'productOverview'">
-          <div class="screen-pad">
-            <h2 class="screen-title" style="color:#C6168D">What Lies Ahead</h2>
-            <img *ngIf="detailForm.get('journeypath.imageurl')?.value || imagePreviews['journeypath_imageurl']"
-                [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
-                class="screen-img" />
-            <p class="screen-body-sm">{{ detailForm.get('journeypath.intro')?.value }}</p>
-            <p class="screen-body-sm">{{ detailForm.get('journeypath.descripition')?.value }}</p>
-          </div>
-        </ng-container>
-
-        <!-- 7: aelSelection — Others bottom sheet preview -->
-        <ng-container *ngIf="currentScreen === 'aelSelection'">
-          <div style="position:relative;height:100%;overflow:hidden">
-
-            <!-- background dimmed -->
-            <div class="screen-pad" style="opacity:0.25;position:absolute;inset:0">
-              <p style="color:#C6168D;font-size:11px;font-weight:500">Select</p>
-              <p style="color:#C6168D;font-size:13px;font-weight:700">Your Goals</p>
-              <div *ngFor="let prod of productincluded.controls"
-                  style="background:#e3f7fd;border-radius:6px;padding:7px 9px;margin-bottom:6px">
-                <p style="font-size:10px;font-weight:700;color:#000;margin:0">
-                  {{ prod.get('title')?.value || 'Product' }}
-                </p>
-              </div>
             </div>
 
-            <!-- Others bottom sheet — contained inside the phone -->
-            <div style="position:absolute;bottom:0;left:0;right:0;height:72%;background:#fff;border-radius:12px 12px 0 0;box-shadow:0 -2px 8px rgba(0,0,0,0.12);display:flex;flex-direction:column;overflow:hidden">
-              <div style="width:28px;height:3px;background:#ddd;border-radius:2px;margin:7px auto 0;flex-shrink:0"></div>
-              <div style="flex:1;overflow-y:auto;padding:8px 10px 6px">
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-                  <p style="font-size:11px;font-weight:700;color:#C6168D;margin:0;flex:1;line-height:1.4;padding-right:6px">
-                    {{ detailForm.get('otherdescripition.title')?.value || 'Title will appear here' }}
-                  </p>
-                  <div style="width:16px;height:16px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"
-                      (click)="currentScreen = 'journeyExperience'; detailTabIndex = 4">
-                    <mat-icon style="font-size:8px;width:8px;height:8px;color:#fff;line-height:1">close</mat-icon>
-                  </div>
-                </div>
-                <p style="font-size:9px;color:#333;line-height:1.6;margin:0">
-                  {{ detailForm.get('otherdescripition.descripition')?.value || 'Description will appear here' }}
-                </p>
-              </div>
-              <div style="padding:6px 10px 10px;flex-shrink:0">
-                <div style="background:#00AEEF;border-radius:7px;padding:7px;text-align:center;font-size:10px;font-weight:600;color:#fff;cursor:pointer"
-                    (click)="currentScreen = 'journeyExperience'; detailTabIndex = 4">
-                  Back
-                </div>
-              </div>
-            </div>
+            <p class="screen-body-sm">
+              {{ detailForm.get('overviewdescription')?.value || 'Overview description will appear here…' }}
 
-          </div>
-        </ng-container>
-
-        <!-- 8: onboarding -->
-        <ng-container *ngIf="currentScreen === 'onboarding'">
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:8px">
-            <mat-icon style="font-size:36px;height:36px;width:36px;color:#C6168D">event</mat-icon>
-            <p style="font-size:13px;font-weight:600;color:#C6168D;margin:0">Onboarding</p>
-            <p style="font-size:11px;font-weight:600;color:#C6168D;margin:0">Call Booking</p>
-          </div>
-        </ng-container>
-
-        <!-- 9: congratulations -->
-        <ng-container *ngIf="currentScreen === 'congratulations'">
-          <div class="screen-pad" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center">
-            <mat-icon style="font-size:48px;height:48px;width:48px;color:#C6168D">celebration</mat-icon>
-            <h2 class="screen-title" style="margin-top:12px">Congratulations!</h2>
-            <p class="screen-body-sm" style="margin-top:8px">Your onboarding call is scheduled.</p>
-            <p class="screen-body-sm" style="margin-top:6px;font-size:10px;color:#888">
-              Dive into EIFLiX videos to prepare for the transformations ahead.
             </p>
           </div>
         </ng-container>
 
-        <!-- bottom sheet — only shown when on journeyExperience screen -->
-        <div class="product-sheet"
-            [class.product-sheet--open]="productSheetOpen && currentScreen === 'journeyExperience'">
-          <div class="product-sheet__handle"></div>
-          <div class="product-sheet__scroll">
-            <div class="product-sheet__header">
-              <span class="product-sheet__title">{{ productSheetTitle }}</span>
-              <button class="product-sheet__close" (click)="closeProductSheet()">✕</button>
-            </div>
+        <!-- ── PAGE 3: JOURNEY DESCRIPTION ───────────── -->
+        <ng-container *ngIf="isScreen('journeyDescripition')">
+          <div class="screen-pad">
+            <p style="color:#C6168D;font-size:11px;font-weight:500;margin:0 0 2px">What Awaits You on the</p>
+            <h2 style="color:#C6168D;font-size:15px;font-weight:700;margin:0 0 12px;line-height:1.3">
+              {{ getJourneyName(detailForm.get('journeyrefDocId')?.value) || 'Journey Name' }} Journey
+            </h2>
 
-            <!-- QUEUE -->
-            <ng-container *ngIf="activeProductType === 'queue'">
-              <p class="ps-text">{{ detailForm.get('queuedescripition.descripition')?.value || '—' }}</p>
-              <p class="ps-section-label">The Process</p>
-              <img *ngIf="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
-                  [src]="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
-                  class="ps-img" />
-              <div *ngIf="!imagePreviews['processimage'] && !detailForm.get('processdetails.processimage')?.value"
-                  class="ps-img-placeholder">process image</div>
-              <div *ngFor="let s of processSteps.controls; let i = index" class="ps-step">
-                <div class="ps-step__num">{{ i + 1 }}</div>
-                <div>
-                  <div class="ps-step__title">{{ s.get('title')?.value || 'Step ' + (i+1) }}</div>
-                  <div class="ps-step__desc">{{ s.get('descripition')?.value }}</div>
+            <p class="screen-body-sm">
+              {{ detailForm.get('journeydetail.intro')?.value || 'Intro text will appear here…' }}
+            </p>
+
+            <!-- Image -->
+            <div *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value"
+                 style="background:#f0f0f0;border-radius:10px;height:120px;display:flex;align-items:center;justify-content:center;margin:10px 0">
+              <span style="font-size:11px;color:#aaa">16:9 Image</span>
+            </div>
+            <img *ngIf="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
+                 [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
+                 class="screen-img" />
+
+            <p class="screen-body-sm">
+              {{ detailForm.get('journeydetail.descripition')?.value || 'Description will appear here…' }}
+            </p>
+          </div>
+        </ng-container>
+
+        <!-- ── PAGE 4: SUBSCRIPTION ───────────────────── -->
+        <ng-container *ngIf="isScreen('subscription')">
+          <div class="screen-pad">
+            <p style="color:#C6168D;font-size:11px;font-weight:500;margin:0 0 2px">Explore Your Journey</p>
+            <p style="color:#C6168D;font-size:14px;font-weight:700;margin:0 0 12px">Subscription and Products</p>
+
+            <div style="background:rgba(198,22,141,0.08);border-radius:10px;padding:12px">
+              <!-- Subscription image -->
+              <div *ngIf="!imagePreviews['subscription_imageurl'] && !detailForm.get('subscription.imageurl')?.value"
+                   style="background:#f0f0f0;border-radius:8px;height:100px;display:flex;align-items:center;justify-content:center;margin-bottom:10px">
+                <span style="font-size:11px;color:#aaa">16:9 Image</span>
+              </div>
+              <img *ngIf="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
+                   [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
+                   style="width:100%;border-radius:8px;object-fit:cover;max-height:100px;margin-bottom:10px" />
+
+              <h3 style="font-size:13px;font-weight:700;color:#000;margin:0 0 6px">
+                {{ getJourneyName(detailForm.get('journeyrefDocId')?.value) || 'Journey Name' }} Journey
+              </h3>
+              <p style="font-size:11px;color:#444;line-height:1.5;margin:0 0 10px">
+                {{ detailForm.get('subscription.descripition')?.value || 'Subscription description…' }}
+              </p>
+              <div style="border-top:1px solid rgba(198,22,141,0.2);padding-top:8px">
+                <p style="font-size:9px;color:#888;margin:0">Duration: <strong>auto from record</strong></p>
+                <p style="font-size:9px;color:#888;margin:3px 0 0">Expiry: <strong>auto from record</strong></p>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- ── PAGE 5: JOURNEY EXPERIENCE ────────────── -->
+        <ng-container *ngIf="isScreen('journeyExperience')">
+          <div class="screen-pad" style="height:100%;overflow-y:auto">
+            <p style="color:#C6168D;font-size:11px;font-weight:500;margin:0 0 2px">What's Included in</p>
+            <p style="color:#C6168D;font-size:13px;font-weight:700;margin:0 0 12px">Your Journey to Experience</p>
+
+            <!-- Product cards -->
+            <div *ngFor="let prod of productincluded.controls; let i = index"
+                 (click)="openPreviewSheet(prod.get('type')?.value)"
+                 style="cursor:pointer;margin-bottom:10px;background:#e3f7fd;border-radius:8px;padding:10px 12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div style="flex:1">
+                  <span style="font-size:9px;font-weight:600;text-transform:uppercase;color:#888;letter-spacing:0.5px">
+                    {{ prod.get('type')?.value || 'type' }}
+                  </span>
+                  <h4 style="font-size:12px;font-weight:700;color:#000;margin:2px 0 4px">
+                    {{ prod.get('title')?.value || 'Product title' }}
+                  </h4>
+                  <p style="font-size:10px;color:#C6168D;margin:0;line-height:1.4">
+                    {{ prod.get('descripition')?.value }}
+                  </p>
+                </div>
+                <div style="width:20px;height:20px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <span style="font-size:10px;color:#00AEEF;font-weight:700">›</span>
                 </div>
               </div>
-              <p class="ps-section-label">ATC Model</p>
-              <div class="ps-atc-box">
-                <p class="ps-atc-title">{{ detailForm.get('queuedescripition.atcmodel.title')?.value || '—' }}</p>
+            </div>
+
+            <div *ngIf="productincluded.controls.length === 0"
+                 style="text-align:center;padding:24px;color:#aaa;font-size:12px">
+              Add products in the Experience tab
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- ── PAGE 6: EVENT DESCRIPTION (bottom sheet) ─ -->
+        <ng-container *ngIf="isScreen('eventDescription')">
+          <div style="position:relative;height:100%;overflow:hidden">
+            <!-- Dimmed background -->
+            <div class="screen-pad" style="opacity:0.2;position:absolute;inset:0;overflow:hidden;background:#f0f4ff">
+              <p style="color:#C6168D;font-size:13px;font-weight:700">Your Journey to Experience</p>
+              <div *ngFor="let prod of productincluded.controls"
+                   style="background:#e3f7fd;border-radius:6px;padding:7px 9px;margin-bottom:6px">
+                <p style="font-size:10px;font-weight:700;color:#000;margin:0">{{ prod.get('title')?.value }}</p>
               </div>
-              <p class="ps-text">{{ detailForm.get('queuedescripition.atcmodel.descripition')?.value }}</p>
-            </ng-container>
+            </div>
+            <!-- Bottom sheet -->
+            <div style="position:absolute;bottom:0;left:0;right:0;height:82%;background:#fff;border-radius:14px 14px 0 0;box-shadow:0 -3px 16px rgba(0,0,0,0.15);display:flex;flex-direction:column;overflow:hidden">
+              <div style="width:28px;height:3px;background:#ddd;border-radius:2px;margin:8px auto 0;flex-shrink:0"></div>
+              <div style="flex:1;overflow-y:auto;padding:10px 12px 6px">
+                <!-- Header -->
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                  <p style="font-size:12px;font-weight:700;color:#C6168D;margin:0;flex:1;line-height:1.4;padding-right:8px">
+                    {{ detailForm.get('eventdescripition.title')?.value || 'Event Title' }}
+                  </p>
+                  <div (click)="goBackToExperience()"
+                       style="width:18px;height:18px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+                    <span style="font-size:9px;color:#fff;line-height:1">✕</span>
+                  </div>
+                </div>
+                <!-- Intro -->
+                <p style="font-size:10px;color:#333;line-height:1.7;margin:0 0 10px">
+                  {{ detailForm.get('eventdescripition.intro')?.value || 'Event intro text… ' }}
+                </p>
+                <!-- Overview heading -->
+                <p style="font-size:10px;font-weight:700;color:#000;margin:0 0 4px">
+                  {{ detailForm.get('eventdescripition.overview')?.value || 'Overview heading…' }}
+                </p>
+                <!-- Overview description -->
+                <p style="font-size:9px;color:#555;line-height:1.6;margin:0 0 10px">
+                  {{ detailForm.get('eventdescripition.overviewdescripition')?.value || 'Overview description…' }}
+                </p>
+              </div>
+              <!-- Footer -->
+              <div style="padding:8px 12px 12px;flex-shrink:0">
+                <div (click)="goBackToExperience()"
+                     style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
+                  Back
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
 
-            <!-- EVENT -->
-            <ng-container *ngIf="activeProductType === 'event'">
-              <p class="ps-title">{{ detailForm.get('eventdescripition.title')?.value || '—' }}</p>
-              <p class="ps-text">{{ detailForm.get('eventdescripition.intro')?.value }}</p>
-              <p class="ps-section-label">{{ detailForm.get('eventdescripition.overview')?.value }}</p>
-              <p class="ps-text">{{ detailForm.get('eventdescripition.overviewdescripition')?.value }}</p>
-            </ng-container>
+        <!-- ── PAGE 7: OTHER DESCRIPTION (bottom sheet) ─ -->
+        <ng-container *ngIf="isScreen('otherDescription')">
+          <div style="position:relative;height:100%;overflow:hidden">
+            <!-- Dimmed background -->
+            <div class="screen-pad" style="opacity:0.2;position:absolute;inset:0;overflow:hidden;background:#f0f4ff">
+              <p style="color:#C6168D;font-size:13px;font-weight:700">Your Journey to Experience</p>
+              <div *ngFor="let prod of productincluded.controls"
+                   style="background:#e3f7fd;border-radius:6px;padding:7px 9px;margin-bottom:6px">
+                <p style="font-size:10px;font-weight:700;color:#000;margin:0">{{ prod.get('title')?.value }}</p>
+              </div>
+            </div>
+            <!-- Bottom sheet -->
+            <div style="position:absolute;bottom:0;left:0;right:0;height:65%;background:#fff;border-radius:14px 14px 0 0;box-shadow:0 -3px 16px rgba(0,0,0,0.15);display:flex;flex-direction:column;overflow:hidden">
+              <div style="width:28px;height:3px;background:#ddd;border-radius:2px;margin:8px auto 0;flex-shrink:0"></div>
+              <div style="flex:1;overflow-y:auto;padding:10px 12px 6px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+                  <p style="font-size:12px;font-weight:700;color:#C6168D;margin:0;flex:1;line-height:1.4;padding-right:8px">
+                    {{ detailForm.get('otherdescripition.title')?.value || 'Other Title' }}
+                  </p>
+                  <div (click)="goBackToExperience()"
+                       style="width:18px;height:18px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+                    <span style="font-size:9px;color:#fff;line-height:1">✕</span>
+                  </div>
+                </div>
+                <p style="font-size:9px;color:#333;line-height:1.7;margin:0">
+                  {{ detailForm.get('otherdescripition.descripition')?.value || 'Description will appear here…' }}
+                </p>
+              </div>
+              <div style="padding:8px 12px 12px;flex-shrink:0">
+                <div (click)="goBackToExperience()"
+                     style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
+                  Back
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
 
-            <!-- OTHERS -->
-            <ng-container *ngIf="activeProductType === 'others'">
-              <p class="ps-title">{{ detailForm.get('otherdescripition.title')?.value || '—' }}</p>
-              <p class="ps-text">{{ detailForm.get('otherdescripition.descripition')?.value }}</p>
-            </ng-container>
+        <!-- ── PAGE 8: QUEUE DESCRIPTION (bottom sheet) ─ -->
+        <ng-container *ngIf="isScreen('queueDescription')">
+          <div style="position:relative;height:100%;overflow:hidden">
+            <!-- Dimmed background -->
+            <div class="screen-pad" style="opacity:0.2;position:absolute;inset:0;overflow:hidden;background:#f0f4ff">
+              <p style="color:#C6168D;font-size:13px;font-weight:700">Your Journey to Experience</p>
+              <div *ngFor="let prod of productincluded.controls"
+                   style="background:#e3f7fd;border-radius:6px;padding:7px 9px;margin-bottom:6px">
+                <p style="font-size:10px;font-weight:700;color:#000;margin:0">{{ prod.get('title')?.value }}</p>
+              </div>
+            </div>
+            <!-- Bottom sheet -->
+            <div style="position:absolute;bottom:0;left:0;right:0;height:90%;background:#fff;border-radius:14px 14px 0 0;box-shadow:0 -3px 16px rgba(0,0,0,0.15);display:flex;flex-direction:column;overflow:hidden">
+              <div style="width:28px;height:3px;background:#ddd;border-radius:2px;margin:8px auto 0;flex-shrink:0"></div>
+              <div style="flex:1;overflow-y:auto;padding:10px 12px 6px;-webkit-overflow-scrolling:touch">
+                <!-- Header -->
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+                  <p style="font-size:11px;font-weight:700;color:#C6168D;margin:0;flex:1">{{ detailForm.get('queuedescripition.title')?.value || 'Title' }}</p>
+                  <div (click)="goBackToExperience()"
+                       style="width:18px;height:18px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+                    <span style="font-size:9px;color:#fff;line-height:1">✕</span>
+                  </div>
+                </div>
+                <!-- Description -->
+                <p style="font-size:9px;color:#333;line-height:1.7;margin:0 0 10px">
+                  {{ detailForm.get('queuedescripition.descripition')?.value || 'Queue description…' }}
+                </p>
+                <!-- Process image -->
+                <p>The Process</p>
+                <div *ngIf="!imagePreviews['processimage'] && !detailForm.get('queuedescripition.processimage')?.value"
+                     style="background:#f0f0f0;border-radius:8px;height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:10px">
+                  <span style="font-size:10px;color:#aaa">Process Image (16:9)</span>
+                </div>
+                <img *ngIf="imagePreviews['processimage'] || detailForm.get('queuedescripition.processimage')?.value"
+                     [src]="imagePreviews['processimage'] || detailForm.get('queuedescripition.processimage')?.value"
+                     style="width:100%;border-radius:8px;object-fit:cover;max-height:80px;margin-bottom:10px" />
+
+                <!-- View Full Process button -->
+                <div (click)="openProcessSteps()"
+                    style="font-size:11px;font-weight:700;color:#C6168D;margin:0;cursor:pointer;display:flex;align-items:center;gap:4px">
+                  <span>View Full Process</span>
+                  <span style="font-size:12px">›</span>
+                </div>
+
+                <!-- Steps — only shown when expanded -->
+                <div *ngIf="showFullProcess">
+                  <div *ngFor="let step of processSteps.controls; let i = index"
+                      style="margin-bottom:16px;border-radius:10px;overflow:hidden;background:#f8f9fa">
+
+                    <!-- Step image — full width at top -->
+                    <div *ngIf="imagePreviews['step_imageurl_' + i] || step.get('imageurl')?.value"
+                        style="width:100%;height:120px;overflow:hidden">
+                      <img [src]="imagePreviews['step_imageurl_' + i] || step.get('imageurl')?.value"
+                          style="width:100%;height:100%;object-fit:cover" />
+                    </div>
+                    <div *ngIf="!imagePreviews['step_imageurl_' + i] && !step.get('imageurl')?.value"
+                        style="width:100%;height:120px;background:#e0e0e0;display:flex;align-items:center;justify-content:center">
+                      <span style="font-size:10px;color:#aaa">Step image (1:1)</span>
+                    </div>
+
+                    <!-- Step content -->
+                    <div style="padding:10px 12px">
+                      <!-- Step number + title -->
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <div style="width:22px;height:22px;border-radius:50%;background:#C6168D;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                          {{ i + 1 }}
+                        </div>
+                        <p style="font-size:11px;font-weight:700;color:#000;margin:0;line-height:1.3">
+                          {{ step.get('title')?.value || 'Step title' }}
+                        </p>
+                      </div>
+                      <!-- Step description -->
+                      <p style="font-size:9px;color:#555;line-height:1.6;margin:0">
+                        {{ step.get('descripition')?.value }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ATC Model -->
+                <div style="margin:10px 0 12px">
+                  <p style="font-size:10px;font-weight:700;color:#000;margin:0 0 6px">ATC Model</p>
+                  <div style="background:#C6168D;border-radius:6px;padding:7px 12px;margin-bottom:8px;text-align:center">
+                    <p style="font-size:10px;font-weight:700;color:#fff;margin:0;letter-spacing:0.3px;text-transform:uppercase;line-height:1.4">
+                      {{ detailForm.get('queuedescripition.atcmodel.title')?.value || 'ATC Title' }}
+                    </p>
+                  </div>
+                  <p style="font-size:9px;color:#333;line-height:1.6;margin:0">
+                    {{ detailForm.get('queuedescripition.atcmodel.descripition')?.value || 'ATC model description…' }}
+                  </p>
+                </div>
+              </div>
+              <!-- Footer -->
+              <div style="padding:8px 12px 12px;flex-shrink:0">
+                <div (click)="goBackToExperience()"
+                     style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
+                  Back
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- ── PAGE: PROCESS STEPS (full screen) ─ -->
+        <ng-container *ngIf="isScreen('processSteps')">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;background:#fff">
+
+            <!-- Scrollable content -->
+            <div style="flex:1;overflow-y:auto;padding:16px 14px 12px;-webkit-overflow-scrolling:touch">
+
+              <!-- Title -->
+              <p style="color:#C6168D;font-size:13px;font-weight:700;margin:0 0 6px;line-height:1.3">
+                {{ detailForm.get('queuedescripition.processdetails.title')?.value || 'Process Title' }}
+              </p>
+
+              <!-- Description -->
+              <p style="font-size:10px;color:#333;line-height:1.7;margin:0 0 14px">
+                {{ detailForm.get('queuedescripition.processdetails.descripition')?.value || 'Process description will appear here…' }}
+              </p>
+
+              <!-- Steps -->
+              <div *ngFor="let step of processSteps.controls; let i = index"
+                  style="margin-bottom:20px">
+
+                <!-- Square image centered at top -->
+                <div style="width:64px;height:64px;border-radius:14px;overflow:hidden;background:#e8f7fd;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
+                  <img *ngIf="imagePreviews['step_imageurl_' + i] || step.get('imageurl')?.value"
+                      [src]="imagePreviews['step_imageurl_' + i] || step.get('imageurl')?.value"
+                      style="width:100%;height:100%;object-fit:contain" />
+                  <span *ngIf="!imagePreviews['step_imageurl_' + i] && !step.get('imageurl')?.value"
+                        style="font-size:28px;color:#00AEEF;opacity:0.5">◈</span>
+                </div>
+
+                <!-- Step number + title -->
+                <p style="font-size:11px;font-weight:700;color:#000;margin:0 0 4px;line-height:1.4">
+                  {{ i + 1 }}. {{ step.get('title')?.value || 'Step ' + (i + 1) }}
+                </p>
+
+                <!-- Description -->
+                <p style="font-size:9px;color:#555;line-height:1.6;margin:0">
+                  {{ step.get('descripition')?.value || 'Step description…' }}
+                </p>
+
+              </div>
+
+                            <!-- Empty state -->
+                            <div *ngIf="processSteps.controls.length === 0"
+                                style="text-align:center;padding:24px;color:#aaa;font-size:11px">
+                              Add steps in Tab 7 to see them here
+                            </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:8px 12px 14px;flex-shrink:0;border-top:1px solid #f0f0f0">
+              <div (click)="goBackToQueue()"
+                  style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
+                Back
+              </div>
+            </div>
 
           </div>
-          <div class="product-sheet__footer">
-            <button class="ps-back-btn" (click)="closeProductSheet()">Back</button>
-          </div>
-        </div>
+        </ng-container>
 
+        <!-- ── PAGE 9: PRODUCT OVERVIEW ───────────────── -->
+        <ng-container *ngIf="isScreen('productOverview')">
+          <div class="screen-pad">
+            <h2 class="screen-title" style="color:#C6168D">What Lies Ahead</h2>
+
+            <div *ngIf="!imagePreviews['journeypath_imageurl'] && !detailForm.get('journeypath.imageurl')?.value"
+                style="background:#f0f0f0;border-radius:10px;height:120px;display:flex;align-items:center;justify-content:center;margin-bottom:12px">
+              <span style="font-size:11px;color:#aaa">16:9 Image</span>
+            </div>
+            <img *ngIf="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
+                [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
+                class="screen-img" />
+
+            <p class="screen-body-sm">
+              {{ detailForm.get('journeypath.intro')?.value || 'Intro text will appear here…' }}
+            </p>
+            <p class="screen-body-sm">
+              {{ detailForm.get('journeypath.descripition')?.value || 'Description will appear here…' }}
+            </p>
+          </div>
+        </ng-container>
+
+        <!-- ── PAGE 10: ONBOARDING CALL BOOKING ──────── -->
+        <!-- <ng-container *ngIf="isScreen('onboarding')">
+          <div class="screen-pad" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center">
+            <div style="width:64px;height:64px;border-radius:50%;background:rgba(198,22,141,0.1);border:2px solid #C6168D;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+              <span style="font-size:28px">📅</span>
+            </div>
+            <p style="color:#C6168D;font-size:14px;font-weight:700;margin:0 0 4px">Onboarding</p>
+            <p style="color:#C6168D;font-size:12px;font-weight:600;margin:0 0 12px">Call Booking</p>
+            <p style="font-size:10px;color:#888;line-height:1.6;margin:0">
+              Calendar booking screen appears here
+            </p>
+          </div>
+        </ng-container> -->
+
+        <!-- ── PAGE 11: CONGRATULATIONS ──────────────── -->
+        <!-- <ng-container *ngIf="isScreen('congratulations')">
+          <div class="screen-pad" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center">
+            <div style="width:64px;height:64px;border-radius:50%;background:rgba(198,22,141,0.1);border:2px solid #C6168D;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+              <span style="font-size:28px">🎉</span>
+            </div>
+            <h2 style="color:#C6168D;font-size:18px;font-weight:700;margin:0 0 8px">Congratulations!</h2>
+            <p style="font-size:12px;color:#444;line-height:1.6;margin:0 0 6px">
+              Your onboarding call is scheduled.
+            </p>
+            <p style="font-size:10px;color:#888;line-height:1.5;margin:0">
+              Dive into EIFLiX videos to prepare for the transformations ahead.
+            </p>
+          </div>
+        </ng-container> -->
+
+      </div><!-- /mobile-screen -->
+    </div><!-- /mobile-frame -->
+  </div><!-- /preview-page -->
+
+
+  <!-- ═══════════════════════════════════════
+       RIGHT — DETAIL MODAL PANEL
+  ═══════════════════════════════════════════ -->
+  <div class="modal-panel modal-panel--wide" [class.modal-panel--open]="activeModal === 'detail'">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <h2>{{ editingIndex !== null ? 'Edit' : 'Add' }} Journey Onboarding Detail</h2>
+        <span class="collection-tag">journeyonboardingdetail / &#123;docid&#125;</span>
+      </div>
+      <button class="modal-close-btn" (click)="closeModal()">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+
+      <!-- Success state -->
+      <div class="success-card" *ngIf="detailSubmitted">
+        <div class="success-icon">✓</div>
+        <p>Saved to <strong>journeyonboardingdetail / {{ detailForm.value.docid }}</strong></p>
+        <button mat-stroked-button (click)="closeModal()">Close</button>
       </div>
 
-  <!-- RIGHT: Detail Modal Panel -->
-  <div class="modal-panel modal-panel--wide" [class.modal-panel--open]="activeModal === 'detail'">
-    <!-- ... all existing modal content unchanged ... -->
-  </div>
+      <ng-container *ngIf="!detailSubmitted">
+        <form [formGroup]="detailForm" autocomplete="off">
 
-</div>
-
-<!-- ══════════════════════════════════════════════════════
-     JOURNEY ONBOARDING DETAIL MODAL
-══════════════════════════════════════════════════════════ -->
-<div class="modal-panel modal-panel--wide" [class.modal-panel--open]="activeModal === 'detail'">
-
-  <div class="modal-header">
-    <div class="modal-title-group">
-      <h2>{{ editingIndex !== null ? 'Edit' : 'Add' }} Journey Onboarding Detail</h2>
-      <span class="collection-tag">journeyonboardingdetail / &#123;docid&#125;</span>
-    </div>
-    <button class="modal-close-btn" (click)="closeModal()">✕</button>
-  </div>
-
-  <div class="modal-body">
-
-    <div class="success-card" *ngIf="detailSubmitted">
-      <div class="success-icon">✓</div>
-      <p>Saved to <strong>journeyonboardingdetail / {{ detailForm.value.docid }}</strong></p>
-      <button mat-stroked-button (click)="closeModal()">Close</button>
-    </div>
-
-    <ng-container *ngIf="!detailSubmitted">
-      <form [formGroup]="detailForm" autocomplete="off">
-
-        <!-- Journey selector — always visible at top -->
-        <div class="field-section-label">
-          journeyref <span class="ref-tag">reference → journey</span>
-          <span *ngIf="isEditMode" class="locked-badge">
-            <mat-icon style="font-size:12px;height:12px;width:12px;line-height:1;vertical-align:middle">lock</mat-icon>
-            locked
-          </span>
-        </div>
-        <div class="loading-hint" *ngIf="journeyOptionsLoading">
-          <span class="spinner"></span> Loading journey collection…
-        </div>
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Select Journey <span class="req" *ngIf="!isEditMode">*</span></mat-label>
-          <mat-select formControlName="journeyrefDocId"
-                      (selectionChange)="onJourneyRefSelect($event.value)">
-            <mat-option value="">— None —</mat-option>
-            <mat-option *ngFor="let j of isEditMode ? journeyOptions : availableJourneyOptions" [value]="j.id">
-              {{ j.label }}
-            </mat-option>
-          </mat-select>
-          <mat-hint *ngIf="isEditMode">Journey cannot be changed once saved</mat-hint>
-          <mat-error *ngIf="isInvalid(detailForm, 'journeyrefDocId')">Please select a journey</mat-error>
-        </mat-form-field>
-
-        <ng-container *ngIf="journeySelected || isEditMode">
-
-          <!-- Tab bar -->
-          <div class="detail-tab-bar">
-            <button *ngFor="let tab of detailTabs; let i = index"
-                    class="detail-tab"
-                    [class.detail-tab--active]="detailTabIndex === i"
-                    (click)="detailTabIndex = i; currentScreen = tab.screen; productSheetOpen = false; activeProductType = null">
-              <span class="detail-tab__dot" [class.detail-tab__dot--filled]="isTabFilled(i)">{{ i + 1 }}</span>
-              <span class="detail-tab__label">{{ tab.label }}</span>
-            </button>
+          <!-- Journey selector -->
+          <div class="field-section-label">
+            journeyref <span class="ref-tag">reference → journey</span>
+            <span *ngIf="isEditMode" class="locked-badge">
+              <mat-icon style="font-size:12px;height:12px;width:12px;line-height:1;vertical-align:middle">lock</mat-icon>
+              locked
+            </span>
           </div>
+          <div class="loading-hint" *ngIf="journeyOptionsLoading">
+            <span class="spinner"></span> Loading journey collection…
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Select Journey <span class="req" *ngIf="!isEditMode">*</span></mat-label>
+            <mat-select formControlName="journeyrefDocId"
+                        (selectionChange)="onJourneyRefSelect($event.value)">
+              <mat-option value="">— None —</mat-option>
+              <mat-option *ngFor="let j of isEditMode ? journeyOptions : availableJourneyOptions" [value]="j.id">
+                {{ j.label }}
+              </mat-option>
+            </mat-select>
+            <mat-hint *ngIf="isEditMode">Journey cannot be changed once saved</mat-hint>
+            <mat-error *ngIf="isInvalid(detailForm, 'journeyrefDocId')">Please select a journey</mat-error>
+          </mat-form-field>
 
-          <!-- ══════════════════════════════════════════════
-              TAB 0 — INTRO
-              Flutter screen: introduction()
-              Shows: introductionvideo (bg), journey name,
-                      introduction text, overviewvideo ref
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 0">
-            <!-- introductionvideo -->
-            <div class="field-section-label">
-              introductionvideo <span class="url-tag">file upload</span>
-            </div>
-            <div class="img-upload-box" (click)="triggerFileInput('introductionvideo')">
-              <ng-container *ngIf="!imagePreviews['introductionvideo'] && !detailForm.get('eventdescripition.introductionvideo')?.value">
-                <mat-icon class="upload-icon">cloud_upload</mat-icon>
-                <span class="upload-label">Click to upload background video / image</span>
-              </ng-container>
-              <ng-container *ngIf="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value">
-                <img class="img-preview"
-                    [src]="imagePreviews['introductionvideo'] || detailForm.get('eventdescripition.introductionvideo')?.value"
-                    alt="preview" />
-                <button class="img-clear-btn" type="button"
-                        (click)="clearImage($event, 'introductionvideo', 'eventdescripition.introductionvideo')">✕</button>
-              </ng-container>
-            </div>
-            <input type="file" accept="image/*,video/*" class="hidden-file-input"
-                  [id]="'file-introductionvideo'"
-                  (change)="onFileChange($event, 'introductionvideo', 'eventdescripition.introductionvideo')" />
+          <!-- Tabs (only after journey selected) -->
+          <ng-container *ngIf="journeySelected || isEditMode">
 
-            <!-- eventdescripition -->
-            <div class="field-section-label">
-              eventdescripition <span class="map-tag">map</span>
+            <!-- Tab bar -->
+            <div class="detail-tab-bar">
+              <button *ngFor="let tab of detailTabs; let i = index"
+                      class="detail-tab"
+                      [class.detail-tab--active]="detailTabIndex === i"
+                      (click)="onTabChange(i, tab)">
+                <span class="detail-tab__dot" [class.detail-tab__dot--filled]="isTabFilled(i)">{{ i + 1 }}</span>
+                <span class="detail-tab__label">{{ tab.label }}</span>
+              </button>
             </div>
-            <div formGroupName="eventdescripition">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>introduction <span class="req">*</span></mat-label>
-                <textarea matInput formControlName="introduction" rows="3"
-                          placeholder="Welcome text shown below the video on the intro screen…"></textarea>
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>title <span class="req">*</span></mat-label>
-                <input matInput formControlName="title" placeholder="The uP! Live Event…" />
-                <mat-error *ngIf="isInvalid(detailForm, 'eventdescripition.title')">Required</mat-error>
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>intro <span class="req">*</span></mat-label>
-                <textarea matInput formControlName="intro" rows="3"
-                          placeholder="The 6-day uP! Arena…"></textarea>
-                <mat-error *ngIf="isInvalid(detailForm, 'eventdescripition.intro')">Required</mat-error>
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>overview</mat-label>
-                <input matInput formControlName="overview" />
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>overviewdescripition</mat-label>
-                <textarea matInput formControlName="overviewdescripition" rows="2"></textarea>
-              </mat-form-field>
 
-              <!-- goalvideourl -->
-              <div class="nested-ref-label">
-                goalvideourl <span class="ref-tag">reference → content_urls</span>
+            <!-- ══════════════════════════════════════════
+                 TAB 0 — INTRO
+            ══════════════════════════════════════════════ -->
+            <ng-container *ngIf="detailTabIndex === 0">
+              <p class="tab-hint">
+                Upload a <strong>portrait (9:16)</strong> background video or image.
+                The journey name and introduction text are overlaid on the mobile screen.
+              </p>
+
+              <div class="field-section-label">
+                introductionvideo <span class="url-tag">file upload</span>
+                <span class="ratio-badge">9 : 16</span>
+              </div>
+              <div class="img-upload-box img-upload-box--portrait"
+                   (click)="triggerFileInput('introductionvideo')">
+                <ng-container *ngIf="!imagePreviews['introductionvideo'] && !detailForm.get('introductionvideo')?.value">
+                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                  <span class="upload-label">Click to upload background video / image (9:16)</span>
+                </ng-container>
+                <ng-container *ngIf="detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo']">
+                  <video *ngIf="isVideoUrl(detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo'])"
+                         class="img-preview"
+                         [src]="detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo']"
+                         autoplay muted playsinline></video>
+                  <img *ngIf="!isVideoUrl(detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo'])"
+                       class="img-preview"
+                       [src]="detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo']"
+                       alt="preview" />
+                  <button class="img-clear-btn" type="button"
+                          (click)="clearImage($event, 'introductionvideo', 'introductionvideo')">✕</button>
+                </ng-container>
+              </div>
+              <input type="file" accept="image/*,video/*" class="hidden-file-input"
+                     id="file-introductionvideo"
+                     (change)="onFileChange($event, 'introductionvideo', 'introductionvideo')" />
+
+              <div class="field-section-label">introduction</div>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Introduction</mat-label>
+                <textarea matInput formControlName="introduction" rows="4" placeholder="Welcome text shown below the video on the intro screen…"></textarea>
+                <mat-error>Required</mat-error>
+              </mat-form-field>
+            </ng-container>
+
+            <!-- ══════════════════════════════════════════
+                 TAB 1 — JOURNEY OVERVIEW
+            ══════════════════════════════════════════════ -->
+            <ng-container *ngIf="detailTabIndex === 1">
+              <p class="tab-hint">
+                Select the <strong>overview video</strong> from content_urls and add the description
+                shown below the player on the Journey Overview screen.
+              </p>
+
+              <div class="field-section-label">
+                overviewvideo <span class="ref-tag">reference → content_urls</span>
               </div>
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Select goal video</mat-label>
-                <mat-select formControlName="goalvideourlDocId"
-                            (selectionChange)="onSingleRefSelect($event.value, 'goalvideourl')">
+                <mat-label>Select overview video</mat-label>
+                <mat-select formControlName="overviewvideoDocId"
+                            (selectionChange)="onSingleRefSelect($event.value, 'overviewvideo')">
                   <mat-option value="">— None —</mat-option>
                   <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
                     <span class="cu-option-wrap">
@@ -666,445 +901,579 @@
                     </span>
                   </mat-option>
                 </mat-select>
+                <mat-error>Required</mat-error>
               </mat-form-field>
-              <div class="cu-preview" *ngIf="selectedRefs['goalvideourl']">
-                <img *ngIf="selectedRefs['goalvideourl']?.thumbnailUrl"
-                    [src]="selectedRefs['goalvideourl']?.thumbnailUrl" class="cu-preview__thumb" />
+              <div class="cu-preview" *ngIf="selectedRefs['overviewvideo']">
+                <img *ngIf="selectedRefs['overviewvideo']?.thumbnailUrl"
+                     [src]="selectedRefs['overviewvideo']?.thumbnailUrl" class="cu-preview__thumb" />
                 <div class="cu-preview__body">
-                  <span class="cu-preview__title">{{ selectedRefs['goalvideourl']?.title }}</span>
-                  <span class="cu-preview__path">content_urls / {{ selectedRefs['goalvideourl']?.id }}</span>
+                  <span class="cu-preview__title">{{ selectedRefs['overviewvideo']?.title }}</span>
                 </div>
               </div>
-            </div>
-          </ng-container>
 
-          <!-- ══════════════════════════════════════════════
-              TAB 1 — JOURNEY OVERVIEW
-              Flutter screen: overview()
-              Shows: journey name, overviewvideo, subscription.descripition
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 1">
-            <p class="tab-hint">
-              This screen shows the <strong>overview video</strong> selected in Tab 1
-              and the <strong>subscription description</strong> below it.
-            </p>
-
-            <!-- overviewvideo -->
-            <div class="field-section-label">
-              overviewvideo <span class="ref-tag">reference → content_urls</span>
-            </div>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Select overview video</mat-label>
-              <mat-select formControlName="overviewvideoDocId"
-                          (selectionChange)="onSingleRefSelect($event.value, 'overviewvideo')">
-                <mat-option value="">— None —</mat-option>
-                <mat-option *ngFor="let opt of contentUrlOptions" [value]="opt.id">
-                  <span class="cu-option-wrap">
-                    <span class="cu-type-badge cu-type-badge--{{ opt.type }}">{{ opt.type }}</span>
-                    {{ opt.title }}
-                  </span>
-                </mat-option>
-              </mat-select>
-            </mat-form-field>
-            <div class="cu-preview" *ngIf="selectedRefs['overviewvideo']">
-              <img *ngIf="selectedRefs['overviewvideo']?.thumbnailUrl"
-                  [src]="selectedRefs['overviewvideo']?.thumbnailUrl" class="cu-preview__thumb" />
-              <div class="cu-preview__body">
-                <span class="cu-preview__title">{{ selectedRefs['overviewvideo']?.title }}</span>
-                <span class="cu-preview__path">content_urls / {{ selectedRefs['overviewvideo']?.id }}</span>
+              <div class="field-section-label" style="margin-top:16px">
+                overviewdescription
               </div>
-            </div>
-
-            <div class="field-section-label">
-              subscription → descripition <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="subscription">
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="3"
-                          placeholder="Shown below the overview video on the Journey Overview screen…"></textarea>
+                <mat-label>overview description</mat-label>
+                <textarea matInput formControlName="overviewdescription" rows="3" placeholder="Shown below the overview video on the Journey Overview screen…"></textarea>
+                <mat-error>Required</mat-error>
               </mat-form-field>
-            </div>
-          </ng-container>
+            </ng-container>
 
-          <!-- ══════════════════════════════════════════════
-              TAB 2 — JOURNEY DESCRIPTION
-              Flutter screen: uPJourney()
-              Shows: journeydetail.intro, journeydetail.imageurl,
-                      journeydetail.descripition
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 2">
+            <!-- ══════════════════════════════════════════
+                 TAB 2 — JOURNEY DESCRIPTION
+            ══════════════════════════════════════════════ -->
+            <ng-container *ngIf="detailTabIndex === 2">
+              <p class="tab-hint">
+                Content stacked on the <em>What Awaits You</em> screen:
+                intro text → image → description. Use a <strong>16:9</strong> image.
+              </p>
 
-            <div class="field-section-label">
-              journeydetail <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="journeydetail">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>intro</mat-label>
-                <textarea matInput formControlName="intro" rows="3"
-                          placeholder="First text block shown on the What Awaits You screen…"></textarea>
-              </mat-form-field>
+              <div class="field-section-label">journeydetail <span class="map-tag">map</span></div>
+              <div formGroupName="journeydetail">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>intro</mat-label>
+                  <textarea matInput formControlName="intro" rows="3" placeholder="First text block shown on the What Awaits You screen…"></textarea>
+                  <mat-error>Required</mat-error>
+                </mat-form-field>
 
-              <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-              <div class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
-                <ng-container *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value">
-                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
-                  <span class="upload-label">Click to upload image</span>
-                </ng-container>
-                <ng-container *ngIf="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value">
-                  <img class="img-preview"
-                      [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
-                      alt="preview" />
-                  <button class="img-clear-btn" type="button"
-                          (click)="clearImage($event, 'journeydetail_imageurl', 'journeydetail.imageurl')">✕</button>
-                </ng-container>
-              </div>
-              <input type="file" accept="image/*" class="hidden-file-input"
-                    [id]="'file-journeydetail_imageurl'"
-                    (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
-
-              <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="3"
-                          placeholder="Second text block shown below the image…"></textarea>
-              </mat-form-field>
-            </div>
-          </ng-container>
-
-          <!-- ══════════════════════════════════════════════
-              TAB 3 — SUBSCRIPTION
-              Flutter screen: subscription()
-              Shows: subscription.imageurl, journey name,
-                      subscription.descripition, duration, expiry
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 3">
-            <p class="tab-hint">
-              The card on this screen shows the image, journey name, description, and the participant's
-              subscription duration and expiry date (pulled from their record automatically).
-            </p>
-
-            <div class="field-section-label">
-              subscription <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="subscription">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="3"></textarea>
-              </mat-form-field>
-
-              <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-              <div class="img-upload-box" (click)="triggerFileInput('subscription_imageurl')">
-                <ng-container *ngIf="!imagePreviews['subscription_imageurl'] && !detailForm.get('subscription.imageurl')?.value">
-                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
-                  <span class="upload-label">Click to upload image</span>
-                </ng-container>
-                <ng-container *ngIf="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value">
-                  <img class="img-preview"
-                      [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
-                      alt="preview" />
-                  <button class="img-clear-btn" type="button"
-                          (click)="clearImage($event, 'subscription_imageurl', 'subscription.imageurl')">✕</button>
-                </ng-container>
-              </div>
-              <input type="file" accept="image/*" class="hidden-file-input"
-                    [id]="'file-subscription_imageurl'"
-                    (change)="onFileChange($event, 'subscription_imageurl', 'subscription.imageurl')" />
-            </div>
-          </ng-container>
-
-          <!-- ══════════════════════════════════════════════
-              TAB 4 — JOURNEY EXPERIENCE
-              Flutter screen: journeyExperience()
-              Each card is tappable:
-                type=queue   → queueBottomSheet()
-                type=event   → appointmentBottomSheet()
-                type=others  → otherBottomSheet()
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 4">
-            <p class="tab-hint">
-              Each card below appears as a tappable tile on the Experience screen.
-              <strong>type = queue</strong> opens the Queue bottom sheet (Tab 8 data) ·
-              <strong>type = event</strong> opens the Event bottom sheet (Tab 1 eventdescripition) ·
-              <strong>type = others</strong> opens the Other bottom sheet (Tab 7 otherdescripition).
-            </p>
-
-            <div class="field-section-label">
-              productincluded <span class="arr-badge">array of maps</span>
-            </div>
-            <div formArrayName="productincluded">
-              <div class="array-card"
-                  *ngFor="let prod of productincluded.controls; let i = index"
-                  [formGroupName]="i">
-                <div class="array-card-header">
-                  <span class="array-index">#{{ i }}</span>
-                  <button mat-icon-button type="button" color="warn"
-                          (click)="removeProduct(i)" *ngIf="productincluded.length > 1">
-                    <mat-icon>close</mat-icon>
-                  </button>
+                <div class="nested-ref-label">
+                  imageurl <span class="url-tag">file upload</span>
+                  <span class="ratio-badge">16 : 9</span>
                 </div>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>title</mat-label>
-                  <input matInput formControlName="title" />
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="full-width">
+                <div class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
+                  <ng-container *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value">
+                    <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                    <span class="upload-label">Click to upload image (16:9)</span>
+                  </ng-container>
+                  <ng-container *ngIf="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value">
+                    <img class="img-preview"
+                         [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
+                         alt="preview" />
+                    <button class="img-clear-btn" type="button"
+                            (click)="clearImage($event, 'journeydetail_imageurl', 'journeydetail.imageurl')">✕</button>
+                  </ng-container>
+                </div>
+                <input type="file" accept="image/*" class="hidden-file-input"
+                       id="file-journeydetail_imageurl"
+                       (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
+
+                <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
                   <mat-label>descripition</mat-label>
-                  <textarea matInput formControlName="descripition" rows="2"></textarea>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>type</mat-label>
-                  <mat-select formControlName="type">
-                    <mat-option value="queue">queue — opens Queue bottom sheet</mat-option>
-                    <mat-option value="event">event — opens Event bottom sheet</mat-option>
-                    <mat-option value="others">others — opens Other bottom sheet</mat-option>
-                  </mat-select>
+                  <textarea matInput formControlName="descripition" rows="3" placeholder="Second text block shown below the image…"></textarea>
+                  <mat-error>Required</mat-error>
                 </mat-form-field>
               </div>
-            </div>
-            <button mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
-              + Add Product
-            </button>
-          </ng-container>
+            </ng-container>
 
-          <!-- ══════════════════════════════════════════════
-              TAB 5 — PRODUCT OVERVIEW
-              Flutter screen: whatLiesAhead()
-              Shows: journeypath.imageurl,
-                      journeydetail.intro, journeydetail.descripition
-              Note: text is reused from journeydetail (Tab 2)
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 5">
-            <p class="tab-hint">
-              The text on this screen reuses <strong>journeydetail.intro</strong> and
-              <strong>journeydetail.descripition</strong> from Tab 2.
-              Only the image is unique to this screen.
-            </p>
+            <!-- ══════════════════════════════════════════
+                 TAB 3 — SUBSCRIPTION
+            ══════════════════════════════════════════════ -->
+            <ng-container *ngIf="detailTabIndex === 3">
+              <p class="tab-hint">
+                The subscription card shows this image and description together with the journey name,
+                and the participant's subscription duration and expiry date (auto). Use a <strong>16:9</strong> image.
+              </p>
 
-            <div class="field-section-label">
-              journeypath <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="journeypath">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>intro</mat-label>
-                <textarea matInput formControlName="intro" rows="2"></textarea>
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="2"></textarea>
-              </mat-form-field>
+              <div class="field-section-label">subscription <span class="map-tag">map</span></div>
+              <div formGroupName="subscription">
+                <div class="nested-ref-label">
+                  imageurl <span class="url-tag">file upload</span>
+                  <span class="ratio-badge">16 : 9</span>
+                </div>
+                <div class="img-upload-box" (click)="triggerFileInput('subscription_imageurl')">
+                  <ng-container *ngIf="!imagePreviews['subscription_imageurl'] && !detailForm.get('subscription.imageurl')?.value">
+                    <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                    <span class="upload-label">Click to upload image (16:9)</span>
+                  </ng-container>
+                  <ng-container *ngIf="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value">
+                    <img class="img-preview"
+                         [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
+                         alt="preview" />
+                    <button class="img-clear-btn" type="button"
+                            (click)="clearImage($event, 'subscription_imageurl', 'subscription.imageurl')">✕</button>
+                  </ng-container>
+                </div>
+                <input type="file" accept="image/*" class="hidden-file-input"
+                       id="file-subscription_imageurl"
+                       (change)="onFileChange($event, 'subscription_imageurl', 'subscription.imageurl')" />
 
-              <div class="nested-ref-label">imageurl <span class="url-tag">file upload</span></div>
-              <div class="img-upload-box" (click)="triggerFileInput('journeypath_imageurl')">
-                <ng-container *ngIf="!imagePreviews['journeypath_imageurl'] && !detailForm.get('journeypath.imageurl')?.value">
-                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
-                  <span class="upload-label">Click to upload image</span>
-                </ng-container>
-                <ng-container *ngIf="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value">
-                  <img class="img-preview"
-                      [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
-                      alt="preview" />
-                  <button class="img-clear-btn" type="button"
-                          (click)="clearImage($event, 'journeypath_imageurl', 'journeypath.imageurl')">✕</button>
-                </ng-container>
-              </div>
-              <input type="file" accept="image/*" class="hidden-file-input"
-                    [id]="'file-journeypath_imageurl'"
-                    (change)="onFileChange($event, 'journeypath_imageurl', 'journeypath.imageurl')" />
-            </div>
-          </ng-container>
-
-          <!-- ══════════════════════════════════════════════
-              TAB 6 — AEL SELECTION
-              Flutter screen: goals() → FillParticipantAEL widget
-              Also powers: otherBottomSheet() via otherdescripition
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 6">
-            <p class="tab-hint">
-              These fields also power the <strong>Others bottom sheet</strong> when a product
-              with type = "others" is tapped on the Experience screen.
-            </p>
-
-            <div class="field-section-label">
-              otherdescripition <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="otherdescripition">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>title</mat-label>
-                <input matInput formControlName="title" placeholder="Ongoing Evolution…" />
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="3"></textarea>
-              </mat-form-field>
-            </div>
-          </ng-container>
-
-          <!-- ══════════════════════════════════════════════
-              TAB 7 — ONBOARDING CALL BOOKING
-              Flutter screen: callBooking()
-              Also powers: queueBottomSheet() when type=queue
-              Fields: queuedescripition, processdetails, steps
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 7">
-            <p class="tab-hint">
-              This data powers both the <strong>Onboarding Call Booking</strong> screen and
-              the <strong>Queue bottom sheet</strong> (tapped from Experience when type = "queue").
-            </p>
-
-            <div class="field-section-label">
-              queuedescripition <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="queuedescripition">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="3"
-                          placeholder="Shown at top of the queue bottom sheet…"></textarea>
-              </mat-form-field>
-
-              <div class="nested-label">atcmodel <span class="map-tag">map</span></div>
-              <div formGroupName="atcmodel">
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>title</mat-label>
-                  <input matInput formControlName="title" placeholder="ADJUSTMENT X TIME = CONSEQUENCES" />
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="full-width">
+                <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
                   <mat-label>descripition</mat-label>
-                  <textarea matInput formControlName="descripition" rows="2"></textarea>
+                  <textarea matInput formControlName="descripition" rows="3" placeholder="Shown inside the subscription card…"></textarea>
+                  <mat-error>Required</mat-error>
                 </mat-form-field>
               </div>
-            </div>
+            </ng-container>
 
-            <div class="field-section-label">
-              processdetails <span class="map-tag">map</span>
-            </div>
-            <div formGroupName="processdetails">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>title</mat-label>
-                <input matInput formControlName="title" placeholder="Personalized uP! Diagnostics…" />
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>descripition</mat-label>
-                <textarea matInput formControlName="descripition" rows="2"></textarea>
-              </mat-form-field>
+            <!-- ══════════════════════════════════════════
+                 TAB 4 — EXPERIENCE
+            ══════════════════════════════════════════════ -->
+            <ng-container *ngIf="detailTabIndex === 4">
 
-              <div class="nested-ref-label">
-                processimage <span class="url-tag">file upload</span>
-              </div>
-              <div class="img-upload-box" (click)="triggerFileInput('processimage')">
-                <ng-container *ngIf="!imagePreviews['processimage'] && !detailForm.get('processdetails.processimage')?.value">
-                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
-                  <span class="upload-label">Click to upload process image</span>
-                </ng-container>
-                <ng-container *ngIf="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value">
-                  <img class="img-preview"
-                      [src]="imagePreviews['processimage'] || detailForm.get('processdetails.processimage')?.value"
-                      alt="preview" />
-                  <button class="img-clear-btn" type="button"
-                          (click)="clearImage($event, 'processimage', 'processdetails.processimage')">✕</button>
-                </ng-container>
-              </div>
-              <input type="file" accept="image/*" class="hidden-file-input"
-                    [id]="'file-processimage'"
-                    (change)="onFileChange($event, 'processimage', 'processdetails.processimage')" />
+              <!-- ── MAIN EXPERIENCE LIST ── -->
+              <ng-container *ngIf="!showProductDetailsPage">
+                <p class="tab-hint">
+                  Each card appears as a tappable tile on the Experience screen.
+                  The <strong>type</strong> controls which detail form opens below.
+                </p>
 
-              <div class="nested-label" style="margin-top:10px">
-                step <span class="arr-badge">array of maps</span>
-              </div>
-              <div formArrayName="step">
-                <div class="array-card"
-                    *ngFor="let s of processSteps.controls; let i = index"
-                    [formGroupName]="i">
-                  <div class="array-card-header">
-                    <span class="array-index">Step {{ i + 1 }}</span>
-                    <button mat-icon-button type="button" color="warn"
-                            (click)="removeProcessStep(i)" *ngIf="processSteps.length > 1">
-                      <mat-icon>close</mat-icon>
+                <div class="field-section-label">
+                  productincluded <span class="arr-badge">array of maps</span>
+                </div>
+                <div formArrayName="productincluded">
+                  <div class="array-card"
+                      *ngFor="let prod of productincluded.controls; let i = index"
+                      [formGroupName]="i">
+                    <div class="array-card-header">
+                      <span class="array-index">#{{ i }}</span>
+                      <button mat-icon-button type="button" color="warn"
+                              (click)="removeProduct(i)" *ngIf="productincluded.length > 1">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>title</mat-label>
+                      <input matInput formControlName="title" placeholder="e.g. The uP! Queue" />
+                      <mat-error>Required</mat-error>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>descripition</mat-label>
+                      <textarea matInput formControlName="descripition" rows="2" placeholder="Short description shown on the card…"></textarea>
+                      <mat-error>Required</mat-error>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>type</mat-label>
+                      <mat-select formControlName="type">
+                        <mat-option value="queue">queue — opens Queue bottom sheet</mat-option>
+                        <mat-option value="event">event — opens Event Description bottom sheet</mat-option>
+                        <mat-option value="others">others — opens Other Description bottom sheet</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <!-- Fill Details button — only shown when type is selected -->
+                    <button *ngIf="prod.get('type')?.value"
+                            mat-stroked-button type="button" class="fill-details-btn"
+                            (click)="goToProductDetailsTab(prod.get('type')?.value)">
+                      <mat-icon style="font-size:16px;height:16px;width:16px;margin-right:4px">edit</mat-icon>
+                      Fill {{ prod.get('type')?.value === 'queue' ? 'Queue' :
+                              prod.get('type')?.value === 'event' ? 'Event' : 'Other' }} Details →
                     </button>
+
                   </div>
+                </div>
+                <button mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
+                  + Add Product
+                </button>
+
+                <!-- Summary chips — only show configured types -->
+                <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px"
+                    *ngIf="hasProductType('event') || hasProductType('others') || hasProductType('queue')">
+                  <p style="font-size:11px;color:#aaa;margin:0">Configured detail sections:</p>
+
+                  <div *ngIf="hasProductType('event')"
+                      style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer"
+                      (click)="goToProductDetailsTab('event')">
+                    <span style="font-size:12px;font-weight:500">Event Description</span>
+                    <mat-icon style="font-size:16px;color:#aaa">arrow_forward</mat-icon>
+                  </div>
+
+                  <div *ngIf="hasProductType('others')"
+                      style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer"
+                      (click)="goToProductDetailsTab('others')">
+                    <span style="font-size:12px;font-weight:500">Other Description</span>
+                    <mat-icon style="font-size:16px;color:#aaa">arrow_forward</mat-icon>
+                  </div>
+
+                  <div *ngIf="hasProductType('queue')"
+                      style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer"
+                      (click)="goToProductDetailsTab('queue')">
+                    <span style="font-size:12px;font-weight:500">Queue Description</span>
+                    <mat-icon style="font-size:16px;color:#aaa">arrow_forward</mat-icon>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- ── EVENT DETAILS SUB-PAGE ── -->
+              <ng-container *ngIf="showProductDetailsPage === 'event'">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
+                  <button mat-icon-button type="button" (click)="goBackToExperienceTab()">
+                    <mat-icon>arrow_back</mat-icon>
+                  </button>
+                  <div>
+                    <p style="margin:0;font-size:13px;font-weight:500">Event Description</p>
+                    <p style="margin:0;font-size:11px;color:#aaa">eventdescripition → title / intro / overview</p>
+                  </div>
+                </div>
+
+                <div class="field-section-label">eventdescripition <span class="map-tag">map</span></div>
+                <div formGroupName="eventdescripition">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>title <span class="req">*</span></mat-label>
+                    <input matInput formControlName="title" placeholder="e.g. The uP! Live Event" />
+                    <mat-error>Required</mat-error>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>intro <span class="req">*</span></mat-label>
+                    <textarea matInput formControlName="intro" rows="3"  placeholder="Opening paragraph shown in the event bottom sheet…"></textarea>
+                    <mat-error>Required</mat-error>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>overview</mat-label>
+                    <input matInput formControlName="overview" placeholder="Section heading (e.g. What to Expect)" />
+                    <mat-error>Required</mat-error>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>overviewdescripition</mat-label>
+                    <textarea matInput formControlName="overviewdescripition" rows="3" placeholder="Paragraph shown under the overview heading…"></textarea>
+                    <mat-error>Required</mat-error>
+                  </mat-form-field>
+                </div>
+              </ng-container>
+
+              <!-- ── OTHER DETAILS SUB-PAGE ── -->
+              <ng-container *ngIf="showProductDetailsPage === 'others'">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
+                  <button mat-icon-button type="button" (click)="goBackToExperienceTab()">
+                    <mat-icon>arrow_back</mat-icon>
+                  </button>
+                  <div>
+                    <p style="margin:0;font-size:13px;font-weight:500">Other Description</p>
+                    <p style="margin:0;font-size:11px;color:#aaa">otherdescripition → title / descripition</p>
+                  </div>
+                </div>
+
+                <div class="field-section-label">otherdescripition <span class="map-tag">map</span></div>
+                <div formGroupName="otherdescripition">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>title</mat-label>
-                    <input matInput formControlName="title" placeholder="Wellness Scaling Form" />
+                    <input matInput formControlName="title" placeholder="e.g. Ongoing Evolution" />
                   </mat-form-field>
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>descripition</mat-label>
-                    <textarea matInput formControlName="descripition" rows="2"></textarea>
+                    <textarea matInput formControlName="descripition" rows="4" placeholder="Description shown in the Others bottom sheet…"></textarea>
+                    <mat-error>Required</mat-error>
                   </mat-form-field>
-
-                  <div class="nested-ref-label">
-                    imageurl <span class="url-tag">file upload</span>
-                  </div>
-                  <div class="img-upload-box" (click)="triggerFileInput('step_imageurl_' + i)">
-                    <ng-container *ngIf="!imagePreviews['step_imageurl_' + i] && !s.get('imageurl')?.value">
-                      <mat-icon class="upload-icon">cloud_upload</mat-icon>
-                      <span class="upload-label">Click to upload step image</span>
-                    </ng-container>
-                    <ng-container *ngIf="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value">
-                      <img class="img-preview"
-                          [src]="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value"
-                          alt="preview" />
-                      <button class="img-clear-btn" type="button"
-                              (click)="clearStepImage($event, i)">✕</button>
-                    </ng-container>
-                  </div>
-                  <input type="file" accept="image/*" class="hidden-file-input"
-                        [id]="'file-step_imageurl_' + i"
-                        (change)="onStepFileChange($event, i)" />
                 </div>
+              </ng-container>
+
+              <!-- ── QUEUE DETAILS SUB-PAGE ── -->
+              <ng-container *ngIf="showProductDetailsPage === 'queue'">
+
+                <!-- Queue main fields -->
+                <ng-container *ngIf="!showProcessStepsPage">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
+                    <button mat-icon-button type="button" (click)="goBackToExperienceTab()">
+                      <mat-icon>arrow_back</mat-icon>
+                    </button>
+                    <div>
+                      <p style="margin:0;font-size:13px;font-weight:500">Queue Description</p>
+                      <p style="margin:0;font-size:11px;color:#aaa">queuedescripition → title / descripition / atcmodel / steps</p>
+                    </div>
+                  </div>
+
+                  <div class="field-section-label">queuedescripition <span class="map-tag">map</span></div>
+                  <div formGroupName="queuedescripition">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>title</mat-label>
+                      <input matInput formControlName="title" placeholder="e.g. Product Title" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>descripition</mat-label>
+                      <textarea matInput formControlName="descripition" rows="3" placeholder="Shown at the top of the Queue bottom sheet…"></textarea>
+                      <mat-error>Required</mat-error>
+                    </mat-form-field>
+
+                    <div class="nested-ref-label" style="margin-top:4px">
+                      processimage <span class="url-tag">file upload</span>
+                      <span class="ratio-badge">16 : 9</span>
+                    </div>
+                    <div class="img-upload-box" (click)="triggerFileInput('processimage')">
+                      <ng-container *ngIf="!imagePreviews['processimage'] && !detailForm.get('queuedescripition.processimage')?.value">
+                        <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                        <span class="upload-label">Click to upload process image (16:9)</span>
+                      </ng-container>
+                      <ng-container *ngIf="imagePreviews['processimage'] || detailForm.get('queuedescripition.processimage')?.value">
+                        <img class="img-preview"
+                            [src]="imagePreviews['processimage'] || detailForm.get('queuedescripition.processimage')?.value"
+                            alt="preview" />
+                        <button class="img-clear-btn" type="button"
+                                (click)="clearImage($event, 'processimage', 'queuedescripition.processimage')">✕</button>
+                      </ng-container>
+                    </div>
+                    <input type="file" accept="image/*" class="hidden-file-input"
+                          id="file-processimage"
+                          (change)="onFileChange($event, 'processimage', 'queuedescripition.processimage')" />
+
+                    <div class="nested-label" style="margin-top:12px">
+                      atcmodel <span class="map-tag">map</span>
+                    </div>
+                    <div formGroupName="atcmodel">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>title</mat-label>
+                        <input matInput formControlName="title" placeholder="e.g. ADJUSTMENT × TIME = CONSEQUENCES" />
+                        <mat-error>Required</mat-error>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>descripition</mat-label>
+                        <textarea matInput formControlName="descripition" rows="2"></textarea>
+                        <mat-error>Required</mat-error>
+                      </mat-form-field>
+                    </div>
+
+                    <button mat-stroked-button type="button"
+                            style="width:100%;margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:10px 16px"
+                            (click)="openProcessSteps()">
+                      <span style="display:flex;align-items:center;gap:8px">
+                        <mat-icon style="font-size:16px;height:16px;width:16px">list</mat-icon>
+                        <span>Edit Process Steps</span>
+                        <span class="arr-badge">{{ processSteps.length }} step{{ processSteps.length !== 1 ? 's' : '' }}</span>
+                      </span>
+                      <mat-icon style="font-size:16px;height:16px;width:16px">arrow_forward</mat-icon>
+                    </button>
+                  </div>
+                </ng-container>
+
+                <!-- Process Steps sub-sub-page -->
+                <ng-container *ngIf="showProcessStepsPage">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
+                    <button mat-icon-button type="button" (click)="goBackToQueue()">
+                      <mat-icon>arrow_back</mat-icon>
+                    </button>
+                    <div>
+                      <p style="margin:0;font-size:13px;font-weight:500">Process Steps</p>
+                      <p style="margin:0;font-size:11px;color:#aaa">
+                        {{ detailForm.get('queuedescripition.processdetails.title')?.value || 'queuedescripition → processdetails → step' }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div formGroupName="queuedescripition">
+                    <div class="nested-label" style="margin-top:12px">
+                      processdetails <span class="map-tag">map</span>
+                    </div>
+                    <div formGroupName="processdetails">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>title</mat-label>
+                        <input matInput formControlName="title" placeholder="e.g. Personalized uP! Diagnostics" />
+                        <mat-error>Required</mat-error>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>descripition</mat-label>
+                        <textarea matInput formControlName="descripition" rows="2"></textarea>
+                        <mat-error>Required</mat-error>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <div formGroupName="queuedescripition">
+                    <div formGroupName="processdetails">
+                      <div formArrayName="step">
+                        <div class="array-card"
+                            *ngFor="let s of processSteps.controls; let i = index"
+                            [formGroupName]="i">
+                          <div class="array-card-header">
+                            <span class="array-index">Step {{ i + 1 }}</span>
+                            <button mat-icon-button type="button" color="warn"
+                                    (click)="removeProcessStep(i)" *ngIf="processSteps.length > 1">
+                              <mat-icon>close</mat-icon>
+                            </button>
+                          </div>
+                          <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>title</mat-label>
+                            <input matInput formControlName="title" placeholder="e.g. Wellness Scaling Form" />
+                            <mat-error>Required</mat-error>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>descripition</mat-label>
+                            <textarea matInput formControlName="descripition" rows="3"></textarea>
+                            <mat-error>Required</mat-error>
+                          </mat-form-field>
+                          <div class="nested-ref-label">
+                            imageurl <span class="url-tag">file upload</span>
+                            <span class="ratio-badge">1 : 1</span>
+                          </div>
+                          <div class="img-upload-box img-upload-box--square"
+                              (click)="triggerFileInput('step_imageurl_' + i)">
+                            <ng-container *ngIf="!imagePreviews['step_imageurl_' + i] && !s.get('imageurl')?.value">
+                              <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                              <span class="upload-label">Click to upload step image (1:1)</span>
+                            </ng-container>
+                            <ng-container *ngIf="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value">
+                              <img class="img-preview"
+                                  [src]="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value"
+                                  alt="preview" />
+                              <button class="img-clear-btn" type="button"
+                                      (click)="clearStepImage($event, i)">✕</button>
+                            </ng-container>
+                          </div>
+                          <input type="file" accept="image/*" class="hidden-file-input"
+                                [id]="'file-step_imageurl_' + i"
+                                (change)="onStepFileChange($event, i)" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <button mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
+                    + Add Step
+                  </button>
+                </ng-container>
+
+              </ng-container><!-- /queue sub-page -->
+
+            </ng-container><!-- /tab 4 -->
+
+            <!-- ══════════════════════════════════════════
+                TAB 5 — PRODUCT OVERVIEW (What Lies Ahead)
+            ══════════════════════════════════════════════ -->
+            <ng-container *ngIf="detailTabIndex === 5">
+              <p class="tab-hint">
+                This content is shown on the <strong>What Lies Ahead</strong> screen.
+              </p>
+
+              <div class="field-section-label">journeypath <span class="map-tag">map</span></div>
+              <div formGroupName="journeypath">
+                <div class="nested-ref-label">
+                  imageurl <span class="url-tag">file upload</span>
+                  <span class="ratio-badge">16 : 9</span>
+                </div>
+                <div class="img-upload-box" (click)="triggerFileInput('journeypath_imageurl')">
+                  <ng-container *ngIf="!imagePreviews['journeypath_imageurl'] && !detailForm.get('journeypath.imageurl')?.value">
+                    <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                    <span class="upload-label">Click to upload image (16:9)</span>
+                  </ng-container>
+                  <ng-container *ngIf="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value">
+                    <img class="img-preview"
+                        [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
+                        alt="preview" />
+                    <button class="img-clear-btn" type="button"
+                            (click)="clearImage($event, 'journeypath_imageurl', 'journeypath.imageurl')">✕</button>
+                  </ng-container>
+                </div>
+                <input type="file" accept="image/*" class="hidden-file-input"
+                      id="file-journeypath_imageurl"
+                      (change)="onFileChange($event, 'journeypath_imageurl', 'journeypath.imageurl')" />
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>intro</mat-label>
+                  <textarea matInput formControlName="intro" rows="3" placeholder="Opening text shown on the What Lies Ahead screen…"></textarea>
+                  <mat-error>Required</mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>descripition</mat-label>
+                  <textarea matInput formControlName="descripition" rows="3" placeholder="Detail text shown below intro…"></textarea>
+                  <mat-error>Required</mat-error>
+                </mat-form-field>
               </div>
-              <button mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
-                + Add Step
+            </ng-container>
+
+            <!-- ══════════════════════════════════════════
+                 TAB 8 — PRODUCT OVERVIEW (What Lies Ahead)
+            ══════════════════════════════════════════════ -->
+            <!-- <ng-container *ngIf="detailTabIndex === 8">
+              <p class="tab-hint">
+                This content is shown on the <strong>What Lies Ahead</strong> screen.
+              </p>
+
+              <div class="field-section-label">journeydetail <span class="map-tag">map</span></div>
+              <div formGroupName="journeydetail">
+                <div class="nested-ref-label">
+                  imageurl <span class="url-tag">file upload</span>
+                  <span class="ratio-badge">16 : 9</span>
+                </div>
+                <div class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
+                  <ng-container *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value">
+                    <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                    <span class="upload-label">Click to upload image (16:9)</span>
+                  </ng-container>
+                  <ng-container *ngIf="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value">
+                    <img class="img-preview"
+                         [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
+                         alt="preview" />
+                    <button class="img-clear-btn" type="button"
+                            (click)="clearImage($event, 'journeydetail_imageurl', 'journeydetail.imageurl')">✕</button>
+                  </ng-container>
+                </div>
+                <input type="file" accept="image/*" class="hidden-file-input"
+                       id="file-journeydetail_imageurl"
+                       (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>intro</mat-label>
+                  <textarea matInput formControlName="intro" rows="3"
+                            placeholder="Opening text shown on the What Lies Ahead screen…"></textarea>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>descripition</mat-label>
+                  <textarea matInput formControlName="descripition" rows="3"
+                            placeholder="Detail text shown below intro…"></textarea>
+                </mat-form-field>
+              </div>
+            </ng-container> -->
+
+            <!-- ══════════════════════════════════════════
+                 TAB 9 — ONBOARDING CALL BOOKING
+            ══════════════════════════════════════════════ -->
+            <!-- <ng-container *ngIf="detailTabIndex === 9">
+              <p class="tab-hint">
+                This screen handles the <strong>Onboarding Call Booking</strong>.
+                It is auto-generated from the queue data entered in Tab 7.
+              </p>
+              <div class="screenorder-readonly-info">
+                <span>📅 Onboarding call booking screen</span>
+                <span style="font-size:11px;color:#aaa;margin-top:4px">
+                  Automatically uses queue description data from Tab 7. No additional fields required.
+                </span>
+              </div>
+            </ng-container> -->
+
+            <!-- ══════════════════════════════════════════
+                 TAB 10 — CONGRATULATIONS
+            ══════════════════════════════════════════════ -->
+            <!-- <ng-container *ngIf="detailTabIndex === 10">
+              <p class="tab-hint">
+                This is the final screen shown after the onboarding call is booked.
+              </p>
+              <div class="screenorder-readonly-info">
+                <span>🎉 Congratulations screen</span>
+                <span style="font-size:11px;color:#aaa;margin-top:4px">
+                  Static screen shown after onboarding call is scheduled.
+                  Encourages participants to explore EIFLiX videos.
+                </span>
+              </div>
+            </ng-container> -->
+
+            <!-- Prev / Next navigation -->
+            <div class="detail-tab-nav">
+              <button mat-stroked-button type="button"
+                      (click)="prevDetailTab()" [disabled]="detailTabIndex === 0">
+                ← Previous
+              </button>
+              <span class="tab-counter">{{ detailTabIndex + 1 }} / {{ detailTabs.length }}</span>
+              <button mat-stroked-button type="button"
+                      (click)="nextDetailTab()" [disabled]="detailTabIndex === detailTabs.length - 1">
+                Next →
               </button>
             </div>
-          </ng-container>
 
-          <!-- ══════════════════════════════════════════════
-              TAB 8 — CONGRATULATIONS
-              Flutter screen: congratulations()
-              No editable fields — auto-generated screen
-          ══════════════════════════════════════════════════ -->
-          <ng-container *ngIf="detailTabIndex === 8">
-            <div style="text-align:center;padding:32px 16px;color:#888">
-              <mat-icon style="font-size:40px;height:40px;width:40px">celebration</mat-icon>
-              <p style="margin-top:12px;font-size:14px;font-weight:500;color:#333">
-                Congratulations screen
-              </p>
-              <p style="margin-top:8px;font-size:13px">
-                This screen is generated automatically after the onboarding call is booked.
-                It shows a Lottie animation and the scheduled appointment time. No editable content.
-              </p>
-            </div>
+          </ng-container><!-- /journeySelected || isEditMode -->
+        </form>
+      </ng-container>
 
-            <div class="field-section-label" style="margin-top:8px">
-              screenorder <span class="arr-badge">array of strings</span> — read only
-            </div>
-            <div class="tag-input-wrap readonly">
-              <span class="tag-pill" *ngFor="let tag of screenorderTags">{{ tag }}</span>
-            </div>
-          </ng-container>
+    </div><!-- /modal-body -->
 
-          <!-- Prev / Next navigation -->
-          <div class="detail-tab-nav">
-            <button mat-stroked-button type="button"
-                    (click)="prevDetailTab()" [disabled]="detailTabIndex === 0">
-              ← Previous
-            </button>
-            <span class="tab-counter">{{ detailTabIndex + 1 }} / {{ detailTabs.length }}</span>
-            <button mat-stroked-button type="button"
-                    (click)="nextDetailTab()" [disabled]="detailTabIndex === detailTabs.length - 1">
-              Next →
-            </button>
-          </div>
+    <!-- Footer -->
+    <div class="modal-footer" *ngIf="!detailSubmitted">
+      <button mat-button type="button" (click)="closeModal()">Cancel</button>
+      <button mat-raised-button color="primary" type="button"
+              [disabled]="detailLoading" (click)="saveDetail()">
+        <span *ngIf="!detailLoading">Save</span>
+        <span *ngIf="detailLoading">Saving…</span>
+      </button>
+    </div>
 
-        </ng-container>
-      </form>
-    </ng-container>
-  </div>
+  </div><!-- /modal-panel -->
 
-  <div class="modal-footer" *ngIf="!detailSubmitted">
-    <button mat-button type="button" (click)="closeModal()">Cancel</button>
-    <button mat-raised-button color="primary" type="button"
-            [disabled]="detailLoading" (click)="saveDetail()">
-      <span *ngIf="!detailLoading">Save </span>
-      <span *ngIf="detailLoading">Saving…</span>
-    </button>
-  </div>
-</div>
+</div><!-- /detail-layout -->

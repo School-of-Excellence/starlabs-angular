@@ -592,3 +592,94 @@
 .host-menu-btn {
   background: rgba(33, 150, 243, 0.8) !important;
 }
+
+/* ============================ */
+/* ACTIVE SPEAKER BORDER        */
+/* ============================ */
+.zoom-video-tile.active-speaker,
+.zoom-video-tile-small.active-speaker {
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+}
+
+/* ============================ */
+/* NETWORK BARS                 */
+/* ============================ */
+.network-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  margin-left: 4px;
+}
+
+.network-bars .bar {
+  width: 3px;
+  background: #555;
+  border-radius: 1px;
+}
+
+.network-bars .bar:nth-child(1) { height: 4px; }
+.network-bars .bar:nth-child(2) { height: 7px; }
+.network-bars .bar:nth-child(3) { height: 10px; }
+.network-bars .bar:nth-child(4) { height: 13px; }
+
+/* active bars get their color from [style.background] binding in the template */
+.network-bars .bar.active {
+  opacity: 1;
+}
+
+/* ============================ */
+/* HOST PARTICIPANT OPTIONS BTN */
+/* ============================ */
+.participant-options-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.55);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.zoom-video-tile:hover .participant-options-btn {
+  display: flex;
+}
+
+/* ============================ */
+/* CAMERA + BLUR MENU GROUP     */
+/* ============================ */
+.camera-btn-group {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.camera-btn-group .zoom-btn {
+  border-radius: 6px 0 0 6px;
+}
+
+.blur-menu-trigger {
+  border-radius: 0 6px 6px 0 !important;
+  padding: 6px 6px !important;
+  min-width: unset;
+  border-left: 1px solid rgba(255,255,255,0.15);
+}
+
+.blur-menu-trigger .material-icons {
+  font-size: 16px !important;
+}
+
+.blur-menu-trigger.blur-active {
+  background: #1565c0;
+}
+
+.blur-menu-trigger.blur-active:hover {
+  background: #0d47a1;
+}

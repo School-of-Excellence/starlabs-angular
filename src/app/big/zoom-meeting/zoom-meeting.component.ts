@@ -84,6 +84,7 @@ export class ZoomMeetingComponent {
           ZoomMtg.init({
             leaveUrl: `${window.location.origin}/particiant_assignment_board`,
             patchJsMedia: true,
+            defaultView: 'gallery',
             success: (success: any) => {
               console.log(success);
               ZoomMtg.join({
@@ -113,6 +114,7 @@ export class ZoomMeetingComponent {
             // leaveUrl: "https://star-labs.web.app/particiant_assignment_board",
             leaveUrl: `${window.location.origin}/particiant_assignment_board`,
             patchJsMedia: true,
+            defaultView: 'gallery',
             success: (success: any) => {
               console.log(success);
               ZoomMtg.join({

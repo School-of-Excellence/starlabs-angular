@@ -1,8 +1,7 @@
-import { Component, OnInit,NgZone } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import { collection, doc, Firestore, getDoc, getDocs, query, updateDoc, where } from '@angular/fire/firestore';
 import { ActivatedRoute } from '@angular/router';
-// import { ZoomMtg } from '@zoomus/websdk';
-import { ZoomMtg } from '@zoom/meetingsdk'
+import { ZoomMtg } from '@zoom/meetingsdk';
 import { HttpClient } from '@angular/common/http';
 import { Storage } from '@angular/fire/storage';
 import * as RecordRTC from 'recordrtc';
@@ -37,86 +36,99 @@ type zoomConfig = {
   styleUrl: './zoom-clientview.component.css'
 })
 export class ZoomClientviewComponent {
-  mediaRecorder:any;
+  mediaRecorder: any;
   recordedChunks: Blob[] = [];
-  bufferSize = 5; // seconds
+  bufferSize = 5;
   buffer: Blob[] = [];
   isRecording = false;
   afterClickChunks: Blob[] = [];
 
-  zoomdata:any
-  hostname:string 
+  zoomdata: any;
+  hostname: string;
   profileid: any;
-  profileHost:boolean
+  profileHost: boolean;
   screenshots: any = [];
-  collectiontype : any;
-  documentId : any;
+  collectiontype: any;
+  documentId: any;
   private subscription: Subscription;
-  constructor(private route: ActivatedRoute,private firestore : Firestore,private ngZone:NgZone,  private storage: Storage,private http: HttpClient, private guard: AuthguardService, private snackBar: MatSnackBar) { 
+
+  isJoined: boolean = false;
+
+  constructor(
+    private route: ActivatedRoute,
+    private firestore: Firestore,
+    private ngZone: NgZone,
+    private storage: Storage,
+    private http: HttpClient,
+    private guard: AuthguardService,
+    private snackBar: MatSnackBar
+  ) {
     this.route.params.subscribe(data => {
       console.log(data);
-      console.log("docid",data['id']);
-      this.documentId = data['id']
-      this.collectiontype = data['collectiontype']
-      
+      console.log("docid", data['id']);
+      this.documentId = data['id'];
+      this.collectiontype = data['collectiontype'];
+
       const collectionMap = {
         'queue': 'live assignment',
         'appointment': 'appointments'
       };
       const collectionName = collectionMap[this.collectiontype];
       getDoc(doc(this.firestore, collectionName, this.documentId)).then(snap => {
-        console.log("docid",snap.id);
-        this.zoomdata = snap.data()
-        console.log("zoom data",this.zoomdata);
+        console.log("docid", snap.id);
+        this.zoomdata = snap.data();
+        console.log("zoom data", this.zoomdata);
         this.startmeeting();
-      })
-
-    })  
-    
+      });
+    });
   }
 
- 
-
-  ngOnInit(): void {
-   
-  }
+  ngOnInit(): void {}
 
   ngOnDestroy() {
-
-    // Remove keydown event listener
     window.removeEventListener('keydown', this.handleKeyDown.bind(this));
     this.clearScreenshots();
   }
- 
 
   loadScreenshots() {
-    // Get screenshots from local storage
     this.screenshots = JSON.parse(localStorage.getItem('screenshots') || '[]');
   }
 
   async startmeeting() {
-    await this.guard.getRoles().then(async roles=>{
-      this.profileid = roles.profile_ref.id
-      const hosts = this.collectiontype === 'queue' ? this.zoomdata["pairing"] : this.zoomdata["hosts"].map(ref => ref.id); 
-      this.profileHost = hosts.includes(this.profileid)
-      console.log(this.profileHost ? "Host" : "Participant")
-      
-    })  
+    await this.guard.getRoles().then(async roles => {
+      this.profileid = roles.profile_ref.id;
+      const hosts = this.collectiontype === 'queue'
+        ? this.zoomdata["pairing"]
+        : this.zoomdata["hosts"].map(ref => ref.id);
+      this.profileHost = hosts.includes(this.profileid);
+      console.log(this.profileHost ? "Host" : "Participant");
+    });
 
-    var profileData = {}
-    await getDocs(query(collection(this.firestore,'profile_data'), where('profileid', '==', this.profileid))).then(snap => {
-      this.hostname = snap.docs[0].data()['name']
-      profileData = snap.docs[0].data()
+    var profileData = {};
+    await getDocs(query(collection(this.firestore, 'profile_data'), where('profileid', '==', this.profileid))).then(snap => {
+      this.hostname = snap.docs[0].data()['name'];
+      profileData = snap.docs[0].data();
       console.log(this.hostname);
-      
-    })
+    });
+
     if (this.zoomdata && this.zoomdata['zoomdata']) {
+
+      // ← ADDED: Diagnostic check for gallery view support
+      console.log('=== GALLERY VIEW DIAGNOSTICS ===');
+      console.log('crossOriginIsolated:', (window as any).crossOriginIsolated);
+      console.log('SharedArrayBuffer available:', typeof SharedArrayBuffer !== 'undefined');
+      if (!(window as any).crossOriginIsolated) {
+        console.warn('⚠️ Page is NOT cross-origin isolated. Gallery view will NOT work.');
+        console.warn('⚠️ Fix: Ensure coi-serviceworker.js is loaded and COOP/COEP headers are set.');
+      }
+      // ← END ADDED
+
       ZoomMtg.setZoomJSLib('https://source.zoom.us/3.13.2/lib', '/av');
 
       ZoomMtg.preLoadWasm();
       ZoomMtg.prepareWebSDK();
 
-      ZoomMtg.i18n.load('en-US')
+      ZoomMtg.i18n.load('en-US');
       document.getElementById('zmmtg-root')?.style.setProperty('display', 'block');
       console.log("ng zone start");
 
@@ -124,35 +136,48 @@ export class ZoomClientviewComponent {
         console.log("zoom");
 
         ZoomMtg.init({
-          leaveUrl: this.profileHost ? `${window.location.origin}/dynamicstudio` : `${window.location.origin}/participantstudio`,
+          leaveUrl: this.profileHost
+            ? `${window.location.origin}/dynamicstudio`
+            : `${window.location.origin}/participantstudio`,
           patchJsMedia: true,
+          defaultView: 'gallery',
           success: (success: any) => {
+            this.ngZone.run(() => {
+              this.isJoined = true;
+            });
             console.log(success);
-            var zoomConfig:zoomConfig = {
+            var zoomConfig: zoomConfig = {
               sdkKey: "rjad2eLZSIKlamaIwi09tw",
-              signature: this.profileHost ? this.zoomdata['hostsignature'] : this.zoomdata['participantsignature'],
+              signature: this.profileHost
+                ? this.zoomdata['hostsignature']
+                : this.zoomdata['participantsignature'],
               meetingNumber: this.zoomdata['zoomdata']['id'],
               passWord: this.zoomdata['zoomdata']['password'],
               userName: this.hostname,
-              userEmail: this.profileHost ? this.zoomdata['zoomdata']['host_email'] : profileData["email"],
+              userEmail: this.profileHost
+                ? this.zoomdata['zoomdata']['host_email']
+                : profileData["email"],
               success: (success: any) => {
                 console.log(success);
                 console.log("zoom successfully joined");
-                this.snackBar.open('Reminder: You can click the Capture button or press the Tab key to take a video clip', 'Close', {
-                  duration: 1000, // Duration in milliseconds
-                  horizontalPosition: 'center',
-                  verticalPosition: 'top'
-                });
+                this.snackBar.open(
+                  'Reminder: You can click the Capture button or press the Tab key to take a video clip',
+                  'Close',
+                  {
+                    duration: 1000,
+                    horizontalPosition: 'center',
+                    verticalPosition: 'top'
+                  }
+                );
               },
               error: (error: any) => {
                 console.log(error);
               }
-            }
-            if(this.profileHost){
-              zoomConfig["zak"] = this.zoomdata['zak']
-            }
-            else{
-              zoomConfig["customerKey"] = this.profileid
+            };
+            if (this.profileHost) {
+              zoomConfig["zak"] = this.zoomdata['zak'];
+            } else {
+              zoomConfig["customerKey"] = this.profileid;
             }
             ZoomMtg.join(zoomConfig);
           },
@@ -167,25 +192,21 @@ export class ZoomClientviewComponent {
 
   async onClick() {
     try {
-      const clickTimestamp = new Date().toISOString(); // Get the current timestamp
+      const clickTimestamp = new Date().toISOString();
       const clipTiming = {
         timestamp: clickTimestamp,
         capturedby: this.profileid
       };
-      var data
-      await getDoc(doc(this.firestore,'live assignment',this.zoomdata['docid'])).then(snap => {
+      var data;
+      await getDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid'])).then(snap => {
         data = snap.data();
       });
       console.log(data);
-      
+
       let clipTimings = data['cliptimings'] ? data.cliptimings : [];
-  
-      // Add the new clip timing to the array
       clipTimings.push(clipTiming);
-  
-      // Update the document with the new array
-      await updateDoc(doc(this.firestore,'live assignment',this.zoomdata['docid']),{ cliptimings: clipTimings });
-  
+      await updateDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid']), { cliptimings: clipTimings });
+
       console.log('Clip timing updated successfully:', clipTiming);
       this.showPopup();
       this.captureScreenshot();
@@ -193,7 +214,7 @@ export class ZoomClientviewComponent {
       console.error('Error updating clip timing:', error);
     }
   }
-  
+
   handleKeyDown(event: KeyboardEvent) {
     if (event.key === 'Tab') {
       this.onClick();
@@ -202,46 +223,37 @@ export class ZoomClientviewComponent {
 
   showPopup(): void {
     this.snackBar.open('Clip captured', 'Close', {
-      duration: 2000, // Duration in milliseconds
+      duration: 2000,
       horizontalPosition: 'center',
       verticalPosition: 'top'
     });
   }
 
   captureScreenshot() {
-    // const videoElement = document.querySelector('#zmmtg-root') as HTMLVideoElement | null;
     const targetElement = document.querySelector('#zmmtg-root') as HTMLElement;
     if (targetElement) {
       html2canvas(targetElement, { useCORS: true, allowTaint: true }).then(canvas => {
         const dataURL = canvas.toDataURL('image/png');
         this.saveScreenshot(dataURL);
         this.updateSlider(dataURL);
-    }).catch(error => {
+      }).catch(error => {
         console.error('Error capturing screenshot:', error);
-    });
-    
+      });
     } else {
       console.error('Target element not found.');
     }
   }
-  
-  
+
   saveScreenshot(dataURL: string) {
-    // Get existing screenshots from local storage
     const screenshots = JSON.parse(localStorage.getItem('screenshots') || '[]');
-    
-    // Add the new screenshot
     screenshots.push(dataURL);
-    
-    // Save back to local storage
     localStorage.setItem('screenshots', JSON.stringify(screenshots));
   }
-  
+
   updateSlider(dataURL: string) {
     this.screenshots.push(dataURL);
   }
-  
-   
+
   clearScreenshots() {
     localStorage.removeItem('screenshots');
     this.screenshots = [];

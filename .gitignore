@@ -43,8 +43,9 @@ Thumbs.db
 src/environments/version.ts
 ticket-management/
 
-
 # Firebase
 .firebase
 src/environments
 src/firebase-messaging-sw.js
+
+.claude
