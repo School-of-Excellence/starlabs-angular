@@ -41,11 +41,15 @@ export class EvolutionMappingAddV2Component implements OnInit {
   title: string = '';
   videourl: string = '';
   recordedDate: Date | null = null;
-  selectedVideoTitle: string = '';
+  selectedVideos: Set<string> = new Set<string>();
+  editVideoUrl: string = '';
+  editVideoTitle: string = '';
+  editRecordedDate: Date | null = null;
   videoTitleOptions: { id: string; title: string; videourl: string; recordeddate: any; type: string }[] = [];
-
+  previewVideo: any = null;
   importPreview: any[] = [];
   mapEmailData: any = {};
+  showPreviewPlayer: boolean = false;
 
   constructor(
     public firestore: Firestore,
@@ -71,14 +75,17 @@ export class EvolutionMappingAddV2Component implements OnInit {
       this.title = this.data.title;
       this.recordedDate = this.data.recordeddate?.toDate ? this.data.recordeddate.toDate() : null;
       this.videourl = this.data.videourl;
-      this.selectedVideoTitle = this.data.title;
+      this.editVideoTitle = this.data.title;
+      this.editVideoUrl = this.data.videourl;
+      this.editRecordedDate = this.data.recordeddate?.toDate ? this.data.recordeddate.toDate() : null;
+      this.recordedDate = this.editRecordedDate;
       this.showPlayer = true;
-      // Load video options for edit mode, then set selectedType
       this.onSelect(this.selectedProfile, true).then(() => {
         const matched = this.videoTitleOptions.find(v => v.title === this.data.title);
         if (matched) {
           this.selectedType = matched.type;
           this.filteredVideoOptions = this.videoTitleOptions.filter(v => v.type === matched.type);
+          this.selectedVideos.add(matched.title);
         }
       });
     }
@@ -94,13 +101,13 @@ export class EvolutionMappingAddV2Component implements OnInit {
     );
   }
 
-  // skipReset: used in edit mode so we don't wipe preloaded values
   async onSelect(selectedId: string, skipReset: boolean = false): Promise<void> {
     this.selectedProfile = selectedId;
     this.videoTitleOptions = [];
 
     if (!skipReset) {
-      this.selectedVideoTitle = '';
+      this.selectedVideos.clear();
+      this.showPlayer = false;
       this.title = '';
       this.videourl = '';
       this.recordedDate = null;
@@ -137,6 +144,7 @@ export class EvolutionMappingAddV2Component implements OnInit {
     this.videoTypes = [...new Set(this.videoTitleOptions.map(v => v.type))];
     this.selectedType = null;
     this.filteredVideoOptions = [];
+    this.previewVideo = null;
   }
 
   videoTypes: string[] = [];
@@ -146,11 +154,6 @@ export class EvolutionMappingAddV2Component implements OnInit {
   onTypeSelect(type: string): void {
     this.selectedType = type;
     this.filteredVideoOptions = this.videoTitleOptions.filter(v => v.type === type);
-    // Reset video selection when type changes
-    this.selectedVideoTitle = '';
-    this.videourl = '';
-    this.recordedDate = null;
-    this.showPlayer = false;
   }
 
   showPlayer: boolean = false;
@@ -168,72 +171,111 @@ export class EvolutionMappingAddV2Component implements OnInit {
     return this.videoTitleOptions.filter(v => v.type === type).length;
   }
 
-  onVideoTitleSelect(selectedTitle: string): void {
-    const selected = this.filteredVideoOptions.find(v => v.title === selectedTitle);
-    if (selected) {
+  onVideoTitleSelect(video: any): void {
+    if (this.data != null) {
+      this.selectedVideos.clear();
+      this.selectedVideos.add(video.title);
+      this.editVideoTitle = video.title;
+      this.title = video.title;
+      this.editVideoUrl = this.convertDropboxUrl(video.videourl);
+      this.videourl = this.editVideoUrl;
+      this.editRecordedDate = video.recordeddate?.toDate? video.recordeddate.toDate(): video.recordeddate ? new Date(video.recordeddate) : null;
+      this.recordedDate = this.editRecordedDate;
       this.showPlayer = false;
-      this.selectedVideoTitle = selected.title;
-      this.title = selected.title;
-      this.videourl = this.convertDropboxUrl(selected.videourl);
-      this.recordedDate = selected.recordeddate?.toDate
-        ? selected.recordeddate.toDate()
-        : selected.recordeddate ? new Date(selected.recordeddate) : null;
       setTimeout(() => { this.showPlayer = true; }, 50);
+      return;
     }
+    if (this.selectedVideos.has(video.title)) {
+      this.selectedVideos.delete(video.title);
+      this.selectedVideos = new Set(this.selectedVideos);
+      if (this.previewVideo?.title === video.title) {
+        this.previewVideo = null;
+      }
+      } else {
+        this.selectedVideos.add(video.title);
+        this.selectedVideos = new Set(this.selectedVideos);
+        this.showPreviewPlayer = false;
+        this.previewVideo = {
+          ...video,
+          videourl: this.convertDropboxUrl(video.videourl),
+          recordedDate: video.recordeddate?.toDate ? video.recordeddate.toDate() : video.recordeddate ? new Date(video.recordeddate) : null
+        };
+        setTimeout(() => { this.showPreviewPlayer = true; }, 50);
+      }
   }
 
+  isVideoSelected(title: string): boolean {
+    return this.selectedVideos.has(title);
+  }
 
+  getSelectedVideoObjects(): any[] {
+    return this.videoTitleOptions.filter(v => this.selectedVideos.has(v.title));
+  }
+
+  selectAllVideos(): void {
+    this.filteredVideoOptions.forEach(v => this.selectedVideos.add(v.title));
+    this.selectedVideos = new Set(this.selectedVideos);
+  }
+
+  clearAllVideos(): void {
+    this.selectedVideos = new Set();
+  }
+
+  removeSelectedVideo(title: string): void {
+    this.selectedVideos.delete(title);
+    this.selectedVideos = new Set(this.selectedVideos);
+  }
 
   async addEvolution(): Promise<void> {
     this.disableButton = true;
-
-    if (!this.selectedProfile || !this.title || !this.videourl) {
-      alert('Please select a participant and a video.');
-      this.disableButton = false;
-      return;
-    }
-
-    try {
-      if (this.data != null) {
-        // Edit: update existing doc
+    if (this.data != null) {
+      if (!this.selectedProfile || this.selectedVideos.size === 0) {
+        alert('Please select a participant and a video.');
+        this.disableButton = false;
+        return;
+      }
+      try {
         const docRef = doc(this.firestore, 'evolutionmappingvideo', this.data.docid);
         await setDoc(docRef, {
           recordeddate: this.recordedDate ?? null,
           title: this.title,
           videourl: this.videourl,
         }, { merge: true });
-
         this.disableButton = false;
         this.closeDialog();
-
-      } else {
-        // Add: create new doc
+      } catch (error) {
+        this.disableButton = false;
+        console.error('Error updating evolution mapping:', error);
+      }
+      return;
+    }
+    if (!this.selectedProfile || this.selectedVideos.size === 0) {
+      alert('Please select a participant and at least one video.');
+      this.disableButton = false;
+      return;
+    }
+    try {
+      const batch = writeBatch(this.firestore);
+      for (const video of this.getSelectedVideoObjects()) {
         const newDocRef = doc(collection(this.firestore, 'evolutionmappingvideo'));
-        await setDoc(newDocRef, {
+        batch.set(newDocRef, {
           docid: newDocRef.id,
-          recordeddate: this.recordedDate ?? null,
-          title: this.title,
-          videourl: this.videourl,
           profileid: this.selectedProfile,
+          title: video.title,
+          videourl: this.convertDropboxUrl(video.videourl),
+          recordeddate: video.recordeddate ?? null,
           created: serverTimestamp(),
           deleted: false,
         });
-
-        this.disableButton = false;
-        this.selectedProfile = null;
-        this.selectedVideoTitle = '';
-        this.title = '';
-        this.videourl = '';
-        this.recordedDate = null;
-        this.videoTitleOptions = [];
-        this.closeDialog();
       }
+      await batch.commit();
+      this.disableButton = false;
+      this.closeDialog();
     } catch (error) {
       this.disableButton = false;
-      console.error('Error saving evolution mapping:', error);
+      console.error('Error saving evolution mappings:', error);
     }
   }
-
   closeDialog(): void {
     this.dialogRef.close();
   }
