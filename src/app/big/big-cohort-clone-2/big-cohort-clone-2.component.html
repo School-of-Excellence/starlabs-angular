@@ -100,6 +100,14 @@
             <span class="fi-count" *ngIf="selectedQueueEvent.length > 0">{{selectedQueueEvent.length}}</span>
             <mat-icon class="chev">expand_more</mat-icon>
           </button>
+          <button class="fi" [class.active]="selectedZoneEvent.length > 0"
+            (click)="zoneDropdownOpen = true; marathonDropdownOpen = false; eventDropdownOpen = false; queueDropdownOpen = false; onZoneDropdownOpen(); $event.stopPropagation()">
+            <mat-icon>place</mat-icon>
+            <span class="fl">Zone</span>
+            <span class="fv">{{getSelectedZoneNames()}}</span>
+            <span class="fi-count" *ngIf="selectedZoneEvent.length > 0">{{selectedZoneEvent.length}}</span>
+            <mat-icon class="chev">expand_more</mat-icon>
+          </button>
         </div>
       </div>
 
@@ -592,6 +600,39 @@
     </div>
   </div>
 
+  <!-- Zone -->
+  <div class="dialog-scrim" *ngIf="zoneDropdownOpen" (click)="zoneDropdownOpen = false">
+    <div class="dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-head">
+        <mat-icon>place</mat-icon>
+        <h3>Select Zones</h3>
+        <button class="dialog-close" (click)="zoneDropdownOpen = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="d-search">
+          <mat-icon>search</mat-icon>
+          <input type="text" placeholder="Search zone…" [(ngModel)]="zoneSearchQuery" (input)="onZoneSearch()">
+        </div>
+        <div class="d-item" *ngFor="let option of searchableZoneEventList"
+          [class.selected]="selectedZoneEvent.includes(option.ref.id)"
+          (click)="toggleZoneSelection(option.ref.id)">
+          <div class="d-check"><mat-icon>check</mat-icon></div>
+          <div class="d-info">
+            <div class="d-name">{{option.name}}</div>
+            <div class="row-sub" *ngIf="option.cohorts?.length">
+              {{option.cohorts.length}} cohort(s) · {{mapAcceleratorEvent[option.eventref?.id] || 'No event'}}
+            </div>
+          </div>
+        </div>
+        <div class="d-empty" *ngIf="searchableZoneEventList.length === 0">No zones found</div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn btn-ghost" *ngIf="selectedZoneEvent.length > 0" (click)="clearZoneSelection()">Clear all</button>
+        <button class="btn btn-primary" (click)="zoneDropdownOpen = false">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Status -->
   <div class="dialog-scrim" *ngIf="statusDropdownOpen" (click)="statusDropdownOpen = false">
     <div class="dialog" (click)="$event.stopPropagation()">
@@ -768,6 +809,12 @@
           <mat-icon>timeline</mat-icon> Progression
         </button>
       </div>
+
+      <button class="btn btn-ghost" style="width:100%;justify-content:space-between;margin-top:6px"
+        (click)="zoneDropdownOpen = true; onZoneDropdownOpen()">
+        <span><mat-icon>place</mat-icon> Zone</span>
+        <span style="opacity:.7">{{getSelectedZoneNames()}}</span>
+      </button>
     </div>
     <div class="sheet-foot">
       <button class="btn btn-primary" (click)="mobileSheetOpen = false">Done</button>
