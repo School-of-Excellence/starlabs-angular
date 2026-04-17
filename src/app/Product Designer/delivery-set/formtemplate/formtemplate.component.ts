@@ -10,7 +10,7 @@ import { MatSelectionListChange } from '@angular/material/list';
 import { FormTemplatePreviewComponent } from '../form-template-preview/form-template-preview.component';
 import { LoadingProgressComponent } from '../../../loading-progress/loading-progress.component';
 import { AuthguardService } from '../../../authguard.service';
-import { FormOptionComponent } from '../form-option/form-option.component';
+// import { FormOptionComponent } from '../form-option/form-option.component'; // draft dialog disabled
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -256,6 +256,9 @@ export class FormtemplateComponent {
             }
           }
           //formpatch ended
+          if (this.formpatch) {
+            this.deliveryForm.disable({ emitEvent: false });
+          }
           this.showcontent = true
         })
       }//patch value if condition
@@ -868,49 +871,74 @@ export class FormtemplateComponent {
         console.log("No Drafts Found");
       }
 
-      // If drafts found, open dialog
-        if (draftforms.length !== 0) {
-                const form = draftforms[0].data();
-                this.draftDocid = form['docid'];
-
+      // If drafts found, patch the latest one directly (no dialog)
+      if (draftforms.length !== 0) {
         const sortedDrafts = draftforms.sort((a, b) => {
           const dateA = a.data()['date']?.toDate()?.getTime() ?? 0;
           const dateB = b.data()['date']?.toDate()?.getTime() ?? 0;
           return dateB - dateA;
         });
 
-        const dialogRef = this.dialog.open(FormOptionComponent, {
-          data: { drafts: [sortedDrafts[0]] },
-          disableClose: true
-        });
+        const selectedDraft = sortedDrafts[0].data();
+        this.draftDocid = selectedDraft['docid'];
 
-        dialogRef.afterClosed().subscribe((result) => {
-          if (result && result.type === 'draft') {
-            const selectedDraft = result.doc.data();
-            this.draftDocid = selectedDraft['docid'];
-
-            let h = 0;
-            for (let i = 0; i < selectedDraft['formarray'].length; i++) {
-              const element = selectedDraft['formarray'][i];
-              if (!['label', 'video', 'audio'].includes(element['type'])) {
-                element['formcontrol'] = `control${h}`;
-                h++;
-                if (!['array', 'date'].includes(element['type'])) {
-                  this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
-                  if (element['flipping'] === true) {
-                    this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {};
-                  }
-                } else if (element['type'] === 'date') {
-                  const dateValue = (element['value'] !== undefined && element['value'] !== null)
-                    ? element['value']?.toDate() : null;
-                  this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
-                } else if (element['type'] === 'array') {
-                  this.processArrayFormControl(element);
-                }
+        let h = 0;
+        for (let i = 0; i < selectedDraft['formarray'].length; i++) {
+          const element = selectedDraft['formarray'][i];
+          if (!['label', 'video', 'audio'].includes(element['type'])) {
+            element['formcontrol'] = `control${h}`;
+            h++;
+            if (!['array', 'date'].includes(element['type'])) {
+              this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
+              if (element['flipping'] === true) {
+                this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {};
               }
+            } else if (element['type'] === 'date') {
+              const dateValue = (element['value'] !== undefined && element['value'] !== null)
+                ? element['value']?.toDate() : null;
+              this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
+            } else if (element['type'] === 'array') {
+              this.processArrayFormControl(element);
             }
           }
-        });
+        }
+
+        // --- Previous behaviour: open draft dialog (kept for reference) ---
+        // const form = draftforms[0].data();
+        // this.draftDocid = form['docid'];
+        //
+        // const dialogRef = this.dialog.open(FormOptionComponent, {
+        //   data: { drafts: [sortedDrafts[0]] },
+        //   disableClose: true
+        // });
+        //
+        // dialogRef.afterClosed().subscribe((result) => {
+        //   if (result && result.type === 'draft') {
+        //     const selectedDraft = result.doc.data();
+        //     this.draftDocid = selectedDraft['docid'];
+        //
+        //     let h = 0;
+        //     for (let i = 0; i < selectedDraft['formarray'].length; i++) {
+        //       const element = selectedDraft['formarray'][i];
+        //       if (!['label', 'video', 'audio'].includes(element['type'])) {
+        //         element['formcontrol'] = `control${h}`;
+        //         h++;
+        //         if (!['array', 'date'].includes(element['type'])) {
+        //           this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
+        //           if (element['flipping'] === true) {
+        //             this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {};
+        //           }
+        //         } else if (element['type'] === 'date') {
+        //           const dateValue = (element['value'] !== undefined && element['value'] !== null)
+        //             ? element['value']?.toDate() : null;
+        //           this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
+        //         } else if (element['type'] === 'array') {
+        //           this.processArrayFormControl(element);
+        //         }
+        //       }
+        //     }
+        //   }
+        // });
       }
 
     } catch (error) {
