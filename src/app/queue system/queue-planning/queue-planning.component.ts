@@ -42,6 +42,8 @@ interface PlanningRow {
     [stageName: string]: {
       cohortIds: string[];
       dates: Array<{
+        title: string | null,
+        description: string | null,
         startdate: Date | null;
         enddate: Date | null;
         starttime: string;
@@ -112,6 +114,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
 
   mapStageSlotBookedSlots = {}
   queueList = [];
+  liveQueueList = [];
   queueVariationList = [];
   segmentList = [];
   cohortsList = [];
@@ -159,6 +162,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   editingStageName: string = null;
   editingDateIndex: number = null;
   editingDateEntry: any = {
+    title: null,
+    description: null,
     startdate: null,
     enddate: null,
     starttime: '09:00',
@@ -252,6 +257,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
           id: doc.id,
           ...doc.data()
         })).sort((a, b) => b['queuestartdate'] - a['queuestartdate']);
+        this.liveQueueList = this.queueList.filter(e => e['queuestartdate'].toDate() <= new Date() && e['queueenddate'].toDate() >= new Date());
       }).then(() => {
         this.loading = false;
       });
@@ -1086,6 +1092,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
                 );
 
                 stageMap.get(stageName).push({
+                  title: slot.title ?? null,
+                  description: slot.description ?? null,
                   startdate: startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null,
                   enddate: endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null,
                   starttime: startDate ? this.formatTimeTo24Hour(startDate) : '09:00',
@@ -1701,6 +1709,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
                 );
 
                 const slotObj: any = {
+                  title: dateEntry.title,
+                  description: dateEntry.description,
                   stagename: stageName,
                   startdate: Timestamp.fromDate(startDateTime),
                   enddate: Timestamp.fromDate(endDateTime),
@@ -2065,6 +2075,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
 
   // Initialize editingDateEntry with the same data
   this.editingDateEntry = {
+    title: null,
+    description: null,
     startdate: null,
     enddate: null,
     starttime: '09:00',
@@ -2165,6 +2177,8 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
     // Initialize with default values for new slot
     this.editingDateEntry = {
+      title: null,
+      description: null,
       startdate: null,
       enddate: null,
       starttime: '09:00',
@@ -2196,6 +2210,8 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
     const dateEntry = row.stageData[stageName].dates[dateIndex];
     this.editingDateEntry = {
+      title: dateEntry.title ? dateEntry.title : null,
+      description: dateEntry.description ? dateEntry.description : null,
       startdate: dateEntry.startdate ? new Date(dateEntry.startdate) : null,
       enddate: dateEntry.enddate ? new Date(dateEntry.enddate) : null,
       starttime: dateEntry.starttime || '09:00',
@@ -2368,6 +2384,8 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
         // Add the new slot - ONLY to this specific stage
         row.stageData[stageName].dates.push({
+          title: this.editingDateEntry.title,
+          description: this.editingDateEntry.description,
           startdate: new Date(this.editingDateEntry.startdate),
           enddate: new Date(this.editingDateEntry.enddate),
           starttime: this.editingDateEntry.starttime,

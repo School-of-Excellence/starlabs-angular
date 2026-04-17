@@ -83,6 +83,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     eventId?: string;
     videoType?: string;
     docId?: string;
+    linkedEventName?: string | null;
     extraVideos?: { videoUrl: string; videoTitle: string; docId: string; videoType: string }[];
   }[] = [];
   dragCardIndex: number | null = null;
@@ -113,12 +114,11 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   private eventFilterSearchSub: Subscription | null = null;  
   private videoFilterSearchSub: Subscription | null = null;  
 
+  //Edit
   showEditVideoOverlay = false;
   editVideoIndex: number | null = null;
-  editVideoDocId: string = '';
-  editVideoEventId: string = '';
-  editVideoRecordedDate: Date | null = null;
-  editVideoSaving = false;
+  editVideoForm!: FormGroup;
+  editVideoSaving = false;;
 
   // Bulk import
   activeTab: 'manual' | 'bulk' = 'manual';
@@ -172,6 +172,17 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   filteredEventFilterOptions: { id: string; name: string }[] = [];
   videoFilterSearchCtrl = new FormControl('');
   filteredVideoFilterOptions: { id: string; name: string }[] = [];
+  private pendingLogEventIndex: number | null = null;
+  // LOG FILTER
+  logEventFilterOptions: { id: string; name: string }[] = [];
+  selectedLogEventFilter: string[] = [];
+  filteredLogEvents: typeof this.logEvents = [];
+  logEventFilterCtrl = new FormControl('');
+  filteredLogEventOptions: { id: string; name: string }[] = [];
+  private logEventFilterSub: Subscription | null = null;
+  showJourneyTypeDropdown = false;
+  journeyFilterDropdownTop = 0;
+  journeyFilterDropdownLeft = 0;
 
   
   constructor(
@@ -205,7 +216,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.participantSearchSub?.unsubscribe();
     this.addVideoSearchSub?.unsubscribe();
     this.eventFilterSearchSub?.unsubscribe();  
-    this.videoFilterSearchSub?.unsubscribe();  
+    this.videoFilterSearchSub?.unsubscribe();
+    this.logEventFilterSub?.unsubscribe();
+  
   }
 
   // Fetch participants for filter dropdown
@@ -272,15 +285,30 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       .map(([id]) => id);
   }
 
-  onParticipantFilterChange() {
-  this.resetPagination();
-  this.fetchRecords();
-}
+  getJourneyTypeFilteredIds(): string[] {
+    if (this.journeyTypeFilter === 'all') return [];
 
-onJourneyFilterChange() {
-  this.resetPagination();
-  this.fetchRecords();
-}
+    return Object.entries(this.mapProfiles)
+      .filter(([, profile]: [string, any]) => {
+        if (this.journeyTypeFilter === 'active') {
+          return !!profile['activejourney'];
+        } else if (this.journeyTypeFilter === 'last') {
+          return !profile['activejourney'] && !!profile['lastcompletedjourney'];
+        }
+        return true;
+      })
+      .map(([id]) => id);
+  }
+
+  onParticipantFilterChange() {
+    this.resetPagination();
+    this.fetchRecords();
+  }
+
+  onJourneyFilterChange() {
+    this.resetPagination();
+    this.fetchRecords();
+  }
   // Fetch event counts
   async fetchEventCounts(records: any[]) {
     const profileIds = records.map((r) => r['profileid']).filter(Boolean);
@@ -314,19 +342,28 @@ onJourneyFilterChange() {
 
     const chunks = this.chunkArray(profileIds, 30);
     const snaps = await Promise.all(
-      chunks.map((chunk) => getDocs(query( collection(this.firestore, 'participant videos'), where('profileid', 'in', chunk), where('delete', '==', false), orderBy('recordeddate', 'desc') )) ) );
-    // Group by profileid 
-    const latestByProfile: { [profileid: string]: any } = {};
+      chunks.map((chunk) => getDocs(query(
+        collection(this.firestore, 'participant videos'),
+        where('profileid', 'in', chunk),
+        where('delete', '==', false),
+        orderBy('recordeddate', 'desc')
+      )))
+    );
+
+    // Group ALL videos by profileid first
+    const allByProfile: { [profileid: string]: any[] } = {};
     snaps.forEach((snap) => {
       snap.docs.forEach((d) => {
         const profileid = d.data()['profileid'];
         const type = d.data()['type'];
 
         if (profileid) {
-          // Keep latest for last video column
-          if (!latestByProfile[profileid]) {
-            latestByProfile[profileid] = d.data();
+          // Collect all for sorting
+          if (!allByProfile[profileid]) {
+            allByProfile[profileid] = [];
           }
+          allByProfile[profileid].push({ ...d.data(), docId: d.id });
+
           // Count by type
           if (!this.mapVideoCount[profileid]) {
             this.mapVideoCount[profileid] = { events: 0, interviews: 0, testimonials: 0 };
@@ -342,24 +379,37 @@ onJourneyFilterChange() {
       });
     });
 
-    // Fetch event names for those that have eventref
+    // For each profileid, pick the latest video by recordeddate
     await Promise.all(
-      Object.entries(latestByProfile).map(async ([profileid, data]) => {
-        let eventName = data['title'] || '—';
+      Object.entries(allByProfile).map(async ([profileid, videos]) => {
+        // Sort descending by recordeddate, nulls last
+        videos.sort((a, b) => {
+          const dateA = a['recordeddate']?.toDate?.() ?? (a['recordeddate'] ? new Date(a['recordeddate']) : null);
+          const dateB = b['recordeddate']?.toDate?.() ?? (b['recordeddate'] ? new Date(b['recordeddate']) : null);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;  // nulls go last
+          if (!dateB) return -1;
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        const latest = videos[0];
+        let eventName = latest['title'] || '—';
         let date: Date | null = null;
 
-        if (data['eventref']?.path) {
+        // Try to get event name from eventref
+        if (latest['eventref']?.path) {
           try {
             const eventDoc = await runInInjectionContext(
-              this.injector, () => getDoc(data['eventref'])
+              this.injector, () => getDoc(latest['eventref'])
             );
             if (eventDoc.exists()) {
-              eventName = eventDoc.data()['name'] || data['title'] || '—';
+              eventName = eventDoc.data()['name'] || latest['title'] || '—';
             }
           } catch (e) {}
         }
 
-        const rawDate = data['recordeddate'] || null;
+        // Parse date
+        const rawDate = latest['recordeddate'] || null;
         if (rawDate?.toDate) date = rawDate.toDate();
         else if (rawDate) date = new Date(rawDate);
 
@@ -420,6 +470,8 @@ onJourneyFilterChange() {
         profileDataMap[d.id] = {
           photo: resolvedPhoto || profileImg,
           mobile: (d.data()['countrycode'] || '') + (d.data()['number'] || ''),
+          email: d.data()['email'] || '',
+
         };
       });
     });
@@ -453,14 +505,23 @@ onJourneyFilterChange() {
     this.fetchRecords();
   }
 
-  toggleJourneyTypeFilter() {
-    if (this.journeyTypeFilter === 'all') {
-      this.journeyTypeFilter = 'active';
-    } else if (this.journeyTypeFilter === 'active') {
-      this.journeyTypeFilter = 'last';
-    } else {
-      this.journeyTypeFilter = 'all';
-    }
+  openJourneyTypeDropdown(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    const btn = target.closest('button') ?? target;
+    const rect = btn.getBoundingClientRect();
+    this.journeyFilterDropdownTop = rect.bottom + 8;
+    this.journeyFilterDropdownLeft = rect.left;
+    this.showJourneyTypeDropdown = !this.showJourneyTypeDropdown;
+    this.showEventFilterDropdown = false;
+    this.showVideoFilterDropdown = false;
+    event.stopPropagation();
+  }
+
+  setJourneyTypeFilter(type: 'all' | 'active' | 'last') {
+    this.journeyTypeFilter = type;
+    this.showJourneyTypeDropdown = false;
+    this.resetPagination();
+    this.fetchRecords();
   }
 
   onEventFilterChange(eventId: string, event: any) {
@@ -548,6 +609,8 @@ onJourneyFilterChange() {
     this.selectedJourneyFilters = [];
     this.selectedEventFilters = [];
     this.selectedVideoFilters = [];
+    this.journeyTypeFilter = 'all';
+    this.showJourneyTypeDropdown = false;          
     this.eventFilterSearchCtrl.setValue('');   
     this.videoFilterSearchCtrl.setValue('');   
     this.showEventFilterDropdown = false;
@@ -615,12 +678,20 @@ onJourneyFilterChange() {
 
     let selectedIds = this.selectedParticipants.map((p) => p.id);
 
-    // Apply journey filter
+    // Apply journey name filter
     if (this.selectedJourneyFilters.length) {
       const journeyIds = this.getJourneyFilteredIds();
       selectedIds = selectedIds.length > 0
         ? selectedIds.filter(id => journeyIds.includes(id))
         : journeyIds;
+    }
+
+    // Apply journey TYPE filter (active / last)
+    if (this.journeyTypeFilter !== 'all') {
+      const typeIds = this.getJourneyTypeFilteredIds();
+      selectedIds = selectedIds.length > 0
+        ? selectedIds.filter(id => typeIds.includes(id))
+        : typeIds;
     }
 
     // Apply event filter
@@ -642,8 +713,8 @@ onJourneyFilterChange() {
     const noFilters = !this.selectedParticipants.length &&
                     !this.selectedJourneyFilters.length &&
                     !this.selectedEventFilters.length &&
-                    !this.selectedVideoFilters.length;
-
+                    !this.selectedVideoFilters.length&&
+                    this.journeyTypeFilter === 'all';
     if (noFilters) {
       this.executeSingleQuery(this.buildBaseQuery(undefined, startAfterDoc));
       return;
@@ -755,6 +826,9 @@ onJourneyFilterChange() {
     this.logParticipantName = row['name'];
     this.logEventCount = this.mapEventCount[row.id] || 0;
     this.logEvents = [];
+    this.filteredLogEvents = [];
+    this.logEventFilterOptions = [];
+    this.selectedLogEventFilter = [];
     this.showLogOverlay = true;
     const profileid = this.mapProfiles[row.id]?.['profileid'] || null;
     this.currentLogProfileId = profileid;
@@ -868,24 +942,42 @@ onJourneyFilterChange() {
 
     // Videos with eventref that didn't match any attended event card
     const matchedEventPaths = new Set(eventItems.map(e => (e as any).eventId));
-    const unmatchedEventVideos = Object.entries(videoByEventRef)
-      .filter(([path]) => !matchedEventPaths.has(path))
-      .flatMap(([, videos]) => videos.map((v: any) => {
-        let date: Date | null = null;
-        if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
-        else if (v['recordeddate']) date = new Date(v['recordeddate']);
-        return {
-          type: 'video' as const,
-          eventName: v['title'] || 'Untitled Video',
-          date,
-          hasVideo: true,
-          videoUrl: v['videourl'],
-          videoTitle: v['title'],
-          videoType: v['type'],
-          docId: v['docId'] || null,
-          extraVideos: [],
-        };
-      }));
+    const unmatchedEntries = Object.entries(videoByEventRef)
+      .filter(([path]) => !matchedEventPaths.has(path));
+
+    const unmatchedEventVideos = await Promise.all(
+      unmatchedEntries.flatMap(([path, videos]) =>
+        videos.map(async (v: any) => {
+          let date: Date | null = null;
+          if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
+          else if (v['recordeddate']) date = new Date(v['recordeddate']);
+
+          // Fetch actual event name from Firestore
+          let linkedEventName: string | null = null;
+          try {
+            const eventDoc = await runInInjectionContext(this.injector, () =>
+              getDoc(doc(this.firestore, path))
+            );
+            if (eventDoc.exists()) {
+              linkedEventName = eventDoc.data()['name'] || null;
+            }
+          } catch (e) {}
+
+          return {
+            type: 'video' as const,
+            eventName: v['title'] || 'Untitled Video',
+            date,
+            hasVideo: true,
+            videoUrl: v['videourl'],
+            videoTitle: v['title'],
+            videoType: v['type'],
+            docId: v['docId'] || null,
+            linkedEventName,   // <-- new field
+            extraVideos: [],
+          };
+        })
+      )
+    );
 
     // Merge and sort by date desc
     const allItems = [...eventItems, ...videoItems, ...unmatchedEventVideos];
@@ -908,8 +1000,35 @@ onJourneyFilterChange() {
     }
 
     this.ngZone.run(() => {
-      this.logEvents = allItems;
-      this.logLoading = false;
+    this.logEvents = allItems;
+    this.filteredLogEvents = [...allItems];
+    this.selectedLogEventFilter = [];
+
+    // Build filter options from attended event cards only
+    this.logEventFilterOptions = allItems
+      .filter((e) => e.type === 'event' && (e as any).eventId)
+      .map((e) => ({
+        id: (e as any).eventId,
+        name: e.eventName,
+      }));
+
+    // Initialize search
+    this.filteredLogEventOptions = [...this.logEventFilterOptions];
+    this.logEventFilterCtrl.setValue('');
+
+    // Subscribe to search input
+    this.logEventFilterSub?.unsubscribe();
+    this.logEventFilterSub = this.logEventFilterCtrl.valueChanges.pipe(
+      debounceTime(200),
+      distinctUntilChanged()
+    ).subscribe((search) => {
+      const lower = (search || '').toLowerCase();
+      this.filteredLogEventOptions = this.logEventFilterOptions.filter(o =>
+        o.name.toLowerCase().includes(lower)
+      );
+    });
+
+    this.logLoading = false;
     });
   }
 
@@ -1013,6 +1132,25 @@ onJourneyFilterChange() {
     window.open(url, '_blank');
   }
 
+  applyLogEventFilter() {
+    if (!this.selectedLogEventFilter.length) {
+      this.filteredLogEvents = [...this.logEvents];
+    } else {
+      this.filteredLogEvents = this.logEvents.filter((e) => {
+        const eventId = (e as any).eventId || null;
+        return eventId && this.selectedLogEventFilter.includes(eventId);
+      });
+    }
+  }
+
+  removeLogEventFilter(id: string) {
+    this.selectedLogEventFilter = this.selectedLogEventFilter.filter(f => f !== id);
+    this.applyLogEventFilter();
+  }
+
+  getLogEventName(id: string): string {
+    return this.logEventFilterOptions.find(o => o.id === id)?.name || id;
+  }
 
   // ADD VIDEO FORM
   get entriesArray(): FormArray {
@@ -1066,6 +1204,7 @@ onJourneyFilterChange() {
     this.bulkImportProcessed = false;
     this.bulkImportLoading = false;
     this.bulkImportSaving = false;
+    this.pendingLogEventIndex = null; // ← add this
     if (this.addVideoSearchSub) {
       this.addVideoSearchSub.unsubscribe();
       this.addVideoSearchSub = null;
@@ -1092,6 +1231,7 @@ onJourneyFilterChange() {
     firstEntry.get('eventId')?.setValue(eventId || '');
 
     this.showAddVideoOverlay = true;
+    this.pendingLogEventIndex = this.logEvents.indexOf(event);
     this.fetchLiveEvents();
 
     if (this.addVideoSearchSub) {
@@ -1109,7 +1249,6 @@ onJourneyFilterChange() {
   }
 
   async fetchLiveEvents() {
-    if (this.liveEvents.length > 0) return;
     const snap = await getDocs(
       query(collection(this.firestore, 'event collection'), orderBy('name', 'asc'))
     );
@@ -1173,7 +1312,7 @@ onJourneyFilterChange() {
     const profileid = this.mapProfiles[participantMetadataId]?.['profileid'] || null;
 
     try {
-      await Promise.all(
+      const savedRefs = await Promise.all(
         formValue.entries.map((entry: any) => {
           const eventRef = entry.eventId
             ? doc(this.firestore, 'event collection', entry.eventId)
@@ -1196,10 +1335,38 @@ onJourneyFilterChange() {
       );
 
       this.ngZone.run(() => {
+        // Live-update the log card if opened from log overlay
+        if (this.showLogOverlay && this.pendingLogEventIndex !== null) {
+          const idx = this.pendingLogEventIndex;
+          const firstEntry = formValue.entries[0];
+          const updated = [...this.logEvents];
+          const current = updated[idx] as any;
+
+          updated[idx] = {
+            ...current,
+            videoTitle: firstEntry.title,
+            videoUrl: firstEntry.videoUrl,
+            videoType: firstEntry.type,
+            hasVideo: !!firstEntry.videoUrl,
+            docId: savedRefs[0].id,
+            date: firstEntry.recordedDate
+              ? new Date(firstEntry.recordedDate)
+              : current.date,
+            extraVideos: formValue.entries.slice(1).map((e: any, i: number) => ({
+              videoUrl: e.videoUrl,
+              videoTitle: e.title,
+              docId: savedRefs[i + 1].id,
+              videoType: e.type,
+            })),
+          };
+          this.logEvents = [...updated];
+          this.pendingLogEventIndex = null;
+        }
+
         this.closeAddVideo();
         this.fetchRecords();
-
       });
+
     } catch (err) {
       console.error('Error saving video:', err);
     }
@@ -1207,11 +1374,18 @@ onJourneyFilterChange() {
 
   openEditVideo(event: any, i: number) {
     this.editVideoIndex = i;
-    this.editVideoDocId = event.docId || '';
-    this.editVideoEventId = event.eventId
-      ? event.eventId.replace('event collection/', '')
-      : '';
-    this.editVideoRecordedDate = event.date || null;
+    this.editVideoForm = this.fb.group({
+      docId: [event.docId || ''],
+      title: [event.videoTitle || event.eventName || '', Validators.required],
+      recordedDate: [event.date || null],
+      type: [event.videoType || 'Event', Validators.required],
+      eventId: [
+        event.eventId
+          ? event.eventId.replace('event collection/', '')
+          : '',
+      ],
+      videoUrl: [event.videoUrl || '', Validators.required],
+    });
     this.showEditVideoOverlay = true;
     this.fetchLiveEvents();
   }
@@ -1219,48 +1393,87 @@ onJourneyFilterChange() {
   closeEditVideo() {
     this.showEditVideoOverlay = false;
     this.editVideoIndex = null;
-    this.editVideoDocId = '';
-    this.editVideoEventId = '';
-    this.editVideoRecordedDate = null;
     this.editVideoSaving = false;
   }
 
   async saveEditVideo() {
-    if (!this.editVideoDocId) return;
+    this.editVideoForm.markAllAsTouched();
+    if (!this.editVideoForm.valid) return;
     this.editVideoSaving = true;
 
+    const val = this.editVideoForm.value;
+    const existingDocId = val.docId;
+
     try {
-      const eventRef = this.editVideoEventId
-        ? doc(this.firestore, 'event collection', this.editVideoEventId)
+      const eventRef = val.eventId
+        ? doc(this.firestore, 'event collection', val.eventId)
         : null;
 
-      await updateDoc(
-        doc(this.firestore, 'participant videos', this.editVideoDocId),
-        {
-          eventref: eventRef,
-          recordeddate: this.editVideoRecordedDate
-            ? Timestamp.fromDate(new Date(this.editVideoRecordedDate))
+      let resolvedDocId = existingDocId;
+
+      if (existingDocId) {
+        // UPDATE existing video doc
+        await updateDoc(doc(this.firestore, 'participant videos', existingDocId), {
+          title: val.title,
+          recordeddate: val.recordedDate
+            ? Timestamp.fromDate(new Date(val.recordedDate))
             : null,
-        }
-      );
+          type: val.type,
+          eventref: eventRef,
+          videourl: val.videoUrl,
+        });
+      } else {
+        // CREATE new video doc (event card had no video yet)
+        const profileid = this.currentLogProfileId;
+        const newRef = await addDoc(collection(this.firestore, 'participant videos'), {
+          profileid: profileid,
+          title: val.title,
+          recordeddate: val.recordedDate
+            ? Timestamp.fromDate(new Date(val.recordedDate))
+            : null,
+          type: val.type,
+          eventref: eventRef,
+          videourl: val.videoUrl,
+          uploadedon: serverTimestamp(),
+          uploadedby: this.loggedInProfileId,
+          delete: false,
+        });
+        resolvedDocId = newRef.id;
+      }
 
     this.ngZone.run(() => {
       if (this.editVideoIndex !== null) {
         const updated = [...this.logEvents];
-        (updated[this.editVideoIndex] as any)['eventId'] = this.editVideoEventId
-          ? `event collection/${this.editVideoEventId}`
+        const current = updated[this.editVideoIndex] as any;
+
+        // Find the linked event name from liveEvents if eventId is set
+        const linkedEvent = val.eventId
+          ? this.liveEvents.find(e => e.id === val.eventId)
           : null;
-        updated[this.editVideoIndex].date = this.editVideoRecordedDate;
-        this.logEvents = updated;
+
+        updated[this.editVideoIndex] = {
+          ...current,
+          videoTitle: val.title,
+          eventName: current.type === 'video' ? val.title : current.eventName,
+          date: val.recordedDate ? new Date(val.recordedDate) : current.date,
+          videoType: val.type,
+          eventId: val.eventId
+            ? `event collection/${val.eventId}`
+            : null,
+          linkedEventName: linkedEvent ? linkedEvent.name : null,
+          videoUrl: val.videoUrl,
+          hasVideo: !!val.videoUrl,
+          docId: resolvedDocId,
+          extraVideos: current.extraVideos || [],
+        };
+        this.logEvents = [...updated];
       }
       this.closeEditVideo();
       this.fetchRecords();
-      if (this.currentLogProfileId) {
-        this.loadEventLog(this.currentLogProfileId);
-      }
     });
+
     } catch (err) {
-      console.error('Error updating video:', err);
+      console.error('Error saving video:', err);
       this.editVideoSaving = false;
     }
   }
@@ -1322,7 +1535,7 @@ onJourneyFilterChange() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
 
         if (rows.length < 2) {
           this.bulkErrorMessages = ['Excel file is empty or has no data rows.'];

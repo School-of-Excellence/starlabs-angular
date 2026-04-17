@@ -9,13 +9,18 @@ import { AuthguardService } from '../../authguard.service';
 import { OpenviduVideoElementComponent } from '../openvidu-video-element/openvidu-video-element.component';
 import { CommonModule } from '@angular/common';
 import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvidu-audio-element.component';
-import { NoiseCancellationService } from '../../Service/NoiseCancellation/noisecancellation.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { BackgroundProcessor } from "@livekit/track-processors";
 import { InstanceStatusService } from '../../instance-status.service';
+import { MatDividerModule } from '@angular/material/divider';
+import { DeepAudioFilterService } from '../../Service/Deep Audio Filter/deep-audio-filter.service';
+// ── [DF3] DeepFilterNet3 noise cancellation service (ONNX · AudioWorklet · no API key needed)
+// Replaces Amazon Voice Focus as the active filter. VoiceFocus import + service kept intact below
+// so it can be re-enabled by swapping the method body back.
+import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -40,6 +45,7 @@ type RoomInfo = {
     CommonModule,
     MatIconModule,
     MatMenuModule,
+    MatDividerModule
   ],
   templateUrl: './join-openvidu-call.component.html',
   styleUrl: './join-openvidu-call.component.css'
@@ -79,14 +85,17 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   isVideoBlurred:boolean = false;
 
+  private previewStream: MediaStream | null = null;
+
   constructor(
     public firestore: Firestore,
     public route: ActivatedRoute,
     public httpClient: HttpClient,
     public guard: AuthguardService,
-    public noiseCancellationService: NoiseCancellationService,
     public dialog: MatDialog,
-    private infraService: InstanceStatusService
+    private infraService: InstanceStatusService,
+    private audiofilterservice : DeepAudioFilterService, // kept — not removed, used in debugAudioLevels()
+    private deepFilter3: DeepFilter3Service              // [DF3] active noise cancellation filter
   ){}
 
   ngAfterViewInit(): void {
@@ -137,7 +146,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.leaveRoom(false)
-    this.noiseCancellationService.cleanup()
     this.roomDetail = null
     this.roomSubscription?.next()
     this.roomSubscription?.complete()
@@ -528,6 +536,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   //   return 1 + remoteVideoCount;
   // }
 
+  isHost(): boolean {
+    if (!this.roomDetail || !this.loggedinProfileid) return false;
+    return this.roomDetail.hosts?.includes(this.loggedinProfileid) || false;
+  }
+
   async checkServer(){
     this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
       next: (serverData) => {
@@ -556,39 +569,37 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   async prepareParticipant() {
     this.isRequesting = true;
-    this.meetingRoomStatus = null
-
+    this.meetingRoomStatus = null;
+ 
     try {
-      // Try to request permission
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-      // Stop immediately to just preview
-      // stream.getTracks().forEach(t => t.stop());
-
+ 
+      // Store the full stream so joinCall() can stop the audio track later
+      this.previewStream = stream;
+ 
+      // Only use video for the preview tile — audio is not played back
       const videoTrack = new LocalVideoTrack(stream.getVideoTracks()[0]);
       this.localParticipant.set(videoTrack);
-
+ 
       this.cameraStatus = 'granted';
       this.micStatus = 'granted';
       this.isRequesting = false;
       return true;
     } catch (err: any) {
-      console.error("Permission error:", err);
-
-      const isHardBlock = err.name === 'NotAllowedError' && err.message?.includes("Permission dismissed") === false;
-
+      console.error('Permission error:', err);
+ 
+      const isHardBlock =
+        err.name === 'NotAllowedError' &&
+        err.message?.includes('Permission dismissed') === false;
+ 
       if (isHardBlock) {
-        // HARD BLOCK → Chrome/Safari won't prompt again
         this.cameraStatus = 'denied';
         this.micStatus = 'denied';
-
-        this.isRequesting = false;
-        return false;
+      } else {
+        this.cameraStatus = 'prompt';
+        this.micStatus = 'prompt';
       }
-
-      // SOFT BLOCK or dismissed popup
-      this.cameraStatus = 'prompt';
-      this.micStatus = 'prompt';
+ 
       this.isRequesting = false;
       return false;
     }
@@ -694,10 +705,12 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
     this.localParticipant.set(videoTrack);
 
-    await room.localParticipant.setMicrophoneEnabled(true, {
-      noiseSuppression: true,
-      echoCancellation: true
-    });
+    await this.enableMicrophoneWithNoiseCancellation(room);
+
+    // await room.localParticipant.setMicrophoneEnabled(true, {
+    //   noiseSuppression: true,
+    //   echoCancellation: true
+    // });
 
       // Enable camera and microphone for publishing - Default
       /*
@@ -1037,4 +1050,315 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     ).length;
     return 1 + remoteVideoCount;
   }
+
+  // /**
+  // * Enable microphone with RNNoise noise cancellation
+  // */
+  // async enableMicrophoneWithNoiseCancellation(room: Room) {
+  //   try {
+  //     console.log('🎙️ Enabling microphone with RNNoise...');
+ 
+  //     // ✅ Stop the preview audio track before opening the RNNoise stream.
+  //     // If the preview audio track is still running when we open a second
+  //     // getUserMedia call, both captures are active simultaneously and their
+  //     // AEC contexts are independent — causing echo on both sides.
+  //     if (this.previewStream) {
+  //       this.previewStream.getAudioTracks().forEach(t => t.stop());
+  //     }
+ 
+  //     // Open a fresh mic stream. echoCancellation is the browser's native AEC
+  //     // — it runs at the OS driver level, before any Web Audio processing.
+  //     // This is the correct layer to handle echo. RNNoise then handles
+  //     // background noise on top of an already echo-cancelled signal.
+  //     const rawStream = await navigator.mediaDevices.getUserMedia({
+  //       audio: {
+  //         echoCancellation: true,   // ← native AEC at OS level, handles echo
+  //         noiseSuppression: false,  // ← RNNoise handles this instead
+  //         autoGainControl: false,   // ← disabled; outputGain in service handles level
+  //         sampleRate: 48000,
+  //         channelCount: 1
+  //       }
+  //     });
+ 
+  //     const cleanAudioTrack = await this.noiseCancellationService.getCleanAudioTrack(rawStream);
+ 
+  //     await room.localParticipant.publishTrack(cleanAudioTrack, {
+  //       source: Track.Source.Microphone,
+  //       name: 'microphone'
+  //     });
+ 
+  //     console.log('✅ Microphone enabled with RNNoise');
+ 
+  //   } catch (error) {
+  //     console.error('❌ RNNoise failed, falling back to WebRTC:', error);
+ 
+  //     // Fallback: stop preview audio track here too before re-opening mic
+  //     if (this.previewStream) {
+  //       this.previewStream.getAudioTracks().forEach(t => t.stop());
+  //     }
+ 
+  //     await room.localParticipant.setMicrophoneEnabled(true, {
+  //       echoCancellation: true,
+  //       noiseSuppression: true,
+  //       autoGainControl: true,
+  //       sampleRate: 48000,
+  //       channelCount: 1
+  //     });
+ 
+  //     console.log('✅ Microphone enabled with WebRTC fallback');
+  //   }
+  // }
+
+  /**
+   * Enable microphone with DeepFilterNet3 noise cancellation.
+   *
+   * ── Audio pipeline ────────────────────────────────────────────────────────
+   *
+   *   getUserMedia (raw mic, 48 kHz)
+   *       │
+   *       ▼
+   *   DeepFilter3Service.init()          — loads ONNX model + AudioWorklet
+   *       │                                (~7.7 MB, one-time per session)
+   *       ▼
+   *   DeepFilter3Service.processStream() — wires audio graph:
+   *       │   MediaStreamSource
+   *       │       → AudioWorkletNode (deepfilternet3-noise-filter)
+   *       │           → MediaStreamDestination
+   *       ▼
+   *   cleanStream (MediaStream)          — background noise removed
+   *       │
+   *       ▼
+   *   room.localParticipant.publishTrack — LiveKit publishes clean audio
+   *
+   * ── Fallback ─────────────────────────────────────────────────────────────
+   *   If DeepFilterNet3 is not supported (non-Chromium browsers without
+   *   AudioWorklet) → native WebRTC noiseSuppression:true is used instead.
+   *
+   * ── Previous filter (Amazon Voice Focus) ─────────────────────────────────
+   *   The original Voice Focus implementation is preserved below, commented
+   *   out. To revert: comment the DF3 block, uncomment the Voice Focus block.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  async enableMicrophoneWithNoiseCancellation(room: Room) {
+  try {
+
+    // ── Step 1 — Stop preview track to prevent double capture ────────────
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => {
+        t.stop();
+        console.log('Stopped preview audio track');
+      });
+    }
+
+    // ── Step 2 — Capture raw mic stream ──────────────────────────────────
+    // noiseSuppression: false — DeepFilterNet3 handles this in the worklet.
+    // echoCancellation: true  — browser AEC still runs (removes speaker echo
+    //   before DF3 sees the signal, which improves DF3 accuracy).
+    const rawStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: false,  // [DF3] DeepFilterNet3 handles noise
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 1
+      }
+    });
+
+    console.log('🎙️ Raw mic stream obtained:', rawStream.getAudioTracks()[0].getSettings());
+
+    // ── Step 3 — Initialise DeepFilterNet3 ───────────────────────────────
+    // Downloads the ONNX model (~7.7 MB) and registers the AudioWorklet
+    // processor. Returns false on unsupported browsers (no AudioWorklet).
+    console.log('🔄 Initialising DeepFilterNet3 (loading WASM + ONNX model)…');
+    const df3Supported = await this.deepFilter3.init(80); // suppressionLevel 0–100
+
+    let cleanAudioTrack: MediaStreamTrack;
+
+    if (df3Supported) {
+      // ── Step 4a — Wire the DF3 audio graph and get the clean stream ─────
+      //
+      //   rawStream (MediaStream)
+      //       └─ MediaStreamAudioSourceNode
+      //               └─ AudioWorkletNode  ← DeepFilterNet3 ONNX inference
+      //                       └─ MediaStreamAudioDestinationNode
+      //                               └─ cleanStream (MediaStream)
+      //
+      const cleanStream = await this.deepFilter3.processStream(rawStream);
+      cleanAudioTrack = cleanStream.getAudioTracks()[0];
+
+      console.log(
+        `✅ DeepFilterNet3 active — init: ${this.deepFilter3.initTimeMs}ms,`,
+        `graph setup: ${this.deepFilter3.processingLatencyMs}ms`
+      );
+
+    } else {
+      // ── Step 4b — Fallback: raw stream (browser will apply its own AEC) ─
+      console.warn('⚠️ DeepFilterNet3 not supported on this browser — using raw stream.');
+      cleanAudioTrack = rawStream.getAudioTracks()[0];
+    }
+
+    // ── Step 5 — Publish clean audio track to LiveKit room ───────────────
+    await room.localParticipant.publishTrack(cleanAudioTrack, {
+      source: Track.Source.Microphone,
+      name: 'microphone'
+    });
+
+    if (this.debugAudioLevels) this.debugAudioLevels();
+    console.log('✅ Microphone published with DeepFilterNet3 noise cancellation');
+
+    // ── [DISABLED] Amazon Voice Focus — original implementation ──────────
+    // Kept intact for easy revert. To re-enable:
+    //   1. Comment the DF3 block above (Steps 3–4b)
+    //   2. Uncomment this block
+    //
+    // console.log('🎙️ Enabling microphone with Amazon Voice Focus...');
+    //
+    // // Step 2 — Init Voice Focus
+    // const supported = await this.audiofilterservice.init();
+    //
+    // let cleanAudioTrack: MediaStreamTrack;
+    //
+    // if (supported) {
+    //   // Step 3a — Apply Voice Focus
+    //   const cleanStream = await this.audiofilterservice.processStream(rawStream);
+    //   cleanAudioTrack = cleanStream.getAudioTracks()[0];
+    //   console.log('✅ Amazon Voice Focus active');
+    // }
+    // ─────────────────────────────────────────────────────────────────────
+
+  } catch (error) {
+    console.error('❌ DeepFilterNet3 failed, falling back to native WebRTC:', error);
+
+    // Destroy DF3 instance if it was partially initialised
+    this.deepFilter3.destroy();
+
+    // Stop preview audio
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => t.stop());
+    }
+
+    // ── Native browser fallback — always works on all browsers ───────────
+    await room.localParticipant.setMicrophoneEnabled(true, {
+      echoCancellation: true,
+      noiseSuppression: true,   // WebRTC built-in suppression as last resort
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1
+    });
+
+    if (this.debugAudioLevels) this.debugAudioLevels();
+    console.log('✅ Microphone enabled with WebRTC native fallback');
+  }
+}
+
+// Keep your existing debugAudioLevels as-is
+debugAudioLevels() {
+  const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
+  if (micPub?.audioTrack) {
+    const settings = micPub.audioTrack.mediaStreamTrack.getSettings();
+    console.log('📊 Audio Track Settings:', {
+      sampleRate: settings.sampleRate,
+      channelCount: settings.channelCount,
+      echoCancellation: settings.echoCancellation,
+      noiseSuppression: settings.noiseSuppression,
+      autoGainControl: settings.autoGainControl,
+      voiceFocusActive: this.audiofilterservice.isActive()
+    });
+  }
+}
+
+  
+
+  /**
+ *remove a participant from the room
+ */
+async removePanticipant(participantIdentity: string, participantName: string) {
+  if (!this.isHost()) {
+    alert('Only hosts can remove participants');
+    return;
+  }
+
+  const confirmed = confirm(`Are you sure you want to remove ${participantName} from the call?`);
+  if (!confirmed) return;
+
+  try {
+    const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/kickParticipant`;
+
+    const response = await firstValueFrom(
+      this.httpClient.post<{ success: boolean; message: string }>(
+        url,
+        {
+          roomName: this.roomDetail.roomId,
+          participantIdentity: participantIdentity,
+          requesterId: this.loggedinProfileid
+        }
+      )
+    );
+
+    console.log('Participant kicked successfully:', response.message);
+    
+  } catch (error: any) {
+    console.error('Failed to kick participant:', error);
+    
+    let errorMessage = 'Failed to remove participant. Please try again.';
+    if (error.status === 403) {
+      errorMessage = 'Only hosts can remove participants';
+    } else if (error.status === 404) {
+      errorMessage = 'Room not found';
+    } else if (error.error?.message) {
+      errorMessage = error.error.message;
+    }
+    
+    alert(errorMessage);
+  }
+}
+
+  /**
+   * Mute/unmute a participant's audio
+   */
+  async toggleParticipantMute(participantIdentity: string, participantName: string, currentlyMuted: boolean) {
+    if (!this.isHost()) {
+      alert('Only hosts can mute/unmute participants');
+      return;
+    }
+
+    const action = currentlyMuted ? 'unmute' : 'mute';
+    const confirmed = confirm(`Are you sure you want to ${action} ${participantName}?`);
+    if (!confirmed) return;
+
+    try {
+      
+      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/muteParticipant`;
+
+      const response = await firstValueFrom(
+        this.httpClient.post<{ success: boolean; message: string }>(
+          url,
+          {
+            roomName: this.roomDetail.roomId,
+            participantIdentity: participantIdentity,
+            trackType: 'audio',
+            muted: !currentlyMuted,
+            requesterId: this.loggedinProfileid
+          }
+        )
+      );
+
+      console.log(`Participant ${action}d:`, response.message);
+      
+    } catch (error: any) {
+      console.error(`Failed to ${action} participant:`, error);
+      
+      let errorMessage = `Failed to ${action} participant. Please try again.`;
+      if (error.status === 403) {
+        errorMessage = 'Only hosts can mute/unmute participants';
+      } else if (error.status === 404) {
+        errorMessage = 'Room not found';
+      } else if (error.error?.message) {
+        errorMessage = error.error.message;
+      }
+      
+      alert(errorMessage);
+    }
+  }
+ 
 }

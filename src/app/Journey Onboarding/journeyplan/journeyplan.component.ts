@@ -195,32 +195,37 @@ export class JourneyplanComponent {
 
       const d = docSnap.data();
 
-      month.data.solarvoice = (d['solarvoice'] ?? []).map((e: any) => ({
-        playlist: (e.playlist ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean),
-        preferredday: e.preferredday ?? 'all',
-        preferredtime: e.preferredtime ?? 'all',
-        allTime: e.preferredtime === 'all',
-        completedcontent: e.completedcontent ?? [],
-        completedplaylist: e.completedplaylist ?? [],
-      }));
+      // Each stored entry has a single `playlist` doc reference. Group entries that share
+      // the same preferredday + preferredtime back into a single UI row with a playlist array.
+      const groupFlatEntries = (entries: any[]) => {
+        const map = new Map<string, any>();
+        for (const e of (entries ?? [])) {
+          const playlistId: string | null = e.playlist?.id ?? null;
+          const day = e.preferredday ?? 'all';
+          const time = e.preferredtime ?? 'all';
+          const key = `${day}__${time}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              playlist: playlistId ? [playlistId] : [],
+              preferredday: day,
+              preferredtime: time,
+              allTime: time === 'all',
+              completedcontent: e.completedcontent ?? [],
+              completedplaylist: e.completedplaylist ?? [],
+            });
+          } else {
+            const row = map.get(key);
+            if (playlistId && !row.playlist.includes(playlistId)) {
+              row.playlist.push(playlistId);
+            }
+          }
+        }
+        return Array.from(map.values());
+      };
 
-      month.data.eiflix = (d['eiflix'] ?? []).map((e: any) => ({
-        playlist: (e.playlist ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean),
-        preferredday: e.preferredday ?? 'all',
-        preferredtime: e.preferredtime ?? 'all',
-        allTime: e.preferredtime === 'all',
-        completedcontent: e.completedcontent ?? [],
-        completedplaylist: e.completedplaylist ?? [],
-      }));
-
-      month.data.generalcontent = (d['generalcontent'] ?? []).map((e: any) => ({
-        playlist: (e.playlist ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean),
-        preferredday: e.preferredday ?? 'all',
-        preferredtime: e.preferredtime ?? 'all',
-        allTime: e.preferredtime === 'all',
-        completedcontent: e.completedcontent ?? [],
-        completedplaylist: e.completedplaylist ?? [],
-      }));
+      month.data.solarvoice = groupFlatEntries(d['solarvoice']);
+      month.data.eiflix = groupFlatEntries(d['eiflix']);
+      month.data.generalcontent = groupFlatEntries(d['generalcontent']);
 
       month.data.workshop = (d['workshop'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean);
       month.data.products = (d['products'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean);
@@ -242,6 +247,12 @@ export class JourneyplanComponent {
 
   toggleRowAllTime(row: any) {
     row.preferredtime = row.allTime ? 'all' : '';
+  }
+
+  compareDates(a: any, b: any): boolean {
+    if (!a || !b) return a === b;
+    return new Date(a).getFullYear() === new Date(b).getFullYear()
+      && new Date(a).getMonth() === new Date(b).getMonth();
   }
 
   validateMonthlyPlan(): { valid: boolean; errors: string[] } {
@@ -306,13 +317,20 @@ export class JourneyplanComponent {
         const productRefs = matchedProducts.filter(p => p['docid']).map(p => doc(this.firestore, 'products', p['productref']));
 
         // --- Category arrays ---
-        const buildCategoryArray = (rows: any[], collectionName: string) => rows.filter(r => (r.playlist || []).length > 0).map((r, idx) => ({
-          playlist: (r.playlist || []).map((id: string) => doc(this.firestore, collectionName, id)),
-          preferredday: r.preferredday ?? 'all',
-          preferredtime: r.allTime ? 'all' : r.preferredtime,
-          completedcontent: r.completedcontent ?? [],
-          completedplaylist: r.completedplaylist ?? [],
-        }));
+        // Each playlist ID in a row becomes its own flat entry with a single doc reference.
+        // Rows with multiple playlist IDs are expanded so every entry has exactly one `playlist` ref.
+        const buildCategoryArray = (rows: any[], collectionName: string) =>
+          rows
+            .filter(r => (r.playlist || []).length > 0)
+            .flatMap(r =>
+              (r.playlist as string[]).map(id => ({
+                playlist: doc(this.firestore, collectionName, id),
+                preferredday: r.preferredday ?? 'all',
+                preferredtime: r.allTime ? 'all' : r.preferredtime,
+                completedcontent: r.completedcontent ?? [],
+                completedplaylist: r.completedplaylist ?? [],
+              }))
+            );
 
         const solarvoice = buildCategoryArray(month.data.solarvoice, 'solar voice playlist');
         const eiflix = buildCategoryArray(month.data.eiflix, 'series');

@@ -3,10 +3,15 @@
     <h4>Create ATC Model</h4>
   </div>
   <div>
-    <form  [formGroup]="form">
-      <app-text label="ATC Model" controlName="atcmodel" [form]="form" ></app-text>
-      <app-text label="Evolution Type" controlName="evolutiontype" [form]="form" ></app-text>
-    <app-auto-complete-with-chip 
+    <form [formGroup]="form">
+
+      <app-text
+        label="ATC Model"
+        controlName="atcmodel"
+        [form]="form">
+      </app-text>
+
+      <app-auto-complete-with-chip
         label="Evolution Type"
         [form]="form"
         controlName="evolutiontype"
@@ -15,12 +20,28 @@
         displayname=""
         valuetype=""
         valuelabel=""
-        [multiple]="false"
-    >
-    </app-auto-complete-with-chip>
-      <app-mat-chip label="Category" controlName="category" [form]="form"></app-mat-chip>
-      <app-text-area label="Description" controlName="description" [form]="form"></app-text-area>
-      <app-auto-complete-with-chip 
+        [multiple]="false">
+      </app-auto-complete-with-chip>
+
+      <app-mat-chip
+        label="Category"
+        controlName="category"
+        [form]="form">
+      </app-mat-chip>
+
+      <app-text-area
+        label="Description"
+        controlName="description"
+        [form]="form">
+      </app-text-area>
+
+      <app-text-area
+        label="ATC Directive"
+        controlName="directive"
+        [form]="form">
+      </app-text-area>
+
+      <app-auto-complete-with-chip
         label="Video URL"
         [form]="form"
         controlName="videourl"
@@ -29,14 +50,14 @@
         displayname="title"
         valuetype="ref"
         valuelabel="ref"
-        [multiple]="true"
-      >
+        [multiple]="true">
       </app-auto-complete-with-chip>
-      <div style="display: flex;justify-content: center;align-items: center;">
-        <button mat-stroked-button type="button" (click)="dialogRef.close()">Cancel</button>&nbsp;&nbsp;&nbsp;
+
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 16px;">
+        <button mat-stroked-button type="button" (click)="dialogRef.close()">Cancel</button> &nbsp;&nbsp;&nbsp;
         <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>
       </div>
-    </form>
-</div>
 
+    </form>
+  </div>
 </div>

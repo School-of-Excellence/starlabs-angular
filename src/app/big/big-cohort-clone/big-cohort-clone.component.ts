@@ -429,7 +429,7 @@ export class BigCohortCloneComponent {
     getDocs(query(
       collection(this.firestore, "event participation request"),
       where("eventref", "in", selectedEventRefs),
-      where("status", "==", "approved")
+      where("status", 'in', ["approved",'attended'])
     )).then(snap => {
       this.eventParticipationList = snap.docs.map(e => {
         const data: any = e.data();
@@ -689,7 +689,7 @@ export class BigCohortCloneComponent {
         this.selectedAcceleratorEvent.includes(eventRefId);
       const matchesMarathon = this.selectedMarathon && marathonRefId === this.selectedMarathon;
       
-      if (matchesEvent || matchesMarathon) {
+      if (matchesEvent) {
         (cohort['participantidlist'] || []).forEach((id: string) => {
           assignedParticipantIds.add(id);
         });
@@ -708,7 +708,6 @@ export class BigCohortCloneComponent {
         
         if (!participantId || assignedParticipantIds.has(participantId)) return;
         if (!this.selectedAcceleratorEvent.includes(eventRefId)) return;
-
         const key = `${participantId}_${eventRefId}`;
         
         participantMap.set(key, {

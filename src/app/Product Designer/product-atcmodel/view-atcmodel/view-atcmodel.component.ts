@@ -1,7 +1,7 @@
 import { Component, OnInit,ViewChild } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateAtcmodelComponent } from '../create-atcmodel/create-atcmodel.component';
-import { collection, collectionData, Firestore, getDocs } from '@angular/fire/firestore';
+import { collection, collectionData, Firestore, getDocs, query } from '@angular/fire/firestore';
 import {MatPaginator, MatPaginatorModule} from '@angular/material/paginator';
 import {MatSort} from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -11,6 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { NgFor } from '@angular/common';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { orderBy } from 'firebase/firestore';
 
 @Component({
   selector: 'app-view-atcmodel',
@@ -28,7 +29,7 @@ import { MatButtonModule } from '@angular/material/button';
 })
 export class ViewAtcmodelComponent {
   private subscription  = new Subject<void>();
-  displayedColumns: string[] = ['atcmodel','evolutiontype','category','description','videourl','edit'];
+  displayedColumns: string[] = ['atcmodel','evolutiontype','category','description','Directive','videourl','edit'];
   dataSource = new MatTableDataSource()
   atcmodelData = []
   @ViewChild(MatPaginator) paginator: MatPaginator;
@@ -40,7 +41,7 @@ export class ViewAtcmodelComponent {
     private firestore : Firestore
   ){
     const atcmodelcollection = collection(this.firestore, 'atc model')
-    this.atcmodelSubscription = collectionData(atcmodelcollection, {idField : 'id'}).pipe(takeUntil(this.subscription)).subscribe(snap => {
+    this.atcmodelSubscription = collectionData(query(atcmodelcollection, orderBy("atcmodel")), {idField : 'id'}).pipe(takeUntil(this.subscription)).subscribe(snap => {
       this.atcmodelData = snap
       this.ngAfterViewInit()
     })

@@ -116,7 +116,6 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   queueStagesConfig: StageConfig[] = [];
   mergedSlots: MergedSlot[] = [];
   queuePlanningSegmentList: string[] = [];
-  slotPlannerSegmentFilter: string[] = [];
 
   private subscriptionHandle = new Subject<void>()
   private subscriptions: Subscription[] = [];
@@ -133,7 +132,6 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   canScrollLeft: boolean = false;
   canScrollRight: boolean = false;
   showFromToday: boolean = true;
-  isSlotPlannerOpen: boolean = false;
 
   // NEW: Panel view type
   panelViewType: 'slot' | 'queue-tokens' | 'segment-participants' | 'overall-queue-tokens' | 'overall-segment-participants' | null = null;
@@ -170,6 +168,37 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   deletedSlotsParticipants: any[] = [];
 
   expandedRows: string[] = []
+  expandedQueueRows: string[] = [];
+  activeSlotPlannerTab: 'appointment' | 'queue' = 'appointment';
+
+  // Cached planning data
+  cachedPlanningData: any = null;
+  private dataReadyFlags = { tokens: false, planners: false, planning: false };
+
+  // Queue tab panel
+  showQueueTabPanel: boolean = false;
+  queueTabPanelParticipants: any[] = [];
+  queueTabPanelTitle: string = '';
+  queueTabPanelType: 'confirmed' | 'non-confirmed' = 'confirmed';
+  queueTabPanelSegmentName: string = '';
+  queueTabPanelSlotTime: string = '';
+  selectedSegmentIds: Set<string> = new Set();
+  currentPanelSlot: any = null;
+
+  // Interim report filter
+  interimDataLoaded: boolean = false;
+  activeInterimCard: 'completed' | 'not-completed' | null = null;
+  completedInterimProfileIds: Set<string> = new Set();
+  notCompletedInterimProfileIds: Set<string> = new Set();
+  allInterimProfileIds: Set<string> = new Set();
+  interimCompletedCount: number = 0;
+  interimNotCompletedCount: number = 0;
+  interimReportLoading: boolean = false;
+  interimReportStartDate: Date | null = null;
+  interimReportEndDate: Date | null = null;
+  showInterimDatePicker: boolean = false;
+  
+  
 
   slotPlannerFilter = {
     startDate: null,
@@ -353,9 +382,17 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.cohortQueuePlannerList = [];
     this.mergedSlots = [];
     this.queuePlanningSegmentList = [];
+    this.cachedPlanningData = null;
+    this.dataReadyFlags = { tokens: false, planners: false, planning: false };
 
     this.closeSlotPanel();
     this.cancelSubscriptions();
+
+    this.interimDataLoaded = false;
+    this.activeInterimCard = null;
+    this.completedInterimProfileIds = new Set();
+    this.notCompletedInterimProfileIds = new Set();
+    this.allInterimProfileIds = new Set();
 
     const loading = this.dialog.open(LoadingProgressComponent, {
       data: { msg: "Loading Queue Data..." },
@@ -409,7 +446,8 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           }
           return true;
         });
-        this.processMergedSlots();
+        this.dataReadyFlags.tokens = true;
+        this.rebuildIfAllReady();
       });
       this.subscriptions.push(queueTokenSub);
 
@@ -419,7 +457,8 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       );
       const cohortPlannerSub = collectionData(cohortQueuePlannerQuery, { idField: 'id' }).subscribe(planners => {
         this.cohortQueuePlannerList = planners;
-        this.processMergedSlots();
+        this.dataReadyFlags.planners = true;
+        this.rebuildIfAllReady();
       });
       this.subscriptions.push(cohortPlannerSub);
 
@@ -432,7 +471,9 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         if (planningDocs.length > 0) {
           this.updateSlotConfiguredFlags(planningDocs[0]);
           this.queuePlanningSegmentList = planningDocs[0]['segmentlist'] || [];
-          await this.loadQueuePlanning(planningDocs[0]);
+          this.cachedPlanningData = planningDocs[0];
+          this.dataReadyFlags.planning = true;
+          this.rebuildIfAllReady();
         }
       });
       this.subscriptions.push(planningSub);
@@ -471,6 +512,24 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   }
 
   async loadQueuePlanning(planningData: any) {
+    this.cachedPlanningData = planningData;
+    this.rebuildIfAllReady();
+  }
+
+  rebuildIfAllReady() {
+    const { tokens, planners, planning } = this.dataReadyFlags;
+    if (!tokens || !planners || !planning) return;
+    this.rebuildMergedSlots();
+  }
+
+  processMergedSlots() {
+    this.rebuildIfAllReady();
+  }
+
+  rebuildMergedSlots() {
+    const planningData = this.cachedPlanningData;
+    if (!planningData) return;
+
     const slotsMap = new Map<string, any>();
 
     if (planningData.planning && planningData.planning.length > 0) {
@@ -528,111 +587,79 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       }
     }
 
-    this.processMergedSlots();
+    this.mergedSlots = Array.from(slotsMap.values()).map(slotData => {
+      const segmentVariations = [];
+
+      slotData.segmentVariationsData.forEach((segVarData, key) => {
+        const existingSegment = segmentVariations.find(sv => sv.segmentId === segVarData.segmentId);
+
+        if (existingSegment) {
+          existingSegment.variations.push({
+            variationId: segVarData.variationId,
+            variationName: this.getVariationName(segVarData.variationId),
+            stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
+          });
+        } else {
+          segmentVariations.push({
+            segmentId: segVarData.segmentId,
+            segmentName: this.getSegmentName(segVarData.segmentId),
+            variations: [{
+              variationId: segVarData.variationId,
+              variationName: this.getVariationName(segVarData.variationId),
+              stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
+            }]
+          });
+        }
+      });
+
+      return {
+        startdate: slotData.startdate,
+        enddate: slotData.enddate,
+        starttime: slotData.starttime,
+        endtime: slotData.endtime,
+        stages: Array.from(slotData.stages),
+        segmentVariations: segmentVariations
+      };
+    });
+
+    this.mergedSlots.sort((a, b) => a.startdate.getTime() - b.startdate.getTime());
   }
 
-  processMergedSlots() {
-    const slotsMap = new Map<string, any>();
+  recalculateMergedSlotParticipants() {
+    const filterSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
+      : this.activeInterimCard === 'not-completed' ? this.notCompletedInterimProfileIds
+      : null;
 
-    const planningQuery = query(collection(this.firestore, 'queue planning'), where('queueid', '==', this.selectedQueue['docid']));
+    for (const slot of this.mergedSlots) {
+      for (const segVar of slot.segmentVariations) {
+        for (const variation of segVar.variations) {
+          for (const stageName of Object.keys(variation.stageData)) {
+            const sd: any = variation.stageData[stageName];
 
-    getDocs(planningQuery).then(planningDocs => {
-      if (planningDocs.docs.length > 0) {
-        const planningData = planningDocs.docs[0].data();
-
-        if (planningData['planning'] && planningData['planning'].length > 0) {
-          for (const variationPlanning of planningData['planning']) {
-            const variationId = variationPlanning.variationid;
-
-            if (variationPlanning.segments && variationPlanning.segments.length > 0) {
-              for (const segmentData of variationPlanning.segments) {
-                const segmentId = segmentData.segmentid;
-
-                if (segmentData.slots && segmentData.slots.length > 0) {
-                  for (const slot of segmentData.slots) {
-                    const startDate = slot.startdate ? slot.startdate.toDate() : null;
-                    const endDate = slot.enddate ? slot.enddate.toDate() : null;
-                    const stageName = slot.stagename;
-
-                    if (startDate && endDate) {
-                      const slotKey = this.generateSlotKey(startDate, endDate);
-
-                      if (!slotsMap.has(slotKey)) {
-                        slotsMap.set(slotKey, {
-                          startdate: startDate,
-                          enddate: endDate,
-                          starttime: this.formatTimeTo24Hour(startDate),
-                          endtime: this.formatTimeTo24Hour(endDate),
-                          stages: new Set<string>(),
-                          segmentVariationsData: new Map()
-                        });
-                      }
-
-                      const slotData = slotsMap.get(slotKey);
-                      slotData.stages.add(stageName);
-
-                      const segmentVariationKey = `${segmentId}_${variationId}`;
-                      if (!slotData.segmentVariationsData.has(segmentVariationKey)) {
-                        slotData.segmentVariationsData.set(segmentVariationKey, {
-                          segmentId,
-                          variationId,
-                          stageData: {}
-                        });
-                      }
-
-                      const segVariationData = slotData.segmentVariationsData.get(segmentVariationKey);
-                      segVariationData.stageData[stageName] = {
-                        maxslot: slot.maxslot || 0,
-                        usedslot: slot.usedslot || 0,
-                        startdate: startDate,
-                        enddate: endDate
-                      };
-                    }
-                  }
-                }
-              }
+            // Store full lists on first call
+            if (!sd._allConfirmed) {
+              sd._allConfirmed = sd.confirmedParticipants || [];
+              sd._allNonConfirmed = sd.nonConfirmedParticipants || [];
             }
-          }
-        }
 
-        this.mergedSlots = Array.from(slotsMap.values()).map(slotData => {
-          const segmentVariations = [];
-
-          slotData.segmentVariationsData.forEach((segVarData, key) => {
-            const existingSegment = segmentVariations.find(sv => sv.segmentId === segVarData.segmentId);
-
-            if (existingSegment) {
-              existingSegment.variations.push({
-                variationId: segVarData.variationId,
-                variationName: this.getVariationName(segVarData.variationId),
-                stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
+            if (filterSet) {
+              sd.confirmedParticipants = sd._allConfirmed.filter((p: any) => {
+                const pid = p.profile_id || p.profileid;
+                return pid && filterSet.has(pid);
+              });
+              sd.nonConfirmedParticipants = sd._allNonConfirmed.filter((p: any) => {
+                const pid = p.profile_id || p.profileid;
+                return pid && filterSet.has(pid);
               });
             } else {
-              segmentVariations.push({
-                segmentId: segVarData.segmentId,
-                segmentName: this.getSegmentName(segVarData.segmentId),
-                variations: [{
-                  variationId: segVarData.variationId,
-                  variationName: this.getVariationName(segVarData.variationId),
-                  stageData: this.calculateStageData(segVarData.segmentId, segVarData.variationId, segVarData.stageData)
-                }]
-              });
+              sd.confirmedParticipants = sd._allConfirmed;
+              sd.nonConfirmedParticipants = sd._allNonConfirmed;
             }
-          });
-
-          return {
-            startdate: slotData.startdate,
-            enddate: slotData.enddate,
-            starttime: slotData.starttime,
-            endtime: slotData.endtime,
-            stages: Array.from(slotData.stages),
-            segmentVariations: segmentVariations
-          };
-        });
-
-        this.mergedSlots.sort((a, b) => a.startdate.getTime() - b.startdate.getTime());
+            sd.usedslot = sd.confirmedParticipants.length;
+          }
+        }
       }
-    });
+    }
   }
 
   calculateStageData(segmentId: string, variationId: string, stageData: any): any {
@@ -892,9 +919,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     (this.queueTokenList || []).forEach(token => {
       const profileId = token.profile_id || token.profileid;
 
-      if (!validParticipantIds.includes(profileId)) {
-        return;
-      }
+      if (!validParticipantIds.includes(profileId)) return;
 
       if (token.tokenstatus !== 'Active' || token.stagestatus !== 'Approved' || ![null, undefined, false].includes(token.delete)) {
         return;
@@ -903,21 +928,21 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       const tokenCurrentStageIndex = this.queueStages.indexOf(token.currentstage);
       if (tokenCurrentStageIndex === -1) return;
 
-      if (tokenCurrentStageIndex > currentStageIndex) {
-        return;
-      }
+      if (tokenCurrentStageIndex > currentStageIndex) return;
 
       if (tokenCurrentStageIndex >= checkFromStageIndex && tokenCurrentStageIndex <= currentStageIndex) {
         const stageSlots = token.selectedstageslot || {};
-        const selectedSlot = stageSlots[stagename];
 
-        // const hasConfirmedThisSlot = selectedSlot &&
-        //   selectedSlot.segmentid === segmentid &&
-        //   selectedSlot.stagename === stagename &&
-        //   toTime(selectedSlot.startdate) === startTs &&
-        //   toTime(selectedSlot.enddate) === endTs;
         const hasConfirmedThisStage = stageSlots[stagename] != null;
         if (!hasConfirmedThisStage) {
+
+          if (this.activeInterimCard === 'completed' && !this.completedInterimProfileIds.has(profileId)) {
+            return;
+          }
+          if (this.activeInterimCard === 'not-completed' && !this.notCompletedInterimProfileIds.has(profileId)) {
+            return;
+          }
+
           if (profileId && !addedProfileIds.has(profileId)) {
             addedProfileIds.add(profileId);
             const participantSegmentId = this.getParticipantSegment(profileId);
@@ -950,15 +975,21 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       validParticipantIds.forEach(profileId => {
         if (!profileId) return;
 
-        if (addedProfileIds.has(profileId)) {
-          return;
-        }
+        if (addedProfileIds.has(profileId)) return;
 
         const hasQueueToken = this.queueTokenList.some(token =>
           (token.profile_id === profileId || token.profileid === profileId)
         );
 
         if (!hasQueueToken) {
+
+          if (this.activeInterimCard === 'completed' && !this.completedInterimProfileIds.has(profileId)) {
+            return;
+          }
+          if (this.activeInterimCard === 'not-completed' && !this.notCompletedInterimProfileIds.has(profileId)) {
+            return;
+          }
+
           addedProfileIds.add(profileId);
           const participantSegmentId = this.getParticipantSegment(profileId);
 
@@ -1010,66 +1041,71 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     return nonConfirmedParticipants;
   }
 
-getConfirmedParticipantsForSlot(
-  variationid: string,
-  segmentid: string,
-  stagename: string,
-  startdate: Date,
-  enddate: Date
-): any[] {
-  const toTime = (d: any): number | null => {
-    if (!d) return null;
-    const dateObj = d.toDate ? d.toDate() : new Date(d);
-    const t = new Date(dateObj).getTime();
-    return Number.isNaN(t) ? null : t;
-  };
+  getConfirmedParticipantsForSlot(
+    variationid: string,
+    segmentid: string,
+    stagename: string,
+    startdate: Date,
+    enddate: Date
+  ): any[] {
+    const toTime = (d: any): number | null => {
+      if (!d) return null;
+      const dateObj = d.toDate ? d.toDate() : new Date(d);
+      const t = new Date(dateObj).getTime();
+      return Number.isNaN(t) ? null : t;
+    };
 
-  const startTs = toTime(startdate);
-  const endTs = toTime(enddate);
-  if (startTs === null || endTs === null) return [];
+    const startTs = toTime(startdate);
+    const endTs = toTime(enddate);
+    if (startTs === null || endTs === null) return [];
 
-  const currentStageIndex = this.queueStages.indexOf(stagename);
-  if (currentStageIndex === -1) return [];
+    const currentStageIndex = this.queueStages.indexOf(stagename);
+    if (currentStageIndex === -1) return [];
 
-  const matchingTokens: any[] = [];
+    const matchingTokens: any[] = [];
 
-  for (const token of this.queueTokenList || []) {
-    if (token.tokenstatus !== 'Active') continue;
-    if (token.stagestatus !== 'Approved') continue;
-    if (![null, undefined, false].includes(token.delete)) continue;
+    for (const token of this.queueTokenList || []) {
+      if (token.tokenstatus !== 'Active') continue;
+      if (token.stagestatus !== 'Approved') continue;
+      if (![null, undefined, false].includes(token.delete)) continue;
 
-    // REMOVED the tokenCurrentStageIndex > currentStageIndex check
-    // A participant may have moved past this stage but still booked a slot for it
+      const stageSlots = token.selectedstageslot || {};
+      const slot = stageSlots[stagename];
 
-    const stageSlots = token.selectedstageslot || {};
-    const slot = stageSlots[stagename];
+      if (
+        slot &&
+        slot.segmentid === segmentid &&
+        slot.stagename === stagename &&
+        toTime(slot.startdate) === startTs &&
+        toTime(slot.enddate) === endTs
+      ) {
+        const profileId = token.profile_id || token.profileid;
 
-    if (
-      slot &&
-      slot.segmentid === segmentid &&
-      slot.stagename === stagename &&
-      toTime(slot.startdate) === startTs &&
-      toTime(slot.enddate) === endTs
-    ) {
-      const slotExistsInPlanning = this.checkSlotExistsInPlanning(
-        variationid, segmentid, stagename,
-        toTime(slot.startdate), toTime(slot.enddate)
-      );
+        if (this.activeInterimCard === 'completed' && !this.completedInterimProfileIds.has(profileId)) {
+          continue;
+        }
+        if (this.activeInterimCard === 'not-completed' && !this.notCompletedInterimProfileIds.has(profileId)) {
+          continue;
+        }
 
-      const profileId = token.profile_id || token.profileid;
-      const participantSegmentId = this.getParticipantSegment(profileId);
+        const slotExistsInPlanning = this.checkSlotExistsInPlanning(
+          variationid, segmentid, stagename,
+          toTime(slot.startdate), toTime(slot.enddate)
+        );
 
-      matchingTokens.push({
-        ...token,
-        hasInvalidSlot: !slotExistsInPlanning,
-        invalidSlotReason: !slotExistsInPlanning ? 'Slot does not exist in queue planning' : null,
-        participantSegmentId: participantSegmentId
-      });
+        const participantSegmentId = this.getParticipantSegment(profileId);
+
+        matchingTokens.push({
+          ...token,
+          hasInvalidSlot: !slotExistsInPlanning,
+          invalidSlotReason: !slotExistsInPlanning ? 'Slot does not exist in queue planning' : null,
+          participantSegmentId: participantSegmentId
+        });
+      }
     }
-  }
 
-  return matchingTokens;
-}
+    return matchingTokens;
+  }
 
   // NEW: Get queue token count for a specific stage
   getQueueTokenCountForStage(stage: string): number {
@@ -1921,21 +1957,25 @@ getConfirmedParticipantsForSlot(
     XLSX.writeFile(workbook, fileName);
   }
 
-  // Export all segment participants (overall)
+  // Fix 2: Export for Queue tab
   exportParticipantsDetailsForStage() {
+    if (!this.selectedStage) return;
 
-    if (!this.selectedStage) return
+    if (this.activeSlotPlannerTab === 'queue') {
+      this.exportQueueTabData();
+    } else {
+      this.exportAppointmentTabData();
+    }
+  }
 
+  exportAppointmentTabData() {
     const allParticipants: any[] = [];
 
-    // Get queue token profile IDs for status check
     const queueTokenMap = new Map<string, any>();
     this.queueTokenList.forEach(token => {
       if (token.tokenstatus === 'Active' && token.stagestatus === 'Approved' && [null, undefined, false].includes(token.delete)) {
         const profileId = token.profile_id || token.profileid;
-        if (profileId) {
-          queueTokenMap.set(profileId, token);
-        }
+        if (profileId) queueTokenMap.set(profileId, token);
       }
     });
 
@@ -1944,66 +1984,112 @@ getConfirmedParticipantsForSlot(
 
     slots.forEach((slot) => {
       const key = slot.startdate.toDateString();
-      if (this.selectedDates.length > 0 && !this.selectedDates.includes(key)) {
-          return
-      }
-      const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}` 
+      if (this.selectedDates.length > 0 && !this.selectedDates.includes(key)) return;
+
+      const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}`;
       slot.segmentVariations.forEach(segmentVar => {
         segmentVar.variations.forEach(variation => {
           if (variation.stageData && variation.stageData[stage]) {
             variation.stageData[stage].confirmedParticipants.forEach((participant) => {
               const participantId = participant.profile_id || participant.profileid;
-
               if (participantId) {
                 allParticipants.push({
-                  participantId, 
-                  segmentName: segmentVar.segmentName, 
-                  variationName : variation.variationName ,  
-                  stageName : stage , 
-                  slotBooked : slotTiming , 
-                  slotBookedTiming : queueTokenMap.get(participantId)?.selectedstageslot[stage]?.slotconfirmation
+                  participantId,
+                  segmentName: segmentVar.segmentName,
+                  variationName: variation.variationName,
+                  stageName: stage,
+                  slotBooked: slotTiming,
+                  slotBookedTiming: queueTokenMap.get(participantId)?.selectedstageslot[stage]?.slotconfirmation
                 });
               }
-            })
+            });
           }
-        })
-      })
-    })
+        });
+      });
+    });
 
-    if (allParticipants.length === 0) {
-      alert('No participants to export');
-      return;
-    }
+    if (allParticipants.length === 0) { alert('No participants to export'); return; }
 
-    const exportData = allParticipants.map((p, index) => ({
+    const exportData = allParticipants.map((p) => ({
       'Name': this.getProfileName(p.participantId) || 'N/A',
       'Email': this.getParticipantEmail(p.participantId) ?? 'N/A',
-      'Phone Number' : this.getParticipantPhoneNumber(p.participantId) ?? 'N/A',
+      'Phone Number': this.getParticipantPhoneNumber(p.participantId) ?? 'N/A',
       'Segment': p.segmentName || 'N/A',
-      'Variation' : p.variationName || 'N/A',
-      'Current Stage' : p.stageName || 'N/A',
-      'Slot Booked' : p.slotBooked || 'N/A',
+      'Variation': p.variationName || 'N/A',
+      'Current Stage': p.stageName || 'N/A',
+      'Slot Booked': p.slotBooked || 'N/A',
       'SlotTiming': p.slotBookedTiming || '',
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Segment Participants');
+    this.downloadExcel(exportData, 'Appointment Participants');
+  }
 
-    // Auto-size columns
+  exportQueueTabData() {
+    const stage = this.selectedStage;
+    const slots = this.getSlotsForStage(stage);
+    const exportData: any[] = [];
+
+    slots.forEach((slot) => {
+      const key = slot.startdate.toDateString();
+      if (this.selectedDates.length > 0 && !this.selectedDates.includes(key)) return;
+
+      const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}`;
+
+      slot.segmentVariations.forEach(segmentVar => {
+        // Apply segment filter
+        if (this.overallSegmentFilter?.length > 0 && 
+        !this.overallSegmentFilter.includes(segmentVar.segmentId)) return;
+
+        segmentVar.variations.forEach(variation => {
+          if (variation.stageData && variation.stageData[stage]) {
+            const confirmed = variation.stageData[stage].confirmedParticipants || [];
+            const nonConfirmed = variation.stageData[stage].nonConfirmedParticipants || [];
+
+            confirmed.forEach((p) => {
+              const profileId = p.profile_id || p.profileid;
+              exportData.push({
+                'Slot': slotTiming,
+                'Segment': segmentVar.segmentName,
+                'Name': this.getProfileName(profileId) || 'N/A',
+                'Email': this.getParticipantEmail(profileId) ?? 'N/A',
+                'Phone': this.getParticipantPhoneNumber(profileId) ?? 'N/A',
+                'Status': 'Confirmed',
+              });
+            });
+
+            nonConfirmed.forEach((p) => {
+              const profileId = p.profile_id || p.profileid;
+              exportData.push({
+                'Slot': slotTiming,
+                'Segment': segmentVar.segmentName,
+                'Name': this.getProfileName(profileId) || 'N/A',
+                'Email': this.getParticipantEmail(profileId) ?? 'N/A',
+                'Phone': this.getParticipantPhoneNumber(profileId) ?? 'N/A',
+                'Status': 'Non-Confirmed',
+              });
+            });
+          }
+        });
+      });
+    });
+
+    if (exportData.length === 0) { alert('No data to export'); return; }
+    this.downloadExcel(exportData, 'Queue Tab');
+  }
+
+  // Helper to avoid duplicate Excel write code
+  private downloadExcel(data: any[], sheetName: string) {
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
     const maxWidth = 50;
-    const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-      wch: Math.min(
-        Math.max(
-          key.length,
-          ...exportData.map(row => String(row[key] || '').length)
-        ),
-        maxWidth
-      )
+    const colWidths = Object.keys(data[0] || {}).map(key => ({
+      wch: Math.min(Math.max(key.length, ...data.map(row => String(row[key] || '').length)), maxWidth)
     }));
     worksheet['!cols'] = colWidths;
 
-    const fileName = `overall_segment_participants_${this.selectedQueue?.['queuename'] || 'queue'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `${sheetName.toLowerCase().replace(/ /g, '_')}_${this.selectedQueue?.['queuename'] || 'queue'}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   }
 
@@ -2468,9 +2554,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   let count = 0;
   slot.segmentVariations.forEach(segmentVar => {
     // SAFE: only filter when slot planner is open AND filter is selected
-    if (this.isSlotPlannerOpen && 
-        this.slotPlannerSegmentFilter?.length > 0 && 
-        !this.slotPlannerSegmentFilter.includes(segmentVar.segmentId)) return;
+    if (this.overallSegmentFilter?.length > 0 && 
+        !this.overallSegmentFilter.includes(segmentVar.segmentId)) return;
     
     segmentVar.variations.forEach(variation => {
       if (variation.stageData && variation.stageData[stage]) {
@@ -2520,9 +2605,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     let count = 0;
     slot.segmentVariations.forEach(segmentVar => {
       // SAFE: only filter when slot planner is open AND filter is selected
-      if (this.isSlotPlannerOpen && 
-          this.slotPlannerSegmentFilter?.length > 0 && 
-          !this.slotPlannerSegmentFilter.includes(segmentVar.segmentId)) return;
+      if (this.overallSegmentFilter?.length > 0 && 
+          !this.overallSegmentFilter.includes(segmentVar.segmentId)) return;
       
       segmentVar.variations.forEach(variation => {
         if (variation.stageData && variation.stageData[stage]) {
@@ -2980,11 +3064,14 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   }
 
   // surya
-   getParticipantPhoneNumber(profileId: string): string {
+  getParticipantPhoneNumber(profileId: string): string | null {
     if (this.mapProfileData && this.mapProfileData[profileId]) {
-      return this.mapProfileData[profileId]?.number;
+      const data = this.mapProfileData[profileId];
+      const number = data?.number;
+      const countryCode = data?.countrycode || '';
+      return number ? `${countryCode} ${number}` : null;
     }
-    return profileId
+    return null;
   }
 
   formatTimeTo24Hour(date: Date): string {
@@ -3907,22 +3994,20 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   // method to open slot planner model -- surya
   openSlotPlannerForStage(stage: string) {
     this.selectedStage = stage;
-    this.isSlotPlannerOpen = true;
-    // Removed auto-selection of today's date — user selects manually if needed
-
     setTimeout(() => this.checkScrollButtons(), 300);
 
     this.dialog.open(this.slotPlanner, {
-      width: '80%',
-      height: '80%',
+      width: '95vw',
+      maxWidth: '95vw',
+      height: '90vh',
     }).afterClosed().toPromise().then(() => {
       this.selectedStage = null;
       this.expandAllRow = true;
       this.expandedRows = [];
       this.selectedDates = [];
-      this.slotPlannerSegmentFilter = [];
       this.showFromToday = true;
-      this.isSlotPlannerOpen = false;
+      this.activeSlotPlannerTab = 'appointment';
+      this.expandedQueueRows = [];
       this.slotPlannerFilter = {
         startDate: null,
         endDate: null
@@ -4086,12 +4171,9 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     if (this.selectedStage) {
       const stage = this.selectedStage;
 
-      // If user has manually selected specific dates, use ALL slots as base
-      // so past dates are still accessible via date buttons
-      // If no date selected, respect the toggle (from today vs overall)
       let baseSlots: any[];
       if (this.selectedDates.length > 0) {
-        baseSlots = this.getSlotsForStage(stage); // all slots, no toggle restriction
+        baseSlots = this.getSlotsForStage(stage);
       } else {
         baseSlots = this.showFromToday
           ? this.getSlotsFromToday()
@@ -4101,28 +4183,30 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       baseSlots.forEach((slot) => {
         const key = slot.startdate.toDateString();
 
-        // Apply date filter if dates are selected
-        if (filter && this.selectedDates.length > 0 && !this.selectedDates.includes(key)) {
-          return;
-        }
+        if (filter && this.selectedDates.length > 0 && !this.selectedDates.includes(key)) return;
+
+        // Apply segment filter for Queue tab
+        const filteredSlot = (this.activeSlotPlannerTab === 'queue' && this.overallSegmentFilter?.length > 0)
+          ? {
+              ...slot,
+              segmentVariations: slot.segmentVariations.filter(sv =>
+                this.overallSegmentFilter.includes(sv.segmentId)
+              )
+            }
+          : slot;
 
         if (!group.has(key)) {
-          group.set(key, {
-            date: key,
-            totalBooked: 0,
-            totalOpen: 0,
-            slots: [],
-          });
+          group.set(key, { date: key, totalBooked: 0, totalOpen: 0, slots: [] });
         }
 
         const slotGroup = group.get(key);
-        const confirmedCount = this.getConfirmedCountForSlot(slot, stage);
+        const confirmedCount = this.getConfirmedCountForSlot(filteredSlot, stage);
         const slotKey = `${slot.startdate.toDateString()}-${slot.starttime}-${slot.endtime}`;
 
         slotGroup.totalBooked += confirmedCount;
-        slotGroup.totalOpen += this.getRemainingSlotsCount(slot, stage);
+        slotGroup.totalOpen += this.getRemainingSlotsCount(filteredSlot, stage);
         slotGroup.slots.push({
-          ...slot,
+          ...filteredSlot,
           showExpand: confirmedCount > 0,
           expanded: this.expandedRows.includes(slotKey),
         });
@@ -4252,9 +4336,9 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     }
 
     const result = [...group.values()];
-    if (this.slotPlannerSegmentFilter && this.slotPlannerSegmentFilter.length > 0) {
+    if (this.overallSegmentFilter && this.overallSegmentFilter.length > 0) {
       return result.filter(segment =>
-        this.slotPlannerSegmentFilter.includes(segment.segmentId)
+        this.overallSegmentFilter.includes(segment.segmentId)
       );
     }
     return result; 
@@ -4275,25 +4359,39 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
   // method to expand all row -- surya
   expandedAllRows() {
-    const expandedRows = this.expandedRows
-    const slotGroups = this.getSlotsGroupForStage();
-    slotGroups.forEach((group) => {
-      group.slots.forEach((slot: MergedSlot) => {
-        const key = `${slot.startdate.toDateString()}-${slot.starttime}-${slot.endtime}`;
-        if (!expandedRows.includes(key)) {
-          expandedRows.push(key);
-        }
-      })
-    });
-
-    this.expandedRows = expandedRows;
+    if (this.activeSlotPlannerTab === 'queue') {
+      const expandedQueueRows = [];
+      const slotGroups = this.getSlotsGroupForStage();
+      slotGroups.forEach((group) => {
+        group.slots.forEach((slot: MergedSlot) => {
+          const key = `${slot.startdate.getTime()}_${slot.enddate.getTime()}`;
+          if (!expandedQueueRows.includes(key)) {
+            expandedQueueRows.push(key);
+          }
+        });
+      });
+      this.expandedQueueRows = expandedQueueRows;
+    } else {
+      const expandedRows = this.expandedRows;
+      const slotGroups = this.getSlotsGroupForStage();
+      slotGroups.forEach((group) => {
+        group.slots.forEach((slot: MergedSlot) => {
+          const key = `${slot.startdate.toDateString()}-${slot.starttime}-${slot.endtime}`;
+          if (!expandedRows.includes(key)) {
+            expandedRows.push(key);
+          }
+        });
+      });
+      this.expandedRows = expandedRows;
+    }
     this.expandAllRow = false;
   }
-
-  // method to collapse all rows -- surya
+ 
+  // method to expand all row -- surya
   collapseAllRows() {
     this.expandAllRow = true;
     this.expandedRows = [];
+    this.expandedQueueRows = [];
   }
 
   // method to get capcity fill class based on percentage of fill -- surya 
@@ -4341,9 +4439,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     let total = 0;
     slot.segmentVariations?.forEach((segVar: any) => {
       // SAFE: only filter when slot planner is open AND filter is selected
-      if (this.isSlotPlannerOpen && 
-          this.slotPlannerSegmentFilter?.length > 0 && 
-          !this.slotPlannerSegmentFilter.includes(segVar.segmentId)) return;
+      if (this.overallSegmentFilter?.length > 0 && 
+          !this.overallSegmentFilter.includes(segVar.segmentId)) return;
       
       segVar.variations?.forEach((variation: any) => {
         if (variation.stageData && variation.stageData[stage]) {
@@ -4363,24 +4460,24 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return total;
   }
   
-    // Returns slots from today onwards for the selected stage
-    getSlotsFromToday(): any[] {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return this.getAllSlotsForStage().filter(slot => {
-        const slotDate = new Date(slot.startdate);
-        slotDate.setHours(0, 0, 0, 0);
-        return slotDate >= today;
-      });
-    }
+  // Returns slots from today onwards for the selected stage
+  getSlotsFromToday(): any[] {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return this.getAllSlotsForStage().filter(slot => {
+      const slotDate = new Date(slot.startdate);
+      slotDate.setHours(0, 0, 0, 0);
+      return slotDate >= today;
+    });
+  }
 
-    // gets ALL slots for stage without any date filter
-    getAllSlotsForStage(): any[] {
-      if (!this.selectedStage || !this.mergedSlots) return [];
-      return this.mergedSlots.filter(slot => 
-        slot.stages && slot.stages.includes(this.selectedStage)
-      );
-    }
+  // gets ALL slots for stage without any date filter
+  getAllSlotsForStage(): any[] {
+    if (!this.selectedStage || !this.mergedSlots) return [];
+    return this.mergedSlots.filter(slot => 
+      slot.stages && slot.stages.includes(this.selectedStage)
+    );
+  }
 
   // Total slots count based on toggle
   getTotalSlotsForScoreboard(): number {
@@ -4410,6 +4507,267 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       }, 0);
     }
     return this.getTotalSlotsOpenForStage();
+  }
+
+  toggleQueueRow(slot: MergedSlot) {
+    const key = `${slot.startdate.getTime()}_${slot.enddate.getTime()}`;
+    if (this.expandedQueueRows.includes(key)) {
+      this.expandedQueueRows = this.expandedQueueRows.filter(k => k !== key);
+    } else {
+      this.expandedQueueRows.push(key);
+      this.selectedSegmentIds = new Set();
+    }
+  }
+
+  isQueueRowExpanded(slot: MergedSlot): boolean {
+    const key = `${slot.startdate.getTime()}_${slot.enddate.getTime()}`;
+    return this.expandedQueueRows.includes(key);
+  }
+
+  getConfirmedCountForSegmentSlot(slot: MergedSlot, stage: string, segmentId: string): number {
+    let count = 0;
+    const segmentVar = slot.segmentVariations.find(sv => sv.segmentId === segmentId);
+    if (segmentVar) {
+      segmentVar.variations.forEach(variation => {
+        if (variation.stageData && variation.stageData[stage]) {
+          count += (variation.stageData[stage].confirmedParticipants || []).length;
+        }
+      });
+    }
+    return count;
+  }
+
+  getNonConfirmedCountForSegmentSlot(slot: MergedSlot, stage: string, segmentId: string): number {
+    let count = 0;
+    const segmentVar = slot.segmentVariations.find(sv => sv.segmentId === segmentId);
+    if (segmentVar) {
+      segmentVar.variations.forEach(variation => {
+        if (variation.stageData && variation.stageData[stage]) {
+          count += (variation.stageData[stage].nonConfirmedParticipants || []).length;
+        }
+      });
+    }
+    return count;
+  }
+
+  getTotalQueueNonConfirmedInTable(): number {
+    if (!this.selectedStage) return 0;
+    const stage = this.selectedStage;
+    const slots = this.selectedDates.length > 0 ? this.getSlotsForStage(stage) : this.showFromToday ? this.getSlotsFromToday() : this.getSlotsForStage(stage);
+    let count = 0;
+    slots.forEach(slot => {
+      const key = slot.startdate.toDateString();
+      if (this.selectedDates.length > 0 && !this.selectedDates.includes(key)) return;
+      count += this.getNonConfirmedCountForSlot(slot, stage);
+    });
+    return count;
+  }
+  openQueueTabPanel(slot: MergedSlot, stage: string, segmentId: string, type: 'confirmed' | 'non-confirmed') {
+    const segmentVar = slot.segmentVariations.find(sv => sv.segmentId === segmentId);
+    if (!segmentVar) return;
+    const participants: any[] = [];
+    const addedIds = new Set<string>();
+
+    segmentVar.variations.forEach(variation => {
+      if (variation.stageData && variation.stageData[stage]) {
+        const list = type === 'confirmed' ? variation.stageData[stage].confirmedParticipants : variation.stageData[stage].nonConfirmedParticipants;
+        (list || []).forEach(p => {
+          const profileId = p.profile_id || p.profileid;
+          if (profileId && !addedIds.has(profileId)) {
+            addedIds.add(profileId);
+            participants.push({ ...p, selected: true });
+          }
+        });
+      }
+    });
+
+    this.allParticipantsForStage = participants;
+    this.activePanelSection = 'all';
+    this.showQueueTabPanel = true;
+    this.currentPanelSlot = slot;
+    this.queueTabPanelType = type;
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelSegmentName = segmentVar.segmentName;
+    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    this.selectedSegmentIds = new Set([segmentId]);
+  }
+  openQueueTabPanelForSlot(slot: MergedSlot, stage: string, type: 'confirmed' | 'non-confirmed') {
+    this.currentPanelSlot = slot;
+    this.queueTabPanelType = type;
+    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    this.selectedSegmentIds = new Set((slot.segmentVariations || []).map(sv => sv.segmentId));
+    this.refreshQueuePanelParticipants(slot, stage, type);
+    this.showQueueTabPanel = true;
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelSegmentName = 'All Segments';
+  }
+
+  toggleSegmentSelection(segmentId: string, checked: boolean, slot: any, stage: string) {
+    if (checked) {
+      this.selectedSegmentIds.add(segmentId);
+    } else {
+      this.selectedSegmentIds.delete(segmentId);
+    }
+
+    // Set panel context if not already open
+    this.currentPanelSlot = slot;
+    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    if (!this.showQueueTabPanel) {
+      this.queueTabPanelType = 'confirmed';
+      this.queueTabPanelTitle = 'Confirmed';
+    }
+
+    const selectedNames = (slot.segmentVariations || [])
+      .filter(sv => this.selectedSegmentIds.has(sv.segmentId))
+      .map(sv => sv.segmentName);
+    this.queueTabPanelSegmentName = selectedNames.length === (slot.segmentVariations || []).length
+      ? 'All Segments'
+      : selectedNames.join(', ') || 'None';
+
+    this.refreshQueuePanelParticipants(slot, stage, this.queueTabPanelType);
+
+    if (this.selectedSegmentIds.size > 0) {
+      this.showQueueTabPanel = true;
+    } else {
+      this.showQueueTabPanel = false;
+    }
+  }
+
+  isSegmentSelected(segmentId: string): boolean {
+    return this.selectedSegmentIds.has(segmentId);
+  }
+
+  refreshQueuePanelParticipants(slot: any, stage: string, type: 'confirmed' | 'non-confirmed') {
+    const participants: any[] = [];
+    const addedIds = new Set<string>();
+
+    (slot.segmentVariations || []).forEach(segmentVar => {
+      if (!this.selectedSegmentIds.has(segmentVar.segmentId)) return;
+      segmentVar.variations.forEach(variation => {
+        if (variation.stageData && variation.stageData[stage]) {
+          const list = type === 'confirmed'
+            ? variation.stageData[stage].confirmedParticipants
+            : variation.stageData[stage].nonConfirmedParticipants;
+          (list || []).forEach(p => {
+            const profileId = p.profile_id || p.profileid;
+            if (profileId && !addedIds.has(profileId)) {
+              addedIds.add(profileId);
+              participants.push({ ...p, selected: true, segmentName: segmentVar.segmentName });
+            }
+          });
+        }
+      });
+    });
+
+    this.allParticipantsForStage = participants;
+    this.activePanelSection = 'all';
+  }
+
+  isActivePanelSlot(slot: any): boolean {
+    if (!this.showQueueTabPanel || !this.currentPanelSlot) return false;
+    return this.getSlotKey(slot) === this.getSlotKey(this.currentPanelSlot);
+  }
+
+  getSlotKey(slot: any): string {
+    return `${slot.startdate.getTime()}_${slot.enddate.getTime()}`;
+  }
+
+  switchPanelType(type: 'confirmed' | 'non-confirmed') {
+    if (!this.currentPanelSlot) return;
+    this.queueTabPanelType = type;
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.refreshQueuePanelParticipants(this.currentPanelSlot, this.selectedStage, type);
+  }
+
+  areAllQueuePanelSelected(): boolean {
+    return this.allParticipantsForStage.length > 0 &&
+      this.allParticipantsForStage.every(p => p.selected);
+  }
+
+  areSomeQueuePanelSelected(): boolean {
+    const selected = this.allParticipantsForStage.filter(p => p.selected).length;
+    return selected > 0 && selected < this.allParticipantsForStage.length;
+  }
+
+  toggleAllQueuePanel(checked: boolean) {
+    this.allParticipantsForStage.forEach(p => p.selected = checked);
+  }
+
+  resetInterimReportFilter() {
+    this.interimDataLoaded = false;
+    this.activeInterimCard = null;
+    this.completedInterimProfileIds = new Set();
+    this.notCompletedInterimProfileIds = new Set();
+    this.allInterimProfileIds = new Set();
+    this.interimCompletedCount = 0;
+    this.interimNotCompletedCount = 0;
+    this.interimReportStartDate = null;
+    this.interimReportEndDate = null;
+    this.showInterimDatePicker = false;
+    this.recalculateMergedSlotParticipants();
+  }
+
+  toggleInterimCard(card: 'completed' | 'not-completed') {
+    if (this.activeInterimCard === card) {
+      this.activeInterimCard = null;
+    } else {
+      this.activeInterimCard = card;
+    }
+    this.recalculateMergedSlotParticipants();
+  }
+
+
+  applyInterimReportFilter() {
+    this.interimReportLoading = true;
+
+    const startDate = new Date(this.interimReportStartDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(this.interimReportEndDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    getDocs(query(
+      collection(this.firestore, 'interimreport log'),
+      where('createdon', '>=', Timestamp.fromDate(startDate)),
+      where('createdon', '<=', Timestamp.fromDate(endDate))
+    )).then(snap => {
+      this.completedInterimProfileIds = new Set();
+      this.notCompletedInterimProfileIds = new Set();
+      this.allInterimProfileIds = new Set();
+      let completedDocCount = 0;
+      let notCompletedDocCount = 0;
+
+      snap.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const profileId = data['profileid'];
+        if (!profileId) return;
+        this.allInterimProfileIds.add(profileId);
+        if (data['status'] === 'completed') {
+          this.completedInterimProfileIds.add(profileId);
+          completedDocCount++;
+        } else {
+          this.notCompletedInterimProfileIds.add(profileId);
+          notCompletedDocCount++;
+        }
+      });
+
+      this.interimCompletedCount = completedDocCount;
+      this.interimNotCompletedCount = notCompletedDocCount;
+      this.interimDataLoaded = true;
+      this.activeInterimCard = null;
+      this.showInterimDatePicker = false;
+      this.interimReportLoading = false;
+
+    }).catch(err => {
+      console.error('Error loading interim reports:', err);
+      this.interimReportLoading = false;
+    });
+  }
+
+  cancelInterimReportFilter() {
+    this.showInterimDatePicker = false;
+    this.interimReportStartDate = null;
+    this.interimReportEndDate = null;
   }
 
 }

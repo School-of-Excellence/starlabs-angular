@@ -24,7 +24,17 @@
       <button mat-stroked-button type="button" (click)="managelist()">Lists & Segments</button>
 
     </div>
-
+    
+    <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1 mb-2">
+    <div class="fw-bold mb-2 h5">Live Queue</div>
+    <span *ngFor="let live of liveQueueList">
+      <button mat-stroked-button class="me-2 mb-2"
+        [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
+        (click)="selectedQueue = live; onQueueSelect()">
+        {{live["queuename"]}}
+      </button>
+    </span>
+  </div>
     <!-- Loading Spinner -->
     <div *ngIf="loading" class="loading-container">
       <mat-spinner diameter="50"></mat-spinner>
@@ -743,6 +753,20 @@
         </div>
 
         <!-- Date and Time Fields (for both modes) -->
+        <div class="datetime-row">
+          <mat-form-field appearance="outline" class="slot-field">
+            <mat-label>Title</mat-label>
+            <input matInput type="text" [(ngModel)]="editingDateEntry.title">
+          </mat-form-field>
+        </div>
+
+        <div class="datetime-row">
+          <mat-form-field appearance="outline" class="slot-field">
+            <mat-label>Description</mat-label>
+            <textarea matInput type="text" [(ngModel)]="editingDateEntry.description"></textarea>
+          </mat-form-field>
+        </div>
+        
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>Start Date</mat-label>
