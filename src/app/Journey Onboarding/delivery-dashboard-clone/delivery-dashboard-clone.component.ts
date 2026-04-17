@@ -3739,8 +3739,8 @@ export class DeliveryDashboardCloneComponent {
                 }
                 if (!isPaymentEligible) {
                     row['Minimum Payment'] = item?.['minimumpayment'] || '';
-                    row['Total Paid'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
-                    row['Remaining Payable'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
+                    row['Total Payable'] = this.mapMetaData[pid]?.['pp_totalpaid'] || '';
+                    row['Remaining Payment'] = ((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0));
                 }
 
                 rows.push(row);
