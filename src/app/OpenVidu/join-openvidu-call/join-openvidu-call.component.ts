@@ -24,6 +24,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
 import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-layout.service';
+import { PicoVoiceKoalaService } from '../../Service/PicoVoice Koala/PicoVoice-Koala.service';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -201,15 +202,20 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     // private audiofilterservice : DeepAudioFilterService, // kept — not removed, used in debugAudioLevels()
     private deepFilter3: DeepFilter3Service,              // [DF3] active noise cancellation filter
     private adaptiveQuality: AdaptiveQualityService,
-    public videoLayout: VideoLayoutService
+    public videoLayout: VideoLayoutService,
+    private koala: PicoVoiceKoalaService
   ){}
 
   ngAfterViewInit(): void {
     // Pre-warm DF3 — downloads ONNX model (~7.7 MB) in background so it is ready
     // before the user clicks Join. By the time enableMicrophoneWithNoiseCancellation()
     // runs, init() will already be done and audio starts with zero delay.
-    this.deepFilter3.init(80).then(ok => {
-      if (!ok) console.warn('⚠️ DF3 pre-warm failed — will retry when joining call');
+    // this.deepFilter3.init(80).then(ok => {
+    //   if (!ok) console.warn('⚠️ DF3 pre-warm failed — will retry when joining call');
+    // });
+
+    this.koala.init(environment['picovoiceAccessKey']).then(ok => {
+      if (!ok) console.warn('⚠️ Koala pre-warm failed — will retry when joining call');
     });
 
     var id = this.route.snapshot.paramMap.get("roomid")
@@ -675,7 +681,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     await currentRoom?.disconnect();
 
     // Tear down DF3 — stops AudioWorklet, closes AudioContext, frees WASM memory
-    this.deepFilter3.destroy();
+    // this.deepFilter3.destroy();
+    this.koala.destroy();
 
     // Reset all variables
     this.room.set(undefined);
@@ -1510,6 +1517,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
    * Prepares the noise-cancelled audio track BEFORE joining the room.
    * Called pre-connect so the VAD has time to calibrate during the room handshake.
    */
+  /*
   async prepareNoiseCancelledTrack(): Promise<MediaStreamTrack> {
     // Stop any existing preview track
     if (this.previewStream) {
@@ -1556,7 +1564,32 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     console.warn('⚠️ DeepFilterNet3 not supported — using raw stream.');
     return rawStream.getAudioTracks()[0];
   }
+  */
 
+  async prepareNoiseCancelledTrack(): Promise<MediaStreamTrack> {
+    // Stop preview audio — WebVoiceProcessor opens its own mic
+    if (this.previewStream) {
+      this.previewStream.getAudioTracks().forEach(t => t.stop());
+    }
+
+    let koalaReady = this.koala.isInitialized()
+      || await this.koala.init(environment['picovoiceAccessKey']);
+
+    if (koalaReady) {
+      const cleanStream = await this.koala.processStream();
+      console.log(`✅ Koala active — init: ${this.koala.initTimeMs}ms`);
+      return cleanStream.getAudioTracks()[0];
+    }
+
+    // Fallback — browser native
+    console.warn('⚠️ Koala failed — using browser fallback');
+    const fallback = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000, channelCount: 1 }
+    });
+    return fallback.getAudioTracks()[0];
+  }
+
+  /*
   async enableMicrophoneWithNoiseCancellation(room: Room, cleanAudioTrack: MediaStreamTrack) {
     try {
 
@@ -1616,6 +1649,37 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
       if (this.debugAudioLevels) this.debugAudioLevels();
       console.log('✅ Microphone enabled with WebRTC native fallback');
+    }
+  }
+  */
+  async enableMicrophoneWithNoiseCancellation(room: Room, cleanAudioTrack: MediaStreamTrack) {
+    try {
+      await room.localParticipant.publishTrack(cleanAudioTrack, {
+        source: Track.Source.Microphone,
+        name: 'microphone',
+        dtx: false
+      });
+
+      console.log('✅ Microphone published with Koala noise suppression');
+
+    } catch (error) {
+      console.error('❌ Koala failed, falling back to native WebRTC:', error);
+
+      this.koala.destroy();
+
+      if (this.previewStream) {
+        this.previewStream.getAudioTracks().forEach(t => t.stop());
+      }
+
+      await room.localParticipant.setMicrophoneEnabled(true, {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 1
+      });
+
+      console.log('✅ Microphone enabled with WebRTC fallback');
     }
   }
 
