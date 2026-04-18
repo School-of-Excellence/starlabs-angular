@@ -264,4 +264,10 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
       .map(author => this.profileMap[author.id]?.name || 'Unknown')
       .join(', ');
   }
+
+  getProcedureStatus(procData: any): 'completed' | 'autogeneralized' | null {
+    if (procData?.['autogeneralized']) return 'autogeneralized';
+    if (procData?.['status'] === 'completed') return 'completed';
+    return null;
+  }
 }
