@@ -6,7 +6,7 @@ import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AssignProcedureStudioComponent } from '../assign-procedure-studio/assign-procedure-studio.component';
 import { InviteOtherStudioComponent } from '../invite-other-studio/invite-other-studio.component';
 import { AcceptOtherStudioComponent } from '../accept-other-studio/accept-other-studio.component';
@@ -148,8 +148,10 @@ export class DynamicStudioComponent {
     private cdr: ChangeDetectorRef,
     public snackBar: MatSnackBar,
     public formbuilder: FormBuilder,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private route: ActivatedRoute
   ) {
+    const overrideProfileId = this.route.snapshot.queryParamMap.get('profileid')
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {msg: "Loading..."},
       disableClose: true
@@ -160,7 +162,7 @@ export class DynamicStudioComponent {
     });
     guard.getRoles().then(async roles=>{
       this.profileRoles = roles
-      this.profileid = roles['profile_ref'].id
+      this.profileid = overrideProfileId || roles['profile_ref'].id
       // if(environment.firebase.projectId == "fir-sample-aae4a" && this.profileid == 'l0ApFnXuM5Ac8tpqJQnk'){
       //   this.deleteOption = true
       // }else if(environment.firebase.projectId == "starlabs-test" && this.profileid == 'g2mQ7GiD6PSV8oaZnZLb'){
