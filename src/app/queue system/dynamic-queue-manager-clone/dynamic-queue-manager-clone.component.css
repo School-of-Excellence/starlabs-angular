@@ -3692,8 +3692,7 @@ button[matMenuTriggerFor] {
   position: relative;
 }
 
-.token-pending-invitation::after {
-  content: 'Invitation Pending';
+.pending-invitation-badge {
   position: absolute;
   top: -10px;
   right: 8px;
@@ -3705,6 +3704,11 @@ button[matMenuTriggerFor] {
   border-radius: 10px;
   letter-spacing: 0.3px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 2;
 }
 
 @keyframes pendingInvitationPulse {
@@ -6148,4 +6152,92 @@ button[matMenuTriggerFor] {
   color: #333;
   max-height: 320px;
   overflow-y: auto;
+}
+
+.whatsapp-preview-box {
+  margin-top: 10px;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  animation: fadeIn 0.15s ease;
+}
+
+.whatsapp-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #ecfdf5;
+  border-bottom: 1px solid #a7f3d0;
+}
+
+.whatsapp-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.whatsapp-preview-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #a0aec0;
+  transition: color 0.15s;
+}
+
+.whatsapp-preview-close:hover { color: #059669; }
+
+.whatsapp-preview-close mat-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.whatsapp-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border-bottom: 1px solid #a7f3d0;
+  font-size: 12px;
+  color: #065f46;
+}
+
+.whatsapp-preview-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.whatsapp-preview-meta-item mat-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: #059669;
+}
+
+.whatsapp-preview-meta-label {
+  font-weight: 600;
+}
+
+.whatsapp-preview-meta-value {
+  color: #1f2937;
+}
+
+.whatsapp-preview-body {
+  padding: 16px 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+  max-height: 360px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
