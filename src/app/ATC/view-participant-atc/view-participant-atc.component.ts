@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, OnChanges, SimpleChanges, Input, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import {
   Firestore, collection, query, where, orderBy,
@@ -40,7 +40,9 @@ interface ProductGroup {
   templateUrl: './view-participant-atc.component.html',
   styleUrl: './view-participant-atc.component.css'
 })
-export class ViewParticipantAtcComponent implements OnInit, OnDestroy {
+export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy {
+  @Input() profileid?: string;
+
   private firestore = inject(Firestore);
   private route = inject(ActivatedRoute);
   private guard = inject(AuthguardService);
@@ -85,6 +87,11 @@ export class ViewParticipantAtcComponent implements OnInit, OnDestroy {
   mapBigActivity: Record<string, string> = {};
 
   ngOnInit(): void {
+    if (this.profileid) {
+      this.profileId.set(this.profileid);
+      this.loadAllData(this.profileid);
+      return;
+    }
     this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const profileid = params['profileid'];
       if (profileid) {
@@ -94,6 +101,16 @@ export class ViewParticipantAtcComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       }
     });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['profileid'] && !changes['profileid'].firstChange) {
+      const next = changes['profileid'].currentValue;
+      if (next) {
+        this.profileId.set(next);
+        this.loadAllData(next);
+      }
+    }
   }
 
   ngOnDestroy(): void {
