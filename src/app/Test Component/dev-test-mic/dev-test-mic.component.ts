@@ -4,22 +4,52 @@ import { FormsModule } from '@angular/forms';
 import { DeepFilter3Service } from '../../Service/DeepFilter3/deepfilter3.service';
 import { KoalaFilterService } from '../../Service/PicoVoice Koala/koala-filter.service';
 
-type Status =
-  | 'idle' | 'loading' | 'live' | 'live-error'
-  | 'recording' | 'processing' | 'done' | 'error';
+// ── Interfaces — mirror OpenViduCallQualitySnapshot structure ─────────────────
 
-type FileStatus = 'idle' | 'loading' | 'done' | 'error';
-
-export interface FilterMetrics {
-  filterName: string;
-  initTimeMs: number;
-  setupMs: number;
-  rawEnergyDb: number;
-  cleanEnergyDb: number;
-  noiseReductionDb: number;
-  sampleRate: number;
-  extraInfo: string; // e.g. suppression level or delay sample ms
+/** Per-channel audio metrics — one instance for RAW, one for Processed. */
+interface AudioChannelMetrics {
+  levelDb: number;            // RMS level in dBFS (average loudness)
+  peakDb: number;             // Peak level in dBFS (loudest sample)
+  durationSec: number;        // Duration in seconds
+  sampleRate: number;         // Hz
+  echoCancellation: boolean;  // Browser AEC state on the source stream
+  noiseSuppression: boolean;  // True when DF3 is actively processing this channel
+  autoGainControl: boolean;   // Browser AGC state on the source stream
 }
+
+/** Derived comparison between the raw and processed channels. */
+interface AudioComparisonMetrics {
+  noiseReductionDb: number;    // raw.levelDb − processed.levelDb (positive = noise removed)
+  initTimeMs: number;          // DF3 ONNX model load time in ms
+  processingLatencyMs: number; // Audio graph wire-up latency in ms
+  suppressionLevel: number;    // Fixed DF3 suppression level used this session
+  filterName: string;          // 'DeepFilterNet3' or 'Koala (Picovoice)'
+}
+
+/** Full test report — three-section structure: RAW · Processed · Comparison. */
+interface AudioTestReport {
+  testedAt: string;               // ISO timestamp
+  browser: string;                // navigator.userAgent
+  mode: 'file' | 'live' | 'abc'; // Which mode produced this report
+  raw: AudioChannelMetrics;       // Metrics for the unprocessed channel
+  processed: AudioChannelMetrics; // Metrics for the DF3-processed channel
+  comparison: AudioComparisonMetrics;
+  koala?: {                       // Mode 3 only — present when Koala access key provided
+    processed: AudioChannelMetrics;
+    comparison: AudioComparisonMetrics;
+  };
+  notes: string;
+}
+
+/** Live PCM capture via ScriptProcessorNode — lossless, no codec. */
+interface PcmCapture {
+  ctx: AudioContext;
+  processor: ScriptProcessorNode;
+  samples: Float32Array[];
+}
+
+type Status = 'idle' | 'loading' | 'live' | 'live-error' | 'recording' | 'processing' | 'done' | 'error';
+type FileStatus = 'idle' | 'loading' | 'done' | 'error';
 
 @Component({
   standalone: true,
@@ -30,72 +60,80 @@ export interface FilterMetrics {
 })
 export class DevTestMicComponent implements OnInit, OnDestroy {
 
-  // ── UI state ─────────────────────────────────────────────────────────────
+  // ── UI state ──────────────────────────────────────────────────────────────
   status: Status = 'idle';
   statusMessage = '';
   isLive = false;
+  /** Tracks which mode last produced results — drives player visibility in template. */
+  resultMode: 'file' | 'live' | 'abc' | null = null;
 
   // ── Filter settings ───────────────────────────────────────────────────────
-  suppressionLevel = 80;            // DeepFilterNet3 — original quality-tested default
-  accessKey = '';                  // Picovoice Koala
-  liveFilter: 'df3' | 'koala' = 'df3'; // which filter for Live Preview
+  suppressionLevel = 80;
+  accessKey = '';
+  liveFilter: 'df3' | 'koala' = 'df3';
 
   // ── Audio streams ─────────────────────────────────────────────────────────
-  private micStream: MediaStream | null = null;
+  private micStream: MediaStream | null = null;  // echoCancellation:true  → feeds DF3 / Koala
+  private rawStream: MediaStream | null = null;  // echoCancellation:false → raw WAV reference
   private df3Stream: MediaStream | null = null;
 
   // ── Live preview ──────────────────────────────────────────────────────────
   private liveAudioEl: HTMLAudioElement | null = null;
+  /** ScriptProcessorNode capture of raw stream during live preview. */
+  private liveRawCapture: PcmCapture | null = null;
+  /** ScriptProcessorNode capture of DF3 / Koala stream during live preview. */
+  private liveProcessedCapture: PcmCapture | null = null;
 
-  // ── A/B/C recording (raw + DF3 + Koala simultaneously) ───────────────────
-  private rawRecorder: MediaRecorder | null = null;
-  private df3Recorder: MediaRecorder | null = null;
-  private rawChunks: Blob[] = [];
-  private df3Chunks: Blob[] = [];
+  // ── A/B/C recording ───────────────────────────────────────────────────────
+  /** ScriptProcessorNode capture of rawStream during ABC recording. */
+  private abcRawCapture: PcmCapture | null = null;
+  /** ScriptProcessorNode capture of df3Stream during ABC recording (replaces MediaRecorder). */
+  private abcDf3Capture: PcmCapture | null = null;
   private recordingStartTime = 0;
+  private koalaWasActive = false;
 
-  rawUrl: string | null = null;
-  df3Url: string | null = null;
-  koalaUrl: string | null = null;
+  // ── Result URLs (Modes 2 + 3) ─────────────────────────────────────────────
+  rawUrl: string | null = null;    // Raw WAV (live / abc)
+  df3Url: string | null = null;    // DF3 WAV  (live / abc)
+  koalaUrl: string | null = null;  // Koala WAV (abc only)
+  recordingTimestamp = '';
 
-  // ── DF3 energy measurement ────────────────────────────────────────────────
-  private analysisCtx: AudioContext | null = null;
-  private rawAnalyser: AnalyserNode | null = null;
-  private df3Analyser: AnalyserNode | null = null;
-  private energyInterval: ReturnType<typeof setInterval> | null = null;
-  private rawSamples: number[] = [];
-  private df3Samples: number[] = [];
-
-  // ── Results ───────────────────────────────────────────────────────────────
-  df3Metrics: FilterMetrics | null = null;
-  koalaMetrics: FilterMetrics | null = null;
-  userNotes = '';
-
-  // ── File Comparison Mode (Mode 1) ─────────────────────────────────────────
+  // ── File mode (Mode 1) ────────────────────────────────────────────────────
   fileStatus: FileStatus = 'idle';
   fileStatusMsg = '';
-  fileProgress = 0; // 0–100
-  fileInputUrl: string | null = null;   // original file for playback
-  fileOutputUrl: string | null = null;  // DF3-processed WAV
+  fileProgress = 0;
+  fileInputUrl: string | null = null;   // Original uploaded file (for playback + download)
+  fileOutputUrl: string | null = null;  // DF3-processed WAV (for playback + download)
   fileProcessingMs = 0;
+
+  // ── Report ────────────────────────────────────────────────────────────────
+  report: AudioTestReport | null = null;
+  userNotes = '';
+
 
   constructor(
     private df3: DeepFilter3Service,
     private koala: KoalaFilterService
   ) {}
 
-  // ─── Lifecycle ────────────────────────────────────────────────────────────
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    // Pre-warm DF3 in the background as soon as this page loads.
-    // By the time the user clicks Start Live Preview or Start Recording,
-    // the ONNX model (~7.7 MB) is already downloaded and compiled — zero delay.
+    // Pre-warm DF3: download + compile ONNX model so init is instant when user clicks Start.
     if (!this.df3.isInitialized()) {
       this.df3.init(this.suppressionLevel).catch(() => {});
     }
   }
 
-  // ─── Slider / key changes ─────────────────────────────────────────────────
+  ngOnDestroy(): void {
+    this.stopLivePreview();
+    this.teardownCaptures();
+    this.teardownStreams();
+    [this.rawUrl, this.df3Url, this.koalaUrl].forEach(u => { if (u) URL.revokeObjectURL(u); });
+    this.resetFileResults();
+  }
+
+  // ── Slider / key changes ──────────────────────────────────────────────────
 
   onSuppressionChange(): void {
     if (this.isLive && this.liveFilter === 'df3') {
@@ -103,7 +141,9 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ─── File Comparison Mode ─────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODE 1 — File Comparison
+  // ─────────────────────────────────────────────────────────────────────────
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -117,16 +157,17 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     this.fileStatusMsg = 'Reading file…';
     this.fileProgress = 0;
     this.resetFileResults();
+    this.report = null;
+    this.resultMode = null;
 
     const t0 = performance.now();
 
     try {
-      // 1. Read file as ArrayBuffer and create a playback URL for the raw input
+      // 1 — Keep original file as a playback / download URL
       const rawBuffer = await file.arrayBuffer();
-      const rawBlob = new Blob([rawBuffer], { type: file.type || 'audio/webm' });
-      this.fileInputUrl = URL.createObjectURL(rawBlob);
+      this.fileInputUrl = URL.createObjectURL(new Blob([rawBuffer], { type: file.type || 'audio/webm' }));
 
-      // 2. Decode audio to PCM at 48 kHz
+      // 2 — Decode to PCM at 48 kHz
       this.fileStatusMsg = 'Decoding audio to PCM…';
       this.fileProgress = 10;
       const decodeCtx = new AudioContext({ sampleRate: 48000 });
@@ -137,20 +178,19 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
         await decodeCtx.close();
       }
 
-      // Mix down to mono (channel 0) — DF3 processes mono at 48 kHz
-      let pcm = audioBuffer.getChannelData(0);
+      // Mix to mono channel 0
+      let rawPcm = audioBuffer.getChannelData(0) as Float32Array<ArrayBuffer>;
 
-      // 3. Resample to 48 kHz if the source differs
+      // 3 — Resample to 48 kHz if source differs
       if (audioBuffer.sampleRate !== 48000) {
-        this.fileStatusMsg = `Resampling from ${audioBuffer.sampleRate} Hz → 48 000 Hz…`;
+        this.fileStatusMsg = `Resampling ${audioBuffer.sampleRate} Hz → 48 000 Hz…`;
         this.fileProgress = 20;
-        pcm = await this.resampleTo48k(pcm, audioBuffer.sampleRate);
+        rawPcm = await this.resampleTo48k(rawPcm, audioBuffer.sampleRate);
       }
-
       this.fileProgress = 25;
 
-      // 4. Init DF3 (loads WASM + model)
-      this.fileStatusMsg = `Loading DeepFilterNet3 model… (suppression: ${this.suppressionLevel}/100)`;
+      // 4 — Init DF3
+      this.fileStatusMsg = `Loading DeepFilterNet3… (suppression: ${this.suppressionLevel}/100)`;
       const initOk = await this.df3.init(this.suppressionLevel);
       if (!initOk) {
         this.fileStatus = 'error';
@@ -159,27 +199,33 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
       }
       this.fileProgress = 40;
 
-      // 5. Process all frames offline (trailing partial frame is zero-padded — no truncation)
-      const totalFrames = Math.ceil(pcm.length / this.df3.frameLength);
+      // 5 — Offline processing
+      const totalFrames = Math.ceil(rawPcm.length / this.df3.frameLength);
       this.fileStatusMsg = `Processing ${totalFrames} frames…`;
-
-      const processed = await this.df3.processOffline(pcm, (pct) => {
+      const processedPcm = await this.df3.processOffline(rawPcm, (pct) => {
         this.fileProgress = 40 + Math.round(pct * 55);
       });
       this.fileProgress = 95;
 
-      // 6. Encode processed PCM as WAV
+      // 6 — Encode processed PCM as WAV
       this.fileStatusMsg = 'Encoding output WAV…';
-      const wavBlob = this.encodeWav(processed, 48000);
-      this.fileOutputUrl = URL.createObjectURL(wavBlob);
+      this.fileOutputUrl = URL.createObjectURL(this.encodeWav(processedPcm, 48000));
 
       this.fileProcessingMs = Math.round(performance.now() - t0);
       this.fileProgress = 100;
       this.fileStatus = 'done';
-      this.fileStatusMsg = `Done — processed ${(pcm.length / 48000).toFixed(1)}s of audio in ${(this.fileProcessingMs / 1000).toFixed(1)}s`;
+      this.fileStatusMsg =
+        `Done — ${(rawPcm.length / 48000).toFixed(1)}s processed in ${(this.fileProcessingMs / 1000).toFixed(1)}s`;
+
+      // 7 — Build report from decoded PCM arrays
+      this.report = this.buildReport('file', rawPcm, processedPcm, {
+        rawEc: false, rawNs: false, rawAgc: false
+      });
+      this.resultMode = 'file';
+      this.recordingTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
     } catch (err) {
-      console.error('File comparison error:', err);
+      console.error('[File] error:', err);
       this.fileStatus = 'error';
       this.fileStatusMsg = `Error: ${String(err)}`;
     } finally {
@@ -187,82 +233,15 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Resample a Float32Array from srcRate → 48000 Hz using OfflineAudioContext. */
-  private async resampleTo48k(pcm: Float32Array, srcRate: number): Promise<Float32Array> {
-    const targetRate = 48000;
-    const targetLength = Math.ceil(pcm.length * targetRate / srcRate);
-    const offCtx = new OfflineAudioContext(1, targetLength, targetRate);
-    const srcBuf = offCtx.createBuffer(1, pcm.length, srcRate);
-    srcBuf.copyToChannel(pcm, 0);
-    const src = offCtx.createBufferSource();
-    src.buffer = srcBuf;
-    src.connect(offCtx.destination);
-    src.start(0);
-    const rendered = await offCtx.startRendering();
-    return rendered.getChannelData(0);
-  }
-
-  /**
-   * Encode a Float32Array of PCM samples as a standard 16-bit WAV file.
-   * @param samples  Mono PCM samples in the range [-1, 1]
-   * @param sampleRate  Samples per second (e.g. 48000)
-   */
-  private encodeWav(samples: Float32Array, sampleRate: number): Blob {
-    const numChannels = 1;
-    const bitsPerSample = 16;
-    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-    const blockAlign = numChannels * bitsPerSample / 8;
-    const dataBytes = samples.length * blockAlign;
-    const buffer = new ArrayBuffer(44 + dataBytes);
-    const view = new DataView(buffer);
-
-    // RIFF header
-    this.writeStr(view, 0, 'RIFF');
-    view.setUint32(4, 36 + dataBytes, true);
-    this.writeStr(view, 8, 'WAVE');
-
-    // fmt sub-chunk
-    this.writeStr(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);          // sub-chunk size
-    view.setUint16(20, 1, true);           // PCM = 1
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitsPerSample, true);
-
-    // data sub-chunk
-    this.writeStr(view, 36, 'data');
-    view.setUint32(40, dataBytes, true);
-
-    // PCM samples — clamp to [-1, 1] then scale to int16
-    let offset = 44;
-    for (let i = 0; i < samples.length; i++) {
-      const s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      offset += 2;
-    }
-
-    return new Blob([buffer], { type: 'audio/wav' });
-  }
-
-  private writeStr(view: DataView, offset: number, str: string): void {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-
-  private resetFileResults(): void {
-    if (this.fileInputUrl)  { URL.revokeObjectURL(this.fileInputUrl);  this.fileInputUrl  = null; }
-    if (this.fileOutputUrl) { URL.revokeObjectURL(this.fileOutputUrl); this.fileOutputUrl = null; }
-    this.fileProcessingMs = 0;
-  }
-
-  // ─── Live Preview ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODE 2 — Live Preview  (records both channels; WAVs ready on stop)
+  // ─────────────────────────────────────────────────────────────────────────
 
   async startLivePreview(): Promise<void> {
     this.status = 'loading';
     this.resetResults();
+    this.report = null;
+    this.resultMode = null;
 
     if (this.liveFilter === 'koala' && !this.accessKey.trim()) {
       this.status = 'live-error';
@@ -272,15 +251,16 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
 
     this.statusMessage = this.liveFilter === 'df3'
       ? 'Loading DeepFilterNet3 model (~7.7 MB)…'
-      : 'Loading Koala model (~3.8 MB) from GitHub…';
+      : 'Loading Koala model (~3.8 MB)…';
 
     try {
-      // Keep browser echo cancellation ON for live preview — without it the
-      // Audio element playing through speakers feeds directly back into the mic,
-      // creating a feedback loop / echo that never stops. EC is safe here because
-      // DF3 handles the actual noise; we just need the browser to prevent mic↔speaker loop.
+      // Production-matching stream (echoCancellation: true) → feeds DF3 / Koala
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 }
+      });
+      // Zero-processing stream (echoCancellation: false) → raw WAV reference
+      this.rawStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 }
       });
     } catch {
       this.status = 'live-error';
@@ -296,7 +276,6 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
   }
 
   private async startDF3LivePreview(): Promise<void> {
-    // Use pre-warmed model if available; only call init() if pre-warm failed or page was cold.
     let ok: boolean;
     if (this.df3.isInitialized()) {
       ok = true;
@@ -307,15 +286,21 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     if (!ok) {
       this.status = 'live-error';
       this.statusMessage = 'DeepFilterNet3 not supported on this browser (try Chrome 91+).';
-      this.micStream!.getTracks().forEach(t => t.stop());
+      this.teardownStreams();
       return;
     }
 
     this.df3Stream = await this.df3.processStream(this.micStream!);
+
+    // Play clean DF3 audio through speakers / headphones
     this.liveAudioEl = new Audio();
     this.liveAudioEl.srcObject = this.df3Stream;
     this.liveAudioEl.muted = false;
     await this.liveAudioEl.play().catch(() => {});
+
+    // Record both channels simultaneously as lossless PCM
+    this.liveRawCapture = this.startPcmCapture(this.rawStream!);
+    this.liveProcessedCapture = this.startPcmCapture(this.df3Stream!);
 
     this.isLive = true;
     this.status = 'live';
@@ -326,54 +311,114 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     const ok = await this.koala.init(this.accessKey.trim());
     if (!ok) {
       this.status = 'live-error';
-      this.statusMessage = 'Koala init failed. Check your access key and internet connection.';
-      this.micStream!.getTracks().forEach(t => t.stop());
+      this.statusMessage = 'Koala init failed. Check your access key.';
+      this.teardownStreams();
       return;
     }
 
     this.koala.startCapture(this.micStream!);
     this.koala.startLivePlayback();
+    this.koala.startRecordingCapture();
+
+    // Record raw reference while Koala plays
+    this.liveRawCapture = this.startPcmCapture(this.rawStream!);
 
     this.isLive = true;
     this.status = 'live';
-    this.statusMessage = 'LIVE — Koala active. Listen through headphones (expect ~150ms delay).';
+    this.statusMessage = 'LIVE — Koala active. Listen through headphones (~150ms delay).';
   }
 
-  stopLivePreview(): void {
-    // Mute + pause audio element FIRST to immediately break any speaker→mic feedback loop
+  async stopLivePreview(): Promise<void> {
+    // Update UI immediately — don't wait for WAV encoding
+    this.isLive = false;
+    this.status = 'processing';
+    this.statusMessage = 'Encoding WAV files…';
+
+    // Mute playback before stopping mic (prevents feedback glitch)
     if (this.liveAudioEl) {
       this.liveAudioEl.muted = true;
       this.liveAudioEl.pause();
       this.liveAudioEl.srcObject = null;
       this.liveAudioEl = null;
     }
-    // Stop mic tracks next (destroys the audio source)
-    this.micStream?.getTracks().forEach(t => t.stop());
-    // Destroy service last (drains queue, closes AudioContext, terminates worker)
-    this.df3.destroy();
-    this.koala.stopCapture();
-    this.koala.stopLivePlayback();
-    this.koala.destroy();
-    this.micStream = null;
-    this.df3Stream = null;
-    this.isLive = false;
-    this.status = 'idle';
-    this.statusMessage = '';
+
+    // Flatten captures
+    const rawPcm = this.liveRawCapture ? this.stopPcmCapture(this.liveRawCapture) : null;
+    this.liveRawCapture = null;
+
+    let processedPcm: Float32Array | null = null;
+
+    if (this.liveFilter === 'df3') {
+      processedPcm = this.liveProcessedCapture ? this.stopPcmCapture(this.liveProcessedCapture) : null;
+      this.liveProcessedCapture = null;
+      this.df3.destroy();
+
+    } else {
+      // Koala: get recorded WAV; decode to PCM for metrics
+      this.koala.stopRecordingCapture();
+      const koalaWav = this.koala.getRecordedWav();
+      this.df3Url = URL.createObjectURL(koalaWav); // reuse df3Url slot for Koala output
+
+      try {
+        const ab = await koalaWav.arrayBuffer();
+        const decodeCtx = new AudioContext({ sampleRate: 48000 });
+        const buf = await decodeCtx.decodeAudioData(ab);
+        await decodeCtx.close();
+        processedPcm = new Float32Array(buf.getChannelData(0));
+      } catch { /* metrics skipped if decode fails */ }
+
+      this.koala.stopCapture();
+      this.koala.stopLivePlayback();
+      this.koala.destroy();
+    }
+
+    this.teardownStreams();
+
+    // Encode WAVs
+    if (rawPcm && rawPcm.length > 0) {
+      this.rawUrl = URL.createObjectURL(this.encodeWav(rawPcm, 48000));
+    }
+    if (processedPcm && processedPcm.length > 0 && !this.df3Url) {
+      // DF3 path — Koala already set df3Url above
+      this.df3Url = URL.createObjectURL(this.encodeWav(processedPcm, 48000));
+    }
+
+    // Build report
+    if (rawPcm && rawPcm.length > 0 && processedPcm && processedPcm.length > 0) {
+      const filterName = this.liveFilter === 'df3' ? 'DeepFilterNet3' : 'Koala (Picovoice)';
+      this.report = this.buildReport('live', rawPcm, processedPcm, {
+        rawEc: false, rawNs: false, rawAgc: false, filterName
+      });
+    }
+
+    this.resultMode = 'live';
+    this.recordingTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    this.status = rawPcm ? 'done' : 'idle';
+    this.statusMessage = rawPcm ? 'Recorded. Compare RAW vs Processed and check the report below.' : '';
   }
 
-  // ─── A/B/C Recording ─────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODE 3 — A/B/C Comparison Recording
+  // ─────────────────────────────────────────────────────────────────────────
 
   async startABCRecording(): Promise<void> {
     const hasKoala = !!this.accessKey.trim();
 
     this.status = 'loading';
-    this.statusMessage = hasKoala ? 'Initialising both filters…' : 'Initialising DeepFilterNet3 (Koala skipped — no access key)…';
+    this.statusMessage = hasKoala ? 'Initialising both filters…' : 'Initialising DeepFilterNet3…';
     this.resetResults();
+    this.report = null;
+    this.resultMode = null;
+    this.koalaWasActive = false;
 
-    // 1. Get mic
     try {
+      // Production-matching stream → DF3 / Koala
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 }
+      });
+      // Raw reference stream (zero browser processing)
+      this.rawStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 }
       });
     } catch {
       this.status = 'error';
@@ -381,7 +426,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // 2. Init DF3 — skip if already pre-warmed by ngOnInit
+    // Init DF3
     let df3Ok: boolean;
     if (this.df3.isInitialized()) {
       df3Ok = true;
@@ -392,231 +437,313 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
     if (!df3Ok) {
       this.status = 'error';
       this.statusMessage = 'DeepFilterNet3 not supported on this browser.';
-      this.micStream.getTracks().forEach(t => t.stop());
+      this.teardownStreams();
       return;
     }
 
-    // 3. Init Koala (optional — skipped if no access key)
-    let koalaOk = false;
+    // Init Koala (optional)
     if (hasKoala) {
-      this.statusMessage = 'Loading Koala model (~3.8 MB) from GitHub…';
-      koalaOk = await this.koala.init(this.accessKey.trim());
+      this.statusMessage = 'Loading Koala (~3.8 MB)…';
+      const koalaOk = await this.koala.init(this.accessKey.trim());
       if (!koalaOk) {
         this.status = 'error';
         this.statusMessage = 'Koala init failed. Check your access key.';
-        this.micStream.getTracks().forEach(t => t.stop());
+        this.teardownStreams();
         this.df3.destroy();
         return;
       }
+      this.koalaWasActive = true;
     }
 
-    // 4. Wire DF3 audio graph
-    this.df3Stream = await this.df3.processStream(this.micStream);
+    // Wire DF3
+    this.df3Stream = await this.df3.processStream(this.micStream!);
 
-    // 5. Wire Koala capture if available
-    if (koalaOk) { this.koala.startCapture(this.micStream); }
+    // Wire Koala
+    if (this.koalaWasActive) {
+      this.koala.startCapture(this.micStream!);
+      this.koala.startRecordingCapture();
+    }
 
-    // 6. Attach DF3 energy analysers
-    this.setupAnalysers();
-
-    // 7. Set up MediaRecorders for raw + DF3
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus' : 'audio/mp4';
-
-    this.rawChunks = [];
-    this.df3Chunks = [];
-
-    this.rawRecorder = new MediaRecorder(this.micStream, { mimeType });
-    this.rawRecorder.ondataavailable = e => { if (e.data.size > 0) this.rawChunks.push(e.data); };
-
-    this.df3Recorder = new MediaRecorder(this.df3Stream, { mimeType });
-    this.df3Recorder.ondataavailable = e => { if (e.data.size > 0) this.df3Chunks.push(e.data); };
-
-    const rawDone = new Promise<void>(r => { this.rawRecorder!.onstop = () => r(); });
-    const df3Done = new Promise<void>(r => { this.df3Recorder!.onstop = () => r(); });
-
-    // 8. Start everything
+    // Start lossless PCM captures (ScriptProcessorNode — no codec, no compression)
+    this.abcRawCapture = this.startPcmCapture(this.rawStream!);
+    this.abcDf3Capture = this.startPcmCapture(this.df3Stream!);
     this.recordingStartTime = Date.now();
-    this.startEnergySampling();
-    if (koalaOk) { this.koala.startRecordingCapture(); }
-
-    this.rawRecorder.start(100);
-    this.df3Recorder.start(100);
 
     this.status = 'recording';
-    this.statusMessage = koalaOk
+    this.statusMessage = this.koalaWasActive
       ? 'Recording Raw + DF3 + Koala simultaneously… click Stop when done.'
-      : 'Recording Raw + DF3 simultaneously (Koala skipped)… click Stop when done.';
-
-    await Promise.all([rawDone, df3Done]);
-    this.finalizeRecording(mimeType, koalaOk);
+      : 'Recording Raw + DF3 simultaneously… click Stop when done.';
   }
 
-  stopABCRecording(): void {
-    this.rawRecorder?.stop();
-    this.df3Recorder?.stop();
-    this.koala.stopRecordingCapture();
-    this.micStream?.getTracks().forEach(t => t.stop());
-    this.stopEnergySampling();
+  async stopABCRecording(): Promise<void> {
     this.status = 'processing';
-    this.statusMessage = 'Finalising recordings…';
-  }
+    this.statusMessage = 'Encoding WAV files…';
 
-  private finalizeRecording(mimeType: string, koalaOk: boolean): void {
     const duration = parseFloat(((Date.now() - this.recordingStartTime) / 1000).toFixed(1));
+    this.recordingTimestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-    // Raw player
-    this.rawUrl = URL.createObjectURL(new Blob(this.rawChunks, { type: mimeType }));
+    // Flatten PCM captures (sync — all samples already in memory)
+    const rawPcm = this.abcRawCapture ? this.stopPcmCapture(this.abcRawCapture) : new Float32Array(0);
+    const df3Pcm = this.abcDf3Capture ? this.stopPcmCapture(this.abcDf3Capture) : new Float32Array(0);
+    this.abcRawCapture = null;
+    this.abcDf3Capture = null;
 
-    // DF3 player
-    this.df3Url = URL.createObjectURL(new Blob(this.df3Chunks, { type: mimeType }));
+    if (this.koalaWasActive) { this.koala.stopRecordingCapture(); }
+    this.teardownStreams();
+    this.df3.destroy();
 
-    // Koala player (only if Koala was active)
-    this.koalaUrl = koalaOk
-      ? URL.createObjectURL(this.koala.getRecordedWav())
-      : null;
+    // Encode WAVs (16-bit PCM, 48 kHz — lossless)
+    if (rawPcm.length > 0) this.rawUrl = URL.createObjectURL(this.encodeWav(rawPcm, 48000));
+    if (df3Pcm.length > 0) this.df3Url = URL.createObjectURL(this.encodeWav(df3Pcm, 48000));
 
-    // DF3 metrics
-    const rawAvg = this.mean(this.rawSamples);
-    const df3Avg = this.mean(this.df3Samples);
-    this.df3Metrics = {
-      filterName: 'DeepFilterNet3',
-      initTimeMs: this.df3.initTimeMs,
-      setupMs: this.df3.processingLatencyMs,
-      rawEnergyDb: parseFloat(rawAvg.toFixed(1)),
-      cleanEnergyDb: parseFloat(df3Avg.toFixed(1)),
-      noiseReductionDb: parseFloat((rawAvg - df3Avg).toFixed(1)),
-      sampleRate: 48000,
-      extraInfo: `Suppression level: ${this.suppressionLevel}/100`
-    };
+    // Koala — get WAV + decode PCM for metrics
+    let koalaPcm: Float32Array | undefined;
+    if (this.koalaWasActive) {
+      const koalaWav = this.koala.getRecordedWav();
+      this.koalaUrl = URL.createObjectURL(koalaWav);
+      this.koala.stopCapture();
+      this.koala.destroy();
 
-    // Koala metrics (only if Koala was active)
-    if (koalaOk) {
-      const koalaRaw = this.koala.getRawEnergyDb();
-      const koalaClean = this.koala.getCleanEnergyDb();
-      this.koalaMetrics = {
-        filterName: 'Koala (Picovoice)',
-        initTimeMs: this.koala.initTimeMs,
-        setupMs: this.koala.captureSetupMs,
-        rawEnergyDb: koalaRaw,
-        cleanEnergyDb: koalaClean,
-        noiseReductionDb: parseFloat((koalaRaw - koalaClean).toFixed(1)),
-        sampleRate: this.koala.sampleRate,
-        extraInfo: `Model delay: ${this.koala.delaySampleMs} ms`
-      };
+      try {
+        const ab = await koalaWav.arrayBuffer();
+        const decodeCtx = new AudioContext({ sampleRate: 48000 });
+        const buf = await decodeCtx.decodeAudioData(ab);
+        await decodeCtx.close();
+        koalaPcm = new Float32Array(buf.getChannelData(0));
+      } catch { /* metrics skipped */ }
     }
 
-    // Cleanup
-    this.teardownAnalysers();
-    this.df3.destroy();
-    if (koalaOk) { this.koala.stopCapture(); this.koala.destroy(); }
-    this.micStream = null;
-    this.df3Stream = null;
+    // Build report
+    if (rawPcm.length > 0 && df3Pcm.length > 0) {
+      this.report = this.buildReport('abc', rawPcm, df3Pcm, { rawEc: false, rawNs: false, rawAgc: false });
 
+      // Append Koala section when PCM was decoded successfully
+      if (koalaPcm && koalaPcm.length > 0 && this.report) {
+        const koalaMetrics = this.channelMetrics(koalaPcm, {
+          ec: false, ns: true, agc: false, sampleRate: this.koala.sampleRate || 16000
+        });
+        this.report.koala = {
+          processed: koalaMetrics,
+          comparison: {
+            noiseReductionDb: parseFloat((this.report.raw.levelDb - koalaMetrics.levelDb).toFixed(1)),
+            initTimeMs: this.koala.initTimeMs,
+            processingLatencyMs: this.koala.captureSetupMs,
+            suppressionLevel: 0,
+            filterName: 'Koala (Picovoice)'
+          }
+        };
+      }
+    }
+
+    this.resultMode = 'abc';
     this.status = 'done';
-    this.statusMessage = koalaOk
-      ? `Done! ${duration}s recorded. Compare three players and download your report.`
-      : `Done! ${duration}s recorded. Raw vs DeepFilterNet3 comparison ready.`;
+    this.statusMessage = this.koalaWasActive
+      ? `Done! ${duration}s recorded. Compare three players and check the report.`
+      : `Done! ${duration}s recorded. Raw vs DF3 comparison ready.`;
   }
 
-  // ─── Energy measurement (DF3 via AnalyserNode) ───────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // PCM capture helpers
+  // ─────────────────────────────────────────────────────────────────────────
 
-  private setupAnalysers(): void {
-    this.analysisCtx = new AudioContext({ sampleRate: 48000 });
-    this.rawAnalyser = this.analysisCtx.createAnalyser();
-    this.df3Analyser = this.analysisCtx.createAnalyser();
-    this.rawAnalyser.fftSize = 2048;
-    this.df3Analyser.fftSize = 2048;
-    this.analysisCtx.createMediaStreamSource(this.micStream!).connect(this.rawAnalyser);
-    this.analysisCtx.createMediaStreamSource(this.df3Stream!).connect(this.df3Analyser);
-    this.rawSamples = [];
-    this.df3Samples = [];
+  /** Attach a ScriptProcessorNode to a stream and begin collecting Float32 PCM. */
+  private startPcmCapture(stream: MediaStream): PcmCapture {
+    const samples: Float32Array[] = [];
+    const ctx = new AudioContext({ sampleRate: 48000 });
+    const source = ctx.createMediaStreamSource(stream);
+    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      // Copy immediately — the underlying buffer is reused each callback
+      samples.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    };
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    return { ctx, processor, samples };
   }
 
-  private startEnergySampling(): void {
-    this.energyInterval = setInterval(() => {
-      if (this.rawAnalyser) this.rawSamples.push(this.averageDb(this.rawAnalyser));
-      if (this.df3Analyser) this.df3Samples.push(this.averageDb(this.df3Analyser));
-    }, 200);
+  /** Disconnect, close context, and flatten all chunks into a single Float32Array. */
+  private stopPcmCapture(capture: PcmCapture): Float32Array {
+    capture.processor.disconnect();
+    capture.ctx.close();
+    const total = capture.samples.reduce((s, c) => s + c.length, 0);
+    const flat = new Float32Array(total);
+    let offset = 0;
+    for (const chunk of capture.samples) { flat.set(chunk, offset); offset += chunk.length; }
+    return flat;
   }
 
-  private stopEnergySampling(): void {
-    if (this.energyInterval !== null) { clearInterval(this.energyInterval); this.energyInterval = null; }
-  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // Report  (RAW · Processed · Comparison — mirrors OpenViduCallQualitySnapshot)
+  // ─────────────────────────────────────────────────────────────────────────
 
-  private teardownAnalysers(): void {
-    this.stopEnergySampling();
-    try { this.analysisCtx?.close(); } catch (_) {}
-    this.analysisCtx = null;
-    this.rawAnalyser = null;
-    this.df3Analyser = null;
-  }
+  private buildReport(
+    mode: 'file' | 'live' | 'abc',
+    rawPcm: Float32Array,
+    processedPcm: Float32Array,
+    opts: { rawEc: boolean; rawNs: boolean; rawAgc: boolean; filterName?: string }
+  ): AudioTestReport {
+    const raw = this.channelMetrics(rawPcm, {
+      ec: opts.rawEc, ns: opts.rawNs, agc: opts.rawAgc
+    });
+    const processed = this.channelMetrics(processedPcm, {
+      ec: true, ns: true, agc: false
+    });
 
-  private averageDb(analyser: AnalyserNode): number {
-    const buf = new Float32Array(analyser.frequencyBinCount);
-    analyser.getFloatFrequencyData(buf);
-    const valid = Array.from(buf).filter(v => isFinite(v) && v > -150);
-    if (valid.length === 0) return -100;
-    return valid.reduce((s, v) => s + v, 0) / valid.length;
-  }
-
-  private mean(arr: number[]): number {
-    return arr.length === 0 ? 0 : arr.reduce((s, v) => s + v, 0) / arr.length;
-  }
-
-  // ─── Report download ──────────────────────────────────────────────────────
-
-  downloadReport(): void {
-    if (!this.df3Metrics) return;
-
-    const report: Record<string, unknown> = {
+    return {
       testedAt: new Date().toISOString(),
       browser: navigator.userAgent,
-      results: {
-        deepFilterNet3: { ...this.df3Metrics, package: 'deepfilternet3-noise-filter@1.1.4' },
-        ...(this.koalaMetrics ? { koala: { ...this.koalaMetrics, package: '@picovoice/koala-web@3.0.0' } } : {})
+      mode,
+      raw,
+      processed,
+      comparison: {
+        noiseReductionDb: parseFloat((raw.levelDb - processed.levelDb).toFixed(1)),
+        initTimeMs: this.df3.initTimeMs,
+        processingLatencyMs: this.df3.processingLatencyMs,
+        suppressionLevel: this.suppressionLevel,
+        filterName: opts.filterName ?? 'DeepFilterNet3'
       },
-      winner: this.pickWinner(),
       notes: this.userNotes.trim()
     };
+  }
 
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  private channelMetrics(
+    pcm: Float32Array,
+    flags: { ec: boolean; ns: boolean; agc: boolean; sampleRate?: number }
+  ): AudioChannelMetrics {
+    const sr = flags.sampleRate ?? 48000;
+    return {
+      levelDb: this.rmsDb(pcm),
+      peakDb: this.peakDb(pcm),
+      durationSec: parseFloat((pcm.length / sr).toFixed(2)),
+      sampleRate: sr,
+      echoCancellation: flags.ec,
+      noiseSuppression: flags.ns,
+      autoGainControl: flags.agc
+    };
+  }
+
+  private rmsDb(pcm: Float32Array): number {
+    if (pcm.length === 0) return -96;
+    let sumSq = 0;
+    for (let i = 0; i < pcm.length; i++) sumSq += pcm[i] * pcm[i];
+    const rms = Math.sqrt(sumSq / pcm.length);
+    return rms === 0 ? -96 : parseFloat((20 * Math.log10(rms)).toFixed(1));
+  }
+
+  private peakDb(pcm: Float32Array): number {
+    if (pcm.length === 0) return -96;
+    let peak = 0;
+    for (let i = 0; i < pcm.length; i++) { const a = Math.abs(pcm[i]); if (a > peak) peak = a; }
+    return peak === 0 ? -96 : parseFloat((20 * Math.log10(peak)).toFixed(1));
+  }
+
+  downloadReport(): void {
+    if (!this.report) return;
+    const out = { ...this.report, notes: this.userNotes.trim() };
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     a.href = url;
-    a.download = `noise-filter-comparison-${ts}.json`;
+    a.download = `audio-test-report-${this.recordingTimestamp}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  private pickWinner(): string {
-    if (!this.df3Metrics) return 'unknown';
-    if (!this.koalaMetrics) return 'DeepFilterNet3 (only filter tested)';
-    return this.df3Metrics.noiseReductionDb >= this.koalaMetrics.noiseReductionDb
-      ? 'DeepFilterNet3' : 'Koala (Picovoice)';
+  // ─────────────────────────────────────────────────────────────────────────
+  // WAV encoding  — 16-bit PCM, mono
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private encodeWav(samples: Float32Array, sampleRate: number): Blob {
+    const numChannels = 1, bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+    const blockAlign = numChannels * bitsPerSample / 8;
+    const dataBytes = samples.length * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataBytes);
+    const view = new DataView(buffer);
+    this.writeStr(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataBytes, true);
+    this.writeStr(view, 8, 'WAVE');
+    this.writeStr(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    this.writeStr(view, 36, 'data');
+    view.setUint32(40, dataBytes, true);
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+    return new Blob([buffer], { type: 'audio/wav' });
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  private writeStr(view: DataView, offset: number, str: string): void {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Resample  (file mode — source rate ≠ 48 kHz)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async resampleTo48k(
+    pcm: Float32Array<ArrayBuffer>,
+    srcRate: number
+  ): Promise<Float32Array<ArrayBuffer>> {
+    const targetRate = 48000;
+    const targetLength = Math.ceil(pcm.length * targetRate / srcRate);
+    const offCtx = new OfflineAudioContext(1, targetLength, targetRate);
+    const srcBuf = offCtx.createBuffer(1, pcm.length, srcRate);
+    srcBuf.copyToChannel(pcm, 0);
+    const src = offCtx.createBufferSource();
+    src.buffer = srcBuf;
+    src.connect(offCtx.destination);
+    src.start(0);
+    const rendered = await offCtx.startRendering();
+    return rendered.getChannelData(0) as Float32Array<ArrayBuffer>;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Template helpers
+  // ─────────────────────────────────────────────────────────────────────────
 
   get isRecording(): boolean { return this.status === 'recording'; }
   get isBusy(): boolean { return this.status === 'loading' || this.status === 'processing'; }
-  get hasResults(): boolean { return this.status === 'done'; }
   get isFileProcessing(): boolean { return this.fileStatus === 'loading'; }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cleanup helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private teardownStreams(): void {
+    this.micStream?.getTracks().forEach(t => t.stop());
+    this.rawStream?.getTracks().forEach(t => t.stop());
+    this.micStream = null;
+    this.rawStream = null;
+    this.df3Stream = null;
+  }
+
+  private teardownCaptures(): void {
+    if (this.liveRawCapture) { this.stopPcmCapture(this.liveRawCapture); this.liveRawCapture = null; }
+    if (this.liveProcessedCapture) { this.stopPcmCapture(this.liveProcessedCapture); this.liveProcessedCapture = null; }
+    if (this.abcRawCapture) { this.stopPcmCapture(this.abcRawCapture); this.abcRawCapture = null; }
+    if (this.abcDf3Capture) { this.stopPcmCapture(this.abcDf3Capture); this.abcDf3Capture = null; }
+  }
 
   private resetResults(): void {
     [this.rawUrl, this.df3Url, this.koalaUrl].forEach(u => { if (u) URL.revokeObjectURL(u); });
-    this.rawUrl = null; this.df3Url = null; this.koalaUrl = null;
-    this.df3Metrics = null; this.koalaMetrics = null;
-    this.userNotes = '';
+    this.rawUrl = null;
+    this.df3Url = null;
+    this.koalaUrl = null;
   }
 
-  // ─── Lifecycle ────────────────────────────────────────────────────────────
-
-  ngOnDestroy(): void {
-    this.stopLivePreview();
-    this.teardownAnalysers();
-    [this.rawUrl, this.df3Url, this.koalaUrl].forEach(u => { if (u) URL.revokeObjectURL(u); });
-    this.resetFileResults();
+  private resetFileResults(): void {
+    if (this.fileInputUrl) { URL.revokeObjectURL(this.fileInputUrl); this.fileInputUrl = null; }
+    if (this.fileOutputUrl) { URL.revokeObjectURL(this.fileOutputUrl); this.fileOutputUrl = null; }
+    this.fileProcessingMs = 0;
   }
 }

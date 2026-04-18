@@ -1,6 +1,6 @@
 <!-- Main container with responsive card-based layout -->
 <!-- Floating draft save status — OUTSIDE form-container so filter/blur doesn't affect it -->
-<div class="draft-save-indicator floating" [ngClass]="draftSaveStatus">
+<div class="draft-save-indicator floating" [ngClass]="draftSaveStatus" *ngIf="!formpatch">
   <ng-container [ngSwitch]="draftSaveStatus">
     <ng-container *ngSwitchCase="'saving'">
       <mat-icon class="spin">sync</mat-icon>
@@ -21,7 +21,7 @@
   </ng-container>
 </div>
 
-<div class="form-container" *ngIf="showcontent" [class.connectivity-blocked]="connectivityDialogRef">
+<div class="form-container" *ngIf="showcontent">
   <!-- Form header with improved styling -->
   <div class="form-header">
     <div class="form-title">

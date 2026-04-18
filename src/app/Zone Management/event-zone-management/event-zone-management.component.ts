@@ -46,10 +46,17 @@ export class EventZoneManagementComponent implements OnDestroy {
   eventZoneList: any[] = []
   mapEventZoneData: { [key: string]: any } = {}
 
-  // Event Cohorts
-  operationalCohortList: any[] = []
-  educationalCohortList: any[] = []
+  // Event Cohorts — bucketed dynamically by cohortCategory value
+  cohortListByCategory: { [key: string]: any[] } = {}
   mapCohortsData: { [key: string]: any } = {}
+
+  get cohortCategories(): string[] {
+    return Object.keys(this.cohortListByCategory).sort()
+  }
+
+  get allCohorts(): any[] {
+    return Object.values(this.cohortListByCategory).flat()
+  }
   
   // Manage Participants
   mapCohortParticipants: { [key: string]: string[] } = {}
@@ -151,8 +158,7 @@ export class EventZoneManagementComponent implements OnDestroy {
     // Reset previous data
     this.eventZoneList = []
     this.mapEventZoneData = {}
-    this.operationalCohortList = []
-    this.educationalCohortList = []
+    this.cohortListByCategory = {}
     this.mapCohortsData = {}
     this.mapCohortParticipants = {}
     this.selectedCohortIds.clear()
@@ -172,7 +178,9 @@ export class EventZoneManagementComponent implements OnDestroy {
 
       var id = []
       data.forEach(d =>{
-        id = [...id, ...d["cohorts"]]
+        if (Array.isArray(d["cohorts"])) {
+          id = [...id, ...d["cohorts"]]
+        }
       })
       console.log("******", id.sort((a, b) => a.localeCompare(b)))
 
@@ -193,7 +201,7 @@ export class EventZoneManagementComponent implements OnDestroy {
 
     // ===== LOAD COHORTS =====
     const cohortCollection = collection(this.firestore, "big cohorts")
-    const cohortQuery = query(cohortCollection, where("eventref", "==", eventRef), where("cohortCategory", "in", ["operational", "educational"]))
+    const cohortQuery = query(cohortCollection, where("eventref", "==", eventRef))
     
     collectionData(cohortQuery, { idField: "docid" }).pipe(
       takeUntil(this.destroy$)
@@ -204,25 +212,24 @@ export class EventZoneManagementComponent implements OnDestroy {
       // Sort cohorts alphabetically
       data.sort((a, b) => a["name"].localeCompare(b["name"]))
       
-      // Reset cohort lists
-      this.operationalCohortList = []
-      this.educationalCohortList = []
-      
+      // Reset cohort lists (categories are discovered dynamically from the data)
+      const cohortListByCategory: { [key: string]: any[] } = {}
+
       // Process each cohort
       data.forEach(cohort => {
         // Store participant list for quick lookup
         this.mapCohortParticipants[cohort["docid"]] = cohort["participantidlist"] || []
-        
+
         // Store cohort data
         this.mapCohortsData[cohort["docid"]] = cohort
-        
-        // Categorize cohorts
-        if (cohort["cohortCategory"] === "operational") {
-          this.operationalCohortList.push(cohort)
-        } else if (cohort["cohortCategory"] === "educational") {
-          this.educationalCohortList.push(cohort)
-        }
+
+        // Categorize cohorts dynamically by whatever cohortCategory value is present
+        const category = cohort["cohortCategory"]
+        if (!category) return;
+        (cohortListByCategory[category] ||= []).push(cohort)
       })
+
+      this.cohortListByCategory = cohortListByCategory
       
       // Recalculate statistics after cohorts are loaded
       this.calculateAllStats()
@@ -296,8 +303,7 @@ export class EventZoneManagementComponent implements OnDestroy {
 
   // Total number of cohorts that haven't been assigned to any zone yet
   get unassignedCohortsCount(): number {
-    const totalCohorts = this.operationalCohortList.length + this.educationalCohortList.length
-    return totalCohorts - this.cohortsAssigned
+    return this.allCohorts.length - this.cohortsAssigned
   }
 
   // Number of unique participants who are assigned to at least one zone
@@ -336,15 +342,12 @@ export class EventZoneManagementComponent implements OnDestroy {
   // Total number of unique participants across all cohorts
   get totalParticipants(): number {
     const allParticipantIds = new Set<string>()
-    
-    // Combine all cohorts
-    const allCohorts = [...this.operationalCohortList, ...this.educationalCohortList]
-    
-    allCohorts.forEach(cohort => {
+
+    this.allCohorts.forEach(cohort => {
       const participants = cohort['participantidlist'] || []
       participants.forEach(pid => allParticipantIds.add(pid))
     })
-    
+
     return allParticipantIds.size
   }
 
@@ -361,15 +364,10 @@ export class EventZoneManagementComponent implements OnDestroy {
       cohorts.forEach((cohortId: string) => assignedCohortIds.add(cohortId))
     })
     
-    // Get all cohorts based on filter
-    let cohorts: any[] = []
-    if (this.cohortFilter === 'operational') {
-      cohorts = [...this.operationalCohortList]
-    } else if (this.cohortFilter === 'educational') {
-      cohorts = [...this.educationalCohortList]
-    } else {
-      cohorts = [...this.operationalCohortList, ...this.educationalCohortList]
-    }
+    // Get all cohorts based on filter ('all' or any dynamic category key)
+    const cohorts: any[] = this.cohortFilter === 'all'
+      ? this.allCohorts
+      : [...(this.cohortListByCategory[this.cohortFilter] || [])]
     
     // Filter out assigned cohorts
     let unassigned = cohorts.filter(cohort => !assignedCohortIds.has(cohort['docid']))
@@ -383,6 +381,19 @@ export class EventZoneManagementComponent implements OnDestroy {
     }
     
     return unassigned
+  }
+
+  // Groups unassigned cohorts (already filtered + searched) by their cohortCategory.
+  // Returns [{ category, cohorts }] so the template can render a section per category dynamically.
+  getUnassignedCohortsGrouped(): { category: string, cohorts: any[] }[] {
+    const grouped: { [key: string]: any[] } = {}
+    this.getUnassignedCohorts().forEach(cohort => {
+      const category = cohort['cohortCategory'] || 'uncategorized'
+      ;(grouped[category] ||= []).push(cohort)
+    })
+    return Object.keys(grouped)
+      .sort()
+      .map(category => ({ category, cohorts: grouped[category] }))
   }
 
   // Toggle selection of a cohort (for multi-select)
@@ -547,7 +558,10 @@ export class EventZoneManagementComponent implements OnDestroy {
    * Get cohort category badge color
    */
   getCategoryBadgeClass(category: string): string {
-    return category === 'operational' ? 'badge-operational' : 'badge-educational'
+    // Derive class name from the category value so any new category gets its own class
+    // e.g. "operational" -> "badge-operational", "technical-ops" -> "badge-technical-ops"
+    const slug = (category || 'uncategorized').toString().toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    return `badge-${slug}`
   }
 
   // Add / Edit Zone
@@ -666,7 +680,7 @@ export class EventZoneManagementComponent implements OnDestroy {
     
     // Get all unique participants from all cohorts
     const allParticipants = new Set<string>();
-    [...this.operationalCohortList, ...this.educationalCohortList].forEach(cohort => {
+    this.allCohorts.forEach(cohort => {
       (cohort['participantidlist'] || []).forEach((pid: string) => {
         allParticipants.add(pid);
         participantZoneMap[pid] = [];
@@ -731,7 +745,7 @@ export class EventZoneManagementComponent implements OnDestroy {
   // Add this helper method:
   private getParticipantCohorts(participantId: string): string[] {
     const cohortIds: string[] = [];
-    [...this.operationalCohortList, ...this.educationalCohortList].forEach(cohort => {
+    this.allCohorts.forEach(cohort => {
       if ((cohort['participantidlist'] || []).includes(participantId)) {
         cohortIds.push(cohort['docid']);
       }
