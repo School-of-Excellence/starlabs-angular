@@ -57,6 +57,7 @@ interface NotificationEvent {
   message: string;
   title:   string;
   logdate: any;
+  templateName?: string;
 }
 
 interface ProfileNotificationSummary {
@@ -214,6 +215,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private storage = inject(Storage);
 
   pendingInvitationTokenIds: Set<string> = new Set();
+  pendingInvitationPairingMap: { [tokenId: string]: string[] } = {};
 
   showMoveMenu: { [key: string]: boolean } = {};
   showTokenMenu: { [key: string]: boolean } = {};
@@ -376,6 +378,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private shouldScrollTracks = false;
   timelineSearchQuery = '';
   selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
+  selectedWhatsappPreview: { profileId: string; item: NotificationEvent } | null = null;
 
   // keep unsubscribe handles to tear down on close
   private timelineUnsubs: (() => void)[] = [];
@@ -540,6 +543,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   hasPendingInvitation(token: any): boolean {
     return !!token?.docid && this.pendingInvitationTokenIds.has(token.docid);
+  }
+
+  getPendingInvitationPairingNames(token: any): string {
+    if (!token?.docid) return '';
+    const pairing = this.pendingInvitationPairingMap[token.docid] ?? [];
+    const names = pairing
+      .map(pid => this.mapProfileData[pid]?.['name'])
+      .filter((n: string) => !!n);
+    return names.join(', ');
   }
 
   getTokenHighlight(profileId: string): 'orange' | 'none' {
@@ -1722,21 +1734,31 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     })
 
     this.pendingInvitationTokenIds = new Set();
+    this.pendingInvitationPairingMap = {};
     collectionData(query(
       collection(this.firestore, "studioinvitation"),
       where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue["docid"])),
       where("clientresponse", "==", null)
     )).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(invitations => {
       const now = Date.now();
-      this.pendingInvitationTokenIds = new Set(
-        invitations
-          .filter(inv => {
-            const expiry = inv['expirydate']?.toDate ? inv['expirydate'].toDate() : inv['expirydate'];
-            return !expiry || expiry.getTime() >= now;
-          })
-          .map(inv => inv['tokenref']?.id)
-          .filter(id => !!id)
-      );
+      const activeInvitations = invitations.filter(inv => {
+        const expiry = inv['expirydate']?.toDate ? inv['expirydate'].toDate() : inv['expirydate'];
+        return !expiry || expiry.getTime() >= now;
+      });
+      const tokenIds = new Set<string>();
+      const pairingMap: { [tokenId: string]: string[] } = {};
+      for (const inv of activeInvitations) {
+        const tokenId = inv['tokenref']?.id;
+        if (!tokenId) continue;
+        tokenIds.add(tokenId);
+        const pairing: string[] = inv['specialistpairing']
+          ?? this.mapStudio[inv['studioid']]?.['pairing']
+          ?? this.mapStudio[inv['studioid']]?.['participants']
+          ?? [];
+        pairingMap[tokenId] = pairing;
+      }
+      this.pendingInvitationTokenIds = tokenIds;
+      this.pendingInvitationPairingMap = pairingMap;
     })
 
     // collectionData(query(collection(this.firestore, "queue generation", this.selectedQueue['docid'], "stagechat"), where("senderprofileid", '==', this.profileid), where("pinned", '==', true), orderBy("date", "desc")), { idField: 'id' }).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(async snap => {
@@ -5441,6 +5463,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   closeQueueTimeline() {
     this.showTimelineOverlay = false;
     this.selectedEmailPreview = null;
+    this.selectedWhatsappPreview = null;
     this.timelineUnsubs.forEach(u => u());
     this.timelineUnsubs = [];
   }
@@ -5570,6 +5593,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       const sent: string[] = data['sent'] || [];
       const failed: string[] = data['failed'] || [];
 
+      const template = data['body'] || data['message'] || '';
+      const parameterConfig = data['parameterConfig'] || data['parameterconfig'] || [];
+      const templateName = data['template_name'] || data['templateName'] || '';
+
       sent.forEach(phone => {
         const profileId = numbersmap[phone];
         if (!profileId) return;
@@ -5578,9 +5605,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         entry.totalSuccess++;
         entry.timeline.push({
           channel: 'whatsapp', status: 'success',
-          message: data['message'] || '',
+          message: this.renderWhatsappMessage(template, parameterConfig, profileId),
           title: data['title'] || '',
           logdate: data['date'],
+          templateName,
         });
       });
 
@@ -5592,9 +5620,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         entry.totalFailed++;
         entry.timeline.push({
           channel: 'whatsapp', status: 'failure',
-          message: data['message'] || '',
+          message: this.renderWhatsappMessage(template, parameterConfig, profileId),
           title: data['title'] || '',
           logdate: data['date'],
+          templateName,
         });
       });
     });
@@ -5667,6 +5696,31 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }, 50);
   }
 
+  renderWhatsappMessage(template: string, parameterConfig: any[], profileId: string): string {
+    if (!template) return '';
+    if (!Array.isArray(parameterConfig) || parameterConfig.length === 0) return template;
+
+    const metadata: Record<string, any> = this.participantMetaDataMap[profileId] || {};
+    const profile: Record<string, any> = (this.mapProfileData[profileId] as Record<string, any>) || {};
+    const datamodel: Record<string, any> = {};
+
+    for (const param of parameterConfig) {
+      const name = param?.['name'];
+      if (!name) continue;
+      let value: any = '';
+      const fillType = param?.['fillType'];
+      if (fillType === 'metadata') {
+        const field = param?.['metadataField'];
+        value = (field != null ? (metadata[field] ?? profile[field]) : undefined) ?? '';
+      } else if (fillType === 'static') {
+        value = param?.['staticValue'] ?? '';
+      }
+      datamodel[name] = value;
+    }
+
+    return this.renderMessage(template, datamodel);
+  }
+
   renderMessage(template: string, datamodel: Record<string, any>): string {
     if (!template || !datamodel) return template || '';
 
@@ -5721,6 +5775,17 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.selectedEmailPreview = null;
     } else {
       this.selectedEmailPreview = { profileId, item };
+    }
+  }
+
+  toggleWhatsappPreview(item: NotificationEvent, profileId: string) {
+    if (
+      this.selectedWhatsappPreview?.profileId === profileId &&
+      this.selectedWhatsappPreview?.item === item
+    ) {
+      this.selectedWhatsappPreview = null;
+    } else {
+      this.selectedWhatsappPreview = { profileId, item };
     }
   }
 
