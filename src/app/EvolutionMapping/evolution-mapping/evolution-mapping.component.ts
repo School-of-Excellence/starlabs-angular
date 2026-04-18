@@ -442,7 +442,9 @@ export class EvolutionMappingComponent {
         disableClose: true,
         autoFocus: false,
         width: '90%',
-        height: '50%',
+        maxWidth: '1100px',
+        height: 'auto',
+        maxHeight: '90vh',
       });
       dialogRef.afterClosed().subscribe(value => {  
         this.getEvolutionMapping();
@@ -455,7 +457,9 @@ export class EvolutionMappingComponent {
         disableClose: true,
         autoFocus: false,
         width: '90%',
-        height: '50%',
+        maxWidth: '1100px',
+        height: 'auto',
+        maxHeight: '90vh',
       });
       dialogRef.afterClosed().subscribe(value => {  
         this.getEvolutionMapping();
