@@ -24,6 +24,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confirmation/stage-incomplete-confirmation.component';
+import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view-participant-atc.component';
 
 
 @Component({
@@ -38,7 +39,7 @@ import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confir
     MatIconModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
-    
+    ViewParticipantAtcComponent,
   ],
   templateUrl: './dynamic-studio.component.html',
   styleUrl: './dynamic-studio.component.css'
@@ -93,6 +94,11 @@ export class DynamicStudioComponent {
   unvalidatedATCList = []
   mapATCnotes = {}
   cwATClist = [] // Changework Assigned ATC
+  showPreviousATC: boolean = false
+  showLoveLetter: boolean = false
+  loveLetterList: any[] = []
+  loveLetterLoading: boolean = false
+  loveLetterLoadedFor: string | null = null
   // Form
   participantForm = []
   // Triple ATC
@@ -1784,6 +1790,40 @@ export class DynamicStudioComponent {
     }
   }
   
+  async getLoveLetters(){
+    const profileid = this.liveAssignment?.["participantid"]
+    if(!profileid){
+      this.loveLetterList = []
+      return
+    }
+    if(this.loveLetterLoadedFor == profileid){
+      return
+    }
+    this.loveLetterLoading = true
+    try {
+      const q = query(
+        collection(this.firestore, "love letter"),
+        where("profileid", "==", profileid),
+        orderBy("created", "desc")
+      )
+      const snap = await getDocs(q)
+      this.loveLetterList = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      this.loveLetterLoadedFor = profileid
+    } catch (error) {
+      console.error('Error fetching love letters:', error)
+      this.loveLetterList = []
+    } finally {
+      this.loveLetterLoading = false
+    }
+  }
+
+  toggleLoveLetter(){
+    this.showLoveLetter = !this.showLoveLetter
+    if(this.showLoveLetter){
+      this.getLoveLetters()
+    }
+  }
+
   async getAssignedATC(){
     var startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
     

@@ -1226,6 +1226,11 @@
                     'priority-orange': getTokenHighlight(token.profile_id) === 'orange',
                     'token-pending-invitation': column.type === 'Waiting' && hasPendingInvitation(token)
                   }" *ngFor="let token of getDisplayedTokens(column); let tokenIndex = index">
+                  <span *ngIf="column.type === 'Waiting' && hasPendingInvitation(token)"
+                    class="pending-invitation-badge"
+                    [matTooltip]="getPendingInvitationPairingNames(token)">
+                    {{ getPendingInvitationPairingNames(token) || 'Invitation Pending' }}
+                  </span>
                   <div class="token-content">
                     <!-- Move Menu Wrapper -->
                     <div class="move-menu-wrapper">
@@ -2043,8 +2048,9 @@
                             <div class="h-node wa"
                                  [class.success]="item.status === 'success'"
                                  [class.failure]="item.status === 'failure'"
-                                 [matTooltip]="item.title + ' — ' + item.message"
-                                 matTooltipClass="multiline-tooltip">
+                                 [matTooltip]="item.title"
+                                 matTooltipClass="multiline-tooltip"
+                                 (click)="toggleWhatsappPreview(item, p.profileId); $event.stopPropagation()">
                               <mat-icon class="h-node-icon">chat</mat-icon>
                               <span class="h-node-badge"
                                     [class.ok]="item.status === 'success'"
@@ -2057,6 +2063,38 @@
                           <div class="h-date">{{ item.logdate?.toDate() | date:'MMM d' }}</div>
                           <div class="h-time">{{ item.logdate?.toDate() | date:'h:mm a' }}</div>
                         </div>
+                      </div>
+
+                      <div *ngIf="selectedWhatsappPreview?.profileId === p.profileId" class="whatsapp-preview-box">
+                        <div class="whatsapp-preview-header">
+                          <div class="whatsapp-preview-title">
+                            <mat-icon style="font-size:15px;width:15px;height:15px;color:#059669;">chat</mat-icon>
+                            <span>{{ selectedWhatsappPreview?.item?.title || 'WhatsApp Message' }}</span>
+                            <span class="email-preview-status-badge"
+                                  [class.badge-sent]="selectedWhatsappPreview?.item?.status === 'success'"
+                                  [class.badge-failed]="selectedWhatsappPreview?.item?.status === 'failure'">
+                              {{ selectedWhatsappPreview?.item?.status === 'success' ? '✓ Sent' : '✗ Failed' }}
+                            </span>
+                          </div>
+                          <button class="whatsapp-preview-close" (click)="selectedWhatsappPreview = null; $event.stopPropagation()">
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </div>
+                        <div class="whatsapp-preview-meta">
+                          <div *ngIf="selectedWhatsappPreview?.item?.templateName" class="whatsapp-preview-meta-item">
+                            <mat-icon>description</mat-icon>
+                            <span class="whatsapp-preview-meta-label">Template:</span>
+                            <span class="whatsapp-preview-meta-value">{{ selectedWhatsappPreview?.item?.templateName }}</span>
+                          </div>
+                          <div *ngIf="selectedWhatsappPreview?.item?.logdate" class="whatsapp-preview-meta-item">
+                            <mat-icon>schedule</mat-icon>
+                            <span class="whatsapp-preview-meta-value">
+                              {{ selectedWhatsappPreview?.item?.logdate?.toDate() | date:'MMM d, y' }}
+                              · {{ selectedWhatsappPreview?.item?.logdate?.toDate() | date:'h:mm a' }}
+                            </span>
+                          </div>
+                        </div>
+                        <div *ngIf="selectedWhatsappPreview?.item?.message?.trim()" class="whatsapp-preview-body">{{ selectedWhatsappPreview?.item?.message }}</div>
                       </div>
                     </div>
 
