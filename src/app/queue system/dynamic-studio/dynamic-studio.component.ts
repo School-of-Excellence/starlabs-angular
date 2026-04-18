@@ -49,6 +49,7 @@ export class DynamicStudioComponent {
   profileRoles = {}
   profileid = null
   mapProfile = {}
+  mapProfileData: any = {}
   ongoingQueueList = []
   ongoingQueue = {}
   selectedQueue = {}
@@ -99,6 +100,11 @@ export class DynamicStudioComponent {
   loveLetterList: any[] = []
   loveLetterLoading: boolean = false
   loveLetterLoadedFor: string | null = null
+  // UP Attendance
+  readonly upProductIds = ['N0MhGQnxP9S8TdavuRJR', '0ayiNALL1HDVvCXDHcZ4', 'Rq9cu2Z3FSuILXdwYtca']
+  participantUPVisitLabel: string | null = null
+  participantUPVisitLoadedFor: string | null = null
+  expandedImage: string | null = null
   // Form
   participantForm = []
   // Triple ATC
@@ -199,7 +205,9 @@ export class DynamicStudioComponent {
             this.ongoingQueue = firstWithStudios || this.ongoingQueueList[0]
             this.selectedQueue = this.ongoingQueue
             await this.onQueueSelect()
-            this.mapProfile = (await guard.getProfileMap()).map
+            const profileMap = await guard.getProfileMap()
+            this.mapProfile = profileMap.map
+            this.mapProfileData = profileMap.docdata
           }
         })
       // }
@@ -742,6 +750,9 @@ export class DynamicStudioComponent {
           else{
             this.tripleATCList = []
           }
+
+          // UP Attendance Count
+          this.getParticipantUPVisit()
 
           // List Form
           var mappedForm = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]?.participantform ?? []
@@ -1792,6 +1803,34 @@ export class DynamicStudioComponent {
     }
   }
   
+  async getParticipantUPVisit(){
+    const profileid = this.liveAssignment?.["participantid"]
+    if(!profileid){
+      this.participantUPVisitLabel = null
+      this.participantUPVisitLoadedFor = null
+      return
+    }
+    if(this.participantUPVisitLoadedFor == profileid){
+      return
+    }
+    try {
+      const snap = await getDoc(doc(this.firestore, "participant metadata", profileid))
+      const consumed: string[] = snap.exists() ? (snap.data()["consumedproducts"] ?? []) : []
+      const matched = consumed.filter(id => this.upProductIds.includes(id)).length
+      this.participantUPVisitLabel = this.formatOrdinal(matched + 1) + ' Time'
+      this.participantUPVisitLoadedFor = profileid
+    } catch (error) {
+      console.error('Error fetching participant UP visit:', error)
+      this.participantUPVisitLabel = null
+    }
+  }
+
+  private formatOrdinal(n: number): string {
+    const s = ['th', 'st', 'nd', 'rd']
+    const v = n % 100
+    return n + (s[(v - 20) % 10] || s[v] || s[0])
+  }
+
   async getLoveLetters(){
     const profileid = this.liveAssignment?.["participantid"]
     if(!profileid){
