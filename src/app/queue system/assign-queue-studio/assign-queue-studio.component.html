@@ -32,9 +32,10 @@
               Required
             </mat-error>
           </mat-form-field>
-          <button mat-icon-button type="button" (click)="removeBonusArray(i)">
+          <button mat-icon-button type="button" (click)="removeBonusArray(i)" *ngIf="!field.get('mandatory').value">
             <mat-icon>remove_circle_outline</mat-icon>
           </button>
+          <span class="mandatory-tag" *ngIf="field.get('mandatory').value">Mandatory</span>
         </div>
       </div>
       <button mat-raised-button (click)="addBonusArray()">

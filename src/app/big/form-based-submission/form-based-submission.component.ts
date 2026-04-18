@@ -2,7 +2,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { arrayUnion, collection, doc, Firestore, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { FormGroup, FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule } from '@angular/forms';
+import { FormGroup, FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule  , FormsModule} from '@angular/forms';
 import { SafeResourceUrl, DomSanitizer } from '@angular/platform-browser';
 import { AbstractControl, ValidatorFn } from '@angular/forms';
 import { MatSlider, MatSliderModule } from '@angular/material/slider';
@@ -21,6 +21,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatSelectModule } from '@angular/material/select';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 function minArrayLength(min: number): ValidatorFn {
   return (control: AbstractControl): { [key: string]: any } | null => {
@@ -54,7 +55,9 @@ function maxArrayLength(max: number): ValidatorFn {
     MatSelectModule,
     MatListModule,
     MatRadioModule,
-    MatSliderModule
+    MatSliderModule,
+    FormsModule,
+    MatCheckboxModule
 
   ],
   templateUrl: './form-based-submission.component.html',
@@ -123,7 +126,6 @@ export class FormBasedSubmissionComponent {
   }
   ngOnInit(): void {
     this.initForm();
-
     // this.deliveryForm.valueChanges.pipe(
     //   debounceTime(1000),
     //   distinctUntilChanged()

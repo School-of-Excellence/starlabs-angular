@@ -1,4 +1,26 @@
 <!-- Main container with responsive card-based layout -->
+<!-- Floating draft save status — OUTSIDE form-container so filter/blur doesn't affect it -->
+<div class="draft-save-indicator floating" [ngClass]="draftSaveStatus" *ngIf="!formpatch">
+  <ng-container [ngSwitch]="draftSaveStatus">
+    <ng-container *ngSwitchCase="'saving'">
+      <mat-icon class="spin">sync</mat-icon>
+      <span>Saving draft…</span>
+    </ng-container>
+    <ng-container *ngSwitchCase="'saved'">
+      <mat-icon>cloud_done</mat-icon>
+      <span>Draft saved{{ draftSavedAt ? ' at ' + (draftSavedAt | date:'shortTime') : '' }}</span>
+    </ng-container>
+    <ng-container *ngSwitchCase="'failed'">
+      <mat-icon>cloud_off</mat-icon>
+      <span>Draft save failed{{ draftSaveError ? ' — ' + draftSaveError : '' }}</span>
+    </ng-container>
+    <ng-container *ngSwitchDefault>
+      <mat-icon>cloud_queue</mat-icon>
+      <span>Draft not saved yet</span>
+    </ng-container>
+  </ng-container>
+</div>
+
 <div class="form-container" *ngIf="showcontent">
   <!-- Form header with improved styling -->
   <div class="form-header">
@@ -69,9 +91,9 @@
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
           <mat-form-field appearance="outline" class="input-field">
-            <input 
-              [type]="form.type" 
-              matInput 
+            <input
+              [type]="form.type"
+              matInput
               [formControlName]="form.formcontrol"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
               (keyup)="autoSave(this.deliveryForm.value)" placeholder="Type Here"
@@ -117,8 +139,8 @@
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
           <mat-form-field appearance="outline" class="input-field">
-            <input matInput 
-              [matDatepicker]="i" 
+            <input matInput
+              [matDatepicker]="i"
               [formControlName]="form.formcontrol"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
               (dateChange)="autoSave(this.deliveryForm.value)" placeholder="MM/DD/YYYY"
@@ -144,11 +166,11 @@
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
           <mat-form-field appearance="outline" class="input-field">
-            <mat-select 
-              [formControlName]="form.formcontrol" 
+            <mat-select
+              [formControlName]="form.formcontrol"
               [multiple]="form.type == 'MultiSelect' ? true : false"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
-              (selectionChange)="autoSave(this.deliveryForm.value)" 
+              (selectionChange)="autoSave(this.deliveryForm.value)"
               [placeholder]="form.type == 'MultiSelect' ? 'Select options' : 'Select an option'">
               <mat-option *ngFor="let item of form.options" [value]="item">{{item}}</mat-option>
             </mat-select>
@@ -176,7 +198,7 @@
           <mat-form-field appearance="outline" class="input-field textarea-field">
             <textarea matInput [formControlName]="form.formcontrol" rows="6"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
-              (keyup)="autoSave(this.deliveryForm.value)" 
+              (keyup)="autoSave(this.deliveryForm.value)"
               placeholder="Enter your response"></textarea>
             <mat-error *ngIf="deliveryForm.get(form.formcontrol).hasError('required'); else error">
               This field is required
@@ -190,10 +212,10 @@
         <!-- Checkbox with improved styling -->
         <ng-container *ngIf="['Checkbox'].includes(form.type)">
           <div class="checkbox-container">
-            <mat-checkbox 
+            <mat-checkbox
               [formControlName]="form.formcontrol"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
-              (change)="autoSave(this.deliveryForm.value)" 
+              (change)="autoSave(this.deliveryForm.value)"
               class="custom-checkbox"
             >
               <span class="checkbox-label">
@@ -219,7 +241,7 @@
           <div class="slider-container">
             <span class="slider-min-label">{{form.options[0]}}</span>
             <!-- [required]="![null,undefined].includes(form.required) ? form.required : false" -->
-            <mat-slider 
+            <mat-slider
               class="custom-slider"
               [min]="1"
               [max]="form.options.length"
@@ -253,15 +275,15 @@
             </h3>
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
-          <mat-selection-list 
-            class="checkbox-list" 
+          <mat-selection-list
+            class="checkbox-list"
             [formControlName]="form.formcontrol"
             (selectionChange)="onMultiSelectionChange($event,form.formcontrol,form,i);autoSave(this.deliveryForm.value)"
           >
-            <mat-list-option 
-              *ngFor="let cbitem of form.options; let mcb = index" 
-              checkboxPosition="before" 
-              [value]="cbitem" 
+            <mat-list-option
+              *ngFor="let cbitem of form.options; let mcb = index"
+              checkboxPosition="before"
+              [value]="cbitem"
               class="checkbox-list-option">
               {{cbitem}}
             </mat-list-option>
@@ -287,12 +309,12 @@
             </h3>
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
-          <mat-radio-group [formControlName]="form.formcontrol" 
+          <mat-radio-group [formControlName]="form.formcontrol"
             class="radio-group"
-            [required]="![null,undefined].includes(form.required) ? form.required : false" 
+            [required]="![null,undefined].includes(form.required) ? form.required : false"
             (change)="autoSave(this.deliveryForm.value)">
-            <mat-radio-button *ngFor="let list of form.options" 
-              [value]="list" 
+            <mat-radio-button *ngFor="let list of form.options"
+              [value]="list"
               class="radio-button">
               {{list}}
             </mat-radio-button>
@@ -366,19 +388,19 @@
             </h3>
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
-          
+
           <div [formArrayName]="form.formcontrol" class="form-array-container">
-            <div *ngFor="let list of getFormArrayControl(form.formcontrol); let j = index" 
+            <div *ngFor="let list of getFormArrayControl(form.formcontrol); let j = index"
               [formGroupName]="j"
               class="form-array-item">
-              
+
               <div class="form-array-header">
                 <h4>Item {{j + 1}}</h4>
               </div>
-              
+
               <div class="form-array-content">
                 <ng-container *ngFor="let obj of form.array; let k = index">
-                  
+
                   <!-- Text inputs in array -->
                   <ng-container *ngIf="['Text','number','time','email'].includes(obj.type)">
                     <div class="array-field">
@@ -396,7 +418,7 @@
                       </mat-form-field>
                     </div>
                   </ng-container>
-                  
+
                   <!-- Date picker in array -->
                   <ng-container *ngIf="['date'].includes(obj.type)">
                     <div class="array-field">
@@ -417,7 +439,7 @@
                       </mat-form-field>
                     </div>
                   </ng-container>
-                  
+
                   <!-- Dropdowns in array -->
                   <ng-container *ngIf="['DropDown','MultiSelect'].includes(obj.type)">
                     <div class="array-field">
@@ -439,7 +461,7 @@
                       </mat-form-field>
                     </div>
                   </ng-container>
-                  
+
                   <!-- Paragraph in array -->
                   <ng-container *ngIf="['Paragraph'].includes(obj.type)">
                     <div class="array-field">
@@ -458,7 +480,7 @@
                       </mat-form-field>
                     </div>
                   </ng-container>
-                  
+
                   <!-- Checkbox in array -->
                   <ng-container *ngIf="['Checkbox'].includes(obj.type)">
                     <div class="array-field checkbox-container">
@@ -470,13 +492,13 @@
                           <span class="required-indicator" *ngIf="![null,undefined].includes(obj.required) ? obj.required : false">*</span>
                         </span>
                       </mat-checkbox>
-                      <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).touched && 
+                      <mat-error *ngIf="getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).touched &&
                                        getFormArrayControl(form.formcontrol)[j].get(obj.formarraycontrol).hasError('required')">
                         This checkbox is required
                       </mat-error>
                     </div>
                   </ng-container>
-                  
+
                   <!-- Radio buttons in array -->
                   <ng-container *ngIf="['radio'].includes(obj.type)">
                     <div class="array-field">
@@ -484,7 +506,7 @@
                         {{obj.fieldname}}
                         <span class="required-indicator" *ngIf="![null,undefined].includes(obj.required) ? obj.required : false">*</span>
                       </h5>
-                      <mat-radio-group [formControlName]="obj.formarraycontrol" 
+                      <mat-radio-group [formControlName]="obj.formarraycontrol"
                         class="radio-group"
                         [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                         (change)="autoSave(this.deliveryForm.value)">
@@ -499,24 +521,27 @@
                       </mat-error>
                     </div>
                   </ng-container>
-                  
+
                 </ng-container>
               </div>
-              
+
               <!-- Array item actions -->
               <div class="form-array-actions">
-                <button *ngIf="j == (getFormArray(form.formcontrol).length - 1)" 
-                  type="button" 
-                  mat-mini-fab 
-                  color="primary" 
+                <button *ngIf="j == (getFormArray(form.formcontrol).length - 1)"
+                  type="button"
+                  mat-mini-fab
+                  color="primary"
+                  [disabled]="form.maxitems && form.maxitems > 0 && getFormArray(form.formcontrol).length >= form.maxitems"
                   (click)="onAdd(form.formcontrol,form.array);autoSave(this.deliveryForm.value)"
-                  class="array-action-button add-button">
+                  class="array-action-button add-button"
+                  [matTooltip]="(form.maxitems && form.maxitems > 0 && getFormArray(form.formcontrol).length >= form.maxitems) ? 'Maximum of ' + form.maxitems + ' items allowed' : ''"
+                  matTooltipPosition="above">
                   <mat-icon>add</mat-icon>
                 </button>
-                <button *ngIf="j != 0 && j == (getFormArray(form.formcontrol).length - 1)" 
-                  type="button" 
-                  mat-mini-fab 
-                  color="warn" 
+                <button *ngIf="j != 0 && j == (getFormArray(form.formcontrol).length - 1)"
+                  type="button"
+                  mat-mini-fab
+                  color="warn"
                   (click)="onRemove(form.formcontrol,j);autoSave(this.deliveryForm.value)"
                   class="array-action-button remove-button">
                   <mat-icon>remove</mat-icon>
@@ -531,25 +556,25 @@
       </div>
       <ng-template #error></ng-template>
     </form>
-    
+
     <!-- Form submission buttons -->
     <!-- <div class="form-actions">
-      <button *ngIf="!formpatch" 
-        mat-raised-button 
-        color="primary" 
-        type="submit" 
-        [disabled]="deliveryForm.invalid" 
-        (click)="onSubmit(this.deliveryForm.value)" 
+      <button *ngIf="!formpatch"
+        mat-raised-button
+        color="primary"
+        type="submit"
+        [disabled]="deliveryForm.invalid"
+        (click)="onSubmit(this.deliveryForm.value)"
         class="submit-button">
         Submit
       </button>
-      
-      <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" 
-        mat-raised-button 
-        color="primary" 
-        type="button" 
-        [disabled]="deliveryForm.invalid" 
-        (click)="onUpdate(this.deliveryForm.value)" 
+
+      <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'"
+        mat-raised-button
+        color="primary"
+        type="button"
+        [disabled]="deliveryForm.invalid"
+        (click)="onUpdate(this.deliveryForm.value)"
         class="submit-button">
         Update
       </button>
@@ -560,13 +585,13 @@
           <mat-icon>visibility</mat-icon>
           Preview & Submit
       </button>
-      
-      <!-- <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" 
-        mat-raised-button 
-        color="primary" 
-        type="button" 
-        [disabled]="deliveryForm.invalid" 
-        (click)="onUpdate(this.deliveryForm.value)" 
+
+      <!-- <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'"
+        mat-raised-button
+        color="primary"
+        type="button"
+        [disabled]="deliveryForm.invalid"
+        (click)="onUpdate(this.deliveryForm.value)"
         class="submit-button">
         <mat-icon>visibility</mat-icon>
         Preview & Update

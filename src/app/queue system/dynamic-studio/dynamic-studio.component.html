@@ -1,17 +1,32 @@
 <div class="mainscreen mb-2">
     <div class="row">
       <div class="col-sm">
-        <mat-form-field *ngIf="ongoingQueueList.length > 1" class="w-100" appearance="outline">
-          <mat-label>Live Queue</mat-label>
-          <mat-select [compareWith]="compareFn" [(ngModel)]="ongoingQueue" (selectionChange)="onQueueSelect(); checkoutQueue()" [disabled]="liveStudio.length != 0">
-            <mat-option *ngFor="let queue of ongoingQueueList" [value]="queue">{{queue['queuename']}}</mat-option>
-          </mat-select>
-        </mat-form-field>
-      </div>
-      <div class="col-sm">
         <h5 class="title mb-3" style="font-size: 20px;">My Arena ({{ongoingQueue["queuename"]}})</h5>
       </div>
-      <div class="col-sm"></div>
+    </div>
+
+    <div *ngIf="noStudioInAnyQueue" class="no-studio-alert mb-3">
+      <mat-icon>info</mat-icon>
+      <span>No studios available in any of your ongoing queues.</span>
+    </div>
+
+    <div *ngIf="queuesWithStudios.length > 1" class="queue-card-list mb-3">
+      <div class="queue-card-list__label">Your Queues</div>
+      <div class="queue-card-row">
+        <div *ngFor="let queue of queuesWithStudios"
+          class="queue-card"
+          [class.queue-card--active]="queue['docid'] === ongoingQueue['docid']"
+          (click)="selectQueueCard(queue)">
+          <div class="queue-card__body">
+            <span class="queue-card__name">{{ queue['queuename'] }}</span>
+            <span class="queue-card__meta">
+              <mat-icon class="queue-card__icon">groups</mat-icon>
+              {{ queueStudioCounts[queue['docid']] || 0 }} studio{{ (queueStudioCounts[queue['docid']] || 0) === 1 ? '' : 's' }}
+            </span>
+          </div>
+          <mat-icon class="queue-card__chevron">chevron_right</mat-icon>
+        </div>
+      </div>
     </div>
   
     <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
@@ -189,7 +204,7 @@
         <div class="w-100 text-left">
           <button mat-stroked-button (click)="inviteMore(false)">Invite More Participant in this Studio</button>
         </div>
-  
+
         <!-- form -->
         <div *ngIf="participantForm.length != 0" class="widgetbox mat-elevation-z2">
           <span class="actiontitle">Forms submitted by the Participant</span>
@@ -232,6 +247,57 @@
             </button>
           </div>
   
+          <!-- Get Previous ATC (only on Diagnostics stage) -->
+          <div class="previous-atc-card" *ngIf="liveAssignment['participantid'] && liveAssignment['stagename']?.toLowerCase() === 'diagnostics'" [class.previous-atc-card--open]="showPreviousATC">
+            <button type="button" class="previous-atc-toggle" (click)="showPreviousATC = !showPreviousATC" [attr.aria-expanded]="showPreviousATC">
+              <span class="previous-atc-toggle__icon">
+                <mat-icon>history</mat-icon>
+              </span>
+              <span class="previous-atc-toggle__text">
+                <span class="previous-atc-toggle__title">Previous ATC History</span>
+                <span class="previous-atc-toggle__subtitle">Show all the previous ATC prescribed to {{ mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+              </span>
+              <mat-icon class="previous-atc-toggle__chevron">{{ showPreviousATC ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            <div class="previous-atc-body" *ngIf="showPreviousATC">
+              <app-view-participant-atc [profileid]="liveAssignment['participantid']"></app-view-participant-atc>
+            </div>
+          </div>
+
+          <!-- Show Love Letter (only on Diagnostics stage) -->
+          <div class="previous-atc-card love-letter-card" *ngIf="liveAssignment['participantid'] && liveAssignment['stagename']?.toLowerCase() === 'diagnostics'" [class.previous-atc-card--open]="showLoveLetter">
+            <button type="button" class="previous-atc-toggle" (click)="toggleLoveLetter()" [attr.aria-expanded]="showLoveLetter">
+              <span class="previous-atc-toggle__icon">
+                <mat-icon>favorite</mat-icon>
+              </span>
+              <span class="previous-atc-toggle__text">
+                <span class="previous-atc-toggle__title">Love Letters</span>
+                <span class="previous-atc-toggle__subtitle">Show all the love letters from {{ mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+              </span>
+              <mat-icon class="previous-atc-toggle__chevron">{{ showLoveLetter ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            <div class="previous-atc-body" *ngIf="showLoveLetter">
+              <div *ngIf="loveLetterLoading" class="love-letter-loading">Loading love letters...</div>
+              <div *ngIf="!loveLetterLoading && loveLetterList.length === 0" class="love-letter-empty">
+                <mat-icon>inbox</mat-icon>
+                <span>No love letters found for this participant.</span>
+              </div>
+              <div *ngIf="!loveLetterLoading && loveLetterList.length > 0" class="love-letter-list">
+                <div class="love-letter-item" *ngFor="let letter of loveLetterList; let i = index">
+                  <div class="love-letter-item__header">
+                    <span class="love-letter-item__index">{{ i + 1 }}.</span>
+                    <span class="love-letter-item__name">{{ mapProfile[letter.profileid] || mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+                    <span class="love-letter-item__date">
+                      {{ (letter.created?.toDate ? letter.created.toDate() : letter.created) | date:'medium' }}
+                    </span>
+                  </div>
+                  <div class="love-letter-item__label">Love Letter</div>
+                  <div class="love-letter-item__content" [innerHTML]="letter.loveletter || '-'"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Prescribed Alpha ATC List -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('prescribedvalidatedatc')">
             <span class="actiontitle">ATC Prescribed to the Participant</span>

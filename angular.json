@@ -42,7 +42,8 @@
               "@angular/material/prebuilt-themes/azure-blue.css",
               "src/styles.css",
               "node_modules/angular-calendar/css/angular-calendar.css",
-              "node_modules/@ctrl/ngx-emoji-mart/picker.css"
+              "node_modules/@ctrl/ngx-emoji-mart/picker.css",
+              "node_modules/@angular/material/prebuilt-themes/indigo-pink.css"
             ],
             "allowedCommonJsDependencies": [
               "recordrtc",

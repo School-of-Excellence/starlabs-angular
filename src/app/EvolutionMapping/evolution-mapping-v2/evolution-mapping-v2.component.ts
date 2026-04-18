@@ -71,14 +71,23 @@ export class EvolutionMappingV2Component {
     ) { 
       this.dataSource = new MatTableDataSource();
       // this.dataSource2 = new MatTableDataSource();
-      this.guard.getProfileMap().then(e => {
-        this.mapProfile = e.map;
-      });
+      // this.guard.getProfileMap().then(e => {
+      //   this.mapProfile = e.map;
+      // });
     }
 
-    ngOnInit(): void {
-      this.getEvolutionMapping();
-      this.getLiveEvolutionMapping()
+    // ngOnInit(): void {
+    //   this.getEvolutionMapping();
+    //   this.getLiveEvolutionMapping()
+    // }
+
+    async ngOnInit(): Promise<void> {
+      const e = await this.guard.getProfileMap();
+      this.mapProfile = e.map;
+
+      // Now it's safe to fetch — mapProfile is populated
+      await this.getEvolutionMapping();
+      await this.getLiveEvolutionMapping();
     }
 
     ngAfterViewInit() {
@@ -176,14 +185,30 @@ export class EvolutionMappingV2Component {
         });
       });
 
-      mapData.sort((a, b) => b.created.toDate() - a.created.toDate());
+      // mapData.sort((a, b) => b.created.toDate() - a.created.toDate());
+      mapData.sort((a, b) => {
+        const aTime = a.created?.toDate?.().getTime() ?? 0;
+        const bTime = b.created?.toDate?.().getTime() ?? 0;
+        return bTime - aTime;
+      });
       this.originalData = [...mapData];
       this.dataSource.data = mapData;
 
       const uniqueProfiles = Array.from(new Set(mapData.map(i => i.profileid)));
+
+      // this.profileOptions = uniqueProfiles.map(id => ({
+      //   id,
+      //   name: this.mapProfile[id],
+      // })).sort((a, b) => a.name.localeCompare(b.name));
+
+      const orphans = uniqueProfiles.filter(id => !this.mapProfile[id]);
+      if (orphans.length) {
+        console.warn('Evolution mapping has orphan profileids (participant deleted?):', orphans);
+      }
+      
       this.profileOptions = uniqueProfiles.map(id => ({
         id,
-        name: this.mapProfile[id],
+        name: this.mapProfile[id] ?? '(Unknown participant)',
       })).sort((a, b) => a.name.localeCompare(b.name));
     }
 
@@ -275,12 +300,16 @@ export class EvolutionMappingV2Component {
 
     // Build unique profile dropdown
     const uniqueProfiles = Array.from(new Set(mapLiveData.map(item => item.profileid)));
-    this.profileOptionsLive = uniqueProfiles
-      .map(id => ({
+    // this.profileOptionsLive = uniqueProfiles
+    //   .map(id => ({
+    //     id,
+    //     name: this.mapProfile[id]
+    //   }))
+    //   .sort((a, b) => a.name.localeCompare(b.name));
+      this.profileOptionsLive = uniqueProfiles.map(id => ({
         id,
-        name: this.mapProfile[id]
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+        name: this.mapProfile[id] ?? '(Unknown participant)',
+      })).sort((a, b) => a.name.localeCompare(b.name));
     }
     // applyProfileFilter() {
     //   let filteredData = [...this.originalData];

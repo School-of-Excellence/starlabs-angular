@@ -332,6 +332,28 @@ export class DeepFilter3Service {
     return this._isActive;
   }
 
+  /** Mic input level in dBFS. Returns -60 if VAD analyser is not ready. */
+  getMicLevelDb(): number {
+    if (!this.vadAnalyser) return -60;
+    const buf = new Float32Array(this.vadAnalyser.fftSize);
+    this.vadAnalyser.getFloatTimeDomainData(buf);
+    let sumSq = 0;
+    for (let i = 0; i < buf.length; i++) sumSq += buf[i] * buf[i];
+    const rms = Math.sqrt(sumSq / buf.length);
+    if (rms === 0) return -60;
+    return parseFloat((20 * Math.log10(rms)).toFixed(1));
+  }
+
+  /** Current VAD decision based on smoothed RMS vs noise floor. */
+  getVadState(): 'speech' | 'silence' {
+    return this.smoothedRms > this.noiseFloor * 3.5 ? 'speech' : 'silence';
+  }
+
+  /** Active DF3 suppression level — 30 during speech, 80 during silence. */
+  getCurrentSuppressionLevel(): number {
+    return this.smoothedRms > this.noiseFloor * 3.5 ? 30 : 80;
+  }
+
   /** True if the ONNX model is loaded and ready — init() has already succeeded. */
   isInitialized(): boolean {
     return !!this.processor;
