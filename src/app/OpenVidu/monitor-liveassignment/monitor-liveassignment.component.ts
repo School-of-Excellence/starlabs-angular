@@ -118,7 +118,15 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
   async joinRoom(roomName:string){
     // Initialize a new Room object
-    const room = new Room();
+    const room = new Room({
+      adaptiveStream: true,
+      reconnectPolicy: {
+        nextRetryDelayInMs: (context) => {
+          const delays = [1_000, 2_000, 5_000, 10_000];
+          return delays[Math.min(context.retryCount, delays.length - 1)];
+        }
+      }
+    });
     this.roomConnections.set(roomName, room);
     this.mapOpenViduRooms.update((value) =>{
       value.set(roomName, new Map())
@@ -224,6 +232,14 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       this.activeSpeakersMap = { ...this.activeSpeakersMap, [roomName]: speakers.map(s => s.identity) };
     });
 
+    // Seed initial mute + quality for participants who join after Monitor connects
+    room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+      const key = `${roomName}:::${participant.identity}`;
+      const isMuted = Array.from(participant.audioTracks.values()).some(p => p.isMuted);
+      if (isMuted) this.participantsMute.update(m => { m.set(key, true); return m; });
+      this.participantsQuality.update(m => { m.set(key, participant.connectionQuality); return m; });
+    });
+
     try {
       // Request a new token
       const response = await this.getToken(roomName);
@@ -235,10 +251,17 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       console.log('Room connected:', this.loggedinProfileid);
       this.roomConnecting.update(m => { m.set(roomName, false); return m; });
 
-      // Enable camera 
-      await room.localParticipant.setCameraEnabled(false);
-      // Enable Microphone
-      await room.localParticipant.setMicrophoneEnabled(false);
+      // Seed initial mute + quality state for participants already in the room
+      room.participants.forEach((participant: RemoteParticipant) => {
+        const key = `${roomName}:::${participant.identity}`;
+        const isMuted = Array.from(participant.audioTracks.values()).some(p => p.isMuted);
+        if (isMuted) this.participantsMute.update(m => { m.set(key, true); return m; });
+        this.participantsQuality.update(m => { m.set(key, participant.connectionQuality); return m; });
+      });
+
+      // Ghost observer — LiveKit does not publish camera/mic unless explicitly enabled
+      // await room.localParticipant.setCameraEnabled(false);
+      // await room.localParticipant.setMicrophoneEnabled(false);
 
     } catch (error: any) {
       // Handle connection errors gracefully
