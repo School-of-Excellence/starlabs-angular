@@ -22,17 +22,31 @@ export class PicoKoalaService {
       class KoalaProcessor extends AudioWorkletProcessor {
         constructor() {
           super();
-          this._buffer = [];
+          // Circular buffer: capacity covers ~8 Koala frames (256 samples each)
+          this._capacity = 2048;
+          this._buf = new Float32Array(this._capacity);
+          this._writeIdx = 0;
+          this._readIdx = 0;
+          this._size = 0;
           this.port.onmessage = (event) => {
-            this._buffer.push(...event.data);
+            const data = event.data;
+            for (let i = 0; i < data.length; i++) {
+              if (this._size < this._capacity) {
+                this._buf[this._writeIdx] = data[i];
+                this._writeIdx = (this._writeIdx + 1) % this._capacity;
+                this._size++;
+              }
+            }
           };
         }
         process(inputs, outputs) {
           const output = outputs[0][0];
           if (!output) return true;
-          if (this._buffer.length >= output.length) {
+          if (this._size >= output.length) {
             for (let i = 0; i < output.length; i++) {
-              output[i] = this._buffer.shift();
+              output[i] = this._buf[this._readIdx];
+              this._readIdx = (this._readIdx + 1) % this._capacity;
+              this._size--;
             }
           } else {
             output.fill(0);
@@ -104,6 +118,8 @@ export class PicoKoalaService {
       {
         source: Track.Source.Microphone,  // tag it as mic so LiveKit handles it correctly
         name: 'koala-enhanced-audio',
+        stopMicTrackOnMute: false, // M7: prevent LiveKit from stopping the AudioWorklet destination track on mute
+        // Without stopMicTrackOnMute:false, muting calls MediaStreamTrack.stop() which tears down the audio graph
       }
     );
   }
@@ -116,6 +132,8 @@ export class PicoKoalaService {
 
   async reset(): Promise<void> {
     if (!this.koala) return;
+    // M8: unsubscribe first to prevent double-subscription causing doubled audio frames + glitches
+    await WebVoiceProcessor.unsubscribe(this.koala);
     // Official: In case the next audio frame does not directly follow the previous one,
     // reset Koala Noise Suppression's internal state
     await this.koala.reset();

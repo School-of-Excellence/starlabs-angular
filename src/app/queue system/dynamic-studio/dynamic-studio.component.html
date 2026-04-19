@@ -169,14 +169,64 @@
     </div>
   
     
+    <!-- Expanded profile image overlay -->
+    <div *ngIf="expandedImage" class="image-lightbox" (click)="expandedImage = null">
+      <button type="button" class="image-lightbox__close" (click)="expandedImage = null; $event.stopPropagation()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <img class="image-lightbox__img" [src]="expandedImage" (click)="$event.stopPropagation()" alt="Profile image">
+    </div>
+
     <!-- Live Assignment -->
     <div *ngIf="liveAssignment != null">
       <div class="mainheading">
-        <span class="title h5">You are with Participant "{{mapProfile[liveAssignment["token"]?.profile_id]}}" {{liveAssignment["stagename"]}} Stage</span><br>
-        <div class="studiopeople font-italic">
-          <span>Participant Product:</span>
-          <span> {{liveAssignment["token"]?.productname}}</span>
-          <span *ngIf="liveAssignment['token']?.variationid != null"> - ({{mapVariationName[liveAssignment['token']?.variationid]}})</span>
+        <div class="profile-card">
+          <div class="profile-card__cover">
+            <span class="profile-card__eyebrow">You are with</span>
+          </div>
+
+          <div class="profile-card__avatar"
+            [class.profile-card__avatar--image]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+            [class.profile-card__avatar--clickable]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+            (click)="(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile) && (expandedImage = (mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile))">
+            <img *ngIf="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+              [src]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+              [alt]="mapProfile[liveAssignment['token']?.profile_id]">
+            <span *ngIf="!(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile)">
+              {{ (mapProfile[liveAssignment["token"]?.profile_id] || '?').charAt(0) | uppercase }}
+            </span>
+            <span class="profile-card__status-dot"></span>
+          </div>
+
+          <div class="profile-card__body">
+            <h3 class="profile-card__name">{{ mapProfile[liveAssignment["token"]?.profile_id] }}</h3>
+            <div class="profile-card__role">
+              <mat-icon>workspace_premium</mat-icon>
+              {{ liveAssignment["stagename"] }} Stage
+            </div>
+
+            <div *ngIf="participantUPVisitLabel" class="profile-card__up-chip">
+              <mat-icon>celebration</mat-icon>
+              They are {{ participantUPVisitLabel }} at uP!
+            </div>
+
+            <div class="profile-card__divider"></div>
+
+            <div class="profile-card__info">
+              <div class="profile-card__info-row">
+                <mat-icon class="profile-card__info-icon">inventory_2</mat-icon>
+                <div class="profile-card__info-content">
+                  <span class="profile-card__info-label">Product</span>
+                  <span class="profile-card__info-value">
+                    {{ liveAssignment["token"]?.productname }}
+                    <span *ngIf="liveAssignment['token']?.variationid != null" class="profile-card__info-sub">
+                      · {{ mapVariationName[liveAssignment['token']?.variationid] }}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <!-- (<span class="studiopeople" *ngFor="let specialist of liveAssignment['pairing']; let i = index">{{mapProfile[specialist]}}{{i+1 == liveAssignment['pairing'].length ? '' : ', '}}</span>) -->
         <div class="statusmessage" *ngIf="ongoingQueue['zoomlinkrequired'] != false && [false,undefined].includes(ongoingQueue['enablezoommeetingsdk']) && selectedStudio['openvidu'] != true">

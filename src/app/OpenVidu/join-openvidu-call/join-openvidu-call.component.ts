@@ -2,7 +2,7 @@ import { PicoKoalaService } from './../../Service/PicoVoice Koala/pico-koala.ser
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality } from 'livekit-client';
+import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality, ScreenSharePresets } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { doc, docData, Firestore, setDoc, updateDoc, getDocs, collection, query, where, orderBy, limit, arrayUnion, serverTimestamp, Timestamp } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
@@ -96,11 +96,14 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   room = signal<Room | undefined>(undefined)
   localParticipant = signal<LocalVideoTrack | undefined>(undefined)
   remoteParticipants = signal<Map<string, TrackInfo>>(new Map());
+  remoteParticipantTracks = computed<TrackInfo[]>(() => Array.from(this.remoteParticipants().values()));
   remoteParticipantsQuality = signal<Map<string, ConnectionQuality>>(new Map());
   remoteParticipantsMute = signal<Map<string, boolean>>(new Map());
   localNetworkQuality = signal<ConnectionQuality>(ConnectionQuality.Unknown);
   isMicMuted = signal<boolean>(false);
-  activeSpeakers:Array<string> = [];
+  // M1: converted to signal — plain array not reactive in Angular 19 signals-first CD
+  // activeSpeakers:Array<string> = [];
+  activeSpeakers = signal<string[]>([]);
 
 
   // Meta Data
@@ -123,11 +126,14 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
 
-  blurLevel: 'none' | 'mid' | 'high' = 'none';
+  blurLevel: 'none' | 'mid' | 'high' = 'high';
   localParticipantIdentity = '';
 
   private previewStream: MediaStream | null = null;
   private canvasPipelineCleanup: (() => void) | null = null;
+  // Cache active blur processor — avoids recreating the canvas pipeline on every camera re-enable
+  private cachedBlurProcessor: any = null;
+  private cachedBlurRadius: number = 0;
 
   // ── Layout: screen share tracking ──────────────────────────────────────
   screenShareTrack = signal<RemoteTrack | null>(null);
@@ -237,21 +243,40 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.qualityCheckInterval) {
-      clearInterval(this.qualityCheckInterval);
-      this.qualityCheckInterval = null;
-    }
+    // C7: ordered synchronous cleanup before async leaveRoom
+
+    // 1. Stop quality snapshot timers
+    if (this.qualityMinuteTimer) clearInterval(this.qualityMinuteTimer);
+    if (this.qualityBatchTimer) clearTimeout(this.qualityBatchTimer);
+
+    // C4: qualityCheckInterval was never assigned a setInterval — dead cleanup, commented out
+    // if (this.qualityCheckInterval) {
+    //   clearInterval(this.qualityCheckInterval);
+    //   this.qualityCheckInterval = null;
+    // }
+
+    // 2. Clear quality debounce state
     this.qualityChangeDebounce.forEach(timeout => clearTimeout(timeout));
     this.qualityChangeDebounce.clear();
     this.lastQualityChange.clear();
 
+    // 3. Stop adaptive quality monitoring (synchronous)
     this.adaptiveQuality.stopMonitoring();
+
+    // 4. Cancel canvas pipeline (synchronous)
     this.canvasPipelineCleanup?.();
     this.canvasPipelineCleanup = null;
-    this.leaveRoom(false)
-    this.roomDetail = null
-    this.roomSubscription?.next()
-    this.roomSubscription?.complete()
+    this.cachedBlurProcessor = null;
+    this.cachedBlurRadius = 0;
+
+    // 5. Async teardown: Koala stop → Koala release → room disconnect
+    //    void is intentional — ngOnDestroy cannot be async; cleanup fires in correct order inside leaveRoom()
+    void this.leaveRoom(false);
+
+    // 6. Complete observables and clear references (synchronous)
+    this.roomDetail = null;
+    this.roomSubscription?.next();
+    this.roomSubscription?.complete();
   }
 
 
@@ -291,7 +316,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.meetingRoomStatus = null;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // C3: audio:true removed — mic is exclusively managed by PicoKoalaService via WebVoiceProcessor
+      // Opening mic here would conflict with Koala's WebVoiceProcessor pipeline (double capture, AEC failure)
+      // const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
 
       // Store the full stream so joinCall() can stop the audio track later
       this.previewStream = stream;
@@ -325,11 +353,23 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async joinCall() {
-    const allowed = await this.prepareParticipant();
-    if (!allowed) {
-      alert("Please allow Camera & Microphone to join the call.");
-      return;
+    // Permissions were already obtained in prepareParticipant() during the pre-join screen.
+    // Calling it again would open a second getUserMedia() on the same device, causing echo
+    // and camera conflicts. Instead, release the preview stream here so LiveKit can open it.
+    if (this.cameraStatus !== 'granted' || this.micStatus !== 'granted') {
+      const allowed = await this.prepareParticipant();
+      if (!allowed) {
+        alert("Please allow Camera & Microphone to join the call.");
+        return;
+      }
     }
+
+    // Stop preview tracks before LiveKit opens the device to avoid double capture
+    if (this.previewStream) {
+      this.previewStream.getTracks().forEach(t => t.stop());
+      this.previewStream = null;
+    }
+    this.localParticipant.set(undefined);
 
     this.meetingRoomStatus = "connecting"
 
@@ -345,14 +385,20 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
-          publication.setVideoQuality(VideoQuality.HIGH);
-          publication.setVideoDimensions({ width: 1920, height: 1080 });
+          // Do NOT call setVideoDimensions() here — it overrides adaptiveStream's ResizeObserver
+          // which automatically selects the simulcast layer matching the rendered tile size.
+          // publication.setVideoDimensions({ width: 1920, height: 1080 }); // ← removed: forces full-HD regardless of tile size
 
-          console.log(`📺 Requested HIGH quality for: ${participant.identity}`, {
-            simulcasted: publication.simulcasted,
-            currentQuality: publication.videoQuality,
-          });
+          // Full native: NO setVideoQuality() calls for camera tracks at all.
+          // adaptiveStream: true auto-selects simulcast layer via ResizeObserver on each <video> element.
+          // SFU congestion control handles network constraints end-to-end without manual intervention.
+          // A1 previous code (caps for Poor/Lost) removed — these overrode adaptiveStream's selection:
+          // const localQuality = this.localNetworkQuality();
+          // if (localQuality === ConnectionQuality.Poor) publication.setVideoQuality(VideoQuality.MEDIUM);
+          // else if (localQuality === ConnectionQuality.Lost) publication.setVideoQuality(VideoQuality.LOW);
+          console.log(`📺 Subscribed to ${participant.identity} | adaptiveStream active — no manual quality cap`);
 
+          // Confirm active simulcast layer after SFU negotiation settles (~2s)
           setTimeout(() => {
             console.log(`📊 Quality verify for ${participant.identity}:`, {
               quality: ['LOW', 'MEDIUM', 'HIGH'][publication.videoQuality as any] ?? publication.videoQuality,
@@ -360,6 +406,26 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
             });
           }, 2000);
         }
+
+        // A4: Screen share subscription quality based on CPU/network at subscription time
+        if (track.kind === Track.Kind.Video && publication.source === Track.Source.ScreenShare) {
+          const cpu = this.adaptiveQuality.cpuPressure();
+          const net = this.localNetworkQuality();
+          const screenQuality =
+            cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW
+            : cpu === 'serious' || net === ConnectionQuality.Poor ? VideoQuality.MEDIUM
+            : VideoQuality.HIGH; // good conditions → full quality for spotlight view
+          publication.setVideoQuality(screenQuality);
+          console.log(`🖥️ Screen share sub quality: ${VideoQuality[screenQuality]} (cpu:${cpu} net:${ConnectionQuality[net]})`);
+        }
+
+        // Seed quality map with Unknown immediately so the bar renders (grey) rather than nothing
+        this.remoteParticipantsQuality.update(prev => {
+          if (prev.has(participant.identity)) return prev; // keep existing quality if already known
+          const next = new Map(prev);
+          next.set(participant.identity, ConnectionQuality.Unknown);
+          return next;
+        });
 
         this.remoteParticipants.update((prev) => {
           const next = new Map(prev);
@@ -413,7 +479,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       }
     );
 
-    // Handle Quality Change
+    // Handle Quality Change — update signals only; setVideoQuality is handled by startQualityMonitoring
     room.on(
       RoomEvent.ConnectionQualityChanged,
       (quality: ConnectionQuality, participant: Participant) => {
@@ -429,8 +495,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           next.set(participant.identity, quality);
           return next;
         });
-
-        this.handleConnectionQualityChange(quality, participant, room);
     });
 
     // Track Muted Participants
@@ -461,7 +525,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       var speakerID = speakers.map(e => e.identity)
 
       console.log("Active Speakers:", speakerID);
-      this.activeSpeakers = speakerID
+      this.activeSpeakers.set(speakerID ?? []); // M1: signal update
     });
 
     // Clean up state maps when a participant disconnects — prevents memory leak
@@ -507,17 +571,15 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
       this.startQualityMonitoring(room);
 
-      setTimeout(() => this.forceHighQualityForRemotes(), 3000);
-      setTimeout(() => this.forceHighQualityForRemotes(), 8000);
-
       room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
         console.log(`👤 Participant connected: ${participant.identity}`);
-        setTimeout(() => this.forceHighQualityForRemotes(), 3000);
       });
 
-      // Enable camera at the adaptive tier's resolution
+      // Enable camera with explicit simulcast publish options (not relying on publishDefaults alone).
+      // getCameraConstraints() → capture resolution/fps; getPublishOptions() → VP8 simulcast layers.
       const cameraConstraints = this.adaptiveQuality.getCameraConstraints(initialTier);
-      await room.localParticipant.setCameraEnabled(true, cameraConstraints);
+      const publishOptions    = this.adaptiveQuality.getPublishOptions(initialTier);
+      await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
 
       const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
       this.localParticipant.set(videoTrack);
@@ -532,33 +594,26 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         console.log('📹 Local video mediaStream stored');
       }
 
-      // ── Raw track constraint enforcement ─────────────────────────────────
-      const tierCfg = cameraConstraints.resolution;
-      const rawMediaTrack = videoTrack?.mediaStreamTrack;
-      if (rawMediaTrack) {
-        try {
-          await rawMediaTrack.applyConstraints({
-            width:     { ideal: tierCfg.width, max: tierCfg.width },
-            height:    { ideal: tierCfg.height, max: tierCfg.height },
-            frameRate: { ideal: tierCfg.frameRate, max: tierCfg.frameRate },
-          });
-          const settings = rawMediaTrack.getSettings();
-          console.log(`Camera constrained: ${settings.width}x${settings.height}@${settings.frameRate}fps`);
-        } catch (constraintErr) {
-          console.warn('applyConstraints() failed (non-critical):', constraintErr);
-        }
-      }
+      // Raw track applyConstraints removed — setCameraEnabled(true, cameraConstraints) already sets them.
+      // Calling applyConstraints() again on the live track forces camera renegotiation → video freeze.
+      // const tierCfg = cameraConstraints.resolution;
+      // const rawMediaTrack = videoTrack?.mediaStreamTrack;
+      // if (rawMediaTrack) { await rawMediaTrack.applyConstraints({...}); }
+      const settings = videoTrack?.mediaStreamTrack?.getSettings();
+      if (settings) console.log(`📹 Camera opened: ${settings.width}x${settings.height}@${settings.frameRate}fps`);
 
-      // Apply blur based on tier — skip on low-end devices to save CPU
-      if (initialTier === 'low' || initialTier === 'minimal') {
-        console.log('⚡ Skipping blur (low-end device)');
-      } else {
-        // 'mid' blur for both medium and high/ultra tiers (blurRadius 6)
-        await this.applyBlur('mid');
-      }
-
-      // Start adaptive quality monitoring
+      // Start adaptive quality monitoring BEFORE blur so the baseline CPU reading
+      // is taken before the blur processor adds its load (warm-up window prevents
+      // premature downgrades during the first 15 seconds).
       this.adaptiveQuality.startMonitoring(room);
+
+      // C6: Default blur is 'none' — blur processor adds heavy per-frame canvas load.
+      // User can enable blur via UI button after joining. This eliminates the main freeze source at call start.
+      // Previous: defaulted to 'high' (or 'none' only if CPU was already critical at join time).
+      // const cpuAtJoin = this.adaptiveQuality.cpuPressure();
+      // const defaultBlur: 'none' | 'high' = (cpuAtJoin === 'critical' || cpuAtJoin === 'serious') ? 'none' : 'high';
+      this.blurLevel = 'none'; // blur off by default — user enables via UI
+      console.log('📹 Blur off by default — enable via UI button');
 
 
       try {
@@ -636,9 +691,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.remoteParticipants.set(new Map());
     this.remoteParticipantsQuality.set(new Map());
     this.remoteParticipantsMute.set(new Map());
-    this.activeSpeakers = [];
+    // this.activeSpeakers = []; // M1: was plain array
+    this.activeSpeakers.set([]); // M1: signal reset
     this.localParticipantIdentity = '';
-    this.blurLevel = 'none';
+    // this.blurLevel = 'none'; // C6: reset to 'high' to match class default (not 'none')
+    this.blurLevel = 'high';
     this.screenShareTrack.set(null);
     this.screenShareParticipantId.set(null);
     this.meetingRoomStatus = "left"
@@ -730,6 +787,22 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Network bars for the LOCAL participant.
+   * Reads from localNetworkQuality (self-reported uplink to the SFU) so the bar
+   * is consistent — Person A always sees their own quality, not how others receive them.
+   */
+  getLocalNetworkBars(): { bars: number; color: string } {
+    const quality = this.localNetworkQuality();
+    switch (quality) {
+      case ConnectionQuality.Excellent: return { bars: 4, color: '#4caf50' };
+      case ConnectionQuality.Good:      return { bars: 3, color: '#ffb300' };
+      case ConnectionQuality.Poor:      return { bars: 1, color: '#e53935' };
+      case ConnectionQuality.Lost:      return { bars: 0, color: '#e53935' };
+      default:                          return { bars: 0, color: '#888' };
+    }
+  }
+
   // Video Control
   isVideoHidden():boolean{
     return this.getLocalTrackPublication(Track.Source.Camera)?.isMuted ?? true
@@ -747,7 +820,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       console.log('📷 Camera disabled');
     } else {
       const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
-      await room.localParticipant.setCameraEnabled(true, cameraConstraints);
+      const publishOptions    = this.adaptiveQuality.getPublishOptions(this.adaptiveQuality.currentTier());
+      await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
 
       await this.refreshLocalVideoStream();
 
@@ -765,8 +839,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   isAnyoneScreenSharing(): boolean {
-    const remoteTracks = Array.from(this.remoteParticipants().values());
-    return remoteTracks.some(track => track.trackPublication.source === Track.Source.ScreenShare);
+    // M2: use remoteParticipantTracks() computed signal instead of allocating new array each call
+    // const remoteTracks = Array.from(this.remoteParticipants().values());
+    return this.remoteParticipantTracks().some(track => track.trackPublication.source === Track.Source.ScreenShare);
   }
 
   // Update toggleScreenShare to check this
@@ -796,8 +871,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
 
     // Check remote participants
-    const remoteTracks = Array.from(this.remoteParticipants().values());
-    const remoteScreenShare = remoteTracks.find(
+    // M2: use remoteParticipantTracks() computed signal instead of allocating new array
+    // const remoteTracks = Array.from(this.remoteParticipants().values());
+    const remoteScreenShare = this.remoteParticipantTracks().find(
       track => track.trackPublication.source === Track.Source.ScreenShare
     );
 
@@ -813,13 +889,30 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async startScreenShare() {
+    // C2: Screen share resolution + encoding based on current network/CPU tier.
+    // Publishing full-HD on a low-tier connection saturates uplink → camera freeze + audio loss.
+    const tier = this.adaptiveQuality.currentTier();
+
+    // Map tier to ScreenSharePresets (official LiveKit presets with encoding config)
+    const screenPreset =
+      (tier === 'minimal' || tier === 'low') ? ScreenSharePresets.h720fps5     // ~400 kbps budget
+      : tier === 'medium'                    ? ScreenSharePresets.h720fps15    // ~1 Mbps budget
+      :                                        ScreenSharePresets.h1080fps15;  // ~2.5 Mbps budget
+
+    // Previous hardcoded approach (no tier check):
+    // const screenTracks = await createLocalScreenTracks({ audio: false, resolution: { width: 1920, height: 1080 } });
+    // const screenResolution = (tier === 'low' || tier === 'minimal') ? { width: 1280, height: 720 } : { width: 1920, height: 1080 };
     const screenTracks = await createLocalScreenTracks({
       audio: false,
-      resolution: { width: 1920, height: 1080 }
+      resolution: screenPreset.resolution,
     });
 
     for (const track of screenTracks) {
-      await this.room()?.localParticipant.publishTrack(track);
+      // C2: publish with tier-matched encoding instead of no options (which defaults to max bitrate)
+      await this.room()?.localParticipant.publishTrack(track, {
+        videoEncoding: screenPreset.encoding,
+        simulcast: false, // screen share is single-layer — simulcast not applicable
+      });
     }
 
     // Notify layout service about local screen share
@@ -920,16 +1013,26 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     try {
       if (level === 'none') {
         await videoTrack.stopProcessor();
+        this.cachedBlurProcessor = null;
+        this.cachedBlurRadius = 0;
         console.log('🔲 Blur removed');
       } else {
-        const blurRadius = level === 'mid' ? 6 : 15;
-        const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
-        await videoTrack.setProcessor(blur);
-        console.log(`🔲 Blur applied: ${level} (radius: ${blurRadius})`);
+        const blurRadius = level === 'mid' ? 5 : 10; // Reduced: was 6/15 — lighter per-frame load
+        if (!this.cachedBlurProcessor || this.cachedBlurRadius !== blurRadius) {
+          // Only create + attach processor when radius changes or first time
+          const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
+          await videoTrack.setProcessor(blur);
+          this.cachedBlurProcessor = blur;
+          this.cachedBlurRadius = blurRadius;
+          console.log(`🔲 Blur applied: ${level} (radius: ${blurRadius})`);
+        } else {
+          // Same radius already active — re-attach cached processor to new track (camera re-enable)
+          await videoTrack.setProcessor(this.cachedBlurProcessor);
+          console.log(`🔲 Blur re-attached: ${level} (radius: ${blurRadius})`);
+        }
       }
 
       this.blurLevel = level;
-
       await this.refreshLocalVideoStream();
     } catch (error) {
       console.error('🔴 Blur error:', error);
@@ -982,16 +1085,19 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     // Implement your snapshot logic here
   }
 
-  returnRemoteParticipantTrack() : TrackInfo[]{
-    return Array.from(this.remoteParticipants().values())
+  returnRemoteParticipantTrack(): TrackInfo[] {
+    return this.remoteParticipantTracks();
   }
 
   getVideoParticipantCount(): number {
-    // Count local participant (always has video) + remote video participants
-    const remoteVideoCount = this.returnRemoteParticipantTrack().filter(
+    // M11: Count all video publications (camera AND screen share) — each is a distinct tile in the grid
+    // Including screen share means the grid adapts correctly when someone shares (tiles get smaller,
+    // which triggers adaptiveStream to request lower quality for the smaller camera tiles)
+    // Previous code excluded screen share: remote.trackPublication.source !== Track.Source.ScreenShare
+    const remoteVideoCount = this.remoteParticipantTracks().filter(
       remote => remote.trackPublication.kind === 'video'
     ).length;
-    return 1 + remoteVideoCount;
+    return 1 + remoteVideoCount; // +1 for local participant
   }
 
   // ── Layout helpers ─────────────────────────────────────────────────────
@@ -1012,111 +1118,29 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   private qualityChangeDebounce = new Map<string, ReturnType<typeof setTimeout>>();
   private lastQualityChange = new Map<string, number>();
-  private readonly QUALITY_CHANGE_COOLDOWN = 5000;
-  private qualityCheckInterval: ReturnType<typeof setInterval> | null = null;
-
-  private forceHighQualityForRemotes(): void {
-    const room = this.room();
-    if (!room) return;
-
-    console.log('🔄 Forcing HIGH quality for all remote participants...');
-
-    const remoteMap: Map<string, RemoteParticipant> =
-      (room as any).participants ?? (room as any).remoteParticipants;
-    if (!remoteMap) return;
-
-    remoteMap.forEach((participant: RemoteParticipant, identity: string) => {
-      const pubs: RemoteTrackPublication[] = Array.from(
-        (participant as any).videoTrackPublications?.values?.()
-          ?? (participant as any).videoTracks?.values?.()
-          ?? []
-      );
-      pubs.forEach((publication: RemoteTrackPublication) => {
-        if (publication.source === Track.Source.Camera && publication.isSubscribed && publication.track) {
-          console.log(`📊 ${identity} before:`, {
-            quality: ['LOW', 'MEDIUM', 'HIGH'][publication.videoQuality as any] ?? publication.videoQuality,
-            dimensions: publication.dimensions,
-            simulcasted: publication.simulcasted,
-          });
-
-          publication.setVideoQuality(VideoQuality.HIGH);
-          publication.setVideoDimensions({ width: 1920, height: 1080 });
-
-          console.log(`📺 Forced HIGH quality for: ${identity}`);
-        }
-      });
-    });
-  }
-
-  private handleConnectionQualityChange(
-    quality: ConnectionQuality,
-    participant: Participant,
-    room: Room
-  ): void {
-    if (participant.identity === room.localParticipant.identity) return;
-
-    const remoteMap: Map<string, RemoteParticipant> =
-      (room as any).participants ?? (room as any).remoteParticipants;
-    const remoteParticipant = remoteMap?.get(participant.identity);
-    if (!remoteParticipant) return;
-
-    const pubs: RemoteTrackPublication[] = Array.from(
-      (remoteParticipant as any).videoTrackPublications?.values?.()
-        ?? (remoteParticipant as any).videoTracks?.values?.()
-        ?? []
-    );
-    const videoPub = pubs.find((p: RemoteTrackPublication) => p.source === Track.Source.Camera);
-
-    if (!videoPub || !videoPub.isSubscribed) return;
-
-    let targetQuality: VideoQuality;
-    let qualityName: string;
-
-    switch (quality) {
-      case ConnectionQuality.Excellent:
-        targetQuality = VideoQuality.HIGH;
-        qualityName = 'HIGH';
-        break;
-      case ConnectionQuality.Good:
-        targetQuality = VideoQuality.HIGH;
-        qualityName = 'HIGH';
-        break;
-      case ConnectionQuality.Poor:
-        targetQuality = VideoQuality.MEDIUM;
-        qualityName = 'MEDIUM';
-        break;
-      case ConnectionQuality.Lost:
-      default:
-        targetQuality = VideoQuality.LOW;
-        qualityName = 'LOW';
-        break;
-    }
-
-    videoPub.setVideoQuality(targetQuality);
-    console.log(`📶 ${participant.identity} connection: ${ConnectionQuality[quality]} → Quality: ${qualityName}`);
-  }
+  private readonly QUALITY_CHANGE_COOLDOWN = 5000; // M12: cooldown removed from setParticipantQuality() downgrade path
+  // C4: qualityCheckInterval was declared but never assigned a setInterval() — dead code, commented out
+  // private qualityCheckInterval: ReturnType<typeof setInterval> | null = null;
 
   private startQualityMonitoring(room: Room) {
     room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
+      // Local participant quality is handled by localNetworkQuality signal
       if (participant.identity === room.localParticipant.identity) return;
 
       console.log(`📶 ${participant.identity} connection: ${ConnectionQuality[quality] ?? quality}`);
 
-      const remoteParticipant = (room as any).participants?.get(participant.identity)
-        ?? (room as any).remoteParticipants?.get(participant.identity);
-      if (!remoteParticipant) return;
-
-      const videoPub = Array.from(remoteParticipant.videoTrackPublications?.values?.() ?? remoteParticipant.videoTracks?.values?.() ?? [])
-        .find((p: any) => p.source === Track.Source.Camera) as RemoteTrackPublication | undefined;
-
-      const targetQuality =
-        quality === ConnectionQuality.Excellent ? VideoQuality.HIGH
-        : quality === ConnectionQuality.Good ? VideoQuality.MEDIUM
-        : VideoQuality.LOW;
-
-      if (videoPub) {
-        this.setParticipantQuality(videoPub, participant.identity, targetQuality);
-      }
+      // Full native: update UI quality bars ONLY — no setVideoQuality() calls.
+      // adaptiveStream + SFU congestion control handle all subscription layer decisions natively.
+      // Previous manual cap logic kept as comment for reference:
+      // networkCap = Good→HIGH, Poor→MEDIUM, Lost→LOW
+      // cpuCap = critical→LOW, serious→MEDIUM, else→HIGH
+      // targetQuality = Math.min(networkCap, cpuCap)
+      // if (targetQuality < HIGH) setParticipantQuality(videoPub, participant.identity, targetQuality)
+      this.remoteParticipantsQuality.update(prev => {
+        const next = new Map(prev);
+        next.set(participant.identity, quality);
+        return next;
+      });
     });
   }
 
@@ -1125,21 +1149,24 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     participantId: string,
     quality: VideoQuality
   ) {
-    const now = Date.now();
-    const lastChange = this.lastQualityChange.get(participantId) || 0;
+    // M12: Removed the 5s QUALITY_CHANGE_COOLDOWN check for downgrade caps.
+    // With A1 fix, this method is only called when quality < HIGH (i.e. downgrade caps only).
+    // Downgrades must respond immediately to bad network — cooldown would delay response by 5–15s.
+    // const now = Date.now();
+    // const lastChange = this.lastQualityChange.get(participantId) || 0;
+    // if (now - lastChange < this.QUALITY_CHANGE_COOLDOWN) {
+    //   console.log(`⏳ Skipping quality change for ${participantId} (cooldown)`);
+    //   return;
+    // }
 
-    if (now - lastChange < this.QUALITY_CHANGE_COOLDOWN) {
-      console.log(`⏳ Skipping quality change for ${participantId} (cooldown)`);
-      return;
-    }
-
+    // Keep 1s debounce to prevent rapid-fire calls on unstable quality events
     const pending = this.qualityChangeDebounce.get(participantId);
     if (pending) clearTimeout(pending);
 
     const timeout = setTimeout(() => {
       publication.setVideoQuality(quality);
       this.lastQualityChange.set(participantId, Date.now());
-      console.log(`📺 Quality applied: ${participantId} → ${VideoQuality[quality] ?? quality}`);
+      console.log(`📺 Quality cap applied: ${participantId} → ${VideoQuality[quality] ?? quality}`);
     }, 1000);
 
     this.qualityChangeDebounce.set(participantId, timeout);
@@ -1420,7 +1447,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           packetsLost: stat.packetsLost ?? 0
         };
       }
-      if (stat.type === 'candidate-pair' && stat.state === 'succeeded') {
+      // M5: filter by nominated:true instead of state==='succeeded'
+      // state=succeeded can match multiple pairs during network handoff (old pair lingers briefly);
+      // nominated:true is set on exactly ONE pair — the one actively carrying traffic
+      // if (stat.type === 'candidate-pair' && stat.state === 'succeeded') {
+      if (stat.type === 'candidate-pair' && stat.nominated === true) {
         network.rtt = parseFloat(((stat.currentRoundTripTime ?? 0) * 1000).toFixed(1));
         network.availableBandwidth = Math.round((stat.availableOutgoingBitrate ?? 0) / 1000);
       }
@@ -1432,25 +1463,34 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     // ── Subscriber stats ─────────────────────────────────────────────────────
     const subStats = await subPC.getStats();
 
+    // Accumulate across all inbound-rtp video streams (one per remote participant).
+    // Previously the last entry silently overwrote prior ones, making freeze/loss unreliable.
     let videoIn = { resolution: 'unknown', fps: 0, packetsReceived: 0, packetsLost: 0, freezeCount: 0, freezeDuration: 0, jitter: 0 };
+    let videoInCount = 0;
     let audioIn = { jitter: 0 };
 
     subStats.forEach((stat: any) => {
       if (stat.type === 'inbound-rtp' && stat.kind === 'video') {
-        videoIn = {
-          resolution: `${stat.frameWidth ?? 0}x${stat.frameHeight ?? 0}`,
-          fps: Math.round(stat.framesPerSecond ?? 0),
-          packetsReceived: stat.packetsReceived ?? 0,
-          packetsLost: stat.packetsLost ?? 0,
-          freezeCount: stat.freezeCount ?? 0,
-          freezeDuration: parseFloat((stat.totalFreezesDuration ?? 0).toFixed(2)),
-          jitter: parseFloat(((stat.jitter ?? 0) * 1000).toFixed(1))
-        };
+        videoInCount++;
+        videoIn.packetsReceived += stat.packetsReceived ?? 0;
+        videoIn.packetsLost    += stat.packetsLost ?? 0;
+        videoIn.freezeCount    += stat.freezeCount ?? 0;
+        videoIn.freezeDuration += stat.totalFreezesDuration ?? 0;
+        videoIn.jitter         += (stat.jitter ?? 0) * 1000;
+        videoIn.fps            += Math.round(stat.framesPerSecond ?? 0);
+        videoIn.resolution      = `${stat.frameWidth ?? 0}x${stat.frameHeight ?? 0}`;
       }
       if (stat.type === 'inbound-rtp' && stat.kind === 'audio') {
         audioIn.jitter = parseFloat(((stat.jitter ?? 0) * 1000).toFixed(1));
       }
     });
+
+    if (videoInCount > 1) {
+      videoIn.fps    = Math.round(videoIn.fps / videoInCount);
+      videoIn.jitter = videoIn.jitter / videoInCount;
+    }
+    videoIn.freezeDuration = parseFloat(videoIn.freezeDuration.toFixed(2));
+    videoIn.jitter         = parseFloat(videoIn.jitter.toFixed(1));
 
     // ── Delta calculations ───────────────────────────────────────────────────
     const prev = this.qualityPrevStats;
@@ -1498,7 +1538,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     const trackSettings = micPub?.audioTrack?.mediaStreamTrack?.getSettings() ?? {};
 
     // ── Connection quality ───────────────────────────────────────────────────
-    const localQuality = this.remoteParticipantsQuality().get(this.localParticipantIdentity) ?? 'Unknown';
+    // C5: local identity never exists in remoteParticipantsQuality — was always 'Unknown'
+    // const localQuality = this.remoteParticipantsQuality().get(this.localParticipantIdentity) ?? 'Unknown';
+    const localQuality = ConnectionQuality[this.localNetworkQuality()] ?? 'Unknown';
 
     this.qualityMinuteCount++;
 
@@ -1552,7 +1594,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         this.qualitySnapshots.push(snapshot);
         console.log(`📊 Quality snapshot ${snapshot.minute} collected`);
       }
-    }, 10_000);
+    }, 60_000);
 
     this.qualityBatchTimer = setInterval(async () => {
       await this.flushQualityBatch('batch');
