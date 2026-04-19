@@ -475,9 +475,9 @@
                   </div>
                 </ng-container>
 
-                <!-- Edit button -->
+                <!-- edit button -->
                 <button class="add-video-icon-btn" *ngIf="event.hasVideo && event.docId"
-                        title="Edit video details"
+                        title="Edit videos"
                         (click)="openEditVideo(event, i)">
                   <mat-icon>edit</mat-icon>
                 </button>
@@ -488,14 +488,72 @@
                         (click)="openAddVideoForEvent(event)">
                   <mat-icon>edit</mat-icon>
                 </button>
+
+                <!--  delete button  -->
+                <button class="add-video-icon-btn delete-icon-btn"
+                        *ngIf="event.hasVideo && event.docId"
+                        title="Delete video"
+                        (click)="openDeleteVideo(i); $event.stopPropagation()">
+                  <mat-icon>delete</mat-icon>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
+
+  <!-- Delete Video Overlay -->
+  <div class="overlay-backdrop"
+      *ngIf="showDeleteVideoOverlay"
+      (click)="closeDeleteVideo()">
+    <div class="delete-video-panel" (click)="$event.stopPropagation()">
+
+      <div class="add-video-header">
+        <h2 class="add-video-title">Delete Video</h2>
+        <button mat-icon-button (click)="closeDeleteVideo()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="delete-video-body" *ngIf="deleteVideoCardIndex !== null">
+        <p class="delete-video-subtitle">Select which video to delete:</p>
+
+        <ng-container *ngIf="logEvents[deleteVideoCardIndex] as card">
+          <div class="delete-video-row">
+            <div class="delete-video-info">
+              <span class="delete-video-number">Video 1</span>
+              <span class="delete-video-title-text">
+                {{ card['videoTitle'] || card['eventName'] || 'Untitled' }}
+              </span>
+              <span class="delete-video-type-badge">{{ card['videoType'] || 'Event' }}</span>
+            </div>
+            <button class="delete-video-icon-btn"
+                    (click)="deleteVideoIndex = 0; executeDelete(); $event.stopPropagation()">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+          <div class="delete-video-row"
+              *ngFor="let extra of card['extraVideos']; let vi = index">
+            <div class="delete-video-info">
+              <span class="delete-video-number">Video {{ vi + 2 }}</span>
+              <span class="delete-video-title-text">{{ extra.videoTitle || 'Untitled' }}</span>
+              <span class="delete-video-type-badge">{{ extra.videoType || 'Event' }}</span>
+            </div>
+            <button class="delete-video-icon-btn"
+                    (click)="deleteVideoIndex = vi + 1; executeDelete(); $event.stopPropagation()">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </ng-container>
+      </div>
+      <div class="add-video-footer">
+        <button mat-stroked-button (click)="closeDeleteVideo()">Close</button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Video Player Overlay -->
   <div class="video-overlay-backdrop" *ngIf="showVideoOverlay" (click)="closeVideoOverlay()">
@@ -540,70 +598,85 @@
 
       <!-- Body -->
       <div class="add-video-body" [formGroup]="editVideoForm">
+        <div formArrayName="entries">
+          <div *ngFor="let entry of $any(editVideoForm.get('entries')).controls; let i = index"
+              [formGroupName]="i"
+              class="video-entry">
 
-        <!-- Title -->
-        <div class="form-group">
-          <label class="form-label">Title</label>
-          <mat-form-field appearance="outline" class="full-width">
-            <input matInput formControlName="title" placeholder="Enter video title">
-            <mat-error *ngIf="editVideoForm.get('title')?.touched && editVideoForm.get('title')?.hasError('required')">
-              Title is required
-            </mat-error>
-          </mat-form-field>
+            <!-- Entry label -->
+            <div class="entry-header">
+              <span class="entry-number">Video {{ i + 1 }}</span>
+            </div>
+
+            <!-- Title -->
+            <div class="form-group">
+              <label class="form-label">Title</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput formControlName="title" placeholder="Enter video title">
+                <mat-error *ngIf="entry.get('title')?.touched && entry.get('title')?.hasError('required')">
+                  Title is required
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <!-- Recorded Date -->
+            <div class="form-group">
+              <label class="form-label">Recorded Date</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput [matDatepicker]="editPicker"
+                      formControlName="recordedDate"
+                      placeholder="Select date">
+                <mat-datepicker-toggle matSuffix [for]="editPicker"></mat-datepicker-toggle>
+                <mat-datepicker #editPicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+
+            <!-- Type -->
+            <div class="form-group">
+              <label class="form-label">Type</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-select formControlName="type">
+                  <mat-option value="Event">Event</mat-option>
+                  <mat-option value="Interview">Interview</mat-option>
+                  <mat-option value="Testimonial">Testimonial</mat-option>
+                </mat-select>
+                <mat-error *ngIf="entry.get('type')?.touched && entry.get('type')?.hasError('required')">
+                  Type is required
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <!-- Live Event -->
+            <div class="form-group">
+              <label class="form-label">Live Event</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-select formControlName="eventId">
+                  <mat-option value="">None</mat-option>
+                  <mat-option *ngFor="let e of liveEvents" [value]="e.id">
+                    {{ e.name }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Optional — link to a live event if related</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <!-- Video URL -->
+            <div class="form-group">
+              <label class="form-label">Video URL</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <input matInput formControlName="videoUrl" placeholder="Enter video URL">
+                <mat-error *ngIf="entry.get('videoUrl')?.touched && entry.get('videoUrl')?.hasError('required')">
+                  Video URL is required
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <!-- Divider between entries -->
+            <hr *ngIf="i < $any(editVideoForm.get('entries')).length - 1"
+                style="border:none; border-top:1px solid #e5e7eb; margin: 8px 0 20px;">
+
+          </div>
         </div>
-
-        <!-- Recorded Date -->
-        <div class="form-group">
-          <label class="form-label">Recorded Date</label>
-          <mat-form-field appearance="outline" class="full-width">
-            <input matInput [matDatepicker]="editDatePicker"
-                  formControlName="recordedDate"
-                  placeholder="Select date">
-            <mat-datepicker-toggle matSuffix [for]="editDatePicker"></mat-datepicker-toggle>
-            <mat-datepicker #editDatePicker></mat-datepicker>
-          </mat-form-field>
-        </div>
-
-        <!-- Type -->
-        <div class="form-group">
-          <label class="form-label">Type</label>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-select formControlName="type">
-              <mat-option value="Event">Event</mat-option>
-              <mat-option value="Interview">Interview</mat-option>
-              <mat-option value="Testimonial">Testimonial</mat-option>
-            </mat-select>
-            <mat-error *ngIf="editVideoForm.get('type')?.touched && editVideoForm.get('type')?.hasError('required')">
-              Type is required
-            </mat-error>
-          </mat-form-field>
-        </div>
-
-        <!-- Live Event -->
-        <div class="form-group">
-          <label class="form-label">Live Event</label>
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-select formControlName="eventId">
-              <mat-option value="">None</mat-option>
-              <mat-option *ngFor="let e of liveEvents" [value]="e.id">
-                {{ e.name }}
-              </mat-option>
-            </mat-select>
-            <mat-hint>Optional — link to a live event if related</mat-hint>
-          </mat-form-field>
-        </div>
-
-        <!-- Video URL -->
-        <div class="form-group">
-          <label class="form-label">Video URL</label>
-          <mat-form-field appearance="outline" class="full-width">
-            <input matInput formControlName="videoUrl" placeholder="Enter video URL">
-            <mat-error *ngIf="editVideoForm.get('videoUrl')?.touched && editVideoForm.get('videoUrl')?.hasError('required')">
-              Video URL is required
-            </mat-error>
-          </mat-form-field>
-        </div>
-
       </div>
 
       <!-- Footer -->
