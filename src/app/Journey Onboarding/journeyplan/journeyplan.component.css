@@ -1006,6 +1006,46 @@
   height: 18px !important;
 }
 
+.onboard-box {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.onboard-journey {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2633;
+
+  mat-icon { color: #6b7384; }
+}
+
+.onboard-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+  button {
+    margin-left: auto;
+    background: #1f54b5;
+    color: #fff;
+  }
+}
+
+.onboard-success { background: #e8f7ee; color: #1f8b49; }
+.onboard-blocked { background: #fff4e6; color: #b56708; }
+.onboard-ready   { background: #eaf2ff; color: #1f54b5; }
+
 /* ===================== */
 /* DRAG DROP             */
 /* ===================== */
