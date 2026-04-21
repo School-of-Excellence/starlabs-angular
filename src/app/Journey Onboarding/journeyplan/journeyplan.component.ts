@@ -20,6 +20,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 
 @Component({
   selector: 'app-journeyplan',
@@ -74,6 +75,12 @@ export class JourneyplanComponent {
   generalContentList = []
   upcomingWorkshop = {}
 
+  mapprofile = {};
+  mapphone = {};
+  mapjourneyname = {};
+  mapproducts = {};
+  participantJourneyData: any = null;
+
   constructor(
     private firestore: Firestore,
     private route: ActivatedRoute,
@@ -93,10 +100,44 @@ export class JourneyplanComponent {
         this.clientdata = snap.data()
         this.totalpaid = parseInt(this.clientdata['pp_totalpaid'])
       });
+      
+      await getDocs(
+        query(
+          collection(this.firestore, 'participantjourneyproduct'),
+          where('profileid', '==', this.profileid)
+        )
+      ).then(snap => {
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          this.participantJourneyData = { ...d.data(), docid: d.id };
+        }
+      });
+
       await this.participantProducts();
       this.initializeMonthlyPlan();
       this.watsonParticipantSchedule();
     });
+
+    guard.getProfileMap().then(e => {
+      this.mapprofile = e.map;
+      this.mapphone = e.phonenumber;
+    });
+
+    guard.getProductMap().then(e => {
+      this.mapproducts = e;
+    });
+
+    getDocs(collection(this.firestore, 'journey')).then(snap => {
+      snap.docs.forEach(d => {
+        this.mapjourneyname[d.id] = d.data()['journey'];
+      });      
+    });
+
+
+
+
+
+
   }
 
   ngOnInit(): void {
@@ -590,6 +631,72 @@ export class JourneyplanComponent {
       })
     })
     this.watsonLoading = false
+  }
+
+
+
+  markOnboarded() {
+    if (!this.participantJourneyData) {
+      alert('No journey record found for this participant.');
+      return;
+    }
+
+    const element = {
+      ...this.participantJourneyData,
+      markonboard: true,
+      mapProfile: this.mapprofile,
+      mapJourney: this.mapjourneyname,
+      mapPhone: this.mapphone,
+      mapProducts: this.mapproducts,
+      journeyname: this.mapjourneyname[this.participantJourneyData['journeyref']?.id]?.['journey'] || ''
+    };
+
+    const dialogRef = this.dialog.open(OnboardingRemarkComponent, {
+      data: element,
+      disableClose: false,
+      panelClass: 'custom-dialog-container'
+    });
+
+    dialogRef.afterClosed().toPromise().then(async value => {
+      if (![null, undefined, ''].includes(value)) {
+        const loadingRef = this.dialog.open(LoadingProgressComponent, {
+          disableClose: true,
+          data: { type: 'spinner', msg: 'Onboard Completing...' }
+        });
+
+        const salesdata = value.salesleadsData;
+        delete value.salesleadsData;
+
+        await updateDoc(
+          doc(this.firestore, 'participantjourneyproduct', element['docid']),
+          value
+        );
+
+        if (![null, undefined, ''].includes(element['appointmentid'])) {
+          await updateDoc(doc(this.firestore, 'appointments', element['appointmentid']), {
+            attended: true,
+            cancelled: false,
+          }).then(() => {
+            this.guard.openSnackBar('Onboard Marked Successfully', 'OK');
+          }).catch(() => {
+            this.guard.openSnackBar('Error while marking Onboard', 'OK');
+          });
+        }
+
+        if (value['journeytype'] === 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
+          const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid'];
+          await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
+            journeystatus: 'Upgraded'
+          });
+        }
+
+        loadingRef.close();
+        // Refresh local journey data
+        this.participantJourneyData = { ...this.participantJourneyData, ...value };
+      } else {
+        this.guard.openSnackBar('No Action Taken', 'OK');
+      }
+    });
   }
 
 

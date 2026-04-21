@@ -493,6 +493,24 @@
     </div>
   </div>
 
+  <div style="margin-left: auto;">
+    <button mat-flat-button
+      [disabled]="!participantJourneyData || participantJourneyData['onboarded'] === true"
+      [ngStyle]="{
+        'background-color': (!participantJourneyData || participantJourneyData['onboarded'] === true)
+          ? '#e0e0e0' : '#1976d2',
+        'color': (!participantJourneyData || participantJourneyData['onboarded'] === true)
+          ? '#9e9e9e' : 'white',
+        'border-radius': '8px',
+        'padding': '0 16px',
+        'height': '40px'
+      }"
+      (click)="markOnboarded()">
+      <mat-icon style="font-size:18px; vertical-align:middle; margin-right:4px;">verified</mat-icon>
+      <b>{{ participantJourneyData?.['onboarded'] === true ? 'Already Onboarded' : 'Mark as Onboarded' }}</b>
+    </button>
+  </div>
+
   <!-- SINGLE BOTTOM BUTTON — unchanged -->
   <div class="bottom-action-bar">
     <button mat-raised-button class="btn-update-plan" (click)="updateParticipantPlan()">
