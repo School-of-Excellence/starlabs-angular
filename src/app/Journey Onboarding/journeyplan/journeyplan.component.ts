@@ -106,8 +106,8 @@ export class JourneyplanComponent {
           where('profileid', '==', this.profileid),
         )
       ).then(async snap => {
-        var purchaseList = snap.docs.map(e => e.data()).filter(e => e["journeyref"] != null)
-        purchaseList.sort((a, b) => b["purchasedate"].toDate() - a["purchasedate"].toDate())
+        var purchaseList = snap.docs.map(e => e.data()).filter(e => e["journeyref"] != null && e["journeystatus"] == "initiated")
+        purchaseList.sort((a, b) => b["purchasedate"]?.toDate() - a["purchasedate"]?.toDate())
 
         if(purchaseList.length != 0){
           this.participantJourneyData = purchaseList[0]
