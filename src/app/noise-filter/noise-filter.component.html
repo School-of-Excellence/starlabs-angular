@@ -1,0 +1,18 @@
+<div class="container">
+  <h2>🎤 Zoom-like Noise Cancellation</h2>
+
+  <button (click)="startRecording()" [disabled]="isRecording">
+    Start Recording
+  </button>
+
+  <button (click)="stopRecording()" [disabled]="!isRecording">
+    Stop Recording
+  </button>
+
+  <p *ngIf="isRecording">🎙 Recording (noise reduced)...</p>
+
+  <div *ngIf="audioUrl">
+    <h3>🔊 Cleaned Audio</h3>
+    <audio [src]="audioUrl" controls></audio>
+  </div>
+</div>

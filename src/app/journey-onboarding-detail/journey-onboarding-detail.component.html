@@ -785,11 +785,28 @@
     <!-- Body -->
     <div class="modal-body">
 
+      <!-- Notification — shown briefly after save -->
+      <div class="save-toast" *ngIf="detailSaveToast">
+        <span class="save-toast__icon">✓</span>
+        <span>Saved successfully to <strong>journeyonboardingdetail</strong></span>
+      </div>
+
+      <!-- Error banner -->
+      <div class="save-error-banner" *ngIf="detailSaveError">
+        <span>⚠ {{ detailSaveError }}</span>
+        <button type="button" (click)="detailSaveError = ''">✕</button>
+      </div>
+
       <!-- Success state -->
       <div class="success-card" *ngIf="detailSubmitted">
         <div class="success-icon">✓</div>
         <p>Saved to <strong>journeyonboardingdetail / {{ detailForm.value.docid }}</strong></p>
-        <button mat-stroked-button (click)="closeModal()">Close</button>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button mat-stroked-button (click)="closeModal()">Close</button>
+          <button mat-raised-button color="primary" (click)="detailSubmitted = false">
+            Continue Editing
+          </button>
+        </div>
       </div>
 
       <ng-container *ngIf="!detailSubmitted">
@@ -1465,12 +1482,17 @@
     </div><!-- /modal-body -->
 
     <!-- Footer -->
-    <div class="modal-footer" *ngIf="!detailSubmitted">
+    <div class="modal-footer">
       <button mat-button type="button" (click)="closeModal()">Cancel</button>
       <button mat-raised-button color="primary" type="button"
-              [disabled]="detailLoading" (click)="saveDetail()">
+              [disabled]="detailLoading" (click)="saveDetail()"
+              *ngIf="!detailSubmitted">
         <span *ngIf="!detailLoading">Save</span>
         <span *ngIf="detailLoading">Saving…</span>
+      </button>
+      <button mat-stroked-button type="button" (click)="closeModal()"
+              *ngIf="detailSubmitted">
+        Done
       </button>
     </div>
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject, EnvironmentInjector, runInInjectionContext  } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatInputModule }     from '@angular/material/input';
@@ -69,6 +69,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   private fb        = inject(FormBuilder);
   private cdr       = inject(ChangeDetectorRef);
   private auth = inject(Auth);
+  private injector = inject(EnvironmentInjector);
   private currentUserName = 'Admin'; // fallback
 
   // ── Modal state ───────────────────────────────────────────────
@@ -91,6 +92,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
    * In edit mode the journey dropdown is shown but disabled.
    */
   isEditMode = false;
+  detailSaveToast = false;
+  detailSaveError = '';
 
   // ── Selected single-ref previews ───────────────────────────────
   selectedRefs: Record<string, ContentUrlOption | null> = {};
@@ -175,7 +178,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.currentUserName = name;
     });
     authState(this.auth).subscribe(user => {
-      console.log('AUTH USER:', user);
+      // console.log('AUTH USER:', user);
     });
   }
 
@@ -744,9 +747,9 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       }),
 
       journeypath: this.fb.group({
-        intro:        [p.journeypath?.intro        ?? '', Validators.required],
-        descripition: [p.journeypath?.descripition ?? '', Validators.required],
-        imageurl:     [p.journeypath?.imageurl     ?? '', Validators.required],
+        intro:        [p.journeypath?.intro        ?? ''],
+        descripition: [p.journeypath?.descripition ?? ''],
+        imageurl:     [p.journeypath?.imageurl     ?? ''],
       }),
 
       otherdescripition: this.fb.group({
@@ -764,16 +767,16 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       ),
 
       queuedescripition: this.fb.group({
-        title:        [p.queuedescripition?.title        ?? '', Validators.required],
-        descripition: [p.queuedescripition?.descripition ?? '', Validators.required],
+        title:        [p.queuedescripition?.title        ?? ''],
+        descripition: [p.queuedescripition?.descripition ?? ''],
         atcmodel: this.fb.group({
-          title:        [p.queuedescripition?.atcmodel?.title        ?? '', Validators.required],
-          descripition: [p.queuedescripition?.atcmodel?.descripition ?? '', Validators.required],
+          title:        [p.queuedescripition?.atcmodel?.title        ?? ''],
+          descripition: [p.queuedescripition?.atcmodel?.descripition ?? ''],
         }),
-        processimage: [p.queuedescripition?.processimage ?? '', Validators.required],
+        processimage: [p.queuedescripition?.processimage ?? ''],
         processdetails: this.fb.group({
-          title:        [p.queuedescripition?.processdetails?.title        ?? '', Validators.required],
-          descripition: [p.queuedescripition?.processdetails?.descripition ?? '', Validators.required],
+          title:        [p.queuedescripition?.processdetails?.title        ?? ''],
+          descripition: [p.queuedescripition?.processdetails?.descripition ?? ''],
           step: this.fb.array(
             (p.queuedescripition?.processdetails?.step ?? [{}]).map((x: any) => this.newProcessStep(x))
           ),
@@ -837,9 +840,9 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
   newProcessStep(v?: any): FormGroup {
     return this.fb.group({
-      title:        [v?.title        ?? '', Validators.required],
-      descripition: [v?.descripition ?? '', Validators.required],
-      imageurl:     [v?.imageurl     ?? '', Validators.required],
+      title:        [v?.title        ?? ''],
+      descripition: [v?.descripition ?? ''],
+      imageurl:     [v?.imageurl     ?? ''],
     });
   }
 
@@ -896,19 +899,18 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   onSingleRefSelect(docId: string, fieldKey: string): void {
     const opt = this.contentUrlOptions.find(o => o.id === docId) ?? null;
     this.selectedRefs[fieldKey] = opt;
+    const path = opt ? `content_urls/${opt.id}` : '';
 
     if (fieldKey === 'overviewvideo') {
       this.detailForm.patchValue({
         overviewvideoDocId: docId,
-        overviewvideo: opt ? `content_urls/${opt.id}` : ''
+        overviewvideo:      path,
       });
-
     } else if (fieldKey === 'goalvideourl') {
-      (this.detailForm.get('eventdescripition') as FormGroup)
-        .patchValue({
-          goalvideourlDocId: docId, // ✅ UI binding
-          goalvideourl: opt ? `content_urls/${opt.id}` : ''
-        });
+      (this.detailForm.get('eventdescripition') as FormGroup).patchValue({
+        goalvideourlDocId: docId,
+        goalvideourl:      path,
+      });
     }
 
     this.cdr.markForCheck();
@@ -951,6 +953,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     delete this.imagePreviews[slot];
     delete this.pendingFiles[slot];
     this.detailForm.get(formPath)?.setValue('');
+    this.detailForm.get(formPath)?.markAsTouched();
     this.cdr.markForCheck();
   }
 
@@ -960,6 +963,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     delete this.imagePreviews[slot];
     delete this.pendingFiles[slot];
     (this.processSteps.at(stepIndex) as FormGroup).patchValue({ imageurl: '' });
+    (this.processSteps.at(stepIndex) as FormGroup).get('imageurl')?.markAsTouched();
     this.cdr.markForCheck();
   }
 
@@ -968,8 +972,10 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     await Promise.all(Object.entries(this.pendingFiles).map(async ([slot, file]) => {
       const path = `journey_onboarding/${Date.now()}_${slot}_${file.name}`;
       const sRef = storageRef(this.storage, path);
-      await uploadBytes(sRef, file);
-      result[slot] = await getDownloadURL(sRef);
+      await runInInjectionContext(this.injector, async () => {
+        await uploadBytes(sRef, file);
+        result[slot] = await getDownloadURL(sRef);
+      });
     }));
     return result;
   }
@@ -1086,6 +1092,10 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   // so the table columns show correct values immediately.
   // ─────────────────────────────────────────────────────────────
   async saveDetail(): Promise<void> {
+    console.log('Save clicked — form valid:', this.detailForm.valid, '| invalid fields:',
+      Object.keys((this.detailForm as any).controls).filter(k => this.detailForm.get(k)?.invalid)
+    );
+
     this.detailForm.markAllAsTouched();
     if (this.detailForm.invalid) { this.cdr.markForCheck(); return; }
 
@@ -1100,7 +1110,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       const jdImageUrl = uploadedUrls['journeydetail_imageurl'] ?? v.journeydetail?.imageurl ?? '';
       const jpImageUrl = uploadedUrls['journeypath_imageurl']   ?? v.journeypath?.imageurl   ?? '';
       const subImageUrl     = uploadedUrls['subscription_imageurl']  ?? v.subscription?.imageurl       ?? '';
-      const processImageUrl = uploadedUrls['processimage']           ?? v.processdetails?.processimage ?? '';
+      const processImageUrl = uploadedUrls['processimage'] ?? v.queuedescripition?.processimage ?? '';
 
       const steps = (v.queuedescripition?.processdetails?.step ?? []).map((s: any, i: number) => ({
         title:        s.title        ?? '',
@@ -1113,6 +1123,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true,
       });
+      const overviewVideoPath = v.overviewvideoDocId ? `content_urls/${v.overviewvideoDocId}` : (v.overviewvideo ?? '');
       const payload: any = {
 
         docid:        v.docid,
@@ -1129,6 +1140,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         introduction:      v.introduction ?? '',
         introductionvideo: introVideoUrl,
         overviewdescription: v.overviewdescription ?? '',
+        overviewvideo:       this.toRef(overviewVideoPath),
         journeydetail: {
           intro:        v.journeydetail?.intro        ?? '',
           descripition: v.journeydetail?.descripition ?? '',
@@ -1143,7 +1155,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           title:        v.otherdescripition?.title        ?? '',
           descripition: v.otherdescripition?.descripition ?? '',
         },
-        overviewvideo:   this.toRef(v.overviewvideo ?? ''),
+        // overviewvideo:   this.toRef(v.overviewvideo ?? ''),
         productincluded: (v.productincluded ?? []).map((p: any) => ({
           title:        p.title        ?? '',
           descripition: p.descripition ?? '',
@@ -1156,12 +1168,12 @@ export class JourneyOnboardingDetailComponent implements OnInit {
             title:        v.queuedescripition?.atcmodel?.title        ?? '',
             descripition: v.queuedescripition?.atcmodel?.descripition ?? '',
           },
+          processimage: processImageUrl,
           processdetails: {
             title:        v.queuedescripition?.processdetails?.title        ?? '',
             descripition: v.queuedescripition?.processdetails?.descripition ?? '',
             step:         steps,
           },
-          processimage: processImageUrl,
         },
         screenorder:  [...this.screenorderTags],
         subscription: {
@@ -1173,6 +1185,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
       await setDoc(doc(this.firestore, 'journeyonboardingdetail', v.docid), payload, { merge: true ,});
       this.detailSubmitted = true;
+      this.detailSaveToast = true;
       this.editingIndex    = null;
       this.pendingFiles    = {};
       this.cdr.markForCheck();
