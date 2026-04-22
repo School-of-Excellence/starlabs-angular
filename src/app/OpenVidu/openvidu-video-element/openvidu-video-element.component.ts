@@ -2,9 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, input, viewChild, OnChanges, SimpleChanges } from '@angular/core';
 import { LocalVideoTrack, RemoteVideoTrack } from 'livekit-client';
 
-import { FaceMesh } from '@mediapipe/face_mesh';
-import { Results } from '@mediapipe/face_mesh';
-import { MatIcon } from "@angular/material/icon";
+// import { FaceMesh } from '@mediapipe/face_mesh';
+// import { Results } from '@mediapipe/face_mesh';
+// import { MatIcon } from "@angular/material/icon";
 
 @Component({
   selector: 'app-openvidu-video-element',
@@ -18,8 +18,8 @@ export class OpenviduVideoElementComponent implements OnChanges {
   track = input.required<LocalVideoTrack | RemoteVideoTrack>();
   participantIdentity = input.required<string>();
 
-  private faceMesh!: FaceMesh;
-  private scanningStarted = false;
+  // private faceMesh!: FaceMesh;
+  // private scanningStarted = false;
 
   ngAfterViewInit() {
     // Only run if track is already present
@@ -63,11 +63,14 @@ export class OpenviduVideoElementComponent implements OnChanges {
   }
 
   ngOnDestroy() {
+    // M9: guard before calling detach — input.required throws RuntimeError if read before binding
+    // Component may be destroyed in an error path before @Input is provided
     try {
-      this.track().detach();
+      if (this.track) this.track().detach();
     } catch {}
   }
 
+  /*
   private initFaceMesh() {
     this.faceMesh = new FaceMesh({
       locateFile: (file) =>
@@ -143,4 +146,5 @@ export class OpenviduVideoElementComponent implements OnChanges {
     video.style.transformOrigin = `${cx * 100}% ${cy * 100}%`;
     video.style.transform = `scale(${zoom})`;
   }
+  */
 }
