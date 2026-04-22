@@ -656,7 +656,7 @@
             <!-- <span *ngIf="column.startsWith('consumed') || column.startsWith('unconsumed')">{{getColumnForTableHeader(column)}}</span> -->
           </th>
           <td [ngClass]="{'remarks-column': column === 'remarks'}" mat-cell *matCellDef="let element">
-            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth' , 'purchase'].includes(column)">{{element[column]}}</span>
+            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth' , 'purchase' ,'UP! count','CPM count'].includes(column)">{{element[column]}}</span>
             <span *ngIf="['consumedproducts', 'unconsumedproducts', 'activeproduct', 'profiletags', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier'].includes(column)">
               <ng-container *ngIf="element[column]">
                
@@ -669,7 +669,7 @@
             
             <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate' , 'dateofbirth'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate') : null)}}</span>
             <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
-            <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+            <!-- <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span> -->
             <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <!-- <span *ngIf="column == 'activejourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->
             <span *ngIf="['activejourney','lastcompletedjourney', 'lastsubscribedjourney','higherorderpurchase'].includes(column)">{{mapfiltervalues[element[column]]}}</span>
@@ -729,22 +729,29 @@
             <span *ngIf="column === 'balance'">{{element['pp_totalpurchasevalue'] - element['pp_totalpaid']}}</span> -->
 
             <!-- journey -->
-            <span *ngIf="column === 'journey'">{{element['customerstatus'] === 'active' ? mapfiltervalues[element['activejourney']] : element['customerstatus'] === 'non active' ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
+            <span *ngIf="column === 'journey'">{{element['customerstatus'] === 'active' ? mapfiltervalues[element['activejourney']]
+              : element['customerstatus'] === 'non active' ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
             <!-- age -->
-             <span *ngIf="column === 'age'">{{calculateAge(element['dateofbirth'])}}</span>
-             <!-- product -->
-              <!-- <span *ngIf="column.startsWith('consumed') || column.startsWith('unconsumed')" >{{getProductCountForParticipant(column , element['profileid'])}}</span> -->
-               <span *ngIf="column === 'consumedproductcount'">
-                <li *ngFor="let product of getProductForParticipant(element['profileid'] , 'consumedCount')">{{productMap[product.key]?.product}} ( {{product?.count}} )</li>
-               </span>
-               <span *ngIf="column === 'unconsumedproductcount'">
-                <li *ngFor="let product of getProductForParticipant(element['profileid'] , 'unconsumedCount')">{{productMap[product.key]?.product}} ( {{product?.count}} )</li>
-               </span>
+            <span *ngIf="column === 'age'">{{calculateAge(element['dateofbirth'])}}</span>
+            <!-- product -->
+            <!-- <span *ngIf="column.startsWith('consumed') || column.startsWith('unconsumed')" >{{getProductCountForParticipant(column , element['profileid'])}}</span> -->
+            <span *ngIf="column === 'consumedproductcount'">
+              <li *ngFor="let product of getProductForParticipant(element['profileid'] , 'consumedCount')">
+                {{productMap[product.key]?.product}} ( {{product?.count}} )</li>
+            </span>
+            <span *ngIf="column === 'unconsumedproductcount'">
+              <li *ngFor="let product of getProductForParticipant(element['profileid'] , 'unConsumedCount')">
+                {{productMap[product.key]?.product}} ( {{product?.count}} )</li>
+            </span>
+            
+            <!-- purchase -->
+            <span *ngIf="column === 'purchase'">
+              <li *ngFor="let purchase of element['purchase'] || []">{{purchase}}</li>
+            </span>
 
-               <!-- purchase -->
-                <span *ngIf="column === 'purchase'">
-                  <li *ngFor="let purchase of element['purchase'] || []">{{purchase}}</li>
-                </span>
+            <!-- up count , cpm count -->
+             <span *ngIf="column === 'UP! count'">{{getUpLiveCount(element['profileid'])}}</span>
+             <span *ngIf="column === 'CPM count'">{{getCPMCount(element['profileid'])}}</span>
           </td>
         </ng-container>
 
