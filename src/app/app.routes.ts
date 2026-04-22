@@ -219,6 +219,7 @@ export const routes: Routes = [
   {path: 'sales-report', loadComponent: () => import('./Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component').then(m => m.SalesDashboardCloneComponent), canActivate:[authGuard]},
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
 
+  {path: 'noicecancelation', loadComponent: () => import('./noise-filter/noise-filter.component').then(m => m.NoiseFilterComponent)},
   // Participants Profile Management
   {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},
   {path: 'participant-evolution-summary', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-evolution-summary/participants-evolution-summary.component').then(m => m.ParticipantsEvolutionSummaryComponent), canActivate:[authGuard]},
