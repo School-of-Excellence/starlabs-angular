@@ -885,7 +885,9 @@
               <input type="file" accept="image/*,video/*" class="hidden-file-input"
                      id="file-introductionvideo"
                      (change)="onFileChange($event, 'introductionvideo', 'introductionvideo')" />
-
+              <div class="img-validation-error" *ngIf="imageValidationError['introductionvideo']">
+                ⚠ {{ imageValidationError['introductionvideo'] }}
+              </div>
               <div class="field-section-label">introduction</div>
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Introduction</mat-label>
@@ -975,7 +977,9 @@
                 <input type="file" accept="image/*" class="hidden-file-input"
                        id="file-journeydetail_imageurl"
                        (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
-
+                <div class="img-validation-error" *ngIf="imageValidationError['journeydetail_imageurl']">
+                  ⚠ {{ imageValidationError['journeydetail_imageurl'] }}
+                </div>
                 <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
                   <mat-label>descripition</mat-label>
                   <textarea matInput formControlName="descripition" rows="3" placeholder="Second text block shown below the image…"></textarea>
@@ -1015,7 +1019,9 @@
                 <input type="file" accept="image/*" class="hidden-file-input"
                        id="file-subscription_imageurl"
                        (change)="onFileChange($event, 'subscription_imageurl', 'subscription.imageurl')" />
-
+                <div class="img-validation-error" *ngIf="imageValidationError['subscription_imageurl']">
+                  ⚠ {{ imageValidationError['subscription_imageurl'] }}
+                </div>
                 <mat-form-field appearance="outline" class="full-width" style="margin-top:8px">
                   <mat-label>descripition</mat-label>
                   <textarea matInput formControlName="descripition" rows="3" placeholder="Shown inside the subscription card…"></textarea>
@@ -1222,7 +1228,9 @@
                     <input type="file" accept="image/*" class="hidden-file-input"
                           id="file-processimage"
                           (change)="onFileChange($event, 'processimage', 'queuedescripition.processimage')" />
-
+                    <div class="img-validation-error" *ngIf="imageValidationError['processimage']">
+                      ⚠ {{ imageValidationError['processimage'] }}
+                    </div>
                     <div class="nested-label" style="margin-top:12px">
                       atcmodel <span class="map-tag">map</span>
                     </div>
@@ -1328,6 +1336,9 @@
                           <input type="file" accept="image/*" class="hidden-file-input"
                                 [id]="'file-step_imageurl_' + i"
                                 (change)="onStepFileChange($event, i)" />
+                          <div class="img-validation-error" *ngIf="imageValidationError['step_imageurl_' + i]">
+                            ⚠ {{ imageValidationError['step_imageurl_' + i] }}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1371,7 +1382,9 @@
                 <input type="file" accept="image/*" class="hidden-file-input"
                       id="file-journeypath_imageurl"
                       (change)="onFileChange($event, 'journeypath_imageurl', 'journeypath.imageurl')" />
-
+                <div class="img-validation-error" *ngIf="imageValidationError['journeypath_imageurl']">
+                  ⚠ {{ imageValidationError['journeypath_imageurl'] }}
+                </div>
                 <mat-form-field appearance="outline" class="full-width">
                   <mat-label>intro</mat-label>
                   <textarea matInput formControlName="intro" rows="3" placeholder="Opening text shown on the What Lies Ahead screen…"></textarea>

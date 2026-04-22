@@ -9,7 +9,7 @@ import { MatIconModule }      from '@angular/material/icon';
 import { MatTableModule }     from '@angular/material/table';
 import { Firestore, doc, setDoc, collection, getDoc, collectionData, getDocs, DocumentReference } from '@angular/fire/firestore';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { Storage, ref as storageRef, uploadBytes, getDownloadURL } from '@angular/fire/storage';
+import { Storage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from '@angular/fire/storage';
 import { catchError } from 'rxjs/operators';
 import { Auth, user } from '@angular/fire/auth';
 import { authState } from '@angular/fire/auth';
@@ -127,6 +127,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   screenorderInput = '';
   solarVoiceOptions: any[] = [];
   seriesOptions: any[] = [];
+  imageValidationError: Record<string, string> = {};
   appLockedForm!: FormGroup;
   previewData: any = {};
   currentPage = 1;
@@ -923,9 +924,31 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     (document.getElementById(`file-${slot}`) as HTMLInputElement)?.click();
   }
 
-  onFileChange(event: Event, slot: string, formPath: string): void {
+  async onFileChange(event: Event, slot: string, formPath: string): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    (event.target as HTMLInputElement).value = '';
+
+    const ratioMap: Record<string, '16:9' | '9:16' | '1:1'> = {
+      'introductionvideo':      '9:16',
+      'journeydetail_imageurl': '16:9',
+      'journeypath_imageurl':   '16:9',
+      'subscription_imageurl':  '16:9',
+      'processimage':           '16:9',
+    };
+
+    const ratio = ratioMap[slot];
+
+    if (ratio) {
+      const error = await this.validateImageDimensions(file, ratio);  // ← validates both images AND videos
+      if (error) {
+        this.imageValidationError[slot] = error;
+        this.cdr.markForCheck();
+        return;
+      }
+    }
+
+    delete this.imageValidationError[slot];
     this.pendingFiles[slot] = file;
     const reader = new FileReader();
     reader.onload = () => {
@@ -934,18 +957,29 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.cdr.markForCheck();
     };
     reader.readAsDataURL(file);
-    (event.target as HTMLInputElement).value = '';
   }
 
-  onStepFileChange(event: Event, stepIndex: number): void {
-    const slot = `step_imageurl_${stepIndex}`;
+  async onStepFileChange(event: Event, stepIndex: number): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    (event.target as HTMLInputElement).value = '';
+
+    const slot = `step_imageurl_${stepIndex}`;
+    const error = await this.validateImageDimensions(file, '1:1');
+    if (error) {
+      this.imageValidationError[slot] = error;
+      this.cdr.markForCheck();
+      return;
+    }
+
+    delete this.imageValidationError[slot];
     this.pendingFiles[slot] = file;
     const reader = new FileReader();
-    reader.onload = () => { this.imagePreviews[slot] = reader.result as string; this.cdr.markForCheck(); };
+    reader.onload = () => {
+      this.imagePreviews[slot] = reader.result as string;
+      this.cdr.markForCheck();
+    };
     reader.readAsDataURL(file);
-    (event.target as HTMLInputElement).value = '';
   }
 
   clearImage(event: MouseEvent, slot: string, formPath: string): void {
@@ -967,22 +1001,135 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  private validateImageDimensions(
+    file: File,
+    expectedRatio: '16:9' | '9:16' | '1:1'
+  ): Promise<string | null> {
+    return new Promise(resolve => {
+      const rules: Record<string, { minW: number; minH: number; maxW: number; maxH: number; label: string }> = {
+        '16:9': { minW: 1280, minH: 720,  maxW: 3840, maxH: 2160, label: '1280×720 to 3840×2160' },
+        '9:16': { minW: 720,  minH: 1280, maxW: 2160, maxH: 3840, label: '720×1280 to 2160×3840' },
+        '1:1':  { minW: 72,   minH: 72,   maxW: 72,   maxH: 72,   label: 'exactly 72×72' },
+      };
+      const rule = rules[expectedRatio];
+      const url = URL.createObjectURL(file);
+
+      if (file.type.startsWith('video/')) {
+        // ← use video element for videos
+        const video = document.createElement('video');
+        video.onloadedmetadata = () => {
+          URL.revokeObjectURL(url);
+          const w = video.videoWidth;
+          const h = video.videoHeight;
+          if (w < rule.minW || h < rule.minH || w > rule.maxW || h > rule.maxH) {
+            resolve(`Video must be ${rule.label}px. Your video is ${w}×${h}px.`);
+          } else {
+            resolve(null);
+          }
+        };
+        video.onerror = () => resolve('Could not read video dimensions.');
+        video.src = url;
+      } else {
+        // ← use image element for images
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const w = img.naturalWidth;
+          const h = img.naturalHeight;
+          if (w < rule.minW || h < rule.minH || w > rule.maxW || h > rule.maxH) {
+            resolve(`Image must be ${rule.label}px. Your image is ${w}×${h}px.`);
+          } else {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve('Could not read image dimensions.');
+        img.src = url;
+      }
+    });
+  }
+
+  private resizeImage(file: File, width: number, height: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error('Canvas toBlob failed'));
+        }, file.type || 'image/jpeg', 0.9);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
   private async uploadPendingFiles(): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
+
+    const journeyDocId = this.detailForm.getRawValue().journeyrefDocId;
+    const journeyName = (this.journeyOptions.find(j => j.id === journeyDocId)?.label ?? 'unknown')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const slotNameMap: Record<string, string> = {
+      'introductionvideo':      'intro_video',
+      'journeydetail_imageurl': 'journey_detail_image',
+      'journeypath_imageurl':   'journey_path_image',
+      'subscription_imageurl':  'subscription_image',
+      'processimage':           'process_image',
+    };
+
     await Promise.all(Object.entries(this.pendingFiles).map(async ([slot, file]) => {
-      const path = `journey_onboarding/${Date.now()}_${slot}_${file.name}`;
+      let imageName = slotNameMap[slot];
+      if (!imageName) {
+        if (slot.startsWith('step_imageurl_')) {
+          const stepIndex = slot.replace('step_imageurl_', '');
+          imageName = `process_step_${Number(stepIndex) + 1}`;
+        } else {
+          imageName = slot;
+        }
+      }
+
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const fileName = `${journeyName}_${imageName}.${ext}`;
+      const path = `journey_onboarding/${fileName}`;
       const sRef = storageRef(this.storage, path);
+
+      // Delete old file first if it exists — same path so it overwrites,
       await runInInjectionContext(this.injector, async () => {
-        await uploadBytes(sRef, file);
+        // Try deleting all possible old extensions for this slot
+        const extensions = ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm'];
+        await Promise.allSettled(
+          extensions.map(oldExt => {
+            const oldPath = `journey_onboarding/${journeyName}_${imageName}.${oldExt}`;
+            const oldRef = storageRef(this.storage, oldPath);
+            return deleteObject(oldRef);
+          })
+        );
+      });
+
+      let uploadData: File | Blob = file;
+      if (slot.startsWith('step_imageurl_')) {
+        uploadData = await this.resizeImage(file, 72, 72);
+      }
+
+      await runInInjectionContext(this.injector, async () => {
+        await uploadBytes(sRef, uploadData);
         result[slot] = await getDownloadURL(sRef);
       });
     }));
+
     return result;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Tag input
-  // ─────────────────────────────────────────────────────────────
   onTagKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' || event.key === ',') {
       event.preventDefault();
@@ -1194,6 +1341,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       alert('Save failed — check console.');
     } finally {
       this.detailLoading = false;
+      setTimeout(() => { this.detailSaveToast = false; this.cdr.markForCheck(); }, 3000);
       this.cdr.markForCheck();
     }
   }
