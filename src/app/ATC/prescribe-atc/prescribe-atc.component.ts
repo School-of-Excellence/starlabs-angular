@@ -9,6 +9,7 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
+import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -227,6 +228,9 @@ export class PrescribeATCComponent {
 
   lastDraftSavedOn = null
 
+  // --- Connectivity monitoring (handled by ConnectivityGuardService) ---
+  private unregisterConnectivity: (() => void) | null = null;
+
   uploadProgress = {
     audio: 0,
     noteImages: 0,
@@ -254,7 +258,8 @@ export class PrescribeATCComponent {
     public clipboard: Clipboard,
     public matDialog: MatDialog,
     public snackbar: MatSnackBar,
-    private networkStatusService : NetworkStatusService
+    private networkStatusService : NetworkStatusService,
+    private connectivity: ConnectivityGuardService
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -411,6 +416,10 @@ export class PrescribeATCComponent {
   }
 
   async ngOnInit(){
+    this.unregisterConnectivity = this.connectivity.register(async () => {
+      if (!this.autoSaveID) return; // no draft context yet
+      await this.autoSave();
+    });
     this.route.queryParams.subscribe(async params => {
       if (!params['aigenerated'] || !params['docid']) return;
       const docid = params['docid'];
@@ -563,6 +572,8 @@ export class PrescribeATCComponent {
 
     this.subscriptionHandle.complete();
     this.subscriptionHandle.next();
+
+    this.unregisterConnectivity?.();
   }
 
   async setupData(){

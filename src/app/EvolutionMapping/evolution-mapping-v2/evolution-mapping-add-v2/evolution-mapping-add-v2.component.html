@@ -59,13 +59,9 @@
     <hr class="divider">
   </div>
 
-  <!-- Two column layout -->
   <div class="dialog-body">
-
-    <!-- LEFT: Steps 1 & 2 -->
     <div class="left-col">
-
-      <!-- Step 1: Participant Selector -->
+      <!-- Participant Selector -->
       <div class="step-block">
         <p class="step-label">
           <span class="step-badge">1</span> Select Participant
@@ -93,7 +89,7 @@
         </mat-form-field>
       </div>
 
-      <!-- Step 2: Select Type -->
+      <!-- Select Type -->
       <div class="step-block" *ngIf="selectedProfile && videoTypes.length > 0">
         <p class="step-label">
           <span class="step-badge">2</span> Select Video Type
@@ -114,17 +110,23 @@
         </div>
       </div>
 
-      <!-- Step 2b: Select Video from type -->
+      <!--  Select Video from type -->
       <div class="step-block" *ngIf="selectedType && filteredVideoOptions.length > 0">
-        <p class="step-label">
-          <span class="step-badge">2b</span> Select Video
-        </p>
+        <!-- Select All / Clear All — Add mode only -->
+        <div *ngIf="data == null" class="select-all-row">
+          <button mat-stroked-button color="primary" (click)="selectAllVideos()">
+            <mat-icon>done_all</mat-icon> Select All
+          </button>
+          <button mat-stroked-button color="warn" (click)="clearAllVideos()">
+            <mat-icon>clear_all</mat-icon> Clear All
+          </button>
+        </div>
         <div class="video-title-list">
           <div
             *ngFor="let v of filteredVideoOptions"
             class="video-title-card"
-            [class.selected]="selectedVideoTitle === v.title"
-            (click)="onVideoTitleSelect(v.title)">
+            [class.selected]="isVideoSelected(v.title)"
+            (click)="onVideoTitleSelect(v)">
             <mat-icon class="card-icon">play_circle_outline</mat-icon>
             <div class="card-info">
               <span class="card-title">{{ v.title }}</span>
@@ -133,47 +135,79 @@
               </span>
               <span class="card-date no-date" *ngIf="!v.recordeddate">No date</span>
             </div>
-            <mat-icon class="check-icon" *ngIf="selectedVideoTitle === v.title">check_circle</mat-icon>
+            <mat-icon class="check-icon" *ngIf="isVideoSelected(v.title)">check_circle</mat-icon>
           </div>
         </div>
       </div>
-
     </div>
 
-    <!-- RIGHT: Video Preview -->
-    <div class="right-col" *ngIf="selectedVideoTitle && videourl">
-      <div class="step-block video-preview-block">
+    <!-- Video Preview -->
+    <div class="right-col">
+      <div *ngIf="data != null && editVideoTitle && editVideoUrl" class="step-block video-preview-block">
         <p class="step-label">
           <span class="step-badge">3</span> Video Preview
         </p>
         <div class="video-player-wrapper">
-          <app-video-player *ngIf="showPlayer" [videoUrl]="videourl"></app-video-player>
+          <app-video-player *ngIf="showPlayer" [videoUrl]="editVideoUrl"></app-video-player>
         </div>
-        <div class="video-meta">
-          <span class="meta-item"><mat-icon>title</mat-icon> {{ selectedVideoTitle }}</span>
-          <span class="meta-item" *ngIf="recordedDate"><mat-icon>event</mat-icon> {{ recordedDate | date: 'mediumDate' }}</span>
-        </div>
-
-        <!-- Date picker shown only when date is missing -->
-        <div *ngIf="!recordedDate" style="margin-top: 12px;">
+        <div style="margin-top: 12px;">
           <mat-form-field appearance="outline" style="width: 100%;">
-            <mat-label>Recorded Date (missing — add now)</mat-label>
+            <mat-label>Title</mat-label>
+            <input matInput [(ngModel)]="title" placeholder="Enter title">
+          </mat-form-field>
+        </div>
+        <div style="margin-top: 8px;">
+          <mat-form-field appearance="outline" style="width: 100%;">
+            <mat-label>Recorded Date</mat-label>
             <input matInput [matDatepicker]="datePicker" [(ngModel)]="recordedDate" placeholder="Choose recorded date">
             <mat-datepicker-toggle matSuffix [for]="datePicker"></mat-datepicker-toggle>
             <mat-datepicker #datePicker></mat-datepicker>
           </mat-form-field>
         </div>
+        <div class="dialog-actions">
+          <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
+            <mat-icon>save</mat-icon> Update Mapping
+          </button>
+        </div>
       </div>
-
-      <!-- Save button inside right col -->
-      <div class="dialog-actions">
-        <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
-          <mat-icon>{{ data != null ? 'save' : 'add_circle' }}</mat-icon>
-          {{ data != null ? 'Update Mapping' : 'Save Mapping' }}
-        </button>
+      <div *ngIf="data == null && selectedVideos.size > 0" class="step-block video-preview-block">
+        <p class="step-label">
+           Selected Videos
+          <span class="selection-count-badge">{{ selectedVideos.size }}</span>
+        </p>
+        <div *ngIf="previewVideo" style="margin-bottom: 12px; display: flex; flex-direction: column; align-items: center;">
+          <app-video-player *ngIf="showPreviewPlayer" [videoUrl]="previewVideo.videourl"></app-video-player>
+          <div class="video-meta" style="margin-top: 8px;">
+            <span class="meta-item"><mat-icon>title</mat-icon> {{ previewVideo.title }}</span>
+            <span class="meta-item" *ngIf="previewVideo.recordedDate"><mat-icon>event</mat-icon> {{ previewVideo.recordedDate | date: 'mediumDate' }}</span>
+          </div>
+        </div>
+        <div class="selected-video-list">
+          <div *ngFor="let v of getSelectedVideoObjects()" class="selected-video-row">
+            <mat-icon class="selected-video-icon">check_circle</mat-icon>
+            <div class="selected-video-info">
+              <span class="selected-video-title">{{ v.title }}</span>
+              <span class="selected-video-date" *ngIf="v.recordeddate">
+                {{ (v.recordeddate?.toDate ? v.recordeddate.toDate() : v.recordeddate) | date: 'mediumDate' }}
+              </span>
+              <span class="selected-video-date no-date" *ngIf="!v.recordeddate">No date</span>
+            </div>
+            <button mat-icon-button color="warn" (click)="removeSelectedVideo(v.title)" title="Remove">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          </div>
+        </div>
+        <div class="dialog-actions" style="margin-top: 16px;">
+          <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
+            <mat-icon>add_circle</mat-icon>
+            Save {{ selectedVideos.size }} Mapping{{ selectedVideos.size > 1 ? 's' : '' }}
+          </button>
+        </div>
+      </div>
+      <div *ngIf="data == null && selectedVideos.size === 0 && selectedType" class="step-block empty-state">
+        <mat-icon style="font-size: 48px; color: #ccc;">video_library</mat-icon>
+        <p style="color: #999; margin-top: 8px;">Select one or more videos from the left</p>
       </div>
     </div>
-
   </div>
-
 </div>
