@@ -2,15 +2,15 @@
 
   <!-- Header -->
   <div class="header">
-    <div class="badge">DeepFilterNet3 vs Koala · Noise Cancellation Comparison</div>
+    <div class="badge">DeepFilterNet3 · Koala · Noise Cancellation Lab</div>
     <h1>Noise Cancellation Test</h1>
     <p class="subtitle">
-      Three modes: process a file, hear the filter live, or record all three simultaneously —
-      then compare lossless WAV outputs and a structured quality report.
+      Three modes — File, Live Mic, Recording. Each shows RAW (browser EC/NS), DeepFilterNet3, and Koala side-by-side.
+      After recording, run PESQ / STOI analysis via the local Python quality server.
     </p>
   </div>
 
-  <!-- Status Banner -->
+  <!-- Status Banner (Modes 2 + 3) -->
   <div class="status-banner"
     [class.live]="status === 'live'"
     [class.loading]="status === 'loading'"
@@ -23,7 +23,7 @@
     {{ statusMessage }}
   </div>
 
-  <!-- ── Config ── -->
+  <!-- ── Configuration ── -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">⚙️</span>
@@ -32,7 +32,7 @@
 
     <div class="config-row">
       <label class="config-label">
-        Picovoice Access Key
+        Picovoice Access Key (required for Koala)
         <a class="key-link" href="https://console.picovoice.ai/" target="_blank">Get free key ↗</a>
       </label>
       <input class="key-input" type="password" [(ngModel)]="accessKey"
@@ -54,22 +54,25 @@
     </div>
   </div>
 
-  <!-- MODE 1 — File Comparison -->
+  <!-- ════════════════════════════════════════════════════════════
+       MODE 1 — File Upload
+       ════════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">📂</span>
-      Mode 1 — File Comparison
-      <span class="section-hint">Upload any audio file · DF3 processes it offline · compare RAW vs Processed</span>
+      Mode 1 — File Upload
+      <span class="section-hint">Upload a file · RAW + DF3 (offline) + Koala (real-time) · all hearable</span>
     </div>
 
     <div class="config-row" *ngIf="fileStatus !== 'loading'">
-      <label class="config-label">Select audio file (WAV / WebM / MP4 / MP3 …)</label>
+      <label class="config-label">Select audio file (WAV / MP3 / WebM / MP4…)</label>
       <input type="file" accept="audio/*,video/webm,video/mp4"
         class="file-input"
         (change)="onFileSelected($event)"
         [disabled]="isFileProcessing || isBusy || isRecording || isLive" />
     </div>
 
+    <!-- File status + dual progress bars -->
     <div class="status-banner"
       [class.loading]="fileStatus === 'loading'"
       [class.done]="fileStatus === 'done'"
@@ -77,60 +80,73 @@
       *ngIf="fileStatusMsg">
       <span class="dot" [class.pulse]="fileStatus === 'loading'"></span>
       {{ fileStatusMsg }}
-      <span *ngIf="fileStatus === 'loading'" class="progress-pct"> {{ fileProgress }}%</span>
     </div>
 
-    <div class="progress-bar-wrap" *ngIf="fileStatus === 'loading'">
-      <div class="progress-bar-fill" [style.width.%]="fileProgress"></div>
+    <div class="progress-dual" *ngIf="fileStatus === 'loading'">
+      <div class="progress-row">
+        <span class="progress-label">🟢 DF3</span>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill df3-fill" [style.width.%]="fileProgress.df3"></div>
+        </div>
+        <span class="progress-pct">{{ fileProgress.df3 }}%</span>
+      </div>
+      <div class="progress-row" *ngIf="accessKey.trim()">
+        <span class="progress-label">🔵 Koala</span>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill koala-fill" [style.width.%]="fileProgress.koala"></div>
+        </div>
+        <span class="progress-pct">{{ fileProgress.koala }}%</span>
+      </div>
     </div>
 
-    <!-- RAW + Processed players (Mode 1 result) -->
-    <div class="players-row" *ngIf="resultMode === 'file' && (fileInputUrl || fileOutputUrl)">
+    <!-- Three-column results -->
+    <div class="three-col" *ngIf="resultMode === 'file' && results">
 
-      <div class="player-card raw">
-        <div class="player-label">🔴 RAW Input</div>
-        <div class="player-sub">Original file · no processing</div>
-        <audio [src]="fileInputUrl!" controls *ngIf="fileInputUrl"></audio>
-        <a *ngIf="fileInputUrl" [href]="fileInputUrl"
-           [download]="'input-raw-' + recordingTimestamp"
-           class="btn-download-audio">⬇ Download RAW</a>
+      <div class="channel-card raw-card">
+        <div class="channel-label raw-label">🔴 RAW (Original File)</div>
+        <div class="channel-sub">Unprocessed · 16-bit PCM · 48 kHz</div>
+        <audio [src]="results.raw.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('raw')">⬇ Download</button>
       </div>
 
-      <div class="player-card df3">
-        <div class="player-label">🟢 Processed (DeepFilterNet3)</div>
-        <div class="player-sub">16-bit PCM WAV · {{ suppressionLevel }}/100 suppression · {{ (fileProcessingMs / 1000).toFixed(1) }}s</div>
-        <audio [src]="fileOutputUrl!" controls *ngIf="fileOutputUrl"></audio>
-        <a *ngIf="fileOutputUrl" [href]="fileOutputUrl"
-           [download]="'df3-processed-' + recordingTimestamp + '.wav'"
-           class="btn-download-audio">⬇ Download Processed WAV</a>
+      <div class="channel-card df3-card">
+        <div class="channel-label df3-label">🟢 DeepFilterNet3</div>
+        <div class="channel-sub">ONNX offline · suppression {{ suppressionLevel }}/100 · 48 kHz</div>
+        <audio [src]="results.df3.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('df3')">⬇ Download</button>
+      </div>
+
+      <div class="channel-card koala-card">
+        <div class="channel-label koala-label">🔵 Koala (Picovoice)</div>
+        <div class="channel-sub">WASM real-time · 16 kHz output</div>
+        <audio [src]="results.koala.url" controls *ngIf="results.koala.url"></audio>
+        <div class="placeholder" *ngIf="!results.koala.url">No access key — Koala skipped</div>
+        <button class="btn-dl" (click)="downloadWav('koala')" *ngIf="results.koala.url">⬇ Download</button>
       </div>
 
     </div>
 
-    <div class="info-hint" *ngIf="fileStatus === 'idle'">
-      <p>Upload any audio file — the tool decodes it to PCM, runs it through DeepFilterNet3 offline, and gives you both the original and the lossless WAV output to compare.</p>
-    </div>
+    <!-- Quality analysis (file mode — RAW is the reference) -->
+    <ng-container *ngIf="resultMode === 'file' && results">
+      <div class="analysis-bar">
+        <button class="btn btn-primary" (click)="runQualityAnalysis()"
+          [disabled]="quality?.analyzing">
+          {{ quality?.analyzing ? '⏳ Analysing…' : '▶ Run PESQ / STOI Analysis' }}
+        </button>
+        <span class="analysis-hint">Requires <code>python quality_server.py</code> running on port 8000</span>
+      </div>
+      <ng-container *ngTemplateOutlet="qualityTable"></ng-container>
+    </ng-container>
   </div>
 
-  <!-- MODE 2 — Live Preview  (records both channels; WAVs ready on stop) -->
+  <!-- ════════════════════════════════════════════════════════════
+       MODE 2 — Live Mic
+       ════════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎧</span>
-      Mode 2 — Live Preview
-      <span class="section-hint">Hear the filter through headphones · RAW + Processed WAVs saved automatically</span>
-    </div>
-
-    <!-- Filter selector -->
-    <div class="filter-toggle" *ngIf="!isLive && !isBusy">
-      <label class="toggle-label">Preview with:</label>
-      <label class="radio-opt" [class.active]="liveFilter === 'df3'">
-        <input type="radio" [(ngModel)]="liveFilter" value="df3" [disabled]="isBusy" />
-        DeepFilterNet3
-      </label>
-      <label class="radio-opt" [class.active]="liveFilter === 'koala'">
-        <input type="radio" [(ngModel)]="liveFilter" value="koala" [disabled]="isBusy" />
-        Koala
-      </label>
+      Mode 2 — Live Mic
+      <span class="section-hint">Hear all three channels simultaneously · toggle each on/off · level meters</span>
     </div>
 
     <div class="controls" *ngIf="!isLive">
@@ -143,334 +159,187 @@
     <div class="live-controls" *ngIf="isLive">
       <div class="live-indicator">
         <span class="live-dot"></span>
-        LIVE — {{ liveFilter === 'df3' ? 'DeepFilterNet3' : 'Koala' }} Active · Recording both channels…
+        LIVE — RAW (browser EC/NS) · DeepFilterNet3 · Koala all running
       </div>
-      <button class="btn btn-stop" (click)="stopLivePreview()">■ Stop &amp; Save WAVs</button>
+      <button class="btn btn-stop" (click)="stopLivePreview()">■ Stop</button>
     </div>
 
-    <!-- RAW + Processed players (Mode 2 result) -->
-    <div class="players-row" *ngIf="resultMode === 'live' && (rawUrl || df3Url)">
+    <!-- Three live channels (always shown while live) -->
+    <div class="three-col" *ngIf="isLive">
 
-      <div class="player-card raw">
-        <div class="player-label">🔴 RAW Microphone</div>
-        <div class="player-sub">No processing · 16-bit PCM WAV · 48 kHz</div>
-        <audio [src]="rawUrl!" controls *ngIf="rawUrl"></audio>
-        <a *ngIf="rawUrl" [href]="rawUrl"
-           [download]="'live-raw-' + recordingTimestamp + '.wav'"
-           class="btn-download-audio">⬇ Download RAW WAV</a>
-        <div class="placeholder" *ngIf="!rawUrl">—</div>
+      <div class="channel-card raw-card">
+        <div class="channel-label raw-label">🔴 RAW — Browser EC/NS</div>
+        <div class="channel-sub">echoCancellation · noiseSuppression · autoGainControl ON</div>
+        <button class="hear-btn" [class.muted]="!liveHear.raw" (click)="toggleHear('raw')">
+          {{ liveHear.raw ? '🔊 Hearing' : '🔇 Muted' }}
+        </button>
+        <div class="meter-bar">
+          <div class="meter-fill raw-fill" [style.width.%]="meterPct(liveLevels.raw)"></div>
+        </div>
+        <div class="meter-val">{{ liveLevels.raw }} dBFS</div>
       </div>
 
-      <div class="player-card df3">
-        <div class="player-label">
-          {{ liveFilter === 'df3' ? '🟢 DeepFilterNet3' : '🔵 Koala (Picovoice)' }}
+      <div class="channel-card df3-card">
+        <div class="channel-label df3-label">🟢 DeepFilterNet3</div>
+        <div class="channel-sub">ONNX AudioWorklet · no browser processing on source</div>
+        <button class="hear-btn" [class.muted]="!liveHear.df3" (click)="toggleHear('df3')">
+          {{ liveHear.df3 ? '🔊 Hearing' : '🔇 Muted' }}
+        </button>
+        <div class="meter-bar">
+          <div class="meter-fill df3-fill" [style.width.%]="meterPct(liveLevels.df3)"></div>
         </div>
-        <div class="player-sub">Processed · 16-bit PCM WAV · 48 kHz</div>
-        <audio [src]="df3Url!" controls *ngIf="df3Url"></audio>
-        <a *ngIf="df3Url" [href]="df3Url"
-           [download]="'live-processed-' + recordingTimestamp + '.wav'"
-           class="btn-download-audio">⬇ Download Processed WAV</a>
-        <div class="placeholder" *ngIf="!df3Url">—</div>
+        <div class="meter-val">{{ liveLevels.df3 }} dBFS</div>
+      </div>
+
+      <div class="channel-card koala-card">
+        <div class="channel-label koala-label">🔵 Koala (Picovoice)</div>
+        <div class="channel-sub">WASM · ~150 ms latency · input level shown</div>
+        <button class="hear-btn" [class.muted]="!liveHear.koala" (click)="toggleHear('koala')">
+          {{ liveHear.koala ? '🔊 Hearing' : '🔇 Muted' }}
+        </button>
+        <div class="meter-bar">
+          <div class="meter-fill koala-fill" [style.width.%]="meterPct(liveLevels.koala)"></div>
+        </div>
+        <div class="meter-val">{{ liveLevels.koala }} dBFS</div>
       </div>
 
     </div>
   </div>
 
-  <!-- MODE 3 — A/B/C Comparison Recording -->
+  <!-- ════════════════════════════════════════════════════════════
+       MODE 3 — Recording
+       ════════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎙️</span>
-      Mode 3 — A/B/C Comparison Recording
-      <span class="section-hint">Records Raw + DF3 + Koala simultaneously · all lossless WAV</span>
+      Mode 3 — Recording
+      <span class="section-hint">Records RAW + DF3 + Koala simultaneously · lossless WAV · PESQ/STOI analysis</span>
     </div>
 
     <div class="controls" *ngIf="!isRecording">
-      <button class="btn btn-record" (click)="startABCRecording()"
+      <button class="btn btn-record" (click)="startRecording()"
         [disabled]="isLive || isBusy">
         ⏺ Start Recording
       </button>
     </div>
 
-    <div class="controls" *ngIf="isRecording">
-      <button class="btn btn-stop" (click)="stopABCRecording()">
-        ■ Stop &amp; Compare
-      </button>
+    <div class="live-controls" *ngIf="isRecording">
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        Recording — {{ recordDuration }}s · RAW + DeepFilterNet3 + Koala
+      </div>
+      <button class="btn btn-stop" (click)="stopRecording()">■ Stop &amp; Save</button>
     </div>
 
-    <!-- Three-way players (Mode 3 result) -->
-    <div class="players-three" *ngIf="resultMode === 'abc' && (rawUrl || df3Url || koalaUrl)">
+    <!-- Three-column playback results -->
+    <div class="three-col" *ngIf="resultMode === 'record' && results">
 
-      <div class="player-card raw">
-        <div class="player-label">🔴 Raw Microphone</div>
-        <div class="player-sub">No processing · 16-bit PCM WAV · 48 kHz</div>
-        <audio [src]="rawUrl!" controls *ngIf="rawUrl"></audio>
-        <a *ngIf="rawUrl" [href]="rawUrl"
-           [download]="'abc-raw-' + recordingTimestamp + '.wav'"
-           class="btn-download-audio">⬇ Download RAW WAV</a>
-        <div class="placeholder" *ngIf="!rawUrl">—</div>
+      <div class="channel-card raw-card">
+        <div class="channel-label raw-label">🔴 RAW — Browser EC/NS</div>
+        <div class="channel-sub">Browser built-in processing · 16-bit PCM · 48 kHz</div>
+        <audio [src]="results.raw.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('raw')">⬇ Download</button>
       </div>
 
-      <div class="player-card df3">
-        <div class="player-label">🟢 DeepFilterNet3</div>
-        <div class="player-sub">ONNX AudioWorklet · 16-bit PCM WAV · 48 kHz</div>
-        <audio [src]="df3Url!" controls *ngIf="df3Url"></audio>
-        <a *ngIf="df3Url" [href]="df3Url"
-           [download]="'abc-df3-' + recordingTimestamp + '.wav'"
-           class="btn-download-audio">⬇ Download DF3 WAV</a>
-        <div class="placeholder loading-ph" *ngIf="!df3Url && status === 'processing'">Processing…</div>
-        <div class="placeholder" *ngIf="!df3Url && status !== 'processing'">—</div>
+      <div class="channel-card df3-card">
+        <div class="channel-label df3-label">🟢 DeepFilterNet3</div>
+        <div class="channel-sub">ONNX AudioWorklet · suppression {{ suppressionLevel }}/100 · 48 kHz</div>
+        <audio [src]="results.df3.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('df3')">⬇ Download</button>
       </div>
 
-      <div class="player-card koala">
-        <div class="player-label">🔵 Koala (Picovoice)</div>
-        <div class="player-sub">WASM · WAV from service</div>
-        <audio [src]="koalaUrl!" controls *ngIf="koalaUrl"></audio>
-        <a *ngIf="koalaUrl" [href]="koalaUrl"
-           [download]="'abc-koala-' + recordingTimestamp + '.wav'"
-           class="btn-download-audio">⬇ Download Koala WAV</a>
-        <div class="placeholder" *ngIf="!koalaUrl">Skipped — no access key</div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════════════
-       REPORT — Three-section: RAW · Processed · Comparison
-       Mirrors OpenViduCallQualitySnapshot structure
-       ══════════════════════════════════════════════════════════════════════ -->
-  <div class="section report-section" *ngIf="report">
-    <div class="section-title">
-      <span class="section-icon">📊</span>
-      Audio Quality Report
-      <span class="section-hint">
-        {{ report.mode === 'file' ? 'File' : report.mode === 'live' ? 'Live' : 'A/B/C' }} mode ·
-        {{ report.comparison.filterName }} · {{ report.testedAt | date:'medium' }}
-      </span>
-    </div>
-
-    <!-- Three-column grid: RAW | Processed | Comparison -->
-    <div class="report-grid">
-
-      <!-- RAW column -->
-      <div class="report-col">
-        <div class="report-col-header raw-header">🔴 RAW (Unprocessed)</div>
-        <table class="metrics-table">
-          <tbody>
-            <tr>
-              <td class="ml">RMS Level</td>
-              <td class="mv">{{ report.raw.levelDb }} dBFS</td>
-            </tr>
-            <tr>
-              <td class="ml">Peak Level</td>
-              <td class="mv">{{ report.raw.peakDb }} dBFS</td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr>
-              <td class="ml">Duration</td>
-              <td class="mv">{{ report.raw.durationSec }} s</td>
-            </tr>
-            <tr>
-              <td class="ml">Sample Rate</td>
-              <td class="mv">{{ report.raw.sampleRate }} Hz</td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr>
-              <td class="ml">echoCancellation</td>
-              <td class="mv">{{ report.raw.echoCancellation }}</td>
-            </tr>
-            <tr>
-              <td class="ml">noiseSuppression</td>
-              <td class="mv">{{ report.raw.noiseSuppression }}</td>
-            </tr>
-            <tr>
-              <td class="ml">autoGainControl</td>
-              <td class="mv">{{ report.raw.autoGainControl }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="report-arrow">→</div>
-
-      <!-- Processed column (DF3) -->
-      <div class="report-col">
-        <div class="report-col-header df3-col-header">🟢 Processed ({{ report.comparison.filterName }})</div>
-        <table class="metrics-table">
-          <tbody>
-            <tr>
-              <td class="ml">RMS Level</td>
-              <td class="mv">{{ report.processed.levelDb }} dBFS</td>
-            </tr>
-            <tr>
-              <td class="ml">Peak Level</td>
-              <td class="mv">{{ report.processed.peakDb }} dBFS</td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr>
-              <td class="ml">Duration</td>
-              <td class="mv">{{ report.processed.durationSec }} s</td>
-            </tr>
-            <tr>
-              <td class="ml">Sample Rate</td>
-              <td class="mv">{{ report.processed.sampleRate }} Hz</td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr>
-              <td class="ml">echoCancellation</td>
-              <td class="mv">{{ report.processed.echoCancellation }}</td>
-            </tr>
-            <tr>
-              <td class="ml">noiseSuppression</td>
-              <td class="mv">{{ report.processed.noiseSuppression }}</td>
-            </tr>
-            <tr>
-              <td class="ml">autoGainControl</td>
-              <td class="mv">{{ report.processed.autoGainControl }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="report-arrow">=</div>
-
-      <!-- Comparison column -->
-      <div class="report-col">
-        <div class="report-col-header cmp-header">📈 Comparison</div>
-        <table class="metrics-table">
-          <tbody>
-            <tr>
-              <td class="ml">Noise Reduction</td>
-              <td class="mv">
-                <span class="nr-value"
-                  [class.nr-positive]="report.comparison.noiseReductionDb > 0"
-                  [class.nr-negative]="report.comparison.noiseReductionDb <= 0">
-                  {{ report.comparison.noiseReductionDb > 0 ? '▼' : '▲' }}
-                  {{ report.comparison.noiseReductionDb }} dB
-                </span>
-              </td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr>
-              <td class="ml">DF3 Init Time</td>
-              <td class="mv">{{ report.comparison.initTimeMs }} ms</td>
-            </tr>
-            <tr>
-              <td class="ml">Graph Setup</td>
-              <td class="mv">{{ report.comparison.processingLatencyMs }} ms</td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr>
-              <td class="ml">Suppression Level</td>
-              <td class="mv">{{ report.comparison.suppressionLevel }}/100</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="channel-card koala-card">
+        <div class="channel-label koala-label">🔵 Koala (Picovoice)</div>
+        <div class="channel-sub">WASM · 16 kHz output</div>
+        <audio [src]="results.koala.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('koala')">⬇ Download</button>
       </div>
 
     </div>
 
-    <!-- Koala section (Mode 3 only — when Koala ran) -->
-    <ng-container *ngIf="report.koala">
-      <div class="koala-report-divider">
-        🔵 Koala (Picovoice) — same recording session
+    <!-- Quality analysis (record mode — RAW is the reference) -->
+    <ng-container *ngIf="resultMode === 'record' && results">
+      <div class="analysis-bar">
+        <button class="btn btn-primary" (click)="runQualityAnalysis()"
+          [disabled]="quality?.analyzing">
+          {{ quality?.analyzing ? '⏳ Analysing…' : '▶ Run PESQ / STOI Analysis' }}
+        </button>
+        <span class="analysis-hint">Requires <code>python quality_server.py</code> running on port 8000</span>
       </div>
-      <div class="report-grid">
-
-        <div class="report-col">
-          <div class="report-col-header raw-header">🔴 RAW (same as above)</div>
-          <table class="metrics-table">
-            <tbody>
-              <tr><td class="ml">RMS Level</td><td class="mv">{{ report.raw.levelDb }} dBFS</td></tr>
-              <tr><td class="ml">Peak Level</td><td class="mv">{{ report.raw.peakDb }} dBFS</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="report-arrow">→</div>
-
-        <div class="report-col">
-          <div class="report-col-header koala-col-header">🔵 Koala Processed</div>
-          <table class="metrics-table">
-            <tbody>
-              <tr><td class="ml">RMS Level</td><td class="mv">{{ report.koala.processed.levelDb }} dBFS</td></tr>
-              <tr><td class="ml">Peak Level</td><td class="mv">{{ report.koala.processed.peakDb }} dBFS</td></tr>
-              <tr><td class="ml separator" colspan="2"></td></tr>
-              <tr><td class="ml">Duration</td><td class="mv">{{ report.koala.processed.durationSec }} s</td></tr>
-              <tr><td class="ml">Sample Rate</td><td class="mv">{{ report.koala.processed.sampleRate }} Hz</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="report-arrow">=</div>
-
-        <div class="report-col">
-          <div class="report-col-header cmp-header">📈 Comparison</div>
-          <table class="metrics-table">
-            <tbody>
-              <tr>
-                <td class="ml">Noise Reduction</td>
-                <td class="mv">
-                  <span class="nr-value"
-                    [class.nr-positive]="report.koala.comparison.noiseReductionDb > 0"
-                    [class.nr-negative]="report.koala.comparison.noiseReductionDb <= 0">
-                    {{ report.koala.comparison.noiseReductionDb > 0 ? '▼' : '▲' }}
-                    {{ report.koala.comparison.noiseReductionDb }} dB
-                  </span>
-                </td>
-              </tr>
-              <tr><td class="ml separator" colspan="2"></td></tr>
-              <tr><td class="ml">Koala Init Time</td><td class="mv">{{ report.koala.comparison.initTimeMs }} ms</td></tr>
-              <tr><td class="ml">Capture Setup</td><td class="mv">{{ report.koala.comparison.processingLatencyMs }} ms</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-      </div>
-
-      <!-- Winner banner -->
-      <div class="winner-banner">
-        <span class="winner-label">📈 Higher Noise Reduction:</span>
-        <span class="winner-name">
-          {{ report.comparison.noiseReductionDb >= report.koala.comparison.noiseReductionDb
-              ? '🟢 DeepFilterNet3 (' + report.comparison.noiseReductionDb + ' dB)'
-              : '🔵 Koala (' + report.koala.comparison.noiseReductionDb + ' dB)' }}
-        </span>
-      </div>
+      <ng-container *ngTemplateOutlet="qualityTable"></ng-container>
     </ng-container>
-
-    <!-- Notes + Download -->
-    <div class="notes-row">
-      <label class="notes-label">Subjective Notes</label>
-      <textarea class="notes-area" [(ngModel)]="userNotes" rows="3"
-        placeholder="e.g. DF3 removed fan hum better; Koala preserved consonants more naturally…"></textarea>
-    </div>
-
-    <div class="download-row">
-      <button class="btn btn-download" (click)="downloadReport()">
-        ⬇ Download Report JSON
-      </button>
-      <span class="download-hint">audio-test-report-{{ recordingTimestamp }}.json</span>
-    </div>
   </div>
 
-  <!-- How it works (idle only) -->
-  <div class="info-card" *ngIf="status === 'idle' && !report && fileStatus === 'idle'">
+  <!-- ════════════════════════════════════════════════════════════
+       Shared Quality Table Template
+       ════════════════════════════════════════════════════════════ -->
+  <ng-template #qualityTable>
+
+    <!-- Server offline warning -->
+    <div class="server-offline" *ngIf="quality?.serverError">
+      ⚠️ {{ quality!.serverError }}
+    </div>
+
+    <!-- Metrics table -->
+    <div class="quality-grid" *ngIf="quality && !quality.serverError && !quality.analyzing">
+
+      <div class="quality-header-row">
+        <div></div>
+        <div class="qh df3-qh">🟢 DeepFilterNet3</div>
+        <div class="qh koala-qh">🔵 Koala</div>
+        <div class="qh">Scale</div>
+      </div>
+
+      <div class="quality-row">
+        <div class="qm-label">PESQ (MOS-LQO)</div>
+        <div class="qm-val" [class]="pesqColor(quality.df3?.pesq ?? null)">
+          {{ quality.df3 ? quality.df3.pesq : '—' }}
+        </div>
+        <div class="qm-val" [class]="pesqColor(quality.koala?.pesq ?? null)">
+          {{ quality.koala ? quality.koala.pesq : '—' }}
+        </div>
+        <div class="qm-scale">-0.5 → 4.5</div>
+      </div>
+
+      <div class="quality-row">
+        <div class="qm-label">STOI</div>
+        <div class="qm-val" [class]="pesqColor((quality.df3?.stoi ?? 0) * 4.5)">
+          {{ quality.df3 ? quality.df3.stoi : '—' }}
+        </div>
+        <div class="qm-val" [class]="pesqColor((quality.koala?.stoi ?? 0) * 4.5)">
+          {{ quality.koala ? quality.koala.stoi : '—' }}
+        </div>
+        <div class="qm-scale">0 → 1.0</div>
+      </div>
+
+      <div class="quality-row">
+        <div class="qm-label">Rating</div>
+        <div class="qm-rating">{{ quality.df3?.pesq_label ?? '—' }}</div>
+        <div class="qm-rating">{{ quality.koala?.pesq_label ?? '—' }}</div>
+        <div></div>
+      </div>
+
+    </div>
+  </ng-template>
+
+  <!-- How it works (idle) -->
+  <div class="info-card" *ngIf="status === 'idle' && !results && fileStatus === 'idle'">
     <div class="info-title">How it works</div>
     <div class="info-row">
       <span class="step-chip">1</span>
-      <span><strong>Mode 1 — File:</strong> Upload any audio file. DF3 processes it offline and gives you both RAW and Processed WAVs to download and compare.</span>
+      <span><strong>Mode 1 — File:</strong> Upload any audio. RAW + DF3 (offline) + Koala (real-time) outputs produced. All three hearable and downloadable.</span>
     </div>
     <div class="info-row">
       <span class="step-chip">2</span>
-      <span><strong>Mode 2 — Live:</strong> Hear the filter in real time through headphones. Both channels (RAW + Processed) are recorded simultaneously — WAVs appear the moment you click Stop.</span>
+      <span><strong>Mode 2 — Live:</strong> All three channels run simultaneously in real time. Toggle each channel's speaker on/off independently. Level meters show noise reduction live.</span>
     </div>
     <div class="info-row">
       <span class="step-chip">3</span>
-      <span><strong>Mode 3 — A/B/C:</strong> Records Raw + DF3 + Koala simultaneously. All three are lossless WAV — the fairest side-by-side comparison possible.</span>
+      <span><strong>Mode 3 — Recording:</strong> Records all three simultaneously as lossless WAV. After stopping, run PESQ/STOI quality analysis via the local Python server.</span>
     </div>
     <div class="info-row">
       <span class="step-chip">4</span>
-      <span>A structured <strong>quality report</strong> (RAW · Processed · Comparison — same format as the call quality tracker) is generated after every mode. Download it as JSON.</span>
+      <span><strong>PESQ/STOI:</strong> Start <code>python quality_server.py</code> in a terminal. Click "Run Analysis" — scores appear in ~2 seconds. RAW is the reference signal.</span>
     </div>
   </div>
 
