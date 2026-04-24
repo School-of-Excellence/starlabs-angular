@@ -49,7 +49,7 @@ export class ContentUploadComponent {
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
-  displayedColumns: string[] = ['serialNo', 'added', 'title', 'videosize', 'thumbnailsize', 'available', 'convertedtohls', 'tags', 'edit'];
+  displayedColumns: string[] = ['serialNo', 'added', 'title', 'videosize', 'thumbnailsize','duration' ,'available', 'convertedtohls', 'tags', 'edit'];
   // displayedColumns: string[] = ['serialNo', 'added', 'title', 'thumbnail', 'thumbnailsize', 'available', 'convertedtohls', 'tags', 'edit', 'delete'];
   contentData = new MatTableDataSource();
   mapTaxonomy = {}
@@ -116,7 +116,19 @@ export class ContentUploadComponent {
       this.contentData.paginator.firstPage();
     }
   }
+  formatDuration(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return '—';
 
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+  }
   editContent(currentcontent) {
     this.dialog.open(ContentUploadDialogComponent, {
       disableClose: true,

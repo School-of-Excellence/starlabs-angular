@@ -93,16 +93,14 @@ export class ContentAnalyticsComponent {
   journeyWiseData: any = {};
   showDuplicatesOnly = false;
 
+  allTierCompletionMap: any = {};
+  allTierParticipantSummary: any = {};
+  allTierStats: typeof this.tierStats = {};
+  allTierSearchQuery = '';
+  allTierViewMode: 'series' | 'participant' = 'participant';
+  allCardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
+  allTierLoading = false;
 
-
-    allTierCompletionMap: any = {};
-    allTierParticipantSummary: any = {};
-    allTierStats: typeof this.tierStats = {};
-    allTierSearchQuery = '';
-    allTierViewMode: 'series' | 'participant' = 'participant';
-    allCardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
-    allTierLoading = false;
-  
   constructor(
     public firestore: Firestore,
     private guard : AuthguardService,
