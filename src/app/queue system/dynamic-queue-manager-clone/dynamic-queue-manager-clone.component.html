@@ -584,44 +584,6 @@
             </div>
           </div>
         </div>
-        <!-- NOTES FILTER ROW -->
-        <div class="fsb-expandable">
-          <div class="fsb-row"[class.fsb-row-active]="notesDropdownOpen"(click)="notesDropdownOpen = !notesDropdownOpen">
-            <mat-icon class="fsb-icon">event_note</mat-icon>
-            <span class="fsb-label">Notes</span>
-            <span class="fsb-value-text" *ngIf="!notesDateRangeStart">Filter by date</span>
-            <span class="fsb-value-text fsb-value-active" 
-                  *ngIf="notesDateRangeStart && notesDateRangeEnd">
-              {{notesDateRangeStart | date:'MMM d'}} – {{notesDateRangeEnd | date:'MMM d'}}
-            </span>
-            <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="notesDropdownOpen">expand_more</mat-icon>
-          </div>
-          <div class="fsb-sub-section" *ngIf="notesDropdownOpen">
-            <div class="fsb-row fsb-row-sub" 
-                [class.fsb-row-active]="notesDateRangeStart && notesDateRangeEnd">
-              <mat-icon class="fsb-icon">date_range</mat-icon>
-              <mat-form-field appearance="outline" class="fsb-date-field">
-                <mat-label>Select date range</mat-label>
-                <mat-date-range-input [rangePicker]="notesRangePicker">
-                  <input matStartDate
-                        [ngModel]="notesDateRangeStart"
-                        (ngModelChange)="notesDateRangeStart=$event"
-                        (dateChange)="buildNotesList()"
-                        placeholder="Start">
-                  <input matEndDate
-                        [ngModel]="notesDateRangeEnd"
-                        (ngModelChange)="notesDateRangeEnd=$event"
-                        (dateChange)="buildNotesList()"
-                        placeholder="End">
-                </mat-date-range-input>
-                <mat-datepicker-toggle matSuffix [for]="notesRangePicker">
-                </mat-datepicker-toggle>
-                <mat-date-range-picker #notesRangePicker></mat-date-range-picker>
-              </mat-form-field>
-            </div>
-          </div>
-
-        </div>
         <!-- EVENT PARTICIPATION FILTER ROW -->
         <div class="fsb-expandable">
           <div class="fsb-row" [class.fsb-row-active]="!!selectedArenaEventId"
@@ -1138,6 +1100,10 @@
             </span>
           </span>
         </div>
+        <!--Notes-->
+        <div class="notes-chip" *ngIf="selectedQueue" (click)="openNotesModal()">
+          <span style="  font-size: 12px;font-weight: 900;color: #1976d2;">View Notes</span>
+        </div>
 
         <!-- Stage Count Chips -->
         <div class="stage-count-chips-row" *ngIf="stageCountCards.length > 0"
@@ -1621,68 +1587,67 @@
       </div>
     </div>
 
-    <!-- Notes List Modal -->
-    <div class="reminder-modal-backdrop"
-        *ngIf="showNotesListModal"
-        (click)="closeNotesListModal()">
-      <div class="reminder-modal-dialog" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h2>
-            <mat-icon style="vertical-align:middle; margin-right:6px;">event_note</mat-icon>
-            Notes — {{notesDateRangeStart | date:'MMM d, yyyy'}} to {{notesDateRangeEnd | date:'MMM d, yyyy'}}
-          </h2>
-          <button mat-icon-button (click)="closeNotesListModal()">
+    <!-- Notes Modal -->
+    <div class="notes-overlay" *ngIf="showNotesListModal">
+      <div class="notes-overlay-bg" (click)="closeNotesModal()"></div>
+      <div class="notes-modal" (click)="$event.stopPropagation()">
+
+        <div class="notes-modal-head">
+          <div class="notes-modal-title">
+            <span>Notes</span>
+          </div>
+          <button mat-icon-button (click)="closeNotesModal()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
-        <div class="modal-body">
-          <table class="reminder-table" *ngIf="filteredNotesList.length > 0">
-            <thead>
-              <tr>
-                <th>S.NO</th>
-                <th>TOKEN</th>
-                <th>NAME</th>
-                <th style="width: 250px; max-width: 250px;">NOTE</th>
-                <th>DATE</th>
-                <th>ADDED BY</th>
-                <th>STAGE</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let note of filteredNotesList; let i = index">
-                <td>{{i + 1}}</td>
-                <td>
-                  <span class="token-badge">#{{note.tokennumber}}</span>
-                </td>
-                <td>
-                  <span class="participant-name">{{note.name}}</span>
-                </td>
-                <td style="max-width: 250px;">
-                  <div class="reminder-context"
-                      [matTooltip]="note.text"
-                      matTooltipClass="multiline-tooltip">
-                    {{note.text}}
-                  </div>
-                </td>
-                <td>
-                  <div class="datetime-cell">
-                    <div class="date-line">
-                      {{note.date | date:'MMM dd, yyyy - h:mm a'}}
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span class="participant-name">{{note.authorName}}</span>
-                </td>
-                <td>
-                  <span style="font-size:12px; color:#666;">{{note.stage || '—'}}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="empty-state" *ngIf="filteredNotesList.length === 0">
+
+        <div class="notes-modal-toolbar">
+          <div class="notes-search-wrap">
+            <mat-icon>search</mat-icon>
+            <input [(ngModel)]="notesSearch"  placeholder="Search by participant name" autocomplete="off">
+            <button *ngIf="notesSearch" (click)="notesSearch = ''">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <mat-form-field appearance="outline" class="notes-date-field">
+            <mat-label>Date range</mat-label>
+            <mat-date-range-input [rangePicker]="notesPicker">
+              <input matStartDate [(ngModel)]="notesDateStart" placeholder="Start">
+              <input matEndDate [(ngModel)]="notesDateEnd" placeholder="End">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matSuffix [for]="notesPicker"></mat-datepicker-toggle>
+            <mat-date-range-picker #notesPicker></mat-date-range-picker>
+            <button matSuffix mat-icon-button *ngIf="notesDateStart"
+              (click)="notesDateStart=null; notesDateEnd=null">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+        </div>
+
+        <div class="notes-modal-body">
+          <div *ngIf="notesGrouped.length === 0" class="notes-empty">
             <mat-icon>notes</mat-icon>
-            <p>No notes found for this date range</p>
+            <p>No notes{{notesDateStart ? ' in this date range' : ''}}</p>
+          </div>
+
+          <div *ngFor="let group of notesGrouped" class="notes-group">
+            <div class="notes-group-head">
+              <span class="notes-avatar">{{group.name.charAt(0).toUpperCase()}}</span>
+              <span class="notes-group-name">{{group.name}}</span>
+            </div>
+
+            <div *ngFor="let n of group.items" class="notes-row">
+              <div class="notes-row-meta">
+                <span class="notes-token">#{{n.tokennumber}}</span>
+                <span class="notes-stage" *ngIf="n.stage">
+                  <mat-icon>layers</mat-icon>{{n.stage}}
+                </span>
+                <span class="notes-date">{{n.date | date:'MMM d, y · h:mm a'}}</span>
+                <span class="notes-author" *ngIf="n.author">· {{n.author}}</span>
+              </div>
+              <p class="notes-text">{{n.text}}</p>
+            </div>
           </div>
         </div>
       </div>
