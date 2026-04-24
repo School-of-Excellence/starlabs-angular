@@ -20,6 +20,7 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import * as XLSX from 'xlsx';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
+import { MatSortModule } from '@angular/material/sort';
 
 @Component({
   selector: 'app-content-upload',
@@ -33,6 +34,7 @@ import { HttpClient } from '@angular/common/http';
     MatTableModule,
     MatPaginatorModule,
     MatSnackBarModule,
+    MatSortModule
   ],
   templateUrl: './content-upload.component.html',
   // styleUrl: './content-upload.component.css'
@@ -49,7 +51,7 @@ export class ContentUploadComponent {
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
-  displayedColumns: string[] = ['serialNo', 'added', 'title', 'videosize', 'thumbnailsize', 'available', 'convertedtohls', 'tags', 'edit'];
+  displayedColumns: string[] = ['serialNo', 'added', 'title', 'videosize', 'thumbnailsize','duration' ,'available', 'convertedtohls', 'tags', 'edit'];
   // displayedColumns: string[] = ['serialNo', 'added', 'title', 'thumbnail', 'thumbnailsize', 'available', 'convertedtohls', 'tags', 'edit', 'delete'];
   contentData = new MatTableDataSource();
   mapTaxonomy = {}
@@ -87,6 +89,14 @@ export class ContentUploadComponent {
         }
         this.contentData.data = this.contentDataList
         this.contentData.sort = this.sort
+        this.contentData.sortingDataAccessor = (item: any, headerSort: string) => {
+          switch (headerSort) {
+            case 'added': return item.added?.toDate().getTime() ?? 0;
+            case 'title': return item.title?.toLowerCase() ?? '';
+            case 'videosize': return item.videoSize ?? 0;
+            case 'duration': return item.duration ?? 0;
+          }
+        };
         this.contentData.paginator = this.paginator
       })
       const atctaxonomyRef = collection(this.firestore, 'atc taxonomy')
@@ -116,7 +126,19 @@ export class ContentUploadComponent {
       this.contentData.paginator.firstPage();
     }
   }
+  formatDuration(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return '—';
 
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+  }
   editContent(currentcontent) {
     this.dialog.open(ContentUploadDialogComponent, {
       disableClose: true,

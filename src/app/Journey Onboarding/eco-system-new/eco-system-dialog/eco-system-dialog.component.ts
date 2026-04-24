@@ -3,7 +3,7 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { Firestore } from '@angular/fire/firestore';
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import { Router } from '@angular/router';
-import { AuthguardService } from '../../authguard.service';
+import { AuthguardService } from '../../../authguard.service';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';

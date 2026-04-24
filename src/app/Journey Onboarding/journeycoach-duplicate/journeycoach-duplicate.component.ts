@@ -20,7 +20,7 @@ import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remar
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
-import { EcoSystemDialogComponent } from '../eco-system-dialog/eco-system-dialog.component';
+import { EcoSystemDialogComponent } from '../eco-system-new/eco-system-dialog/eco-system-dialog.component';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';

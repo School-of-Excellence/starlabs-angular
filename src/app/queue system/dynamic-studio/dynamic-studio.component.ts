@@ -6,7 +6,7 @@ import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AssignProcedureStudioComponent } from '../assign-procedure-studio/assign-procedure-studio.component';
 import { InviteOtherStudioComponent } from '../invite-other-studio/invite-other-studio.component';
 import { AcceptOtherStudioComponent } from '../accept-other-studio/accept-other-studio.component';
@@ -24,6 +24,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confirmation/stage-incomplete-confirmation.component';
+import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view-participant-atc.component';
 
 
 @Component({
@@ -38,7 +39,7 @@ import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confir
     MatIconModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
-    
+    ViewParticipantAtcComponent,
   ],
   templateUrl: './dynamic-studio.component.html',
   styleUrl: './dynamic-studio.component.css'
@@ -48,6 +49,7 @@ export class DynamicStudioComponent {
   profileRoles = {}
   profileid = null
   mapProfile = {}
+  mapProfileData: any = {}
   ongoingQueueList = []
   ongoingQueue = {}
   selectedQueue = {}
@@ -93,6 +95,16 @@ export class DynamicStudioComponent {
   unvalidatedATCList = []
   mapATCnotes = {}
   cwATClist = [] // Changework Assigned ATC
+  showPreviousATC: boolean = false
+  showLoveLetter: boolean = false
+  loveLetterList: any[] = []
+  loveLetterLoading: boolean = false
+  loveLetterLoadedFor: string | null = null
+  // UP Attendance
+  readonly upProductIds = ['N0MhGQnxP9S8TdavuRJR', '0ayiNALL1HDVvCXDHcZ4', 'Rq9cu2Z3FSuILXdwYtca']
+  participantUPVisitLabel: string | null = null
+  participantUPVisitLoadedFor: string | null = null
+  expandedImage: string | null = null
   // Form
   participantForm = []
   // Triple ATC
@@ -142,8 +154,10 @@ export class DynamicStudioComponent {
     private cdr: ChangeDetectorRef,
     public snackBar: MatSnackBar,
     public formbuilder: FormBuilder,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private route: ActivatedRoute
   ) {
+    const overrideProfileId = this.route.snapshot.queryParamMap.get('profileid')
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {msg: "Loading..."},
       disableClose: true
@@ -154,7 +168,7 @@ export class DynamicStudioComponent {
     });
     guard.getRoles().then(async roles=>{
       this.profileRoles = roles
-      this.profileid = roles['profile_ref'].id
+      this.profileid = overrideProfileId || roles['profile_ref'].id
       // if(environment.firebase.projectId == "fir-sample-aae4a" && this.profileid == 'l0ApFnXuM5Ac8tpqJQnk'){
       //   this.deleteOption = true
       // }else if(environment.firebase.projectId == "starlabs-test" && this.profileid == 'g2mQ7GiD6PSV8oaZnZLb'){
@@ -191,7 +205,9 @@ export class DynamicStudioComponent {
             this.ongoingQueue = firstWithStudios || this.ongoingQueueList[0]
             this.selectedQueue = this.ongoingQueue
             await this.onQueueSelect()
-            this.mapProfile = (await guard.getProfileMap()).map
+            const profileMap = await guard.getProfileMap()
+            this.mapProfile = profileMap.map
+            this.mapProfileData = profileMap.docdata
           }
         })
       // }
@@ -734,6 +750,9 @@ export class DynamicStudioComponent {
           else{
             this.tripleATCList = []
           }
+
+          // UP Attendance Count
+          this.getParticipantUPVisit()
 
           // List Form
           var mappedForm = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]?.participantform ?? []
@@ -1784,6 +1803,68 @@ export class DynamicStudioComponent {
     }
   }
   
+  async getParticipantUPVisit(){
+    const profileid = this.liveAssignment?.["participantid"]
+    if(!profileid){
+      this.participantUPVisitLabel = null
+      this.participantUPVisitLoadedFor = null
+      return
+    }
+    if(this.participantUPVisitLoadedFor == profileid){
+      return
+    }
+    try {
+      const snap = await getDoc(doc(this.firestore, "participant metadata", profileid))
+      const consumed: string[] = snap.exists() ? (snap.data()["consumedproducts"] ?? []) : []
+      const matched = consumed.filter(id => this.upProductIds.includes(id)).length
+      this.participantUPVisitLabel = this.formatOrdinal(matched + 1) + ' Time'
+      this.participantUPVisitLoadedFor = profileid
+    } catch (error) {
+      console.error('Error fetching participant UP visit:', error)
+      this.participantUPVisitLabel = null
+    }
+  }
+
+  private formatOrdinal(n: number): string {
+    const s = ['th', 'st', 'nd', 'rd']
+    const v = n % 100
+    return n + (s[(v - 20) % 10] || s[v] || s[0])
+  }
+
+  async getLoveLetters(){
+    const profileid = this.liveAssignment?.["participantid"]
+    if(!profileid){
+      this.loveLetterList = []
+      return
+    }
+    if(this.loveLetterLoadedFor == profileid){
+      return
+    }
+    this.loveLetterLoading = true
+    try {
+      const q = query(
+        collection(this.firestore, "love letter"),
+        where("profileid", "==", profileid),
+        orderBy("created", "desc")
+      )
+      const snap = await getDocs(q)
+      this.loveLetterList = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      this.loveLetterLoadedFor = profileid
+    } catch (error) {
+      console.error('Error fetching love letters:', error)
+      this.loveLetterList = []
+    } finally {
+      this.loveLetterLoading = false
+    }
+  }
+
+  toggleLoveLetter(){
+    this.showLoveLetter = !this.showLoveLetter
+    if(this.showLoveLetter){
+      this.getLoveLetters()
+    }
+  }
+
   async getAssignedATC(){
     var startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
     
