@@ -20,6 +20,7 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import * as XLSX from 'xlsx';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
+import { MatSortModule } from '@angular/material/sort';
 
 @Component({
   selector: 'app-content-upload',
@@ -33,6 +34,7 @@ import { HttpClient } from '@angular/common/http';
     MatTableModule,
     MatPaginatorModule,
     MatSnackBarModule,
+    MatSortModule
   ],
   templateUrl: './content-upload.component.html',
   // styleUrl: './content-upload.component.css'
@@ -87,6 +89,14 @@ export class ContentUploadComponent {
         }
         this.contentData.data = this.contentDataList
         this.contentData.sort = this.sort
+        this.contentData.sortingDataAccessor = (item: any, headerSort: string) => {
+          switch (headerSort) {
+            case 'added': return item.added?.toDate().getTime() ?? 0;
+            case 'title': return item.title?.toLowerCase() ?? '';
+            case 'videosize': return item.videoSize ?? 0;
+            case 'duration': return item.duration ?? 0;
+          }
+        };
         this.contentData.paginator = this.paginator
       })
       const atctaxonomyRef = collection(this.firestore, 'atc taxonomy')
