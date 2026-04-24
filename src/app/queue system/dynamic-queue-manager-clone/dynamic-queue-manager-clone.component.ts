@@ -4961,8 +4961,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   
   openNotesModal() {
     this.notesSearch = '';
-    this.notesDateStart = null;
-    this.notesDateEnd = null;
+    const today= new Date();
+    today.setHours(0,0,0,0);
+    this.notesDateStart = today;
+    this.notesDateEnd = today;
 
     const rows: any[] = [];
     for (const token of this.allTokensData) {
