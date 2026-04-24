@@ -59,7 +59,7 @@
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Prescribed Date</mat-label>
       
-        <mat-date-range-input [rangePicker]="picker" [disabled]="selectedQueue != null">
+        <mat-date-range-input [rangePicker]="picker">
           <input matStartDate placeholder="Start date" [(ngModel)]="startDate">
       
           <input matEndDate placeholder="End date" [(ngModel)]="endDate" (ngModelChange)="onDateRangeChange()">
@@ -151,7 +151,7 @@
                 <div>
                   <label class="info-label">Participant Name:</label>
                   <label class="info-value">
-                    <span class="hoverprofile" (click)="selectedParticipants.includes(atcData['profileid']); onParticipantSelect()">
+                    <span class="hoverprofile" (click)="selectParticipantName(atcData['profileid'])">
                       {{(profileMap[atcData['profileid']] || {})['name']}}
                     </span>
                     <mat-icon class="view-icon" (click)="openParticipantView(atcData['profileid'], $event)">open_in_new</mat-icon>
@@ -206,8 +206,8 @@
             </div>
             <!-- Profile Image -->
             <div class="profile-image-container nonprintable">
-              <div *ngIf="profileMap[atcData['profileid']] && (profileMap[atcData['profileid']]['profileimg'] || profileMap[atcData['profileid']]['profile'])">
-                <img class="profile-image" [src]="profileMap[atcData['profileid']]['profileimg'] || profileMap[atcData['profileid']]['profile']">
+              <div *ngIf="profileMap[atcData['profileid']] && (profileMap[atcData['profileid']]['profile'] || profileMap[atcData['profileid']]['profileimg'])">
+                <img class="profile-image" [src]="profileMap[atcData['profileid']]['profile'] || profileMap[atcData['profileid']]['profileimg']">
               </div>
             </div>
           </div>
