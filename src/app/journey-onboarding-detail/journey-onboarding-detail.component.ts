@@ -273,14 +273,71 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
   nextDetailTab(): void {
     if (this.detailTabIndex >= this.detailTabs.length - 1) return;
-    if (!this.isTabFilled(this.detailTabIndex)) {
-      this.detailForm.markAllAsTouched();
-      this.cdr.markForCheck();
-      return;
+    // Mark all fields touched so errors show
+    this.detailForm.markAllAsTouched();
+    this.cdr.markForCheck();
+    // Block if current tab is not fully valid
+    if (!this.isTabValid(this.detailTabIndex)) {
+      return; // ← stops navigation
     }
     this.detailTabIndex++;
     this.currentScreen = this.detailTabs[this.detailTabIndex].screen;
     this.cdr.markForCheck();
+  }
+
+  isTabValid(tabIndex: number): boolean {
+    const v = this.detailForm;
+    if (!v) return false;
+
+    switch (tabIndex) {
+      case 0: // Intro
+        return (
+          v.get('introduction')?.valid === true &&
+          v.get('introductionvideo')?.valid === true &&
+          v.get('eventdescripition.title')?.valid === true &&
+          v.get('eventdescripition.intro')?.valid === true &&
+          v.get('eventdescripition.overview')?.valid === true &&
+          v.get('eventdescripition.overviewdescripition')?.valid === true
+        );
+
+      case 1: // Journey Overview
+        return (
+          v.get('overviewdescription')?.valid === true &&
+          v.get('overviewvideoDocId')?.valid === true
+        );
+
+      case 2: // Journey Description
+        return (
+          v.get('journeydetail.intro')?.valid === true &&
+          v.get('journeydetail.descripition')?.valid === true &&
+          v.get('journeydetail.imageurl')?.valid === true &&
+          v.get('journeypath.intro')?.valid === true &&
+          v.get('journeypath.descripition')?.valid === true &&
+          v.get('journeypath.imageurl')?.valid === true
+        );
+
+      case 3: // Subscription
+        return (
+          v.get('subscription.descripition')?.valid === true &&
+          v.get('subscription.imageurl')?.valid === true
+        );
+
+      case 4: // Experience / Product
+        return this.productincluded.controls.every(ctrl =>
+          ctrl.get('title')?.valid &&
+          ctrl.get('descripition')?.valid &&
+          ctrl.get('type')?.valid
+        );
+
+      case 5: // Product Overview
+        return (
+          v.get('otherdescripition.title')?.valid === true &&
+          v.get('otherdescripition.descripition')?.valid === true
+        );
+
+      default:
+        return true;
+    }
   }
 
   prevDetailTab(): void {
@@ -322,6 +379,12 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   }
 
   onTabChange(index: number, tab: any) {
+
+    if (index > this.detailTabIndex && !this.isTabValid(this.detailTabIndex)) {
+      this.detailForm.markAllAsTouched();
+      this.cdr.markForCheck();
+      return;
+    }
     this.showFullProcess = false;
     this.showProductDetailsPage = null;
     this.showProcessStepsPage = false;
@@ -725,7 +788,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       docid:          [docid],
       journeyrefDocId:[{ value: journeyDocId, disabled: !!prefill }, Validators.required],
       journeyref:     [p.journeyref ?? ''],
-      overviewvideoDocId: [''],
+      overviewvideoDocId: ['', Validators.required],
 
       eventdescripition: this.fb.group({
         title:                [p.eventdescripition?.title                ?? '', Validators.required],
@@ -739,7 +802,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       introduction:        [p.introduction      ?? '', Validators.required],
       introductionvideo:   [p.introductionvideo ?? '', Validators.required],
       overviewdescription: [p.overviewdescription ?? '', Validators.required],
-      overviewvideo:       [p.overviewvideo ?? ''],
+      overviewvideo:       [p.overviewvideo ?? '', Validators.required],
 
       journeydetail: this.fb.group({
         intro:        [p.journeydetail?.intro        ?? '', Validators.required],
@@ -748,9 +811,9 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       }),
 
       journeypath: this.fb.group({
-        intro:        [p.journeypath?.intro        ?? ''],
-        descripition: [p.journeypath?.descripition ?? ''],
-        imageurl:     [p.journeypath?.imageurl     ?? ''],
+        intro:        [p.journeypath?.intro        ?? '', Validators.required],
+        descripition: [p.journeypath?.descripition ?? '', Validators.required],
+        imageurl:     [p.journeypath?.imageurl     ?? '', Validators.required],
       }),
 
       otherdescripition: this.fb.group({
@@ -768,16 +831,16 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       ),
 
       queuedescripition: this.fb.group({
-        title:        [p.queuedescripition?.title        ?? ''],
-        descripition: [p.queuedescripition?.descripition ?? ''],
+        title:        [p.queuedescripition?.title        ?? '', Validators.required],
+        descripition: [p.queuedescripition?.descripition ?? '', Validators.required],
         atcmodel: this.fb.group({
-          title:        [p.queuedescripition?.atcmodel?.title        ?? ''],
-          descripition: [p.queuedescripition?.atcmodel?.descripition ?? ''],
+          title:        [p.queuedescripition?.atcmodel?.title        ?? '', Validators.required],
+          descripition: [p.queuedescripition?.atcmodel?.descripition ?? '', Validators.required],
         }),
         processimage: [p.queuedescripition?.processimage ?? ''],
         processdetails: this.fb.group({
-          title:        [p.queuedescripition?.processdetails?.title        ?? ''],
-          descripition: [p.queuedescripition?.processdetails?.descripition ?? ''],
+          title:        [p.queuedescripition?.processdetails?.title        ?? '', Validators.required],
+          descripition: [p.queuedescripition?.processdetails?.descripition ?? '', Validators.required],
           step: this.fb.array(
             (p.queuedescripition?.processdetails?.step ?? [{}]).map((x: any) => this.newProcessStep(x))
           ),
