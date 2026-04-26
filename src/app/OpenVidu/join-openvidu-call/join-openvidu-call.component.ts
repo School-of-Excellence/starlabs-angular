@@ -1,8 +1,8 @@
-import { PicoKoalaService } from './../../Service/PicoVoice Koala/pico-koala.service';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+// import { PicoKoalaService } from './../../Service/PicoVoice Koala/pico-koala.service';
+import { HttpClient } from '@angular/common/http';
 import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality, ScreenSharePresets } from 'livekit-client';
+import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { doc, docData, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
@@ -60,15 +60,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   room = signal<Room | undefined>(undefined)
   localParticipant = signal<LocalVideoTrack | undefined>(undefined)
   remoteParticipants = signal<Map<string, TrackInfo>>(new Map());
-  remoteParticipantTracks = computed<TrackInfo[]>(() => Array.from(this.remoteParticipants().values()));
   remoteParticipantsQuality = signal<Map<string, ConnectionQuality>>(new Map());
   remoteParticipantsMute = signal<Map<string, boolean>>(new Map());
   localNetworkQuality = signal<ConnectionQuality>(ConnectionQuality.Unknown);
-  isMicMuted = signal<boolean>(false);
-  // M1: converted to signal — plain array not reactive in Angular 19 signals-first CD
-  // activeSpeakers:Array<string> = [];
   activeSpeakers = signal<string[]>([]);
-
+  isLocalScreenSharing = signal<boolean>(false);
 
   // Meta Data
   roomDetail: RoomInfo | undefined | null;
@@ -79,7 +75,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   // UI States
   loading = true;
-  isSharing = false;
   meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended" = "servercheck"
   // Fullscreen Enable
   isFullscreen = false;
@@ -90,40 +85,25 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
 
-  blurLevel: 'none' | 'mid' | 'high' = 'high';
+  blurLevel: 'none' | 'mid' | 'high' = 'none';
   localParticipantIdentity = '';
 
   private previewStream: MediaStream | null = null;
-  private canvasPipelineCleanup: (() => void) | null = null;
   // Cache active blur processor — avoids recreating the canvas pipeline on every camera re-enable
   private cachedBlurProcessor: any = null;
   private cachedBlurRadius: number = 0;
 
-  // ── Layout: screen share tracking ──────────────────────────────────────
-  screenShareTrack = signal<RemoteTrack | null>(null);
-  screenShareParticipantId = signal<string | null>(null);
-  localVideoStream = signal<MediaStream | null>(null);
-
-
-
   // Layout mode computed from participant count and screen share state
   layoutMode = computed<LayoutMode>(() => {
     const remoteVideoCount = this.getRemoteVideoCount();
-    const hasScreenShare = this.getActiveScreenShare() !== null;
+    const hasScreenShare = this.isLocalScreenSharing() || this.returnRemoteParticipantTrack().some(t => t.trackPublication.source === Track.Source.ScreenShare);
+    // this.getActiveScreenShare() != null;
 
     if (hasScreenShare) return 'screen-share';  // Screen share layout
     if (remoteVideoCount === 0) return 'grid';   // 1 participant = grid (not solo)
     if (remoteVideoCount === 1) return 'spotlight'; // 2 participants = spotlight
     return 'grid';  // 3+ participants = grid
   });
-
-
-  // scroll state
-  @ViewChild('filmstripContainer') filmstripContainer!: ElementRef<HTMLDivElement>;
-  canScrollLeft = false;
-  canScrollRight = false;
-  showFilmstripScrollButtons = false;
-
 
   constructor(
     public firestore: Firestore,
@@ -134,12 +114,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     private infraService: InstanceStatusService,
     private adaptiveQuality: AdaptiveQualityService,
     public videoLayout: VideoLayoutService,
-    public picoKoalaService : PicoKoalaService
+    // public picoKoalaService : PicoKoalaService
   ){}
 
   ngAfterViewInit(): void {
-
-
     var id = this.route.snapshot.paramMap.get("roomid")
     console.log("Router ID", id)
     if(id){
@@ -186,19 +164,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // C7: ordered synchronous cleanup before async leaveRoom
-
-    // 1. Clear quality debounce state
-    this.qualityChangeDebounce.forEach(timeout => clearTimeout(timeout));
-    this.qualityChangeDebounce.clear();
-    this.lastQualityChange.clear();
-
     // 3. Stop adaptive quality monitoring (synchronous)
     this.adaptiveQuality.stopMonitoring();
 
     // 4. Cancel canvas pipeline (synchronous)
-    this.canvasPipelineCleanup?.();
-    this.canvasPipelineCleanup = null;
     this.cachedBlurProcessor = null;
     this.cachedBlurRadius = 0;
 
@@ -252,7 +221,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       // C3: audio:true removed — mic is exclusively managed by PicoKoalaService via WebVoiceProcessor
       // Opening mic here would conflict with Koala's WebVoiceProcessor pipeline (double capture, AEC failure)
       // const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
       // Store the full stream so joinCall() can stop the audio track later
       this.previewStream = stream;
@@ -268,9 +237,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     } catch (err: any) {
       console.error('Permission error:', err);
 
-      const isHardBlock =
-        err.name === 'NotAllowedError' &&
-        err.message?.includes('Permission dismissed') === false;
+      const isHardBlock = err.name === 'NotAllowedError' && err.message?.includes('Permission dismissed') === false;
 
       if (isHardBlock) {
         this.cameraStatus = 'denied';
@@ -317,37 +284,13 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-        if (track.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
-          // Do NOT call setVideoDimensions() here — it overrides adaptiveStream's ResizeObserver
-          // which automatically selects the simulcast layer matching the rendered tile size.
-          // publication.setVideoDimensions({ width: 1920, height: 1080 }); // ← removed: forces full-HD regardless of tile size
-
-          // Full native: NO setVideoQuality() calls for camera tracks at all.
-          // adaptiveStream: true auto-selects simulcast layer via ResizeObserver on each <video> element.
-          // SFU congestion control handles network constraints end-to-end without manual intervention.
-          // A1 previous code (caps for Poor/Lost) removed — these overrode adaptiveStream's selection:
-          // const localQuality = this.localNetworkQuality();
-          // if (localQuality === ConnectionQuality.Poor) publication.setVideoQuality(VideoQuality.MEDIUM);
-          // else if (localQuality === ConnectionQuality.Lost) publication.setVideoQuality(VideoQuality.LOW);
-          console.log(`📺 Subscribed to ${participant.identity} | adaptiveStream active — no manual quality cap`);
-
-          // Confirm active simulcast layer after SFU negotiation settles (~2s)
-          setTimeout(() => {
-            console.log(`📊 Quality verify for ${participant.identity}:`, {
-              quality: ['LOW', 'MEDIUM', 'HIGH'][publication.videoQuality as any] ?? publication.videoQuality,
-              dimensions: publication.dimensions,
-            });
-          }, 2000);
-        }
-
         // A4: Screen share subscription quality based on CPU/network at subscription time
         if (track.kind === Track.Kind.Video && publication.source === Track.Source.ScreenShare) {
           const cpu = this.adaptiveQuality.cpuPressure();
           const net = this.localNetworkQuality();
-          const screenQuality =
-            cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW
-            : cpu === 'serious' || net === ConnectionQuality.Poor ? VideoQuality.MEDIUM
-            : VideoQuality.HIGH; // good conditions → full quality for spotlight view
+          const screenQuality = 
+          cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW : 
+          cpu === 'serious' || net === ConnectionQuality.Poor ? VideoQuality.MEDIUM : VideoQuality.HIGH; // good conditions → full quality for spotlight view
           publication.setVideoQuality(screenQuality);
           console.log(`🖥️ Screen share sub quality: ${VideoQuality[screenQuality]} (cpu:${cpu} net:${ConnectionQuality[net]})`);
         }
@@ -370,20 +313,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
           return next;
         });
 
-        const mode = this.layoutMode();
         console.log('Tracked', this.remoteParticipants());
-        console.log(`Layout after track subscribed: ${mode} (${this.remoteParticipants().size} remotes)`);
-
-        // Screen share detection
-        if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
-          console.log('Screen share started:', participant.identity);
-          this.screenShareTrack.set(track);
-          this.screenShareParticipantId.set(participant.identity);
-          this.videoLayout.setScreenShareActive(participant.identity, true);
-        }
-
-        // Check filmstrip scroll after new participant
-        setTimeout(() => this.checkFilmstripScroll(), 100);
       }
     );
 
@@ -398,21 +328,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         });
 
         console.log('UnTracked', this.remoteParticipants());
-
-        // Screen share ended
-        if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
-          console.log('Screen share ended:', participant.identity);
-          this.screenShareTrack.set(null);
-          this.screenShareParticipantId.set(null);
-          this.videoLayout.setScreenShareActive(participant.identity, false);
-        }
-
-        // Check filmstrip scroll after participant left
-        setTimeout(() => this.checkFilmstripScroll(), 100);
       }
     );
 
-    // Handle Quality Change — update signals only; setVideoQuality is handled by startQualityMonitoring
+    // Handle Quality Change
     room.on(
       RoomEvent.ConnectionQualityChanged,
       (quality: ConnectionQuality, participant: Participant) => {
@@ -441,6 +360,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         console.log('Audio muted:', participant.identity);
       }
     });
+
     // Track unMuted Participants
     room.on(RoomEvent.TrackUnmuted, (publication: RemoteTrackPublication, participant: Participant) => {
       if (publication.kind === Track.Kind.Audio) {
@@ -479,12 +399,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       const response = await this.getTokenWithRetry();
       console.log('Token received:', response);
 
-      // ── KOALA: Init BEFORE room.connect() so it's ready the moment we join ──
-      // This captures mic, runs the noise suppression pipeline, and produces
-      // a clean MediaStreamTrack — all before the room handshake begins.
-      await this.picoKoalaService.init();
-      await this.picoKoalaService.start();
-
+      // ── KOALA: Init BEFORE room.connect() so This captures mic, runs the noise suppression pipeline, and produces a clean MediaStreamTrack — all before the room handshake begins.
+      // await this.picoKoalaService.init();
+      // await this.picoKoalaService.start();
 
       // Connect to the LiveKit room
       // await ensures we wait until initial signaling is done
@@ -492,12 +409,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       this.meetingRoomStatus = "connected"
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
-
-      this.startQualityMonitoring(room);
-
-      room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-        console.log(`👤 Participant connected: ${participant.identity}`);
-      });
 
       // Enable camera with explicit simulcast publish options (not relying on publishDefaults alone).
       // getCameraConstraints() → capture resolution/fps; getPublishOptions() → VP8 simulcast layers.
@@ -508,49 +419,24 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
       this.localParticipant.set(videoTrack);
 
-      // ⬇️ ADD THIS: Store the MediaStream for local video
-      if (videoTrack?.mediaStreamTrack) {
-        const localStream = new MediaStream([videoTrack.mediaStreamTrack]);
-        this.localVideoStream.set(localStream);
-        console.log('📹 Local video stream stored');
-      } else if (videoTrack?.mediaStream) {
-        this.localVideoStream.set(videoTrack.mediaStream);
-        console.log('📹 Local video mediaStream stored');
-      }
-
-      // Raw track applyConstraints removed — setCameraEnabled(true, cameraConstraints) already sets them.
-      // Calling applyConstraints() again on the live track forces camera renegotiation → video freeze.
-      // const tierCfg = cameraConstraints.resolution;
-      // const rawMediaTrack = videoTrack?.mediaStreamTrack;
-      // if (rawMediaTrack) { await rawMediaTrack.applyConstraints({...}); }
-      const settings = videoTrack?.mediaStreamTrack?.getSettings();
-      if (settings) console.log(`📹 Camera opened: ${settings.width}x${settings.height}@${settings.frameRate}fps`);
-
       // Start adaptive quality monitoring BEFORE blur so the baseline CPU reading
       // is taken before the blur processor adds its load (warm-up window prevents
       // premature downgrades during the first 15 seconds).
       this.adaptiveQuality.startMonitoring(room);
 
-      // C6: Default blur is 'none' — blur processor adds heavy per-frame canvas load.
-      // User can enable blur via UI button after joining. This eliminates the main freeze source at call start.
-      // Previous: defaulted to 'high' (or 'none' only if CPU was already critical at join time).
-      // const cpuAtJoin = this.adaptiveQuality.cpuPressure();
-      // const defaultBlur: 'none' | 'high' = (cpuAtJoin === 'critical' || cpuAtJoin === 'serious') ? 'none' : 'high';
-      this.blurLevel = 'none'; // blur off by default — user enables via UI
-      console.log('📹 Blur off by default — enable via UI button');
-
-
-      try {
-        await this.picoKoalaService.publishToRoom(room);
-        console.log('🎙️ Koala noise-suppressed audio published');
-      } catch (koalaPublishError) {
-        // Fallback: if Koala publish fails, use standard mic
-        console.warn('Koala publish failed, falling back to standard mic:', koalaPublishError);
+      // try {
+      //   await this.picoKoalaService.publishToRoom(room);
+      //   console.log('🎙️ Koala noise-suppressed audio published');
+      // } catch (koalaPublishError) {
+      //   // Fallback: if Koala publish fails, use standard mic
+      //   console.warn('Koala publish failed, falling back to standard mic:', koalaPublishError);
         await room.localParticipant.setMicrophoneEnabled(true, {
           noiseSuppression: true,
           echoCancellation: true,
+          autoGainControl: true,
         });
-      }
+      // }
+
     } catch (error: any) {
       // Handle connection errors gracefully
       console.log(error)
@@ -618,13 +504,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.localParticipantIdentity = '';
     // this.blurLevel = 'none'; // C6: reset to 'high' to match class default (not 'none')
     this.blurLevel = 'high';
-    this.screenShareTrack.set(null);
-    this.screenShareParticipantId.set(null);
     this.meetingRoomStatus = "left"
-
-    // 3. Cleanup when leaving
-    await this.picoKoalaService.stop();
-    await this.picoKoalaService.release();
   }
 
   // Close the Room and disconnect everyone
@@ -658,11 +538,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (!room) return undefined;
 
     if (source === Track.Source.Microphone) {
-      return Array.from(room.localParticipant.audioTracks.values())
-        .find(pub => pub.source === source);
+      return Array.from(room.localParticipant.audioTracks.values()).find(pub => pub.source === source);
     } else {
-      return Array.from(room.localParticipant.videoTracks.values())
-        .find(pub => pub.source === source);
+      return Array.from(room.localParticipant.videoTracks.values()).find(pub => pub.source === source);
     }
   }
 
@@ -678,33 +556,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     if(value){
       micPub.unmute()
-      this.isMicMuted.set(false);
     }
     else{
       micPub.mute()
-      this.isMicMuted.set(true);
-    }
-  }
-
-  getNetworkQualityClass(quality: ConnectionQuality | undefined): string {
-    if (quality === undefined || quality === null) return 'unknown';
-    switch (quality) {
-      case ConnectionQuality.Excellent: return 'excellent';
-      case ConnectionQuality.Good: return 'good';
-      case ConnectionQuality.Poor: return 'poor';
-      case ConnectionQuality.Lost: return 'lost';
-      default: return 'unknown';
-    }
-  }
-
-  getNetworkQualityLabel(quality: ConnectionQuality | undefined): string {
-    if (quality === undefined || quality === null) return 'Unknown';
-    switch (quality) {
-      case ConnectionQuality.Excellent: return 'Excellent';
-      case ConnectionQuality.Good: return 'Good';
-      case ConnectionQuality.Poor: return 'Poor';
-      case ConnectionQuality.Lost: return 'Disconnected';
-      default: return 'Unknown';
     }
   }
 
@@ -737,14 +591,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
     if (isCurrentlyEnabled) {
       await room.localParticipant.setCameraEnabled(false);
-      this.localVideoStream.set(null);
       console.log('📷 Camera disabled');
     } else {
       const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
       const publishOptions    = this.adaptiveQuality.getPublishOptions(this.adaptiveQuality.currentTier());
       await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
-
-      await this.refreshLocalVideoStream();
 
       if (this.blurLevel !== 'none') {
         await this.applyBlur(this.blurLevel);
@@ -760,9 +611,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   isAnyoneScreenSharing(): boolean {
-    // M2: use remoteParticipantTracks() computed signal instead of allocating new array each call
-    // const remoteTracks = Array.from(this.remoteParticipants().values());
-    return this.remoteParticipantTracks().some(track => track.trackPublication.source === Track.Source.ScreenShare);
+    return this.returnRemoteParticipantTrack().some(track => track.trackPublication.source === Track.Source.ScreenShare);
   }
 
   // Update toggleScreenShare to check this
@@ -792,9 +641,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     }
 
     // Check remote participants
-    // M2: use remoteParticipantTracks() computed signal instead of allocating new array
-    // const remoteTracks = Array.from(this.remoteParticipants().values());
-    const remoteScreenShare = this.remoteParticipantTracks().find(
+    const remoteScreenShare = this.returnRemoteParticipantTrack().find(
       track => track.trackPublication.source === Track.Source.ScreenShare
     );
 
@@ -815,10 +662,17 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     const tier = this.adaptiveQuality.currentTier();
 
     // Map tier to ScreenSharePresets (official LiveKit presets with encoding config)
-    const screenPreset =
-      (tier === 'minimal' || tier === 'low') ? ScreenSharePresets.h720fps5     // ~400 kbps budget
-      : tier === 'medium'                    ? ScreenSharePresets.h720fps15    // ~1 Mbps budget
-      :                                        ScreenSharePresets.h1080fps15;  // ~2.5 Mbps budget
+    var screenPreset: VideoPreset
+
+    if(tier === 'minimal' || tier === 'low'){
+      screenPreset = ScreenSharePresets.h720fps5 // ~400 kbps budget
+    }
+    else if(tier === 'medium'){
+      screenPreset = ScreenSharePresets.h720fps15    // ~1 Mbps budget
+    }
+    else{
+      screenPreset = ScreenSharePresets.h1080fps15;  // ~2.5 Mbps budget
+    }
 
     // Previous hardcoded approach (no tier check):
     // const screenTracks = await createLocalScreenTracks({ audio: false, resolution: { width: 1920, height: 1080 } });
@@ -835,11 +689,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         simulcast: false, // screen share is single-layer — simulcast not applicable
       });
     }
-
-    // Notify layout service about local screen share
-    this.screenShareParticipantId.set(this.localParticipantIdentity);
-    this.videoLayout.setScreenShareActive(this.localParticipantIdentity, true);
     console.log("Screen sharing started");
+    this.isLocalScreenSharing.set(true);
   }
 
   stopScreenShare() {
@@ -847,11 +698,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (pub) {
       this.room()?.localParticipant.unpublishTrack(pub.track!);
       pub.track?.stop();
-
-      this.screenShareTrack.set(null);
-      this.screenShareParticipantId.set(null);
-      this.videoLayout.setScreenShareActive(this.localParticipantIdentity, false);
       console.log("Screen sharing stopped");
+      this.isLocalScreenSharing.set(false);
     }
   }
 
@@ -954,38 +802,8 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       }
 
       this.blurLevel = level;
-      await this.refreshLocalVideoStream();
     } catch (error) {
       console.error('🔴 Blur error:', error);
-    }
-  }
-
-  private async refreshLocalVideoStream(): Promise<void> {
-    const room = this.room();
-    if (!room) {
-      console.warn('⚠️ No room for stream refresh');
-      return;
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 150));
-
-    const publication = this.getLocalTrackPublication(Track.Source.Camera);
-    const track: any = publication?.track;
-
-    if (!track) {
-      console.warn('⚠️ No camera track found');
-      return;
-    }
-
-    if (track.mediaStreamTrack) {
-      const newStream = new MediaStream([track.mediaStreamTrack]);
-      this.localVideoStream.set(newStream);
-      console.log('📹 Local video stream refreshed');
-    } else if (track.mediaStream) {
-      this.localVideoStream.set(track.mediaStream);
-      console.log('📹 Local video stream refreshed (mediaStream)');
-    } else {
-      console.warn('⚠️ Track has no mediaStreamTrack');
     }
   }
 
@@ -1007,7 +825,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   }
 
   returnRemoteParticipantTrack(): TrackInfo[] {
-    return this.remoteParticipantTracks();
+    return  Array.from(this.remoteParticipants().values());
   }
 
   getVideoParticipantCount(): number {
@@ -1015,7 +833,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     // Including screen share means the grid adapts correctly when someone shares (tiles get smaller,
     // which triggers adaptiveStream to request lower quality for the smaller camera tiles)
     // Previous code excluded screen share: remote.trackPublication.source !== Track.Source.ScreenShare
-    const remoteVideoCount = this.remoteParticipantTracks().filter(
+    const remoteVideoCount = this.returnRemoteParticipantTrack().filter(
       remote => remote.trackPublication.kind === 'video'
     ).length;
     return 1 + remoteVideoCount; // +1 for local participant
@@ -1035,72 +853,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return this.returnRemoteVideoTracks().length;
   }
 
-  // ── Remote video quality monitoring ────────────────────────────────────
-
-  private qualityChangeDebounce = new Map<string, ReturnType<typeof setTimeout>>();
-  private lastQualityChange = new Map<string, number>();
-  private readonly QUALITY_CHANGE_COOLDOWN = 5000; // M12: cooldown removed from setParticipantQuality() downgrade path
-  // C4: qualityCheckInterval was declared but never assigned a setInterval() — dead code, commented out
-  // private qualityCheckInterval: ReturnType<typeof setInterval> | null = null;
-
-  private startQualityMonitoring(room: Room) {
-    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
-      // Local participant quality is handled by localNetworkQuality signal
-      if (participant.identity === room.localParticipant.identity) return;
-
-      console.log(`📶 ${participant.identity} connection: ${ConnectionQuality[quality] ?? quality}`);
-
-      // Full native: update UI quality bars ONLY — no setVideoQuality() calls.
-      // adaptiveStream + SFU congestion control handle all subscription layer decisions natively.
-      // Previous manual cap logic kept as comment for reference:
-      // networkCap = Good→HIGH, Poor→MEDIUM, Lost→LOW
-      // cpuCap = critical→LOW, serious→MEDIUM, else→HIGH
-      // targetQuality = Math.min(networkCap, cpuCap)
-      // if (targetQuality < HIGH) setParticipantQuality(videoPub, participant.identity, targetQuality)
-      this.remoteParticipantsQuality.update(prev => {
-        const next = new Map(prev);
-        next.set(participant.identity, quality);
-        return next;
-      });
-    });
-  }
-
-  private setParticipantQuality(
-    publication: RemoteTrackPublication,
-    participantId: string,
-    quality: VideoQuality
-  ) {
-    // M12: Removed the 5s QUALITY_CHANGE_COOLDOWN check for downgrade caps.
-    // With A1 fix, this method is only called when quality < HIGH (i.e. downgrade caps only).
-    // Downgrades must respond immediately to bad network — cooldown would delay response by 5–15s.
-    // const now = Date.now();
-    // const lastChange = this.lastQualityChange.get(participantId) || 0;
-    // if (now - lastChange < this.QUALITY_CHANGE_COOLDOWN) {
-    //   console.log(`⏳ Skipping quality change for ${participantId} (cooldown)`);
-    //   return;
-    // }
-
-    // Keep 1s debounce to prevent rapid-fire calls on unstable quality events
-    const pending = this.qualityChangeDebounce.get(participantId);
-    if (pending) clearTimeout(pending);
-
-    const timeout = setTimeout(() => {
-      publication.setVideoQuality(quality);
-      this.lastQualityChange.set(participantId, Date.now());
-      console.log(`📺 Quality cap applied: ${participantId} → ${VideoQuality[quality] ?? quality}`);
-    }, 1000);
-
-    this.qualityChangeDebounce.set(participantId, timeout);
-  }
-
   // ── PiP interaction methods ────────────────────────────────────────────
 
   pipDragPosition = { x: 0, y: 0 };
   private isDragging = false;
-
-  onPipClick() {
-    // Swap feature removed
-  }
 
   onPipDragStarted() {
     this.isDragging = true;
@@ -1138,54 +894,6 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (!this.isDragging) {
       this.videoLayout.togglePipSize();
     }
-  }
-
-  // ── Grid tile click → switch to spotlight ──────────────────────────────
-
-  onGridTileClick(participantId: string) {
-    console.log(`Grid tile clicked: ${participantId}`);
-  }
-
-  // ── Filmstrip methods ─────────────────────────────────────────────────
-
-  checkFilmstripScroll() {
-    const container = this.filmstripContainer?.nativeElement;
-    if (!container) return;
-
-    const hasOverflow = container.scrollWidth > container.clientWidth;
-    this.showFilmstripScrollButtons = hasOverflow;
-    this.canScrollLeft = container.scrollLeft > 0;
-    this.canScrollRight = container.scrollLeft < (container.scrollWidth - container.clientWidth - 10);
-  }
-
-  scrollFilmstrip(direction: 'left' | 'right') {
-    const container = this.filmstripContainer?.nativeElement;
-    if (!container) return;
-
-    const scrollAmount = 200;
-    const targetScroll = direction === 'left'
-      ? container.scrollLeft - scrollAmount
-      : container.scrollLeft + scrollAmount;
-
-    container.scrollTo({ left: targetScroll, behavior: 'smooth' });
-  }
-
-  onFilmstripScroll() {
-    this.checkFilmstripScroll();
-  }
-
-  onFilmstripTileClick(participantId: string) {
-    console.log(`Filmstrip tile clicked: ${participantId}`);
-  }
-
-  getScreenShareParticipantName(): string {
-    const id = this.screenShareParticipantId();
-    if (!id) return 'Someone';
-    if (id === this.localParticipantIdentity) return 'You';
-    for (const p of this.remoteParticipants().values()) {
-      if (p.participantIdentity === id) return p.participantName;
-    }
-    return 'Someone';
   }
 
   /**
