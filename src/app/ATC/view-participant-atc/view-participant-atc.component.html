@@ -10,9 +10,9 @@
   <!-- Header -->
   <div class="header">
     <div class="header-content">
-      @if (participantProfile()?.profileimg || participantProfile()?.profile) {
-        <img class="profile-img" 
-             [src]="participantProfile()?.profileimg || participantProfile()?.profile" 
+      @if (participantProfile()?.profile || participantProfile()?.profileimg) {
+        <img class="profile-img"
+             [src]="participantProfile()?.profile || participantProfile()?.profileimg"
              alt="Profile">
       } @else {
         <div class="profile-placeholder">

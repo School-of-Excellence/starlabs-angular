@@ -772,3 +772,211 @@ audio {
 }
 .info-hint p { margin: 0; }
 
+/* ── Three-column grid ───────────────────────────────────────────────────── */
+.three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* ── Channel cards ───────────────────────────────────────────────────────── */
+.channel-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.channel-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.raw-label   { background: #fef2f2; color: #991b1b; }
+.df3-label   { background: #f0fdf4; color: #166534; }
+.koala-label { background: #eff6ff; color: #1e40af; }
+.channel-sub {
+  font-size: 0.76rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* ── Audio player ────────────────────────────────────────────────────────── */
+.channel-card audio {
+  width: 100%;
+  height: 36px;
+  border-radius: 6px;
+}
+
+/* ── Download button (per channel) ──────────────────────────────────────── */
+.btn-dl {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  color: #374151;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s;
+}
+.btn-dl:hover { background: #e5e7eb; }
+
+/* ── Hear toggle button (Mode 2) ─────────────────────────────────────────── */
+.hear-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.hear-btn.muted {
+  background: #f9fafb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+/* ── Level meter ─────────────────────────────────────────────────────────── */
+.meter-bar {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.08s linear;
+}
+.raw-fill   { background: linear-gradient(90deg, #fca5a5, #ef4444); }
+.df3-fill   { background: linear-gradient(90deg, #86efac, #22c55e); }
+.koala-fill { background: linear-gradient(90deg, #93c5fd, #3b82f6); }
+.meter-val {
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-align: right;
+}
+
+/* ── Dual progress bars (Mode 1) ─────────────────────────────────────────── */
+.progress-dual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.progress-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  width: 64px;
+  flex-shrink: 0;
+}
+.df3-fill.progress-bar-fill   { background: #22c55e; }
+.koala-fill.progress-bar-fill { background: #3b82f6; }
+
+/* ── Analysis bar ────────────────────────────────────────────────────────── */
+.analysis-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.analysis-hint {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.analysis-hint code {
+  background: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.76rem;
+}
+
+/* ── Server offline warning ──────────────────────────────────────────────── */
+.server-offline {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  color: #92400e;
+  margin-top: 12px;
+}
+
+/* ── Quality metrics table ───────────────────────────────────────────────── */
+.quality-grid {
+  margin-top: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.83rem;
+}
+.quality-header-row,
+.quality-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 1fr 80px;
+  align-items: center;
+}
+.quality-header-row {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 8px 14px;
+}
+.quality-row {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.quality-row:last-child { border-bottom: none; }
+.qh { text-align: center; }
+.df3-qh   { color: #15803d; }
+.koala-qh { color: #1d4ed8; }
+.qm-label { color: #374151; font-weight: 600; }
+.qm-val {
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #111827;
+}
+.qm-val.good { color: #15803d; }
+.qm-val.fair { color: #b45309; }
+.qm-val.poor { color: #dc2626; }
+.qm-rating {
+  text-align: center;
+  font-weight: 600;
+  color: #6b7280;
+}
+.qm-scale {
+  text-align: right;
+  color: #9ca3af;
+  font-size: 0.73rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 780px) {
+  .three-col { grid-template-columns: 1fr; }
+  .quality-header-row,
+  .quality-row { grid-template-columns: 120px 1fr 1fr; }
+  .qm-scale { display: none; }
+}
