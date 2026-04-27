@@ -110,8 +110,10 @@ export class WorkshopsComponent {
 
   openEiflixBannerDialog() {
     this.dialog.open(EiflixBannerComponent, {
-      width: '900px',
-      maxHeight: '90vh',
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
       autoFocus: false,
       panelClass: 'eiflix-banner-dialog'
     });
