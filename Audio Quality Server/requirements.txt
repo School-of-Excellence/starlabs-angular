@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pesq
+pystoi
+soundfile
+scipy
+numpy
