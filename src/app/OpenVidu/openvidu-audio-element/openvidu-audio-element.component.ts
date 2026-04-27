@@ -25,6 +25,9 @@ export class OpenviduAudioElementComponent {
   }
 
   ngOnDestroy() {
-    this.track().detach();
+    // M10: guard before detach — input.required throws unhandled RuntimeError if read before binding
+    try {
+      if (this.track) this.track().detach();
+    } catch {}
   }
 }

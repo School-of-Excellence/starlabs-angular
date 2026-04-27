@@ -930,6 +930,11 @@
 /* ============================ */
 /* SCREEN SHARE LAYOUT          */
 /* ============================ */
+
+.mirrorsharing{
+  transform: scaleX(-1);
+}
+
 .screen-share-layout {
   display: flex;
   gap: 6px;
