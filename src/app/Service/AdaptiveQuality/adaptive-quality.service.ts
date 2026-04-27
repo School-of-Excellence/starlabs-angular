@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { Room, VideoPresets, ConnectionQuality, VideoPreset, VideoQuality } from 'livekit-client';
+import { Room, VideoPresets, ConnectionQuality, VideoPreset, VideoQuality, VideoCaptureOptions, TrackPublishOptions, RoomOptions } from 'livekit-client';
 // RemoteTrackPublication, Track removed — remote subscription caps moved to comments (full native approach)
 
 export type QualityTier = 'ultra' | 'high' | 'medium' | 'low' | 'minimal';
@@ -104,7 +104,7 @@ export class AdaptiveQualityService {
 
   // ── Room & camera config builders ──────────────────────────────────────
 
-  getRoomConfig(tier: QualityTier) {
+  getRoomConfig(tier: QualityTier): RoomOptions {
     const cfg = TIER_CONFIG[tier];
     return {
       adaptiveStream: true,
@@ -128,9 +128,11 @@ export class AdaptiveQualityService {
     };
   }
 
-  getCameraConstraints(tier: QualityTier) {
+  getCameraConstraints(tier: QualityTier): VideoCaptureOptions {
     const cfg = TIER_CONFIG[tier];
     return {
+      deviceId: "frontcamera",
+      facingMode: "user",
       resolution: {
         width: cfg.width,
         height: cfg.height,
@@ -141,7 +143,7 @@ export class AdaptiveQualityService {
 
   // Returns explicit simulcast publish options for the given tier.
   // Pass this as the third argument to setCameraEnabled() so simulcast is not silently relying on publishDefaults.
-  getPublishOptions(tier: QualityTier) {
+  getPublishOptions(tier: QualityTier): TrackPublishOptions {
     const cfg = TIER_CONFIG[tier];
     return {
       videoCodec: 'vp8' as const,
