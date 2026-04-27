@@ -643,9 +643,14 @@ export class ViewPrescribedATCComponent {
     this.setupATCQueries()
   }
 
-  selectAuthorName(authorpath) {
-    this.selectedPrescribers = authorpath
+  selectAuthorName(authorpath: string) {
+    this.selectedPrescribers = [authorpath]
     this.onPrescriberSelect()
+  }
+
+  selectParticipantName(profileid: string) {
+    this.selectedParticipants = [profileid]
+    this.onParticipantSelect()
   }
 
   // getProfileData() {

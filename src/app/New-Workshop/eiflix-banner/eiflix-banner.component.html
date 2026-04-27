@@ -56,10 +56,13 @@
 
           <div class="upload-row">
             <label class="upload-btn">
-              <i class="fa-solid fa-image"></i> Select Image
+              <i class="fa-solid fa-image"></i> Select Web Image 
               <input type="file" accept="image/*" hidden (change)="onImageSelected($event)">
             </label>
-
+            <label class="upload-btn">
+              <i class="fa-solid fa-image"></i> Select App Image
+              <input type="file" accept="image/*" hidden (change)="onImageSelectedApp($event)">
+            </label>
             <label class="upload-btn">
               <i class="fa-solid fa-video"></i> Select Video
               <input type="file" accept="video/*" hidden (change)="onVideoSelected($event)">
@@ -68,7 +71,12 @@
 
           <div class="preview-container">
             <img *ngIf="imagePreview" [src]="imagePreview" class="preview-img">
+            <!-- <img *ngIf="imagePreviewApp" [src]="imagePreviewApp" class="preview-img"> -->
             <video *ngIf="videoPreview" [src]="videoPreview" class="preview-video" controls></video>
+          </div>
+          <br>
+          <div class="preview-container-app">
+            <img *ngIf="imagePreviewApp" [src]="imagePreviewApp" class="preview-container-appimg">
           </div>
 
           <button mat-raised-button color="primary" 

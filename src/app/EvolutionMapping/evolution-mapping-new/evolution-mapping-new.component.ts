@@ -117,6 +117,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   //Edit
   showEditVideoOverlay = false;
   editVideoIndex: number | null = null;
+  editmultiVideoIndex: number | null = null; 
   editVideoForm!: FormGroup;
   editVideoSaving = false;;
 
@@ -183,6 +184,11 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   showJourneyTypeDropdown = false;
   journeyFilterDropdownTop = 0;
   journeyFilterDropdownLeft = 0;
+  // Delete
+  showDeleteVideoOverlay = false;
+  deleteVideoCardIndex: number | null = null;
+  deleteVideoIndex: number | null = null;
+  deleteVideoSaving = false;
 
   
   constructor(
@@ -912,12 +918,20 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             eventId: eventref.path,
             docId: matchedVideo?.['docId'] || null,
             videoType: matchedVideo?.['type'] || null,
-            extraVideos: matchedVideos.slice(1).map((v: any) => ({
-              videoUrl: v['videourl'],
-              videoTitle: v['title'] || 'Untitled',
-              docId: v['docId'],
-              videoType: v['type'] || null,
-            })),
+            extraVideos: matchedVideos.slice(1).map((v: any) => {
+              let extraDate: Date | null = null;
+              const rawExtraDate = v['recordeddate'] || null;
+              if (rawExtraDate?.toDate) extraDate = rawExtraDate.toDate();
+              else if (rawExtraDate) extraDate = new Date(rawExtraDate);
+              return {
+                videoUrl: v['videourl'],
+                videoTitle: v['title'] || 'Untitled',
+                docId: v['docId'],
+                videoType: v['type'] || null,
+                recordedDate: extraDate,
+                eventId: eventref.path,
+              };
+            }),
           };
         })
     );
@@ -1374,26 +1388,48 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   openEditVideo(event: any, i: number) {
     this.editVideoIndex = i;
+
+    const allVideos = [
+      {
+        docId: event.docId || '',
+        title: event.videoTitle || event.eventName || '',
+        recordedDate: event.date ?? null,
+        type: event.videoType || 'Event',
+        eventId: event.eventId ? event.eventId.replace('event collection/', '') : '',
+        videoUrl: event.videoUrl || '',
+      },
+      ...(event['extraVideos'] || []).map((v: any) => ({
+        docId: v.docId || '',
+        title: v.videoTitle || '',
+        recordedDate: v.recordedDate ?? null,
+        type: v.videoType || 'Event',
+        eventId: v.eventId ? v.eventId.replace('event collection/', '') : '',
+        videoUrl: v.videoUrl || '',
+      }))
+    ];
+
     this.editVideoForm = this.fb.group({
-      docId: [event.docId || ''],
-      title: [event.videoTitle || event.eventName || '', Validators.required],
-      recordedDate: [event.date || null],
-      type: [event.videoType || 'Event', Validators.required],
-      eventId: [
-        event.eventId
-          ? event.eventId.replace('event collection/', '')
-          : '',
-      ],
-      videoUrl: [event.videoUrl || '', Validators.required],
+      entries: this.fb.array(
+        allVideos.map(v => this.fb.group({
+          docId: [v.docId],
+          title: [v.title, Validators.required],
+          recordedDate: [v.recordedDate],
+          type: [v.type, Validators.required],
+          eventId: [v.eventId],
+          videoUrl: [v.videoUrl, Validators.required],
+        }))
+      )
     });
+
     this.showEditVideoOverlay = true;
     this.fetchLiveEvents();
   }
-
   closeEditVideo() {
     this.showEditVideoOverlay = false;
     this.editVideoIndex = null;
     this.editVideoSaving = false;
+    this.editmultiVideoIndex = null;
+
   }
 
   async saveEditVideo() {
@@ -1401,80 +1437,119 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     if (!this.editVideoForm.valid) return;
     this.editVideoSaving = true;
 
-    const val = this.editVideoForm.value;
-    const existingDocId = val.docId;
+    const entries = (this.editVideoForm.get('entries') as FormArray).value;
 
     try {
-      const eventRef = val.eventId
-        ? doc(this.firestore, 'event collection', val.eventId)
-        : null;
+      await Promise.all(
+        entries.map((val: any) => {
+          const eventRef = val.eventId
+            ? doc(this.firestore, 'event collection', val.eventId)
+            : null;
 
-      let resolvedDocId = existingDocId;
+          return updateDoc(doc(this.firestore, 'participant videos', val.docId), {
+            title: val.title,
+            recordeddate: val.recordedDate
+              ? Timestamp.fromDate(new Date(val.recordedDate))
+              : null,
+            type: val.type,
+            eventref: eventRef,
+            videourl: val.videoUrl,
+          });
+        })
+      );
 
-      if (existingDocId) {
-        // UPDATE existing video doc
-        await updateDoc(doc(this.firestore, 'participant videos', existingDocId), {
-          title: val.title,
-          recordeddate: val.recordedDate
-            ? Timestamp.fromDate(new Date(val.recordedDate))
-            : null,
-          type: val.type,
-          eventref: eventRef,
-          videourl: val.videoUrl,
-        });
-      } else {
-        // CREATE new video doc (event card had no video yet)
-        const profileid = this.currentLogProfileId;
-        const newRef = await addDoc(collection(this.firestore, 'participant videos'), {
-          profileid: profileid,
-          title: val.title,
-          recordeddate: val.recordedDate
-            ? Timestamp.fromDate(new Date(val.recordedDate))
-            : null,
-          type: val.type,
-          eventref: eventRef,
-          videourl: val.videoUrl,
-          uploadedon: serverTimestamp(),
-          uploadedby: this.loggedInProfileId,
-          delete: false,
-        });
-        resolvedDocId = newRef.id;
-      }
+      this.ngZone.run(() => {
+        if (this.editVideoIndex !== null) {
+          const updated = [...this.logEvents];
+          const current = updated[this.editVideoIndex] as any;
+          const [primary, ...extras] = entries;
 
-    this.ngZone.run(() => {
-      if (this.editVideoIndex !== null) {
-        const updated = [...this.logEvents];
-        const current = updated[this.editVideoIndex] as any;
+          const linkedEvent = primary.eventId
+            ? this.liveEvents.find((e: any) => e.id === primary.eventId)
+            : null;
 
-        // Find the linked event name from liveEvents if eventId is set
-        const linkedEvent = val.eventId
-          ? this.liveEvents.find(e => e.id === val.eventId)
-          : null;
+          updated[this.editVideoIndex] = {
+            ...current,
+            videoTitle: primary.title,
+            eventName: current.type === 'video' ? primary.title : current.eventName,
+            date: primary.recordedDate ? new Date(primary.recordedDate) : current.date,
+            videoType: primary.type,
+            eventId: primary.eventId ? `event collection/${primary.eventId}` : null,
+            linkedEventName: linkedEvent ? linkedEvent.name : null,
+            videoUrl: primary.videoUrl,
+            hasVideo: !!primary.videoUrl,
+            docId: primary.docId,
+            extraVideos: extras.map((e: any) => ({
+              docId: e.docId,
+              videoUrl: e.videoUrl,
+              videoTitle: e.title,
+              videoType: e.type,
+              recordedDate: e.recordedDate ? new Date(e.recordedDate) : null,
+              eventId: e.eventId ? `event collection/${e.eventId}` : null,
+            })),
+          };
 
-        updated[this.editVideoIndex] = {
-          ...current,
-          videoTitle: val.title,
-          eventName: current.type === 'video' ? val.title : current.eventName,
-          date: val.recordedDate ? new Date(val.recordedDate) : current.date,
-          videoType: val.type,
-          eventId: val.eventId
-            ? `event collection/${val.eventId}`
-            : null,
-          linkedEventName: linkedEvent ? linkedEvent.name : null,
-          videoUrl: val.videoUrl,
-          hasVideo: !!val.videoUrl,
-          docId: resolvedDocId,
-          extraVideos: current.extraVideos || [],
-        };
-        this.logEvents = [...updated];
-      }
-      this.closeEditVideo();
-      this.fetchRecords();
-    });
+          this.logEvents = [...updated];
+        }
+        this.closeEditVideo();
+        this.fetchRecords();
+      });
 
     } catch (err) {
       console.error('Error saving video:', err);
       this.editVideoSaving = false;
+    }
+  }
+
+  openDeleteVideo(cardIndex: number) {
+    const card = this.logEvents[cardIndex] as any;
+    this.deleteVideoCardIndex = cardIndex;
+    if (card.extraVideos?.length > 0) {
+      this.showDeleteVideoOverlay = true;
+    } else {
+      this.deleteVideoIndex = 0;
+      this.executeDelete();
+    }
+  }
+
+  closeDeleteVideo() {
+    this.showDeleteVideoOverlay = false;
+    this.deleteVideoCardIndex = null;
+    this.deleteVideoIndex = null;
+    this.deleteVideoSaving = false;
+  }
+
+  async executeDelete() {
+    const confirmed = confirm('Are you sure you want to delete this video?');
+    if (!confirmed) {
+      this.closeDeleteVideo();
+      return;
+    }
+
+    if (this.deleteVideoCardIndex === null || this.deleteVideoIndex === null) return;
+    this.deleteVideoSaving = true;
+    const card = this.logEvents[this.deleteVideoCardIndex] as any;
+    const docIdToDelete = this.deleteVideoIndex === 0? card.docId: card.extraVideos[this.deleteVideoIndex - 1]?.docId;
+
+    if (!docIdToDelete) {
+      this.deleteVideoSaving = false;
+      return;
+    }
+
+    try {
+      await updateDoc(doc(this.firestore, 'participant videos', docIdToDelete), {
+        delete: true
+      });
+
+      this.ngZone.run(() => {
+        this.closeDeleteVideo();
+        this.loadEventLog(this.currentLogProfileId);
+        this.fetchRecords();
+      });
+
+    } catch (err) {
+      console.error('Error deleting video:', err);
+      this.deleteVideoSaving = false;
     }
   }
 

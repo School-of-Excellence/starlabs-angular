@@ -38,6 +38,7 @@ interface Banner {
   externallink:string;
   path: string;
   imageUrl: string;
+  imageUrlApp: string;
   videoUrl: string;
   timestamp: number;
   enable: boolean;
@@ -78,6 +79,7 @@ export class EiflixBannerComponent implements AfterViewInit {
   seriesList: any[] = [];
 
   imagePreview: string | null = null;
+  imagePreviewApp: string | null = null;
   videoPreview: string | null = null;
 
   isUploading = false;
@@ -106,6 +108,7 @@ export class EiflixBannerComponent implements AfterViewInit {
       seriesId: [''],
       externallink: [''],
       image: [null, Validators.required],
+      imageApp: [null, Validators.required],
       video: [null, Validators.required],
       buttonname: ['']
     });
@@ -182,6 +185,15 @@ export class EiflixBannerComponent implements AfterViewInit {
       reader.readAsDataURL(file);
     }
   }
+  onImageSelectedApp(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.form.patchValue({ imageApp: file });
+      const reader = new FileReader();
+      reader.onload = () => this.imagePreviewApp = reader.result as string;
+      reader.readAsDataURL(file);
+    }
+  }
 
   onVideoSelected(event: any) {
     const file = event.target.files[0];
@@ -232,6 +244,7 @@ export class EiflixBannerComponent implements AfterViewInit {
       let existing: Banner[] = docSnap.exists() ? docSnap.data()['banner'] || [] : [];
 
       let imageUrl = this.editingBanner?.imageUrl || '';
+      let imageUrlApp = this.editingBanner?.imageUrlApp || '';
       let videoUrl = this.editingBanner?.videoUrl || '';
 
       // Only upload if NEW FILE selected
@@ -239,7 +252,10 @@ export class EiflixBannerComponent implements AfterViewInit {
         const imageRef = ref(this.storage, `eiflixbanner/images/${Date.now()}_${formValue.image.name}`);
         imageUrl = await this.uploadWithProgress(imageRef, formValue.image, 0, 50);
       }
-
+      if (formValue.imageApp instanceof File) {
+        const imageRef = ref(this.storage, `eiflixbanner/images/${Date.now()}_${formValue.imageApp.name}`);
+        imageUrlApp = await this.uploadWithProgress(imageRef, formValue.imageApp, 0, 50);
+      }
       if (formValue.video instanceof File) {
         const videoRef = ref(this.storage, `eiflixbanner/videos/${Date.now()}_${formValue.video.name}`);
         videoUrl = await this.uploadWithProgress(videoRef, formValue.video, 50, 100);
@@ -254,6 +270,7 @@ export class EiflixBannerComponent implements AfterViewInit {
         buttonname: formValue.buttonname || '',
         externallink: formValue.externallink || '',
         imageUrl: imageUrl,
+        imageUrlApp: imageUrlApp,
         videoUrl: videoUrl,
         timestamp: this.currentEditIndex !== null 
           ? this.editingBanner!.timestamp
@@ -292,6 +309,7 @@ export class EiflixBannerComponent implements AfterViewInit {
       path: 'DeepLink'
     });
     this.imagePreview = null;
+    this.imagePreviewApp = null;
     this.videoPreview = null;
     this.currentEditIndex = null;
     this.editingBanner = null;
@@ -312,6 +330,7 @@ export class EiflixBannerComponent implements AfterViewInit {
     });
 
     this.imagePreview = banner.imageUrl;
+    this.imagePreviewApp = banner.imageUrlApp;
     this.videoPreview = banner.videoUrl;
 
     this.tabGroup.selectedIndex = 0;
@@ -327,6 +346,14 @@ export class EiflixBannerComponent implements AfterViewInit {
           await deleteObject(imageRef);
         } catch (e) {
           console.log('Image already deleted or not found');
+        }
+      }
+      if (banner.imageUrlApp) {
+        try {
+          const imageRef = ref(this.storage, banner.imageUrlApp);
+          await deleteObject(imageRef);
+        } catch (e) {
+          console.log('App Image already deleted or not found');
         }
       }
       if (banner.videoUrl) {
