@@ -35,6 +35,16 @@
                 "glob": "**/*",
                 "input": "node_modules/@ai-coustics/aic-sdk/dist/assets",
                 "output": "/assets/aic/"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/onnxruntime-web/dist",
+                "output": "assets/ort-wasm"
+              },
+              {
+                "glob": "ort-wasm-simd-threaded.jsep.mjs",
+                "input": "src/assets/ort-wasm",
+                "output": "assets/ort-wasm"
               }
             ],
             "styles": [

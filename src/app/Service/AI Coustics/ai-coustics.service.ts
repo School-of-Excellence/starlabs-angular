@@ -1,61 +1,6 @@
 import { Injectable } from '@angular/core';
 import { environment } from '../../../environments/environment';
 
-const SAMPLE_RATE = 16000;
-const NUM_FRAMES = 160;
-
-const CAPTURE_WORKLET = `
-  class CaptureProcessor extends AudioWorkletProcessor {
-    constructor() {
-      super();
-      this._buf = new Float32Array(${NUM_FRAMES});
-      this._pos = 0;
-    }
-    process(inputs) {
-      const ch = inputs[0]?.[0];
-      if (!ch) return true;
-      for (let i = 0; i < ch.length; i++) {
-        this._buf[this._pos++] = ch[i];
-        if (this._pos >= ${NUM_FRAMES}) {
-          const copy = this._buf.slice().buffer;
-          this.port.postMessage(copy, [copy]);
-          this._pos = 0;
-        }
-      }
-      return true;
-    }
-  }
-  registerProcessor('aic-capture', CaptureProcessor);
-`;
-
-const PLAYBACK_WORKLET = `
-  class PlaybackProcessor extends AudioWorkletProcessor {
-    constructor() {
-      super();
-      this._queue = [];
-      this._current = null;
-      this._offset = 0;
-      this.port.onmessage = (e) => {
-        this._queue.push(new Float32Array(e.data));
-      };
-    }
-    process(_, outputs) {
-      const out = outputs[0]?.[0];
-      if (!out) return true;
-      let i = 0;
-      while (i < out.length) {
-        if (!this._current || this._offset >= this._current.length) {
-          this._current = this._queue.shift() ?? null;
-          this._offset = 0;
-        }
-        if (!this._current) break;
-        out[i++] = this._current[this._offset++];
-      }
-      return true;
-    }
-  }
-  registerProcessor('aic-playback', PlaybackProcessor);
-`;
 
 
 @Injectable({
@@ -63,114 +8,110 @@ const PLAYBACK_WORKLET = `
 })
 export class AiCousticsService {
 
-  constructor() { }
+  private audioContext: AudioContext | null = null;
+  private workletNode: AudioWorkletNode | null = null;
+  private cleanStream: MediaStream | null = null;
+  private outputNode: MediaStreamAudioDestinationNode | null = null;
+  private socket: WebSocket | null = null;
 
-  private ws!: WebSocket;
-  private audioCtx!: AudioContext;
-  private playbackNode!: AudioWorkletNode;
-  private captureNode!: AudioWorkletNode;
-  private source!: MediaStreamAudioSourceNode;
-  private isInitialized = false;
+  // Replace with your EC2 public IP
+  private readonly AIC_WS_URL = 'ws://54.227.170.44:8080';
 
-  async init(): Promise<void> {
-    if (this.isInitialized) {
-      console.log('AudioFilterService already initialized');
-      return;
-    }
+  async createCleanStream(rawStream: MediaStream): Promise<MediaStream> {
+    await this.stop();
 
-    const wsUrl = environment["aicWebSocketUrl"] ?? "";
-    console.log(`🔌 Connecting to AIC backend: ${wsUrl}`);
+  this.audioContext = new AudioContext({ sampleRate: 48000 });
 
-    this.ws = new WebSocket(wsUrl);
-    this.ws.binaryType = 'arraybuffer';
-
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('WebSocket connection timed out after 10s'));
-      }, 10000);
-
-      this.ws.onopen = () => {
-        clearTimeout(timeout);
-        console.log('✅ AIC WebSocket connected');
-        resolve();
-      };
-
-      this.ws.onerror = (e) => {
-        clearTimeout(timeout);
-        reject(new Error('WebSocket connection failed — is the AIC backend running?'));
-      };
-    });
-
-    this.isInitialized = true;
+  if (this.audioContext.state === 'suspended') {
+    await this.audioContext.resume();
   }
 
-  async processStream(rawStream: MediaStream): Promise<MediaStream> {
-  this.audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+  // await this.audioContext.audioWorklet.addModule('/assets/audio-processor.js');
+  await this.audioContext.audioWorklet.addModule(
+  `/assets/audio-processor.js?v=${Date.now()}`
+);
 
-  // ✅ FIX 1: Resume AudioContext — browsers suspend it by default
-  await this.audioCtx.resume();
-  console.log('🔊 AudioContext state:', this.audioCtx.state); // must be "running"
+  const source = this.audioContext.createMediaStreamSource(rawStream);
 
-  const captureBlob  = new Blob([CAPTURE_WORKLET],  { type: 'application/javascript' });
-  const playbackBlob = new Blob([PLAYBACK_WORKLET], { type: 'application/javascript' });
+  this.workletNode = new AudioWorkletNode(this.audioContext, 'aic-processor', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2]
+  });
 
-  await this.audioCtx.audioWorklet.addModule(URL.createObjectURL(captureBlob));
-  await this.audioCtx.audioWorklet.addModule(URL.createObjectURL(playbackBlob));
+  this.outputNode = this.audioContext.createMediaStreamDestination();
 
-  this.source      = this.audioCtx.createMediaStreamSource(rawStream);
-  this.captureNode = new AudioWorkletNode(this.audioCtx, 'aic-capture');
+  this.socket = new WebSocket(this.AIC_WS_URL);
+  this.socket.binaryType = 'arraybuffer';
 
-  let chunksSent = 0;
-  this.captureNode.port.onmessage = ({ data }: MessageEvent<ArrayBuffer>) => {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(data);
-      chunksSent++;
-      // ✅ FIX 2: Log first 5 chunks to confirm mic audio is flowing
-      if (chunksSent <= 5) {
-        console.log(`📤 Sent chunk #${chunksSent} to backend (${data.byteLength} bytes)`);
+  // ✅ Return a Promise that resolves only after first enhanced chunk arrives
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+
+    this.socket!.onopen = () => {
+      console.log('✅ Connected to ai-coustics server');
+    };
+
+    this.socket!.onerror = (err) => {
+      console.error('❌ ai-coustics WebSocket error:', err);
+      if (!resolved) reject(err);
+    };
+
+    this.socket!.onclose = () => {
+      console.warn('⚠️ ai-coustics WebSocket closed');
+    };
+
+    // Server → worklet
+    this.socket!.onmessage = (event: MessageEvent) => {
+      if (this.workletNode) {
+        const buffer = event.data as ArrayBuffer;
+        this.workletNode.port.postMessage(
+          { type: 'enhanced', buffer },
+          [buffer]
+        );
+
+        // ✅ Resolve only after first enhanced audio arrives
+        if (!resolved) {
+          resolved = true;
+          console.log('🎙️ First enhanced chunk received — stream ready');
+          resolve(this.outputNode!.stream);
+        }
       }
-    }
-  };
+    };
 
-  this.source.connect(this.captureNode);
+    // Worklet → server
+    this.workletNode!.port.onmessage = (event: MessageEvent) => {
+      if (event.data.type === 'raw' &&
+          this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send(event.data.buffer);
+      }
+    };
 
-  this.playbackNode = new AudioWorkletNode(this.audioCtx, 'aic-playback');
-  const destination = this.audioCtx.createMediaStreamDestination();
-  this.playbackNode.connect(destination);
+    // Connect audio graph
+    source.connect(this.workletNode!);
+    this.workletNode!.connect(this.outputNode!);
 
-  let chunksReceived = 0;
-  this.ws.onmessage = ({ data }: MessageEvent<ArrayBuffer>) => {
-    chunksReceived++;
-    // ✅ FIX 3: Log first 5 responses to confirm backend is sending back audio
-    if (chunksReceived <= 5) {
-      console.log(`📥 Received chunk #${chunksReceived} from backend (${data.byteLength} bytes)`);
-    }
-    this.playbackNode.port.postMessage(data, [data]);
-  };
-
-  // ✅ FIX 4: Confirm the output stream has an audio track
-  console.log('🎵 Output stream tracks:', destination.stream.getAudioTracks().length);
-  console.log('🎵 Output track enabled:', destination.stream.getAudioTracks()[0]?.enabled);
-
-  console.log('✅ AIC stream processing active');
-  return destination.stream;
+    // Safety timeout — if no enhanced audio in 3s, fall back to raw stream
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.warn('⚠️ ai-coustics timeout — falling back to raw stream');
+        resolve(rawStream);
+      }
+    }, 3000);
+  });
 }
 
-  isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+
+  async stop() {
+    this.socket?.close();
+    this.workletNode?.disconnect();
+    await this.audioContext?.close();
+    this.audioContext = null;
+    this.workletNode = null;
+    this.cleanStream = null;
+    this.outputNode = null;
   }
 
-  destroy(): void {
-    try {
-      this.captureNode?.disconnect();
-      this.playbackNode?.disconnect();
-      this.source?.disconnect();
-      this.audioCtx?.close();
-      this.ws?.close();
-      this.isInitialized = false;
-      console.log('🧹 AudioFilterService destroyed');
-    } catch (err) {
-      console.error('Error during AudioFilterService cleanup:', err);
-    }
-  }
+
 }

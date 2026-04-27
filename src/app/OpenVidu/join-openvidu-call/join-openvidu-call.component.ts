@@ -2,7 +2,7 @@ import { PicoKoalaService } from './../../Service/PicoVoice Koala/pico-koala.ser
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality, ScreenSharePresets } from 'livekit-client';
+import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoPresets, VideoQuality, ScreenSharePresets, LocalAudioTrack } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { doc, docData, Firestore, setDoc, updateDoc, getDocs, collection, query, where, orderBy, limit, arrayUnion, serverTimestamp, Timestamp } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
@@ -20,6 +20,9 @@ import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
 import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
 import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-layout.service';
+import { Df3NoiseService } from '../../Service/df3-noise.service';
+import { AiCousticsService } from '../../Service/AI Coustics/ai-coustics.service';
+
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -104,6 +107,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   // M1: converted to signal — plain array not reactive in Angular 19 signals-first CD
   // activeSpeakers:Array<string> = [];
   activeSpeakers = signal<string[]>([]);
+  private micPublication: LocalTrackPublication | null = null;
 
 
   // Meta Data
@@ -128,6 +132,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
   blurLevel: 'none' | 'mid' | 'high' = 'high';
   localParticipantIdentity = '';
+
+  // df3 ONNX
+  isInRoom : boolean = false;
+  get isWarmedUp() { return this.df3['isWarmedUp']; }
 
   private previewStream: MediaStream | null = null;
   private canvasPipelineCleanup: (() => void) | null = null;
@@ -191,7 +199,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     private infraService: InstanceStatusService,
     private adaptiveQuality: AdaptiveQualityService,
     public videoLayout: VideoLayoutService,
-    public picoKoalaService : PicoKoalaService
+    public picoKoalaService : PicoKoalaService,
+    public df3: Df3NoiseService,
+    public aicoustics: AiCousticsService
   ){}
 
   ngAfterViewInit(): void {
@@ -549,9 +559,25 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       // ── KOALA: Init BEFORE room.connect() so it's ready the moment we join ──
       // This captures mic, runs the noise suppression pipeline, and produces
       // a clean MediaStreamTrack — all before the room handshake begins.
-      await this.picoKoalaService.init();
-      await this.picoKoalaService.start();
+      // await this.picoKoalaService.init();
+      // await this.picoKoalaService.start();
 
+      // let df3Track: MediaStreamTrack | null = null;
+      // try {
+      //   console.log('[DF3] Starting getCleanTrack()...');
+      //   df3Track = await this.df3.getCleanTrack();
+      //   this.df3.debugAudioPipeline();
+      //   console.log('[DF3] Track state:', df3Track?.readyState);
+      //   console.log('[DF3] Track enabled:', df3Track?.enabled);
+      //   console.log('[DF3] Track muted:', df3Track?.muted);
+      //   console.log('[DF3] Track settings:', df3Track?.getSettings());
+      //   console.log('[DF3] ✅ getCleanTrack() succeeded:', this.df3.executionProvider);
+      // } catch (df3Error: any) {
+      //   // Log the FULL error so we can see what actually failed
+      //   console.error('[DF3] ❌ getCleanTrack() failed:', df3Error);
+      //   console.error('[DF3] ❌ Error message:', df3Error?.message);
+      //   console.error('[DF3] ❌ Error stack:', df3Error?.stack);
+      // }
 
       // Connect to the LiveKit room
       // await ensures we wait until initial signaling is done
@@ -559,6 +585,11 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       this.meetingRoomStatus = "connected"
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
+
+      // ai-coustics noise cancellation
+
+
+
 
       // ── Quality tracking ──────────────────────────────────────────────────
       try {
@@ -575,6 +606,29 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
         console.log(`👤 Participant connected: ${participant.identity}`);
       });
 
+      // 1. Enable mic — returns the publication directly
+      const micPub = await room.localParticipant.setMicrophoneEnabled(true, {
+        sampleRate: 48000,
+        channelCount: 2,
+        echoCancellation: true
+      });
+      this.micPublication = micPub as LocalTrackPublication;
+
+      // 2. Get LocalAudioTrack via .track property (correct for v1.x)
+      const livekitMicTrack = micPub?.track as LocalAudioTrack;
+      if (!livekitMicTrack) throw new Error('No mic track found');
+
+      // 3. Create MediaStream from LiveKit's raw mic track
+      const rawStream = new MediaStream([livekitMicTrack.mediaStreamTrack]);
+
+      // 4. Process through ai-coustics
+      const cleanStream = await this.aicoustics.createCleanStream(rawStream);
+      const cleanMediaTrack = cleanStream.getAudioTracks()[0];
+
+      // 5. Replace LiveKit's track with ai-coustics clean track
+      await livekitMicTrack.replaceTrack(cleanMediaTrack, true);
+
+      console.log('🎙️ ai-coustics track replaced successfully');
       // Enable camera with explicit simulcast publish options (not relying on publishDefaults alone).
       // getCameraConstraints() → capture resolution/fps; getPublishOptions() → VP8 simulcast layers.
       const cameraConstraints = this.adaptiveQuality.getCameraConstraints(initialTier);
@@ -616,17 +670,21 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       console.log('📹 Blur off by default — enable via UI button');
 
 
-      try {
-        await this.picoKoalaService.publishToRoom(room);
-        console.log('🎙️ Koala noise-suppressed audio published');
-      } catch (koalaPublishError) {
-        // Fallback: if Koala publish fails, use standard mic
-        console.warn('Koala publish failed, falling back to standard mic:', koalaPublishError);
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          noiseSuppression: true,
-          echoCancellation: true,
-        });
-      }
+      // try {
+      //   await this.picoKoalaService.publishToRoom(room);
+      //   console.log('🎙️ Koala noise-suppressed audio published');
+      // } catch (koalaPublishError) {
+      //   // Fallback: if Koala publish fails, use standard mic
+      //   console.warn('Koala publish failed, falling back to standard mic:', koalaPublishError);
+      //   await room.localParticipant.setMicrophoneEnabled(true, {
+      //     noiseSuppression: true,
+      //     echoCancellation: true,
+      //   });
+      // }
+
+
+
+      // ────────────────
     } catch (error: any) {
       // Handle connection errors gracefully
       console.log(error)
@@ -701,8 +759,10 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     this.meetingRoomStatus = "left"
 
     // 3. Cleanup when leaving
-    await this.picoKoalaService.stop();
-    await this.picoKoalaService.release();
+    // await this.picoKoalaService.stop();
+    // await this.picoKoalaService.release();
+    await this.aicoustics.stop();
+
   }
 
   // Close the Room and disconnect everyone
@@ -750,21 +810,17 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     return this.getLocalTrackPublication(Track.Source.Microphone)?.isMuted ?? true
   }
 
-  toggleMute(){
-    var value = this.isAudioMuted()
-    const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
-    if (!micPub) return;
-
-    if(value){
-      micPub.unmute()
-      this.isMicMuted.set(false);
-    }
-    else{
-      micPub.mute()
-      this.isMicMuted.set(true);
-    }
+  toggleMute() {
+  if (!this.micPublication) return;
+  const value = this.isAudioMuted();
+  if (value) {
+    (this.micPublication as LocalTrackPublication).unmute();
+    this.isMicMuted.set(false);
+  } else {
+    (this.micPublication as LocalTrackPublication).mute();
+    this.isMicMuted.set(true);
   }
-
+}
   getNetworkQualityClass(quality: ConnectionQuality | undefined): string {
     if (quality === undefined || quality === null) return 'unknown';
     switch (quality) {
