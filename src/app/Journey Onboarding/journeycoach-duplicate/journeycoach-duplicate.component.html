@@ -49,9 +49,10 @@
 
     <div class="jcd-toolbar-sep"></div>
 
-    <!-- Quick filters -->
-    <button class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='today'" (click)="onDateFilterClick('today')">Today</button>
-    <button class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='last7days'" (click)="onDateFilterClick('last7days')">Last 7 Days</button>
+    <!-- days Filter -->
+
+   <input class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='days'"type="texts"placeholder="Enter days(1-60)" [(ngModel)]="daysInput"max="60"(input)="onDaysChange()">
+    <button class="jcd-filter"  [disabled]="!daysInput" (click)="onDateFilterClick('days')"> + </button>
 
     <!-- Clear quick filter -->
     <button class="jcd-clear-filter" *ngIf="selectedDateFilter != null" (click)="onDateFilterClick(null)" title="Clear filter">
@@ -99,9 +100,9 @@
       </div>
     </div>
     <div class="metrics-row">
-      <div class="m-box"><div class="l">New</div><div class="v" style="color:var(--success)" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div></div>
-      <div class="m-box"><div class="l">Upgrades</div><div class="v" style="color:var(--primary)" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div></div>
-      <div class="m-box"><div class="l">Add-On</div><div class="v" style="color:var(--accent)" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div></div>
+      <div class="m-box"><div class="l">New</div><div class="v" style="color:var(--success)" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div><div class="l">&#8377;{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Upgrades</div><div class="v" style="color:var(--primary)" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div><div class="l">&#8377;{{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Add-On</div><div class="v" style="color:var(--accent)" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div><div class="l">&#8377;{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
     </div>
     <div class="row-neg">
       <div class="neg-box neg-cancel" (click)="onCancelledClick($event,'grossCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['grosscancelledsale'].count}}</div><div class="a">&#8377;{{totalGrossCancelled.toLocaleString('en-IN')}}</div></div>
@@ -127,9 +128,9 @@
       </div>
     </div>
     <div class="metrics-row">
-      <div class="m-box"><div class="l">New</div><div class="v" style="color:var(--success)" (click)="onAssuredSplitClick($event,'assuredNewSales')">{{assuredSalesSplit['new']}}</div></div>
-      <div class="m-box"><div class="l">Upgrades</div><div class="v" style="color:var(--primary)" (click)="onAssuredSplitClick($event,'assuredUpgradeSales')">{{assuredSalesSplit['upgrades']}}</div></div>
-      <div class="m-box"><div class="l">Add-On</div><div class="v" style="color:var(--accent)" (click)="onAssuredSplitClick($event,'assuredAddonSales')">{{assuredSalesSplit['addons']}}</div></div>
+      <div class="m-box"><div class="l">New</div><div class="v" style="color:var(--success)" (click)="onAssuredSplitClick($event,'assuredNewSales')">{{assuredSalesSplit['new']}}</div><div class="l">&#8377;{{assuredSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Upgrades</div><div class="v" style="color:var(--primary)" (click)="onAssuredSplitClick($event,'assuredUpgradeSales')">{{assuredSalesSplit['upgrades']}}</div><div class="l">&#8377; {{assuredSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Add-On</div><div class="v" style="color:var(--accent)" (click)="onAssuredSplitClick($event,'assuredAddonSales')">{{assuredSalesSplit['addons']}}</div><div class="l">&#8377;{{assuredSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
     </div>
     <div class="row-neg">
       <div class="neg-box neg-cancel" (click)="onCancelledClick($event,'assuredCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['assuredcancelledsale'].count}}</div><div class="a">&#8377;{{totalAssuredCancelled.toLocaleString('en-IN')}}</div></div>
@@ -183,11 +184,11 @@
   <div class="card">
     <div class="card-h" style="margin-bottom:10px"><span class="card-t">Onboarding Status</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:8px">
-      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openCalendarDialog()">
+      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('onboardingScheduled')">
         <div style="font-size:16px;font-weight:800;color:var(--primary)">{{ getTotalOnboardingScheduledCount() }}</div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">OB Call</div>
       </div>
-      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openCalendarDialog()">
+      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('coachingScheduled')">
         <div style="font-size:16px;font-weight:800;color:var(--primary)">{{ getTotalCoachingScheduledCount() }}</div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">JC Calls</div>
       </div>

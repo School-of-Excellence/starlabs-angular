@@ -18,6 +18,7 @@ import { FormsModule } from '@angular/forms';
 import {MatTabGroup, MatTabsModule} from '@angular/material/tabs';
 import { AuthguardService } from '../../authguard.service';
 import { map} from "rxjs/operators"
+import { MatSortModule } from '@angular/material/sort';
 
 export class uploadingelement {
   id:String | null;
@@ -70,7 +71,8 @@ export class uploadingelement {
     MatIconModule,
     MatButtonModule,
     FormsModule,
-    MatTabsModule
+    MatTabsModule,
+    MatSortModule
   ],
   templateUrl: './episodes-dashboard.component.html',
   // styleUrl: './episodes-dashboard.component.css'
@@ -139,7 +141,17 @@ export class EpisodesDashboardComponent {
       let snapshotData = episodesData.map(doc=>({id:doc.id,...doc.data()}))
       this.dataSource.data = snapshotData;
       this.dataSource.paginator = this.paginator;
-      // this.dataSource.sort = this.sort;
+      this.dataSource.sort = this.sort;
+      this.dataSource.sortingDataAccessor = (item : any, headerSort : string)=>{
+        switch(headerSort){
+          case 'Title' : return item.title?.toLowerCase() ?? '';
+          case 'Referencetitle' : return item.reftitle?. toLowerCase() ?? '';
+          case 'Duration' : return item.duration ?? 0 ;
+          case 'added': return item.date?.toDate().getTime() ?? 0;
+          case 'videosize' :return item.videoSize ?? 0 ;  
+          case 'Series' : return item.imagesize ?? 0;   
+        }
+      }
     });
 
     const atctaxonomyRef = collection(this.firestore,"atc taxonomy")
