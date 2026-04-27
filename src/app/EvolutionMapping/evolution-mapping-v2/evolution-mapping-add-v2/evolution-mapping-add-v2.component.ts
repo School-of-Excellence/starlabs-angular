@@ -60,11 +60,33 @@ export class EvolutionMappingAddV2Component implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: any,
     public router: Router,
   ) {
+    
     this.guard.getProfileMap().then(e => {
       this.mapProfile = e.map;
       this.mapEmailData = e.mapEmailData;
       this.filteredKeys = this.getKeys(this.mapProfile);
-    }).then(() => {
+    }).then(async() => {
+
+      const snap = await getDocs(collection(this.firestore, 'evolutionmappingvideo'));
+        let fixed = 0;
+
+        const batch = writeBatch(this.firestore);
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          const url: string = data['videourl'] || '';
+          if (url.includes('/scl/fi/') && /[?&]raw=1/.test(url)) {
+            const cleaned = url.replace(/[?&]raw=1/, '').replace(/\?&/, '?').replace(/&&/g, '&');
+            batch.update(docSnap.ref, { videourl: cleaned });
+            fixed++;
+          }
+        });
+
+        if (fixed > 0) {
+          await batch.commit();
+          console.log(`Cleaned ${fixed} URLs`);
+        } else {
+          console.log('Nothing to clean');
+        }
       this.loading = false;
     });
   }
