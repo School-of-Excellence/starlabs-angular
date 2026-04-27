@@ -39,7 +39,7 @@ export class AudioDashboardComponent {
   pageTitle = 'audio-dashboard';
   userRole: any;
 
-  displayedColumns: string[] = ['thumbnail', 'name', 'date', 'size', 'playlists', 'tags', 'actions'];
+  displayedColumns: string[] = ['thumbnail', 'name', 'date', 'size', 'duration', 'playlists', 'tags', 'actions'];
   dataSource: MatTableDataSource<any> = new MatTableDataSource();
 
   private _paginator!: MatPaginator;
@@ -169,6 +169,14 @@ export class AudioDashboardComponent {
       }
       if (this._sort) {
         this.dataSource.sort = this._sort;
+        this.dataSource.sortingDataAccessor = (item: any, headerSort: string) => {
+          switch (headerSort) {
+            case 'name':return item.name?. toLocaleLowerCase() ?? '';
+            case 'date': return item.date?.toDate().getTime() ?? 0;
+            case 'size': return item.sizeBytes ?? 0;
+            case 'duration': return item.duration ?? 0;
+          }
+        };
       }
     });
   }
@@ -319,6 +327,20 @@ export class AudioDashboardComponent {
     const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
+  
+  formatDuration(seconds: number): string {
+  if (!seconds || isNaN(seconds)) return '—';
+
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  } else {
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+}
 
   openDialog() {
     this.dialog.open(AddAudioComponent, {
