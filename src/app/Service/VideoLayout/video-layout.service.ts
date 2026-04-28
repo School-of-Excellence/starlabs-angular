@@ -15,28 +15,10 @@ export class VideoLayoutService {
   // Is PiP minimized
   isPipMinimized = signal(false);
 
-  // Determine layout mode based on participant count and screen share
-  getLayoutMode(remoteCount: number, hasScreenShare: boolean): LayoutMode {
-    if (hasScreenShare) return 'screen-share';
-    if (remoteCount === 0) return 'grid';
-    if (remoteCount === 1) return 'spotlight';
-    return 'grid';
-  }
-
-  // Set screen share as main
-  setScreenShareActive(participantId: string, active: boolean) {
-    console.log(`Screen share ${active ? 'started' : 'ended'}: ${participantId}`);
-  }
-
   // Toggle PiP minimized state
   togglePipSize() {
     this.isPipMinimized.update(v => !v);
     console.log(`PiP ${this.isPipMinimized() ? 'minimized' : 'expanded'}`);
-  }
-
-  // Update PiP position when dragged
-  updatePipPosition(x: number, y: number) {
-    this.pipCustomPosition.set({ x, y });
   }
 
   // Snap PiP to nearest corner

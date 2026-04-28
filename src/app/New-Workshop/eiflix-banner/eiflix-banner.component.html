@@ -1,189 +1,378 @@
-<mat-card class="card">
-  <h2><i class="fa-solid fa-film"></i> EiFlix Banner</h2>
-
-<mat-tab-group #tabGroup>
+<div class="banner-page">
+  <header class="page-header">
+    <div class="header-left">
+      <div class="header-icon">
+        <i class="fa-solid fa-film"></i>
+      </div>
+      <div>
+        <h1 class="page-title">EiFlix Banner</h1>
+        <p class="page-subtitle">Manage banners shown across web and app</p>
+      </div>
+    </div>
+    <button mat-icon-button (click)="closeDialog()" class="close-btn">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+  <mat-tab-group #tabGroup class="tab-group" mat-stretch-tabs="false" mat-align-tabs="start">
     <mat-tab>
       <ng-template mat-tab-label>
-        <i class="fa-solid fa-plus"></i>&nbsp; Add Banner
+        <i class="fa-solid fa-plus tab-icon"></i>
+        <span>{{ currentEditIndex !== null ? 'Edit Banner' : 'Add Banner' }}</span>
       </ng-template>
 
-      <div class="tab-content">
-        <form [formGroup]="form">
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>Title</mat-label>
-            <input matInput formControlName="title">
-            <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required</mat-error>
-          </mat-form-field>
+      <div class="tab-body">
+        <form [formGroup]="form" class="banner-form">
+          <section class="form-section">
+            <div class="section-head">
+              <h3 class="section-title">Banner Details</h3>
+            </div>
 
-          <mat-form-field appearance="outline" class="full">
-            <mat-label>Description</mat-label>
-            <textarea rows="3" matInput formControlName="description"></textarea>
-            <mat-error *ngIf="form.get('description')?.hasError('required')">Description is required</mat-error>
-          </mat-form-field>
-            <div style="display: flex;gap: 10px;">
+            <div class="section-body">
               <mat-form-field appearance="outline" class="full">
-              <mat-label>Select Mode</mat-label>
-              <mat-select formControlName="path" (selectionChange)="onPathChange()">
-                  <mat-option value="DeepLink">DeepLink</mat-option>
-                  <mat-option value="External Link">External Link</mat-option>
-              </mat-select>
+                <mat-label>Title</mat-label>
+                <input matInput formControlName="title" placeholder="e.g. Summer Special">
+                <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required</mat-error>
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full" *ngIf="form.get('path')?.value === 'DeepLink'">
-              <mat-label>Select Series</mat-label>
-              <mat-select formControlName="seriesId">
-                  <mat-option *ngFor="let s of seriesList" [value]="s.id">
-                  {{ s.seriesName }}
-                  </mat-option>
-              </mat-select>
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Description</mat-label>
+                <textarea rows="3" matInput formControlName="description" placeholder="Briefly describe this banner..."></textarea>
+                <mat-error *ngIf="form.get('description')?.hasError('required')">Description is required</mat-error>
               </mat-form-field>
+            </div>
+          </section>
+          <div class="section-divider"></div>
+          <section class="form-section">
+            <div class="section-head">
+              <h3 class="section-title">Navigation</h3>
+            </div>
 
-              <mat-form-field appearance="outline" class="full" *ngIf="form.get('path')?.value === 'External Link'">
-              <mat-label>External Link</mat-label>
-              <input matInput formControlName="externallink">
-              </mat-form-field>
+            <div class="section-body">
+              <div class="grid-2">
+                <mat-form-field appearance="outline">
+                  <mat-label>Mode</mat-label>
+                  <mat-select formControlName="path" (selectionChange)="onPathChange()">
+                    <mat-option value="DeepLink">Deep Link</mat-option>
+                    <mat-option value="External Link">External Link</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="form.get('path')?.value === 'DeepLink'">
+                  <mat-label>Series</mat-label>
+                  <mat-select formControlName="seriesId">
+                    <mat-option *ngFor="let s of seriesList" [value]="s.id">
+                      {{ s.seriesName }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="form.get('path')?.value === 'External Link'">
+                  <mat-label>External URL</mat-label>
+                  <input matInput formControlName="externallink" placeholder="https://...">
+                </mat-form-field>
+              </div>
+
               <mat-form-field appearance="outline" class="full">
                 <mat-label>Button Name</mat-label>
-                <input matInput formControlName="buttonname">
+                <input matInput formControlName="buttonname" placeholder="e.g. Watch Now">
               </mat-form-field>
-              <mat-slide-toggle formControlName="enable">
-                  Enable Banner
-              </mat-slide-toggle>
             </div>
-            <!-- <div style="margin: 15px 0;display: flex;gap:10px;">
+          </section>
 
-            </div> -->
+          <div class="section-divider"></div>
+          <section class="form-section">
+            <div class="section-head">
+              <h3 class="section-title">Visibility</h3>
+            </div>
 
-          <div class="upload-row">
-            <label class="upload-btn">
-              <i class="fa-solid fa-image"></i> Select Web Image 
-              <input type="file" accept="image/*" hidden (change)="onImageSelected($event)">
-            </label>
-            <label class="upload-btn">
-              <i class="fa-solid fa-image"></i> Select App Image
-              <input type="file" accept="image/*" hidden (change)="onImageSelectedApp($event)">
-            </label>
-            <label class="upload-btn">
-              <i class="fa-solid fa-video"></i> Select Video
-              <input type="file" accept="video/*" hidden (change)="onVideoSelected($event)">
-            </label>
+            <div class="section-body">
+              <div class="grid-2 align-row">
+                <div class="toggle-card">
+                  <div class="toggle-card-content">
+                    <div class="toggle-icon-wrap toggle-icon-web">
+                      <i class="fa-solid fa-desktop"></i>
+                    </div>
+                    <div>
+                      <div class="toggle-label">Web</div>
+                      <div class="toggle-hint">Show on desktop / web app</div>
+                    </div>
+                  </div>
+                  <mat-slide-toggle formControlName="enable"></mat-slide-toggle>
+                </div>
+
+                <div class="toggle-card">
+                  <div class="toggle-card-content">
+                    <div class="toggle-icon-wrap toggle-icon-mobile">
+                      <i class="fa-solid fa-mobile-screen"></i>
+                    </div>
+                    <div>
+                      <div class="toggle-label">Mobile</div>
+                      <div class="toggle-hint">Show in iOS / Android app</div>
+                    </div>
+                  </div>
+                  <mat-slide-toggle formControlName="enableapp"></mat-slide-toggle>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="section-divider"></div>
+          <section class="form-section">
+            <div class="section-head">
+              <h3 class="section-title">Media Assets</h3>
+            </div>
+
+            <div class="section-body">
+              <div class="media-grid">
+                <div class="media-card">
+                  <div class="media-card-head">
+                    <span class="media-tag">
+                      <i class="fa-solid fa-desktop media-tag-icon"></i>
+                      Web Image
+                    </span>
+                    <label class="media-action">
+                      <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload
+                      <input type="file" accept="image/*" hidden (change)="onImageSelected($event)">
+                    </label>
+                  </div>
+                  <div class="media-preview media-preview-wide">
+                    <img *ngIf="imagePreview" [src]="imagePreview" alt="Web preview">
+                    <div *ngIf="!imagePreview" class="media-placeholder">
+                      <i class="fa-regular fa-image"></i>
+                      <span>16:9 recommended</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="media-card">
+                  <div class="media-card-head">
+                    <span class="media-tag">
+                      <i class="fa-solid fa-mobile-screen media-tag-icon"></i>
+                      App Image
+                    </span>
+                    <label class="media-action">
+                      <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload
+                      <input type="file" accept="image/*" hidden (change)="onImageSelectedApp($event)">
+                    </label>
+                  </div>
+                  <div class="media-preview media-preview-square">
+                    <img *ngIf="imagePreviewApp" [src]="imagePreviewApp" alt="App preview">
+                    <div *ngIf="!imagePreviewApp" class="media-placeholder">
+                      <i class="fa-regular fa-image"></i>
+                      <span>4:3 recommended</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="media-card">
+                  <div class="media-card-head">
+                    <span class="media-tag">
+                      <i class="fa-solid fa-video media-tag-icon"></i>
+                      Video
+                    </span>
+                    <label class="media-action">
+                      <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload
+                      <input type="file" accept="video/*" hidden (change)="onVideoSelected($event)">
+                    </label>
+                  </div>
+                  <div class="media-preview media-preview-wide">
+                    <video *ngIf="videoPreview" [src]="videoPreview" controls></video>
+                    <div *ngIf="!videoPreview" class="media-placeholder">
+                      <i class="fa-regular fa-circle-play"></i>
+                      <span>MP4 / WebM</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="form-actions">
+            <button mat-stroked-button type="button" (click)="resetForm()" [disabled]="isUploading">
+              Reset
+            </button>
+            <button mat-flat-button color="primary"
+                    type="button"
+                    (click)="submit()"
+                    [disabled]="isUploading"
+                    class="primary-btn">
+              <ng-container *ngIf="!isUploading">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                {{ currentEditIndex !== null ? 'Update Banner' : 'Save Banner' }}
+              </ng-container>
+              <ng-container *ngIf="isUploading">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                Uploading {{ uploadProgress }}%
+              </ng-container>
+            </button>
           </div>
-
-          <div class="preview-container">
-            <img *ngIf="imagePreview" [src]="imagePreview" class="preview-img">
-            <!-- <img *ngIf="imagePreviewApp" [src]="imagePreviewApp" class="preview-img"> -->
-            <video *ngIf="videoPreview" [src]="videoPreview" class="preview-video" controls></video>
+          <div class="upload-progress" *ngIf="isUploading">
+            <div class="upload-progress-bar">
+              <div class="upload-progress-fill" [style.width.%]="uploadProgress"></div>
+            </div>
           </div>
-          <br>
-          <div class="preview-container-app">
-            <img *ngIf="imagePreviewApp" [src]="imagePreviewApp" class="preview-container-appimg">
-          </div>
-
-          <button mat-raised-button color="primary" 
-                  (click)="submit()" 
-                  class="submit"
-                  [disabled]="isUploading">
-            <ng-container *ngIf="!isUploading">
-              <i class="fa-solid fa-cloud-arrow-up"></i> Submit
-            </ng-container>
-            <ng-container *ngIf="isUploading">
-              <i class="fa-solid fa-spinner fa-spin"></i> Uploading {{ uploadProgress }}%
-            </ng-container>
-          </button>
         </form>
       </div>
     </mat-tab>
     <mat-tab>
       <ng-template mat-tab-label>
-        <i class="fa-solid fa-list"></i>&nbsp; Banner List
+        <i class="fa-solid fa-list tab-icon"></i>
+        <span>Banner List</span>
+        <span class="tab-count" *ngIf="dataSource.data.length">{{ dataSource.data.length }}</span>
       </ng-template>
-      <div class="tab-content">
-        <div style="display: flex;gap: 10px;">
+
+      <div class="tab-body">
+        <div class="list-toolbar">
           <mat-form-field appearance="outline" class="search-field">
-            <input matInput [(ngModel)]="searchText" (keyup)="applyFilter()" placeholder="Search by title, description...">
-            <button *ngIf="searchText" matSuffix mat-icon-button (click)="clearSearch()">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput
+                   [(ngModel)]="searchText"
+                   (keyup)="applyFilter()"
+                   placeholder="Search banners by title, description...">
+            <button *ngIf="searchText" matSuffix mat-icon-button (click)="clearSearch()" type="button">
               <mat-icon>close</mat-icon>
             </button>
-            <mat-icon matPrefix>search</mat-icon>
           </mat-form-field>
-          <mat-form-field appearance="outline" class="search-field">
+
+          <mat-form-field appearance="outline" class="priority-field">
             <mat-label>Banner Priority</mat-label>
             <mat-select [(ngModel)]="priority" (selectionChange)="workshopPriority()">
-                <mat-option value="workshop">Workshop</mat-option>
-                <mat-option value="eiflix">EiFlix</mat-option>
+              <mat-option value="workshop">Workshop</mat-option>
+              <mat-option value="eiflix">EiFlix</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
-        <div class="table-container">
-          <table mat-table [dataSource]="dataSource" matSort class="banner-table" cdkDropList (cdkDropListDropped)="dropTable($event)">
+        <div class="table-wrapper">
+          <table mat-table
+                 [dataSource]="dataSource"
+                 matSort
+                 class="banner-table"
+                 cdkDropList
+                 (cdkDropListDropped)="dropTable($event)">
+            <ng-container matColumnDef="drag">
+              <th mat-header-cell *matHeaderCellDef class="col-drag"></th>
+              <td mat-cell *matCellDef="let element" class="col-drag">
+                <i class="fa-solid fa-grip-vertical drag-handle" matTooltip="Drag to reorder"></i>
+              </td>
+            </ng-container>
             <ng-container matColumnDef="image">
-              <th mat-header-cell *matHeaderCellDef>Image</th>
-              <td mat-cell *matCellDef="let element">
-                <img [src]="element.imageUrl" class="table-img">
+              <th mat-header-cell *matHeaderCellDef class="col-image">Banner</th>
+              <td mat-cell *matCellDef="let element" class="col-image">
+                <img [src]="element.imageUrl" class="cell-image" alt="banner">
               </td>
             </ng-container>
             <ng-container matColumnDef="title">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
-              <td mat-cell *matCellDef="let element">{{ element.title }}</td>
-            </ng-container>
-            <ng-container matColumnDef="description">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
               <td mat-cell *matCellDef="let element">
-                <span class="description-cell" [matTooltip]="element.description">
-                  {{ element.description | slice:0:50 }}{{ element.description.length > 50 ? '...' : '' }}
-                </span>
+                <div class="cell-title">{{ element.title }}</div>
+                <div class="cell-desc" [matTooltip]="element.description">
+                  {{ element.description | slice:0:60 }}{{ element.description.length > 60 ? '…' : '' }}
+                </div>
               </td>
             </ng-container>
             <ng-container matColumnDef="seriesName">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>Navigate</th>
-              <td mat-cell *matCellDef="let element">{{ element.seriesName != null ? element.seriesName : element.externallink  }}</td>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Navigation</th>
+              <td mat-cell *matCellDef="let element">
+                <div class="nav-cell">
+                  <span class="nav-type" [class.nav-deeplink]="element.path === 'DeepLink'" [class.nav-external]="element.path === 'External Link'">
+                    <i class="fa-solid" [class.fa-link]="element.path === 'DeepLink'" [class.fa-arrow-up-right-from-square]="element.path === 'External Link'"></i>
+                    {{ element.path }}
+                  </span>
+                  <span class="nav-target">{{ element.seriesName != null ? element.seriesName : element.externallink }}</span>
+                </div>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef class="col-status">Status</th>
+              <td mat-cell *matCellDef="let element" class="col-status">
+                <div class="status-stack">
+                  <div class="platform-status" [matTooltip]="'Web: ' + (element.enable ? 'Active' : 'Inactive')">
+                    <i class="fa-solid fa-desktop platform-icon"></i>
+                    <span class="status-pill" [class.active]="element.enable" [class.inactive]="!element.enable">
+                      <span class="status-dot"></span>
+                      {{ element.enable ? 'Active' : 'Inactive' }}
+                    </span>
+                  </div>
+                  <div class="platform-status" [matTooltip]="'Mobile: ' + (element.enableapp ? 'Active' : 'Inactive')">
+                    <i class="fa-solid fa-mobile-screen platform-icon"></i>
+                    <span class="status-pill" [class.active]="element.enableapp" [class.inactive]="!element.enableapp">
+                      <span class="status-dot"></span>
+                      {{ element.enableapp ? 'Active' : 'Inactive' }}
+                    </span>
+                  </div>
+                </div>
+              </td>
             </ng-container>
             <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef>Actions</th>
-              <td mat-cell *matCellDef="let element; let i = index">
-                <button mat-icon-button color="primary" [matTooltip]="'View Video'" 
-                        (click)="openVideo(element.videoUrl)">
-                  <mat-icon>play_circle</mat-icon>
-                </button>
-                <mat-slide-toggle 
-                [matTooltip]="element.enable ? 'Disable' : 'Enable'"
-                [checked]="element.enable"
-                (change)="toggleEnable(element)">
-                </mat-slide-toggle>
+              <th mat-header-cell *matHeaderCellDef class="col-actions">Actions</th>
+              <td mat-cell *matCellDef="let element; let i = index" class="col-actions">
+                <div class="action-group">
+                  <button mat-icon-button
+                          class="action-btn action-play"
+                          matTooltip="Preview Video"
+                          (click)="openVideo(element.videoUrl)">
+                    <mat-icon>play_circle</mat-icon>
+                  </button>
 
-                <button mat-icon-button color="accent" [matTooltip]="'Edit Video'" 
-                        (click)="editBanner(element, i)">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn" [matTooltip]="'Delete Banner'" 
-                        (click)="deleteBanner(element, i)">
-                  <mat-icon>delete</mat-icon>
-                </button>
+                  <div class="action-divider"></div>
+
+                  <div class="platform-toggles">
+                    <div class="platform-toggle"
+                         [matTooltip]="(element.enable ? 'Disable' : 'Enable') + ' on Web'">
+                      <i class="fa-solid fa-desktop platform-toggle-icon"></i>
+                      <mat-slide-toggle
+                        class="action-toggle"
+                        [checked]="element.enable"
+                        (change)="togglePlatform(element, 'web')">
+                      </mat-slide-toggle>
+                    </div>
+                    <div class="platform-toggle"
+                         [matTooltip]="(element.enableapp ? 'Disable' : 'Enable') + ' on Mobile'">
+                      <i class="fa-solid fa-mobile-screen platform-toggle-icon"></i>
+                      <mat-slide-toggle
+                        class="action-toggle"
+                        [checked]="element.enableapp"
+                        (change)="togglePlatform(element, 'app')">
+                      </mat-slide-toggle>
+                    </div>
+                  </div>
+
+                  <div class="action-divider"></div>
+
+                  <button mat-icon-button
+                          class="action-btn action-edit"
+                          matTooltip="Edit"
+                          (click)="editBanner(element, i)">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+
+                  <button mat-icon-button
+                          class="action-btn action-delete"
+                          matTooltip="Delete"
+                          (click)="deleteBanner(element, i)">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
               </td>
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <!-- <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr> -->
-            <tr
-              mat-row
-              *matRowDef="let row; columns: displayedColumns"
-              cdkDrag
-            ></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns" cdkDrag></tr>
+
             <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell no-data" [attr.colspan]="displayedColumns.length">
-                <div class="no-data-content">
-                  <i class="fa-solid fa-inbox fa-2x"></i>
-                  <p>No banners found</p>
+              <td class="empty-cell" [attr.colspan]="displayedColumns.length">
+                <div class="empty-state">
+                  <i class="fa-solid fa-inbox"></i>
+                  <h4>No banners yet</h4>
+                  <p>Add your first banner from the previous tab</p>
                 </div>
               </td>
             </tr>
           </table>
         </div>
-        <mat-paginator [pageSizeOptions]="[5, 10, 25, 50]" 
-                       showFirstLastButtons
-                       aria-label="Select page of banners">
+
+        <mat-paginator
+          [pageSizeOptions]="[20, 50, 100, 500]"
+          showFirstLastButtons
+          aria-label="Select page of banners">
         </mat-paginator>
       </div>
     </mat-tab>
   </mat-tab-group>
-</mat-card>
+</div>

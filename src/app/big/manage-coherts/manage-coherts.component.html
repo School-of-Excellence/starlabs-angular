@@ -499,7 +499,14 @@
   <!-- Footer Actions -->
   <div class="dialog-footer">
     <button class="btn btn-secondary" (click)="onCancel()">Cancel</button>
-    <button class="btn btn-primary" (click)="onSubmit()" [disabled]="cohortsForm.invalid || loadingInvitations || loadingMentors || loadingTeam || isImportingParticipants">
+    <button class="btn btn-primary" (click)="onSubmit()" 
+        [disabled]="cohortsForm.invalid 
+        || (cohortsForm.controls['cohortCategory'].value == 'studio' && [null , undefined , ''].includes(cohortsForm.controls['bigactivity']?.value)) 
+        || ( isEventType() && [null , undefined , ''].includes(cohortsForm.controls['eventref']?.value))
+        || loadingInvitations 
+        || loadingMentors 
+        || loadingTeam 
+        || isImportingParticipants">
       {{getSubmitButtonText()}}
     </button>
   </div>
