@@ -67,7 +67,13 @@
               <mat-option *ngFor="let option of platformNameList" [value]="option">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
-
+          <mat-slide-toggle 
+            [(ngModel)]="showDuplicatesOnly" 
+            (change)="onFilter(filterValue)"
+            color="warn"
+            class="ctrl-toggle-duplicates">
+            Duplicates only
+          </mat-slide-toggle>
           <button mat-stroked-button type="button" (click)="onClearFilterValue()" class="btn-clear">
             <span class="btn-icon"><mat-icon>clear</mat-icon></span>Clear
         </button>
@@ -95,7 +101,19 @@
 
       <div class="mat-elevation-z8" style="margin-top:16px">
         <table mat-table [dataSource]="contentData" matSort>
-
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row" style="width:40px;padding:0 4px">
+            <button
+              *ngIf="row['isDuplicate']"
+              mat-icon-button
+              color="warn"
+              (click)="deleteRow(row); $event.stopPropagation()"
+              title="Delete duplicate">
+              <mat-icon style="font-size:18px">delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
           <ng-container matColumnDef="profileid">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
             <td mat-cell *matCellDef="let row">

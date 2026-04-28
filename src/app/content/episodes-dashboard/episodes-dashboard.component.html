@@ -18,11 +18,11 @@
         <div class="table-card">
           <table mat-table matSort [dataSource]="dataSource">
             <ng-container matColumnDef="Title">
-              <th mat-header-cell *matHeaderCellDef>Title</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
               <td mat-cell *matCellDef="let row" class="col-title-big"><span class="c-name">{{ row.title }}</span></td>
             </ng-container>
             <ng-container matColumnDef="Referencetitle">
-              <th mat-header-cell *matHeaderCellDef class="col-desc">Reference Title</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-desc">Reference Title</th>
               <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.reftitle }}</span></td>
             </ng-container>
             <!-- <ng-container matColumnDef="Description">
@@ -30,7 +30,7 @@
               <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.description }}</span></td>
             </ng-container> -->
             <ng-container matColumnDef="Duration">
-              <th mat-header-cell *matHeaderCellDef class="col-desc">Duration</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-desc">Duration</th>
               <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.duration }}</span></td>
             </ng-container>
             <ng-container matColumnDef="added">
@@ -48,7 +48,7 @@
               </td>
             </ng-container>
             <ng-container matColumnDef="convertedtohls">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>HLS</th>
+              <th mat-header-cell *matHeaderCellDef>HLS</th>
               <td mat-cell *matCellDef="let row">
                 <span class="status-badge" [class.active]="row.convertedtohls" [class.deleted]="!row.convertedtohls">
                   {{ row.convertedtohls ? 'Yes' : 'No' }}
@@ -56,7 +56,7 @@
               </td>
             </ng-container>
             <ng-container matColumnDef="videosize">
-              <th mat-header-cell *matHeaderCellDef class="col-size">Video Size</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Video Size</th>
               <td mat-cell *matCellDef="let row" class="col-size">
                 <!-- <span class="c-size">
                  {{ row.videoSizeBytes / (1024 * 1024 * 1024) | number:'1.2-2' }} GB
@@ -73,7 +73,7 @@
               </td>
             </ng-container>
             <ng-container matColumnDef="Series">
-              <th mat-header-cell *matHeaderCellDef class="col-size">Img Size</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Img Size</th>
               <td mat-cell *matCellDef="let row" class="col-size">
               <span class="c-size">
                 {{

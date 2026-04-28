@@ -42,7 +42,7 @@ export class OnboardingRemarkComponent {
   addon: boolean = false;
 
   mapProfile: Object = {};
-  mapphone: Object = {};
+  // mapphone: Object = {};
   mapjourneyname: Object = {};
   mapAppointments: Object = {};
   salesleadsData: Object = {};
@@ -86,7 +86,7 @@ export class OnboardingRemarkComponent {
 
     this.guard.getAppointmentMap().then(data => this.mapAppointments = data);
     this.mapProfile = this.participantjourneyproduct['mapProfile'];
-    this.mapphone = this.participantjourneyproduct['mapPhone'];
+    // this.mapphone = this.participantjourneyproduct['mapPhone'];
     this.mapjourneyname = this.participantjourneyproduct['mapJourney'];
 
     if (![null, undefined, ''].includes(this.participantjourneyproduct['salesleadsref'])) {
@@ -182,7 +182,7 @@ export class OnboardingRemarkComponent {
         value['onboarded'] = true
         value['onboardingreport'] = ![null, undefined, ''].includes(this.note) ? this.note : null;
         value['referral'] = this.participantjourneyproduct['referral'];
-        value['journeystatus'] = 'ongoing';
+        // value['journeystatus'] = 'ongoing';
         value['onboardingreportlog'] = [{
           updated: new Date(),
           report: this.note || null

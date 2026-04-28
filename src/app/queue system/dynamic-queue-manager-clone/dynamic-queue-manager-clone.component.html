@@ -757,6 +757,22 @@
 
           </div>
         </div>
+
+        <!-- NO ATC FILTER ROW -->
+        <div class="fsb-row fsb-toggle-row"
+          [class.fsb-row-active]="noAtcFilterActive"
+          [class.fsb-row-disabled]="atcFilterActive"
+          (click)="!atcFilterActive && toggleNoAtcFilter()">
+          <mat-icon class="fsb-icon">medical_services</mat-icon>
+          <span class="fsb-label">No ATC</span>
+          <span class="fsb-count" *ngIf="atcDataLoaded && getNoAtcCount() > 0">
+            {{getNoAtcCount()}}
+          </span>
+          <div class="fsb-toggle" [class.fsb-toggle-on]="noAtcFilterActive">
+            <div class="fsb-toggle-knob"></div>
+          </div>
+        </div>
+
         <!-- DFU ROW -->
         <div class="fsb-row fsb-toggle-row" [class.fsb-row-active]="dfuFilterActive"
           [class.fsb-row-disabled]="!!selectedStageSlot" (click)="!selectedStageSlot && toggleDFUFilter()">
@@ -1053,6 +1069,11 @@
             ATC: {{atcFilter === 'none' ? 'All' : atcFilter === 'validated' ? 'Validated' : 'Unvalidated'}}
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
+          <mat-chip *ngIf="noAtcFilterActive"
+            (removed)="noAtcFilterActive=false; processTokensIntoStages(allTokensData)">
+            No ATC
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
           <mat-chip *ngIf="selectedCustomerSupportCategories.length > 0"
             (removed)="selectedCustomerSupportCategories=[]; processTokensIntoStages(allTokensData)">
             CS: {{selectedCustomerSupportCategories.length}} categor{{selectedCustomerSupportCategories.length > 1 ?
@@ -1078,6 +1099,10 @@
               Today - {{todayReminders.length}}
             </span>
           </span>
+        </div>
+        <!--Notes-->
+        <div class="notes-chip" *ngIf="selectedQueue" (click)="openNotesModal()">
+          <span style="  font-size: 12px;font-weight: 900;color: #1976d2;">View Notes</span>
         </div>
 
         <!-- Stage Count Chips -->
@@ -1164,8 +1189,14 @@
                     'example-box-defaulted': ['defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true,
                     'example-box': !['locked', 'defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) || (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] != true,
                     'current-match-scroll-target': isCurrentMatch(token),
-                    'priority-orange': getTokenHighlight(token.profile_id) === 'orange'
+                    'priority-orange': getTokenHighlight(token.profile_id) === 'orange',
+                    'token-pending-invitation': column.type === 'Waiting' && hasPendingInvitation(token)
                   }" *ngFor="let token of getDisplayedTokens(column); let tokenIndex = index">
+                  <span *ngIf="column.type === 'Waiting' && hasPendingInvitation(token)"
+                    class="pending-invitation-badge"
+                    [matTooltip]="getPendingInvitationPairingNames(token)">
+                    {{ getPendingInvitationPairingNames(token) || 'Invitation Pending' }}
+                  </span>
                   <div class="token-content">
                     <!-- Move Menu Wrapper -->
                     <div class="move-menu-wrapper">
@@ -1555,6 +1586,73 @@
         </div>
       </div>
     </div>
+
+    <!-- Notes Modal -->
+    <div class="notes-overlay" *ngIf="showNotesListModal">
+      <div class="notes-overlay-bg" (click)="closeNotesModal()"></div>
+      <div class="notes-modal" (click)="$event.stopPropagation()">
+
+        <div class="notes-modal-head">
+          <div class="notes-modal-title">
+            <span>Notes</span>
+          </div>
+          <button mat-icon-button (click)="closeNotesModal()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="notes-modal-toolbar">
+          <div class="notes-search-wrap">
+            <mat-icon>search</mat-icon>
+            <input [(ngModel)]="notesSearch"  placeholder="Search by participant name" autocomplete="off">
+            <button *ngIf="notesSearch" (click)="notesSearch = ''">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <mat-form-field appearance="outline" class="notes-date-field">
+            <mat-label>Date range</mat-label>
+            <mat-date-range-input [rangePicker]="notesPicker">
+              <input matStartDate [(ngModel)]="notesDateStart" placeholder="Start">
+              <input matEndDate [(ngModel)]="notesDateEnd" placeholder="End">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matSuffix [for]="notesPicker"></mat-datepicker-toggle>
+            <mat-date-range-picker #notesPicker></mat-date-range-picker>
+            <button matSuffix mat-icon-button *ngIf="notesDateStart"
+              (click)="notesDateStart=null; notesDateEnd=null">
+              <mat-icon>clear</mat-icon>
+            </button>
+          </mat-form-field>
+        </div>
+
+        <div class="notes-modal-body">
+          <div *ngIf="notesGrouped.length === 0" class="notes-empty">
+            <mat-icon>notes</mat-icon>
+            <p>No notes{{notesDateStart ? ' in this date range' : ''}}</p>
+          </div>
+
+          <div *ngFor="let group of notesGrouped" class="notes-group">
+            <div class="notes-group-head">
+              <span class="notes-avatar">{{group.name.charAt(0).toUpperCase()}}</span>
+              <span class="notes-group-name">{{group.name}}</span>
+            </div>
+
+            <div *ngFor="let n of group.items" class="notes-row">
+              <div class="notes-row-meta">
+                <span class="notes-token">#{{n.tokennumber}}</span>
+                <span class="notes-stage" *ngIf="n.stage">
+                  <mat-icon>layers</mat-icon>{{n.stage}}
+                </span>
+                <span class="notes-date">{{n.date | date:'MMM d, y · h:mm a'}}</span>
+                <span class="notes-author" *ngIf="n.author">· {{n.author}}</span>
+              </div>
+              <p class="notes-text">{{n.text}}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Reminder List Modal -->
     <div class="reminder-modal-backdrop" *ngIf="showReminderListModal" (click)="closeReminderListModal()">
       <div class="reminder-modal-dialog" (click)="$event.stopPropagation()">
@@ -1915,8 +2013,9 @@
                             <div class="h-node wa"
                                  [class.success]="item.status === 'success'"
                                  [class.failure]="item.status === 'failure'"
-                                 [matTooltip]="item.title + ' — ' + item.message"
-                                 matTooltipClass="multiline-tooltip">
+                                 [matTooltip]="item.title"
+                                 matTooltipClass="multiline-tooltip"
+                                 (click)="toggleWhatsappPreview(item, p.profileId); $event.stopPropagation()">
                               <mat-icon class="h-node-icon">chat</mat-icon>
                               <span class="h-node-badge"
                                     [class.ok]="item.status === 'success'"
@@ -1929,6 +2028,38 @@
                           <div class="h-date">{{ item.logdate?.toDate() | date:'MMM d' }}</div>
                           <div class="h-time">{{ item.logdate?.toDate() | date:'h:mm a' }}</div>
                         </div>
+                      </div>
+
+                      <div *ngIf="selectedWhatsappPreview?.profileId === p.profileId" class="whatsapp-preview-box">
+                        <div class="whatsapp-preview-header">
+                          <div class="whatsapp-preview-title">
+                            <mat-icon style="font-size:15px;width:15px;height:15px;color:#059669;">chat</mat-icon>
+                            <span>{{ selectedWhatsappPreview?.item?.title || 'WhatsApp Message' }}</span>
+                            <span class="email-preview-status-badge"
+                                  [class.badge-sent]="selectedWhatsappPreview?.item?.status === 'success'"
+                                  [class.badge-failed]="selectedWhatsappPreview?.item?.status === 'failure'">
+                              {{ selectedWhatsappPreview?.item?.status === 'success' ? '✓ Sent' : '✗ Failed' }}
+                            </span>
+                          </div>
+                          <button class="whatsapp-preview-close" (click)="selectedWhatsappPreview = null; $event.stopPropagation()">
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </div>
+                        <div class="whatsapp-preview-meta">
+                          <div *ngIf="selectedWhatsappPreview?.item?.templateName" class="whatsapp-preview-meta-item">
+                            <mat-icon>description</mat-icon>
+                            <span class="whatsapp-preview-meta-label">Template:</span>
+                            <span class="whatsapp-preview-meta-value">{{ selectedWhatsappPreview?.item?.templateName }}</span>
+                          </div>
+                          <div *ngIf="selectedWhatsappPreview?.item?.logdate" class="whatsapp-preview-meta-item">
+                            <mat-icon>schedule</mat-icon>
+                            <span class="whatsapp-preview-meta-value">
+                              {{ selectedWhatsappPreview?.item?.logdate?.toDate() | date:'MMM d, y' }}
+                              · {{ selectedWhatsappPreview?.item?.logdate?.toDate() | date:'h:mm a' }}
+                            </span>
+                          </div>
+                        </div>
+                        <div *ngIf="selectedWhatsappPreview?.item?.message?.trim()" class="whatsapp-preview-body">{{ selectedWhatsappPreview?.item?.message }}</div>
                       </div>
                     </div>
 

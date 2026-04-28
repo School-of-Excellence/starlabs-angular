@@ -1175,15 +1175,30 @@
                 <mat-hint>Shown to participants after completing the final challenge</mat-hint>
                 </mat-form-field>
             </div>
-            <div class="form-row" style="align-items: center; margin-bottom: 4px;">
+            <!-- <div class="form-row" style="align-items: center; margin-bottom: 4px;">
                 <span style="font-size: 13px; font-weight: 600; color: var(--black); flex: 1;">Daily Communication</span>
                 <button mat-icon-button type="button" color="primary" (click)="addDailyCommunication()"
                 matTooltip="Add message">
                 <mat-icon>add_circle</mat-icon>
                 </button>
-            </div>
-
+            </div> -->
             <div formArrayName="dailyCommunication">
+              <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
+                class="form-row">
+                <mat-form-field appearance="outline" style="flex: 1;">
+                  <mat-label>Day {{ i + 1 }} Message</mat-label>
+                  <textarea
+                    matInput
+                    [formControlName]="i"
+                    placeholder="Enter message for day {{ i + 1 }}..."
+                    cdkTextareaAutosize
+                    cdkAutosizeMinRows="2"
+                    cdkAutosizeMaxRows="6"
+                  ></textarea>
+                </mat-form-field>
+              </div>
+            </div>
+            <!-- <div formArrayName="dailyCommunication">
                 <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
                 class="form-row" style="align-items: flex-start; gap: 8px;">
                 <mat-form-field appearance="outline" style="flex: 1;">
@@ -1205,7 +1220,7 @@
                     <mat-icon>remove_circle</mat-icon>
                 </button>
                 </div>
-            </div>
+            </div> -->
             </ng-container>
               <h3 class="section-title">Workshop Facilitator</h3>
               <div class="form-row">

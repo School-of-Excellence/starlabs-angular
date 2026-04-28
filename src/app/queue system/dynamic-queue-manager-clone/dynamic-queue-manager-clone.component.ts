@@ -57,6 +57,7 @@ interface NotificationEvent {
   message: string;
   title:   string;
   logdate: any;
+  templateName?: string;
 }
 
 interface ProfileNotificationSummary {
@@ -213,6 +214,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private liveQueueSubscription = new Subject<void>();
   private storage = inject(Storage);
 
+  pendingInvitationTokenIds: Set<string> = new Set();
+  pendingInvitationPairingMap: { [tokenId: string]: string[] } = {};
+
   showMoveMenu: { [key: string]: boolean } = {};
   showTokenMenu: { [key: string]: boolean } = {};
   showVariationSubmenu = false;
@@ -258,69 +262,83 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   showTimeSlotPicker: boolean = false;
   showTimeDropdown: boolean = false;
   showStageCountPanel: boolean = false;
+
   showAddLinkDialog: boolean = false;
   showAddLinkForm: boolean = false;
-  showReminderDialog: boolean = false;
-  showReminderListModal: boolean = false;
-  reminderTodayFilterActive: boolean = false;
-  showReminderBanner: boolean = true;
-
-  stageCountSubscription: any;
-  selectedStageCountCard: any = null;
-  selectedReminderToken: any = null;
-
-  remindersSubscription: Subscription;
-  quickLinksSubscription: Subscription;
-  editingReminderContext: string = '';
-  newReminderContext: string = '';
-  editingLinkIndex: number = -1;
-
-  newReminderTime: string = '18:00';
-  minReminderDate: Date = new Date();
 
   newLinkData = { screenName: '', url: '', isInternal: false };
   editingLinkData = { screenName: '', url: '', isInternal: false };
-
+  
+  // reminders
   selectedReminderFilter: 'overdue' | 'today' | 'upcoming' | 'all' | 'completed' = 'all';
   timeDropdownPosition = { top: '0px', right: '0px', left: 'auto' };
-
   activeReminderNotification: any = null;
   showReminderNotification: boolean = false;
   dueRemindersToShow: any[] = [];
   private reminderCheckInterval: any;
   private shownReminderIds: Set<string> = new Set();
   editingReminderTime: string ;
+  showReminderDialog: boolean = false;
+  showReminderListModal: boolean = false;
+  reminderTodayFilterActive: boolean = false;
+  showReminderBanner: boolean = true;
+  stageCountSubscription: any;
+  selectedStageCountCard: any = null;
+  selectedReminderToken: any = null;
+  remindersSubscription: Subscription;
+  quickLinksSubscription: Subscription;
+  editingReminderContext: string = '';
+  newReminderContext: string = '';
+  editingLinkIndex: number = -1;
+  newReminderTime: string = '18:00';
+  minReminderDate: Date = new Date();
   sidenavMode: 'comms' | 'filter' = 'comms';
+  //stage slot
   preassignedDropdownOpen: boolean = false;
   stageSlotDropdownOpen: boolean = false;
   showStageCountDropdown: boolean = false;
+  // customer support
   customerSupportDropdownOpen: boolean = false;
   customerSupportSubscription: Subscription;
   customerSupportMap: { [profileId: string]: any[] } = {};
   availableCustomerSupportCategories: string[] = [];
   selectedCustomerSupportCategories: string[] = [];
+  // event participantion
   eventParticipationDropdownOpen: boolean = false;
-  eventParticipationList: any[] = []; // all events + queues (lazy loaded)
-  eventParticipationListLoaded: boolean = false; // lazy load flag
-  selectedEventParticipation: any = null; // selected event/queue
+  eventParticipationList: any[] = []; 
+  eventParticipationListLoaded: boolean = false; 
+  selectedEventParticipation: any = null; 
   arenaEventFilterList: Array<{ docid: string; name: string }> = [];
   arenaEventProfileMap: { [arenaeventid: string]: Set<string> } = {};
   selectedArenaEventId: string | null = null;
   arenaEventDropdownOpen: boolean = false;
   arenaEventLoading: boolean = false;
   eventParticipationSearchTerm: string = '';
+  // atc filter 
   atcValidatedProfileIds: Set<string> = new Set();
   atcUnvalidatedProfileIds: Set<string> = new Set();
-  atcAllProfileIds: Set<string> = new Set(); // combined set
-  atcFilterActive: boolean = false; // main toggle
-  atcFilter: 'none' | 'validated' | 'unvalidated' = 'none'; // sub filter
+  atcAllProfileIds: Set<string> = new Set(); 
+  atcFilterActive: boolean = false; 
+  atcFilter: 'none' | 'validated' | 'unvalidated' = 'none'; 
   atcDataLoaded: boolean = false;
   atcDropdownOpen: boolean = false;
   atcDateRangeOnlyProfileIds: Set<string> = new Set();
+  // no atc filter
+  noAtcFilterActive: boolean = false;
+  noAtcProfileIds: Set<string> = new Set();
+  noAtcCount: number = 0;
+  // timeline notification
   notificationTimelineMap: { [profileId: string]: any[] } = {};
   notificationTimelineLoading: boolean = false;
   selectedTimelineToken: any = null;
   showTimelineDialog: boolean = false;
+  // notes filter
+  showNotesListModal = false;
+  notesSearch = '';
+  notesDateStart: Date | null = null;
+  notesDateEnd: Date | null = null;
+  notesData: any[] = [];
+  
 
   // Add this property
   isRoundRobinRunning = false;
@@ -360,6 +378,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private shouldScrollTracks = false;
   timelineSearchQuery = '';
   selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
+  selectedWhatsappPreview: { profileId: string; item: NotificationEvent } | null = null;
 
   // keep unsubscribe handles to tear down on close
   private timelineUnsubs: (() => void)[] = [];
@@ -420,7 +439,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
     
     // Close filter dropdowns when clicking outside
-    if (!target.closest('.filter-sidenav-body')) {
+    if (!target.closest('.filter-sidenav-body') && 
+      !target.closest('.cdk-overlay-container')) { 
       this.segmentDropdownOpen = false;
       this.tagDropdownOpen = false;
       this.preassignedDropdownOpen = false;
@@ -519,6 +539,19 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     );
 
     return productNames.join('\n');
+  }
+
+  hasPendingInvitation(token: any): boolean {
+    return !!token?.docid && this.pendingInvitationTokenIds.has(token.docid);
+  }
+
+  getPendingInvitationPairingNames(token: any): string {
+    if (!token?.docid) return '';
+    const pairing = this.pendingInvitationPairingMap[token.docid] ?? [];
+    const names = pairing
+      .map(pid => this.mapProfileData[pid]?.['name'])
+      .filter((n: string) => !!n);
+    return names.join(', ');
   }
 
   getTokenHighlight(profileId: string): 'orange' | 'none' {
@@ -860,6 +893,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.atcFilterActive = false;
     this.atcFilter = 'none';
     this.atcDropdownOpen = false;
+    this.noAtcFilterActive = false;
+    this.noAtcProfileIds = new Set();
+    this.noAtcCount = 0;
     this.clearSearch();
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1552,11 +1588,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         });
       }
 
-      getDocs(
-        query(collection(this.firestore, 'products'), where('mode', '==', 'Priority Mode'))
-      ).then(prioritySnap => {
-        this.priorityModeProductIds = prioritySnap.docs.map(d => d.id);
-      }); 
+    getDocs(
+      query(collection(this.firestore, 'products'), where('mode', '==', 'Priority Mode'))
+    ).then(prioritySnap => {
+      this.priorityModeProductIds = prioritySnap.docs.map(d => d.id);
+    }); 
 
     this.quickLinksSubscription = collectionData(
       query(collection(this.firestore, 'classify'), where(documentId(), '==', 'queuesystem')),
@@ -1571,26 +1607,26 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.loadReminders();
     }
     this.reminderCheckInterval = setInterval(() => {
-      this.checkForDueReminders();
-    }, 30000); // Check every 30 seconds
-    
-    // Check immediately on load
-    this.checkForDueReminders();
+      if (Object.keys(this.mapProfileData).length > 0) {
+        this.checkForDueReminders();
+      }
+    }, 30000);
   }
 
   ngAfterViewInit(): void {
     this.guard.getProfileMap().then(data => {
-      this.mapProfileData = data.docdata
+      this.mapProfileData = data.docdata;
       this.mapProfileIdToEmail = Object.fromEntries(
         Object.entries(this.mapProfileData).map(([id, data]) => [id, data['email']])
-      )
+      );
+
+      this.checkForDueReminders();
     });
 
     this.participantSubscription = collectionData(collection(this.firestore, 'participant metadata'), { idField: 'id' }).pipe(takeUntil(this.subscriptionHandle)).subscribe((participantdoc) => {
       participantdoc.forEach((data) => {
         this.participantMetaDataMap[data['profileid']] = data;
       });
-
       this.allParticipants.set(participantdoc);
       if (this.dfuFilterActive && this.allTokensData.length > 0) {
         this.processTokensIntoStages(this.allTokensData);
@@ -1616,6 +1652,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const drawerContent = document.querySelector('mat-drawer-content');
     if (drawerContent) {
       drawerContent.removeEventListener('scroll', () => {});
+    }
+    if (this.reminderCheckInterval) {
+      clearInterval(this.reminderCheckInterval);
+      this.reminderCheckInterval = null;
     }
     if (this.remindersSubscription) {
       this.remindersSubscription.unsubscribe();
@@ -1659,6 +1699,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.atcFilter = 'none';
     this.atcDataLoaded = false;
     this.atcDropdownOpen = false;
+    this.noAtcFilterActive = false;
+    this.noAtcProfileIds = new Set();
+    this.noAtcCount = 0;
     this.customerSupportMap = {};
     this.availableCustomerSupportCategories = [];
     this.selectedCustomerSupportCategories = [];
@@ -1688,6 +1731,34 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       if (count >= 6) {
         loading.close()
       }
+    })
+
+    this.pendingInvitationTokenIds = new Set();
+    this.pendingInvitationPairingMap = {};
+    collectionData(query(
+      collection(this.firestore, "studioinvitation"),
+      where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue["docid"])),
+      where("clientresponse", "==", null)
+    )).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(invitations => {
+      const now = Date.now();
+      const activeInvitations = invitations.filter(inv => {
+        const expiry = inv['expirydate']?.toDate ? inv['expirydate'].toDate() : inv['expirydate'];
+        return !expiry || expiry.getTime() >= now;
+      });
+      const tokenIds = new Set<string>();
+      const pairingMap: { [tokenId: string]: string[] } = {};
+      for (const inv of activeInvitations) {
+        const tokenId = inv['tokenref']?.id;
+        if (!tokenId) continue;
+        tokenIds.add(tokenId);
+        const pairing: string[] = inv['specialistpairing']
+          ?? this.mapStudio[inv['studioid']]?.['pairing']
+          ?? this.mapStudio[inv['studioid']]?.['participants']
+          ?? [];
+        pairingMap[tokenId] = pairing;
+      }
+      this.pendingInvitationTokenIds = tokenIds;
+      this.pendingInvitationPairingMap = pairingMap;
     })
 
     // collectionData(query(collection(this.firestore, "queue generation", this.selectedQueue['docid'], "stagechat"), where("senderprofileid", '==', this.profileid), where("pinned", '==', true), orderBy("date", "desc")), { idField: 'id' }).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(async snap => {
@@ -2081,6 +2152,14 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         );
       }
     }
+
+    if (this.noAtcFilterActive) {
+      filteredTokens = filteredTokens.filter(token =>
+        this.noAtcProfileIds.has(token.profile_id) &&
+        token.tokenstatus !== 'inActive'
+      );
+    }
+
     if (this.reminderTodayFilterActive) {
       const todayProfileIds = new Set(this.todayReminders.map(r => r.profileid));
       filteredTokens = filteredTokens.filter(
@@ -4631,6 +4710,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.editingReminderId = reminder.docid;
     this.editingReminderContext = reminder.context;
     this.editingReminderDate = reminder.date?.toDate();
+
+    const d = reminder.date?.toDate();
+    if (d) {
+      const hh = d.getHours().toString().padStart(2, '0');
+      const mm = d.getMinutes().toString().padStart(2, '0');
+      this.editingReminderTime = `${hh}:${mm}`;
+    } else {
+      this.editingReminderTime = '18:00';
+    }
   }
 
   cancelEditReminder() {
@@ -4833,9 +4921,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     
     const dueReminders: any[] = [];
     
+    
     this.reminders.forEach(reminder => {
       const reminderDate = reminder.date?.toDate();
-      if (!reminderDate) return;      
+      if (!reminderDate) return;  
+      if (reminder.status === 'completed') return;    
       if (this.shownReminderIds.has(reminder.docid)) return;      
       const alreadyInPopup = this.dueRemindersToShow.some(r => r.docid === reminder.docid);
       if (alreadyInPopup) return;
@@ -4868,6 +4958,64 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.showReminderNotification = false;
     this.dueRemindersToShow = [];
   }
+  
+  openNotesModal() {
+    this.notesSearch = '';
+    this.notesDateStart = null;
+    this.notesDateEnd = null;
+
+    const rows: any[] = [];
+    for (const token of this.allTokensData) {
+      if (!token.notesList?.length || token.tokenstatus !== 'Active') continue;
+      for (const note of token.notesList) {
+        const date: Date = note.updatedon?.toDate?.() ?? note.updatedon;
+        if (!date) continue;
+        rows.push({
+          profileId: token.profile_id,
+          name: this.mapProfileData[token.profile_id]?.['name'] || '',
+          tokennumber: token.tokennumber,
+          text: note.text,
+          date,
+          author: this.mapProfileData[note.author]?.['name'] || '',
+          stage: note.stage || ''
+        });
+      }
+    }
+    this.notesData = rows.sort((a, b) => b.date - a.date);
+    this.showNotesListModal = true;
+  }
+
+  get notesGrouped(): { profileId: string; name: string; items: any[] }[] {
+    let rows = this.notesData;
+
+    if (this.notesDateStart && this.notesDateEnd) {
+      const end = new Date(this.notesDateEnd);
+      end.setHours(23, 59, 59, 999);
+      rows = rows.filter(r => r.date >= this.notesDateStart! && r.date <= end);
+    }
+
+    if (this.notesSearch.trim()) {
+      const q = this.notesSearch.toLowerCase().trim();
+      rows = rows.filter(r => r.name.toLowerCase().includes(q));
+    }
+
+    const map = new Map<string, any>();
+    for (const row of rows) {
+      if (!map.has(row.profileId)) {
+        map.set(row.profileId, { profileId: row.profileId, name: row.name, items: [] });
+      }
+      map.get(row.profileId).items.push(row);
+    }
+    return Array.from(map.values());
+  }
+
+  closeNotesModal() {
+    this.showNotesListModal = false;
+    this.notesSearch = '';
+    this.notesDateStart = null;
+    this.notesDateEnd = null;
+    this.notesData = [];
+  }
 
   getActiveFilterCount(): number {
     let count = 0;
@@ -4881,6 +5029,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (this.dfuFilterActive) count++;
     if (this.reminderTodayFilterActive) count++;
     if (this.atcFilterActive) count++;
+    if (this.noAtcFilterActive) count++;
     count += this.selectedCustomerSupportCategories.length;
     if (this.selectedArenaEventId) count++;
     return count;
@@ -5157,6 +5306,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     
     this.atcDataLoaded = true;
   }
+
   async toggleATCFilter() {
     if (!this.atcDataLoaded) {
       await this.fetchATCParticipants();
@@ -5169,30 +5319,69 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
     this.processTokensIntoStages(this.allTokensData);
   }
-  getTotalATCCount(): number {
-    return this.allTokensData.filter(token =>
-      this.atcAllProfileIds.has(token.profile_id) &&
-      token.tokenstatus === 'Active'
-    ).length;
+
+  async toggleNoAtcFilter() {
+    if (!this.atcDataLoaded) {
+      await this.fetchATCParticipants();
+    }
+    this.noAtcFilterActive = !this.noAtcFilterActive;
+    if (this.noAtcFilterActive) {
+      this.noAtcProfileIds = new Set(
+        this.allTokensData
+          .filter(t =>
+            t.tokenstatus === 'Active' &&
+            !this.atcAllProfileIds.has(t.profile_id)
+          )
+          .map(t => t.profile_id)
+      );
+    }
+    this.processTokensIntoStages(this.allTokensData);
   }
+
+  getTotalATCCount(): number {
+    return this.stageQueue
+      .filter(stage => stage.stagename !== 'Unattended Participants')
+      .reduce((sum, stage) => {
+        return sum + (stage.allTokens || stage.tokenlist || [])
+          .filter((token: any) => this.atcAllProfileIds.has(token.profile_id))
+          .length;
+      }, 0);
+  }
+
+  getATCValidatedCount(): number {
+    return this.stageQueue
+      .filter(stage => stage.stagename !== 'Unattended Participants')
+      .reduce((sum, stage) => {
+        return sum + (stage.allTokens || stage.tokenlist || [])
+          .filter((token: any) => this.atcValidatedProfileIds.has(token.profile_id))
+          .length;
+      }, 0);
+  }
+
+  getATCUnvalidatedCount(): number {
+    return this.stageQueue
+      .filter(stage => stage.stagename !== 'Unattended Participants')
+      .reduce((sum, stage) => {
+        return sum + (stage.allTokens || stage.tokenlist || [])
+          .filter((token: any) => this.atcUnvalidatedProfileIds.has(token.profile_id))
+          .length;
+      }, 0);
+  }
+
+  getNoAtcCount(): number {
+    return this.stageQueue
+      .filter(stage => stage.stagename !== 'Unattended Participants')
+      .reduce((sum, stage) => {
+        return sum + (stage.allTokens || stage.tokenlist || [])
+          .filter((token: any) => !this.atcAllProfileIds.has(token.profile_id))
+          .length;
+      }, 0);
+  }
+  
   selectATCFilter(type: 'validated' | 'unvalidated' | 'none') {
     this.atcFilter = this.atcFilter === type ? 'none' : type;
     this.atcDropdownOpen = false;
     this.processTokensIntoStages(this.allTokensData);
-  }
-
-  getATCValidatedCount(): number {
-    return this.allTokensData.filter(token =>
-      this.atcValidatedProfileIds.has(token.profile_id) &&
-      token.tokenstatus === 'Active'
-    ).length;
-  }
-
-  getATCUnvalidatedCount(): number {
-    return this.allTokensData.filter(token =>
-      this.atcUnvalidatedProfileIds.has(token.profile_id) &&
-      token.tokenstatus === 'Active'
-    ).length;
   }
   
   isATCDateRangeOnly(profileId: string): boolean {
@@ -5274,6 +5463,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   closeQueueTimeline() {
     this.showTimelineOverlay = false;
     this.selectedEmailPreview = null;
+    this.selectedWhatsappPreview = null;
     this.timelineUnsubs.forEach(u => u());
     this.timelineUnsubs = [];
   }
@@ -5403,6 +5593,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       const sent: string[] = data['sent'] || [];
       const failed: string[] = data['failed'] || [];
 
+      const template = data['body'] || data['message'] || '';
+      const parameterConfig = data['parameterConfig'] || data['parameterconfig'] || [];
+      const templateName = data['template_name'] || data['templateName'] || '';
+
       sent.forEach(phone => {
         const profileId = numbersmap[phone];
         if (!profileId) return;
@@ -5411,9 +5605,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         entry.totalSuccess++;
         entry.timeline.push({
           channel: 'whatsapp', status: 'success',
-          message: data['message'] || '',
+          message: this.renderWhatsappMessage(template, parameterConfig, profileId),
           title: data['title'] || '',
           logdate: data['date'],
+          templateName,
         });
       });
 
@@ -5425,9 +5620,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         entry.totalFailed++;
         entry.timeline.push({
           channel: 'whatsapp', status: 'failure',
-          message: data['message'] || '',
+          message: this.renderWhatsappMessage(template, parameterConfig, profileId),
           title: data['title'] || '',
           logdate: data['date'],
+          templateName,
         });
       });
     });
@@ -5500,6 +5696,31 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }, 50);
   }
 
+  renderWhatsappMessage(template: string, parameterConfig: any[], profileId: string): string {
+    if (!template) return '';
+    if (!Array.isArray(parameterConfig) || parameterConfig.length === 0) return template;
+
+    const metadata: Record<string, any> = this.participantMetaDataMap[profileId] || {};
+    const profile: Record<string, any> = (this.mapProfileData[profileId] as Record<string, any>) || {};
+    const datamodel: Record<string, any> = {};
+
+    for (const param of parameterConfig) {
+      const name = param?.['name'];
+      if (!name) continue;
+      let value: any = '';
+      const fillType = param?.['fillType'];
+      if (fillType === 'metadata') {
+        const field = param?.['metadataField'];
+        value = (field != null ? (metadata[field] ?? profile[field]) : undefined) ?? '';
+      } else if (fillType === 'static') {
+        value = param?.['staticValue'] ?? '';
+      }
+      datamodel[name] = value;
+    }
+
+    return this.renderMessage(template, datamodel);
+  }
+
   renderMessage(template: string, datamodel: Record<string, any>): string {
     if (!template || !datamodel) return template || '';
 
@@ -5554,6 +5775,17 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.selectedEmailPreview = null;
     } else {
       this.selectedEmailPreview = { profileId, item };
+    }
+  }
+
+  toggleWhatsappPreview(item: NotificationEvent, profileId: string) {
+    if (
+      this.selectedWhatsappPreview?.profileId === profileId &&
+      this.selectedWhatsappPreview?.item === item
+    ) {
+      this.selectedWhatsappPreview = null;
+    } else {
+      this.selectedWhatsappPreview = { profileId, item };
     }
   }
 

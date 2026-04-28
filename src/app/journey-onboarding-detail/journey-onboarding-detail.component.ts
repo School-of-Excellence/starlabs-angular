@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject, EnvironmentInjector, runInInjectionContext  } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatInputModule }     from '@angular/material/input';
@@ -9,7 +9,7 @@ import { MatIconModule }      from '@angular/material/icon';
 import { MatTableModule }     from '@angular/material/table';
 import { Firestore, doc, setDoc, collection, getDoc, collectionData, getDocs, DocumentReference } from '@angular/fire/firestore';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { Storage, ref as storageRef, uploadBytes, getDownloadURL } from '@angular/fire/storage';
+import { Storage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from '@angular/fire/storage';
 import { catchError } from 'rxjs/operators';
 import { Auth, user } from '@angular/fire/auth';
 import { authState } from '@angular/fire/auth';
@@ -69,6 +69,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   private fb        = inject(FormBuilder);
   private cdr       = inject(ChangeDetectorRef);
   private auth = inject(Auth);
+  private injector = inject(EnvironmentInjector);
   private currentUserName = 'Admin'; // fallback
 
   // ── Modal state ───────────────────────────────────────────────
@@ -91,6 +92,8 @@ export class JourneyOnboardingDetailComponent implements OnInit {
    * In edit mode the journey dropdown is shown but disabled.
    */
   isEditMode = false;
+  detailSaveToast = false;
+  detailSaveError = '';
 
   // ── Selected single-ref previews ───────────────────────────────
   selectedRefs: Record<string, ContentUrlOption | null> = {};
@@ -124,6 +127,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   screenorderInput = '';
   solarVoiceOptions: any[] = [];
   seriesOptions: any[] = [];
+  imageValidationError: Record<string, string> = {};
   appLockedForm!: FormGroup;
   previewData: any = {};
   currentPage = 1;
@@ -175,7 +179,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.currentUserName = name;
     });
     authState(this.auth).subscribe(user => {
-      console.log('AUTH USER:', user);
+      // console.log('AUTH USER:', user);
     });
   }
 
@@ -269,14 +273,71 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
   nextDetailTab(): void {
     if (this.detailTabIndex >= this.detailTabs.length - 1) return;
-    if (!this.isTabFilled(this.detailTabIndex)) {
-      this.detailForm.markAllAsTouched();
-      this.cdr.markForCheck();
-      return;
+    // Mark all fields touched so errors show
+    this.detailForm.markAllAsTouched();
+    this.cdr.markForCheck();
+    // Block if current tab is not fully valid
+    if (!this.isTabValid(this.detailTabIndex)) {
+      return; // ← stops navigation
     }
     this.detailTabIndex++;
     this.currentScreen = this.detailTabs[this.detailTabIndex].screen;
     this.cdr.markForCheck();
+  }
+
+  isTabValid(tabIndex: number): boolean {
+    const v = this.detailForm;
+    if (!v) return false;
+
+    switch (tabIndex) {
+      case 0: // Intro
+        return (
+          v.get('introduction')?.valid === true &&
+          v.get('introductionvideo')?.valid === true &&
+          v.get('eventdescripition.title')?.valid === true &&
+          v.get('eventdescripition.intro')?.valid === true &&
+          v.get('eventdescripition.overview')?.valid === true &&
+          v.get('eventdescripition.overviewdescripition')?.valid === true
+        );
+
+      case 1: // Journey Overview
+        return (
+          v.get('overviewdescription')?.valid === true &&
+          v.get('overviewvideoDocId')?.valid === true
+        );
+
+      case 2: // Journey Description
+        return (
+          v.get('journeydetail.intro')?.valid === true &&
+          v.get('journeydetail.descripition')?.valid === true &&
+          v.get('journeydetail.imageurl')?.valid === true &&
+          v.get('journeypath.intro')?.valid === true &&
+          v.get('journeypath.descripition')?.valid === true &&
+          v.get('journeypath.imageurl')?.valid === true
+        );
+
+      case 3: // Subscription
+        return (
+          v.get('subscription.descripition')?.valid === true &&
+          v.get('subscription.imageurl')?.valid === true
+        );
+
+      case 4: // Experience / Product
+        return this.productincluded.controls.every(ctrl =>
+          ctrl.get('title')?.valid &&
+          ctrl.get('descripition')?.valid &&
+          ctrl.get('type')?.valid
+        );
+
+      case 5: // Product Overview
+        return (
+          v.get('otherdescripition.title')?.valid === true &&
+          v.get('otherdescripition.descripition')?.valid === true
+        );
+
+      default:
+        return true;
+    }
   }
 
   prevDetailTab(): void {
@@ -318,6 +379,12 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   }
 
   onTabChange(index: number, tab: any) {
+
+    if (index > this.detailTabIndex && !this.isTabValid(this.detailTabIndex)) {
+      this.detailForm.markAllAsTouched();
+      this.cdr.markForCheck();
+      return;
+    }
     this.showFullProcess = false;
     this.showProductDetailsPage = null;
     this.showProcessStepsPage = false;
@@ -325,6 +392,35 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     this.currentScreen = tab.screen;
     this.productSheetOpen = false;
     this.activeProductType = null;
+    this.cdr.markForCheck();
+  }
+
+  getSelectedContentUrlIds(): string[] {
+    return this.contentUrls.controls
+      .map(c => c.get('docId')?.value)
+      .filter(Boolean);
+  }
+
+  onTcMultiSelect(ids: string[]): void {
+    const cuArr = this.contentUrls;
+    while (cuArr.length) cuArr.removeAt(0);
+    ids.filter(Boolean).forEach(id => {
+      const opt = this.contentUrlOptions.find(o => o.id === id);
+      cuArr.push(this.newContentUrl({
+        docId: id,
+        path: `content_urls/${id}`,
+        title: opt?.title ?? '',
+        thumbnailUrl: opt?.thumbnailUrl ?? '',
+      }));
+    });
+    this.cdr.markForCheck();
+  }
+
+  dropContentUrls(event: CdkDragDrop<string[]>): void {
+    const arr = this.contentUrls;
+    const ctrl = arr.at(event.previousIndex);
+    arr.removeAt(event.previousIndex);
+    arr.insert(event.currentIndex, ctrl);
     this.cdr.markForCheck();
   }
 
@@ -692,7 +788,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       docid:          [docid],
       journeyrefDocId:[{ value: journeyDocId, disabled: !!prefill }, Validators.required],
       journeyref:     [p.journeyref ?? ''],
-      overviewvideoDocId: [''],
+      overviewvideoDocId: ['', Validators.required],
 
       eventdescripition: this.fb.group({
         title:                [p.eventdescripition?.title                ?? '', Validators.required],
@@ -706,7 +802,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       introduction:        [p.introduction      ?? '', Validators.required],
       introductionvideo:   [p.introductionvideo ?? '', Validators.required],
       overviewdescription: [p.overviewdescription ?? '', Validators.required],
-      overviewvideo:       [p.overviewvideo ?? ''],
+      overviewvideo:       [p.overviewvideo ?? '', Validators.required],
 
       journeydetail: this.fb.group({
         intro:        [p.journeydetail?.intro        ?? '', Validators.required],
@@ -741,7 +837,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           title:        [p.queuedescripition?.atcmodel?.title        ?? '', Validators.required],
           descripition: [p.queuedescripition?.atcmodel?.descripition ?? '', Validators.required],
         }),
-        processimage: [p.queuedescripition?.processimage ?? '', Validators.required],
+        processimage: [p.queuedescripition?.processimage ?? ''],
         processdetails: this.fb.group({
           title:        [p.queuedescripition?.processdetails?.title        ?? '', Validators.required],
           descripition: [p.queuedescripition?.processdetails?.descripition ?? '', Validators.required],
@@ -808,9 +904,9 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
   newProcessStep(v?: any): FormGroup {
     return this.fb.group({
-      title:        [v?.title        ?? '', Validators.required],
-      descripition: [v?.descripition ?? '', Validators.required],
-      imageurl:     [v?.imageurl     ?? '', Validators.required],
+      title:        [v?.title        ?? ''],
+      descripition: [v?.descripition ?? ''],
+      imageurl:     [v?.imageurl     ?? ''],
     });
   }
 
@@ -867,19 +963,18 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   onSingleRefSelect(docId: string, fieldKey: string): void {
     const opt = this.contentUrlOptions.find(o => o.id === docId) ?? null;
     this.selectedRefs[fieldKey] = opt;
+    const path = opt ? `content_urls/${opt.id}` : '';
 
     if (fieldKey === 'overviewvideo') {
       this.detailForm.patchValue({
         overviewvideoDocId: docId,
-        overviewvideo: opt ? `content_urls/${opt.id}` : ''
+        overviewvideo:      path,
       });
-
     } else if (fieldKey === 'goalvideourl') {
-      (this.detailForm.get('eventdescripition') as FormGroup)
-        .patchValue({
-          goalvideourlDocId: docId, // ✅ UI binding
-          goalvideourl: opt ? `content_urls/${opt.id}` : ''
-        });
+      (this.detailForm.get('eventdescripition') as FormGroup).patchValue({
+        goalvideourlDocId: docId,
+        goalvideourl:      path,
+      });
     }
 
     this.cdr.markForCheck();
@@ -892,9 +987,31 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     (document.getElementById(`file-${slot}`) as HTMLInputElement)?.click();
   }
 
-  onFileChange(event: Event, slot: string, formPath: string): void {
+  async onFileChange(event: Event, slot: string, formPath: string): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    (event.target as HTMLInputElement).value = '';
+
+    const ratioMap: Record<string, '16:9' | '9:16' | '1:1'> = {
+      'introductionvideo':      '9:16',
+      'journeydetail_imageurl': '16:9',
+      'journeypath_imageurl':   '16:9',
+      'subscription_imageurl':  '16:9',
+      'processimage':           '16:9',
+    };
+
+    const ratio = ratioMap[slot];
+
+    if (ratio) {
+      const error = await this.validateImageDimensions(file, ratio);  // ← validates both images AND videos
+      if (error) {
+        this.imageValidationError[slot] = error;
+        this.cdr.markForCheck();
+        return;
+      }
+    }
+
+    delete this.imageValidationError[slot];
     this.pendingFiles[slot] = file;
     const reader = new FileReader();
     reader.onload = () => {
@@ -903,18 +1020,29 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       this.cdr.markForCheck();
     };
     reader.readAsDataURL(file);
-    (event.target as HTMLInputElement).value = '';
   }
 
-  onStepFileChange(event: Event, stepIndex: number): void {
-    const slot = `step_imageurl_${stepIndex}`;
+  async onStepFileChange(event: Event, stepIndex: number): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
+    (event.target as HTMLInputElement).value = '';
+
+    const slot = `step_imageurl_${stepIndex}`;
+    const error = await this.validateImageDimensions(file, '1:1');
+    if (error) {
+      this.imageValidationError[slot] = error;
+      this.cdr.markForCheck();
+      return;
+    }
+
+    delete this.imageValidationError[slot];
     this.pendingFiles[slot] = file;
     const reader = new FileReader();
-    reader.onload = () => { this.imagePreviews[slot] = reader.result as string; this.cdr.markForCheck(); };
+    reader.onload = () => {
+      this.imagePreviews[slot] = reader.result as string;
+      this.cdr.markForCheck();
+    };
     reader.readAsDataURL(file);
-    (event.target as HTMLInputElement).value = '';
   }
 
   clearImage(event: MouseEvent, slot: string, formPath: string): void {
@@ -922,6 +1050,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     delete this.imagePreviews[slot];
     delete this.pendingFiles[slot];
     this.detailForm.get(formPath)?.setValue('');
+    this.detailForm.get(formPath)?.markAsTouched();
     this.cdr.markForCheck();
   }
 
@@ -931,23 +1060,139 @@ export class JourneyOnboardingDetailComponent implements OnInit {
     delete this.imagePreviews[slot];
     delete this.pendingFiles[slot];
     (this.processSteps.at(stepIndex) as FormGroup).patchValue({ imageurl: '' });
+    (this.processSteps.at(stepIndex) as FormGroup).get('imageurl')?.markAsTouched();
     this.cdr.markForCheck();
+  }
+
+  private validateImageDimensions(
+    file: File,
+    expectedRatio: '16:9' | '9:16' | '1:1'
+  ): Promise<string | null> {
+    return new Promise(resolve => {
+      const rules: Record<string, { minW: number; minH: number; maxW: number; maxH: number; label: string }> = {
+        '16:9': { minW: 1280, minH: 720,  maxW: 3840, maxH: 2160, label: '1280×720 to 3840×2160' },
+        '9:16': { minW: 720,  minH: 1280, maxW: 2160, maxH: 3840, label: '720×1280 to 2160×3840' },
+        '1:1':  { minW: 72,   minH: 72,   maxW: 72,   maxH: 72,   label: 'exactly 72×72' },
+      };
+      const rule = rules[expectedRatio];
+      const url = URL.createObjectURL(file);
+
+      if (file.type.startsWith('video/')) {
+        // ← use video element for videos
+        const video = document.createElement('video');
+        video.onloadedmetadata = () => {
+          URL.revokeObjectURL(url);
+          const w = video.videoWidth;
+          const h = video.videoHeight;
+          if (w < rule.minW || h < rule.minH || w > rule.maxW || h > rule.maxH) {
+            resolve(`Video must be ${rule.label}px. Your video is ${w}×${h}px.`);
+          } else {
+            resolve(null);
+          }
+        };
+        video.onerror = () => resolve('Could not read video dimensions.');
+        video.src = url;
+      } else {
+        // ← use image element for images
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const w = img.naturalWidth;
+          const h = img.naturalHeight;
+          if (w < rule.minW || h < rule.minH || w > rule.maxW || h > rule.maxH) {
+            resolve(`Image must be ${rule.label}px. Your image is ${w}×${h}px.`);
+          } else {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve('Could not read image dimensions.');
+        img.src = url;
+      }
+    });
+  }
+
+  private resizeImage(file: File, width: number, height: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error('Canvas toBlob failed'));
+        }, file.type || 'image/jpeg', 0.9);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
   }
 
   private async uploadPendingFiles(): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
+
+    const journeyDocId = this.detailForm.getRawValue().journeyrefDocId;
+    const journeyName = (this.journeyOptions.find(j => j.id === journeyDocId)?.label ?? 'unknown')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const slotNameMap: Record<string, string> = {
+      'introductionvideo':      'intro_video',
+      'journeydetail_imageurl': 'journey_detail_image',
+      'journeypath_imageurl':   'journey_path_image',
+      'subscription_imageurl':  'subscription_image',
+      'processimage':           'process_image',
+    };
+
     await Promise.all(Object.entries(this.pendingFiles).map(async ([slot, file]) => {
-      const path = `journey_onboarding/${Date.now()}_${slot}_${file.name}`;
+      let imageName = slotNameMap[slot];
+      if (!imageName) {
+        if (slot.startsWith('step_imageurl_')) {
+          const stepIndex = slot.replace('step_imageurl_', '');
+          imageName = `process_step_${Number(stepIndex) + 1}`;
+        } else {
+          imageName = slot;
+        }
+      }
+
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const fileName = `${journeyName}_${imageName}.${ext}`;
+      const path = `journey_onboarding/${fileName}`;
       const sRef = storageRef(this.storage, path);
-      await uploadBytes(sRef, file);
-      result[slot] = await getDownloadURL(sRef);
+
+      // Delete old file first if it exists — same path so it overwrites,
+      await runInInjectionContext(this.injector, async () => {
+        // Try deleting all possible old extensions for this slot
+        const extensions = ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm'];
+        await Promise.allSettled(
+          extensions.map(oldExt => {
+            const oldPath = `journey_onboarding/${journeyName}_${imageName}.${oldExt}`;
+            const oldRef = storageRef(this.storage, oldPath);
+            return deleteObject(oldRef);
+          })
+        );
+      });
+
+      let uploadData: File | Blob = file;
+      if (slot.startsWith('step_imageurl_')) {
+        uploadData = await this.resizeImage(file, 72, 72);
+      }
+
+      await runInInjectionContext(this.injector, async () => {
+        await uploadBytes(sRef, uploadData);
+        result[slot] = await getDownloadURL(sRef);
+      });
     }));
+
     return result;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Tag input
-  // ─────────────────────────────────────────────────────────────
   onTagKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' || event.key === ',') {
       event.preventDefault();
@@ -1057,6 +1302,10 @@ export class JourneyOnboardingDetailComponent implements OnInit {
   // so the table columns show correct values immediately.
   // ─────────────────────────────────────────────────────────────
   async saveDetail(): Promise<void> {
+    console.log('Save clicked — form valid:', this.detailForm.valid, '| invalid fields:',
+      Object.keys((this.detailForm as any).controls).filter(k => this.detailForm.get(k)?.invalid)
+    );
+
     this.detailForm.markAllAsTouched();
     if (this.detailForm.invalid) { this.cdr.markForCheck(); return; }
 
@@ -1071,7 +1320,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       const jdImageUrl = uploadedUrls['journeydetail_imageurl'] ?? v.journeydetail?.imageurl ?? '';
       const jpImageUrl = uploadedUrls['journeypath_imageurl']   ?? v.journeypath?.imageurl   ?? '';
       const subImageUrl     = uploadedUrls['subscription_imageurl']  ?? v.subscription?.imageurl       ?? '';
-      const processImageUrl = uploadedUrls['processimage']           ?? v.processdetails?.processimage ?? '';
+      const processImageUrl = uploadedUrls['processimage'] ?? v.queuedescripition?.processimage ?? '';
 
       const steps = (v.queuedescripition?.processdetails?.step ?? []).map((s: any, i: number) => ({
         title:        s.title        ?? '',
@@ -1084,6 +1333,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true,
       });
+      const overviewVideoPath = v.overviewvideoDocId ? `content_urls/${v.overviewvideoDocId}` : (v.overviewvideo ?? '');
       const payload: any = {
 
         docid:        v.docid,
@@ -1100,6 +1350,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
         introduction:      v.introduction ?? '',
         introductionvideo: introVideoUrl,
         overviewdescription: v.overviewdescription ?? '',
+        overviewvideo:       this.toRef(overviewVideoPath),
         journeydetail: {
           intro:        v.journeydetail?.intro        ?? '',
           descripition: v.journeydetail?.descripition ?? '',
@@ -1114,7 +1365,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
           title:        v.otherdescripition?.title        ?? '',
           descripition: v.otherdescripition?.descripition ?? '',
         },
-        overviewvideo:   this.toRef(v.overviewvideo ?? ''),
+        // overviewvideo:   this.toRef(v.overviewvideo ?? ''),
         productincluded: (v.productincluded ?? []).map((p: any) => ({
           title:        p.title        ?? '',
           descripition: p.descripition ?? '',
@@ -1127,12 +1378,12 @@ export class JourneyOnboardingDetailComponent implements OnInit {
             title:        v.queuedescripition?.atcmodel?.title        ?? '',
             descripition: v.queuedescripition?.atcmodel?.descripition ?? '',
           },
+          processimage: processImageUrl,
           processdetails: {
             title:        v.queuedescripition?.processdetails?.title        ?? '',
             descripition: v.queuedescripition?.processdetails?.descripition ?? '',
             step:         steps,
           },
-          processimage: processImageUrl,
         },
         screenorder:  [...this.screenorderTags],
         subscription: {
@@ -1144,6 +1395,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
 
       await setDoc(doc(this.firestore, 'journeyonboardingdetail', v.docid), payload, { merge: true ,});
       this.detailSubmitted = true;
+      this.detailSaveToast = true;
       this.editingIndex    = null;
       this.pendingFiles    = {};
       this.cdr.markForCheck();
@@ -1152,6 +1404,7 @@ export class JourneyOnboardingDetailComponent implements OnInit {
       alert('Save failed — check console.');
     } finally {
       this.detailLoading = false;
+      setTimeout(() => { this.detailSaveToast = false; this.cdr.markForCheck(); }, 3000);
       this.cdr.markForCheck();
     }
   }

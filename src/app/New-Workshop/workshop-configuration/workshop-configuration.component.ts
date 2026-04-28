@@ -660,7 +660,11 @@ async ngOnInit() {
     meta.get('workshopDays')?.updateValueAndValidity();
     meta.get('lastChallengeMessage')?.updateValueAndValidity();
   });
-
+  this.settingsForm.get('evergreenWorkshopMeta.workshopDays')?.valueChanges
+    .pipe(takeUntil(this.subscription))
+    .subscribe((days: number) => {
+      this.syncDailyCommunicationArray(days);
+    });
   this.settingsForm.get('cohortcategoriesforthisworkshop')?.valueChanges.subscribe((newValue: string[]) => {
     if (this.previousValueCohorts && this.previousValueCohorts.length > 0) {
       const removedIds = this.previousValueCohorts.filter(id => !newValue?.includes(id));
@@ -693,6 +697,28 @@ async ngOnInit() {
       this.loadWorkshopData();
       this.loadIconData()
       this.getWorkshopCategories()
+    }
+  }
+  
+  private dailyCommunicationBuffer: string[] = [];
+
+  syncDailyCommunicationArray(days: number): void {
+    if (!days || days < 1) return;
+    const arr = this.getDailyCommunicationArray();
+    const isEnabled = this.settingsForm.get('evergreenWorkshop')?.value;
+    arr.controls.forEach((ctrl, i) => {
+      this.dailyCommunicationBuffer[i] = ctrl.value || this.dailyCommunicationBuffer[i] || '';
+    });
+
+    while (arr.length > days) {
+      arr.removeAt(arr.length - 1);
+    }
+    while (arr.length < days) {
+      const index = arr.length;
+      arr.push(this.fb.control({
+        value: this.dailyCommunicationBuffer[index] || '',
+        disabled: !isEnabled
+      }));
     }
   }
   getDailyCommunicationArray(): FormArray{
@@ -1969,15 +1995,21 @@ private rebuildActivityIds(): void {
         heroImage: data['heroImage'] || '',
         heroVideo: data['heroVideo'] || '',
       });
+
       const isEvergreenEnabled = !!data['evergreenWorkshop'];
-      const dailyComms: string[] = data['evergreenWorkshopMeta']?.dailyCommunication?.length
-        ? data['evergreenWorkshopMeta'].dailyCommunication
-        : [''];
+      const workshopDays = data['evergreenWorkshopMeta']?.workshopDays || 0;
+      const savedComms: string[] = data['evergreenWorkshopMeta']?.dailyCommunication || [];
+      this.dailyCommunicationBuffer = [...savedComms];
+      
       const dailyArray = this.getDailyCommunicationArray();
       dailyArray.clear();
-      dailyComms.forEach(msg => {
-        dailyArray.push(this.fb.control({ value: msg, disabled: !isEvergreenEnabled }));
-      });
+
+      for (let i = 0; i < workshopDays; i++) {
+        dailyArray.push(this.fb.control({
+          value: savedComms[i] || '',
+          disabled: !isEvergreenEnabled
+        }));
+      }
 
       if (isEvergreenEnabled) {
         const meta = this.settingsForm.get('evergreenWorkshopMeta') as FormGroup;
@@ -1987,6 +2019,63 @@ private rebuildActivityIds(): void {
       }
     }
   }
+  // patchSettingsData(data: WorkshopConfig): void {
+  //   if (data && typeof data === 'object') {
+  //     this.settingsForm.patchValue({
+  //       active: data['active'] || false,
+  //       qanda: data['qanda'] || false,
+  //       breakdown: data['breakdown'] || false,
+  //       enableshare: data['enableshare'] || false,
+  //       triggerFunction: data['triggerFunction'] || false,
+  //       activeparticipants: data['activeparticipants'] || false,
+  //       evergreenWorkshop: data['evergreenWorkshop'] || false,
+  //       evergreenWorkshopMeta: {
+  //         workshopDays: data['evergreenWorkshopMeta']?.workshopDays ?? null,
+  //         lastChallengeMessage: data['evergreenWorkshopMeta']?.lastChallengeMessage ?? '',
+  //       },
+  //       newusersonly: data['newusersonly'] || false,
+  //       journeybased: data['journeybased'] || false,
+  //       tierbased: data['tierbased'] || false,
+  //       categorybased: data['categorybased'] || false,
+  //       testmode: data['testmode'] || false,
+  //       facilitator: data['facilitator'] || false,
+  //       testusers: data['testusers'] || [],
+  //       facilitatorprofiles: data['facilitatorprofiles'] || [],
+  //       selectedgroup: data['selectedgroup'] || null,
+  //       enrollwattimessage: data['enrollwattimessage'] || null,
+  //       mailTemplate: data['mailTemplate'] || null,
+  //       selectedjourneys: data['selectedjourneys'] || [],
+  //       selectedtiers: data['selectedtiers'] || [],
+  //       categoriesforthisworkshop: data['categoriesforthisworkshop'] || [],
+  //       cohortcategoriesforthisworkshop: data['cohortcategoriesforthisworkshop'] || [],
+  //       cohortsforthisworkshop: data['cohortsforthisworkshop'] || [],
+  //       categorythumbnail: data['categorythumbnail'] || '',
+  //       categoryVideo: data['categoryVideo'] || '',
+  //       hero: data['hero'] || false,
+  //       heroHeading: data['heroHeading'] || '',
+  //       heroDescription: data['heroDescription'] || '',
+  //       heroshowtype: data['heroshowtype'] || '',
+  //       heroImage: data['heroImage'] || '',
+  //       heroVideo: data['heroVideo'] || '',
+  //     });
+  //     const isEvergreenEnabled = !!data['evergreenWorkshop'];
+  //     const dailyComms: string[] = data['evergreenWorkshopMeta']?.dailyCommunication?.length
+  //       ? data['evergreenWorkshopMeta'].dailyCommunication
+  //       : [''];
+  //     const dailyArray = this.getDailyCommunicationArray();
+  //     dailyArray.clear();
+  //     dailyComms.forEach(msg => {
+  //       dailyArray.push(this.fb.control({ value: msg, disabled: !isEvergreenEnabled }));
+  //     });
+
+  //     if (isEvergreenEnabled) {
+  //       const meta = this.settingsForm.get('evergreenWorkshopMeta') as FormGroup;
+  //       meta.get('workshopDays')?.enable();
+  //       meta.get('lastChallengeMessage')?.enable();
+  //       dailyArray.controls.forEach(c => c.enable());
+  //     }
+  //   }
+  // }
   // patchSettingsData(data: WorkshopConfig): void {
   //   if (data && typeof data === 'object') {
   //     this.settingsForm.patchValue({
