@@ -483,18 +483,15 @@ export class CustomerChatScreenComponent {
       });
 
       this.filterFormInitialValue = this.filterform.value;
-      const participantjourneyproductRef = collection(this.firestore, 'participantjourneyproduct')
-      const participantjourneyproductquery = query(participantjourneyproductRef, where("profileid", "==", this.clientid), where("journeystatus", "in", ["ongoing", "initiated", "completed"]), orderBy("subscriptionstart", "desc"))
-      getDocs(participantjourneyproductquery).then((journey) => {
-        if (journey.docs.length != 0) {
-          this.activejourney = journey.docs[0].data()['journeyref'].id
+      const participantMetaRef = doc(this.firestore, 'participant metadata', this.clientid);
+      getDoc(participantMetaRef).then((docSnap) => {
+        if (docSnap.exists()) {
+          this.activejourney = docSnap.data()['activejourney'];
         } else {
           console.log("No Journey");
         }
       });
-
     });
-
   }
 
   fetchTicketMessages(ticket) {
