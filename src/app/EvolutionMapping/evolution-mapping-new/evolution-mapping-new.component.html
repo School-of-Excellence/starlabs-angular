@@ -1,3 +1,9 @@
+<div class="loading-overlay" *ngIf="initialLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading Dashboard</div>
+  </div>
+</div>
 <div class="mainscreen" (click)="showEventFilterDropdown = false; showVideoFilterDropdown = false; showJourneyTypeDropdown = false">
     <!-- Page Header -->
   <div class="page-header">
@@ -8,22 +14,14 @@
         <span class="summary-count">{{ summaryStats.totalParticipants }}</span>
         <span class="summary-label">Participants</span>
       </div>
-      <div class="summary-card summary-card-event">
-        <span class="summary-count">{{ summaryStats.totalEvents }}</span>
-        <span class="summary-label">Event Videos</span>
-      </div>
-      <div class="summary-card summary-card-interview">
-        <span class="summary-count">{{ summaryStats.totalInterviews }}</span>
-        <span class="summary-label">Interviews</span>
-      </div>
-      <div class="summary-card summary-card-testimonial">
-        <span class="summary-count">{{ summaryStats.totalTestimonials }}</span>
-        <span class="summary-label">Testimonials</span>
+      <div class="summary-card" *ngFor="let key of videoTypeKeys"
+          [class]="'summary-card-' + key.toLowerCase()">
+        <span class="summary-count">{{ summaryStats.videoCounts[key] || 0 }}</span>
+        <span class="summary-label">{{ videoTypeMap[key] }}</span>
       </div>
     </div>
   </div>
     
-
   <!-- Filters -->
   <div class="filters-row">
     <div class="filters-left">
@@ -61,8 +59,6 @@
 
       <button mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
-
-
 
     <button class="add-video-btn" (click)="openAddVideo()">
       + Add Video
@@ -160,22 +156,15 @@
         </th>
         <td mat-cell *matCellDef="let row">
           <div class="video-dots-row" *ngIf="mapVideoCount[mapProfiles[row['id']]?.['profileid']]; else noVideos">
-            <span class="video-dot dot-event"
-                  *ngIf="mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.events > 0"
-                  [title]="mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.events + ' Event'">
-            </span>
-            <span class="video-dot dot-interview"
-                  *ngIf="mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.interviews > 0"
-                  [title]="mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.interviews + ' Interview'">
-            </span>
-            <span class="video-dot dot-testimonial"
-                  *ngIf="mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.testimonials > 0"
-                  [title]="mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.testimonials + ' Testimonial'">
-            </span>
+            <ng-container *ngFor="let key of videoTypeKeys">
+              <span class="video-dot"
+                    [class]="'dot-' + key.toLowerCase()"
+                    *ngIf="mapVideoCount[mapProfiles[row['id']]?.['profileid']][key] > 0"
+                    [title]="mapVideoCount[mapProfiles[row['id']]?.['profileid']][key] + ' ' + videoTypeMap[key]">
+              </span>
+            </ng-container>
             <span class="video-total-count">
-              {{ (mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.events || 0) +
-                (mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.interviews || 0) +
-                (mapVideoCount[mapProfiles[row['id']]?.['profileid']]?.testimonials || 0) }} videos
+              {{ getTotalVideoCount(mapProfiles[row['id']]?.['profileid']) }} videos
             </span>
           </div>
           <ng-template #noVideos>
@@ -261,23 +250,18 @@
   <div class="col-filter-dropdown" *ngIf="showVideoFilterDropdown" [style.top.px]="videoFilterDropdownTop" [style.left.px]="videoFilterDropdownLeft" (click)="$event.stopPropagation()">
     <div class="col-filter-header">
       <span>Filter by Video Event</span>
-      <button class="col-filter-clear"
-              *ngIf="selectedVideoFilters.length > 0"
-              (click)="selectedVideoFilters = []; fetchRecords()">
+      <button class="col-filter-clear"*ngIf="selectedVideoFilters.length > 0"(click)="selectedVideoFilters = []; fetchRecords()">
         Clear
       </button>
     </div>
 
     <!-- Search input -->
     <div class="col-filter-search">
-      <input class="col-filter-search-input"
-            [formControl]="videoFilterSearchCtrl"
-            placeholder="Search events..."
-            (click)="$event.stopPropagation()">
+      <input class="col-filter-search-input"[formControl]="videoFilterSearchCtrl"placeholder="Search events..."(click)="$event.stopPropagation()">
     </div>
 
     <div class="col-filter-list">
-      <div class="col-filter-item" *ngFor="let event of filteredVideoFilterOptions">
+      <div class="col-filter-item" *ngFor="let event of filteredEventFilterOptions">
         <label class="col-filter-label">
           <input type="checkbox"
                 [checked]="selectedVideoFilters.includes(event.id)"
@@ -292,19 +276,14 @@
   <div class="col-filter-dropdown" *ngIf="showEventFilterDropdown" [style.top.px]="eventFilterDropdownTop" [style.left.px]="eventFilterDropdownLeft" (click)="$event.stopPropagation()">
     <div class="col-filter-header">
       <span>Filter by Event</span>
-      <button class="col-filter-clear"
-              *ngIf="selectedEventFilters.length > 0"
-              (click)="selectedEventFilters = []; fetchRecords()">
+      <button class="col-filter-clear"*ngIf="selectedEventFilters.length > 0"(click)="selectedEventFilters = []; fetchRecords()">
         Clear
       </button>
     </div>
 
     <!-- Search input -->
     <div class="col-filter-search">
-      <input class="col-filter-search-input"
-            [formControl]="eventFilterSearchCtrl"
-            placeholder="Search events..."
-            (click)="$event.stopPropagation()">
+      <input class="col-filter-search-input"[formControl]="eventFilterSearchCtrl"placeholder="Search events..."(click)="$event.stopPropagation()">
     </div>
 
     <div class="col-filter-list">
@@ -328,7 +307,6 @@
   <!-- Evolution Log Overlay -->
   <div class="log-overlay-wrap" *ngIf="showLogOverlay">
     <div class="log-panel">
-
       <!-- Header -->
       <div class="log-header">
         <div class="log-header-left">
@@ -341,16 +319,12 @@
           </button>
         </div>
       </div>
-
       <!-- Filter Bar -->
       <div class="log-filter-bar" *ngIf="logEventFilterOptions.length > 0">
         <div class="log-filter-left">
-
           <mat-form-field appearance="outline" class="log-event-filter">
             <mat-label>Filter by Event</mat-label>
-            <mat-select multiple
-                        [(ngModel)]="selectedLogEventFilter"
-                        (ngModelChange)="applyLogEventFilter()">
+            <mat-select multiple [(ngModel)]="selectedLogEventFilter"(ngModelChange)="applyLogEventFilter()">
               <mat-option>
                 <ngx-mat-select-search
                   [formControl]="logEventFilterCtrl"
@@ -363,8 +337,6 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
-
-          <!-- ↓ ADD CHIPS RIGHT HERE, inside log-filter-left, after mat-form-field -->
           <div class="log-filter-chips" *ngIf="selectedLogEventFilter.length > 0">
             <ng-container *ngFor="let id of selectedLogEventFilter">
               <div class="log-filter-chip">
@@ -375,16 +347,11 @@
               </div>
             </ng-container>
           </div>
-
         </div>
-
-        <button class="log-filter-clear"
-                *ngIf="selectedLogEventFilter.length > 0"
-                (click)="selectedLogEventFilter = []; applyLogEventFilter()">
+        <button class="log-filter-clear"*ngIf="selectedLogEventFilter.length > 0"(click)="selectedLogEventFilter = []; applyLogEventFilter()">
           Clear filters
         </button>
       </div>
-
       <div class="loading-spinner" *ngIf="logLoading">
         <mat-spinner diameter="36"></mat-spinner>
       </div>
@@ -530,7 +497,7 @@
               <span class="delete-video-type-badge">{{ card['videoType'] || 'Event' }}</span>
             </div>
             <button class="delete-video-icon-btn"
-                    (click)="deleteVideoIndex = 0; executeDelete(); $event.stopPropagation()">
+                    (click)="deleteVideoIndex = 0;Delete(); $event.stopPropagation()">
               <mat-icon>delete</mat-icon>
             </button>
           </div>
@@ -542,7 +509,7 @@
               <span class="delete-video-type-badge">{{ extra.videoType || 'Event' }}</span>
             </div>
             <button class="delete-video-icon-btn"
-                    (click)="deleteVideoIndex = vi + 1; executeDelete(); $event.stopPropagation()">
+                    (click)="deleteVideoIndex = vi + 1;Delete(); $event.stopPropagation()">
               <mat-icon>delete</mat-icon>
             </button>
           </div>
@@ -635,11 +602,11 @@
             <div class="form-group">
               <label class="form-label">Type</label>
               <mat-form-field appearance="outline" class="full-width">
-                <mat-select formControlName="type">
-                  <mat-option value="Event">Event</mat-option>
-                  <mat-option value="Interview">Interview</mat-option>
-                  <mat-option value="Testimonial">Testimonial</mat-option>
-                </mat-select>
+              <mat-select formControlName="type">
+                <mat-option *ngFor="let key of videoTypeKeys" [value]="key">
+                  {{ videoTypeMap[key] }}
+                </mat-option>
+              </mat-select>
                 <mat-error *ngIf="entry.get('type')?.touched && entry.get('type')?.hasError('required')">
                   Type is required
                 </mat-error>
@@ -648,15 +615,15 @@
 
             <!-- Live Event -->
             <div class="form-group">
-              <label class="form-label">Live Event</label>
+              <label class="form-label">Event</label>
               <mat-form-field appearance="outline" class="full-width">
                 <mat-select formControlName="eventId">
                   <mat-option value="">None</mat-option>
-                  <mat-option *ngFor="let e of liveEvents" [value]="e.id">
+                  <mat-option *ngFor="let e of liveevent" [value]="e.id">
                     {{ e.name }}
                   </mat-option>
                 </mat-select>
-                <mat-hint>Optional — link to a live event if related</mat-hint>
+                <mat-hint>Optional — link to a event if related</mat-hint>
               </mat-form-field>
             </div>
 
@@ -674,7 +641,6 @@
             <!-- Divider between entries -->
             <hr *ngIf="i < $any(editVideoForm.get('entries')).length - 1"
                 style="border:none; border-top:1px solid #e5e7eb; margin: 8px 0 20px;">
-
           </div>
         </div>
       </div>
@@ -686,13 +652,11 @@
           {{ editVideoSaving ? 'Saving...' : 'Save' }}
         </button>
       </div>
-
     </div>
   </div>
   <!-- Add Video Overlay -->
   <div class="overlay-backdrop" *ngIf="showAddVideoOverlay" (click)="closeAddVideo()">
     <div class="add-video-panel" (click)="$event.stopPropagation()">
-
       <!-- Header -->
       <div class="add-video-header">
         <h2 class="add-video-title">Add Video</h2>
@@ -703,12 +667,10 @@
 
       <!-- Tab Switcher -->
       <div class="tab-switcher">
-        <button class="tab-btn" [class.tab-active]="activeTab === 'manual'"
-                (click)="switchTab('manual')">
+        <button class="tab-btn" [class.tab-active]="activeTab === 'manual'"(click)="switchTab('manual')">
           Manual Entry
         </button>
-        <button class="tab-btn" [class.tab-active]="activeTab === 'bulk'"
-                (click)="switchTab('bulk')">
+        <button class="tab-btn" [class.tab-active]="activeTab === 'bulk'" (click)="switchTab('bulk')">
           Bulk Import
         </button>
       </div>
@@ -716,7 +678,6 @@
       <!-- MANUAL TAB -->
       <ng-container *ngIf="activeTab === 'manual'">
         <div class="add-video-body" [formGroup]="addVideoForm">
-
           <!-- Participant -->
           <div class="form-group">
             <label class="form-label">Participant</label>
@@ -775,11 +736,11 @@
             <div class="form-group">
               <label class="form-label">Type</label>
               <mat-form-field appearance="outline" class="full-width">
-                <mat-select formControlName="type" (selectionChange)="onEntryTypeChange($any(entry))">
-                  <mat-option value="Event">Event</mat-option>
-                  <mat-option value="Interview">Interview</mat-option>
-                  <mat-option value="Testimonial">Testimonial</mat-option>
-                </mat-select>
+              <mat-select formControlName="type" (selectionChange)="onEntryTypeChange($any(entry))">
+                <mat-option *ngFor="let key of videoTypeKeys" [value]="key">
+                  {{ videoTypeMap[key] }}
+                </mat-option>
+              </mat-select>
                 <mat-error *ngIf="entry.get('type')?.touched && entry.get('type')?.hasError('required')">
                   Type is required
                 </mat-error>
@@ -787,13 +748,13 @@
             </div>
 
             <div class="form-group" *ngIf="entry.get('type')?.value">
-              <label class="form-label">Live Event</label>
+              <label class="form-label">Event</label>
               <mat-form-field appearance="outline" class="full-width">
                 <mat-select formControlName="eventId">
-                  <mat-option *ngFor="let e of liveEvents" [value]="e.id">{{ e.name }}</mat-option>
+                  <mat-option *ngFor="let e of liveevent" [value]="e.id">{{ e.name }}</mat-option>
                 </mat-select>
-                <mat-hint *ngIf="entry.get('type')?.value === 'Interview' || entry.get('type')?.value === 'Testimonial'">
-                  Optional — link to a live event if related
+               <mat-hint *ngIf="entry.get('type')?.value && entry.get('type')?.value !== 'Event'">
+                  Optional — link to a event if related
                 </mat-hint>
               </mat-form-field>
             </div>
@@ -918,7 +879,7 @@
   <div class="overlay-backdrop" *ngIf="showBulkErrorDialog" (click)="closeBulkErrorDialog()">
     <div class="error-dialog-panel" (click)="$event.stopPropagation()">
       <div class="note-header">
-        <h3>⚠️ Import Errors Found</h3>
+        <h3>Import Errors Found</h3>
         <button mat-icon-button (click)="closeBulkErrorDialog()">
           <mat-icon>close</mat-icon>
         </button>

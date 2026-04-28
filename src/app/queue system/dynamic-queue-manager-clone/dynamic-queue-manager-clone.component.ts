@@ -337,8 +337,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   notesSearch = '';
   notesDateStart: Date | null = null;
   notesDateEnd: Date | null = null;
-  notesData: any[] = [];
-  
+  notesData: any[] = [];  
 
   // Add this property
   isRoundRobinRunning = false;
@@ -4960,55 +4959,45 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
   
   openNotesModal() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     this.notesSearch = '';
-    const today= new Date();
-    today.setHours(0,0,0,0);
     this.notesDateStart = today;
     this.notesDateEnd = today;
+    this.showNotesListModal = true;
+    this.buildNotesGrouped();
+  }
 
-    const rows: any[] = [];
+  buildNotesGrouped() {
+    const map = new Map<string, any>();
+
+    const end = this.notesDateEnd ? new Date(this.notesDateEnd) : null;
+    if (end) end.setHours(23, 59, 59, 999);
+
+    const searchTerm = this.notesSearch.toLowerCase().trim();
+
     for (const token of this.allTokensData) {
       if (!token.notesList?.length || token.tokenstatus !== 'Active') continue;
+
+      const name = this.mapProfileData[token.profile_id]?.['name'] || '';
+      if (searchTerm && !name.toLowerCase().includes(searchTerm)) continue;
+
       for (const note of token.notesList) {
         const date: Date = note.updatedon?.toDate?.() ?? note.updatedon;
         if (!date) continue;
-        rows.push({
-          profileId: token.profile_id,
-          name: this.mapProfileData[token.profile_id]?.['name'] || '',
-          tokennumber: token.tokennumber,
-          text: note.text,
-          date,
-          author: this.mapProfileData[note.author]?.['name'] || '',
-          stage: note.stage || ''
-        });
+
+        if (this.notesDateStart && date < this.notesDateStart) continue;
+        if (end && date > end) continue;
+
+        if (!map.has(token.profile_id)) {
+          map.set(token.profile_id, { token, notes: [] });
+        }
+
+        map.get(token.profile_id).notes.push({ note, date });
       }
     }
-    this.notesData = rows.sort((a, b) => b.date - a.date);
-    this.showNotesListModal = true;
-  }
 
-  get notesGrouped(): { profileId: string; name: string; items: any[] }[] {
-    let rows = this.notesData;
-
-    if (this.notesDateStart && this.notesDateEnd) {
-      const end = new Date(this.notesDateEnd);
-      end.setHours(23, 59, 59, 999);
-      rows = rows.filter(r => r.date >= this.notesDateStart! && r.date <= end);
-    }
-
-    if (this.notesSearch.trim()) {
-      const q = this.notesSearch.toLowerCase().trim();
-      rows = rows.filter(r => r.name.toLowerCase().includes(q));
-    }
-
-    const map = new Map<string, any>();
-    for (const row of rows) {
-      if (!map.has(row.profileId)) {
-        map.set(row.profileId, { profileId: row.profileId, name: row.name, items: [] });
-      }
-      map.get(row.profileId).items.push(row);
-    }
-    return Array.from(map.values());
+    this.notesData = Array.from(map.values());
   }
 
   closeNotesModal() {
