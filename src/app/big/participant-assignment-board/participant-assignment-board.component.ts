@@ -646,6 +646,7 @@ export class ParticipantAssignmentBoardComponent {
   }
 
   shouldShowButton(activity: any): boolean {
+    if(activity?.assignmenttype === 'Manual Assignment') return false;
     // Always show button for review, rework, and completed
     if (['review', 'rework', 'completed'].includes(this.selectedStatus)) {
       return true;
