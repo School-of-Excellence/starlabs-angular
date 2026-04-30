@@ -190,6 +190,18 @@ export class MarkAppointmentStatusComponent implements OnInit {
     console.log(newEnd)
     var totalMinutes = ((newEnd.getHours()*60 + newEnd.getMinutes()) - (newStart.getHours()*60 + newStart.getMinutes()))
 
+    if(!this.attended){
+      if (this.data['journeycoach'] == true || this.data['onboarding'] == true) {
+        const Ref = doc(this.firestore,'participantjourneyproduct', (this.data['participantjourneyproductid'] ?? this.data['participantjourneyproduct']))
+        updateDoc(Ref, {
+          onboardingscheduled: null,
+          onreschedule: true,
+        }).catch((e)=>{
+          console.error('Error updating document:', e);
+        });
+      }
+    }
+
     var appointmentDoc = doc(this.firestore, "appointments/"+this.data["bookingid"])
     await updateDoc(appointmentDoc, {
       attended: this.attended,
