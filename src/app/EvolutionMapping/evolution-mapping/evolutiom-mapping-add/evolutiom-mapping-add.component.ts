@@ -50,6 +50,10 @@ export class EvolutiomMappingAddComponent implements OnInit {
   importPreview: any[] = [];
   mapEmailData: any = {};
   showPreviewPlayer: boolean = false;
+  showPlayer: boolean = false;
+  videoTypes: string[] = [];
+  selectedType: string | null = null;
+  filteredVideoOptions: any[] = [];
 
   constructor(
     public firestore: Firestore,
@@ -77,8 +81,6 @@ export class EvolutiomMappingAddComponent implements OnInit {
       this.videourl = this.data.videourl;
       this.editVideoTitle = this.data.title;
       this.editVideoUrl = this.data.videourl;
-      this.editRecordedDate = this.data.recordeddate?.toDate ? this.data.recordeddate.toDate() : null;
-      this.recordedDate = this.editRecordedDate;
       this.showPlayer = true;
       this.onSelect(this.selectedProfile, true).then(() => {
         const matched = this.videoTitleOptions.find(v => v.title === this.data.title);
@@ -102,9 +104,7 @@ export class EvolutiomMappingAddComponent implements OnInit {
   }
 
   async onSelect(selectedId: string, skipReset: boolean = false): Promise<void> {
-    this.selectedProfile = selectedId;
     this.videoTitleOptions = [];
-
     if (!skipReset) {
       this.selectedVideos.clear();
       this.showPlayer = false;
@@ -116,18 +116,10 @@ export class EvolutiomMappingAddComponent implements OnInit {
       this.videoTypes = [];
     }
 
-    const profileDataSnap = await getDocs(
-      query(collection(this.firestore, 'profile_data'),
-        where('name', '==', selectedId))
-    );
-
-    if (profileDataSnap.empty) return;
-    const profileid = profileDataSnap.docs[0].data()['profileid'] || selectedId;
-
     const videoSnap = await getDocs(
       query(
         collection(this.firestore, 'participant videos'),
-        where('profileid', '==', profileid),
+        where('profileid', '==', selectedId),  
         where('delete', '==', false)
       )
     );
@@ -140,23 +132,16 @@ export class EvolutiomMappingAddComponent implements OnInit {
       type: d.data()['type'] || 'Other',
     }));
 
-    // Build unique types
     this.videoTypes = [...new Set(this.videoTitleOptions.map(v => v.type))];
     this.selectedType = null;
     this.filteredVideoOptions = [];
     this.previewVideo = null;
   }
 
-  videoTypes: string[] = [];
-  selectedType: string | null = null;
-  filteredVideoOptions: any[] = [];
-
   onTypeSelect(type: string): void {
     this.selectedType = type;
     this.filteredVideoOptions = this.videoTitleOptions.filter(v => v.type === type);
   }
-
-  showPlayer: boolean = false;
 
   convertDropboxUrl(url: string): string {
     if (!url || !url.includes('dropbox.com')) return url;
