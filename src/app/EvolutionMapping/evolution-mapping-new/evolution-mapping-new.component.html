@@ -56,10 +56,18 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-
+      <button mat-stroked-button class="has-video-filter-btn"
+        [class.has-video-filter-active]="showOnlyWithVideos"
+        (click)="showOnlyWithVideos = !showOnlyWithVideos; resetPagination(); fetchRecords()">
+        <mat-icon>videocam</mat-icon>
+        Has Video
+      </button>
       <button mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
-
+    <button class="export-btn" (click)="exportToExcel()" [disabled]="exportLoading">
+      <mat-icon>download</mat-icon>
+      {{ exportLoading ? 'Exporting...' : 'Export' }}
+    </button>
     <button class="add-video-btn" (click)="openAddVideo()">
       + Add Video
     </button>
@@ -400,6 +408,7 @@
                 <div class="video-type-badge linked-event-badge" *ngIf="event['linkedEventName']">
                   Event: {{ event['linkedEventName'] }}
                 </div>
+               
               </div>
               <div class="event-card-action">
                 <!-- Primary watch button -->
@@ -465,6 +474,16 @@
                 </button>
               </div>
             </div>
+            <div class="video-remarks" *ngIf="event['remarks']">
+              <mat-icon class="remarks-icon">notes</mat-icon>
+              <span class="remarks-text">{{ event['extraVideos']?.length > 0 ? 'Video 1: ' : '' }}{{ event['remarks'] }}</span>
+            </div>
+            <ng-container *ngFor="let extra of event['extraVideos']; let vi = index">
+              <div class="video-remarks" *ngIf="extra.remarks">
+                <mat-icon class="remarks-icon">notes</mat-icon>
+                <span class="remarks-text">Video {{ vi + 2 }}: {{ extra.remarks }}</span>
+              </div>
+            </ng-container>
           </div>
         </div>
       </div>
@@ -638,6 +657,14 @@
               </mat-form-field>
             </div>
 
+            <div class="form-group">
+              <label class="form-label">Remarks</label>
+              <mat-form-field appearance="outline" class="full-width">
+              <textarea matInput formControlName="remarks"placeholder="Add any remarks if there for this video..." rows="3"cdkTextareaAutosizecdkAutosizeMinRows="2" cdkAutosizeMaxRows="5">
+              </textarea>  
+              </mat-form-field>
+            </div>
+
             <!-- Divider between entries -->
             <hr *ngIf="i < $any(editVideoForm.get('entries')).length - 1"
                 style="border:none; border-top:1px solid #e5e7eb; margin: 8px 0 20px;">
@@ -768,6 +795,13 @@
                 </mat-error>
               </mat-form-field>
             </div>
+            <div class="form-group" *ngIf="entry.get('type')?.value">
+              <label class="form-label">Remarks</label>
+              <mat-form-field appearance="outline" class="full-width">
+                <textarea matInput formControlName="remarks" placeholder="Add any remarks if there for this video..."rows="3" cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="5"></textarea>
+                <mat-hint align="end">Optional</mat-hint>
+              </mat-form-field>
+            </div>
           </div>
         </div>
 
@@ -823,6 +857,7 @@
                     <th>Type</th>
                     <th>Event</th>
                     <th>Video URL</th>
+                    <th>Remarks</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -838,6 +873,7 @@
                     <td>{{ row.type }}</td>
                     <td>{{ row.eventName || '—' }}</td>
                     <td class="bulk-url-cell">{{ row.videoUrl }}</td>
+                    <td>{{ row.remarks || '—' }}</td>
                     <td>
                       <span class="bulk-status-badge" [class.status-valid]="row.status === 'valid'"
                             [class.status-error]="row.status === 'error'">
