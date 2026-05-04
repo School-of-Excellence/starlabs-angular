@@ -1604,7 +1604,7 @@
         <div class="notes-modal-toolbar">
           <div class="notes-search-wrap">
             <mat-icon>search</mat-icon>
-            <input [(ngModel)]="notesSearch"  placeholder="Search by participant name" autocomplete="off">
+            <input [(ngModel)]="notesSearch" (ngModelChange)="buildNotesGrouped()" placeholder="Search by participant name" autocomplete="off">
             <button *ngIf="notesSearch" (click)="notesSearch = ''">
               <mat-icon>close</mat-icon>
             </button>
@@ -1613,40 +1613,45 @@
           <mat-form-field appearance="outline" class="notes-date-field">
             <mat-label>Date range</mat-label>
             <mat-date-range-input [rangePicker]="notesPicker">
-              <input matStartDate [(ngModel)]="notesDateStart" placeholder="Start">
-              <input matEndDate [(ngModel)]="notesDateEnd" placeholder="End">
+              <input matStartDate [(ngModel)]="notesDateStart" (dateChange)="buildNotesGrouped()" placeholder="Start">
+              <input matEndDate [(ngModel)]="notesDateEnd" (dateChange)="buildNotesGrouped()" placeholder="End">
             </mat-date-range-input>
             <mat-datepicker-toggle matSuffix [for]="notesPicker"></mat-datepicker-toggle>
             <mat-date-range-picker #notesPicker></mat-date-range-picker>
             <button matSuffix mat-icon-button *ngIf="notesDateStart"
-              (click)="notesDateStart=null; notesDateEnd=null">
+              (click)="notesDateStart=null; notesDateEnd=null; buildNotesGrouped()">
               <mat-icon>clear</mat-icon>
             </button>
           </mat-form-field>
         </div>
 
         <div class="notes-modal-body">
-          <div *ngIf="notesGrouped.length === 0" class="notes-empty">
+          <div *ngIf="notesData.length === 0" class="notes-empty">
             <mat-icon>notes</mat-icon>
-            <p>No notes{{notesDateStart ? ' in this date range' : ''}}</p>
+            <p>No notes{{notesDateStart ? 'Today' : ''}}</p>
           </div>
-
-          <div *ngFor="let group of notesGrouped" class="notes-group">
+          <div *ngFor="let group of notesData" class="notes-group">
             <div class="notes-group-head">
-              <span class="notes-avatar">{{group.name.charAt(0).toUpperCase()}}</span>
-              <span class="notes-group-name">{{group.name}}</span>
+              <span class="notes-avatar">
+                {{mapProfileData[group.token.profile_id]?.['name']?.charAt(0).toUpperCase()}}
+              </span>
+              <span class="notes-group-name">
+                {{mapProfileData[group.token.profile_id]?.['name']}}
+              </span>
             </div>
 
-            <div *ngFor="let n of group.items" class="notes-row">
+            <div *ngFor="let n of group.notes" class="notes-row">
               <div class="notes-row-meta">
-                <span class="notes-token">#{{n.tokennumber}}</span>
-                <span class="notes-stage" *ngIf="n.stage">
-                  <mat-icon>layers</mat-icon>{{n.stage}}
+                <span class="notes-token">#{{group.token.tokennumber}}</span>
+                <span class="notes-stage" *ngIf="n.note.stage">
+                  <mat-icon>layers</mat-icon>{{n.note.stage}}
                 </span>
                 <span class="notes-date">{{n.date | date:'MMM d, y · h:mm a'}}</span>
-                <span class="notes-author" *ngIf="n.author">· {{n.author}}</span>
+                <span class="notes-author" *ngIf="n.note.author">
+                  · {{mapProfileData[n.note.author]?.['name']}}
+                </span>
               </div>
-              <p class="notes-text">{{n.text}}</p>
+              <p class="notes-text">{{n.note.text}}</p>
             </div>
           </div>
         </div>
