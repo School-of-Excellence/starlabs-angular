@@ -730,7 +730,7 @@
 
             <!-- journey -->
             <span *ngIf="column === 'journey'">{{element['customerstatus'] === 'active' ? mapfiltervalues[element['activejourney']]
-              : element['customerstatus'] === 'non active' ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
+              : ['non active' , 'discontinued'].includes(element['customerstatus']) ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
             <!-- age -->
             <span *ngIf="column === 'age'">{{calculateAge(element['dateofbirth'])}}</span>
             <!-- product -->
