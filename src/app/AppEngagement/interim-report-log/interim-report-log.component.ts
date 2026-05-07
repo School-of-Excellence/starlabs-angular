@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule , DatePipe} from '@angular/common';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { arrayUnion, collection, collectionData, doc, Firestore, getDocs, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, updateDoc, where, setDoc } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
@@ -27,6 +27,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { environment } from '../../../environments/environment.development';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
+import * as XLSX from 'xlsx';
+
 
 @Component({
   selector: 'app-interim-report-log',
@@ -49,7 +51,8 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
     NgxMatSelectSearchModule
   ],
   templateUrl: './interim-report-log.component.html',
-  styleUrl: './interim-report-log.component.css'
+  styleUrl: './interim-report-log.component.css',
+  providers : [DatePipe]
 })
 export class InterimReportLogComponent implements OnInit, OnDestroy {
 
@@ -148,7 +151,8 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     private dialog: MatDialog,
     private storage: Storage,
     private _snackBar: MatSnackBar,
-    private http: HttpClient
+    private http: HttpClient,
+    private datePipe : DatePipe
   ) {
     const logStartDate = new Date();
     const logEndDate = new Date();
@@ -907,6 +911,29 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  exportTable() {
+    if (this.logDataSource.filteredData.length === 0) {
+      alert('No Logs Found');
+      return;
+    }
+    const exportData = this.logDataSource.filteredData.map((log) => ({
+      'name': log["name"],
+      'email' : this.mapParticipantMetaData[log['profileid'] || '']?.email ?? '' , 
+      'reports done': log["reportlist"],
+      'last update': this.datePipe.transform(log["lastupdate"], 'MMMM d, y, h:mm a'),
+      'status': log["status"],
+      'due date': this.datePipe.transform(log["duedate"]),
+      'remainder date': this.datePipe.transform(log["remainderdate"]),
+      'lock date': this.datePipe.transform(log["lockdate"]),
+      'send date': this.datePipe.transform(log["createdon"], 'medium')
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Participants');
+    const fileName = `$interim_report_log${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
   }
 
 }

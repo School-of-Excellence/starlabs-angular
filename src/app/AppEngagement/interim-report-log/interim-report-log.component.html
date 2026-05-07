@@ -202,40 +202,43 @@
             </div>
         
           </section>
-          <div class="actionitem">
-            <mat-form-field appearance="outline">
-              <mat-label>Filter Table</mat-label>
-              <input matInput (keyup)="filterLogData(logInput.value)" #logInput autocomplete="off">
-            </mat-form-field>
-            <div class="log-date-range">
+          <div class="actions-items-wrap">
+            <div class="actionitem">
               <mat-form-field appearance="outline">
-                <mat-label>Select Send Date</mat-label>
-                <mat-date-range-input [rangePicker]="rangePickerlog">
-                  <input matStartDate [formControl]="logStartDate" placeholder="Start date">
-                  <input matEndDate [formControl]="logEndDate" placeholder="End date">
-                </mat-date-range-input>
-                <mat-datepicker-toggle matSuffix [for]="rangePickerlog"></mat-datepicker-toggle>
-                <mat-date-range-picker #rangePickerlog ></mat-date-range-picker>
+                <mat-label>Filter Table</mat-label>
+                <input matInput (keyup)="filterLogData(logInput.value)" #logInput autocomplete="off">
               </mat-form-field>
-              <button mat-raised-button color="primary" (click)="fetchInterimLog()">Apply</button>
-              <button mat-stroked-button (click)="clearInterimReportFilter()">Clear Date</button>
+              <div class="log-date-range">
+                <mat-form-field appearance="outline">
+                  <mat-label>Select Send Date</mat-label>
+                  <mat-date-range-input [rangePicker]="rangePickerlog">
+                    <input matStartDate [formControl]="logStartDate" placeholder="Start date">
+                    <input matEndDate [formControl]="logEndDate" placeholder="End date">
+                  </mat-date-range-input>
+                  <mat-datepicker-toggle matSuffix [for]="rangePickerlog"></mat-datepicker-toggle>
+                  <mat-date-range-picker #rangePickerlog ></mat-date-range-picker>
+                </mat-form-field>
+                <button mat-raised-button color="primary" (click)="fetchInterimLog()">Apply</button>
+                <button mat-stroked-button (click)="clearInterimReportFilter()">Clear Date</button>
+              </div>
+              <div *ngIf="selection.hasValue()" class="action-btn-group">
+              <button class="action-btn action-btn--notification" mat-stroked-button (click)="sendNotificationinBreakthrough()">
+                <mat-icon>notifications</mat-icon>
+                <span>Notification</span>
+              </button>
+              
+              <button class="action-btn action-btn--whatsapp" mat-stroked-button (click)="sendWatiMessage()">
+                <mat-icon>chat</mat-icon>
+                <span>WhatsApp</span>
+              </button>
+              
+              <button class="action-btn action-btn--email" mat-stroked-button (click)="sendEmailToSelectedParicipant()">
+                <mat-icon>mail</mat-icon>
+                <span>Email</span>
+              </button>
+              </div>
             </div>
-            <div *ngIf="selection.hasValue()" class="action-btn-group">
-            <button class="action-btn action-btn--notification" mat-stroked-button (click)="sendNotificationinBreakthrough()">
-              <mat-icon>notifications</mat-icon>
-              <span>Notification</span>
-            </button>
-            
-            <button class="action-btn action-btn--whatsapp" mat-stroked-button (click)="sendWatiMessage()">
-              <mat-icon>chat</mat-icon>
-              <span>WhatsApp</span>
-            </button>
-            
-            <button class="action-btn action-btn--email" mat-stroked-button (click)="sendEmailToSelectedParicipant()">
-              <mat-icon>mail</mat-icon>
-              <span>Email</span>
-            </button>
-            </div>
+            <button mat-raised-button color="primary" (click)="exportTable()">Export Table</button>
           </div>
         </div>
         <div class="table-container">
@@ -294,7 +297,7 @@
             <tr mat-row *matRowDef="let row; columns: logDisplayedColumns;"></tr>
           </table>
         </div>
-        <mat-paginator #logPaginator [pageSizeOptions]="[25, 50, 100]"></mat-paginator>
+        <mat-paginator #logPaginator [pageSizeOptions]="[25, 50, 100 , logDataSource.data.length]" [length]="logDataSource.data.length"></mat-paginator>
       </div>
     </mat-tab>
   </mat-tab-group>
