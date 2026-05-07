@@ -187,12 +187,12 @@ export class ParticipantsAnalyticsComponent {
   object = ['customersupport', 'customersupportcategory']
   number = ['atccount', 'totaladjustmentaware', 'totaladjustmentunaware']
   stringarray = ['atcmodel']
-  arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'activejourney', 'financialstatus', 'customerstatus', 'lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
+  arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'financialstatus', 'customerstatus', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
   stringmaparray = ['productevent', 'queueevent']
   numbermapnumber = ['productcount'];
   computeColumns = ['UP! count' , 'CPM count'];
   columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray, ...this.computeColumns,
-  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'totalpaid', 'balance', 'emi', 'journey', 'consumedproductcount', 'unconsumedproductcount']
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'journey', 'consumedproductcount', 'unconsumedproductcount']
   filterText = null
   showSectionType = null
   savedfilterquery: any = []
@@ -2173,7 +2173,7 @@ export class ParticipantsAnalyticsComponent {
         else if (column === 'kyj') {
           formattedRow[column] = element[column];
         } else if (column === 'journey') {
-          formattedRow[column] = element['customerstatus'] === 'active' ? this.mapfiltervalues[element['activejourney']] : element['customerstatus'] === 'non active' ? this.mapfiltervalues[element['lastcompletedjourney']] : ''
+          formattedRow[column] = element['customerstatus'] === 'active' ? this.mapfiltervalues[element['activejourney']] : ['non active' , 'discontinued'].includes(element['customerstatus']) ? this.mapfiltervalues[element['lastcompletedjourney']] : ''
         } else if (column === 'age') {
           formattedRow[column] = this.calculateAge(element['dateofbirth']);
         }
