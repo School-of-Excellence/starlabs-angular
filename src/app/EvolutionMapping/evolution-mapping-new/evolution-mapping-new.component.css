@@ -1826,18 +1826,153 @@ mat-paginator {
   50% { width: 80%; }
   100% { width: 10%; }
 }
+.remarks-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.remarks-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.remarks-author {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.remarks-dot {
+  color: #cbd5e1;
+}
+
+.remarks-date {
+  color: #94a3b8;
+}
+
+.remarks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.remark-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.remark-item-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.remark-item-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.remark-text-preview {
+  font-size: 13px;
+  color: #374151;
+  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.remark-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ef4444;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.remark-delete-btn:hover {
+  background: #fef2f2;
+}
+
+.remark-delete-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.remark-add-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.remark-add-btn {
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-top: 4px;
+  transition: background 0.15s;
+}
+
+.remark-add-btn:hover {
+  background: #4f46e5;
+}
+
+.remark-add-btn:disabled {
+  background: #c7d2fe;
+  cursor: not-allowed;
+}
+
+.remark-textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #111827;
+  resize: vertical;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.remark-textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.1);
+}
 .video-remarks {
   display: flex;
   align-items: flex-start;
   gap: 4px;
   margin-top: 6px;
+  margin-left: 26px;
   padding: 6px 8px;
   background: #f8fafc;
   border-left: 2px solid #cbd5e1;
   border-radius: 0 4px 4px 0;
-  width: 100%;
+  width: calc(100% - 26px);
+  overflow: hidden;
+  box-sizing: border-box;
 }
-
 .remarks-icon {
   font-size: 14px;
   width: 14px;
@@ -1846,13 +1981,14 @@ mat-paginator {
   flex-shrink: 0;
   margin-top: 1px;
 }
-
 .remarks-text {
   font-size: 12px;
   color: #64748b;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 .has-video-filter-btn {
   height: 40px;

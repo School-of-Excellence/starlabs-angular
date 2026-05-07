@@ -1,5 +1,10 @@
 <div class="qwv-root">
-
+  <app-web-studio-invitation
+    *ngIf="profileJourneyProduct?.['queueData']"
+    [profileid]="user.profileid"
+    [queueref]="profileJourneyProduct['queuetoken']['queueref']"
+    [useremail]="user.email">
+  </app-web-studio-invitation>
   <!-- Loading -->
   <div class="qwv-loading" *ngIf="loadingQueue">
     <div class="qwv-loading-inner">
