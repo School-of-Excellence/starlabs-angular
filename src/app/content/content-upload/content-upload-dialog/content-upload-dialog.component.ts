@@ -182,12 +182,16 @@ export class ContentUploadDialogComponent {
     });
 
     try {
+
+       const duration = await this.extractVideoDuration(file);
+
       this.Videourl.push({
         url: URL.createObjectURL(file),
         filename: file.name,
         uploadurl: file, // File object
         videoSize: sizeInfo.videoSize,
-        videoSizeBytes: sizeInfo.videoSizeBytes
+        videoSizeBytes: sizeInfo.videoSizeBytes,
+        duration: duration 
       });
     } catch (error) {
       console.error("Error while creating video preview URL:", error);
@@ -293,6 +297,19 @@ export class ContentUploadDialogComponent {
     };
   }
 
+  private extractVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.src = URL.createObjectURL(file);
+    video.onloadedmetadata = () => {
+      resolve(Math.floor(video.duration));
+      URL.revokeObjectURL(video.src);
+    };
+    video.onerror = () => resolve(null);
+  });
+}
+
   // Resumable upload with progress tracking
   private uploadFileWithProgress(file: File, storagePath: string, label: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -396,7 +413,8 @@ export class ContentUploadDialogComponent {
           type: this.type,
           publishdate: this.publishdate,
           hero: this.hero,
-          tags: this.tags
+          tags: this.tags,
+          duration: this.Videourl[0]?.duration ?? this.currentContent.duration ?? null 
         });
 
         this.openSnackBar("Successfully Content Updated", "");
@@ -447,7 +465,8 @@ export class ContentUploadDialogComponent {
           type: this.type,
           publishdate: this.publishdate,
           hero: this.hero,
-          tags: this.tags
+          tags: this.tags,
+          duration: this.Videourl[0]?.duration ?? null
         });
 
         this.openSnackBar("Successfully Content Added", "");

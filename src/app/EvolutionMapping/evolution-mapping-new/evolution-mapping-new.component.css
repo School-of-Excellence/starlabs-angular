@@ -1775,3 +1775,134 @@ mat-paginator {
 .delete-video-icon-btn:hover {
   background: #fef2f2;
 }
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  min-width: 300px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 20px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  animation: em-spin 1s linear infinite;
+}
+
+@keyframes em-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@keyframes em-progress {
+  0% { width: 10%; }
+  50% { width: 80%; }
+  100% { width: 10%; }
+}
+.video-remarks {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border-left: 2px solid #cbd5e1;
+  border-radius: 0 4px 4px 0;
+  width: 100%;
+}
+
+.remarks-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.remarks-text {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.has-video-filter-btn {
+  height: 40px;
+  border: 1px solid #d1d5db !important;
+  color: #6b7280 !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.has-video-filter-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.has-video-filter-active {
+  background: #eef2ff !important;
+  color: #6366f1 !important;
+  border-color: #c7d2fe !important;
+}
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.export-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.export-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
