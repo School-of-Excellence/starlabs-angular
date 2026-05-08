@@ -484,21 +484,30 @@ export class DeliveryDashboardCloneComponent {
     sortDirection: { [key: number]: 'asc' | 'desc' } = {};
     ticketRequest: any[] = [];
     ticketSubscription: any;
-    diagnosticsScheduledAll: any = [];
-    diagnosticsScheduledFiltered: any = [];
-    diagnosticsScheduledToday: any = [];
-    diagnosticsScheduledTomorrow: any = [];
-    diagnosticsScheduledOverDue: any = [];
-    diagnosticsAwaitingAll: any = [];
-    diagnosticsAwaitingFiltered: any = [];
-    implementationScheduledAll: any = {};
-    implementationScheduledToday: any = {};
-    implementationScheduledTomorrow: any = {};
-    implementationScheduledOverDue: any = {};
-    reviewScheduledAll: any = {};
-    reviewScheduledToday: any = {};
-    reviewScheduledTomorrow: any = {};
-    reviewScheduledOverDue: any = {};
+    selectedFilter: string = 'recent';
+    selectedStageFilter: string = '';
+    openAppointmentModal = false;
+    selectedStage = '';
+    stageData: any = {
+        diagnostics: {
+            all: [],
+            today: [],
+            tomorrow: [],
+            overdue: []
+        },
+        implementation: {
+            all: [],
+            today: [],
+            tomorrow: [],
+            overdue: []
+        },
+        review: {
+            all: [],
+            today: [],
+            tomorrow: [],
+            overdue: []
+        }
+    };
 
     async ngOnInit() {
         this.setCurrentMonth();
@@ -1021,7 +1030,7 @@ export class DeliveryDashboardCloneComponent {
             idField: 'id'
         }).subscribe((participantTickets: any) => {
 
-            if (JSON.stringify(this.ticketRequest) !== JSON.stringify(participantTickets)) {
+            if (this.ticketRequest !== participantTickets) {
                 this.ticketRequest = participantTickets;
             }
         });
@@ -1090,24 +1099,15 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async filterStageData() {
-        const diagnostics = this.filterAppointmentsForStage('Critical Support Diagnostics');
-        this.diagnosticsScheduledAll = diagnostics.all;
-        this.diagnosticsScheduledToday = diagnostics.today;
-        this.diagnosticsScheduledTomorrow = diagnostics.tomorrow;
-        this.diagnosticsScheduledOverDue = diagnostics.overdue;
+        const stageConfig = [
+            { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
+            { key: 'implementation', appointmentType: 'Critical Support Implementation' },
+            { key: 'review', appointmentType: 'Critical Support Review' }
+        ];
 
-
-        const implementation = this.filterAppointmentsForStage('Critical Support Implementation');
-        this.implementationScheduledAll = implementation.all;
-        this.implementationScheduledToday = implementation.today;
-        this.implementationScheduledTomorrow = implementation.tomorrow;
-        this.implementationScheduledOverDue = implementation.overdue;
-
-        const review = this.filterAppointmentsForStage('Critical Support Review');
-        this.reviewScheduledAll = review.all;
-        this.reviewScheduledToday = review.today;
-        this.reviewScheduledTomorrow = review.tomorrow;
-        this.reviewScheduledOverDue = review.overdue;
+        stageConfig.forEach(stage => {
+            this.stageData[stage.key] = this.filterAppointmentsForStage(stage.appointmentType);
+        });
     }
 
     filterAppointmentsForStage(appointmentTypeName: string) {
@@ -1117,50 +1117,31 @@ export class DeliveryDashboardCloneComponent {
             endOfTomorrow
         } = this.getTodayAndTomorrowRange();
 
-        const all = this.allAppointments.filter(app => {
-            return (
-                app.appointmentTypeName === appointmentTypeName &&
-                app.attended === false
-            );
-        });
-
-        const today = this.allAppointments.filter(app => {
-            const appointmentDate = app?.endtime?.toDate();
-
-            return (
-                app.appointmentTypeName === appointmentTypeName &&
-                app.attended === false &&
-                appointmentDate >= startOfToday &&
-                appointmentDate < startOfTomorrow
-            );
-        });
-
-        const tomorrow = this.allAppointments.filter(app => {
-            const appointmentDate = app?.endtime?.toDate();
-
-            return (
-                app.appointmentTypeName === appointmentTypeName &&
-                app.attended === false &&
-                appointmentDate >= startOfTomorrow &&
-                appointmentDate <= endOfTomorrow
-            );
-        });
-
-        const overdue = this.allAppointments.filter(app => {
-            const appointmentDate = app?.endtime?.toDate();
-
-            return (
-                app.appointmentTypeName === appointmentTypeName &&
-                app.attended === false &&
-                appointmentDate < startOfToday
-            );
-        });
+        const filteredAppointments = this.allAppointments.filter(app =>
+            app.appointmentTypeName === appointmentTypeName &&
+            app.attended === false
+        );
 
         return {
-            all,
-            today,
-            tomorrow,
-            overdue
+            all: filteredAppointments,
+            today: filteredAppointments.filter(app => {
+                const appointmentDate = app?.endtime?.toDate();
+                return (
+                    appointmentDate >= startOfToday &&
+                    appointmentDate < startOfTomorrow
+                );
+            }),
+            tomorrow: filteredAppointments.filter(app => {
+                const appointmentDate = app?.endtime?.toDate();
+                return (
+                    appointmentDate >= startOfTomorrow &&
+                    appointmentDate <= endOfTomorrow
+                );
+            }),
+            overdue: filteredAppointments.filter(app => {
+                const appointmentDate = app?.endtime?.toDate();
+                return appointmentDate < startOfToday;
+            })
         };
     }
 
@@ -2008,10 +1989,6 @@ export class DeliveryDashboardCloneComponent {
         return Object.keys(this.currentGroupedByProfile);
     }
 
-    get stageProfileIds(): string[] {
-        return Object.keys(this.currentGroupedByStageProfile);
-    }
-
     openModal(productId: string, type: 'all' | 'filtered' | 'bonus' | 'purchased' | 'noteligible') {
         this.selectedProductId = productId;
         this.modalType = type;
@@ -2034,9 +2011,6 @@ export class DeliveryDashboardCloneComponent {
         this.groupedByProfileAll = grouped;
     }
 
-    openAppointmentModal = false;
-    selectedStage = '';
-
     openStageModal(selectedStage: string, stageFilter: string, participantData: any) {
         this.openAppointmentModal = true;
         this.selectedStage = selectedStage;
@@ -2045,28 +2019,27 @@ export class DeliveryDashboardCloneComponent {
         this.groupedByStageProfileAll = participantData;
     }
 
-    selectedFilter: string = 'recent';
-    selectedStageFilter: string = '';
-
     onFilterChange(selectedFilter: string) {
         this.selectedFilter = selectedFilter;
+        const stageKey = this.selectedStage?.toLowerCase();
+        const stage = this.stageData[stageKey];
+
+        if (!stage) return;
+        // Scheduled 
         if (this.selectedStageFilter === 'Scheduled') {
-            if (selectedFilter === 'today') this.groupedByStageProfileAll = this.diagnosticsScheduledToday;
-            else if (selectedFilter === 'tomorrow') this.groupedByStageProfileAll = this.diagnosticsScheduledTomorrow;
-            else if (selectedFilter === 'overdue') this.groupedByStageProfileAll = this.diagnosticsScheduledOverDue;
-            else if (selectedFilter === 'all') this.groupedByStageProfileAll = this.diagnosticsScheduledAll;
-        } else if (this.selectedStageFilter === 'Awaiting') {
-            if (selectedFilter === 'recent') this.groupedByStageProfileAll = this.diagnosticsAwaitingAll;
-            else this.groupedByStageProfileAll = this.diagnosticsAwaitingAll;
+            this.groupedByStageProfileAll =
+                stage[selectedFilter] || stage.all;
         }
+
+        // Awaiting
+        // else if (this.selectedStageFilter === 'Awaiting') {
+        //     this.groupedByStageProfileAll =
+        //         stage.awaiting?.[selectedFilter] || stage.awaiting?.all || [];
+        // }
     }
 
     get currentGroupedByProfile() {
         return this.groupedByProfileAll;
-    }
-
-    get currentGroupedByStageProfile() {
-        return this.groupedByStageProfileAll;
     }
 
     closeModal() {
@@ -2294,8 +2267,6 @@ export class DeliveryDashboardCloneComponent {
 
         return new Promise((resolve, reject) => {
             try {
-
-                // prevent multiple subscriptions
                 this.appointmentsSubscription?.unsubscribe();
                 this.appointmentsSubscription = new Subscription();
 
@@ -2328,7 +2299,6 @@ export class DeliveryDashboardCloneComponent {
                         next: async (appointmentsSnap: any[]) => {
 
                             let updatedAppointments = [...appointmentsSnap];
-
                             await Promise.all(
                                 updatedAppointments.map(async (appointment) => {
                                     appointment.appointmentTypeName =
@@ -2341,60 +2311,39 @@ export class DeliveryDashboardCloneComponent {
                                     (product: any) =>
                                         product.docid === app.participantproductid
                                 );
-
                                 return {
                                     ...app,
                                     ...matchedProduct
                                 };
                             });
 
-                            // prevent unnecessary reassignment
-                            const hasChanges =
-                                JSON.stringify(this.allAppointments) !==
-                                JSON.stringify(updatedAppointments);
-
+                            const hasChanges = this.allAppointments !== updatedAppointments;
                             if (hasChanges) {
                                 this.allAppointments = updatedAppointments;
-
-                                console.log(
-                                    "all appointments with details",
-                                    this.allAppointments
-                                );
 
                                 if (this.selectedProductLabel) {
                                     await this.selectProduct(this.selectedProductLabel);
                                 }
-
                                 this.cdr.detectChanges();
                             }
-
                             this.loadingStates.appointments = true;
                             this.journeyFlowLoading = false;
-
                             resolve();
                         },
-
                         error: (err) => {
                             console.error("Error loading appointments:", err);
-
                             this.loadingStates.appointments = true;
                             this.journeyFlowLoading = false;
                             this.cdr.detectChanges();
-
                             reject(err);
                         }
                     });
-
                 this.appointmentsSubscription.add(sub);
-
             } catch (error) {
-
                 console.error("Error loading appointments:", error);
-
                 this.loadingStates.appointments = true;
                 this.journeyFlowLoading = false;
                 this.cdr.detectChanges();
-
                 reject(error);
             }
         });
@@ -4233,9 +4182,7 @@ export class DeliveryDashboardCloneComponent {
         this.filteredCardsMap = {};
         this.productData = {};
         this.ticketRequest = [];
-        this.diagnosticsScheduledAll = [];
-        this.implementationScheduledAll = [];
-        this.reviewScheduledAll = [];
+        this.stageData = {}
     }
 
     resetStats() {

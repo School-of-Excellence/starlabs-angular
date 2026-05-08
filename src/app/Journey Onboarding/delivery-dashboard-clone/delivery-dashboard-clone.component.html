@@ -714,78 +714,23 @@
             </div>
             <div>
               <div class="col-mini-stats">
-
-                <!-- Diagnostics -->
-                <ng-container *ngIf="col === 'Diagnostics'">
-                  <div (click)="openStageModal(col, 'Scheduled', diagnosticsScheduledAll)"
-                    class="mini-stat mini-stat-clickable" title="View scheduled participants">
-
+                <ng-container *ngIf="stageData[col.toLowerCase()] as stage">
+                  <div (click)="openStageModal(col, 'Scheduled', stage.all)" class="mini-stat mini-stat-clickable"
+                    title="View scheduled participants">
                     <div class="mini-stat-val" style="color:var(--blue)">
-                      {{ diagnosticsScheduledAll.length || 0 }}
+                      {{ stage.all.length || 0 }}
                     </div>
-
                     <div class="mini-stat-lbl">Scheduled</div>
                   </div>
-
-                  <!-- <div (click)="openStageModal(col, 'Awaiting', diagnosticsAwaitingAll)"
-                    class="mini-stat mini-stat-clickable" title="View awaiting participants">
-
+                  <!-- Awaiting -->
+                  <div (click)="openStageModal(col, 'Awaiting', stage.awaiting)" class="mini-stat mini-stat-clickable"
+                    title="View awaiting participants">
                     <div class="mini-stat-val" style="color:var(--coral)">
-                      {{ diagnosticsAwaitingAll.length }}
+                      {{ stage.awaiting?.length || 0 }}
                     </div>
-
                     <div class="mini-stat-lbl">Awaiting</div>
-                  </div> -->
-                </ng-container>
-
-
-                <!-- Implementation -->
-                <ng-container *ngIf="col === 'Implementation'">
-                  <div (click)="openStageModal(col, 'Scheduled', implementationScheduledAll)"
-                    class="mini-stat mini-stat-clickable" title="View scheduled participants">
-
-                    <div class="mini-stat-val" style="color:var(--blue)">
-                      {{ implementationScheduledAll.length || 0 }}
-                    </div>
-
-                    <div class="mini-stat-lbl">Scheduled</div>
                   </div>
-
-                  <!-- <div (click)="openStageModal(col, 'Awaiting', implementationAwaitingAll)"
-                    class="mini-stat mini-stat-clickable" title="View awaiting participants">
-
-                    <div class="mini-stat-val" style="color:var(--coral)">
-                      {{ implementationAwaitingAll.length }}
-                    </div>
-
-                    <div class="mini-stat-lbl">Awaiting</div>
-                  </div> -->
                 </ng-container>
-
-
-                <!-- Review -->
-                <ng-container *ngIf="col === 'Review'">
-                  <div (click)="openStageModal(col, 'Scheduled', reviewScheduledAll)"
-                    class="mini-stat mini-stat-clickable" title="View scheduled participants">
-
-                    <div class="mini-stat-val" style="color:var(--blue)">
-                      {{ reviewScheduledAll.length || 0 }}
-                    </div>
-
-                    <div class="mini-stat-lbl">Scheduled</div>
-                  </div>
-
-                  <!-- <div (click)="openStageModal(col, 'Awaiting', reviewAwaitingAll)"
-                    class="mini-stat mini-stat-clickable" title="View awaiting participants">
-
-                    <div class="mini-stat-val" style="color:var(--coral)">
-                      {{ reviewAwaitingAll.length }}
-                    </div> -->
-
-                    <!-- <div class="mini-stat-lbl">Awaiting</div>
-                  </div> -->
-                </ng-container>
-
               </div>
             </div>
           </div>
@@ -799,12 +744,10 @@
                 <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
                   <div class="card-info">
                     <div class="card-name">
-                      <!-- {{ mapMetaData[c.profileid]?.name }} Temporary -->
                       {{ c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name }}
                     </div>
                   </div>
                 </div>
-
                 <!-- Status -->
                 <div class="d-flex">
                   <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
