@@ -777,6 +777,19 @@
                           <mat-label>Completed Zoom URL</mat-label>
                           <input matInput formControlName="completedzoomurl" placeholder="Enter zoom meeting link">
                         </mat-form-field>
+                        <mat-form-field appearance="outline" class="full-width">
+                          <mat-label>Select Zoom call</mat-label>
+                          <mat-select formControlName="zoomvideoref" [compareWith]="compareRefs">
+                            <mat-option *ngFor="let content of videocontent" [value]="content.ref">
+                              {{ refTitleMap[content.ref.path] }}
+                            </mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                        <button class="btn-save" mat-raised-button (click)="openUploadDialog()">
+                        <span *ngIf="!loading">Upload Zoom Call</span>
+                      </button>
+                      </div>
+                      <div *ngIf="curriculum.get('type')?.value === 'zoomcall'" class="form-row">
                         <mat-slide-toggle
                           [checked]="curriculum.get('status')?.value === 'completed'"
                           (change)="curriculum.get('status')?.setValue($event.checked ? 'completed' : null)">
@@ -1109,6 +1122,54 @@
                         </button>
                       </mat-form-field>
                     </div>
+                    <ng-container formGroupName="cpwelcomemessage">
+                      <div *ngFor="let field of cpwelcomeFields" class="rich-text-section">
+                        <label class="editor-label">{{ field.label }}</label>
+                        <div class="NgxEditor__Wrapper">
+                          <ngx-editor-menu [editor]="cpwelcomeeditors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+                          <ngx-editor
+                            [editor]="cpwelcomeeditors[field.key]"
+                            [formControlName]="field.key"
+                            [disabled]="false"
+                            [placeholder]="field.placeholder">
+                          </ngx-editor>
+                        </div>
+                        <div class="editor-hint">{{ field.hint }}</div>
+                      </div>
+                    </ng-container>
+                    <h3 class="section-title">Workshop Facilitator</h3>
+                    <div class="form-row">
+                      <div class="toggle-row full-width">
+                        <mat-slide-toggle formControlName="facilitator" (change)="onToggleChange('facilitator', $event)" color="primary">Workshop Facilitator</mat-slide-toggle>
+                        <div class="toggle-status">
+                          <p class="status-label">{{ settingsForm.get('facilitator')?.value ? 'Active' : 'Inactive' }}</p>
+                          <p class="status-desc">{{ settingsForm.get('facilitator')?.value ? 'Workshop Facilitator Enabled' : '' }}</p>
+                        </div>
+                        <mat-icon [style.color]="settingsForm.get('facilitator')?.value ? '#00AEEF' : '#EC008C'">
+                          {{ settingsForm.get('facilitator')?.value ? 'check_circle' : 'cancel' }}
+                        </mat-icon>
+                        <div class="toggle-expand">
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Select Facilitators</mat-label>
+                            <mat-select formControlName="facilitatorprofiles" multiple>
+                              <mat-option *ngFor="let facilitators of names" [value]="facilitators.id">{{ facilitators.name }}</mat-option>
+                            </mat-select>
+                            <mat-hint>Selected {{ settingsForm.get('facilitatorprofiles')?.value?.length || 0 }} facilitators</mat-hint>
+                          </mat-form-field>
+                          <div *ngIf="settingsForm.get('facilitatorprofiles')?.value?.length > 0">
+                            <mat-chip-set>
+                              <ng-container *ngFor="let facilitators of names">
+                                <mat-chip *ngIf="settingsForm.get('facilitatorprofiles')?.value?.includes(facilitators.id)"
+                                  [removable]="true" (removed)="removeFacilitator(facilitators.id)">
+                                  {{ facilitators.name }}
+                                  <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                                </mat-chip>
+                              </ng-container>
+                            </mat-chip-set>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1175,13 +1236,6 @@
                 <mat-hint>Shown to participants after completing the final challenge</mat-hint>
                 </mat-form-field>
             </div>
-            <!-- <div class="form-row" style="align-items: center; margin-bottom: 4px;">
-                <span style="font-size: 13px; font-weight: 600; color: var(--black); flex: 1;">Daily Communication</span>
-                <button mat-icon-button type="button" color="primary" (click)="addDailyCommunication()"
-                matTooltip="Add message">
-                <mat-icon>add_circle</mat-icon>
-                </button>
-            </div> -->
             <div formArrayName="dailyCommunication">
               <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
                 class="form-row">
@@ -1198,31 +1252,8 @@
                 </mat-form-field>
               </div>
             </div>
-            <!-- <div formArrayName="dailyCommunication">
-                <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
-                class="form-row" style="align-items: flex-start; gap: 8px;">
-                <mat-form-field appearance="outline" style="flex: 1;">
-                    <mat-label>Day {{ i + 1 }} Message</mat-label>
-                    <textarea
-                    matInput
-                    [formControlName]="i"
-                    placeholder="Enter message for day {{ i + 1 }}..."
-                    cdkTextareaAutosize
-                    cdkAutosizeMinRows="2"
-                    cdkAutosizeMaxRows="6"
-                    ></textarea>
-                </mat-form-field>
-                <button mat-icon-button type="button" class="btn-danger-icon"
-                    (click)="removeDailyCommunication(i)"
-                    [disabled]="getDailyCommunicationArray().length === 1"
-                    matTooltip="Remove"
-                    style="margin-top: 8px;">
-                    <mat-icon>remove_circle</mat-icon>
-                </button>
-                </div>
-            </div> -->
             </ng-container>
-              <h3 class="section-title">Workshop Facilitator</h3>
+              <!-- <h3 class="section-title">Workshop Facilitator</h3>
               <div class="form-row">
                 <div class="toggle-row full-width">
                   <mat-slide-toggle formControlName="facilitator" (change)="onToggleChange('facilitator', $event)" color="primary">Workshop Facilitator</mat-slide-toggle>
@@ -1254,7 +1285,7 @@
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> -->
             </div>
             <div class="form-section">
               <h3 class="section-title">Workshop Mail Template</h3>

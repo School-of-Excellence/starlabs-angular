@@ -2015,7 +2015,7 @@ export class JourneycoachDuplicateComponent {
                   (tempActiveJourney[journeyName] as any)['_journeyId'] = journeyId;
                 }
               }
-            } else if (customerStatus === null || customerStatus === undefined || customerStatus === '') {
+            } else if ([null, undefined, '', "none"].includes(customerStatus)) {
               tempNullStatusProfiles.push(metaData);
             }
 
