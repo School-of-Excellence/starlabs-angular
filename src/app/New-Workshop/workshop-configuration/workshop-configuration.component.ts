@@ -35,6 +35,7 @@ import { QuizComponent } from '../quiz/quiz.component';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 import { AuthguardService } from '../../authguard.service';
 import { WorkshopCategoryComponent } from '../workshop-category/workshop-category.component';
+import { UploadEpisodeDialogComponent } from '../../content/episodes-dashboard/upload-episode-dialog/upload-episode-dialog.component';
 
 interface WorkshopConfig {
   detailpage?: {
@@ -109,6 +110,7 @@ interface CurriculumItem {
   type: 'zoomcall' | 'challenge' | '';
   zoomlink?: string;
   completedzoomurl?: string;
+  zoomvideoref?: any;
   // status?: 'completed' | null; 
   status?: 'completed'; 
   hidezoom?:boolean;
@@ -160,6 +162,33 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
   editors: { [key: string]: Editor } = {};
   noteeditors: { [key: string]: Editor } = {};
   assignmenteditors: { [key: string]: Editor } = {};
+  cpwelcomeeditors: { [key: string]: Editor } = {};
+  cpwelcomeFields = [
+    {
+      key: 'abovediagnosticsheading',
+      label: 'Above Diagnostics Welcome Heading',
+      placeholder: 'Enter heading to show for abovediagnostics .',
+      hint: 'Shown to Above Diagnostics participants when they enrolled',
+    },
+    {
+      key: 'abovediagnosticsdescription',
+      label: 'Above Diagnostics Welcome Description',
+      placeholder: 'Enter Description to show for abovediagnostics .',
+      hint: 'Shown to Above Diagnostics participants when they enrolled',
+    },
+    {
+      key: 'facilitatorheading',
+      label: 'Facilitators Welcome Heading',
+      placeholder: 'Enter heading to show for Facilitators .',
+      hint: 'Shown to Facilitators participants when they enrolled',
+    },
+    {
+      key: 'facilitatordescription',
+      label: 'Facilitators Welcome Description',
+      placeholder: 'Enter Description to show for Facilitators .',
+      hint: 'Shown to Facilitators participants when they enrolled',
+    },
+  ];
   noterichTextContents: { [key: string]: string } = {};
   assignmentrichTextContents: { [key: string]: string } = {};
   recentTemplates = [];
@@ -692,6 +721,9 @@ async ngOnInit() {
       this.editors[field.key] = new Editor();
       this.richTextContents[field.key] = '';
     });
+    this.cpwelcomeFields.forEach(field => {
+      this.cpwelcomeeditors[field.key] = new Editor();
+    });
     this.workshopId = this.route.snapshot.paramMap.get('id');
     if (this.workshopId) {
       this.loadWorkshopData();
@@ -856,6 +888,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     Object.values(this.editors).forEach(editor => editor?.destroy());
     Object.values(this.noteeditors).forEach(editor => editor?.destroy());
     Object.values(this.assignmenteditors).forEach(editor => editor?.destroy());
+    Object.values(this.cpwelcomeeditors).forEach(editor => editor?.destroy());
     this.subscription.next();
     this.subscription.complete();
   }
@@ -883,6 +916,12 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         dailyCommunication: this.fb.array([
           this.fb.control({value:'',disabled:true})
         ])
+      }),
+      cpwelcomemessage: this.fb.group({
+        abovediagnosticsdescription: [''],
+        abovediagnosticsheading: [''],
+        facilitatordescription: [''],
+        facilitatorheading: [''],
       }),
       newusersonly:[false],
       journeybased: [false],
@@ -1193,6 +1232,11 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     return value;
   }
 
+  compareRefs = (a: any, b: any): boolean => {
+    if (!a || !b) return a === b;
+    return a.path === b.path;
+  };
+
     getFormArray(key: string): FormArray {
       return this.detailPageForm.get(key) as FormArray;
     }
@@ -1477,6 +1521,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       status: [undefined],
       hidezoom: [null],
       completedzoomurl:[''],
+      zoomvideoref: [null],
       headicon:[''],
       heading: [''],
       subheading: [''],
@@ -1750,6 +1795,7 @@ private rebuildActivityIds(): void {
       zoomattend: [challenge['zoomattend'] || []],
       zoomlink: [challenge.zoomlink || ''],
       completedzoomurl: [challenge.completedzoomurl || ''],
+      zoomvideoref: [challenge.zoomvideoref || null],
       // status: [challenge.status ?? null],
       status: [challenge.status || undefined],
       hidezoom: [challenge.hidezoom ?? false],
@@ -1970,6 +2016,12 @@ private rebuildActivityIds(): void {
           workshopDays: data['evergreenWorkshopMeta']?.workshopDays ?? null,
           lastChallengeMessage: data['evergreenWorkshopMeta']?.lastChallengeMessage ?? '',
         },
+        cpwelcomemessage: {
+          abovediagnosticsdescription: data['cpwelcomemessage']?.abovediagnosticsdescription ?? '',
+          abovediagnosticsheading: data['cpwelcomemessage']?.abovediagnosticsheading ?? '',
+          facilitatordescription: data['cpwelcomemessage']?.facilitatordescription ?? '',
+          facilitatorheading: data['cpwelcomemessage']?.facilitatorheading ?? '',
+        },
         newusersonly: data['newusersonly'] || false,
         journeybased: data['journeybased'] || false,
         tierbased: data['tierbased'] || false,
@@ -2138,6 +2190,7 @@ private rebuildActivityIds(): void {
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
         evergreenWorkshop: this.settingsForm.get('evergreenWorkshop')?.value || false,
         evergreenWorkshopMeta: this.settingsForm.get('evergreenWorkshopMeta')?.value ?? null,
+        cpwelcomemessage: this.settingsForm.get('cpwelcomemessage')?.value ?? null,
         newusersonly: this.settingsForm.get('newusersonly')?.value || false,
         journeybased: this.settingsForm.get('journeybased')?.value || false,
         tierbased: this.settingsForm.get('tierbased')?.value || false,
@@ -2525,4 +2578,12 @@ dropCategory(event: CdkDragDrop<string[]>): void {
   moveItemInArray(currentOrder, event.previousIndex, event.currentIndex);
   this.settingsForm.get('categoriesforthisworkshop')?.setValue(currentOrder);
 }
+  openUploadDialog() {
+    this.dialog.open(UploadEpisodeDialogComponent, {
+      width: '95vw',
+      maxWidth: '1400px',
+      height: '90vh',
+      panelClass: 'upload-episode-dialog-panel',
+    });
+  }
 }
