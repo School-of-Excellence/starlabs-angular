@@ -195,7 +195,7 @@ export class ManageCohertsComponent {
           name: this.data.doc['name'],
           cohortCategory: this.data.doc['cohortCategory'] || 'studio',
           cohortType: this.data.doc['cohortType'] || 'general',
-          participantidlist: this.data.doc['participantidlist'],
+          participantidlist: this.data.doc['participantidlist'] || [],
           docid: this.data.doc['docid'],
           createddate: this.data.doc['createddate']?.toDate ? this.data.doc['createddate'].toDate() : this.data.doc['createddate'],
           udpateddate: new Date(),
