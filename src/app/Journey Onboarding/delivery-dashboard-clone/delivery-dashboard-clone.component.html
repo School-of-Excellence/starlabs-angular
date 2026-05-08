@@ -245,18 +245,31 @@
   <div class="modal-overlay" *ngIf="selectedProductId" (click)="closeModal()">
     <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3>{{ getCardName(selectedProductId) }} -
-          {{ modalType === 'all' ? 'All Eligible' :
-          modalType === 'filtered' ? 'Filtered Eligible' :
-          modalType === 'noteligible' ? 'Not Eligible' :
-          modalType === 'bonus' ? 'Bonus' :
-          modalType === 'purchased' ? 'Purchased' :
-          modalType === 'thismonth' ? 'This Month' :
-          modalType === 'nextmonth' ? 'Next Month' : '' }}
-        </h3>
-        <span class="modal-count">{{ profileIds.length }} profiles</span>
-        <button class="modal-export-btn" (click)="exportProfileModal()">Export</button>
-        <button class="modal-close" (click)="closeModal()">✕</button>
+        <div class="modal-header-left">
+          <h3>{{ getCardName(selectedProductId) }} -
+            {{ modalType === 'all' ? 'All Eligible' :
+            modalType === 'filtered' ? 'Filtered Eligible' :
+            modalType === 'noteligible' ? 'Not Eligible' :
+            modalType === 'bonus' ? 'Bonus' :
+            modalType === 'purchased' ? 'Purchased' :
+            modalType === 'thismonth' ? 'This Month' :
+            modalType === 'nextmonth' ? 'Next Month' : '' }}
+          </h3>
+          <span class="modal-count">{{ profileIds.length }} profiles</span>
+        </div>
+        <div class="modal-header-right">
+          <select *ngIf="modalType === 'purchased' || modalType === 'bonus'" class="custom-select pe-2"
+            [(ngModel)]="selectedStatus" (change)="filterCardProfiles()">
+            <option value="all">All</option>
+            <option value="">Not Initiated</option>
+            <option value="initiated">Initiated</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="completed">Completed</option>
+          </select>
+
+          <button class="modal-export-btn pe-2" (click)="exportProfileModal()">Export</button>
+          <button class="modal-close" (click)="closeModal()">✕</button>
+        </div>
       </div>
       <div class="modal-body">
         <div class="profile-row" *ngFor="let pid of profileIds; let i = index">
@@ -272,11 +285,14 @@
                 }}</span>
               <span *ngIf="!isParticipantEligible(pid, item)">
                 <span>
-                  Mode: {{ mapMetaData[pid]?.['participantmode'] || pid }}
+                  <span class="fw-bold">Mode: </span>
+                  <span>{{ mapMetaData[pid]?.['participantmode'] || pid }}</span>
                 </span>
-                <span *ngIf="(((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0))) >= 0">
-                  Remaining Payable: {{ ((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0))
-                  }}
+                <span class="ps-2"
+                  *ngIf="(((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0))) >= 0">
+                  <span class="fw-bold">Remaining Payable: </span>
+                  <span>{{ formatPrice(((item?.['minimumpayment'] || 0) - (mapMetaData[pid]?.['pp_totalpaid'] || 0)))
+                    }}</span>
                 </span>
               </span>
             </div>
@@ -373,6 +389,111 @@
           </tbody>
         </table>
         <div class="no-data" *ngIf="avgModalDetails.length === 0">No participants have both dates recorded.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== STAGE MODAL ========== -->
+  <!-- <div class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <h3>{{ this.selectedStage }} {{ this.selectedStageFilter }} Participants -
+          </h3>
+          <span class="modal-count">{{ groupedByStageProfileAll.length }} profiles</span>
+        </div>
+        <div class="modal-header-right">
+          <select *ngIf="selectedStageFilter === 'Scheduled'" [(ngModel)]="selectedFilter" (change)="onFilterChange()">
+            <option value="recent">Recent</option>
+            <option value="all">All</option>
+          </select>
+          <button class="modal-close" (click)="closeStageModal()">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
+          <div class="profile-header">
+            <span class="participant-index">{{ i + 1 }}</span>
+            <span class="participant-name">{{ mapMetaData[app.profileid]?.['name'] || app.profileid }}</span>
+          </div>
+          <div class="profile-products">
+            <div class="product-tag">
+              <span class="status-tag ongoing">{{ selectedStageFilter === 'Scheduled' ? 'Scheduled' : 'Not
+                Scheduled'}}</span>
+              <span *ngIf="selectedStageFilter === 'Scheduled'">
+                <span class="fw-bold">Start: </span>
+                <span>{{ app.starttime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+                <span class="fw-bold ps-2">End: </span>
+                <span>{{ app.endtime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div> -->
+
+  <div *ngIf="openAppointmentModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="diag-modal-header">
+        <div class="diag-modal-title">
+          <span id="diagModalTitle">{{ this.selectedStage }} {{ this.selectedStageFilter}} Participants</span>
+          <span id="diagModalCount" class="diag-modal-count"></span>
+        </div>
+        <button class="diag-modal-close" (click)="closeStageModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="diag-tabs">
+        <button class="diag-tab" [class.active]="selectedFilter === 'all'" (click)="onFilterChange('all')">
+          All
+        </button>
+
+        <button class="diag-tab" [class.active]="selectedFilter === 'today'" (click)="onFilterChange('today')">
+          Today
+        </button>
+
+        <button class="diag-tab" [class.active]="selectedFilter === 'tomorrow'" (click)="onFilterChange('tomorrow')">
+          Tomorrow
+        </button>
+
+        <button class="diag-tab" [class.active]="selectedFilter === 'overdue'" (click)="onFilterChange('overdue')">
+          <span class="diag-tab-dot"></span>
+          Missed / Overdue
+        </button>
+      </div>
+
+      <!-- List -->
+      <div class="diag-modal-list" id="diagModalList">
+        <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
+          <div class="profile-header">
+            <span class="participant-index">{{ i + 1 }}</span>
+            <a class="participant-name" [href]="'/participantdeliverysequence/' + app.profileid">
+              {{ mapMetaData[app.profileid]?.['name'] || app.profileid }}
+            </a>
+          </div>
+          <div class="profile-products">
+            <div class="product-tag">
+              <span class="status-tag" [ngClass]="selectedStageFilter === 'Scheduled' ? 'scheduled' : 'not-scheduled'">
+                {{ selectedStageFilter === 'Scheduled' ? 'Scheduled' : 'Not Scheduled' }}
+              </span>
+              <span *ngIf="selectedStageFilter === 'Scheduled'">
+                <span class="fw-bold">Start: </span>
+                <span>{{ app.starttime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+                <span class="fw-bold ps-2">End: </span>
+                <span>{{ app.endtime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="groupedByStageProfileAll.length === 0" class="no-data">
+          No data yet
+        </div>
       </div>
     </div>
   </div>
@@ -551,14 +672,14 @@
         </div>
 
         <button class="clear-tab" [class.active]="!selectedProductLabel" (click)="clearStats()">
-          Clear Stat
+          Clear Stats
         </button>
 
         <!-- Product Selector -->
         <div class="filter-tabs">
-          <button *ngFor="let p of products" class="tab" [class.active]="selectedProductLabel === p"
-            (click)="selectProduct(p)" [disabled]="p!== 'EI Starter Pack'">
-            {{ p }}
+          <button *ngFor="let p of products" class="tab" [class.active]="selectedProductLabel === p.label"
+            (click)="selectProduct(p.label)" [disabled]="!['Critical Support'].includes(p.label)">
+            {{ p.label }}
           </button>
         </div>
       </div>
@@ -573,40 +694,159 @@
       <ng-container *ngIf="!participantLoading">
         <div class="column" *ngFor="let col of columns; let i = index">
           <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
-            <div class="col-header-left">
-              <span class="col-title">{{ col }}</span>
+            <div class="header-col">
+              <div class="d-flex filter-asc" (click)="sortColumn(i)">
+                <div class="col-header-left">
+                  <span class="col-title">{{ col }}</span>
+                </div>
+                <div class="filter-asc ps-2">
+                  <i class="fas text-black-50 filter-asc" [ngClass]="{
+         'fa-sort': !sortDirection[i],
+         'fa-sort-up': sortDirection[i] === 'asc',
+         'fa-sort-down': sortDirection[i] === 'desc'
+       }">
+                  </i>
+                </div>
+              </div>
+              <span class="col-badge">
+                {{ filteredCardsMap[i]?.length || 0 }}
+              </span>
             </div>
-            <span class="col-badge">
-              {{ filteredCardsMap[i]?.length || 0 }}
-            </span>
+            <div>
+              <div class="col-mini-stats">
+
+                <!-- Diagnostics -->
+                <ng-container *ngIf="col === 'Diagnostics'">
+                  <div (click)="openStageModal(col, 'Scheduled', diagnosticsScheduledAll)"
+                    class="mini-stat mini-stat-clickable" title="View scheduled participants">
+
+                    <div class="mini-stat-val" style="color:var(--blue)">
+                      {{ diagnosticsScheduledAll.length || 0 }}
+                    </div>
+
+                    <div class="mini-stat-lbl">Scheduled</div>
+                  </div>
+
+                  <!-- <div (click)="openStageModal(col, 'Awaiting', diagnosticsAwaitingAll)"
+                    class="mini-stat mini-stat-clickable" title="View awaiting participants">
+
+                    <div class="mini-stat-val" style="color:var(--coral)">
+                      {{ diagnosticsAwaitingAll.length }}
+                    </div>
+
+                    <div class="mini-stat-lbl">Awaiting</div>
+                  </div> -->
+                </ng-container>
+
+
+                <!-- Implementation -->
+                <ng-container *ngIf="col === 'Implementation'">
+                  <div (click)="openStageModal(col, 'Scheduled', implementationScheduledAll)"
+                    class="mini-stat mini-stat-clickable" title="View scheduled participants">
+
+                    <div class="mini-stat-val" style="color:var(--blue)">
+                      {{ implementationScheduledAll.length || 0 }}
+                    </div>
+
+                    <div class="mini-stat-lbl">Scheduled</div>
+                  </div>
+
+                  <!-- <div (click)="openStageModal(col, 'Awaiting', implementationAwaitingAll)"
+                    class="mini-stat mini-stat-clickable" title="View awaiting participants">
+
+                    <div class="mini-stat-val" style="color:var(--coral)">
+                      {{ implementationAwaitingAll.length }}
+                    </div>
+
+                    <div class="mini-stat-lbl">Awaiting</div>
+                  </div> -->
+                </ng-container>
+
+
+                <!-- Review -->
+                <ng-container *ngIf="col === 'Review'">
+                  <div (click)="openStageModal(col, 'Scheduled', reviewScheduledAll)"
+                    class="mini-stat mini-stat-clickable" title="View scheduled participants">
+
+                    <div class="mini-stat-val" style="color:var(--blue)">
+                      {{ reviewScheduledAll.length || 0 }}
+                    </div>
+
+                    <div class="mini-stat-lbl">Scheduled</div>
+                  </div>
+
+                  <!-- <div (click)="openStageModal(col, 'Awaiting', reviewAwaitingAll)"
+                    class="mini-stat mini-stat-clickable" title="View awaiting participants">
+
+                    <div class="mini-stat-val" style="color:var(--coral)">
+                      {{ reviewAwaitingAll.length }}
+                    </div> -->
+
+                    <!-- <div class="mini-stat-lbl">Awaiting</div>
+                  </div> -->
+                </ng-container>
+
+              </div>
+            </div>
           </div>
 
           <div class="col-body">
             <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
-              <div class="card" *ngFor="let c of filteredCardsMap[i]" [class.card-expanded]="c._expanded">
+              <div class="card" *ngFor="let c of filteredCardsMap[i]; trackBy: trackByCard"
+                [class.card-expanded]="c._expanded">
 
                 <!-- Visible Card -->
                 <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
                   <div class="card-info">
                     <div class="card-name">
-                      {{ mapMetaData[c.profileid]?.name }}
+                      <!-- {{ mapMetaData[c.profileid]?.name }} Temporary -->
+                      {{ c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name }}
                     </div>
                   </div>
                 </div>
 
                 <!-- Status -->
-                <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
-                  {{ c.status || 'NOT INITIATED' }}
-                </span>
+                <div class="d-flex">
+                  <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
+                    {{ c?.profileid ? (c.status || 'NOT INITIATED') : 'Pending' }}
+                  </span>
+                  <span class="card-status" *ngIf="(c?.status === null || c?.status === 'initiated')">
+                    {{
+                    addonsPackageLookup[c?.packageref?.id || c?.packageref]
+                    || bonusPackageLookup[c?.packageref?.id || c?.packageref]
+                    || 'Purchased'
+                    }}
+                  </span>
+                </div>
 
                 <!-- Active Appointment Detail -->
                 <div class="detail-row" (click)="toggleExpand(c, i)">
-                  <span>
-                    <span class="detail-label">
-                      {{ showActiveStage(c) }}
+                  <span class="d-flex flex-column">
+                    <span>
+                      <span class="detail-label">
+                        {{ showActiveStage(c) }}
+                      </span>
+                      <span class="detail-val">
+                        {{ showParticipantActiveDate(c) }}
+                      </span>
                     </span>
-                    <span class="detail-val">
-                      {{ showParticipantActiveDate(c) }}
+                    <span>
+                      <ng-container *ngIf="c?.status === 'ongoing' && c.hosts?.length">
+                        <span class="detail-label">Specialist: </span>
+                        <span class="detail-val">
+                          {{
+                          mapProfileData[
+                          (c.hosts[0]?.path || c.hosts[0]).split('/').pop()
+                          ]?.name
+                          }}
+                        </span>
+                      </ng-container>
+                    </span>
+                    <span>
+                      <ng-container *ngIf="showDelayDate(c) as delay">
+                        <span *ngIf="delay" class="detail-label">Delayed By: </span>
+                        <span *ngIf="delay" class="detail-val">{{ delay }}</span>
+                      </ng-container>
                     </span>
                   </span>
                   <span class="chevron" [class.open]="c._expanded">
@@ -617,39 +857,53 @@
                 <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
                   <hr class="divider">
                   <ng-container>
-                    <div class="d-flex justify-content-between align-items-center mb-2" *ngFor="let stage of stages">
-                      <ng-container *ngIf="getAppointmentByStage(stage, c?.allappointments) as appointment">
-                        <div>
-                          <div class="detail-stage-label text-muted">
-                            {{ stage }}
+                    <div *ngFor="let stage of stages">
+                      <!-- When appointments exist -->
+                      <ng-container *ngIf="getAppointmentsByStage(stage, c?.allappointments) as appointments">
+                        <ng-container *ngIf="appointments.length > 0; else noAppointments">
+                          <div *ngFor="let appointment of appointments"
+                            class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                              <div class="detail-stage-label text-muted">
+                                {{ stage }}
+                              </div>
+                              <div *ngIf="appointment?.starttime">
+                                <span class="detail-stage-label">Start: </span>
+                                <span class="detail-stage-label">
+                                  {{ formatDateTime(appointment?.starttime) }}
+                                </span>
+                              </div>
+                              <div *ngIf="appointment?.endtime">
+                                <span class="detail-stage-label">End: </span>
+                                <span class="detail-stage-label">
+                                  {{ formatDateTime(appointment?.endtime) }}
+                                </span>
+                              </div>
+                              <div *ngIf="appointment?.date">
+                                <span class="detail-stage-label">Submitted: </span>
+                                <span class="detail-stage-label">
+                                  {{ formatDateTime(appointment?.date) }}
+                                </span>
+                              </div>
+                            </div>
+                            <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
+                              {{ getAppointmentStatus(stage, appointment) }}
+                            </div>
                           </div>
-                          <div class="" *ngIf="appointment?.starttime">
-                            <span class="detail-stage-label">Start: </span>
-                            <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
+                        </ng-container>
+                        <!-- When NO appointments -->
+                        <ng-template #noAppointments>
+                          <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                              <div class="detail-stage-label text-muted">
+                                {{ stage }}
+                              </div>
+                            </div>
+                            <div class="status-badge status-notscheduled">
+                              Not Scheduled
+                            </div>
                           </div>
-                          <div class="" *ngIf="appointment?.endtime">
-                            <span class="detail-stage-label">End: </span>
-                            <span class="detail-stage-label">{{ formatDateTime(appointment?.endtime) }}</span>
-                          </div>
-                          <div class="" *ngIf="appointment?.date">
-                            <span class="detail-stage-label">Submitted: </span>
-                            <span class="detail-stage-label">{{ formatDateTime(appointment?.date) }}</span>
-                          </div>
-                        </div>
-                        <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
-                          {{ getAppointmentStatus(stage, appointment) }}
-                        </div>
-
-                      </ng-container>
-                      <ng-container *ngIf="!getAppointmentByStage(stage, c?.allappointments)">
-                        <div>
-                          <div class="detail-stage-label text-muted">
-                            {{ stage }}
-                          </div>
-                        </div>
-                        <div class="status-badge status-notscheduled">
-                          Not Scheduled
-                        </div>
+                        </ng-template>
                       </ng-container>
                     </div>
                   </ng-container>

@@ -18,7 +18,7 @@
     <div class="info-row">
       <!-- <span class="label">Specialists:</span>
       <span class="value"> -->
-        <strong><label class="text-start">{{data.hosts}}</label></strong>
+      <strong><label class="text-start">{{data.hosts}}</label></strong>
       <!-- </span> -->
     </div>
     <div class="info-row" *ngIf="productType">
@@ -37,6 +37,7 @@
   <div>
     <mat-checkbox [(ngModel)]="attended">Appointment Happened Successfully!</mat-checkbox>
   </div>
+
   <div class="journeystatusbox" *ngIf="!attended">
     <div class="subtitle">Why not Happened?</div>
     <mat-form-field appearance="outline">
@@ -48,6 +49,7 @@
   </div>
   <div class="btnbox">
     <button class="cancelbtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
-    <button class="submitbtn" mat-stroked-button (click)="submit()" [disabled]="loading">{{loading ? 'Please wait...' : 'Update Status'}}</button>
+    <button class="submitbtn" mat-stroked-button (click)="submit()" [disabled]="loading">{{loading ? 'Please wait...' :
+      'Update Status'}}</button>
   </div>
 </div>
