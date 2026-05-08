@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
@@ -246,9 +246,12 @@ export class PrescribeATCComponent {
   assignmentId:string;
   participantAssignmentId:string;
 
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
   constructor(
     public location : Location,
-    public firestore : Firestore,
+    // public firestore : Firestore,
     public storage : Storage,
     public route: ActivatedRoute,
     public router: Router,
@@ -281,9 +284,9 @@ export class PrescribeATCComponent {
     guardservice.getuid().then(uid=>{
       this.loggedinUser = uid
       console.log(uid)
-      getDocs(query(collection(this.firestore,"profile_data"),where("user_ref", "==", doc(this.firestore,'user_data',uid)))).then(async profileData=>{
+      getDocs(query(collection(this.firestoreDefault, "profile_data"),where("user_ref", "==", doc(this.firestoreDefault, 'user_data', uid)))).then(async profileData=>{
         this.loggedinProfileid = profileData.docs[0].id
-        getDoc(doc(this.firestore,profileData.docs[0].data()['role_ref']['path'])).then(async roleDoc=>{
+        getDoc(doc(this.firestoreDefault, profileData.docs[0].data()['role_ref']['path'])).then(async roleDoc=>{
           var roleData = roleDoc.data()
           this.admin = roleData['admin'] ?? false
           this.transcriber = roleData['transcriber'] ?? false
@@ -306,7 +309,7 @@ export class PrescribeATCComponent {
         })
       })
       //get adjustment_wareness
-      getDoc(doc(this.firestore,"classify","adjustment_awareness")).then( snap => {
+      getDoc(doc(this.firestoreDefault, "classify", "adjustment_awareness")).then( snap => {
         if(snap.exists()){
           this.adjustmentAwarenessDetail = snap.data()
         }
@@ -423,7 +426,7 @@ export class PrescribeATCComponent {
     this.route.queryParams.subscribe(async params => {
       if (!params['aigenerated'] || !params['docid']) return;
       const docid = params['docid'];
-      const draftRef = doc(this.firestore, 'temporary_ATC', docid);
+      const draftRef = doc(this.firestoreATC, 'temporary_ATC', docid);
       const draftSnap = await getDoc(draftRef);
 
       if (draftSnap.exists()) {
@@ -447,7 +450,7 @@ export class PrescribeATCComponent {
       }
       console.log('No draft found → parsing AI output');
 
-      const aiRef = doc(this.firestore, 'ai_generated_atc_summary', docid);
+      const aiRef = doc(this.firestoreATC, 'ai_generated_atc_summary', docid);
       const aiSnap = await getDoc(aiRef);
 
       if (!aiSnap.exists()) {
@@ -551,7 +554,7 @@ export class PrescribeATCComponent {
     // Big Assignment
     if(this.bigActivity()){
       this.validationnotrequired = false;
-      await getDoc(doc(collection(this.firestore, 'big participants assignments'),this.participantAssignmentId)).then((bpadoc)=>{
+      await getDoc(doc(collection(this.firestoreDefault, 'big participants assignments'),this.participantAssignmentId)).then((bpadoc)=>{
         if(bpadoc.exists() && bpadoc.data()['status'] == 'initiated'){
           updateDoc(bpadoc.ref,{status : 'ongoing'});
         }
@@ -579,19 +582,19 @@ export class PrescribeATCComponent {
   async setupData(){
     try {
       // Fetch Products
-      collectionData(query(collection(this.firestore,"products"), orderBy("atcmodel")), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(products=>{
+      collectionData(query(collection(this.firestoreDefault,"products"), orderBy("atcmodel")), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(products=>{
         for (let i = 0; i < products.length; i++) {
           const productAvailable = products[i]
           this.mapProductidtoatcmodel[productAvailable['id']] = productAvailable['atcmodel']
         }
       })
-      collectionData(query(collection(this.firestore,"atc model"), orderBy("atcmodel")), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(products=>{
+      collectionData(query(collection(this.firestoreDefault, "atc model"), orderBy("atcmodel")), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(products=>{
         this.productAvailable = products.filter(e => (e["atcmodel"] ?? "").trim().length != 0)
         this.productLists = Array.from(new Map(this.productAvailable.map(item => [item["atcmodel"], item])).values());
       })
 
       // Fetch User Roles
-      collectionData(query(collection(this.firestore, 'users_roles'), orderBy('name')), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(userRoles=>{
+      collectionData(query(collection(this.firestoreDefault, 'users_roles'), orderBy('name')), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(userRoles=>{
         var usersWithRoles = []
         var mentor = []
         var profileList = []
@@ -622,7 +625,7 @@ export class PrescribeATCComponent {
       })
 
       // Procedure Recommendation
-      collectionSnapshots(query(collection(this.firestore, "procedure_recommend"), orderBy('name'))).pipe(takeUntil(this.subscriptionHandle)).subscribe(names=>{
+      collectionSnapshots(query(collection(this.firestoreDefault, "procedure_recommend"), orderBy('name'))).pipe(takeUntil(this.subscriptionHandle)).subscribe(names=>{
         var list = [];
         names.forEach(type=>{
           list.push({
@@ -635,7 +638,7 @@ export class PrescribeATCComponent {
       })
 
       // Fetch changeworks
-      collectionSnapshots(query(collection(this.firestore,"procedures"),orderBy("name"))).pipe(takeUntil(this.subscriptionHandle)).subscribe(procedureList=>{
+      collectionSnapshots(query(collection(this.firestoreDefault,"procedures"),orderBy("name"))).pipe(takeUntil(this.subscriptionHandle)).subscribe(procedureList=>{
       // this.procedureSubscription = this.firestore.collection("procedures", ref=>ref.orderBy("name")).snapshotChanges().subscribe(procedureList=>{
         var list = []
         for (let i = 0; i < procedureList.length; i++) {
@@ -657,7 +660,7 @@ export class PrescribeATCComponent {
       })
 
       // Big Activity
-      getDocs(query(collection(this.firestore, "bigactivity"), orderBy("activity"))).then(activityList=>{
+      getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity"))).then(activityList=>{
         for (let i = 0; i < activityList.docs.length; i++) {
           const activityDoc = activityList.docs[i];
           var activityData = activityDoc.data()
@@ -695,11 +698,11 @@ export class PrescribeATCComponent {
       })
 
       // Check if inside a Queue
-      await getDocs(query(collection(this.firestore,'queue generation'),where("queueenddate", ">=", new Date()))).then(async queuesnap=>{
+      await getDocs(query(collection(this.firestoreDefault,'queue generation'),where("queueenddate", ">=", new Date()))).then(async queuesnap=>{
         var ongoingQueueList = queuesnap.docs.map(e => e.data()).filter(e => e["queuestartdate"].toDate() < new Date())
-        var queueref = ongoingQueueList.map(e => doc(this.firestore, 'queue generation', e["docid"]))
+        var queueref = ongoingQueueList.map(e => doc(this.firestoreDefault, 'queue generation', e["docid"]))
         if(queueref.length != 0){
-          await getDocs(query(collection(this.firestore, "queue studio pairing"), where("queueref", "in", queueref),where("participants", "array-contains", this.loggedinProfileid),where("checkin", "==", true),where("studioin", "==", true))).then(pairing=>{
+          await getDocs(query(collection(this.firestoreDefault, "queue studio pairing"), where("queueref", "in", queueref),where("participants", "array-contains", this.loggedinProfileid),where("checkin", "==", true),where("studioin", "==", true))).then(pairing=>{
             if(pairing.size != 0){
               this.ongoingQueue = ongoingQueueList.find(e => e["docid"] == pairing.docs[0].data()["queueref"].id) ?? null
               if(this.ongoingQueue != null) this.arenamode = true
@@ -750,7 +753,7 @@ export class PrescribeATCComponent {
     Object.keys(this.observerMap).forEach(item=>{
       observerPath = [...observerPath, ...(this.observerMap[item] ?? [])]
     })
-    this.mentorOption = Array.from(new Set([...this.relatedATCauthor, ...observerPath.map(e => doc(this.firestore,e).id)]))
+    this.mentorOption = Array.from(new Set([...this.relatedATCauthor, ...observerPath.map(e => doc(this.firestoreDefault,e).id)]))
   }
 
   editDirective(){
@@ -815,7 +818,7 @@ export class PrescribeATCComponent {
     console.log("Selected Profile", this.participantProfileid)
     this.selectedParticipantProfile = {}
     if(this.participantProfileid){
-      getDoc(doc(this.firestore, "profile_data",this.participantProfileid)).then(profile =>{
+      getDoc(doc(this.firestoreDefault, "profile_data",this.participantProfileid)).then(profile =>{
         if(profile.exists()){
           this.selectedParticipantProfile = profile.data()
         }
@@ -834,7 +837,7 @@ export class PrescribeATCComponent {
         }
       })
       console.log(atcActivityStage)
-      getDocs(query(collection(this.firestore,"live assignment"),where("queueid", "==", this.ongoingQueue["docid"]),where("participantid", "==", this.participantProfileid),where('pairing', 'array-contains', this.loggedinProfileid),orderBy("created", "desc"))).then(async (studio) =>{
+      getDocs(query(collection(this.firestoreDefault,"live assignment"),where("queueid", "==", this.ongoingQueue["docid"]),where("participantid", "==", this.participantProfileid),where('pairing', 'array-contains', this.loggedinProfileid),orderBy("created", "desc"))).then(async (studio) =>{
         var live = studio.docs.filter(e => e.data()["status"] == "recording" || e.data()["status"] == "live")
         var atcStudio = null
         if(live.length != 0){
@@ -853,7 +856,7 @@ export class PrescribeATCComponent {
           this.stagename = this.liveassignmentdata['stagename']
           this.queueid = this.ongoingQueue["docid"]
           this.validationnotrequired = this.mentor || this.queryparam["validation"] == "true" // this.liveassignmentdata['stagetype'] == 'consultation' || this.liveassignmentdata['stagetype'] == 'ah' || (this.ongoingQueue["isconsultationrequired"] ?? []).length == 0
-          getDocs(query(collection(this.firestore,"queue stage log"), where("liveassignmentid", "==", this.liveassignmentid),limit(1))).then(queuetoken=>{
+          getDocs(query(collection(this.firestoreDefault,"queue stage log"), where("liveassignmentid", "==", this.liveassignmentid),limit(1))).then(queuetoken=>{
             console.log("queue Token", queuetoken.size)
             console.log("Live Assignment", this.liveassignmentdata)
             if(queuetoken.size != 0){
@@ -975,14 +978,14 @@ export class PrescribeATCComponent {
     var draftATC = []
     if (this.developer || this.admin) {
       const q = query(
-        collection(this.firestore, 'temporary_ATC'),
+        collection(this.firestoreATC, 'temporary_ATC'),
         where('profileid', '==', this.participantProfileid),
         where('delete', '==', false)
       );
       draftATC = (await getDocs(q)).docs;
     } else {
       const q = query(
-        collection(this.firestore, 'temporary_ATC'),
+        collection(this.firestoreATC, 'temporary_ATC'),
         where('profileid', '==', this.participantProfileid),
         where('delete', '==', false),
         where('authorprofileid', 'array-contains', this.loggedinProfileid)
@@ -990,7 +993,7 @@ export class PrescribeATCComponent {
       draftATC = (await getDocs(q)).docs;
     }
     console.log(draftATC.map(e => e.ref.path))
-    this.autoSaveID = this.guardservice.generateId(this.firestore, "temporary_ATC")
+    this.autoSaveID = this.guardservice.generateId(this.firestoreATC, "temporary_ATC")
     if(draftATC.length != 0){
       var dialogRef = this.matDialog.open(AtcOptionComponent, {
         data:{
@@ -1185,7 +1188,7 @@ export class PrescribeATCComponent {
 
   async getDirectiveAssignments(profilemap){
     console.log("ATC Assignments")
-    const q = query(collection(this.firestore, 'atc assignment'), where("assignedto","array-contains",this.loggedinProfileid), where("status", "==", 'initiated'))
+    const q = query(collection(this.firestoreDefault, 'atc assignment'), where("assignedto","array-contains",this.loggedinProfileid), where("status", "==", 'initiated'))
     var atcassignment = (await getDocs(q)).docs;
     if(atcassignment.length != 0){
       var dialogRef = this.matDialog.open(AtcOptionComponent, {
@@ -1207,7 +1210,7 @@ export class PrescribeATCComponent {
             this.date = new Date()
             this.atcdirective = value['directive']
             this.participantProfileid = value['profileid']
-            this.authorMap[value["activity"]] = value['assignedto'].map(e => doc(this.firestore, "profile_data", e).path)
+            this.authorMap[value["activity"]] = value['assignedto'].map(e => doc(this.firestoreDefault, "profile_data", e).path)
             // this.author = value['assignedto'].map(e => this.firestore.collection("profile_data").doc(e).ref.path)
             this.directiveMentor = value['author']
             this.assignmentInitiated = true
@@ -1452,7 +1455,7 @@ export class PrescribeATCComponent {
         var authorprofileid = [];
         Object.values<any>(this.authorMap ?? {}).forEach(value => {
           if (value) {
-            var id = (value ?? []).map(e => doc(this.firestore, e).id);
+            var id = (value ?? []).map(e => doc(this.firestoreDefault, e).id);
             authorprofileid = [...authorprofileid, ...id];
           }
         });
@@ -1504,7 +1507,7 @@ export class PrescribeATCComponent {
 
         console.log("Data with audio URLs:", data);
 
-        await setDoc(doc(this.firestore, 'temporary_ATC', this.autoSaveID), data);
+        await setDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), data);
 
         this.draftStatus = {
           message: "ATC and Audio Saved to Draft.",
@@ -1852,7 +1855,7 @@ async removeATCImage(index: number) {
 }
 
   async submit(){
-    this.alphaid = generateId(this.firestore, 'atc_alpha');
+    this.alphaid = generateId(this.firestoreATC, 'atc_alpha');
 
     if(this.date == null || this.date == undefined){
       alert("Enter the Date of Prescription")
@@ -1938,7 +1941,9 @@ async removeATCImage(index: number) {
   }
 
   async uploadATC(){
-    var firebaseBatch = writeBatch(this.firestore);
+    var firebaseDefaultBatch = writeBatch(this.firestoreDefault)
+    var firebaseATCBatch = writeBatch(this.firestoreATC)
+    // var firebaseBatch = writeBatch(this.firestore);
     var selectedProfile = this.mapProfile[this.participantProfileid]["name"]
     var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${this.ongoingQueue['queuename']}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
     var aelConfirm = this.matDialog.open(AtcAelConfirmComponent, {
@@ -1978,16 +1983,16 @@ async removeATCImage(index: number) {
           var specialistList = this.authorMap[e] ?? []
           authorref = [...authorref, ...specialistList]
           if(specialistList.length != 0){
-            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestore, e).id)
+            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreDefault, e).id)
           }
         })
         this.additionalActivityMap.forEach(additional=>{
           if(additional.specialist.length != 0){
-            atclevelBigActivity[additional.activity] = [...(atclevelBigActivity[additional.activity] ?? []), ...additional.specialist.map(e => doc(this.firestore, e).id)]
+            atclevelBigActivity[additional.activity] = [...(atclevelBigActivity[additional.activity] ?? []), ...additional.specialist.map(e => doc(this.firestoreDefault, e).id)]
           }
         })
         authorref = Array.from(new Set(authorref))
-        authorref = authorref.map(e => doc(this.firestore, e))
+        authorref = authorref.map(e => doc(this.firestoreDefault, e))
         console.log(authorref)
 
         // Observer
@@ -1996,11 +2001,11 @@ async removeATCImage(index: number) {
           var specialistList = this.observerMap[e] ?? []
           observerref = [...observerref, ...specialistList]
           if(specialistList.length != 0){
-            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestore, e).id)
+            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreDefault, e).id)
           }
         })
         observerref = Array.from(new Set(observerref))
-        observerref = observerref.map(e => doc(this.firestore, e))
+        observerref = observerref.map(e => doc(this.firestoreDefault, e))
         console.log(observerref)
 
         // Mentor
@@ -2009,28 +2014,29 @@ async removeATCImage(index: number) {
           var specialistList = this.mentorMap[e] ?? []
           mentroref = [...mentroref, ...specialistList]
           if(specialistList.length != 0){
-            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestore, e).id)
+            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreDefault, e).id)
           }
         })
         mentroref = Array.from(new Set(mentroref))
-        mentroref = mentroref.map(e => doc(this.firestore, e))
+        mentroref = mentroref.map(e => doc(this.firestoreDefault, e))
         console.log(mentroref)
 
         var validatorref = []
         for (let k = 0; k < this.validator.length; k++) {
-          validatorref.push(doc(this.firestore, this.validator[k]))
+          validatorref.push(doc(this.firestoreDefault, this.validator[k]))
         }
         console.log(validatorref)
 
         // Write on ATC Alpha
-        var mentoringID = (this.mentornotes ?? "").trim().length != 0 ? generateId(this.firestore, 'pick_for_mentoring') : null;
-        var notesID = generateId(this.firestore, 'atc_notes');
+        var mentoringID = (this.mentornotes ?? "").trim().length != 0 ? generateId(this.firestoreDefault, 'pick_for_mentoring') : null;
+        var notesID = generateId(this.firestoreATC, 'atc_notes');
         console.log(this.alphaid)
         var alphaData = {
           atcid: this.alphaid,
           notesid: notesID,
           mentoringid: mentoringID,
           directive: this.atcdirective ?? null,
+          mentroref: mentroref,
           mentee: this.mentee ?? [],
           author: authorref.length == 0 ? null : authorref,
           prescription_date: new Date(new Date(this.date).setHours(new Date().getHours(), new Date().getMinutes())),
@@ -2073,9 +2079,9 @@ async removeATCImage(index: number) {
 
           //Big Assignment
           console.log(this.participantAssignmentId);
-          firebaseBatch.update(doc(this.firestore, 'big participants assignments',this.participantAssignmentId),{
+          firebaseDefaultBatch.update(doc(this.firestoreDefault, 'big participants assignments',this.participantAssignmentId),{
             'status': 'review',
-            'activityref' : doc(this.firestore, collectionName, this.alphaid)
+            'activityref' : doc(this.firestoreATC, collectionName, this.alphaid)
           });
         }else{
           collectionName = this.validationnotrequired ? "atc_alpha" : "atc_to_validate"
@@ -2083,11 +2089,11 @@ async removeATCImage(index: number) {
         console.log(alphaData)
 
         // Write Alpha Level
-        firebaseBatch.set(doc(this.firestore, collectionName, this.alphaid), alphaData);
+        firebaseATCBatch.set(doc(this.firestoreATC, collectionName, this.alphaid), alphaData);
         if (this.queryparam?.['aigenerated'] && this.queryparam?.['docid']) {
-          const aiSummaryRef = doc(this.firestore, 'ai_generated_atc_summary', this.queryparam['docid']);
-          firebaseBatch.update(aiSummaryRef, {
-            atcalpharef: doc(this.firestore, collectionName, this.alphaid),
+          const aiSummaryRef = doc(this.firestoreATC, 'ai_generated_atc_summary', this.queryparam['docid']);
+          firebaseATCBatch.update(aiSummaryRef, {
+            atcalpharef: doc(this.firestoreATC, collectionName, this.alphaid),
             atcsubmittedat: serverTimestamp(),
           });
         }
@@ -2117,7 +2123,7 @@ async removeATCImage(index: number) {
             }
 
             // Write Adjustment Level
-            firebaseBatch.set(doc(collection(doc(this.firestore, collectionName, this.alphaid), "corrections"), adjId), adjustmentData);
+            firebaseATCBatch.set(doc(collection(doc(this.firestoreATC, collectionName, this.alphaid), "corrections"), adjId), adjustmentData);
 
             for (let j = 0; j < this.transcript[i].procedure.length; j++) {
               var procedureID = adjId + " - " + (j+1).toString()
@@ -2128,20 +2134,20 @@ async removeATCImage(index: number) {
                 (this.transcript[i].procedure[j].assignedMap[key] ?? []).forEach(item=>{
                   assignref.push(item)
                   procedurelevelBigActivity[key] = procedurelevelBigActivity[key] ?? []
-                  procedurelevelBigActivity[key].push(doc(this.firestore, item).id)
+                  procedurelevelBigActivity[key].push(doc(this.firestoreDefault, item).id)
                 })
               })
               assignref = Array.from(new Set(assignref))
-              assignref = assignref.map(e => doc(this.firestore, e))
+              assignref = assignref.map(e => doc(this.firestoreDefault, e))
 
               console.log(assignlevel)
-              console.log(this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestore, this.transcript[i].procedure[j].recommended_to) : null)
+              console.log(this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestoreDefault, this.transcript[i].procedure[j].recommended_to) : null)
               console.log(assignref.length != 0 ? assignref : null)
               var procedureData = {
-                name : doc(this.firestore, this.transcript[i].procedure[j].name),
+                name : doc(this.firestoreDefault, this.transcript[i].procedure[j].name),
                 assigned_to : assignref.length != 0 ? assignref : null,
                 level : assignlevel,
-                recommended_to : this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestore, this.transcript[i].procedure[j].recommended_to) : null,
+                recommended_to : this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestoreDefault, this.transcript[i].procedure[j].recommended_to) : null,
                 status : this.transcript[i].procedure[j].completed ? "completed" : "yet to start",
                 created : serverTimestamp(),
                 mandatory : this.transcript[i].procedure[j].mandatory,
@@ -2153,14 +2159,14 @@ async removeATCImage(index: number) {
               }
 
               // Write Procedure Level
-              firebaseBatch.set(doc(collection(doc(collection(doc(this.firestore, collectionName, this.alphaid), "corrections"), adjId), "procedures"), procedureID), procedureData);
+              firebaseATCBatch.set(doc(collection(doc(collection(doc(this.firestoreATC, collectionName, this.alphaid), "corrections"), adjId), "procedures"), procedureID), procedureData);
             }
           }
         }
 
         // Commit Batch
-        await firebaseBatch.commit()
-        atc_alpha_ref: doc(this.firestore, 'atc_alpha', this.alphaid)
+        await firebaseATCBatch.commit()
+        await firebaseDefaultBatch.commit()
         // Audio Note & Notes Image
         if(this.audioBlob.length == 0 && this.selectedNoteImages.length == 0){
           this.uploadATCnotes(notesID, mentoringID, [], [], authorref)
@@ -2206,20 +2212,21 @@ async removeATCImage(index: number) {
   }
 
   async uploadATCnotes(notesID: string, mentoringID: string, audiobrief: string[], imagenotes: string[], atcAuthorRef: DocumentReference[]){
-    var firebaseBatch = writeBatch(this.firestore);
+    var firebaseDefaultBatch = writeBatch(this.firestoreDefault);
+    var firebaseATCBatch = writeBatch(this.firestoreATC);
 
     if(this.arenamode && this.liveassignmentid != null){
       // Close Live Assignment
-      firebaseBatch.update(doc(this.firestore, "live assignment", this.liveassignmentid), {changeworkbrief: audiobrief});
+      firebaseDefaultBatch.update(doc(this.firestoreDefault, "live assignment", this.liveassignmentid), {changeworkbrief: audiobrief});
     }
 
     for (let i = 0; i < this.atcAssignment.length; i++) {
       const assignment = this.atcAssignment[i];
       if((assignment.directive ?? "").trim().length != 0 && assignment.assignedto.length != 0){
-        var docid = generateId(this.firestore, 'atc assignment');
+        var docid = generateId(this.firestoreDefault, 'atc assignment');
         var assignmentData = {
           directive: assignment.directive,
-          assignedto: assignment.assignedto.map(e => doc(this.firestore, e).id),
+          assignedto: assignment.assignedto.map(e => doc(this.firestoreDefault, e).id),
           activity: assignment.activity,
           author: atcAuthorRef.map(e => e.id),
           atcid: this.alphaid,
@@ -2228,7 +2235,7 @@ async removeATCImage(index: number) {
           status: "initiated"
         }
         // Save ATC Assignment
-        firebaseBatch.set(doc(this.firestore, "atc assignment", docid), assignmentData);
+        firebaseDefaultBatch.set(doc(this.firestoreDefault, "atc assignment", docid), assignmentData);
       }
     }
 
@@ -2237,7 +2244,7 @@ async removeATCImage(index: number) {
       Object.keys(this.authorMap).forEach(e =>{
         authorref = [...authorref, ...(this.authorMap[e] ?? [])]
       })
-      authorref = authorref.map(e => doc(this.firestore, e))
+      authorref = authorref.map(e => doc(this.firestoreDefault, e))
       var mentorData = {
         lastupdated: serverTimestamp(),
         atcid : this.alphaid,
@@ -2250,7 +2257,7 @@ async removeATCImage(index: number) {
         created: serverTimestamp()
       }
       // Save Mentor Notes
-      firebaseBatch.set(doc(this.firestore, "pick_for_mentoring", mentoringID), mentorData);
+      firebaseDefaultBatch.set(doc(this.firestoreDefault, "pick_for_mentoring", mentoringID), mentorData);
     }
 
     var notesData = {
@@ -2264,8 +2271,9 @@ async removeATCImage(index: number) {
       imagenotes: imagenotes,
       from: this.validationnotrequired ? "alpha" : "validation",
     }
-    firebaseBatch.set(doc(this.firestore, "atc_notes", notesID), notesData);
-    await firebaseBatch.commit()
+    firebaseATCBatch.set(doc(this.firestoreATC, "atc_notes", notesID), notesData);
+    await firebaseDefaultBatch.commit()
+    await firebaseATCBatch.commit()
     this.uploadCompleted()
   }
 
@@ -2273,7 +2281,7 @@ async removeATCImage(index: number) {
     this.loadingref?.close()
     this.loading = false
     // await this.cleanTemporaryaudio()
-    updateDoc(doc(this.firestore, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
+    updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
       console.log(err)
     })
 
@@ -2313,7 +2321,7 @@ async removeATCImage(index: number) {
       this.mentornotes = null;
       this.audioBlob = [];
       this.audioBlobURL = [];
-      this.autoSaveID = generateId(this.firestore, 'temporary_ATC');
+      this.autoSaveID = generateId(this.firestoreATC, 'temporary_ATC');
       this.selectedNoteImages = []
       this.previewNoteImages = []
       this.selectedATCImages = []
@@ -2352,6 +2360,7 @@ async removeATCImage(index: number) {
     })
   }
 
+  /*
   async closeStudio(stagename: string, previousstage: boolean){
     console.log(stagename, previousstage)
     var loading = this.matDialog.open(LoadingProgressComponent, {
@@ -2435,6 +2444,7 @@ async removeATCImage(index: number) {
     var url = '/editATC/'+ id +"/" + collection
     window.open(url.toString(), '_blank')
   }
+  */
 
   moveToStudio(){
     this.router.navigateByUrl("/dynamicstudio")
