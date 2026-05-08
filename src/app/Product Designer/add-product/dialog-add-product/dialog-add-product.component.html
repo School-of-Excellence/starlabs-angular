@@ -92,7 +92,7 @@
        <!-- <br> -->
       <!-- <app-mat-chip label="Category" [form]="addProductForm" valuetype="string" controlName="category"></app-mat-chip> -->
     </div>
-      
+
     <div class="text-left">
       <mat-form-field class="textField" appearance="outline">
         <mat-label>Immersive Integration Period</mat-label>
@@ -122,6 +122,19 @@
     <div *ngIf="productimage.previewurl != null || productimage.url != null" style="display:flex;flex-direction: column;">
       <img [src]="productimage.previewurl || productimage.url"alt="" height="200" width="310">
       <button mat-stroked-button type="button" (click)="onImageRemove()">Remove Image</button>
+    </div>
+    <label>Attachments :</label>&nbsp;&nbsp;
+    <input type="file" multiple (change)="onAttachmentSelected($event)" #attachmentInput [disabled]="attachments.length >= 5">
+    <div *ngFor="let att of attachments; let i = index" style="display:flex; align-items:center; gap:8px; margin-top:8px">
+      <mat-icon>insert_drive_file</mat-icon>
+      <span>{{ att.name }}</span>
+      <button mat-stroked-button type="button" (click)="removeAttachment(i)">Remove</button>
+    </div>
+    <div *ngIf="uploadProgress !== null" style="margin-top: 8px;">
+      <span>Uploading... {{uploadProgress}}%</span>
+      <div style="background:#e0e0e0; border-radius:4px; height:6px; width:100%; margin-top:4px;">
+        <div [style.width.%]="uploadProgress" style="background:#1976d2; height:6px; border-radius:4px; transition: width 0.3s;"></div>
+      </div>
     </div>
 
     <!-- unlimited flag -->
