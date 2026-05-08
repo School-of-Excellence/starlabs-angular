@@ -365,7 +365,6 @@ export class OnboardingRemarkComponent {
       console.error('resolveBonusProducts error:', err);
     } finally {
       this.bonusLoading = false;
-      // Rebuild preview now that bonus is resolved
       this.buildPreview();
     }
   }
