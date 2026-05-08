@@ -370,11 +370,7 @@ export class DeliveryDashboardCloneComponent {
         'Post-Process Form',
         'Review'
     ];
-    deliveryActivities = [
-        'Critical Support Diagnostics',
-        'Critical Support Implementation',
-        'Critical Support Review'
-    ];
+
     tableData: any[] = [];
     filteredParticipantData: any = {};
     searchedParticipantHeaders: string[] = [
@@ -817,6 +813,94 @@ export class DeliveryDashboardCloneComponent {
         this.participantLoading = false;
     }
 
+    async filterAppointmentsByType(): Promise<void> {
+        this.journeyFlowLoading = true;
+        this.cdr.detectChanges();
+
+        return new Promise((resolve, reject) => {
+            try {
+                this.appointmentsSubscription?.unsubscribe();
+                this.appointmentsSubscription = new Subscription();
+
+                const monthStart = new Date(
+                    this.selectedMonth.getFullYear(),
+                    this.selectedMonth.getMonth(),
+                    1
+                );
+                monthStart.setHours(0, 0, 0, 0);
+
+                const monthEnd = new Date(
+                    this.selectedMonth.getFullYear(),
+                    this.selectedMonth.getMonth() + 1,
+                    0
+                );
+                monthEnd.setHours(23, 59, 59, 999);
+
+                const startTimestamp = Timestamp.fromDate(monthStart);
+                const endTimestamp = Timestamp.fromDate(monthEnd);
+
+                const q = query(
+                    collection(this.firestore, "appointments"),
+                    where("cancelled", "==", false),
+                    where("starttime", ">=", startTimestamp),
+                    where("starttime", "<=", endTimestamp)
+                );
+
+                const sub = collectionData(q, { idField: 'id' })
+                    .subscribe({
+                        next: async (appointmentsSnap: any[]) => {
+
+                            let updatedAppointments = [...appointmentsSnap];
+                            await Promise.all(
+                                updatedAppointments.map(async (appointment) => {
+                                    appointment.appointmentTypeName =
+                                        await this.resolveAppointmentType(appointment);
+                                })
+                            );
+
+                            updatedAppointments = updatedAppointments.map((app: any) => {
+                                const matchedProduct = this.allMatchedProductsRaw.find(
+                                    (product: any) =>
+                                        product.docid === app.participantproductid
+                                );
+                                return {
+                                    ...app,
+                                    ...matchedProduct
+                                };
+                            });
+
+                            const hasChanges = this.allAppointments !== updatedAppointments;
+                            if (hasChanges) {
+                                this.allAppointments = updatedAppointments;
+
+                                if (this.selectedProductLabel) {
+                                    await this.selectProduct(this.selectedProductLabel);
+                                }
+                                this.cdr.detectChanges();
+                            }
+                            this.loadingStates.appointments = true;
+                            this.journeyFlowLoading = false;
+                            resolve();
+                        },
+                        error: (err) => {
+                            console.error("Error loading appointments:", err);
+                            this.loadingStates.appointments = true;
+                            this.journeyFlowLoading = false;
+                            this.cdr.detectChanges();
+                            reject(err);
+                        }
+                    });
+                this.appointmentsSubscription.add(sub);
+            } catch (error) {
+                console.error("Error loading appointments:", error);
+                this.loadingStates.appointments = true;
+                this.journeyFlowLoading = false;
+                this.cdr.detectChanges();
+                reject(error);
+            }
+        });
+    }
+
     async filterProductData(productId: string) {
 
         let productData = {
@@ -845,6 +929,8 @@ export class DeliveryDashboardCloneComponent {
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
 
+                console.log("all appointments", this.allAppointments);
+
                 const attendedAppointments = appointments.filter(app => app.attended === true || app.status === 'submitted');
 
                 if (attendedAppointments.length === 0) {
@@ -859,7 +945,7 @@ export class DeliveryDashboardCloneComponent {
                         app.appointmentTypeName?.toLowerCase() === `critical support review`
                     );
                     const postprocessAppointment = attendedAppointments.find(app =>
-                        app.formname?.toLowerCase() === 'post-process form'
+                        app.formname?.toLowerCase() === 'critical support post form'
                     )
                     const implementationAppointment = attendedAppointments.find(app =>
                         app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
@@ -934,7 +1020,6 @@ export class DeliveryDashboardCloneComponent {
             data = { ...data, allappointments: appointments };
             productData.completion.push(data);
         }
-
         Object.assign(this.productData, productData);
         this.updateFilteredCards();
     }
@@ -965,14 +1050,14 @@ export class DeliveryDashboardCloneComponent {
         else productData.totalEligible.push(mergedData);
     }
 
-
     async FilterReportData(productId: string) {
-        const forms: any[] = [];
         if (this.formsSubscription) {
             this.formsSubscription.unsubscribe();
         }
 
+        this.formsSubscription = new Subscription();
         const observables: Observable<any[]>[] = [];
+
         for (let i = 0; i < this.allMatchedProductsRaw.length; i += 10) {
             const chunk = this.allMatchedProductsRaw
                 .slice(i, i + 10)
@@ -987,36 +1072,45 @@ export class DeliveryDashboardCloneComponent {
             observables.push(obs$);
         }
 
-        const snapshots = await firstValueFrom(combineLatest(observables));
-        for (const docs of snapshots) {
-            const formResults = await Promise.all(
-                docs.map(async (data: any) => {
-                    let appointments = Array.from(this.allAppointments.values() || [])
-                        .filter((app: any) =>
-                            app.participantproductid === data.participantproductid
-                        );
-                    for (let appointment of appointments) {
-                        try {
-                            const appointmenttype = await this.resolveAppointmentType(appointment);
-                            appointment.appointmentTypeName = appointmenttype;
-                        } catch (err) {
-                            console.log("error", err);
-                        }
-                    }
+        const sub = combineLatest(observables).subscribe(async (snapshots) => {
+            const updatedForms: any[] = [];
+            for (const docs of snapshots) {
+                console.log("preprocess data updating...");
+                const formResults = await Promise.all(
+                    docs.map(async (data: any) => {
+                        let appointments = Array.from(this.allAppointments.values() || [])
+                            .filter((app: any) =>
+                                app.participantproductid === data.participantproductid
+                            );
+                        for (let appointment of appointments) {
+                            try {
+                                const appointmenttype =
+                                    await this.resolveAppointmentType(appointment);
 
-                    appointments = [...appointments, data];
-                    return {
-                        ...data,
-                        status: data?.date ? 'submitted' : 'pending',
-                        appointmentstart: data?.date || null,
-                        productid: productId,
-                        allappointments: appointments || []
-                    };
-                })
-            );
-            forms.push(...formResults);
-        }
-        this.allAppointments = [...this.allAppointments, ...forms];
+                                appointment.appointmentTypeName = appointmenttype;
+                            } catch (err) {
+                                console.log("error", err);
+                            }
+                        }
+                        appointments = [...appointments, data];
+                        return {
+                            ...data,
+                            status: data?.date ? 'submitted' : 'pending',
+                            appointmentstart: data?.date || null,
+                            productid: productId,
+                            allappointments: appointments || []
+                        };
+                    })
+                );
+                updatedForms.push(...formResults);
+            }
+            this.allAppointments = [
+                ...Array.from(this.allAppointments.values()),
+                ...updatedForms
+            ];
+            await this.filterProductData(productId);
+        });
+        this.formsSubscription.add(sub);
     }
 
     fetchTicketRiseParticipants() {
@@ -1043,8 +1137,10 @@ export class DeliveryDashboardCloneComponent {
             let typeName = '';
             if (app?.appointmentTypeName) {
                 typeName = app.appointmentTypeName;
-            } else if (app?.formid) {
+            } else if (app?.formname === 'Critical Support Request') {
                 typeName = 'Pre-Process';
+            } else if (app?.formname === 'Critical Support Post Form') {
+                typeName = 'Post-Process Form'
             }
             return typeName.toLowerCase().includes(stage.toLowerCase());
         });
@@ -2261,93 +2357,6 @@ export class DeliveryDashboardCloneComponent {
         await this.fetchDFUProductData();
     }
 
-    async filterAppointmentsByType(): Promise<void> {
-        this.journeyFlowLoading = true;
-        this.cdr.detectChanges();
-
-        return new Promise((resolve, reject) => {
-            try {
-                this.appointmentsSubscription?.unsubscribe();
-                this.appointmentsSubscription = new Subscription();
-
-                const monthStart = new Date(
-                    this.selectedMonth.getFullYear(),
-                    this.selectedMonth.getMonth(),
-                    1
-                );
-                monthStart.setHours(0, 0, 0, 0);
-
-                const monthEnd = new Date(
-                    this.selectedMonth.getFullYear(),
-                    this.selectedMonth.getMonth() + 1,
-                    0
-                );
-                monthEnd.setHours(23, 59, 59, 999);
-
-                const startTimestamp = Timestamp.fromDate(monthStart);
-                const endTimestamp = Timestamp.fromDate(monthEnd);
-
-                const q = query(
-                    collection(this.firestore, "appointments"),
-                    where("cancelled", "==", false),
-                    where("starttime", ">=", startTimestamp),
-                    where("starttime", "<=", endTimestamp)
-                );
-
-                const sub = collectionData(q, { idField: 'id' })
-                    .subscribe({
-                        next: async (appointmentsSnap: any[]) => {
-
-                            let updatedAppointments = [...appointmentsSnap];
-                            await Promise.all(
-                                updatedAppointments.map(async (appointment) => {
-                                    appointment.appointmentTypeName =
-                                        await this.resolveAppointmentType(appointment);
-                                })
-                            );
-
-                            updatedAppointments = updatedAppointments.map((app: any) => {
-                                const matchedProduct = this.allMatchedProductsRaw.find(
-                                    (product: any) =>
-                                        product.docid === app.participantproductid
-                                );
-                                return {
-                                    ...app,
-                                    ...matchedProduct
-                                };
-                            });
-
-                            const hasChanges = this.allAppointments !== updatedAppointments;
-                            if (hasChanges) {
-                                this.allAppointments = updatedAppointments;
-
-                                if (this.selectedProductLabel) {
-                                    await this.selectProduct(this.selectedProductLabel);
-                                }
-                                this.cdr.detectChanges();
-                            }
-                            this.loadingStates.appointments = true;
-                            this.journeyFlowLoading = false;
-                            resolve();
-                        },
-                        error: (err) => {
-                            console.error("Error loading appointments:", err);
-                            this.loadingStates.appointments = true;
-                            this.journeyFlowLoading = false;
-                            this.cdr.detectChanges();
-                            reject(err);
-                        }
-                    });
-                this.appointmentsSubscription.add(sub);
-            } catch (error) {
-                console.error("Error loading appointments:", error);
-                this.loadingStates.appointments = true;
-                this.journeyFlowLoading = false;
-                this.cdr.detectChanges();
-                reject(error);
-            }
-        });
-    }
     applyProductFilter() {
         const productKeywordsMap: any = {
             "WISH": ["WiSH"],
@@ -4181,7 +4190,7 @@ export class DeliveryDashboardCloneComponent {
         this.selectedProductLabel = "";
         this.filteredCardsMap = {};
         this.productData = {};
-        this.ticketRequest = [];
+        // this.ticketRequest = [];
         this.stageData = {}
     }
 

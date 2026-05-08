@@ -3891,6 +3891,7 @@ table.specialist-table tr:hover td {
   border-radius: 6px;
   padding: 5px 8px;
   text-align: center;
+  width: fit-content;
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
