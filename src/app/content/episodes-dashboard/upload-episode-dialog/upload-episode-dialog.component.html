@@ -88,14 +88,15 @@
           <label class="label">Subtitle File (.srt)</label>
           <div class="upload-zone" (click)="srtref.click()">
             <input #srtref type="file" accept=".srt" (change)="addToDoc($event)" hidden />
-            <div class="upload-zone-content" *ngIf="!uploadEpisodeDoc.srtFileName">
+            <div class="upload-zone-content" *ngIf="!uploadEpisodeDoc.srtFileName && !uploadEpisodeDoc.srt">
               <mat-icon class="upload-icon">subtitles</mat-icon>
               <span class="upload-text">Click to upload SRT</span>
             </div>
-            <div class="upload-preview-audio" *ngIf="uploadEpisodeDoc.srtFileName">
+            <div class="upload-preview-audio" *ngIf="uploadEpisodeDoc.srtFileName || uploadEpisodeDoc.srt">
               <mat-icon class="preview-icon">subtitles</mat-icon>
-              <span class="preview-name">{{ uploadEpisodeDoc.srtFileName }}</span>
+              <span class="preview-name">{{ uploadEpisodeDoc.srtFileName || getSrtFileNameFromUrl(uploadEpisodeDoc.srt) }}</span>
               <mat-icon class="preview-change">swap_horiz</mat-icon>
+              <mat-icon class="preview-remove" (click)="removeSrt($event)">close</mat-icon>
             </div>
           </div>
         </div>
