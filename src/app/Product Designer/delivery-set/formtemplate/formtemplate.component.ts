@@ -1,6 +1,6 @@
 import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, ViewChildren, QueryList, ElementRef, signal } from '@angular/core';
 import { ConnectivityGuardService } from '../../../shared/connectivity-guard.service';
-import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites} from '@angular/fire/firestore';
+import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites, getFirestore} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { FormGroup,FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule}from'@angular/forms';
@@ -86,7 +86,8 @@ export class FormtemplateComponent {
 
   profileid: any;
   draftDocid:string
-  private firestore = inject(Firestore)
+  firestoreDefault = getFirestore()
+  private firestoreForms = getFirestore('firestore-forms')
   private auth = inject(AuthguardService)
   currentUserId:string
   userProfile:any
@@ -119,7 +120,7 @@ export class FormtemplateComponent {
     public sanitizer: DomSanitizer
   ) {
     this.deliveryForm = this.fb.group({})
-    this.draftDocid = doc(collection(this.firestore,"temporary_forms")).id;
+    this.draftDocid = doc(collection(this.firestoreForms,"temporary_forms")).id;
   }
 
   closeTab(): void {
@@ -168,7 +169,7 @@ export class FormtemplateComponent {
     console.log(this.route.snapshot.queryParams['id'], "---", this.participantformtemplateid?.formid)
 
     const deliveryFormsId = this.inlineFormId ?? this.route.snapshot.queryParams['id'] ?? this.participantformtemplateid?.formid
-    const deliveryFormCollectionDoc = doc(collection(this.firestore,'delivery forms'),deliveryFormsId)
+    const deliveryFormCollectionDoc = doc(collection(this.firestoreDefault,'delivery forms'),deliveryFormsId)
     getDoc(deliveryFormCollectionDoc).then(async snap => {
       this.submittedClientForm = snap.data()
       console.log('from : ',this.submittedClientForm.formarray)
@@ -201,8 +202,8 @@ export class FormtemplateComponent {
         this.showcontent = true
       }else if(![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) || ![null,undefined].includes(this.participantformtemplateid)){
         // console.log("view");
-        let formsByClientPath = ![null,undefined].includes(this.participantformtemplateid) ? doc(this.firestore,"formsByClient",this.participantformtemplateid.docid).path  : null
-        getDoc(doc(this.firestore,this.route.snapshot.queryParams['patchdata'] ?? formsByClientPath)).then(async formsByClientSnap => {
+        let formsByClientPath = ![null,undefined].includes(this.participantformtemplateid) ? doc(this.firestoreForms,"formsByClient",this.participantformtemplateid.docid).path  : null
+        getDoc(doc(this.firestoreForms,this.route.snapshot.queryParams['patchdata'] ?? formsByClientPath)).then(async formsByClientSnap => {
           //form setup start
           this.submittedClientForm = formsByClientSnap.data()
            console.log('from : ',this.submittedClientForm.formarray)
@@ -289,7 +290,7 @@ export class FormtemplateComponent {
   private async initializeQueueData() {
     try {
       // Get queue document
-      const queueDocRef = doc(this.firestore, 'queue generation', this.queueId!);
+      const queueDocRef = doc(this.firestoreDefault, 'queue generation', this.queueId!);
       const queueDoc = await getDoc(queueDocRef);
 
       if (queueDoc.exists()) {
@@ -297,7 +298,7 @@ export class FormtemplateComponent {
       }
 
       // Get participant queue token
-      const tokenCollectionRef = collection(this.firestore, 'queue_token');
+      const tokenCollectionRef = collection(this.firestoreDefault, 'queue_token');
       const tokenQuery = query(
         tokenCollectionRef,
         where('queueref', '==', queueDocRef),
@@ -550,7 +551,7 @@ export class FormtemplateComponent {
 
   private async handleQueueSubmission() {
     if (this.queueId) {
-      const queueDocRef = doc(this.firestore, 'queue generation', this.queueId);
+      const queueDocRef = doc(this.firestoreDefault, 'queue generation', this.queueId);
       this.submittedClientForm['queueref'] = queueDocRef;
 
       if (this.participantQueueToken) {
@@ -570,7 +571,7 @@ export class FormtemplateComponent {
 
     if (variationId) {
       // Get next stage from variation
-      const variationDocRef = doc(this.firestore, 'queue variation', variationId);
+      const variationDocRef = doc(this.firestoreDefault, 'queue variation', variationId);
       const variationDoc = await getDoc(variationDocRef);
 
       if (variationDoc.exists()) {
@@ -593,12 +594,12 @@ export class FormtemplateComponent {
   private async submitFormData(nextstage: string | null) {
     // Submit form to formsByClient collection
     console.log("submitformdata", this.submittedClientForm['docid']);
-    const formDocRef = doc(this.firestore, 'formsByClient', this.submittedClientForm['docid']);
+    const formDocRef = doc(this.firestoreForms, 'formsByClient', this.submittedClientForm['docid']);
     await setDoc(formDocRef, this.submittedClientForm);
 
     // Delete draft
     if (this.draftDocid) {
-      const draftDocRef = doc(this.firestore, 'temporary_forms', this.draftDocid);
+      const draftDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
       await deleteDoc(draftDocRef);
       console.log("Draft deleted");
     }
@@ -606,7 +607,7 @@ export class FormtemplateComponent {
     // Handle post-submission updates
     if (!this.queueId && this.route.snapshot.queryParams['data']) {
       // Update delivery status for non-queue submissions
-      const dataDocRef = doc(this.firestore, this.route.snapshot.queryParams['data']);
+      const dataDocRef = doc(this.firestoreDefault, this.route.snapshot.queryParams['data']);
       await updateDoc(dataDocRef, {
         fileref: arrayUnion(formDocRef),
         status: "completed"
@@ -642,12 +643,12 @@ export class FormtemplateComponent {
     const updatedData = { ...this.participantQueueToken, ...tokenUpdate };
 
     // Update queue token
-    const tokenDocRef = doc(this.firestore, 'queue_token', this.participantQueueToken.docid);
+    const tokenDocRef = doc(this.firestoreDefault, 'queue_token', this.participantQueueToken.docid);
     await updateDoc(tokenDocRef, updatedData);
 
     // Create stage log
-    const logDocId = doc(collection(this.firestore, 'queue stage log')).id;
-    const logDocRef = doc(this.firestore, 'queue stage log', logDocId);
+    const logDocId = doc(collection(this.firestoreDefault, 'queue stage log')).id;
+    const logDocRef = doc(this.firestoreDefault, 'queue stage log', logDocId);
     updatedData["logdocid"] = logDocId;
     updatedData["movedby"] = this.profileid
     updatedData["movedthrough"] = 'form'
@@ -678,12 +679,12 @@ export class FormtemplateComponent {
         try {
           // Get existing form data and create log entry
           const patchDataPath = this.route.snapshot.queryParams['patchdata'];
-          const existingFormDocRef = doc(this.firestore, patchDataPath);
+          const existingFormDocRef = doc(this.firestoreDefault, patchDataPath);
           const existingFormDoc = await getDoc(existingFormDocRef);
 
           if (existingFormDoc.exists()) {
             // Create log entry in formsByClient log collection
-            const logDocRef = doc(this.firestore, 'formsByClient log', this.draftDocid);
+            const logDocRef = doc(this.firestoreForms, 'formsByClient log', this.draftDocid);
             await setDoc(logDocRef, existingFormDoc.data());
           }
 
@@ -809,7 +810,7 @@ export class FormtemplateComponent {
       console.log(this.submittedClientForm);
 
       // Save to temporary_forms collection using modern Firebase syntax
-      const tempFormDocRef = doc(this.firestore, 'temporary_forms', this.draftDocid);
+      const tempFormDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
       // Fire the local write (resolves from local cache quickly).
       setDoc(tempFormDocRef, this.submittedClientForm, { merge: true })
         .catch(err => {
@@ -822,7 +823,7 @@ export class FormtemplateComponent {
 
       // Wait until Firestore has actually acknowledged ALL pending writes from the server.
       // This is what guarantees the draft is really in the DB, not just queued locally.
-      await waitForPendingWrites(this.firestore);
+      await waitForPendingWrites(this.firestoreForms);
 
       // Only the latest autoSave call may flip to 'saved' — stale earlier calls are ignored.
       if (myEpoch === this.draftSaveEpoch) {
@@ -853,7 +854,7 @@ export class FormtemplateComponent {
       console.log(this.profileid);
 
       // Query temporary_forms collection with modern Firebase syntax
-      const tempFormsCollectionRef = collection(this.firestore, 'temporary_forms');
+      const tempFormsCollectionRef = collection(this.firestoreForms, 'temporary_forms');
       const draftQuery = query(
         tempFormsCollectionRef,
         where('formid', '==', this.patchformid),

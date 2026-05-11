@@ -1,5 +1,5 @@
 import { Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
-import { collection, collectionData, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, getFirestore, getDocs, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -30,6 +30,9 @@ import { MatButtonModule } from '@angular/material/button';
 })
 export class PickForMentoringComponent implements OnDestroy {
   @ViewChild('noteField') noteField: ElementRef;
+
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
 
   loggedinID: string
   loading:boolean
@@ -63,7 +66,7 @@ export class PickForMentoringComponent implements OnDestroy {
   mentoringSubscription: Subscription
   mapMentoringNote = {}
 
-  constructor(public guard: AuthguardService, public firestore: Firestore, public router: Router) {
+  constructor(public guard: AuthguardService, public router: Router) {
     this.loading = true
     guard.getRoles().then(roles=>{
       this.loggedinID = roles.profile_ref.id
@@ -82,7 +85,7 @@ export class PickForMentoringComponent implements OnDestroy {
   fetchData() {
     this.guard.getProcedureMap().then(data => this.mapProcedure = data)
     this.guard.getProfileMap().then(data => this.mapProfile = data.map)
-    var collectionRef = collection(this.firestore, "users_roles")
+    var collectionRef = collection(this.firestoreDefault, "users_roles")
     var queryRef = query(collectionRef, orderBy("name"))
     this.profileRoleSubscription = collectionData(queryRef).subscribe(profile=>{
       var profileList = []
@@ -122,21 +125,21 @@ export class PickForMentoringComponent implements OnDestroy {
 
   async getATC(){
     this.loading = true
-    var alphaCollection = collection(this.firestore, "atc_alpha")
+    var alphaCollection = collection(this.firestoreATC, "atc_alpha")
     var alphaQuery = query(alphaCollection, where("isdelete", "==", false), where("type", "==", "online"), orderBy("prescription_date", "desc"))
     this.alphaSubscription = collectionData(alphaQuery).subscribe(atc=>{
       this.alphaATC = atc
       this.mentoringATC = [...this.alphaATC, ...this.validateATC].filter(e => ![null, undefined].includes(e["mentoringid"]))
       this.filterATC()
     })
-    var toValidateCollection = collection(this.firestore, "atc_to_validate")
+    var toValidateCollection = collection(this.firestoreATC, "atc_to_validate")
     var toValidateQuery = query(toValidateCollection, where("status", "==", "atc given"), where("isdelete", "==", false), orderBy("prescription_date", "desc"))
     this.validateSubscription = collectionData(toValidateQuery).subscribe(atc=>{
       this.validateATC = atc
       this.mentoringATC = [...this.alphaATC, ...this.validateATC].filter(e => ![null, undefined].includes(e["mentoringid"]))
       this.filterATC()
     })
-    var mentoringCollection = collection(this.firestore, "pick_for_mentoring")
+    var mentoringCollection = collection(this.firestoreDefault, "pick_for_mentoring")
     var mentoringQuery = query(mentoringCollection, orderBy("created", "desc"))
     this.mentoringSubscription = collectionSnapshots(mentoringQuery).subscribe(atc=>{
       for (let i = 0; i < atc.length; i++) {
@@ -168,10 +171,10 @@ export class PickForMentoringComponent implements OnDestroy {
   }
   
   markATCvalidate(atcid, validator){
-    var validatorPath = [...(validator ?? []).map(e => e.path), doc(this.firestore, "profile_data", this.loggedinID).path]
+    var validatorPath = [...(validator ?? []).map(e => e.path), doc(this.firestoreDefault, "profile_data", this.loggedinID).path]
     validatorPath = Array.from(new Set(validatorPath))
-    var validatorRef = validatorPath.map(e => doc(this.firestore, e))
-    updateDoc(doc(this.firestore, "atc_to_validate", atcid), {
+    var validatorRef = validatorPath.map(e => doc(this.firestoreDefault, e))
+    updateDoc(doc(this.firestoreATC, "atc_to_validate", atcid), {
       status: "validated",
       validator: validatorRef
     })
@@ -182,12 +185,12 @@ export class PickForMentoringComponent implements OnDestroy {
     var atcpath = ""
     var selectedATC = null
     if(type == "alpha"){
-      atcpath = doc(this.firestore, "atc_alpha", atc.atcid).path
+      atcpath = doc(this.firestoreATC, "atc_alpha", atc.atcid).path
       var index = this.alphaATC.findIndex(e => e.atcid == atcid)
       if(index != -1) selectedATC = this.alphaATC[index]
     }
     else if(type == "validate"){
-      atcpath = doc(this.firestore, "atc_to_validate", atc.atcid).path
+      atcpath = doc(this.firestoreATC, "atc_to_validate", atc.atcid).path
       var index = this.validateATC.findIndex(e => e.atcid == atcid)
       if(index != -1) selectedATC = this.validateATC[index]
     }
@@ -195,7 +198,7 @@ export class PickForMentoringComponent implements OnDestroy {
       selectedATC["transcription"] = []
     }
 
-    var adjCollection = collection(this.firestore, atcpath, "corrections")
+    var adjCollection = collection(this.firestoreATC, atcpath, "corrections")
     var adjQuery = query(adjCollection, where("isdelete", "==", false))
 
     getDocs(adjQuery).then(adjustment=>{
@@ -203,7 +206,7 @@ export class PickForMentoringComponent implements OnDestroy {
       for (let i = 0; i < adjustment.docs.length; i++) {
         const adjdoc = adjustment.docs[i];
 
-        var procedureCollection = collection(this.firestore, adjdoc.ref.path, "procedures")
+        var procedureCollection = collection(this.firestoreATC, adjdoc.ref.path, "procedures")
         var procedureQuery = query(procedureCollection, where("isdelete", "==", false))
         const adjdata = adjdoc.data();
         getDocs(procedureQuery).then(procedure=>{
@@ -229,9 +232,10 @@ export class PickForMentoringComponent implements OnDestroy {
 
   pickformentoring(from, atc){
     console.log(atc)
-    var mentoringID = doc(collection(this.firestore,'pick_for_mentoring')).id
-    var batch = writeBatch(this.firestore)
-    batch.set(doc(this.firestore, "pick_for_mentoring", mentoringID), {
+    var mentoringID = doc(collection(this.firestoreDefault,'pick_for_mentoring')).id
+    var defaultBatch = writeBatch(this.firestoreDefault)
+    var atcBatch = writeBatch(this.firestoreATC)
+    defaultBatch.set(doc(this.firestoreDefault, "pick_for_mentoring", mentoringID), {
       lastupdated: serverTimestamp(),
       atcid : atc.atcid,
       profileid: atc.profileid,
@@ -242,21 +246,22 @@ export class PickForMentoringComponent implements OnDestroy {
       mentorperson: this.loggedinID,
       created: serverTimestamp()
     })
-    batch.update(doc(this.firestore, from == "alpha" ? "atc_alpha" : "atc_to_validate", atc.atcid), {
+    atcBatch.update(doc(this.firestoreATC, from == "alpha" ? "atc_alpha" : "atc_to_validate", atc.atcid), {
       mentoringid: mentoringID
     })
-    batch.commit()
+    defaultBatch.commit()
+    atcBatch.commit()
   }
 
   updateMentoringNote(note:string, atc){
-    var batch = writeBatch(this.firestore)
+    var batch = writeBatch(this.firestoreDefault)
     console.log(note, atc)
     if(note.trim().length != 0){
       if(this.mapMentoringNote[atc.mentoringid]){
-        var logid = doc(collection(this.firestore,'pick_for_mentoring')).id
-        batch.set(doc(this.firestore, "pick_for_mentoring", atc.mentoringid, "revision", logid), {logid: logid, ...this.mapMentoringNote[atc.mentoringid]})
+        var logid = doc(collection(this.firestoreDefault,'pick_for_mentoring')).id
+        batch.set(doc(this.firestoreDefault, "pick_for_mentoring", atc.mentoringid, "revision", logid), {logid: logid, ...this.mapMentoringNote[atc.mentoringid]})
       }
-      batch.update(doc(this.firestore, "pick_for_mentoring", atc.mentoringid), {
+      batch.update(doc(this.firestoreDefault, "pick_for_mentoring", atc.mentoringid), {
         mentoringnote: note.trim(),
         mentorperson: this.loggedinID,
         atcid : atc.atcid,

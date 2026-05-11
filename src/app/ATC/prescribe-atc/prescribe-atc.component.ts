@@ -208,7 +208,7 @@ export class PrescribeATCComponent {
   //directive assignment ongoing
   mapProductidtoatcmodel:any = {}
   assignmentInitiated:boolean = false
-  directiveAssignmentRef : any = {}
+  directiveAssignmentRef : any = null
   directiveMentor:any [] = []
   adjustmentAwarenessDetail:any = {}
 
@@ -1983,16 +1983,16 @@ async removeATCImage(index: number) {
           var specialistList = this.authorMap[e] ?? []
           authorref = [...authorref, ...specialistList]
           if(specialistList.length != 0){
-            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreDefault, e).id)
+            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreATC, e).id)
           }
         })
         this.additionalActivityMap.forEach(additional=>{
           if(additional.specialist.length != 0){
-            atclevelBigActivity[additional.activity] = [...(atclevelBigActivity[additional.activity] ?? []), ...additional.specialist.map(e => doc(this.firestoreDefault, e).id)]
+            atclevelBigActivity[additional.activity] = [...(atclevelBigActivity[additional.activity] ?? []), ...additional.specialist.map(e => doc(this.firestoreATC, e).id)]
           }
         })
         authorref = Array.from(new Set(authorref))
-        authorref = authorref.map(e => doc(this.firestoreDefault, e))
+        authorref = authorref.map(e => doc(this.firestoreATC, e))
         console.log(authorref)
 
         // Observer
@@ -2001,34 +2001,34 @@ async removeATCImage(index: number) {
           var specialistList = this.observerMap[e] ?? []
           observerref = [...observerref, ...specialistList]
           if(specialistList.length != 0){
-            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreDefault, e).id)
+            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreATC, e).id)
           }
         })
         observerref = Array.from(new Set(observerref))
-        observerref = observerref.map(e => doc(this.firestoreDefault, e))
+        observerref = observerref.map(e => doc(this.firestoreATC, e))
         console.log(observerref)
 
         // Mentor
-        var mentroref = []
+        var mentorref = []
         Object.keys(this.mentorMap).forEach(e =>{
           var specialistList = this.mentorMap[e] ?? []
-          mentroref = [...mentroref, ...specialistList]
+          mentorref = [...mentorref, ...specialistList]
           if(specialistList.length != 0){
-            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreDefault, e).id)
+            atclevelBigActivity[e] = specialistList.map(e => doc(this.firestoreATC, e).id)
           }
         })
-        mentroref = Array.from(new Set(mentroref))
-        mentroref = mentroref.map(e => doc(this.firestoreDefault, e))
-        console.log(mentroref)
+        mentorref = Array.from(new Set(mentorref))
+        mentorref = mentorref.map(e => doc(this.firestoreATC, e))
+        console.log(mentorref)
 
         var validatorref = []
         for (let k = 0; k < this.validator.length; k++) {
-          validatorref.push(doc(this.firestoreDefault, this.validator[k]))
+          validatorref.push(doc(this.firestoreATC, this.validator[k]))
         }
         console.log(validatorref)
 
         // Write on ATC Alpha
-        var mentoringID = (this.mentornotes ?? "").trim().length != 0 ? generateId(this.firestoreDefault, 'pick_for_mentoring') : null;
+        var mentoringID = (this.mentornotes ?? "").trim().length != 0 ? generateId(this.firestoreATC, 'pick_for_mentoring') : null;
         var notesID = generateId(this.firestoreATC, 'atc_notes');
         console.log(this.alphaid)
         var alphaData = {
@@ -2036,7 +2036,7 @@ async removeATCImage(index: number) {
           notesid: notesID,
           mentoringid: mentoringID,
           directive: this.atcdirective ?? null,
-          mentroref: mentroref,
+          mentorref: mentorref,
           mentee: this.mentee ?? [],
           author: authorref.length == 0 ? null : authorref,
           prescription_date: new Date(new Date(this.date).setHours(new Date().getHours(), new Date().getMinutes())),
@@ -2054,7 +2054,7 @@ async removeATCImage(index: number) {
         }
 
         if(this.assignmentInitiated){
-          alphaData['directiveassignmentref'] = this.directiveAssignmentRef
+          alphaData['directiveassignmentref'] = doc(this.firestoreATC, this.directiveAssignmentRef.path)
           alphaData['mentor'] = this.directiveMentor
         }
         if(this.queueid != null){
@@ -2081,7 +2081,7 @@ async removeATCImage(index: number) {
           console.log(this.participantAssignmentId);
           firebaseDefaultBatch.update(doc(this.firestoreDefault, 'big participants assignments',this.participantAssignmentId),{
             'status': 'review',
-            'activityref' : doc(this.firestoreATC, collectionName, this.alphaid)
+            'activityref' : doc(this.firestoreDefault, collectionName, this.alphaid)
           });
         }else{
           collectionName = this.validationnotrequired ? "atc_alpha" : "atc_to_validate"
@@ -2134,20 +2134,20 @@ async removeATCImage(index: number) {
                 (this.transcript[i].procedure[j].assignedMap[key] ?? []).forEach(item=>{
                   assignref.push(item)
                   procedurelevelBigActivity[key] = procedurelevelBigActivity[key] ?? []
-                  procedurelevelBigActivity[key].push(doc(this.firestoreDefault, item).id)
+                  procedurelevelBigActivity[key].push(doc(this.firestoreATC, item).id)
                 })
               })
               assignref = Array.from(new Set(assignref))
-              assignref = assignref.map(e => doc(this.firestoreDefault, e))
+              assignref = assignref.map(e => doc(this.firestoreATC, e))
 
               console.log(assignlevel)
-              console.log(this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestoreDefault, this.transcript[i].procedure[j].recommended_to) : null)
+              console.log(this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestoreATC, this.transcript[i].procedure[j].recommended_to) : null)
               console.log(assignref.length != 0 ? assignref : null)
               var procedureData = {
-                name : doc(this.firestoreDefault, this.transcript[i].procedure[j].name),
+                name : doc(this.firestoreATC, this.transcript[i].procedure[j].name),
                 assigned_to : assignref.length != 0 ? assignref : null,
                 level : assignlevel,
-                recommended_to : this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestoreDefault, this.transcript[i].procedure[j].recommended_to) : null,
+                recommended_to : this.transcript[i].procedure[j].recommended_to != null ? doc(this.firestoreATC, this.transcript[i].procedure[j].recommended_to) : null,
                 status : this.transcript[i].procedure[j].completed ? "completed" : "yet to start",
                 created : serverTimestamp(),
                 mandatory : this.transcript[i].procedure[j].mandatory,

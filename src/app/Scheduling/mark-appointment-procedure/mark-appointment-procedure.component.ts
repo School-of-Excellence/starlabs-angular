@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject, OnInit } from '@angular/core';
-import { collection, doc, Firestore, getDocs, query, where } from '@angular/fire/firestore';
+import { collection, doc, Firestore, getDocs, getFirestore, query, where } from '@angular/fire/firestore';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -58,9 +58,10 @@ export class MarkAppointmentProcedureComponent implements OnInit {
   }
 
   async getATC(){
+    const firestoreATC = getFirestore("firestore-atc")
     var data = []
     var specialistRef = this.specialist.map(e => doc(this.firestore, "profile_data/"+e))
-    var collectionRef = collection(this.firestore, "atc_alpha")
+    var collectionRef = collection(firestoreATC, "atc_alpha")
     var queryFilter = query(collectionRef, where("profileid", "==", this.profileid), where("implementationagent", "array-contains-any", this.specialist), where("isdelete", "==", false))
     await getDocs(queryFilter).then(async atclist=>{
       var relevantATC = atclist.docs.sort((a, b) => b.data()["prescription_date"].toDate() - a.data()["prescription_date"].toDate())
@@ -76,14 +77,14 @@ export class MarkAppointmentProcedureComponent implements OnInit {
       console.log(relevantATC.map(e => e.data()))
       for (let i = 0; i < relevantATC.length; i++) {
         const atc = relevantATC[i];
-        var adjCollection = collection(this.firestore, atc.ref.path+"/corrections")
+        var adjCollection = collection(firestoreATC, atc.ref.path+"/corrections")
         var adjQuery = query(adjCollection, where("isdelete", "==", false), where("implementationagent", "array-contains-any", this.specialist))
         await getDocs(adjQuery).then(async adjustmentList=>{
           for (let j = 0; j < adjustmentList.docs.length; j++) {
             const adjustment = adjustmentList.docs[j];
             var context = adjustment.data()["name"]
             var changework = []
-            var procedureCollection = collection(this.firestore, adjustment.ref.path+"/procedures")
+            var procedureCollection = collection(firestoreATC, adjustment.ref.path+"/procedures")
             var procedureQuery = query(procedureCollection, where("isdelete", "==", false), where("status", "==", "yet to start"), where("assigned_to", "array-contains-any", specialistRef))
             await getDocs(procedureQuery).then(procedureList =>{
               for (let k = 0; k < procedureList.docs.length; k++) {

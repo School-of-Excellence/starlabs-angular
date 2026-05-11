@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
-import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
+import { and, collection, collectionData, getFirestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take, combineLatest } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -631,8 +631,9 @@ export class JourneycoachDuplicateComponent {
   askAHSourceFilter: 'all' | 'askAH' | 'loveLetter' = 'all';
   askAHResolvedFilter: 'all' | 'resolved' | 'unresolved' = 'all';
 
+  firestoreDefault = getFirestore()
+
   constructor(
-    public firestore: Firestore,
     private cdr: ChangeDetectorRef,
     private guard: AuthguardService,
     private fb: FormBuilder,
@@ -665,7 +666,7 @@ export class JourneycoachDuplicateComponent {
     this.setCurrentMonth();
 
     try {
-      getDocs(query(collection(this.firestore, 'users_roles'), where('ahmember', '==', true))).then(snap => {
+      getDocs(query(collection(this.firestoreDefault, 'users_roles'), where('ahmember', '==', true))).then(snap => {
         this.coachesList = snap.docs
           .map(e => e.data())
           .sort((a: any, b: any) => {
@@ -677,7 +678,7 @@ export class JourneycoachDuplicateComponent {
 
       this.fetchJourneyCoachTags();
 
-      this.subscriptions['appointments'] = collectionData(query(collection(this.firestore, "appointments"), where("journeycoach", "==", true)), { idField: 'id' }).subscribe((appointments) => {
+      this.subscriptions['appointments'] = collectionData(query(collection(this.firestoreDefault, "appointments"), where("journeycoach", "==", true)), { idField: 'id' }).subscribe((appointments) => {
         let tempArray = [];
         let tempMap = {};
 
@@ -706,7 +707,7 @@ export class JourneycoachDuplicateComponent {
         }
       })
 
-      await getDocs(collection(this.firestore, 'journey')).then(snap => {
+      await getDocs(collection(this.firestoreDefault, 'journey')).then(snap => {
         for (let i = 0; i < snap.docs.length; i++) {
           const element = snap.docs[i].data();
           this.mapjourneyname[element['id']] = element['journey'];
@@ -878,7 +879,7 @@ export class JourneycoachDuplicateComponent {
 
   loadQueueList(): void {
     const queueQuery = query(
-      collection(this.firestore, 'queue generation'),
+      collection(this.firestoreDefault, 'queue generation'),
       orderBy('queueenddate', 'desc')
     );
 
@@ -1485,7 +1486,7 @@ export class JourneycoachDuplicateComponent {
     let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
 
     const queryValue = or(and(where("purchasedate", ">=", startdate), where("purchasedate", "<=", enddate)), and(where("date", ">=", startdate), where("date", "<=", enddate)))
-    this.subscriptions['salesleads'] = collectionData(query(collection(this.firestore, "salesleads"), queryValue)).subscribe(async (salesleads) => {
+    this.subscriptions['salesleads'] = collectionData(query(collection(this.firestoreDefault, "salesleads"), queryValue)).subscribe(async (salesleads) => {
       if (salesleads.length != 0) {
 
         let grossData = [];
@@ -1568,7 +1569,7 @@ export class JourneycoachDuplicateComponent {
 
                     if (![null, undefined, ''].includes(upgradeFromDocId)) {
                       try {
-                        const fromDocSnap = await getDoc(doc(this.firestore, 'salesleads', upgradeFromDocId));
+                        const fromDocSnap = await getDoc(doc(this.firestoreDefault, 'salesleads', upgradeFromDocId));
                         if (fromDocSnap.exists()) {
                           const fromEMI = fromDocSnap.data()['installmentamount'] || 0;
                           const emiDiff = toEMI - fromEMI;
@@ -1744,7 +1745,7 @@ export class JourneycoachDuplicateComponent {
               const cancelledValues = await Promise.all(
                 cancelledData.map(async (sale) => {
                   if (sale['canceldocid']) {
-                    const cancelRef = doc(this.firestore, 'salesleads', sale['canceldocid']);
+                    const cancelRef = doc(this.firestoreDefault, 'salesleads', sale['canceldocid']);
                     const cancelSnap = await getDoc(cancelRef);
 
                     if (cancelSnap.exists()) {
@@ -1766,7 +1767,7 @@ export class JourneycoachDuplicateComponent {
                 downgradeData.map(async (sale) => {
                   if (!sale['downgradefromdocid']) return 0;
 
-                  const downgradeRef = doc(this.firestore, 'salesleads', sale['downgradefromdocid']);
+                  const downgradeRef = doc(this.firestoreDefault, 'salesleads', sale['downgradefromdocid']);
                   const downgradeSnap = await getDoc(downgradeRef);
 
                   if (downgradeSnap.exists()) {
@@ -1856,7 +1857,7 @@ export class JourneycoachDuplicateComponent {
 
   // Function to fetch data from participant metadata 
   loadParticipantMetadata() {
-    this.subscriptions['metadata'] = collectionData(query(collection(this.firestore, "participant metadata"), orderBy("name", "asc"))).subscribe((metadata) => {
+    this.subscriptions['metadata'] = collectionData(query(collection(this.firestoreDefault, "participant metadata"), orderBy("name", "asc"))).subscribe((metadata) => {
       // Subscription declarations 
       let currentMonthEnd = [];
       let lastMonthEnd = [];
@@ -2171,7 +2172,7 @@ export class JourneycoachDuplicateComponent {
     last7days.setDate(currentDate.getDate() - 7);
 
     try {
-      this.subscriptions['journeyproduct1'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "==", null))).subscribe(async (notassured) => {
+      this.subscriptions['journeyproduct1'] = collectionData(query(collection(this.firestoreDefault, "participantjourneyproduct"), where("paymentplan", "==", null))).subscribe(async (notassured) => {
         if (notassured.length != 0) {
           let tempArray1 = [];
           let addonsToCheck: { index: number; salesLeadId: string; data: any }[] = [];
@@ -2208,7 +2209,7 @@ export class JourneycoachDuplicateComponent {
             const cancelChecks = await Promise.all(
               addonsToCheck.map(item => {
                 const saleleadsQuery = query(
-                  collection(this.firestore, 'salesleads'),
+                  collection(this.firestoreDefault, 'salesleads'),
                   where('canceldocid', '==', item.salesLeadId),
                   where('status', '==', 'Approved'),
                   limit(1)
@@ -2231,7 +2232,7 @@ export class JourneycoachDuplicateComponent {
         }
       });
 
-      this.subscriptions['journeyproduct2'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "!=", null))).subscribe((onboarded) => {
+      this.subscriptions['journeyproduct2'] = collectionData(query(collection(this.firestoreDefault, "participantjourneyproduct"), where("paymentplan", "!=", null))).subscribe((onboarded) => {
         if (onboarded.length != 0) {
           // last 30days 
           let last30days = new Date();
@@ -2320,7 +2321,7 @@ export class JourneycoachDuplicateComponent {
       })
 
       getDocs(query(
-        collection(this.firestore, "participantjourneyproduct"),
+        collection(this.firestoreDefault, "participantjourneyproduct"),
         where("journeystatus", "in", ['ongoing', "completed"]),
         where("subscriptionend", ">=", startdate),
         where("subscriptionend", "<=", enddate)
@@ -2358,7 +2359,7 @@ export class JourneycoachDuplicateComponent {
 
   // Function to load customer support tickets 
   // async loadCustomerSupport() {
-  //   this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
+  //   this.subscriptions['clientissue'] = collectionData(query(collection(this.firestoreDefault, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
   //     if (tickets.length != 0) {
   //       const currentMonthStart = new Date(this.startDate);
   //       currentMonthStart.setHours(0, 0, 0, 0);
@@ -2588,7 +2589,7 @@ export class JourneycoachDuplicateComponent {
     let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
 
 
-    getDocs(query(collection(this.firestore, "participantsproduct"), where("statusdate.initiated", ">=", startdate), where("statusdate.initiated", "<=", enddate))).then((products) => {
+    getDocs(query(collection(this.firestoreDefault, "participantsproduct"), where("statusdate.initiated", ">=", startdate), where("statusdate.initiated", "<=", enddate))).then((products) => {
       let tempArray = [];
       if (products.docs.length != 0) {
         for (let index = 0; index < products.docs.length; index++) {
@@ -2618,7 +2619,7 @@ export class JourneycoachDuplicateComponent {
   }
 
   async getModes() {
-    const q = query(collection(this.firestore, 'modes'), orderBy('sequence', 'asc'));
+    const q = query(collection(this.firestoreDefault, 'modes'), orderBy('sequence', 'asc'));
     const modesSnapshot = await getDocs(q);
     this.modesList = [];
     modesSnapshot.forEach((doc) => {
@@ -2891,13 +2892,13 @@ export class JourneycoachDuplicateComponent {
 
         delete value.salesleadsData;
 
-        await updateDoc(doc(this.firestore, 'participantjourneyproduct', element['docid']), value);
-        await updateDoc(doc(this.firestore, 'salesleads', salesdata['docid']), {
+        await updateDoc(doc(this.firestoreDefault, 'participantjourneyproduct', element['docid']), value);
+        await updateDoc(doc(this.firestoreDefault, 'salesleads', salesdata['docid']), {
           referral: value['referral']
         });
 
         if (![null, undefined, ''].includes(value['appointmentid'])) {
-          await updateDoc(doc(this.firestore, "appointments", element['appointmentid']), {
+          await updateDoc(doc(this.firestoreDefault, "appointments", element['appointmentid']), {
             attended: true,
             cancelled: false,
           }).then(() => {
@@ -2912,7 +2913,7 @@ export class JourneycoachDuplicateComponent {
         // Updating Journey Status as Upgraded for previous Journey
         // if (value['journeytype'] == 'upgrade' && ![null, undefined, ''].includes(salesdata)) {
         //   const previousJourneyID = salesdata['upgradefromparticipantjourneyproductid']
-        //   await updateDoc(doc(this.firestore, 'participantjourneyproduct', previousJourneyID), {
+        //   await updateDoc(doc(this.firestoreDefault, 'participantjourneyproduct', previousJourneyID), {
         //     journeystatus: 'Upgraded'
         //   }).then(() => {
         //     console.log("Previous Journey Status Updated");
@@ -3116,7 +3117,7 @@ export class JourneycoachDuplicateComponent {
       if (![null, undefined, ''].includes(schedule['docid'])) {
         var x = confirm("Are you sure to mark Journey Coach complete");
         if (x) {
-          await updateDoc(doc(this.firestore, "appointments", schedule['docid']), {
+          await updateDoc(doc(this.firestoreDefault, "appointments", schedule['docid']), {
             attended: true,
             cancelled: false,
           }).then(() => {
@@ -4053,7 +4054,7 @@ export class JourneycoachDuplicateComponent {
       if (![null, undefined, ''].includes(generalnotes)) {
         element['generalnotes'] = element['generalnotes'] || []
         element['generalnotes'].push(generalnotes)
-        updateDoc(doc(this.firestore, 'participant metadata', element['profileid']), {
+        updateDoc(doc(this.firestoreDefault, 'participant metadata', element['profileid']), {
           generalnotes: element['generalnotes']
         }).then(() => {
           console.log("Notes Updated Successfully");
@@ -4086,20 +4087,21 @@ export class JourneycoachDuplicateComponent {
     });
   }
 
-  // Function to get atc alpha data 
+  // Function to get atc alpha data
   getAtcAlpha() {
+    const firestoreATC = getFirestore("firestore-atc")
     let atcQuery: any;
     let unvalidatedATCQuery: any;
 
     if (this.filterMode === 'queue' && this.selectedQueueIds.length > 0) {
       // Queue mode — no date filter
       atcQuery = query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where('queueid', 'in', this.selectedQueueIds),
         where("isdelete", "==", false)
       );
       unvalidatedATCQuery = query(
-        collection(this.firestore, "atc_to_validate"),
+        collection(firestoreATC, "atc_to_validate"),
         where('queueid', 'in', this.selectedQueueIds),
         where("isdelete", "==", false)
       );
@@ -4123,13 +4125,13 @@ export class JourneycoachDuplicateComponent {
       if (!startdate || !enddate) return;
 
       atcQuery = query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
       );
       unvalidatedATCQuery = query(
-        collection(this.firestore, "atc_to_validate"),
+        collection(firestoreATC, "atc_to_validate"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
@@ -4494,13 +4496,13 @@ export class JourneycoachDuplicateComponent {
     const endTimestamp = Timestamp.fromDate(endDate);
 
     const askAHQuery = query(
-      collection(this.firestore, 'ask AH'),
+      collection(this.firestoreDefault, 'ask AH'),
       where('created', '>=', startTimestamp),
       where('created', '<=', endTimestamp)
     );
 
     const loveLetterQuery = query(
-      collection(this.firestore, 'love letter'),
+      collection(this.firestoreDefault, 'love letter'),
       where('created', '>=', startTimestamp),
       where('created', '<=', endTimestamp)
     );
@@ -4572,9 +4574,9 @@ export class JourneycoachDuplicateComponent {
     const CATEGORIES = this.CATEGORIES;
 
     const [aelSnapshot, interimSnapshot] = await Promise.all([
-      getDocs(collection(this.firestore, 'accelerated evolution level')),
+      getDocs(collection(this.firestoreDefault, 'accelerated evolution level')),
       getDocs(query(
-        collection(this.firestore, 'interim crossover'),
+        collection(this.firestoreDefault, 'interim crossover'),
         where('created', '>=', Timestamp.fromDate(startDate)),
         where('created', '<=', Timestamp.fromDate(endDate))
       ))
@@ -5047,7 +5049,7 @@ export class JourneycoachDuplicateComponent {
     // treat empty string as no selection
     const resolvedTagId = selectedTagId === '' ? null : selectedTagId;
 
-    const metadataRef = doc(this.firestore, 'participant metadata', profileId);
+    const metadataRef = doc(this.firestoreDefault, 'participant metadata', profileId);
     const metadataSnap = await getDoc(metadataRef);
     if (!metadataSnap.exists()) return;
 
@@ -5063,8 +5065,8 @@ export class JourneycoachDuplicateComponent {
 
     // Single removal log with ALL removed tags in one array
     if (existingJourneyCoachTags.length > 0) {
-      const logId = doc(collection(this.firestore, 'participant tag logs')).id;
-      logPromises.push(setDoc(doc(this.firestore, 'participant tag logs', logId), {
+      const logId = doc(collection(this.firestoreDefault, 'participant tag logs')).id;
+      logPromises.push(setDoc(doc(this.firestoreDefault, 'participant tag logs', logId), {
         logid: logId,
         profileid: profileId,
         type: 'removed',
@@ -5080,14 +5082,14 @@ export class JourneycoachDuplicateComponent {
       ? [...nonJourneyCoachTags, resolvedTagId]
       : nonJourneyCoachTags;
 
-    const batch = writeBatch(this.firestore);
+    const batch = writeBatch(this.firestoreDefault);
     batch.update(metadataRef, { profiletags: newProfileTags });
     await batch.commit();
 
     // Addition log only if a real tag was selected
     if (resolvedTagId) {
-      const logId = doc(collection(this.firestore, 'participant tag logs')).id;
-      logPromises.push(setDoc(doc(this.firestore, 'participant tag logs', logId), {
+      const logId = doc(collection(this.firestoreDefault, 'participant tag logs')).id;
+      logPromises.push(setDoc(doc(this.firestoreDefault, 'participant tag logs', logId), {
         logid: logId,
         profileid: profileId,
         type: 'added',
@@ -5105,7 +5107,7 @@ export class JourneycoachDuplicateComponent {
   private async fetchJourneyCoachTags(): Promise<void> {
     try {
       const tagsSnapshot = await getDocs(query(
-        collection(this.firestore, 'participant tags'),
+        collection(this.firestoreDefault, 'participant tags'),
         where('tagsfor', 'array-contains', 'journey coach')
       ));
       this.journeyCoachTags = (tagsSnapshot?.docs ?? []).map(doc => ({

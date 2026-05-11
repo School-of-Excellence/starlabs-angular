@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, inject } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { QueueInvitationApprovalComponent } from '../queue-invitation-approval/queue-invitation-approval.component';
@@ -14,7 +14,7 @@ import { PreassignStudioComponent } from '../preassign-studio/preassign-studio.c
 import { HoldAlertDialogComponent } from '../hold-alert-dialog/hold-alert-dialog.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference } from '@angular/fire/firestore';
+import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -776,7 +776,8 @@ export class DynamicStudioComponent {
               }
             }
             console.log("Involved Queue", involvedQueueRef.map(e => e.path))
-            await getDocs(query(collection(this.firestore,"formsByClient"), where("queueref", "in", involvedQueueRef),where("profileid", "==", this.liveAssignment["participantid"]))).then(queueform =>{
+            const firestoreForms = getFirestore("firestore-forms")
+            await getDocs(query(collection(firestoreForms,"formsByClient"), where("queueref", "in", involvedQueueRef),where("profileid", "==", this.liveAssignment["participantid"]))).then(queueform =>{
               console.log("Related Form", queueform.docs.map(e =>e.data()["formid"]))
               this.participantForm = queueform.docs.map(e =>e.data()).filter(e => mappedForm.includes(e["formid"]))
               console.log(this.participantForm)
@@ -1647,7 +1648,8 @@ export class DynamicStudioComponent {
   }
   
   viewform(form){
-    let path = doc(this.firestore, "formsByClient", form['docid']).path
+    const firestoreForms = getFirestore("firestore-forms")
+    let path = doc(firestoreForms, "formsByClient", form['docid']).path
     const url = this.router.createUrlTree(['/formtemplate'],{queryParams: {id: form.formid, type:'form', patchdata:path}})
     window.open(url.toString(), '_blank')
   }

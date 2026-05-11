@@ -10,7 +10,8 @@ import {
   Timestamp,
   doc,
   docData,
-  updateDoc
+  updateDoc,
+  getFirestore
 } from '@angular/fire/firestore';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -100,8 +101,10 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
   isAdmin = false;
 
   private destroy$ = new Subject<void>();
+  firestoreDefault = getFirestore()
+  firestoreForms = getFirestore('firestore-forms')
 
-  constructor(private firestore: Firestore) { }
+  constructor() { }
 
   ngOnInit(): void {
     if (this.profileId) this.initializeData();
@@ -141,7 +144,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
   }
 
   private loadProfileData(): void {
-    const profileRef = doc(this.firestore, 'participant metadata', this.profileId);
+    const profileRef = doc(this.firestoreDefault, 'participant metadata', this.profileId);
     docData(profileRef, { idField: 'profileid' }).pipe(takeUntil(this.destroy$)).subscribe(data => {
       this.profileData = data as Participant;
       if (this.profileData?.notes?.ahnotes) {
@@ -152,7 +155,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
   }
 
   private loadMetadata(): void {
-    const metadataRef = collection(this.firestore, 'participant metadata');
+    const metadataRef = collection(this.firestoreDefault, 'participant metadata');
     const q = query(metadataRef, where('profileid', '==', this.profileId));
     collectionData(q, { idField: 'id' }).pipe(takeUntil(this.destroy$)).subscribe(metadata => {
       if (metadata.length > 0) this.participantMetadata = metadata[0] as Participant;
@@ -160,7 +163,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
   }
 
   private loadJourneys(): void {
-    const journeyRef = collection(this.firestore, 'journey');
+    const journeyRef = collection(this.firestoreDefault, 'journey');
     collectionData(journeyRef, { idField: 'id' }).pipe(takeUntil(this.destroy$)).subscribe(journeys => {
       this.journeyMap.clear();
       (journeys as Journey[]).forEach(j => this.journeyMap.set(j.id, j));
@@ -168,7 +171,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
   }
 
   private loadProducts(): void {
-    const productsRef = collection(this.firestore, 'products');
+    const productsRef = collection(this.firestoreDefault, 'products');
     collectionData(productsRef, { idField: 'id' }).pipe(takeUntil(this.destroy$)).subscribe(products => {
       this.productsMap.clear();
       (products as any[]).forEach(p => this.productsMap.set(p.id, p));
@@ -177,7 +180,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
 
   private loadForms(): void {
     this.formsLoading = true;
-    const formsRef = collection(this.firestore, 'formsByClient');
+    const formsRef = collection(this.firestoreForms, 'formsByClient');
     const q = query(formsRef, where('profileid', '==', this.profileId));
     collectionData(q, { idField: 'docid' }).pipe(takeUntil(this.destroy$)).subscribe(forms => {
       this.formsByClient.clear();
@@ -198,7 +201,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
     const authorIds = new Set(notes.map(n => n.givenby).filter(Boolean));
     authorIds.forEach(id => {
       if (!this.mapProfile.has(id)) {
-        docData(doc(this.firestore, 'participant metadata', id)).pipe(takeUntil(this.destroy$))
+        docData(doc(this.firestoreDefault, 'participant metadata', id)).pipe(takeUntil(this.destroy$))
           .subscribe(data => { if (data) this.mapProfile.set(id, data); });
       }
     });
@@ -270,7 +273,7 @@ export class ParticipantDetailComponent implements OnInit, OnDestroy, OnChanges 
     const ahnotes = notesMap.ahnotes || [];
     ahnotes.push({ givenby: this.loggedUser['profileid'] || 'unknown', ahnotes: this.newNoteText.trim(), date: new Date() });
     try {
-      await updateDoc(doc(this.firestore, 'participant metadata', this.profileId), { notes: { ahnotes } });
+      await updateDoc(doc(this.firestoreDefault, 'participant metadata', this.profileId), { notes: { ahnotes } });
       this.newNoteText = '';
       // Refresh notes
       this.processNotes(ahnotes);
