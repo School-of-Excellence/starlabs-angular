@@ -1052,12 +1052,14 @@ export class AuthguardService {
 
     if (confirm("Sure, Do you want to cancel this appointment?")) {
       if (journeycoach == true || onboarding == true) {
-        const Ref = doc(this.participantjourneyproductRefs, (apptData['participantjourneyproductid'] ?? apptData['participantjourneyproduct']))
-        updateDoc(Ref, {
-          onboardingscheduled: null,
-          onreschedule: true,
-          // orientationstatus: "appointmentcancelled"
-        })
+        if (apptData['participantjourneyproductid'] || apptData['participantjourneyproduct']) {
+          const Ref = doc(this.participantjourneyproductRefs, (apptData['participantjourneyproductid'] ?? apptData['participantjourneyproduct']))
+          updateDoc(Ref, {
+            onboardingscheduled: null,
+            onreschedule: true,
+            // orientationstatus: "appointmentcancelled"
+          })
+        }
       }
 
       const appointmentRef = doc(this.appointmentsRefs, id)

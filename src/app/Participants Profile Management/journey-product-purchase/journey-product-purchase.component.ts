@@ -47,6 +47,7 @@ interface ParticipantPurchase {
   productref: any
   watsonpurchaseid: any
   watsonpurchaselabel: any
+  purchasedate: any
   products: Array<purchaseProduct>
 }
 
@@ -299,6 +300,8 @@ export class JourneyProductPurchaseComponent {
             deliverytype: mapProduct["deliverytype"] ?? null
           })
         }
+        const watsonpurchaseid = journeyproductdata["purchaseref"] != null ? mapPurchase[journeyproductdata["purchaseref"].id]["watsonpurchaseid"] : null
+        const watsonpurchaselabel = journeyproductdata["purchaseref"] != null ? mapPurchase[journeyproductdata["purchaseref"].id]["watsonpurchaselabel"] : null
         PurchaseboxList.push({
           purchasetype: journeyproductdata["journeyref"] != null ? "journey" : "product",
           participantjourneyproductref: journeyproductdata["docid"],
@@ -309,12 +312,13 @@ export class JourneyProductPurchaseComponent {
           subscriptionstart: journeyproductdata["subscriptionstart"]?.toDate() ?? null,
           subscriptionend: journeyproductdata["subscriptionend"]?.toDate() ?? null,
           products: productList,
-          watsonpurchaseid: journeyproductdata["purchaseref"] != null ? mapPurchase[journeyproductdata["purchaseref"].id]["watsonpurchaseid"] : null,
-          watsonpurchaselabel: journeyproductdata["purchaseref"] != null ? mapPurchase[journeyproductdata["purchaseref"].id]["watsonpurchaselabel"] : null,
+          watsonpurchaseid: watsonpurchaseid,
+          watsonpurchaselabel: watsonpurchaselabel,
+          purchasedate: journeyproductdata["purchasedate"]?.toDate?.() ?? null,
         })
       }
       // this.participantJourneyProducts = journeyProductlist
-      PurchaseboxList.sort((a, b) => a.purchasetype.localeCompare(b.purchasetype))
+      this.sortPurchaseList(PurchaseboxList)
       this.participantPurchase = PurchaseboxList
     })
     // console.log("journey box", this.participantJourneyProducts)
@@ -362,6 +366,7 @@ export class JourneyProductPurchaseComponent {
       subscriptionend: null,
       watsonpurchaseid: null,
       watsonpurchaselabel: null,
+      purchasedate: null,
       products: [{
         productref: null,
         packageref: null,
@@ -373,7 +378,28 @@ export class JourneyProductPurchaseComponent {
         deliverytype: null
       }]
     })
-    this.participantPurchase = this.participantPurchase.sort((a, b) => a.purchasetype.localeCompare(b.purchasetype))
+    this.sortPurchaseList(this.participantPurchase)
+  }
+
+  sortPurchaseList(list: Array<ParticipantPurchase>){
+    const activeStatuses = new Set(['initiated', 'ongoing', 'completed'])
+    const sortDate = (p: ParticipantPurchase): Date | null => {
+      if(p.purchasedate instanceof Date) return p.purchasedate
+      if(p.subscriptionstart instanceof Date) return p.subscriptionstart
+      if(p.subscriptionend instanceof Date) return p.subscriptionend
+      return null
+    }
+    list.sort((a, b) => {
+      const aActive = activeStatuses.has(a.journeystatus)
+      const bActive = activeStatuses.has(b.journeystatus)
+      if(aActive !== bActive) return aActive ? -1 : 1
+      const aDate = sortDate(a)
+      const bDate = sortDate(b)
+      if(aDate == null && bDate == null) return 0
+      if(aDate == null) return 1
+      if(bDate == null) return -1
+      return bDate.getTime() - aDate.getTime()
+    })
   }
 
   removePurchase(journeyindex){
