@@ -2483,8 +2483,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     showParticipantActiveDate(c: any): string {
-        const { status, date, statusdate, appointmentTypeName, tentativestart, appointmentstart, appointmentend, attended } = c;
-        const productName = this.mapProductName?.[c?.productref?.id];
+        const { status, date, statusdate, appointmentTypeName, tentativestart, starttime, attended, endtime } = c;
         const validAppointments = [
             `Critical Support Diagnostics`,
             `Critical Support Implementation`,
@@ -2497,15 +2496,15 @@ export class DeliveryDashboardCloneComponent {
         else if (statusdate?.completed) return this.formatDateTime(statusdate?.completed);
         else if (status === 'ongoing' &&
             !attended &&
-            appointmentstart &&
+            starttime &&
             validAppointments.includes(appointmentTypeName)) {
-            return this.formatDateTime(appointmentstart);
+            return this.formatDateTime(starttime);
         }
         else if (status === 'ongoing' &&
             attended &&
-            appointmentend &&
+            endtime &&
             validAppointments.includes(appointmentTypeName)) {
-            return this.formatDateTime(appointmentend);
+            return this.formatDateTime(endtime);
         }
         else return '';
     }
