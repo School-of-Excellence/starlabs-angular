@@ -23,6 +23,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { A, COMMA, ENTER } from '@angular/cdk/keycodes';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -149,6 +151,8 @@ interface CurriculumItem {
     MatSnackBarModule,
     MatRadioModule,
     MatSelectModule,
+    MatTabsModule,
+    MatTooltipModule,
     DragDropModule,
     NgxEditorModule,
     MatSlideToggleModule,
@@ -1294,6 +1298,17 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
 
   onMenuChange(menu: 'detailpage' | 'challenges'  | 'challengesettings' |'payment'): void {
     this.selectedMenu = menu;
+  }
+
+  private readonly tabMenuMap: Array<'detailpage' | 'challenges' | 'challengesettings'> = ['detailpage', 'challenges', 'challengesettings'];
+
+  get selectedTabIndex(): number {
+    const idx = this.tabMenuMap.indexOf(this.selectedMenu as any);
+    return idx >= 0 ? idx : 0;
+  }
+
+  onTabChange(index: number): void {
+    this.onMenuChange(this.tabMenuMap[index]);
   }
   drop(event: CdkDragDrop<FormArray>, key: string): void {
     if (event.previousIndex === event.currentIndex) return;

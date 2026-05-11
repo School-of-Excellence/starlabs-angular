@@ -492,3 +492,457 @@ mat-divider { margin: 8px 0 !important; }
   .toggle-row { gap: 12px; padding: 12px; }
   .empty-state, .developing-message { padding: 40px 16px; }
 }
+
+/* .config-tabs {
+  width: 100%;
+} */
+
+.config-tabs ::ng-deep .mat-mdc-tab-header {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+
+.tab-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0 24px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.document-size {
+  font-size: 13px;
+  color: var(--gray-600);
+  font-weight: 500;
+}
+
+.fab-stack {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 1000;
+}
+
+.fab-stack .fab-secondary {
+  background: var(--white);
+  color: var(--pink);
+}
+
+.fab-stack .fab-primary {
+  background: var(--pink);
+  color: var(--white);
+}
+
+.fab-stack button[disabled] {
+  opacity: 0.6;
+}
+
+.fab-stack mat-spinner ::ng-deep circle {
+  stroke: var(--white);
+}
+
+/* ---------- Enrollment Form refresh ---------- */
+.enrollment-form-card {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.enrollment-form-card > mat-card-content,
+.enrollment-form-card > .mat-mdc-card-content {
+  padding: 0 !important;
+}
+
+/* Restore inner padding for nested cards (curriculum-card, challenge-item-card) */
+.enrollment-form-card .curriculum-card > div > mat-card-content,
+.enrollment-form-card .curriculum-card mat-card-content {
+  padding: 16px 20px 8px !important;
+}
+
+.enrollment-form-card .curriculum-card {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.enrollment-form-card .curriculum-card .form-row {
+  margin-bottom: 4px;
+}
+
+.enrollment-form-card .challenge-item-card {
+  margin: 0 4px 12px !important;
+}
+
+.enrollment-form-card .challenge-item-card .form-row {
+  margin-bottom: 4px;
+}
+
+/* Fields inside a curriculum-card grow to fill row and wrap responsively
+   (4-in-a-row on wide, 2-in-a-row on medium, 1 per row on narrow) */
+.enrollment-form-card .curriculum-card .form-row > .full-width,
+.enrollment-form-card .curriculum-card .form-row > mat-form-field {
+  flex: 1 1 200px;
+  min-width: 180px;
+  max-width: none;
+}
+
+/* Full-span field (Choose Category, Description) */
+.enrollment-form .form-row > .full-row {
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+}
+
+/* ---------- Settings inner tabs ---------- */
+.settings-inner-tabs {
+  margin-top: 4px;
+}
+
+.settings-inner-tabs ::ng-deep .mat-mdc-tab-header {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  margin-bottom: 18px;
+}
+
+.settings-tab-body {
+  padding: 12px 0 8px;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setting-row {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.setting-row:hover {
+  border-color: var(--blue);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.setting-row-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.setting-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.setting-row-desc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.setting-row-expand {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-subsection {
+  margin-top: 4px;
+}
+
+.settings-subsection-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.reorder-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gray-600);
+  margin: 8px 0;
+}
+
+.reorder-hint mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.reorder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reorder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+}
+
+.reorder-item-name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.reorder-item-index {
+  font-size: 12px;
+  color: var(--gray-400);
+}
+
+.comm-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upload-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--gray-50);
+  border: 1px dashed var(--gray-200);
+  border-radius: var(--radius-sm);
+}
+
+.upload-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gray-600);
+  font-weight: 500;
+}
+
+.upload-preview img {
+  max-width: 220px;
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+}
+
+.upload-preview video {
+  max-width: 320px;
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .setting-row {
+    padding: 14px;
+  }
+  .setting-row-main {
+    flex-wrap: wrap;
+  }
+  .setting-row-text {
+    flex: 1 1 100%;
+  }
+}
+
+.enrollment-form-header {
+  max-width: 1240px;
+  margin: 0 auto !important;
+  padding: 4px 4px 16px !important;
+  border-radius: 7px !important;;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.enrollment-form-header mat-card-title {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: var(--gray-800) !important;
+}
+
+.enrollment-form {
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  gap: 20px;
+}
+
+.enrollment-form .form-section {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  padding: 24px 28px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+
+.enrollment-form .form-section:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.enrollment-form .section-title {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--pink) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.14em !important;
+  margin: 0 0 18px !important;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.enrollment-form .section-divider {
+  display: none;
+}
+
+.enrollment-form .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 16px;
+  margin-bottom: 4px;
+}
+
+.enrollment-form .form-row > .full-width,
+.enrollment-form .form-row > .full-width-max,
+.enrollment-form .form-row > mat-form-field {
+  flex: 0 1 290px;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.enrollment-form .form-row > .preview-icon {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.enrollment-form .form-row > .btn-danger-icon {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-top: 4px;
+}
+
+.enrollment-form .form-row > mat-slide-toggle {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+  padding: 6px 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.enrollment-form .form-row > .preview-icon img {
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  padding: 4px;
+  background: var(--white);
+}
+
+.enrollment-form .form-section > mat-form-field {
+  width: 100%;
+  max-width: 720px;
+  display: block;
+}
+
+.enrollment-form .rich-text-section {
+  max-width: 760px;
+}
+
+.enrollment-form .editor-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 6px;
+}
+
+.enrollment-form .btn-primary-outline {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.enrollment-form mat-chip-set {
+  margin-top: 8px;
+}
+
+.enrollment-form .section-wrapper {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 18px 20px;
+  height: 100%;
+}
+
+.enrollment-form .section-wrapper .section-title {
+  border-bottom: none;
+  padding-bottom: 0 !important;
+  margin-bottom: 12px !important;
+}
+
+.enrollment-form .section-wrapper .form-row {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.enrollment-form .section-wrapper .form-row > .full-width,
+.enrollment-form .section-wrapper .form-row > mat-form-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.enrollment-form .section-wrapper .drag-icon {
+  flex: 0 0 auto;
+  color: var(--gray-400);
+}
+
+@media (max-width: 720px) {
+  .enrollment-form .form-section {
+    padding: 18px 16px 14px;
+  }
+  .enrollment-form .form-row > .full-width,
+  .enrollment-form .form-row > .full-width-max,
+  .enrollment-form .form-row > mat-form-field {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
