@@ -338,6 +338,8 @@ export class DeliveryDashboardCloneComponent {
     private appointmentsSubscription: Subscription | null = null;
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
+    private ticketRequestSubscription: Subscription;
+    
 
     columns = [
         "Total Eligible",
@@ -650,7 +652,7 @@ export class DeliveryDashboardCloneComponent {
         this.participantsProductDataSubscription?.unsubscribe();
         this.appointmentsSubscription?.unsubscribe();
         this.formsSubscription?.unsubscribe();
-        this.ticketSubscription?.unsubscribe();
+        this.ticketRequestSubscription?.unsubscribe();
     }
 
     onFilterClick(filter: string) {
@@ -800,7 +802,6 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async selectProduct(product: string) {
-        console.log("filtering ticket requests");
         this.participantLoading = true;
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
@@ -930,8 +931,6 @@ export class DeliveryDashboardCloneComponent {
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
 
-                console.log("all appointments", this.allAppointments);
-
                 const attendedAppointments = appointments.filter(app => app.attended === true || app.status === 'submitted');
 
                 if (attendedAppointments.length === 0) {
@@ -1009,20 +1008,34 @@ export class DeliveryDashboardCloneComponent {
             let appointments = Array.from(allAppointments.values() || [])
                 .filter((app: any) => app.participantproductid === data.docid);
 
-            for (let appointment of appointments) {
-                try {
-                    const appointmenttype = await this.resolveAppointmentType(appointment);
-                    appointment.appointmentTypeName = appointmenttype;
-                } catch (err) {
-                    console.log("error", err);
-                }
-            }
-
             data = { ...data, allappointments: appointments };
             productData.completion.push(data);
         }
         Object.assign(this.productData, productData);
         this.updateFilteredCards();
+    }
+
+    async fetchTicketRiseParticipants() {
+        this.ticketRequestSubscription?.unsubscribe();
+        this.ticketRequestSubscription = new Subscription();
+
+        const ticketQuery = query(
+            collection(this.firestore, 'clientissue'),
+            where('category', '==', 'Critical Support'),
+            where('status.status', '==', 'Open')
+        );
+
+        const sub = collectionData(ticketQuery, {
+            idField: 'id'
+        }).subscribe(async (participantTickets: any) => {
+
+            this.ticketRequest = participantTickets;
+
+            if (this.selectedProductLabel) {
+                await this.selectProduct(this.selectedProductLabel);
+            }
+        });
+        this.ticketRequestSubscription.add(sub);
     }
 
     handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
@@ -1111,27 +1124,6 @@ export class DeliveryDashboardCloneComponent {
             if (this.selectedProductLabel) await this.selectProduct(this.selectedProductLabel);
         });
         this.formsSubscription.add(sub);
-    }
-
-
-    async fetchTicketRiseParticipants() {
-
-        const ticketQuery = query(
-            collection(this.firestore, 'clientissue'),
-            where('category', '==', 'Critical Support'),
-            where('status.status', '==', 'Open')
-        );
-
-        this.ticketSubscription = collectionData(ticketQuery, {
-            idField: 'id'
-        }).subscribe(async (participantTickets: any) => {
-
-            this.ticketRequest = participantTickets;
-
-            if (this.selectedProductLabel) {
-                await this.selectProduct(this.selectedProductLabel);
-            }
-        });
     }
 
     getAppointmentsByStage(stage: string, appointments: any[]) {
