@@ -800,14 +800,15 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async selectProduct(product: string) {
+        console.log("filtering ticket requests");
         this.participantLoading = true;
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         if (this.allAppointments?.length === 0) {
             await this.filterAppointmentsByType();
             await this.FilterReportData(productId);
+            await this.fetchTicketRiseParticipants();
         }
-        await this.fetchTicketRiseParticipants();
         await this.filterProductData(productId);
         await this.filterStageData();
         this.participantLoading = false;
@@ -1075,7 +1076,6 @@ export class DeliveryDashboardCloneComponent {
         const sub = combineLatest(observables).subscribe(async (snapshots) => {
             const updatedForms: any[] = [];
             for (const docs of snapshots) {
-                console.log("preprocess data updating...");
                 const formResults = await Promise.all(
                     docs.map(async (data: any) => {
                         let appointments = Array.from(this.allAppointments.values() || [])
@@ -1108,12 +1108,14 @@ export class DeliveryDashboardCloneComponent {
                 ...Array.from(this.allAppointments.values()),
                 ...updatedForms
             ];
-            await this.filterProductData(productId);
+            if (this.selectedProductLabel) await this.selectProduct(this.selectedProductLabel);
         });
         this.formsSubscription.add(sub);
     }
 
-    fetchTicketRiseParticipants() {
+
+    async fetchTicketRiseParticipants() {
+
         const ticketQuery = query(
             collection(this.firestore, 'clientissue'),
             where('category', '==', 'Critical Support'),
@@ -1122,10 +1124,12 @@ export class DeliveryDashboardCloneComponent {
 
         this.ticketSubscription = collectionData(ticketQuery, {
             idField: 'id'
-        }).subscribe((participantTickets: any) => {
+        }).subscribe(async (participantTickets: any) => {
 
-            if (this.ticketRequest !== participantTickets) {
-                this.ticketRequest = participantTickets;
+            this.ticketRequest = participantTickets;
+
+            if (this.selectedProductLabel) {
+                await this.selectProduct(this.selectedProductLabel);
             }
         });
     }
@@ -1737,8 +1741,8 @@ export class DeliveryDashboardCloneComponent {
             const groupPids = this.mergedGroupIds[groupName];
             const hasData = [...groupPids].some((pid) => allProductIds.has(pid)); // Temporary
             if (hasData) { // Temporary
-            result.push('group:' + groupName);
-            for (const pid of groupPids) seen.add(pid);
+                result.push('group:' + groupName);
+                for (const pid of groupPids) seen.add(pid);
             } // Temporary
         }
 
