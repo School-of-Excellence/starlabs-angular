@@ -1735,11 +1735,11 @@ export class DeliveryDashboardCloneComponent {
 
         for (const groupName of Object.keys(this.mergedGroupIds)) {
             const groupPids = this.mergedGroupIds[groupName];
-            // const hasData = [...groupPids].some((pid) => allProductIds.has(pid)); // Temporary
-            // if (hasData) { // Temporary
+            const hasData = [...groupPids].some((pid) => allProductIds.has(pid)); // Temporary
+            if (hasData) { // Temporary
             result.push('group:' + groupName);
             for (const pid of groupPids) seen.add(pid);
-            // } // Temporary
+            } // Temporary
         }
 
         for (const pid of allProductIds) {
@@ -2363,7 +2363,7 @@ export class DeliveryDashboardCloneComponent {
             "A&H LIGHT": ["A&H Light"],
             "EI Solution": ["EI Solution", "EI Celebration", "EI Implementation", "EI Diagnostics", "EI Review"],
             "EI Starter Pack": ["EI Starter Pack"],
-            "Critical Support": ["Critical Support"]
+            "Critical Support": ["Critical Support Implementation and Diagnostics"]
         };
 
         let filteredLatestAppointments = this.allFetchedAppointments;
