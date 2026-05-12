@@ -1,65 +1,26 @@
 <div class="workshop-config-container">
-  <div class="sidebar">
-    <mat-card class="menu-card">
-      <mat-card-header>
-        <mat-card-title>
-          <span>{{detailPageForm.get('title').value}}</span> {{documentsize}}
-        </mat-card-title>
-      </mat-card-header>
-
-      <mat-card-content>
-        <mat-radio-group [(ngModel)]="selectedMenu" (change)="onMenuChange($event.value)" class="menu-radio-group">
-          <div class="menu-item">
-            <mat-radio-button value="detailpage">Enrollment Page</mat-radio-button>
-          </div>
-          <div class="menu-item">
-            <mat-radio-button value="challenges">Challenges</mat-radio-button>
-          </div>
-          <div class="menu-item">
-            <mat-radio-button value="challengesettings">Settings</mat-radio-button>
-          </div>
-        </mat-radio-group>
-
-        <div class="sidebar-actions">
-          <button mat-stroked-button class="btn-sidebar-secondary" (click)="routing('addimage',null)" type="button">
-            <mat-icon>insert_photo</mat-icon> Add Icon / Image
-          </button>
-
-          <button *ngIf="selectedMenu === 'detailpage'"
-            class="btn-save" mat-raised-button
-            (click)="saveDetailPage()"
-            [disabled]="loading || detailPageForm.invalid">
-            <mat-spinner *ngIf="loading" diameter="18"></mat-spinner>
-            <span *ngIf="!loading">Save Enrollment</span>
-          </button>
-
-          <button *ngIf="selectedMenu === 'challenges'"
-            class="btn-save" mat-raised-button
-            (click)="saveChallengesPage()"
-            [disabled]="loading || challengesPageForm.invalid">
-            <mat-spinner *ngIf="loading" diameter="18"></mat-spinner>
-            <span *ngIf="!loading">Save Challenges</span>
-          </button>
-
-          <button *ngIf="selectedMenu === 'challengesettings'"
-            class="btn-save" mat-raised-button
-            (click)="saveSettings()"
-            [disabled]="loading">
-            <mat-spinner *ngIf="loading" diameter="18"></mat-spinner>
-            <span *ngIf="!loading">Save Settings</span>
-          </button>
-        </div>
-      </mat-card-content>
-    </mat-card>
-  </div>
-  <div class="main-content">
-    <div *ngIf="workshopData" class="content-wrapper">
-      <mat-card *ngIf="selectedMenu === 'detailpage'" class="form-card">
-        <mat-card-header>
-          <mat-card-title>{{detailPageForm.get('title').value}}</mat-card-title>
-        </mat-card-header>
+  <div *ngIf="workshopData" class="main-content">
+    <mat-tab-group [selectedIndex]="selectedTabIndex" mat-align-tabs="center" mat-stretch-tabs="false" (selectedIndexChange)="onTabChange($event)">
+      <mat-tab label="Enrollment Page">
+        <div class="tab-body">
+          <!-- <div class="tab-header" *ngIf="documentsize">
+            <div class="document-size">{{documentsize}}</div>
+          </div> -->
+          <mat-card *ngIf="selectedMenu === 'detailpage'" class="form-card enrollment-form-card">
+            <mat-card-header class="enrollment-form-header">
+              <mat-card-title>{{detailPageForm.get('title').value}}
+                <span *ngIf="documentsize" style="font-weight: 300;">
+                  ({{documentsize}})
+                </span> 
+                <!-- <span>
+                  <div class="tab-header" *ngIf="documentsize">
+                    <div class="document-size">{{documentsize}}</div>
+                  </div>
+                </span> -->
+              </mat-card-title>
+            </mat-card-header> <br>
         <mat-card-content>
-          <form [formGroup]="detailPageForm" class="detail-form">
+          <form [formGroup]="detailPageForm" class="detail-form enrollment-form">
             <div class="form-section">
               <h3 class="section-title">Workshop Information</h3>
               <div class="form-row">
@@ -381,13 +342,38 @@
 
           </form>
         </mat-card-content>
-      </mat-card>
-      <mat-card *ngIf="selectedMenu === 'challenges'" class="form-card">
-        <mat-card-header>
-          <mat-card-title>Workshop Challenges Configuration</mat-card-title>
-        </mat-card-header>
+          </mat-card>
+        </div>
+          <div class="fab-stack">
+            <button mat-fab class="fab-secondary" (click)="routing('addimage',null)" type="button"
+              matTooltip="Add Icon / Image" matTooltipPosition="left" aria-label="Add Icon / Image">
+              <mat-icon>insert_photo</mat-icon>
+            </button>
+            <button mat-fab color="primary" class="fab-primary" (click)="saveDetailPage()"
+              [disabled]="loading || detailPageForm.invalid"
+              matTooltip="Save Enrollment" matTooltipPosition="left" aria-label="Save Enrollment">
+              <mat-spinner *ngIf="loading" diameter="24"></mat-spinner>
+              <mat-icon *ngIf="!loading">save</mat-icon>
+            </button>
+          </div>
+      </mat-tab>
+      <mat-tab label="Challenges">
+        <div class="tab-body">
+          <mat-card *ngIf="selectedMenu === 'challenges'" class="form-card enrollment-form-card">
+            <mat-card-header class="enrollment-form-header">
+              <mat-card-title>{{detailPageForm.get('title').value}}
+                <span *ngIf="documentsize" style="font-weight: 300;">
+                  ({{documentsize}})
+                </span> 
+                <!-- <span>
+                  <div class="tab-header" *ngIf="documentsize">
+                    <div class="document-size">{{documentsize}}</div>
+                  </div>
+                </span> -->
+              </mat-card-title>
+            </mat-card-header> <br>
         <mat-card-content>
-          <form [formGroup]="challengesPageForm" class="detail-form">
+          <form [formGroup]="challengesPageForm" class="detail-form enrollment-form">
             <div class="form-section">
               <div formArrayName="challenges"
                 cdkDropList
@@ -418,7 +404,7 @@
 
                   <div *ngIf="challengeExpanded[i]">
                     <mat-card-content>
-                      <div class="form-row">
+                      <div class="form-row challenge-main-row">
                         <mat-form-field appearance="outline" class="full-width">
                           <mat-label>Challenge Type</mat-label>
                           <mat-select formControlName="type">
@@ -426,12 +412,12 @@
                             <mat-option value="challenge">Activity</mat-option>
                           </mat-select>
                         </mat-form-field>
-                      </div>
-
-                      <div *ngIf="curriculum.get('type')?.value === 'challenge' || curriculum.get('type')?.value === 'zoomcall'">
-                        <div class="form-row">
+                        <ng-container *ngIf="curriculum.get('type')?.value === 'challenge' || curriculum.get('type')?.value === 'zoomcall'">
                           <mat-form-field appearance="outline" class="full-width">
                             <mat-label>Choose Icon</mat-label>
+                            <img *ngIf="curriculum.get('headicon')?.value" matPrefix
+                              [src]="curriculum.get('headicon')?.value" alt="" width="22" height="22"
+                              style="margin: 0 6px 0 10px; border-radius: 4px;" />
                             <mat-select formControlName="headicon">
                               <mat-option *ngFor="let option of iconData" [value]="option['imageUrl']">
                                 <img [src]="option['imageUrl']" alt="icon" width="40" height="40" style="margin-right:8px;vertical-align:middle;" />
@@ -439,9 +425,6 @@
                               </mat-option>
                             </mat-select>
                           </mat-form-field>
-                          <div *ngIf="curriculum.get('headicon')?.value" class="preview-icon">
-                            <img [src]="curriculum.get('headicon')?.value" alt="icon preview" width="40" height="40" />
-                          </div>
                           <mat-form-field appearance="outline" class="full-width">
                             <mat-label>Heading</mat-label>
                             <input matInput formControlName="heading" placeholder="Enter heading">
@@ -450,13 +433,18 @@
                             <mat-label>Sub Heading</mat-label>
                             <input matInput formControlName="subheading" placeholder="Enter subheading">
                           </mat-form-field>
-                          <mat-form-field appearance="outline" class="full-width">
+                        </ng-container>
+                      </div>
+
+                      <div *ngIf="curriculum.get('type')?.value === 'challenge' || curriculum.get('type')?.value === 'zoomcall'">
+                        <div class="form-row">
+                          <mat-form-field appearance="outline" class="full-width full-row">
                             <mat-label>Description</mat-label>
                             <input matInput formControlName="description" placeholder="Enter description">
                           </mat-form-field>
                         </div>
                         <div class="form-row">
-                          <mat-form-field appearance="outline" class="full-width">
+                          <mat-form-field appearance="outline" class="full-width full-row">
                             <mat-label>Choose Category</mat-label>
                             <mat-select formControlName="workshopcategory" multiple>
                               <mat-option *ngFor="let categoryId of uniqueWorkshopCategories || []" [value]="categoryId">
@@ -464,6 +452,8 @@
                               </mat-option>
                             </mat-select>
                           </mat-form-field>
+                        </div>
+                        <div class="form-row">
                           <mat-slide-toggle
                             [checked]="curriculum.get('facilitatoronly')?.value === true"
                             (change)="curriculum.get('facilitatoronly')?.setValue($event.checked)">
@@ -777,6 +767,19 @@
                           <mat-label>Completed Zoom URL</mat-label>
                           <input matInput formControlName="completedzoomurl" placeholder="Enter zoom meeting link">
                         </mat-form-field>
+                        <mat-form-field appearance="outline" class="full-width">
+                          <mat-label>Select Zoom call</mat-label>
+                          <mat-select formControlName="zoomvideoref" [compareWith]="compareRefs">
+                            <mat-option *ngFor="let content of videocontent" [value]="content.ref">
+                              {{ refTitleMap[content.ref.path] }}
+                            </mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                        <button class="btn-save" mat-raised-button (click)="openUploadDialog()">
+                        <span *ngIf="!loading">Upload Zoom Call</span>
+                      </button>
+                      </div>
+                      <div *ngIf="curriculum.get('type')?.value === 'zoomcall'" class="form-row">
                         <mat-slide-toggle
                           [checked]="curriculum.get('status')?.value === 'completed'"
                           (change)="curriculum.get('status')?.setValue($event.checked ? 'completed' : null)">
@@ -824,523 +827,509 @@
             </div>
           </form>
         </mat-card-content>
-      </mat-card>
-      <mat-card *ngIf="selectedMenu === 'challengesettings'" class="form-card">
-        <mat-card-header>
-          <mat-card-title>Workshop Settings</mat-card-title>
-        </mat-card-header>
-
+          </mat-card>
+          <div class="fab-stack">
+            <button mat-fab color="primary" class="fab-primary" (click)="saveChallengesPage()"
+              [disabled]="loading || challengesPageForm.invalid"
+              matTooltip="Save Challenges" matTooltipPosition="left" aria-label="Save Challenges">
+              <mat-spinner *ngIf="loading" diameter="24"></mat-spinner>
+              <mat-icon *ngIf="!loading">save</mat-icon>
+            </button>
+          </div>
+        </div>
+      </mat-tab>
+      <mat-tab label="Settings">
+        <div class="tab-body">
+          <mat-card *ngIf="selectedMenu === 'challengesettings'" class="form-card enrollment-form-card">
+            <!-- <mat-card-header class="enrollment-form-header">
+              <mat-card-title>Workshop Settings</mat-card-title>
+            </mat-card-header> -->
+            <mat-card-header class="enrollment-form-header">
+              <mat-card-title>{{detailPageForm.get('title').value}}
+                <span *ngIf="documentsize" style="font-weight: 300;">
+                  ({{documentsize}})
+                </span> 
+                <!-- <span>
+                  <div class="tab-header" *ngIf="documentsize">
+                    <div class="document-size">{{documentsize}}</div>
+                  </div>
+                </span> -->
+              </mat-card-title>
+            </mat-card-header> <br>
         <mat-card-content>
-          <form [formGroup]="settingsForm" class="detail-form">
-            <div class="form-section">
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="testmode" (change)="onToggleChange('testmode', $event)" color="primary">
-                    Workshop TestMode
-                  </mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('testmode')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('testmode')?.value ? 'Workshop is currently in Test Mode' : 'Workshop is Not in Test Mode' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('testmode')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('testmode')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                  <div class="toggle-expand">
-                    <mat-form-field appearance="outline" class="w-100">
-                      <mat-label>Select Profiles</mat-label>
-                      <mat-select formControlName="testusers" multiple>
-                        <mat-option *ngFor="let profile of names" [value]="profile.id">{{ profile.name }}</mat-option>
-                      </mat-select>
-                      <mat-hint>Selected {{ settingsForm.get('testusers')?.value?.length || 0 }} users</mat-hint>
-                    </mat-form-field>
-                    <div *ngIf="settingsForm.get('testusers')?.value?.length > 0">
-                      <mat-chip-set>
-                        <ng-container *ngFor="let profile of names">
-                          <mat-chip *ngIf="settingsForm.get('testusers')?.value?.includes(profile.id)"
-                            [removable]="true" (removed)="removeUser(profile.id)">
-                            {{ profile.name }}
-                            <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                          </mat-chip>
-                        </ng-container>
-                      </mat-chip-set>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="active" (change)="onToggleChange('active', $event)" color="primary">Workshop Active</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('active')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('active')?.value ? 'Workshop is visible to participants' : 'Workshop is hidden from participants' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('active')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('active')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="qanda" (change)="onToggleChange('qanda', $event)" color="primary">Enable Q&A</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('qanda')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('qanda')?.value ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('qanda')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('qanda')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="breakdown" (change)="onToggleChange('breakdown', $event)" color="primary">Workshop Breakdown</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('breakdown')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('breakdown')?.value ? 'Breakdown is active and visible' : 'Breakdown is inactive and hidden' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('breakdown')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('breakdown')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="enableshare" (change)="onToggleChange('enableshare', $event)" color="primary">Enable Share</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('enableshare')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('enableshare')?.value ? 'Workshop can be shared with others' : 'Sharing is disabled' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('enableshare')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('enableshare')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-              </div>
-              <h3 class="section-title">Developer Settings</h3>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="triggerFunction" (change)="onToggleChange('triggerFunction', $event)" color="primary">Update Participant Workshop</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('triggerFunction')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('triggerFunction')?.value ? 'Workshop updates in participant document' : 'Workshop will not update participant document' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('triggerFunction')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('triggerFunction')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-              </div>
-              <h3 class="section-title">Workshop For</h3>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="activeparticipants" (change)="onToggleChange('activeparticipants', $event)" color="primary">Active Participants Only</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('activeparticipants')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('activeparticipants')?.value ? 'Workshop is for Active participants' : '' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('activeparticipants')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('activeparticipants')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="newusersonly" (change)="onToggleChange('newusersonly', $event)" color="primary">New Users Only</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('newusersonly')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('newusersonly')?.value ? 'Workshop is for New participants' : '' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('newusersonly')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('newusersonly')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="journeybased" (change)="onToggleChange('journeybased', $event)" color="primary">Journey Based</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('journeybased')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('journeybased')?.value ? 'Workshop is Only for Journey Based' : '' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('journeybased')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('journeybased')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                  <div class="toggle-expand">
-                    <mat-form-field appearance="outline" class="w-100">
-                      <mat-label>Select Journey</mat-label>
-                      <mat-select formControlName="selectedjourneys" multiple>
-                        <mat-option *ngFor="let journey of journeyData" [value]="journey.id">{{ journey.journey }}</mat-option>
-                      </mat-select>
-                      <mat-hint>Selected {{ settingsForm.get('selectedjourneys')?.value?.length || 0 }} journeys</mat-hint>
-                    </mat-form-field>
-                    <div *ngIf="settingsForm.get('selectedjourneys')?.value?.length > 0">
-                      <mat-chip-set>
-                        <ng-container *ngFor="let journey of journeyData">
-                          <mat-chip *ngIf="settingsForm.get('selectedjourneys')?.value?.includes(journey.id)"
-                            [removable]="true" (removed)="removeJourney(journey.id)">
-                            {{ journey.journey }}
-                            <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                          </mat-chip>
-                        </ng-container>
-                      </mat-chip-set>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="tierbased" (change)="onToggleChange('tierbased', $event)" color="primary">Tier Based</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('tierbased')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('tierbased')?.value ? 'Workshop is for Tier Based' : '' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('tierbased')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('tierbased')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                  <div class="toggle-expand">
-                    <mat-form-field appearance="outline" class="w-100">
-                      <mat-label>Select Tier</mat-label>
-                      <mat-select formControlName="selectedtiers" multiple>
-                        <mat-option *ngFor="let tier of tierData" [value]="tier.id">{{ tier.tier }}</mat-option>
-                      </mat-select>
-                      <mat-hint>Selected {{ settingsForm.get('selectedtiers')?.value?.length || 0 }} tiers</mat-hint>
-                    </mat-form-field>
-                    <div *ngIf="settingsForm.get('selectedtiers')?.value?.length > 0">
-                      <mat-chip-set>
-                        <ng-container *ngFor="let tier of tierData">
-                          <mat-chip *ngIf="settingsForm.get('selectedtiers')?.value?.includes(tier.id)"
-                            [removable]="true" (removed)="removeTier(tier.id)">
-                            {{ tier.tier }}
-                            <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                          </mat-chip>
-                        </ng-container>
-                      </mat-chip-set>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="categorybased" (change)="onToggleChange('categorybased', $event)" color="primary">Category Based</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('categorybased')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('categorybased')?.value ? 'Workshop is Now Category Based' : '' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('categorybased')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('categorybased')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                  <div class="toggle-expand">
-                    <button mat-stroked-button class="btn-primary-outline" (click)="createCategory()" type="button">
-                      <mat-icon>category</mat-icon> Create Category
-                    </button>
-                    <div style="margin-top:12px;">
-                      <h4 style="font-size:13px;font-weight:600;margin-bottom:6px;">Available Categories</h4>
-                      <mat-chip-set>
-                        <ng-container *ngFor="let category of workshopCategories">
-                          <mat-chip (click)="editCategory(category)">
-                            {{ category.name }} ({{category.description}})
-                          </mat-chip>
-                        </ng-container>
-                      </mat-chip-set>
-                    </div>
-                    <div style="margin-top:16px;">
-                      <mat-form-field appearance="outline" class="w-100">
-                        <mat-label>Select Category for this Workshop</mat-label>
-                        <mat-select formControlName="categoriesforthisworkshop" multiple>
-                          <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id">
-                            {{ categories.name }} ({{categories.description}})
-                          </mat-option>
-                        </mat-select>
-                        <mat-hint>Selected {{ settingsForm.get('categoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
-                      </mat-form-field>
-                      <div *ngIf="settingsForm.get('categoriesforthisworkshop')?.value?.length > 0" style="margin-top:12px;">
-                        <p style="font-size:12px;color:#a1a1aa;margin-bottom:6px;">
-                          <mat-icon style="font-size:14px;vertical-align:middle;">drag_indicator</mat-icon> Drag to reorder:
-                        </p>
-                        <div cdkDropList (cdkDropListDropped)="dropCategory($event)" style="display:flex;flex-direction:column;gap:6px;">
-                          <div *ngFor="let catId of settingsForm.get('categoriesforthisworkshop')?.value; let i = index"
-                            cdkDrag class="toggle-row" style="padding:8px 12px;cursor:grab;">
-                            <mat-icon cdkDragHandle class="drag-icon">drag_indicator</mat-icon>
-                            <span style="flex:1;">{{ workshopCategoriesMap[catId] }}</span>
-                            <span style="font-size:12px;color:#a1a1aa;">#{{ i + 1 }}</span>
-                            <button mat-icon-button class="btn-danger-icon" (click)="removecategoriesforthisworkshop(catId)">
-                              <mat-icon>cancel</mat-icon>
-                            </button>
-                          </div>
+          <form [formGroup]="settingsForm" class="detail-form enrollment-form">
+            <mat-tab-group class="settings-inner-tabs">
+
+              <mat-tab label="General">
+                <div class="settings-tab-body">
+                  <div class="settings-list">
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Workshop Test Mode</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('testmode')?.value ? 'Workshop is currently in Test Mode' : 'Workshop is Not in Test Mode' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="testmode" (change)="onToggleChange('testmode', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <div *ngIf="settingsForm.get('testmode')?.value" class="setting-row-expand">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Select Profiles</mat-label>
+                          <mat-select formControlName="testusers" multiple>
+                            <mat-option *ngFor="let profile of names" [value]="profile.id">{{ profile.name }}</mat-option>
+                          </mat-select>
+                          <mat-hint>Selected {{ settingsForm.get('testusers')?.value?.length || 0 }} users</mat-hint>
+                        </mat-form-field>
+                        <div *ngIf="settingsForm.get('testusers')?.value?.length > 0">
+                          <mat-chip-set>
+                            <ng-container *ngFor="let profile of names">
+                              <mat-chip *ngIf="settingsForm.get('testusers')?.value?.includes(profile.id)"
+                                [removable]="true" (removed)="removeUser(profile.id)">
+                                {{ profile.name }}
+                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                              </mat-chip>
+                            </ng-container>
+                          </mat-chip-set>
                         </div>
                       </div>
                     </div>
-                    <mat-divider class="section-divider"></mat-divider>
-                    <mat-form-field appearance="outline" class="w-100" style="margin-top:12px;">
-                      <mat-label>Select Cohorts for this Workshop</mat-label>
-                      <mat-select formControlName="cohortsforthisworkshop" multiple (selectionChange)="onCohortSelectionChange($event)">
-                        <mat-option *ngFor="let cohort of bigCohorts" [value]="cohort.id" [disabled]="isCohortDisabled(cohort.id)">
-                          {{ cohort.name }} - ({{ cohort.participantidlist?.length || 0 }} Participants)
-                        </mat-option>
-                      </mat-select>
-                      <mat-hint>Selected {{ settingsForm.get('cohortsforthisworkshop')?.value?.length || 0 }} Cohort</mat-hint>
-                    </mat-form-field>
-                    <mat-form-field appearance="outline" class="w-100" style="margin-top:12px;">
-                      <mat-label>Select Category for Cohort</mat-label>
-                      <mat-select formControlName="cohortcategoriesforthisworkshop" multiple (selectionChange)="onCohortCategorySelectionChange($event)">
-                        <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id"
-                          [disabled]="onCohortCategoryDisabled(categories.id)">
-                          {{ categories.name }} ({{categories.description}})
-                        </mat-option>
-                      </mat-select>
-                      <mat-hint>Selected {{ settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
-                    </mat-form-field>
-                    <div *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length > 0" style="margin-top:12px;">
-                      <mat-chip-set>
-                        <ng-container *ngFor="let categories of workshopCategories">
-                          <mat-chip *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.includes(categories.id)"
-                            [removable]="true" (removed)="removeCohortcategoriesforthisworkshop(categories.id)">
-                            {{ categories.name }} ({{categories.description}})
-                            <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                          </mat-chip>
-                        </ng-container>
-                      </mat-chip-set>
-                    </div>
-                    <div class="form-row" style="margin-top:12px;">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Thumbnail Image URL</mat-label>
-                        <input matInput formControlName="categorythumbnail" placeholder="Enter thumbnail image URL">
-                        <button mat-icon-button (click)="uploadcategoryThumbnail()" matSuffix>
-                          <mat-icon>upload</mat-icon>
-                        </button>
-                      </mat-form-field>
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Video URL</mat-label>
-                        <input matInput formControlName="categoryVideo" placeholder="Enter video URL">
-                        <button mat-icon-button (click)="uploadcategoryVideo()" matSuffix>
-                          <mat-icon>upload</mat-icon>
-                        </button>
-                      </mat-form-field>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <!-- <h3 class="section-title">Evergreen Workshop Settings</h3>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="evergreenWorkshop" (change)="onToggleChange('evergreenWorkshop', $event)" color="primary">Is this Evergreen Workshop</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('evergreenWorkshop')?.value ? 'Yes' : 'No' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('evergreenWorkshop')?.value ? 'Evergreen Workshop Enabled' : '' }}</p>
-                  </div>
-                  <mat-icon [style.color]="settingsForm.get('evergreenWorkshop')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('evergreenWorkshop')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                </div>
-              </div> -->
-            <h3 class="section-title">Evergreen Workshop Settings</h3>
-            <div class="form-row">
-            <div class="toggle-row full-width">
-                <mat-slide-toggle formControlName="evergreenWorkshop" (change)="onToggleChange('evergreenWorkshop', $event)" color="primary">Is this Evergreen Workshop</mat-slide-toggle>
-                <div class="toggle-status">
-                <p class="status-label">{{ settingsForm.get('evergreenWorkshop')?.value ? 'Yes' : 'No' }}</p>
-                <p class="status-desc">{{ settingsForm.get('evergreenWorkshop')?.value ? 'Evergreen Workshop Enabled' : '' }}</p>
-                </div>
-                <mat-icon [style.color]="settingsForm.get('evergreenWorkshop')?.value ? '#00AEEF' : '#EC008C'">
-                {{ settingsForm.get('evergreenWorkshop')?.value ? 'check_circle' : 'cancel' }}
-                </mat-icon>
-            </div>
-            </div>
-            <ng-container *ngIf="settingsForm.get('evergreenWorkshop')?.value" formGroupName="evergreenWorkshopMeta">
-            <div class="form-row">
-                <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Workshop Days</mat-label>
-                <input
-                    matInput
-                    type="number"
-                    formControlName="workshopDays"
-                    placeholder="Enter number of days"
-                    min="1"
-                />
-                <mat-icon matSuffix>calendar_today</mat-icon>
-                <mat-hint>Number of days this evergreen workshop runs</mat-hint>
-                <mat-error *ngIf="settingsForm.get('evergreenWorkshopMeta')?.get('workshopDays')?.hasError('required')">
-                    Workshop days is required
-                </mat-error>
-                <mat-error *ngIf="settingsForm.get('evergreenWorkshopMeta')?.get('workshopDays')?.hasError('min')">
-                    Must be at least 1 day
-                </mat-error>
-                </mat-form-field>
-            </div>
 
-            <div class="form-row">
-                <mat-form-field appearance="outline" class="w-100">
-                <mat-label>Last Challenge Message</mat-label>
-                <textarea
-                    matInput
-                    formControlName="lastChallengeMessage"
-                    placeholder="Enter message to show after the last challenge..."
-                    rows="4"
-                    cdkTextareaAutosize
-                    cdkAutosizeMinRows="3"
-                    cdkAutosizeMaxRows="8"
-                ></textarea>
-                <mat-hint>Shown to participants after completing the final challenge</mat-hint>
-                </mat-form-field>
-            </div>
-            <!-- <div class="form-row" style="align-items: center; margin-bottom: 4px;">
-                <span style="font-size: 13px; font-weight: 600; color: var(--black); flex: 1;">Daily Communication</span>
-                <button mat-icon-button type="button" color="primary" (click)="addDailyCommunication()"
-                matTooltip="Add message">
-                <mat-icon>add_circle</mat-icon>
-                </button>
-            </div> -->
-            <div formArrayName="dailyCommunication">
-              <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
-                class="form-row">
-                <mat-form-field appearance="outline" style="flex: 1;">
-                  <mat-label>Day {{ i + 1 }} Message</mat-label>
-                  <textarea
-                    matInput
-                    [formControlName]="i"
-                    placeholder="Enter message for day {{ i + 1 }}..."
-                    cdkTextareaAutosize
-                    cdkAutosizeMinRows="2"
-                    cdkAutosizeMaxRows="6"
-                  ></textarea>
-                </mat-form-field>
-              </div>
-            </div>
-            <!-- <div formArrayName="dailyCommunication">
-                <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
-                class="form-row" style="align-items: flex-start; gap: 8px;">
-                <mat-form-field appearance="outline" style="flex: 1;">
-                    <mat-label>Day {{ i + 1 }} Message</mat-label>
-                    <textarea
-                    matInput
-                    [formControlName]="i"
-                    placeholder="Enter message for day {{ i + 1 }}..."
-                    cdkTextareaAutosize
-                    cdkAutosizeMinRows="2"
-                    cdkAutosizeMaxRows="6"
-                    ></textarea>
-                </mat-form-field>
-                <button mat-icon-button type="button" class="btn-danger-icon"
-                    (click)="removeDailyCommunication(i)"
-                    [disabled]="getDailyCommunicationArray().length === 1"
-                    matTooltip="Remove"
-                    style="margin-top: 8px;">
-                    <mat-icon>remove_circle</mat-icon>
-                </button>
-                </div>
-            </div> -->
-            </ng-container>
-              <h3 class="section-title">Workshop Facilitator</h3>
-              <div class="form-row">
-                <div class="toggle-row full-width">
-                  <mat-slide-toggle formControlName="facilitator" (change)="onToggleChange('facilitator', $event)" color="primary">Workshop Facilitator</mat-slide-toggle>
-                  <div class="toggle-status">
-                    <p class="status-label">{{ settingsForm.get('facilitator')?.value ? 'Active' : 'Inactive' }}</p>
-                    <p class="status-desc">{{ settingsForm.get('facilitator')?.value ? 'Workshop Facilitator Enabled' : '' }}</p>
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Workshop Active</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('active')?.value ? 'Workshop is visible to participants' : 'Workshop is hidden from participants' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="active" (change)="onToggleChange('active', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Enable Q&amp;A</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('qanda')?.value ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="qanda" (change)="onToggleChange('qanda', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Enable Share</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('enableshare')?.value ? 'Workshop can be shared with others' : 'Sharing is disabled' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="enableshare" (change)="onToggleChange('enableshare', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Workshop Breakdown</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('breakdown')?.value ? 'Breakdown is active and visible' : 'Breakdown is inactive and hidden' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="breakdown" (change)="onToggleChange('breakdown', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Update Participant Workshop</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('triggerFunction')?.value ? 'Workshop updates in participant document' : 'Workshop will not update participant document' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="triggerFunction" (change)="onToggleChange('triggerFunction', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
                   </div>
-                  <mat-icon [style.color]="settingsForm.get('facilitator')?.value ? '#00AEEF' : '#EC008C'">
-                    {{ settingsForm.get('facilitator')?.value ? 'check_circle' : 'cancel' }}
-                  </mat-icon>
-                  <div class="toggle-expand">
-                    <mat-form-field appearance="outline" class="w-100">
-                      <mat-label>Select Facilitators</mat-label>
-                      <mat-select formControlName="facilitatorprofiles" multiple>
-                        <mat-option *ngFor="let facilitators of names" [value]="facilitators.id">{{ facilitators.name }}</mat-option>
-                      </mat-select>
-                      <mat-hint>Selected {{ settingsForm.get('facilitatorprofiles')?.value?.length || 0 }} facilitators</mat-hint>
-                    </mat-form-field>
-                    <div *ngIf="settingsForm.get('facilitatorprofiles')?.value?.length > 0">
-                      <mat-chip-set>
-                        <ng-container *ngFor="let facilitators of names">
-                          <mat-chip *ngIf="settingsForm.get('facilitatorprofiles')?.value?.includes(facilitators.id)"
-                            [removable]="true" (removed)="removeFacilitator(facilitators.id)">
-                            {{ facilitators.name }}
-                            <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                          </mat-chip>
-                        </ng-container>
-                      </mat-chip-set>
+                </div>
+              </mat-tab>
+              <mat-tab label="Access">
+                <div class="settings-tab-body">
+                  <div class="settings-list">
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Active Participants Only</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('activeparticipants')?.value ? 'Workshop is for Active participants' : 'Available to all participants' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="activeparticipants" (change)="onToggleChange('activeparticipants', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">New Users Only</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('newusersonly')?.value ? 'Workshop is for New participants' : 'Available to all users' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="newusersonly" (change)="onToggleChange('newusersonly', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Journey Based</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('journeybased')?.value ? 'Workshop is restricted to selected journeys' : 'No journey restriction' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="journeybased" (change)="onToggleChange('journeybased', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <div *ngIf="settingsForm.get('journeybased')?.value" class="setting-row-expand">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Select Journey</mat-label>
+                          <mat-select formControlName="selectedjourneys" multiple>
+                            <mat-option *ngFor="let journey of journeyData" [value]="journey.id">{{ journey.journey }}</mat-option>
+                          </mat-select>
+                          <mat-hint>Selected {{ settingsForm.get('selectedjourneys')?.value?.length || 0 }} journeys</mat-hint>
+                        </mat-form-field>
+                        <div *ngIf="settingsForm.get('selectedjourneys')?.value?.length > 0">
+                          <mat-chip-set>
+                            <ng-container *ngFor="let journey of journeyData">
+                              <mat-chip *ngIf="settingsForm.get('selectedjourneys')?.value?.includes(journey.id)"
+                                [removable]="true" (removed)="removeJourney(journey.id)">
+                                {{ journey.journey }}
+                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                              </mat-chip>
+                            </ng-container>
+                          </mat-chip-set>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Tier Based</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('tierbased')?.value ? 'Workshop is restricted to selected tiers' : 'No tier restriction' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="tierbased" (change)="onToggleChange('tierbased', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <div *ngIf="settingsForm.get('tierbased')?.value" class="setting-row-expand">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Select Tier</mat-label>
+                          <mat-select formControlName="selectedtiers" multiple>
+                            <mat-option *ngFor="let tier of tierData" [value]="tier.id">{{ tier.tier }}</mat-option>
+                          </mat-select>
+                          <mat-hint>Selected {{ settingsForm.get('selectedtiers')?.value?.length || 0 }} tiers</mat-hint>
+                        </mat-form-field>
+                        <div *ngIf="settingsForm.get('selectedtiers')?.value?.length > 0">
+                          <mat-chip-set>
+                            <ng-container *ngFor="let tier of tierData">
+                              <mat-chip *ngIf="settingsForm.get('selectedtiers')?.value?.includes(tier.id)"
+                                [removable]="true" (removed)="removeTier(tier.id)">
+                                {{ tier.tier }}
+                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                              </mat-chip>
+                            </ng-container>
+                          </mat-chip-set>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Category Based</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('categorybased')?.value ? 'Workshop is restricted by categories' : 'No category restriction' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="categorybased" (change)="onToggleChange('categorybased', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <div *ngIf="settingsForm.get('categorybased')?.value" class="setting-row-expand">
+                        <button mat-stroked-button class="btn-primary-outline" (click)="createCategory()" type="button">
+                          <mat-icon>category</mat-icon> Create Category
+                        </button>
+                        <div class="settings-subsection">
+                          <h4 class="settings-subsection-title">Available Categories</h4>
+                          <mat-chip-set>
+                            <ng-container *ngFor="let category of workshopCategories">
+                              <mat-chip (click)="editCategory(category)">
+                                {{ category.name }} ({{category.description}})
+                              </mat-chip>
+                            </ng-container>
+                          </mat-chip-set>
+                        </div>
+                        <div class="settings-subsection">
+                          <h4 class="settings-subsection-title">Selected Categories</h4>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Select Category for this Workshop</mat-label>
+                            <mat-select formControlName="categoriesforthisworkshop" multiple>
+                              <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id">
+                                {{ categories.name }} ({{categories.description}})
+                              </mat-option>
+                            </mat-select>
+                            <mat-hint>Selected {{ settingsForm.get('categoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
+                          </mat-form-field>
+                          <div *ngIf="settingsForm.get('categoriesforthisworkshop')?.value?.length > 0">
+                            <p class="reorder-hint">
+                              <mat-icon>drag_indicator</mat-icon> Drag to reorder
+                            </p>
+                            <div cdkDropList (cdkDropListDropped)="dropCategory($event)" class="reorder-list">
+                              <div *ngFor="let catId of settingsForm.get('categoriesforthisworkshop')?.value; let i = index"
+                                cdkDrag class="reorder-item">
+                                <mat-icon cdkDragHandle class="drag-icon">drag_indicator</mat-icon>
+                                <span class="reorder-item-name">{{ workshopCategoriesMap[catId] }}</span>
+                                <span class="reorder-item-index">#{{ i + 1 }}</span>
+                                <button mat-icon-button class="btn-danger-icon" (click)="removecategoriesforthisworkshop(catId)">
+                                  <mat-icon>cancel</mat-icon>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="settings-subsection">
+                          <h4 class="settings-subsection-title">Select Cohort</h4>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Select Cohorts for this Workshop</mat-label>
+                            <mat-select formControlName="cohortsforthisworkshop" multiple (selectionChange)="onCohortSelectionChange($event)">
+                              <mat-option *ngFor="let cohort of bigCohorts" [value]="cohort.id" [disabled]="isCohortDisabled(cohort.id)">
+                                {{ cohort.name }} - ({{ cohort.participantidlist?.length || 0 }} Participants)
+                              </mat-option>
+                            </mat-select>
+                            <mat-hint>Selected {{ settingsForm.get('cohortsforthisworkshop')?.value?.length || 0 }} Cohort</mat-hint>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Select Category for Cohort</mat-label>
+                            <mat-select formControlName="cohortcategoriesforthisworkshop" multiple (selectionChange)="onCohortCategorySelectionChange($event)">
+                              <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id"
+                                [disabled]="onCohortCategoryDisabled(categories.id)">
+                                {{ categories.name }} ({{categories.description}})
+                              </mat-option>
+                            </mat-select>
+                            <mat-hint>Selected {{ settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
+                          </mat-form-field>
+                          <div *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length > 0">
+                            <mat-chip-set>
+                              <ng-container *ngFor="let categories of workshopCategories">
+                                <mat-chip *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.includes(categories.id)"
+                                  [removable]="true" (removed)="removeCohortcategoriesforthisworkshop(categories.id)">
+                                  {{ categories.name }} ({{categories.description}})
+                                  <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                                </mat-chip>
+                              </ng-container>
+                            </mat-chip-set>
+                          </div>
+                          <div class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                              <mat-label>Thumbnail Image URL</mat-label>
+                              <input matInput formControlName="categorythumbnail" placeholder="Enter thumbnail image URL">
+                              <button mat-icon-button (click)="uploadcategoryThumbnail()" matSuffix>
+                                <mat-icon>upload</mat-icon>
+                              </button>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="full-width">
+                              <mat-label>Video URL</mat-label>
+                              <input matInput formControlName="categoryVideo" placeholder="Enter video URL">
+                              <button mat-icon-button (click)="uploadcategoryVideo()" matSuffix>
+                                <mat-icon>upload</mat-icon>
+                              </button>
+                            </mat-form-field>
+                          </div>
+                          <ng-container formGroupName="cpwelcomemessage">
+                            <div *ngFor="let field of cpwelcomeFields" class="rich-text-section">
+                              <label class="editor-label">{{ field.label }}</label>
+                              <div class="NgxEditor__Wrapper">
+                                <ngx-editor-menu [editor]="cpwelcomeeditors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+                                <ngx-editor
+                                  [editor]="cpwelcomeeditors[field.key]"
+                                  [formControlName]="field.key"
+                                  [disabled]="false"
+                                  [placeholder]="field.placeholder">
+                                </ngx-editor>
+                              </div>
+                              <div class="editor-hint">{{ field.hint }}</div>
+                            </div>
+                          </ng-container>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Workshop Facilitator</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('facilitator')?.value ? 'Workshop Facilitator Enabled' : 'No facilitator assigned' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="facilitator" (change)="onToggleChange('facilitator', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <div *ngIf="settingsForm.get('facilitator')?.value" class="setting-row-expand">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Select Facilitators</mat-label>
+                          <mat-select formControlName="facilitatorprofiles" multiple>
+                            <mat-option *ngFor="let facilitators of names" [value]="facilitators.id">{{ facilitators.name }}</mat-option>
+                          </mat-select>
+                          <mat-hint>Selected {{ settingsForm.get('facilitatorprofiles')?.value?.length || 0 }} facilitators</mat-hint>
+                        </mat-form-field>
+                        <div *ngIf="settingsForm.get('facilitatorprofiles')?.value?.length > 0">
+                          <mat-chip-set>
+                            <ng-container *ngFor="let facilitators of names">
+                              <mat-chip *ngIf="settingsForm.get('facilitatorprofiles')?.value?.includes(facilitators.id)"
+                                [removable]="true" (removed)="removeFacilitator(facilitators.id)">
+                                {{ facilitators.name }}
+                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                              </mat-chip>
+                            </ng-container>
+                          </mat-chip-set>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
+                          <h4 class="setting-row-title">Evergreen Workshop</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('evergreenWorkshop')?.value ? 'Evergreen Workshop Enabled' : 'Standard Workshop' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="evergreenWorkshop" (change)="onToggleChange('evergreenWorkshop', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <ng-container *ngIf="settingsForm.get('evergreenWorkshop')?.value" formGroupName="evergreenWorkshopMeta">
+                        <div class="setting-row-expand">
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Workshop Days</mat-label>
+                            <input matInput type="number" formControlName="workshopDays"
+                              placeholder="Enter number of days" min="1" />
+                            <mat-icon matSuffix>calendar_today</mat-icon>
+                            <mat-hint>Number of days this evergreen workshop runs</mat-hint>
+                            <mat-error *ngIf="settingsForm.get('evergreenWorkshopMeta')?.get('workshopDays')?.hasError('required')">
+                              Workshop days is required
+                            </mat-error>
+                            <mat-error *ngIf="settingsForm.get('evergreenWorkshopMeta')?.get('workshopDays')?.hasError('min')">
+                              Must be at least 1 day
+                            </mat-error>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Last Challenge Message</mat-label>
+                            <textarea matInput formControlName="lastChallengeMessage"
+                              placeholder="Enter message to show after the last challenge..."
+                              rows="4" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="8"></textarea>
+                            <mat-hint>Shown to participants after completing the final challenge</mat-hint>
+                          </mat-form-field>
+                          <div formArrayName="dailyCommunication" class="settings-subsection">
+                            <h4 class="settings-subsection-title">Daily Communication</h4>
+                            <mat-form-field *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
+                              appearance="outline" class="w-100">
+                              <mat-label>Day {{ i + 1 }} Message</mat-label>
+                              <textarea matInput [formControlName]="i"
+                                placeholder="Enter message for day {{ i + 1 }}..."
+                                cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+                            </mat-form-field>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </div>
+
+                  </div>
+                </div>
+              </mat-tab>
+              <mat-tab label="Communication">
+                <div class="settings-tab-body">
+
+                  <div class="form-section">
+                    <h3 class="section-title">Workshop Mail Template</h3>
+                    <div formGroupName="mailTemplate" class="comm-section-body">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Mail Subject</mat-label>
+                        <textarea matInput formControlName="subject" rows="3"></textarea>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Mail Description</mat-label>
+                        <textarea matInput formControlName="description" rows="3"></textarea>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Live Call Text</mat-label>
+                        <textarea matInput formControlName="liveCallText" rows="3"></textarea>
+                      </mat-form-field>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-            <div class="form-section">
-              <h3 class="section-title">Workshop Mail Template</h3>
-              <div formGroupName="mailTemplate" class="toggle-row">
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Mail Subject</mat-label>
-                  <textarea matInput formControlName="subject" rows="3"></textarea>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Mail Description</mat-label>
-                  <textarea matInput formControlName="description" rows="3"></textarea>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Live Call Text</mat-label>
-                  <textarea matInput formControlName="liveCallText" rows="3"></textarea>
-                </mat-form-field>
-              </div>
-            </div>
-            <div class="form-section">
-              <h3 class="section-title">WhatsApp Enroll Message</h3>
-              <div class="toggle-row">
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Message</mat-label>
-                  <textarea matInput formControlName="enrollwattimessage" rows="3"></textarea>
-                </mat-form-field>
-              </div>
-            </div>
-            <div class="form-section">
-              <h3 class="section-title">Workshop Chat</h3>
-              <div class="toggle-row">
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Select Chat Group</mat-label>
-                  <mat-select formControlName="selectedgroup">
-                    <mat-option *ngFor="let group of chatgroupslist" [value]="group.id">{{ group.group_name }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </div>
-            </div>
-            <div class="form-section">
-              <h3 class="section-title">Workshop Hero Image</h3>
-              <div class="toggle-row">
-                <mat-slide-toggle formControlName="hero" (change)="onToggleChange('hero', $event)" color="primary">Hero Active</mat-slide-toggle>
-                <div class="toggle-status">
-                  <p class="status-label">{{ settingsForm.get('hero')?.value ? 'Active' : 'Inactive' }}</p>
-                  <p class="status-desc">{{ settingsForm.get('hero')?.value ? 'Workshop Hero is active and visible' : 'Workshop Hero is inactive and hidden' }}</p>
-                </div>
-                <mat-icon [style.color]="settingsForm.get('hero')?.value ? '#00AEEF' : '#EC008C'">
-                  {{ settingsForm.get('hero')?.value ? 'check_circle' : 'cancel' }}
-                </mat-icon>
-              </div>
-              <div class="toggle-row" style="flex-direction:column;align-items:stretch;">
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Hero Heading</mat-label>
-                  <textarea matInput formControlName="heroHeading" rows="2"></textarea>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Hero Description</mat-label>
-                  <textarea matInput formControlName="heroDescription" rows="3"></textarea>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="w-100">
-                  <mat-label>Hero Type</mat-label>
-                  <mat-select formControlName="heroshowtype">
-                    <mat-option value="image">Image</mat-option>
-                    <mat-option value="video">Video</mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <div>
-                  <p style="font-size:13px;color:#52525b;margin-bottom:6px;">Choose Image — Recommended Size: 3840 × 1350</p>
-                  <input type="file" (change)="onHeroImageUpload($event)" />
-                  <div *ngIf="settingsForm.get('heroImage')?.value" style="margin-top:8px;">
-                    <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image" style="max-width:200px;border-radius:8px;">
-                  </div>
-                </div>
-                <div style="margin-top:12px;">
-                  <p style="font-size:13px;color:#52525b;margin-bottom:6px;">Choose Video</p>
-                  <input type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
-                  <div *ngIf="settingsForm.get('heroVideo')?.value" style="margin-top:8px;">
-                    <video [src]="settingsForm.get('heroVideo')?.value" controls style="max-width:300px;border-radius:8px;"></video>
-                  </div>
-                </div>
-              </div>
-            </div>
 
+                  <div class="form-section">
+                    <h3 class="section-title">WhatsApp Enroll Message</h3>
+                    <div class="comm-section-body">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Message</mat-label>
+                        <textarea matInput formControlName="enrollwattimessage" rows="3"></textarea>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <h3 class="section-title">Workshop Chat</h3>
+                    <div class="comm-section-body">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Select Chat Group</mat-label>
+                        <mat-select formControlName="selectedgroup">
+                          <mat-option *ngFor="let group of chatgroupslist" [value]="group.id">{{ group.group_name }}</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <h3 class="section-title">Workshop Hero Image</h3>
+                    <div class="comm-section-body">
+                      <div class="setting-row">
+                        <div class="setting-row-main">
+                          <div class="setting-row-text">
+                            <h4 class="setting-row-title">Hero Active</h4>
+                            <p class="setting-row-desc">{{ settingsForm.get('hero')?.value ? 'Workshop Hero is active and visible' : 'Workshop Hero is inactive and hidden' }}</p>
+                          </div>
+                          <mat-slide-toggle formControlName="hero" (change)="onToggleChange('hero', $event)" color="primary"></mat-slide-toggle>
+                        </div>
+                      </div>
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Hero Heading</mat-label>
+                        <textarea matInput formControlName="heroHeading" rows="2"></textarea>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Hero Description</mat-label>
+                        <textarea matInput formControlName="heroDescription" rows="3"></textarea>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Hero Type</mat-label>
+                        <mat-select formControlName="heroshowtype">
+                          <mat-option value="image">Image</mat-option>
+                          <mat-option value="video">Video</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                      <div class="upload-block">
+                        <p class="upload-label">Choose Image — Recommended Size: 3840 × 1350</p>
+                        <input type="file" (change)="onHeroImageUpload($event)" />
+                        <div *ngIf="settingsForm.get('heroImage')?.value" class="upload-preview">
+                          <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image">
+                        </div>
+                      </div>
+                      <div class="upload-block">
+                        <p class="upload-label">Choose Video</p>
+                        <input type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
+                        <div *ngIf="settingsForm.get('heroVideo')?.value" class="upload-preview">
+                          <video [src]="settingsForm.get('heroVideo')?.value" controls></video>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </mat-tab>
+
+            </mat-tab-group>
           </form>
         </mat-card-content>
-      </mat-card>
+          </mat-card>
+          <div class="fab-stack">
+            <button mat-fab color="primary" class="fab-primary" (click)="saveSettings()"
+              [disabled]="loading"
+              matTooltip="Save Settings" matTooltipPosition="left" aria-label="Save Settings">
+              <mat-spinner *ngIf="loading" diameter="24"></mat-spinner>
+              <mat-icon *ngIf="!loading">save</mat-icon>
+            </button>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
       <mat-card *ngIf="selectedMenu === 'payment'" class="form-card">
         <mat-card-header>
           <mat-card-title>Payment Configuration</mat-card-title>
@@ -1357,6 +1346,5 @@
         </mat-card-content>
       </mat-card>
 
-    </div>
   </div>
 </div>

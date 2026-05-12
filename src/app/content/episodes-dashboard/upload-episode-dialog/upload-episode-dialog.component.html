@@ -1,0 +1,210 @@
+<div class="audio-dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Upload Episode</h1>
+      <p class="dash-sub">Add new episode with media and tags</p>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn-primary" [disabled]="showFileSizeError" (click)="onSubmit()">
+        <mat-icon>cloud_upload</mat-icon>
+        <span>Upload</span>
+      </button>
+      <button class="a-btn a-del" mat-dialog-close aria-label="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+  <div class="content-layout">
+    <div class="content-col">
+      <div class="form-fields">
+        <div class="field-group">
+          <label class="label">Title <span class="required">*</span></label>
+          <div class="input-box">
+            <mat-icon class="ib-icon">title</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter episode title"
+              [(ngModel)]="uploadEpisodeDoc.title" required />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Reference Title <span class="required">*</span></label>
+          <div class="input-box">
+            <mat-icon class="ib-icon">title</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter episode Reference Title"
+              [(ngModel)]="uploadEpisodeDoc.reftitle" required />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Description <span class="required">*</span></label>
+          <div class="input-box">
+            <mat-icon class="ib-icon">description</mat-icon>
+            <input type="text" class="ib-input" placeholder="Enter description"
+              [(ngModel)]="uploadEpisodeDoc.description" required />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Duration (in Minutes only, Example 56:45)</label>
+          <div class="input-box">
+            <mat-icon class="ib-icon">schedule</mat-icon>
+            <input type="text"
+              class="ib-input"
+              placeholder="Auto detected or enter manually"
+              [(ngModel)]="uploadEpisodeDoc.duration" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Thumbnail</label>
+          <div class="upload-zone" (click)="thumbnailref.click()">
+            <input #thumbnailref type="file" accept="image/*" (change)="previewImage($event)" hidden />
+            <div class="upload-zone-content"
+              *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewImageUrl) && [null,undefined].includes(uploadEpisodeDoc.imageUrl)">
+              <mat-icon class="upload-icon">image</mat-icon>
+              <span class="upload-text">Click to upload thumbnail</span>
+              <span class="upload-hint">PNG, JPG supported</span>
+            </div>
+          </div>
+          <div class="media-card"
+            *ngIf="![null,undefined].includes(uploadEpisodeDoc.previewImageUrl) || ![null,undefined].includes(uploadEpisodeDoc.imageUrl)">
+            <img [src]="![null,undefined].includes(uploadEpisodeDoc.previewImageUrl) ? uploadEpisodeDoc.previewImageUrl : uploadEpisodeDoc.imageUrl"
+              class="media-preview media-preview-img" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Screenshot</label>
+          <div class="upload-zone" (click)="screenshotref.click()">
+            <input #screenshotref type="file" accept="image/*" (change)="previewScreenshot($event)" hidden />
+            <div class="upload-zone-content"
+              *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) && [null,undefined].includes(uploadEpisodeDoc.screenshot)">
+              <mat-icon class="upload-icon">screenshot_monitor</mat-icon>
+              <span class="upload-text">Click to upload screenshot</span>
+            </div>
+          </div>
+          <div class="media-card"
+            *ngIf="![null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) || ![null,undefined].includes(uploadEpisodeDoc.screenshot)">
+            <img [src]="![null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) ? uploadEpisodeDoc.previewScreenshotUrl : uploadEpisodeDoc.screenshot"
+              class="media-preview media-preview-img" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Subtitle File (.srt)</label>
+          <div class="upload-zone" (click)="srtref.click()">
+            <input #srtref type="file" accept=".srt" (change)="addToDoc($event)" hidden />
+            <div class="upload-zone-content" *ngIf="!uploadEpisodeDoc.srtFileName && !uploadEpisodeDoc.srt">
+              <mat-icon class="upload-icon">subtitles</mat-icon>
+              <span class="upload-text">Click to upload SRT</span>
+            </div>
+            <div class="upload-preview-audio" *ngIf="uploadEpisodeDoc.srtFileName || uploadEpisodeDoc.srt">
+              <mat-icon class="preview-icon">subtitles</mat-icon>
+              <span class="preview-name">{{ uploadEpisodeDoc.srtFileName || getSrtFileNameFromUrl(uploadEpisodeDoc.srt) }}</span>
+              <mat-icon class="preview-change">swap_horiz</mat-icon>
+              <mat-icon class="preview-remove" (click)="removeSrt($event)">close</mat-icon>
+            </div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="label">Video</label>
+          <div class="upload-zone" (click)="videoref.click()">
+            <input #videoref type="file" accept="video/*" (change)="previewVideo($event)" hidden />
+            <div class="upload-zone-content"
+              *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) && [null,undefined].includes(uploadEpisodeDoc.videoUrl)">
+              <mat-icon class="upload-icon">videocam</mat-icon>
+              <span class="upload-text">Click to upload video</span>
+              <span class="upload-hint">MP4, MOV, MKV, AVI (max 15 GB)</span>
+            </div>
+          </div>
+          <span class="field-error" *ngIf="showFileSizeError">Maximum file size limit is 15 GB.</span>
+          <div class="media-card"
+            *ngIf="![null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) || ![null,undefined].includes(uploadEpisodeDoc.videoUrl)">
+            <video controls class="media-preview"
+              [src]="![null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) ? sanitize(uploadEpisodeDoc.previewVideoUrl) : uploadEpisodeDoc.videoUrl">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="content-col">
+      <div class="field-group">
+        <label class="label">Tags</label>
+        <div class="selected-tags" *ngIf="uploadEpisodeDoc.tags?.length">
+          <span class="chip" *ngFor="let tag of uploadEpisodeDoc.tags; let i = index">
+            {{ mapTaxonomy[tag] }}
+            <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+          </span>
+        </div>
+        <div class="input-box">
+          <mat-icon class="ib-icon">search</mat-icon>
+          <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+        </div>
+        <div class="available-tags">
+          <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+            <mat-icon>add_circle_outline</mat-icon>
+            {{ tag['name'] }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="table-outer" *ngIf="uploadingTask.length > 0" style="margin-top: 28px;">
+    <div class="dash-header" style="margin-bottom: 14px;">
+      <div>
+        <h1 class="dash-title" style="font-size: 18px;">Upload Queue</h1>
+        <p class="dash-sub">{{ uploadingTask.length }} item(s) in queue</p>
+      </div>
+    </div>
+
+    <div class="upload-queue">
+      <div class="queue-card" *ngFor="let task of uploadingTask; let i = index">
+        <div class="queue-card-header">
+          <div class="queue-info">
+            <span class="c-name">{{ task.title }}</span>
+            <span class="c-desc">{{ task.description }}</span>
+          </div>
+          <div class="queue-actions">
+            <span class="status-badge active" *ngIf="task.status$ | async">
+              {{ getTaskStatus(task, i) }}
+            </span>
+            <button class="a-btn a-edit" (click)="editFromQueue(task, i)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </div>
+        </div>
+        <div class="tags-wrap" *ngIf="task.tags?.length" style="margin-top: 8px;">
+          <span class="chip chip-sm" *ngFor="let tag of task.tags">{{ mapTaxonomy[tag] }}</span>
+        </div>
+        <div class="queue-progress-list">
+          <div class="queue-progress-row" *ngIf="task.uploadImageFile">
+            <mat-icon class="queue-file-icon">image</mat-icon>
+            <span class="queue-file-name">{{ task.imageFileName }}</span>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" [style.width.%]="(task.uploadingImagePercentage | async) || 0"></div>
+            </div>
+            <span class="queue-pct">{{ (task.uploadingImagePercentage | async) | number:'1.0-0' }}%</span>
+          </div>
+          <div class="queue-progress-row" *ngIf="task.uploadScreenshotFile">
+            <mat-icon class="queue-file-icon">screenshot_monitor</mat-icon>
+            <span class="queue-file-name">{{ task.screenshotFileName }}</span>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" [style.width.%]="(task.uploadingScreenshotPercentage | async) || 0"></div>
+            </div>
+            <span class="queue-pct">{{ (task.uploadingScreenshotPercentage | async) | number:'1.0-0' }}%</span>
+          </div>
+          <div class="queue-progress-row" *ngIf="task.uploadSrtFile">
+            <mat-icon class="queue-file-icon">subtitles</mat-icon>
+            <span class="queue-file-name">{{ task.srtFileName }}</span>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" [style.width.%]="(task.uploadingSrtPercentage | async) || 0"></div>
+            </div>
+            <span class="queue-pct">{{ (task.uploadingSrtPercentage | async) | number:'1.0-0' }}%</span>
+          </div>
+          <div class="queue-progress-row" *ngIf="task.uploadVideoFile">
+            <mat-icon class="queue-file-icon">videocam</mat-icon>
+            <span class="queue-file-name">{{ task.videoFileName }}</span>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" [style.width.%]="(task.uploadingVideoPercentage | async) || 0"></div>
+            </div>
+            <span class="queue-pct">{{ (task.uploadingVideoPercentage | async) | number:'1.0-0' }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

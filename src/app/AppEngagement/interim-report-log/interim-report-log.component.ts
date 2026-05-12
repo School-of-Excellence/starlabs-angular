@@ -932,9 +932,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Participants');
-
     const fileName = `$interim_report_log${new Date().toISOString().split('T')[0]}.xlsx`;
-
     XLSX.writeFile(workbook, fileName);
   }
 
