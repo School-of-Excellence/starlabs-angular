@@ -1466,7 +1466,7 @@ export class JourneycoachDashboardComponent {
     var dialogRef = this.dialog.open(OnboardingRemarkComponent, {
       data: element,
       disableClose: false,
-      panelClass: 'custom-dialog-container'
+      panelClass: 'fullscreen-dialog'
     })
     dialogRef.afterClosed().toPromise().then(async value => {
       delete value.salesleadsData;
