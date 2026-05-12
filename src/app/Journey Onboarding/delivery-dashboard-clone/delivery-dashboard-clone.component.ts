@@ -342,7 +342,7 @@ export class DeliveryDashboardCloneComponent {
             "Pre-Process",
             "D&I Appointments",
             "Report",
-            "Celebration Call Completed"
+            "Celebration Call"
         ],
 
         "criticalSupport": [
@@ -829,7 +829,7 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
-        this.productData = { eiStarterPack: {}, criticalSupport: {} };
+        this.productData = {};
 
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
@@ -840,6 +840,7 @@ export class DeliveryDashboardCloneComponent {
             await this.FilterReportData(productId);
             if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
+
         if (product === 'EI Starter Pack') {
             this.selectedColumns = this.columns.eiStarterPack;
             await this.filterProductData('eiStarterPack', product, productId);
@@ -850,7 +851,6 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (product === 'Critical Support') await this.filterStageData();
-
         this.participantLoading = false;
     }
 
@@ -943,11 +943,11 @@ export class DeliveryDashboardCloneComponent {
     }
 
 
+
+
     async filterProductData(productType: string, product: string, productId: string) {
-        let productData: any = {};
-        this.selectedProductType = productType;
-        if (productType === 'eiStarterPack') {
-            productData = {
+        let productData: any = {
+            eiStarterPack: {
                 totalEligible: [],
                 pastMonth: [],
                 thisMonth: [],
@@ -956,173 +956,249 @@ export class DeliveryDashboardCloneComponent {
                 upcomingDIAppointments: [],
                 reports: [],
                 celebrationCall: []
-            };
-        }
-        else if (productType === 'criticalSupport') {
-            productData = {
+            },
+
+            criticalSupport: {
                 totalEligible: [],
-                request: this.ticketRequest?.length ? [...this.ticketRequest] : [],
+                request: this.ticketRequest.length ? this.ticketRequest : [],
                 preprocess: [],
                 diagnostics: [],
                 implementation: [],
                 postForm: [],
                 review: [],
                 completion: []
-            };
-        }
+            }
+        };
 
+        this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
-        const totalEligible = this.getCardGroupedFiltered(productId);
 
-        // Total Eligible
-        productData.totalEligible = [...totalEligible];
+        try {
+            const totalEligible = this.getCardGroupedFiltered(productId);
 
-        const ongoingData = this.funnelData[productId]?.ongoing || [];
+            if (productType === 'criticalSupport') {
+                productData.criticalSupport.totalEligible = [...totalEligible];
+            }
+            else if (productType === 'eiStarterPack') {
+                for (let data of totalEligible) {
+                    const { status, tentativestart } = data;
 
-        for (let data of ongoingData) {
-
-            let appointments = Array.from(allAppointments.values() || [])
-                .filter((app: any) => app.participantproductid === data.docid);
-            await Promise.all(
-                appointments.map(async (appointment) => {
-                    if (!appointment.appointmentTypeName) {
-                        appointment.appointmentTypeName =
-                            await this.resolveAppointmentType(appointment);
+                    if (status === null || status === "initiated") {
+                        if (!tentativestart) productData.totalEligible.push(data);
+                        else if (tentativestart) {
+                            const date = tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData);
+                        }
                     }
-                })
-            );
+                };
+            }
 
-            const attendedAppointments = appointments.filter(app =>
-                app.attended === true || app.status === 'submitted'
-            );
-            let mergedData = {
-                ...data,
-                allappointments: appointments
-            };
+            // Total Eligible
 
-            // ========================= EI STARTER PACK =========================
-            if (productType === 'eiStarterPack') {
-                const celebrationCallAppointment = attendedAppointments.find(app =>
-                    app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
-                );
-                const reportAppointment = attendedAppointments.find(app =>
-                    app.formname?.toLowerCase() === `${product.toLowerCase()} post session check-in`
-                );
-                const implementationAppointment = attendedAppointments.find(app =>
-                    app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
+            const ongoingData = this.funnelData[productId]?.ongoing || [];
+
+            for (let data of ongoingData) {
+
+                let appointments = Array.from(allAppointments.values() || [])
+                    .filter((app: any) => app.participantproductid === data.docid);
+                await Promise.all(
+                    appointments.map(async (appointment) => {
+                        if (!appointment.appointmentTypeName) {
+                            appointment.appointmentTypeName =
+                                await this.resolveAppointmentType(appointment);
+                        }
+                    })
                 );
 
-                const diagnosticsAppointment = attendedAppointments.find(app =>
-                    app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} diagnostics`
-                );
-
-                const welcomeCallAppointment = attendedAppointments.find(app =>
-                    app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} welcome call`
-                );
-
-                if (celebrationCallAppointment) {
-                    productData.celebrationCall.push({
-                        ...mergedData,
-                        ...celebrationCallAppointment
-                    });
+                const attendedAppointments = appointments.filter(app => app.attended === true || app.status === 'submitted');
+                let mergedData = {
+                    ...data,
+                    allappointments: appointments
+                };
+                if (attendedAppointments.length === 0) {
+                    if (productType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
+                    if (productType === 'eiStarterPack') {
+                        if (!data.tentativestart) {
+                            mergedData = {
+                                ...data,
+                                allappointments: appointments
+                            }
+                            productData.eiStarterPack.totalEligible.push(mergedData);
+                        } else {
+                            const date = data.tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData);
+                        }
+                    }
                 }
-                else if (reportAppointment) {
-                    productData.reports.push({
-                        ...mergedData,
-                        ...reportAppointment
-                    });
+                else if (attendedAppointments.length > 0) {
+                    // ========================= EI STARTER PACK =========================
+                    if (productType === 'eiStarterPack') {
+                        const celebrationCallAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
+                        );
+                        const reportAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === `${product.toLowerCase()} post session check-in`
+                        );
+                        const implementationAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
+                        );
 
-                }
-                else if (implementationAppointment || diagnosticsAppointment) {
-                    productData.upcomingDIAppointments.push({
-                        ...mergedData,
-                        ...(implementationAppointment || diagnosticsAppointment)
-                    });
+                        const diagnosticsAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} diagnostics`
+                        );
 
-                } else if (welcomeCallAppointment) {
-                    productData.onBoarded.push({
-                        ...mergedData,
-                        ...welcomeCallAppointment
-                    });
+                        const welcomeCallAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} welcome call`
+                        );
+
+                        if (celebrationCallAppointment) {
+                            productData.eiStarterPack.celebrationCall.push({
+                                ...mergedData,
+                                ...celebrationCallAppointment
+                            });
+                        }
+                        else if (reportAppointment) {
+                            productData.eiStarterPack.reports.push({
+                                ...mergedData,
+                                ...reportAppointment
+                            });
+
+                        }
+                        else if (implementationAppointment || diagnosticsAppointment) {
+                            productData.eiStarterPack.upcomingDIAppointments.push({
+                                ...mergedData,
+                                ...(implementationAppointment || diagnosticsAppointment)
+                            });
+
+                        } else if (welcomeCallAppointment) {
+                            productData.eiStarterPack.onBoarded.push({
+                                ...mergedData,
+                                ...welcomeCallAppointment
+                            });
+                        }
+                    }
+
+                    // ========================= CRITICAL SUPPORT =========================
+                    else if (productType === 'criticalSupport') {
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `critical support review`
+                        );
+
+                        const postprocessAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === 'critical support post form'
+                        );
+
+                        const implementationAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
+                        );
+
+                        const diagnosticsAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === 'critical support diagnostics'
+                        );
+
+                        const preprocessAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === 'critical support request'
+                        );
+
+                        if (reviewAppointment) {
+                            let mergedData = {
+                                ...data,
+                                ...reviewAppointment,
+                                allappointments: appointments
+                            }
+                            productData.criticalSupport.review.push(mergedData);
+                        }
+                        else if (postprocessAppointment) {
+                            let mergedData = {
+                                ...data,
+                                ...postprocessAppointment,
+                                allappointments: appointments
+                            }
+                            productData.criticalSupport.postForm.push(mergedData);
+                        }
+                        else if (implementationAppointment) {
+                            let mergedData = {
+                                ...data,
+                                ...implementationAppointment,
+                                allappointments: appointments
+                            }
+                            productData.criticalSupport.implementation.push(mergedData);
+                        }
+                        else if (diagnosticsAppointment) {
+                            let mergedData = {
+                                ...data,
+                                ...diagnosticsAppointment,
+                                allappointments: appointments
+                            }
+                            productData.criticalSupport.diagnostics.push(mergedData);
+                        }
+                        else if (preprocessAppointment) {
+                            let mergedData = {
+                                ...data,
+                                ...preprocessAppointment,
+                                allappointments: appointments
+                            }
+                            productData.criticalSupport.preprocess.push(mergedData);
+                        }
+                    }
                 }
             }
 
-            // ========================= CRITICAL SUPPORT =========================
-            if (productType === 'criticalSupport') {
-                const reviewAppointment = attendedAppointments.find(app =>
-                    app.appointmentTypeName?.toLowerCase() === `critical support review`
-                );
+            // ========================= COMPLETED DATA =========================
+            const completedData = this.funnelData[productId]?.completed || [];
 
-                const postprocessAppointment = attendedAppointments.find(app =>
-                    app.formname?.toLowerCase() === 'critical support post form'
-                );
+            for (let data of completedData) {
+                let appointments = Array.from(allAppointments.values() || [])
+                    .filter((app: any) => app.participantproductid === data.docid);
+                data = {
+                    ...data,
+                    allappointments: appointments
+                };
 
-                const implementationAppointment = attendedAppointments.find(app =>
-                    app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
-                );
-
-                const diagnosticsAppointment = attendedAppointments.find(app =>
-                    app.appointmentTypeName?.toLowerCase() === 'critical support diagnostics'
-                );
-
-                const preprocessAppointment = attendedAppointments.find(app =>
-                    app.formname?.toLowerCase() === 'critical support request'
-                );
-
-                if (reviewAppointment) {
-                    productData.review.push({
-                        ...mergedData,
-                        ...reviewAppointment
-                    });
+                if (productType === 'eiStarterPack') {
+                    productData.eiStarterPack.celebrationCall.push(data);
                 }
-                else if (postprocessAppointment) {
-                    productData.postForm.push({
-                        ...mergedData,
-                        ...postprocessAppointment
-                    });
-                }
-                else if (implementationAppointment) {
-                    productData.implementation.push({
-                        ...mergedData,
-                        ...implementationAppointment
-                    });
-                }
-                else if (diagnosticsAppointment) {
-                    productData.diagnostics.push({
-                        ...mergedData,
-                        ...diagnosticsAppointment
-                    });
-                }
-                else if (preprocessAppointment) {
-                    productData.preprocess.push({
-                        ...mergedData,
-                        ...preprocessAppointment
-                    });
+
+                if (productType === 'criticalSupport') {
+                    productData.criticalSupport.completion.push(data);
                 }
             }
+            Object.assign(this.productData, productData);
+            console.log("product data", productData);
+            this.updateFilteredCards();
+        } catch (err) {
+            console.log("error filtering data", err);
+        }
+    }
+
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
+        let mergedData: any;
+        if (allappointments !== null && allappointments?.length > 0) {
+            mergedData = { ...data, allappointments: allappointments }
+        } else {
+            mergedData = data;
         }
 
-        // ========================= COMPLETED DATA =========================
-        const completedData = this.funnelData[productId]?.completed || [];
-
-        for (let data of completedData) {
-            let appointments = Array.from(allAppointments.values() || [])
-                .filter((app: any) => app.participantproductid === data.docid);
-            data = {
-                ...data,
-                allappointments: appointments
-            };
-
-            if (productType === 'eiStarterPack') {
-                productData.celebrationCall.push(data);
-            }
-
-            if (productType === 'criticalSupport') {
-                productData.completion.push(data);
-            }
+        if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
+            productData.eiStarterPack.thisMonth.push(mergedData);
         }
-        Object.assign(this.productData, productData);
-        this.updateFilteredCards();
+        else if (
+            (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
+            (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
+        ) {
+            productData.eiStarterPack.pastMonth.push(mergedData);
+        }
+        else if (
+            (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
+            (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
+        ) {
+            productData.eiStarterPack.nextMonth.push(mergedData);
+        }
+        else productData.eiStarterPack.totalEligible.push(mergedData);
     }
 
     async fetchTicketRiseParticipants() {
@@ -1329,56 +1405,30 @@ export class DeliveryDashboardCloneComponent {
             .find((p: any) => p.id === id)?.package;
     }
 
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
-        let mergedData: any;
-        if (allappointments !== null && allappointments?.length > 0) {
-            mergedData = { ...data, allappointments: allappointments }
-        } else {
-            mergedData = data;
-        }
-
-        if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
-            productData.thisMonth.push(mergedData);
-        }
-        else if (
-            (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
-            (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
-        ) {
-            productData.pastMonth.push(mergedData);
-        }
-        else if (
-            (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
-            (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
-        ) {
-            productData.nextMonth.push(mergedData);
-        }
-        else productData.totalEligible.push(mergedData);
-    }
-
     updateFilteredCards() {
         const search = this.searchText?.toLowerCase().trim() || '';
         let sources: any = {};
         if (this.selectedProductType === 'eiStarterPack') {
             sources = {
-                0: this.productData.totalEligible || [],
-                1: this.productData.pastMonth || [],
-                2: this.productData.thisMonth || [],
-                3: this.productData.nextMonth || [],
-                4: this.productData.onBoarded || [],
-                6: this.productData.upcomingDIAppointments || [],
-                7: this.productData.reports || [],
-                8: this.productData.celebrationCall || []
+                0: this.productData.eiStarterPack.totalEligible || [],
+                1: this.productData.eiStarterPack.pastMonth || [],
+                2: this.productData.eiStarterPack.thisMonth || [],
+                3: this.productData.eiStarterPack.nextMonth || [],
+                4: this.productData.eiStarterPack.onBoarded || [],
+                6: this.productData.eiStarterPack.upcomingDIAppointments || [],
+                7: this.productData.eiStarterPack.report || [],
+                8: this.productData.eiStarterPack.celebrationCall || []
             };
         } else if (this.selectedProductType === 'criticalSupport') {
             sources = {
-                0: this.productData.totalEligible || [],
-                1: this.productData.request || [],
-                2: this.productData.preprocess || [],
-                3: this.productData.diagnostics || [],
-                4: this.productData.implementation || [],
-                5: this.productData.postForm || [],
-                6: this.productData.review || [],
-                7: this.productData.completion || []
+                0: this.productData.criticalSupport.totalEligible || [],
+                1: this.productData.criticalSupport.request || [],
+                2: this.productData.criticalSupport.preprocess || [],
+                3: this.productData.criticalSupport.diagnostics || [],
+                4: this.productData.criticalSupport.implementation || [],
+                5: this.productData.criticalSupport.postForm || [],
+                6: this.productData.criticalSupport.review || [],
+                7: this.productData.criticalSupport.completion || []
             };
         }
         Object.keys(sources).forEach((key: any) => {
