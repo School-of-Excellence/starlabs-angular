@@ -972,10 +972,8 @@ export class DeliveryDashboardCloneComponent {
 
         this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
-
         try {
             const totalEligible = this.getCardGroupedFiltered(productId);
-
             if (productType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
             }
@@ -996,11 +994,9 @@ export class DeliveryDashboardCloneComponent {
             }
 
             // Total Eligible
-
             const ongoingData = this.funnelData[productId]?.ongoing || [];
 
             for (let data of ongoingData) {
-
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
                 await Promise.all(
@@ -1017,14 +1013,11 @@ export class DeliveryDashboardCloneComponent {
                     ...data,
                     allappointments: appointments
                 };
+
                 if (attendedAppointments.length === 0) {
                     if (productType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
                     if (productType === 'eiStarterPack') {
                         if (!data.tentativestart) {
-                            mergedData = {
-                                ...data,
-                                allappointments: appointments
-                            }
                             productData.eiStarterPack.totalEligible.push(mergedData);
                         } else {
                             const date = data.tentativestart.toDate();
@@ -1081,7 +1074,6 @@ export class DeliveryDashboardCloneComponent {
                             });
                         }
                     }
-
                     // ========================= CRITICAL SUPPORT =========================
                     else if (productType === 'criticalSupport') {
                         const reviewAppointment = attendedAppointments.find(app =>
@@ -1105,44 +1097,34 @@ export class DeliveryDashboardCloneComponent {
                         );
 
                         if (reviewAppointment) {
-                            let mergedData = {
-                                ...data,
-                                ...reviewAppointment,
-                                allappointments: appointments
-                            }
-                            productData.criticalSupport.review.push(mergedData);
+                            productData.criticalSupport.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
+                            });
                         }
                         else if (postprocessAppointment) {
-                            let mergedData = {
-                                ...data,
-                                ...postprocessAppointment,
-                                allappointments: appointments
-                            }
-                            productData.criticalSupport.postForm.push(mergedData);
+                            productData.criticalSupport.postForm.push({
+                                ...mergedData,
+                                ...postprocessAppointment
+                            });
                         }
                         else if (implementationAppointment) {
-                            let mergedData = {
-                                ...data,
-                                ...implementationAppointment,
-                                allappointments: appointments
-                            }
-                            productData.criticalSupport.implementation.push(mergedData);
+                            productData.criticalSupport.implementation.push({
+                                ...mergedData,
+                                ...implementationAppointment
+                            });
                         }
                         else if (diagnosticsAppointment) {
-                            let mergedData = {
-                                ...data,
-                                ...diagnosticsAppointment,
-                                allappointments: appointments
-                            }
-                            productData.criticalSupport.diagnostics.push(mergedData);
+                            productData.criticalSupport.postForm.push({
+                                ...mergedData,
+                                ...diagnosticsAppointment
+                            });
                         }
                         else if (preprocessAppointment) {
-                            let mergedData = {
-                                ...data,
-                                ...preprocessAppointment,
-                                allappointments: appointments
-                            }
-                            productData.criticalSupport.preprocess.push(mergedData);
+                            productData.criticalSupport.preprocess.push({
+                                ...mergedData,
+                                ...preprocessAppointment
+                            });
                         }
                     }
                 }
@@ -1168,7 +1150,6 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
             Object.assign(this.productData, productData);
-            console.log("product data", productData);
             this.updateFilteredCards();
         } catch (err) {
             console.log("error filtering data", err);
