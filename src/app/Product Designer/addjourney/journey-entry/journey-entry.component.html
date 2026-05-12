@@ -82,6 +82,20 @@
         </mat-select>
       </mat-form-field>
     </div>
+    <!-- Attachments -->
+    <label>Attachments :</label>&nbsp;&nbsp;
+    <input type="file" multiple (change)="onAttachmentSelected($event)" #attachmentInput [disabled]="attachments.length >= 5">
+    <div *ngFor="let att of attachments; let i = index" style="display:flex; align-items:center; gap:8px; margin-top:8px">
+      <mat-icon>insert_drive_file</mat-icon>
+      <span>{{ att.name }}</span>
+      <button mat-stroked-button type="button" (click)="removeAttachment(i)">Remove</button>
+    </div>
+    <div *ngIf="uploadProgress !== null" style="margin-top: 8px;">
+      <span>Uploading... {{uploadProgress}}%</span>
+      <div style="background:#e0e0e0; border-radius:4px; height:6px; width:100%; margin-top:4px;">
+        <div [style.width.%]="uploadProgress" style="background:#1976d2; height:6px; border-radius:4px; transition: width 0.3s;"></div>
+      </div>
+    </div>
     <div class="formrow">
       <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
       <button [disabled]="addJourneyForm.invalid" mat-raised-button color="primary"

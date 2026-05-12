@@ -35,7 +35,7 @@ import { MatSortModule } from '@angular/material/sort';
   styleUrls: ['../../content-upload-version2/content-upload-shared.css']
 })
 export class EpisodesDashboardComponent {
-  displayedColumns: string[] = ['Title', 'Referencetitle', 'Duration', 'added', 'convertedtohls', 'videosize', 'Series', 'Edit', 'Delete'];
+  displayedColumns: string[] = ['Title', 'Referencetitle', 'Duration', 'added', 'convertedtohls', 'srt', 'videosize', 'Series', 'Edit', 'Delete'];
   dataSource = new MatTableDataSource();
 
   @ViewChild(MatPaginator) paginator: MatPaginator | any;
@@ -63,6 +63,7 @@ export class EpisodesDashboardComponent {
           case 'Referencetitle': return item.reftitle?.toLowerCase() ?? '';
           case 'Duration': return item.duration ?? 0;
           case 'added': return item.date?.toDate().getTime() ?? 0;
+          case 'srt': return item.srt ? 1 : 0;
           case 'videosize': return item.videoSize ?? 0;
           case 'Series': return item.imagesize ?? 0;
         }

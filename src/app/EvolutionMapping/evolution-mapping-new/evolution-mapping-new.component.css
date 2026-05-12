@@ -496,6 +496,50 @@ mat-paginator {
   background: rgba(255,255,255,0.25);
 }
 
+.image-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.image-edit-btn:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.image-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.image-edit-btn mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.image-edit-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.image-edit-btn.ghost {
+  background: rgba(255,255,255,0.12);
+  color: #ffffff;
+}
+
+.image-edit-btn.ghost:hover:not(:disabled) {
+  background: rgba(255,255,255,0.22);
+}
+
 .avatar-img {
   cursor: pointer;
   transition: opacity 0.15s;
