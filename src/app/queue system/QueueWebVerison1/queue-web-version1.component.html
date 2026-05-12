@@ -62,8 +62,6 @@
           <!-- Label -->
           <div class="qwv-sidebar-stage-info">
             <span class="qwv-sidebar-stage-name">{{ stage }}</span>
-            <span *ngIf="i === currentQueueStageIndex" class="qwv-sidebar-badge qwv-sidebar-badge--now">Now</span>
-            <span *ngIf="i === currentQueueStageIndex + 1" class="qwv-sidebar-badge qwv-sidebar-badge--next">Up next</span>
           </div>
         </div>
       </div>
@@ -76,15 +74,11 @@
         <!-- Inline Form -->
         <ng-container *ngIf="showInlineForm">
         <div class="qwv-activity-card">
-            <div class="qwv-inline-form-header">
-            <button class="qwv-back-btn" (click)="showInlineForm = false; inlineFormId = null; inlineQueueId = null;">
-                ← Back
-            </button>
-            </div>
             <app-formtemplate
             [inlineFormId]="inlineFormId"
             [inlineQueueId]="inlineQueueId"
             [isInline]="true"
+            (backClicked)="showInlineForm = false; inlineFormId = null; inlineQueueId = null;"
             (formSubmitted)="showInlineForm = false; inlineFormId = null; inlineQueueId = null;">
             </app-formtemplate>
         </div>
