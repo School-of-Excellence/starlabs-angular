@@ -591,6 +591,7 @@ export class DeliveryDashboardCloneComponent {
             // Load metadata + dependent data
             await this.loadParticipantMetadata();
 
+            // Get Appointment Types
             const appointmentTypesSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(collection(this.firestore, 'appointmenttype'))
             );
@@ -2470,7 +2471,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     showActiveStage(c: any) {
-        const { status, appointmentTypeName, tentativestart, clientid } = c;
+        const { status, appointmentTypeName, tentativestart } = c;
 
         if (status?.status == 'Open') return 'Ticket Raised: ';
         if ((status === null || status === 'initiated') && tentativestart) return 'Tentative Start: '
@@ -2483,7 +2484,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     showParticipantActiveDate(c: any): string {
-        const { status, date, statusdate, appointmentTypeName, tentativestart, starttime, attended, endtime } = c;
+        const { status, date, statusdate, appointmentTypeName, appointmentend, appointmentstart, tentativestart, starttime, attended, endtime } = c;
         const validAppointments = [
             `Critical Support Diagnostics`,
             `Critical Support Implementation`,
@@ -2495,13 +2496,13 @@ export class DeliveryDashboardCloneComponent {
         else if (status === 'submitted') return this.formatDateTime(date);
         else if (statusdate?.completed) return this.formatDateTime(statusdate?.completed);
         else if (status === 'ongoing' &&
-            !attended &&
+            !attended && appointmentstart &&
             starttime &&
             validAppointments.includes(appointmentTypeName)) {
             return this.formatDateTime(starttime);
         }
         else if (status === 'ongoing' &&
-            attended &&
+            attended && appointmentend &&
             endtime &&
             validAppointments.includes(appointmentTypeName)) {
             return this.formatDateTime(endtime);
@@ -2528,7 +2529,7 @@ export class DeliveryDashboardCloneComponent {
             return this.getDaysDifference(status.date);
         }
 
-        if (status === null || status === 'initiated' && tentativestart) {
+        if ((status === null || status === 'initiated') && tentativestart) {
             return this.getDaysDifference(tentativestart);
         } else if (
             status === 'ongoing' &&
@@ -2563,19 +2564,6 @@ export class DeliveryDashboardCloneComponent {
     searchParticipant(event: any) {
         this.searchText = event.target.value;
         this.updateFilteredCards();
-    }
-
-    getRawCards(index: number) {
-        switch (index) {
-            case 0: return this.totalEligible || [];
-            case 1: return this.pastMonth || [];
-            case 2: return this.thisMonth || [];
-            case 3: return this.nextMonth || [];
-            case 4: return this.onBoarded || [];
-            case 6: return this.upcomingDIAppointments || [];
-            case 8: return this.celebrationCall || [];
-            default: return [];
-        }
     }
 
     productsSubscription: Subscription;
