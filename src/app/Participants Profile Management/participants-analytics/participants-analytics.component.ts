@@ -2173,7 +2173,7 @@ export class ParticipantsAnalyticsComponent {
         else if (column === 'kyj') {
           formattedRow[column] = element[column];
         } else if (column === 'journey') {
-          formattedRow[column] = element['customerstatus'] === 'active' ? this.mapfiltervalues[element['activejourney']] : ['non active' , 'discontinued'].includes(element['customerstatus']) ? this.mapfiltervalues[element['lastcompletedjourney']] : ''
+          formattedRow[column] = this.getJourneyForParticipant(element);
         } else if (column === 'age') {
           formattedRow[column] = this.calculateAge(element['dateofbirth']);
         }
@@ -2968,6 +2968,19 @@ export class ParticipantsAnalyticsComponent {
       const count =  this.participantProductMap[profileId][productId]?.consumedCount || 0;
       return total + count;
     } , 0);
+  }
+
+  getJourneyForParticipant(metadata){
+    const customerStatus = metadata['customerstatus'] ?? null;
+    
+    if (customerStatus === 'active') {
+      return this.mapfiltervalues[metadata['activejourney']];
+    } else if (customerStatus === 'non active') {
+      return this.mapfiltervalues[metadata['lastcompletedjourney']];
+    } else if (customerStatus === 'discontinued') {
+      return this.mapfiltervalues[metadata['lastsubscribedjourney']];
+    } 
+    return ''
   }
 
   // rawProductsData

@@ -729,8 +729,7 @@
             <span *ngIf="column === 'balance'">{{element['pp_totalpurchasevalue'] - element['pp_totalpaid']}}</span> -->
 
             <!-- journey -->
-            <span *ngIf="column === 'journey'">{{element['customerstatus'] === 'active' ? mapfiltervalues[element['activejourney']]
-              : ['non active' , 'discontinued'].includes(element['customerstatus']) ? mapfiltervalues[element['lastcompletedjourney']] : ''}}</span>
+            <span *ngIf="column === 'journey'">{{getJourneyForParticipant(element)}}</span>
             <!-- age -->
             <span *ngIf="column === 'age'">{{calculateAge(element['dateofbirth'])}}</span>
             <!-- product -->
