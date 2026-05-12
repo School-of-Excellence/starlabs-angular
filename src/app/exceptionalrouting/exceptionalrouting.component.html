@@ -1,0 +1,48 @@
+<div class="full-page">
+
+  <!-- APP SCREEN -->
+  <ng-container *ngIf="mode === 'app'">
+
+    <!-- Header -->
+    <div class="app-header">
+      <img src="assets/logo.png" alt="Breakthroughs App" class="app-logo" />
+      <h1>Breakthroughs App</h1>
+      <p class="subtitle">Scan to download the app</p>
+
+      <!-- NEW MESSAGE -->
+      <p class="info-msg">
+        This content is available only in the mobile app.
+        Please download the app using the QR code below.
+      </p>
+    </div>
+
+    <!-- QR Section -->
+    <div class="qr-container">
+
+      <div class="qr-box">
+        <img
+          src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://play.google.com/store/apps/details?id=com.soe.launchyourlegacy"
+        />
+        <p>Download for Android</p>
+      </div>
+
+      <div class="qr-box">
+        <img
+          src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://apps.apple.com/in/app/breakthroughs/id1450187620"
+        />
+        <p>Download for iOS</p>
+      </div>
+
+    </div>
+
+  </ng-container>
+
+  <!-- INVALID -->
+  <ng-container *ngIf="mode === 'invalid'">
+    <div class="invalid">
+      <h2> Invalid URL</h2>
+      <p>Redirecting to homepage...</p>
+    </div>
+  </ng-container>
+
+</div>
