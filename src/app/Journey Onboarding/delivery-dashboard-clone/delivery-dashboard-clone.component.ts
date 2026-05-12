@@ -1115,7 +1115,7 @@ export class DeliveryDashboardCloneComponent {
                             });
                         }
                         else if (diagnosticsAppointment) {
-                            productData.criticalSupport.postForm.push({
+                            productData.criticalSupport.diagnostics.push({
                                 ...mergedData,
                                 ...diagnosticsAppointment
                             });
