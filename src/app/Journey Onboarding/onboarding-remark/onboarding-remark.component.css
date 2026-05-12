@@ -547,3 +547,99 @@
 .displaynotes span { margin-bottom:10px; }
 .loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; gap:16px; }
 .loading-text { font-size:14px; color:#666; }
+/* ── Mail Attachments Panel ── */
+.gmail-attach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.gmail-attach-header-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.gmail-attach-count {
+  font-weight: 400;
+  color: #9aa0a6;
+}
+
+.gmail-add-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f1f3f4;
+  border: 1px solid #dadce0;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3c4043;
+  cursor: pointer;
+  transition: background 0.1s;
+  user-select: none;
+}
+.gmail-add-attach-btn:hover { background: #e8eaed; }
+.gmail-add-attach-btn mat-icon { font-size: 14px; height: 14px; width: 14px; }
+
+.gmail-attach-empty {
+  font-size: 12px;
+  color: #9aa0a6;
+  padding: 6px 0 10px;
+  font-style: italic;
+}
+
+/* Override existing item for managed list (has actions, no outer link) */
+.gmail-attach-item--managed {
+  text-decoration: none;
+  cursor: default;
+}
+
+.gmail-attach-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gmail-attach-source-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gmail-attach-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.gmail-attach-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  color: #9aa0a6;
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+}
+.gmail-attach-action-btn:hover { background: #f1f3f4; color: #3c4043; }
+.gmail-attach-action-btn mat-icon { font-size: 15px; height: 15px; width: 15px; }
+
+.gmail-attach-remove-btn:hover { color: #d93025 !important; background: #fce8e6 !important; }

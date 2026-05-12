@@ -132,7 +132,7 @@ export class OnboardingRemarkComponent {
   mapJourney: Record<string,Object> = {};   
   bonusProducts: string[] = [];
   bonusLoading: boolean = false;
-  mailattachments: Array<Object> = [];
+  mailAttachments: Array<Object> = [];
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
@@ -164,7 +164,7 @@ export class OnboardingRemarkComponent {
       const [packageSnap, productSnap, journeySnap] = await Promise.all([
         getDocs(collection(this.firestore, 'package')),
         getDocs(collection(this.firestore, 'products')),
-        getDocs(collection(this.firestore, 'jounrey')),
+        getDocs(collection(this.firestore, 'journey')),
       ]);
       packageSnap.docs.forEach(d => {
         this.mapPackage[d.id] = d.data()['package'] || '';
@@ -259,6 +259,7 @@ export class OnboardingRemarkComponent {
       ));
       if (!snap.empty) {
         this.selectedTemplate = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        this.mailAttachments = [];
         this.buildPreview();
         this.extractAttachments();
         this.resolveBonusProducts();
@@ -307,9 +308,10 @@ export class OnboardingRemarkComponent {
     this.templateSearchQuery = template.templatename;
     this.templateDropdownOpen = false;
     this.emailSent = false;
-    this.bonusProducts = [];
+    this.bonusProducts   = [];
+    this.mailAttachments = [];
     this.buildPreview();
-    this.extractAttachments();
+    this.extractAttachments();  
     this.resolveBonusProducts();
   }
 
@@ -323,51 +325,149 @@ export class OnboardingRemarkComponent {
     this.templateAttachments = [];
   }
 
+  // async resolveBonusProducts(): Promise<void> {
+  //   this.bonusProducts = [];
+
+  //   // Only run if the template actually contains a {{#bonus}} block
+  //   const templateHtml: string = this.selectedTemplate?.htmlbody || '';
+  //   const hasBonusParam = /\{\{#bonus\}\}/i.test(templateHtml);
+  //   if (!hasBonusParam) return;
+
+  //   this.bonusLoading = true;
+  //   try {
+  //     const participantProducts: any[] = this.participantjourneyproduct['participantproducts'] || [];
+
+  //     const bonusNames: string[] = [];
+  //     const bonusAttachments: object[] = [];
+
+  //     for (const pp of participantProducts) {
+  //       const packageRefId: string = pp['packageref']?.id || '';
+  //       if (!packageRefId) continue;
+
+  //       // Check if this package is 'Bonus' using the pre-built map
+  //       const packageName = this.mapPackage[packageRefId] || '';
+  //       if (packageName.toLowerCase() !== 'bonus') continue;
+
+  //       // Resolve product name from the pre-built product map
+  //       const productRefId: string = pp['productref']?.id || '';
+  //       if (!productRefId) continue;
+
+  //       const productName = this.mapProduct[productRefId]['product'] || '';
+  //       bonusAttachments.push(this.mapProduct[productRefId]['attachments'] || []);
+  //       if (productName && !bonusNames.includes(productName)) {
+  //         bonusNames.push(productName);
+  //       }
+  //     }
+  //     const journeyAttchements = this.mapJourney[this.participantjourneyproduct['journeyref']?.id]['attachments'] || []
+  //     this.mailattachments = [...this.mailattachments, ...bonusAttachments];
+  //     this.mailattachments.push(journeyAttchements);
+  //     this.bonusProducts = bonusNames;
+  //     console.log('Attachments',this.mailattachments);
+      
+  //   } catch (err) {
+  //     console.error('resolveBonusProducts error:', err);
+  //   } finally {
+  //     this.bonusLoading = false;
+  //     this.buildPreview();
+  //   }
+  // }
+
   async resolveBonusProducts(): Promise<void> {
     this.bonusProducts = [];
 
-    // Only run if the template actually contains a {{#bonus}} block
     const templateHtml: string = this.selectedTemplate?.htmlbody || '';
     const hasBonusParam = /\{\{#bonus\}\}/i.test(templateHtml);
-    if (!hasBonusParam) return;
 
     this.bonusLoading = true;
     try {
       const participantProducts: any[] = this.participantjourneyproduct['participantproducts'] || [];
-
       const bonusNames: string[] = [];
-      const bonusAttachments: object[] = [];
+
+      // ── Journey attachments ──────────────────────────────────────────────
+      const journeyId = this.participantjourneyproduct['journeyref']?.id;
+      if (journeyId && this.mapJourney[journeyId]) {
+        const journeyData = this.mapJourney[journeyId] as any;
+        const journeyAttachments: any[] = Array.isArray(journeyData['attachments'])
+          ? journeyData['attachments'] : [];
+        journeyAttachments.forEach((att, i) => {
+          if (!att) return;
+          const alreadyAdded = (this.mailAttachments as any[]).find(a => a['url'] === att.url);
+          if (!alreadyAdded) {
+            (this.mailAttachments as any[]).push({
+              ...att,
+              _source: 'journey',
+              _id: `journey_${i}_${Date.now()}`,
+            });
+          }
+        });
+      }
 
       for (const pp of participantProducts) {
         const packageRefId: string = pp['packageref']?.id || '';
         if (!packageRefId) continue;
 
-        // Check if this package is 'Bonus' using the pre-built map
-        const packageName = this.mapPackage[packageRefId] || '';
-        if (packageName.toLowerCase() !== 'bonus') continue;
-
-        // Resolve product name from the pre-built product map
+        const packageName: string = (this.mapPackage[packageRefId] || '').toLowerCase();
         const productRefId: string = pp['productref']?.id || '';
         if (!productRefId) continue;
 
-        const productName = this.mapProduct[productRefId]['product'] || '';
-        const bonusAttachments = this.mapProduct[productRefId]['attachments'] || [];
-        if (productName && !bonusNames.includes(productName)) {
-          bonusNames.push(productName);
+        const productData = this.mapProduct[productRefId] as any;
+        if (!productData) continue;
+
+        const productName: string = productData['product'] || '';
+        const productAttachments: any[] = Array.isArray(productData['attachments'])
+          ? productData['attachments'] : [];
+
+        // ── Bonus ────────────────────────────────────────────────────────
+        if (packageName === 'bonus') {
+          if (hasBonusParam && productName && !bonusNames.includes(productName)) {
+            bonusNames.push(productName);
+          }
+          productAttachments.forEach((att, i) => {
+            if (!att) return;
+            const alreadyAdded = (this.mailAttachments as any[]).find(a => a['url'] === att.url);
+            if (!alreadyAdded) {
+              (this.mailAttachments as any[]).push({
+                ...att,
+                _source: 'bonus',
+                _id: `bonus_${productRefId}_${i}_${Date.now()}`,
+              });
+            }
+          });
+        }
+
+        // ── Addon: only when journeyref is null/undefined ────────────────
+        if (packageName === 'add-on' || packageName === 'addon') {
+          const hasJourney = ![null, undefined, ''].includes(
+            this.participantjourneyproduct['journeyref']
+          );
+          if (!hasJourney) {
+            productAttachments.forEach((att, i) => {
+              if (!att) return;
+              const alreadyAdded = (this.mailAttachments as any[]).find(a => a['url'] === att.url);
+              if (!alreadyAdded) {
+                (this.mailAttachments as any[]).push({
+                  ...att,
+                  _source: 'addon',
+                  _id: `addon_${productRefId}_${i}_${Date.now()}`,
+                });
+              }
+            });
+          }
         }
       }
-      this.mailattachments = [...this.mailattachments, ...bonusAttachments];
-      this.mailattachments.push(this.mapJourney[this.participantjourneyproduct['journey']]['attachments']);
+
       this.bonusProducts = bonusNames;
-      console.log('Attachments',this.mailattachments);
-      
+      // Replace reference so Angular detects the change
+      this.mailAttachments = [...this.mailAttachments];
+
+      console.log('mailAttachments final:', this.mailAttachments);
     } catch (err) {
       console.error('resolveBonusProducts error:', err);
     } finally {
       this.bonusLoading = false;
       this.buildPreview();
     }
-  }
+  } 
 
   // ── Attachments ───────────────────────────────────────────────────────────
 
@@ -375,10 +475,24 @@ export class OnboardingRemarkComponent {
     if (!this.selectedTemplate) { this.templateAttachments = []; return; }
     const raw = this.selectedTemplate.attachments;
     this.templateAttachments = Array.isArray(raw) && raw.length > 0 ? raw as Attachment[] : [];
+
+    this.templateAttachments.forEach((att, i) => {
+      const alreadyAdded = (this.mailAttachments as any[]).find(
+        (a: any) => a['url'] === att.url && a['_source'] === 'template'
+      );
+      if (!alreadyAdded) {
+        (this.mailAttachments as any[]).push({
+          ...att,
+          _source: 'template',
+          _id: `template_${i}_${Date.now()}`,
+        });
+      }
+    });
+    console.log('mailAttachments after extractAttachments:', this.mailAttachments);
   }
 
   formatFileSize(bytes: number): string {
-    if (!bytes) return '0 B';
+    if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
@@ -405,35 +519,36 @@ export class OnboardingRemarkComponent {
   }
 
   // ── Preview builder ───────────────────────────────────────────────────────
-
   buildPreview() {
     if (!this.selectedTemplate) return;
     const participantName = this.getParticipantName();
     let html: string = this.selectedTemplate.htmlbody || '';
 
-    // Known scalar replacements
+    // ── Compute bonus text once ─────────────────────────────────────────────
+    const getBonusText = () => {
+      if (this.bonusLoading) return `<span style="color:#9aa0a6;font-style:italic;">Loading…</span>`;
+      if (this.bonusProducts.length === 0) return '-';
+      if (this.bonusProducts.length === 1) return this.bonusProducts[0];
+      if (this.bonusProducts.length === 2) return `${this.bonusProducts[0]} and ${this.bonusProducts[1]}`;
+      return `${this.bonusProducts.slice(0, -1).join(', ')}, and ${this.bonusProducts[this.bonusProducts.length - 1]}`;
+    };
+
+    // ── Triple-brace {{{bonustext}}} ────────────────────────────────────────
+    html = html.replace(/\{\{\{bonustext\}\}\}/gi, getBonusText);
+
+    // ── Triple-brace {{{bonus}}} ────────────────────────────────────────────
+    html = html.replace(/\{\{\{bonus\}\}\}/gi, getBonusText);
+
+    // ── Block {{#bonus}}...{{/bonus}} — replace entire block with inline text
+    html = html.replace(/\{\{#bonus\}\}([\s\S]*?)\{\{\/bonus\}\}/gi, getBonusText);
+
+    // ── Scalar replacements ─────────────────────────────────────────────────
     html = html.replace(/\{\{name\}\}/gi, `<strong>${participantName}</strong>`);
     html = html.replace(/\{\{participantname\}\}/gi, `<strong>${participantName}</strong>`);
     html = html.replace(/\{\{journey\}\}/gi, this.currentJourney || '');
     html = html.replace(/\{\{journeyname\}\}/gi, this.currentJourney || '');
 
-    // ── Bonus block: {{#bonus}} ... {{value}} ... {{/bonus}} ──────────────
-    // If bonusProducts resolved → render one row per product.
-    // If still loading or empty → render a placeholder or nothing.
-    html = html.replace(/\{\{#bonus\}\}([\s\S]*?)\{\{\/bonus\}\}/gi, (_, inner: string) => {
-      if (this.bonusLoading) {
-        return `<span style="color:#9aa0a6;font-style:italic;font-size:12px;">Loading bonus products…</span>`;
-      }
-      if (this.bonusProducts.length === 0) {
-        return ''; // no bonus products — collapse the block entirely
-      }
-      // Repeat inner template for each bonus product, replacing {{value}}
-      return this.bonusProducts
-        .map(name => inner.replace(/\{\{value\}\}/gi, `<p>${name}</p>`))
-        .join('');
-    });
-
-    // Highlight any remaining unresolved variables
+    // ── Highlight remaining unresolved variables ────────────────────────────
     html = html.replace(/\{\{(\w+)\}\}/g, (_, v) =>
       `<span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:0 3px;font-family:monospace;font-size:11px;">{{${v}}}</span>`
     );
@@ -597,8 +712,14 @@ export class OnboardingRemarkComponent {
     });
 
     // ── Attachments only on `attachments`, postmarkAttachments stays empty ──
-    const attachments = this.templateAttachments.length > 0 ? this.templateAttachments : [];
-
+    // const attachments = this.templateAttachments.length > 0 ? this.templateAttachments : [];
+    const attachments = (this.mailAttachments as any[]).map(a => ({
+      name: a['name'],
+      size: a['size'] || null,
+      type: a['type'],
+      url:  a['url'],
+      uploadedAt: a['uploadedAt'] || null,
+    }));
     const archiveRef = doc(collection(this.firestore, COL_EMAIL_ARCHIVE));
     const docid = archiveRef.id;
 
@@ -638,7 +759,8 @@ export class OnboardingRemarkComponent {
         onboardedby: this.participantjourneyproduct['onboardedby'] || null,
       },
     };
-
+    console.log("EMail Archive",map);
+    
     await setDoc(archiveRef, map);
     console.log('Email Archive Created:', docid, '| emailMap:', emailMap);
   }
@@ -769,6 +891,58 @@ export class OnboardingRemarkComponent {
 
   addnotes() {
     this.dialogRef.close({ note: this.generalnote, updatedby: this.loggedInProfileId, updated: new Date() });
+  }
+
+  removeMailAttachment(id: string) {
+    this.mailAttachments = this.mailAttachments.filter((a: any) => a['_id'] !== id);
+  }
+
+  onAddAttachment(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    Array.from(input.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const existing = this.mailAttachments as any[];
+        // Avoid duplicates by name
+        if (existing.find(a => a.name === file.name)) return;
+        existing.push({
+          name:     file.name,
+          size:     file.size,
+          type:     file.type,
+          url:      reader.result as string,   // data URL for preview
+          _source:  'manual',
+          _id:      `manual_${file.name}_${Date.now()}`,
+        });
+        // Trigger CD — replace reference so Angular detects change
+        this.mailAttachments = [...existing];
+      };
+      reader.readAsDataURL(file);
+    });
+    // Reset input so same file can be re-added after removal
+    input.value = '';
+  }
+
+  getSourceBadge(source: string): string {
+    const map: Record<string, string> = {
+      template: 'Template',
+      journey: 'Journey',
+      bonus:   'Bonus',
+      addon:   'Add-on',
+      manual:  'Added',
+    };
+    return map[source] || '';
+  }
+
+  getSourceBadgeColor(source: string): string {
+    const map: Record<string, string> = {
+      template: '#00796b',
+      journey: '#1565c0',
+      bonus:   '#7b1fa2',
+      addon:   '#e65100',
+      manual:  '#2e7d32',
+    };
+    return map[source] || '#546e7a';
   }
 
   closeDialog() { this.dialogRef.close(); }

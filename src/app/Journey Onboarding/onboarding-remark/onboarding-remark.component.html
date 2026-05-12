@@ -421,7 +421,84 @@
           <div class="gmail-body" [innerHTML]="previewHtml"></div>
 
           <!-- Attachments inside composer -->
-          <div *ngIf="templateAttachments.length > 0" class="gmail-attachments">
+          <!-- ══ Mail Attachments Panel ══ -->
+          <div class="gmail-attachments">
+            <div class="gmail-attachment-divider"></div>
+
+            <!-- Header row -->
+            <div class="gmail-attach-header">
+              <span class="gmail-attach-header-title">
+                <mat-icon style="font-size:15px;height:15px;width:15px;vertical-align:middle;">attach_file</mat-icon>
+                Attachments
+                <span class="gmail-attach-count">({{mailAttachments.length}})</span>
+              </span>
+
+              <!-- Add attachment button -->
+              <label class="gmail-add-attach-btn" title="Add attachment">
+                <mat-icon>add</mat-icon>
+                Add
+                <input type="file" multiple hidden (change)="onAddAttachment($event)">
+              </label>
+            </div>
+
+            <!-- Loading state while resolving bonus/addon/journey -->
+            <div *ngIf="bonusLoading" class="gmail-dd-loading" style="padding:8px 0;">
+              <mat-progress-spinner [diameter]="14" strokeWidth="2" mode="indeterminate"></mat-progress-spinner>
+              Resolving attachments…
+            </div>
+
+            <!-- Empty state -->
+            <div *ngIf="!bonusLoading && mailAttachments.length === 0" class="gmail-attach-empty">
+              No attachments. Click <b>Add</b> to upload files.
+            </div>
+
+            <!-- Attachment list -->
+            <div *ngIf="!bonusLoading && mailAttachments.length > 0" class="gmail-attach-list">
+              <div *ngFor="let att of mailAttachments" class="gmail-attach-item gmail-attach-item--managed">
+
+                <!-- File icon -->
+                <mat-icon class="gmail-attach-icon" [class]="getFileIconColor(att.type)">
+                  {{getFileIcon(att.type)}}
+                </mat-icon>
+
+                <!-- Info -->
+                <div class="gmail-attach-info">
+                  <div class="gmail-attach-name-row">
+                    <span class="gmail-attach-name">{{att.name}}</span>
+                    <!-- Source badge -->
+                    <span class="gmail-attach-source-badge"
+                          [style.background]="getSourceBadgeColor(att['_source']) + '18'"
+                          [style.color]="getSourceBadgeColor(att['_source'])"
+                          [style.borderColor]="getSourceBadgeColor(att['_source']) + '44'">
+                      {{getSourceBadge(att['_source'])}}
+                    </span>
+                  </div>
+                  <span class="gmail-attach-size">{{formatFileSize(att.size)}}</span>
+                </div>
+
+                <!-- Actions -->
+                <div class="gmail-attach-actions">
+                  <!-- Open link (only for URL-based, not data: URLs) -->
+                  <a *ngIf="att.url && !att.url.startsWith('data:')"
+                    [href]="att.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="gmail-attach-action-btn"
+                    title="Open">
+                    <mat-icon>open_in_new</mat-icon>
+                  </a>
+                  <!-- Remove -->
+                  <button class="gmail-attach-action-btn gmail-attach-remove-btn"
+                          (click)="removeMailAttachment(att['_id'])"
+                          title="Remove attachment">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <!-- <div *ngIf="templateAttachments.length > 0" class="gmail-attachments">
             <div class="gmail-attachment-divider"></div>
             <div class="gmail-attach-list">
               <a *ngFor="let att of templateAttachments"
@@ -437,7 +514,8 @@
                 <mat-icon class="gmail-attach-open">open_in_new</mat-icon>
               </a>
             </div>
-          </div>
+          </div> -->
+
 
           <!-- Gmail toolbar / send -->
           <div class="gmail-toolbar">

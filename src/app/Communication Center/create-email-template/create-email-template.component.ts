@@ -37,7 +37,7 @@ interface TemplateAttachment {
   url: string;
   size: number;
   type: string;
-  uploadedAt: number;
+  uploadedAt: Date;
 }
 
 interface EmailTemplate {
@@ -1246,7 +1246,7 @@ export class CreateEmailTemplateComponent implements OnInit, AfterViewInit, OnDe
   async uploadAttachment(file: File): Promise<void> {
     this.isUploadingAttachment = true;
     try {
-      const timestamp = new Date().getTime();
+      const timestamp = new Date();
       const fileName = `email-attachments/${timestamp}_${file.name}`;
       const storageRef = ref(this.storage, fileName);
 
