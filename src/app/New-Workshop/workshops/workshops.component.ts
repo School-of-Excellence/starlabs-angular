@@ -125,6 +125,14 @@ export class WorkshopsComponent {
 
   async onWorkshopStatusChange(workshop: any, event: any): Promise<void> {
     const isActive = event.checked;
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(
+      `Are you sure you want to ${isActive ? 'activate' : 'deactivate'} "${title}"?`
+    );
+    if (!confirmed) {
+      event.source.checked = !isActive;
+      return;
+    }
     try {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
       await updateDoc(workshopRef, { active: isActive });
@@ -142,6 +150,14 @@ export class WorkshopsComponent {
 
   async onWorkshopCompletedChange(workshop: any, event: any): Promise<void> {
     const isCompleted = event.checked;
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(
+      `Are you sure you want to mark "${title}" as ${isCompleted ? 'completed' : 'pending'}?`
+    );
+    if (!confirmed) {
+      event.source.checked = !isCompleted;
+      return;
+    }
     try {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
       await updateDoc(workshopRef, { workshopcompleted: isCompleted });

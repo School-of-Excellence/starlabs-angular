@@ -786,16 +786,18 @@ mat-divider { margin: 8px 0 !important; }
 .enrollment-form-header {
   max-width: 1240px;
   margin: 0 auto !important;
-  padding: 4px 4px 16px !important;
+  padding: 4px 4px 4px 16px !important;
   border-radius: 7px !important;;
   width: 100%;
   box-sizing: border-box;
+  color: var(--pink) !important;
 }
 
 .enrollment-form-header mat-card-title {
   font-size: 22px !important;
   font-weight: 700 !important;
-  color: var(--gray-800) !important;
+  /* color: var(--gray-800) !important; */
+  color: var(--pink) !important;
 }
 
 .enrollment-form {
