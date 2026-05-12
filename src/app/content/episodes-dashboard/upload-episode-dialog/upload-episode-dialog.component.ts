@@ -47,6 +47,7 @@ export class uploadingelement {
   videoTask: UploadTask | null;
   imagetask: UploadTask | null;
   srtTask: UploadTask | null;
+  srtToDelete: string | null;
   screenshotTask: UploadTask | null;
   submitted: boolean;
   savetofirestore: boolean;
@@ -195,8 +196,36 @@ export class UploadEpisodeDialogComponent {
     const input = event.target as HTMLInputElement;
     if (input && input.files && input.files.length > 0) {
       const file: File = input.files[0];
+      if (this.uploadEpisodeDoc.srt && !this.uploadEpisodeDoc.srtToDelete) {
+        this.uploadEpisodeDoc.srtToDelete = this.uploadEpisodeDoc.srt;
+      }
       this.uploadEpisodeDoc.uploadSrtFile = file;
       this.uploadEpisodeDoc.srtFileName = file.name;
+      this.uploadEpisodeDoc.srt = null;
+    }
+  }
+
+  removeSrt(event: Event) {
+    event.stopPropagation();
+    if (this.uploadEpisodeDoc.srt && !this.uploadEpisodeDoc.srtToDelete) {
+      this.uploadEpisodeDoc.srtToDelete = this.uploadEpisodeDoc.srt;
+    }
+    this.uploadEpisodeDoc.srt = null;
+    this.uploadEpisodeDoc.srtFileName = null;
+    this.uploadEpisodeDoc.uploadSrtFile = null;
+    if (this.srtref?.nativeElement) {
+      this.srtref.nativeElement.value = '';
+    }
+  }
+
+  getSrtFileNameFromUrl(url: string): string {
+    if (!url) return '';
+    try {
+      const decoded = decodeURIComponent(url.split('?')[0]);
+      const segment = decoded.substring(decoded.lastIndexOf('/') + 1);
+      return segment || 'Subtitle file';
+    } catch {
+      return 'Subtitle file';
     }
   }
 
@@ -397,7 +426,7 @@ export class UploadEpisodeDialogComponent {
         const srtSnap = await this.uploadingTask[index].srtTask;
         if (srtSnap.bytesTransferred === srtSnap.totalBytes) {
           const url = await getDownloadURL(srtSnap.ref);
-          const existingSrtUrl = this.uploadingTask[index].srt;
+          const existingSrtUrl = this.uploadingTask[index].srtToDelete ?? this.uploadingTask[index].srt;
           if (existingSrtUrl !== null && existingSrtUrl !== undefined) {
             try {
               const oldFileRef = ref(this.storage, existingSrtUrl);
@@ -407,6 +436,7 @@ export class UploadEpisodeDialogComponent {
             }
           }
           this.uploadingTask[index].srt = url;
+          this.uploadingTask[index].srtToDelete = null;
           checkuploaded.push(true);
         } else {
           checkuploaded.push(false);
@@ -415,6 +445,14 @@ export class UploadEpisodeDialogComponent {
         console.error('Error uploading SRT:', err);
         checkuploaded.push(false);
       }
+    } else if (this.uploadingTask[index].srtToDelete) {
+      try {
+        const oldFileRef = ref(this.storage, this.uploadingTask[index].srtToDelete);
+        await deleteObject(oldFileRef);
+      } catch (deleteErr) {
+        console.warn('Error deleting removed SRT:', this.uploadingTask[index].srtToDelete, deleteErr);
+      }
+      this.uploadingTask[index].srtToDelete = null;
     }
 
     if (!checkuploaded.includes(false)) {

@@ -663,6 +663,7 @@ audio { display: none; }
 .preview-icon { color: var(--primary); font-size: 24px !important; width: 24px !important; height: 24px !important; }
 .preview-name { font-size: 13px; font-weight: 500; color: var(--primary); }
 .preview-change { font-size: 16px !important; width: 16px !important; height: 16px !important; color: var(--txt3); }
+.preview-remove { font-size: 16px !important; width: 16px !important; height: 16px !important; color: var(--danger, #d33); cursor: pointer; }
 .audio-player { width: 100%; margin-top: 12px; border-radius: 8px; height: 36px; }
 
 .img-zone { width: 140px; height: 140px; padding: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
