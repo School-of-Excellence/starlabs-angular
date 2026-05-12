@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { collection, deleteDoc, doc, Firestore, getDocs, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, deleteDoc, doc, Firestore, Timestamp, getDocs, setDoc, updateDoc } from '@angular/fire/firestore';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatChipsModule } from '@angular/material/chips';
@@ -54,7 +54,7 @@ export class JourneyEntryComponent implements OnInit {
 
   atcModelList = []
   videos = []
-  attachments: Array<{ name: string; type: string; url: string }> = [];
+  attachments: Array<{ name: string; type: string; size: number; uploadedAt: Timestamp; url: string }> = [];
   readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
   uploadProgress: number | null = null;
 
@@ -215,7 +215,7 @@ export class JourneyEntryComponent implements OnInit {
           );
         });
         const url = await getDownloadURL(uploadTask.snapshot.ref);
-        this.attachments = [...this.attachments, { name: file.name, type: file.type, url }];
+        this.attachments = [...this.attachments, { name: file.name, type: file.type, size: file.size, uploadedAt: Timestamp.now(),url }];
         this.uploadProgress = null;
       } catch (err) {
         console.error('upload error:', err);
