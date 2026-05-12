@@ -351,7 +351,7 @@ export class ViewPrescribedATCComponent {
 
     if (this.selectedPrescribers.length > 0) {
       const prescriberRefs = this.selectedPrescribers.map(p =>
-        doc(this.firestoreDefault, p)
+        doc(this.firestoreATC, p)
       );
       filters.push(
         where("author", "array-contains-any", prescriberRefs)
@@ -917,7 +917,7 @@ export class ViewPrescribedATCComponent {
     var assigned = []
     Object.keys(this.newProcedureValue["bigactivity"]).forEach(activity => {
       if ((this.newProcedureValue["bigactivity"][activity] || []).length != 0) {
-        bigactivity[activity] = this.newProcedureValue["bigactivity"][activity].map(e => doc(this.firestoreDefault, e).id)
+        bigactivity[activity] = this.newProcedureValue["bigactivity"][activity].map(e => doc(this.firestoreATC, e).id)
         assigned = [...assigned, ...this.newProcedureValue["bigactivity"][activity]]
       }
     })
@@ -926,7 +926,7 @@ export class ViewPrescribedATCComponent {
       status: ["autogeneralized", "completed"].includes(this.newProcedureValue["status"]) ? "completed" : "yet to start",
       mandatory: this.newProcedureValue["mandatory"],
       bigactivity: bigactivity,
-      assigned_to: assigned.map(e => doc(this.firestoreDefault, e)),
+      assigned_to: assigned.map(e => doc(this.firestoreATC, e)),
       last_activity: this.newProcedureValue["lastactivity"] != null ? new Date(this.newProcedureValue["lastactivity"]) : null
     }
     console.log("Rew Record", newRecord)
@@ -961,7 +961,7 @@ export class ViewPrescribedATCComponent {
     console.log(result)
     let validators = []
     var resultList = result ?? []
-    resultList.forEach((e: any) => validators.push(e.profile_ref))
+    resultList.forEach((e: any) => validators.push(doc(this.firestoreATC, e.profile_ref.path)))
     updateDoc(doc(this.firestoreATC, "atc_to_validate/" + atcid), {
       status: "validated",
       validator: validators

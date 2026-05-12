@@ -43,7 +43,6 @@ export class AssignProcedureStudioComponent {
   sortedParticipantsByStudio: {};
   studiolist: any = [];
 
-  firestoreDefault = getFirestore() // Default Firestore
   firestoreATC = getFirestore("firestore-atc") // ATC Firestore
 
   constructor(
@@ -73,7 +72,7 @@ export class AssignProcedureStudioComponent {
     
     this.loading = true
     
-    var eisRef = this.dialogdata.authorid.map(e => doc(this.firestoreDefault,'profile_data',e))
+    var eisRef = this.dialogdata.authorid.map(e => doc(this.firestoreATC, 'profile_data',e))
     getDocs(query(collection(this.firestoreATC,"atc_alpha"),where("author", "array-contains-any", eisRef),where("profileid", "==", this.dialogdata.participantid),where("isdelete", "==", false),orderBy("prescription_date", "desc"),limit(1))).then(async atc=>{
       if(atc.size != 0){
         this.guard.getProcedureMap().then(data => this.mapProcedure = data)
@@ -181,7 +180,7 @@ export class AssignProcedureStudioComponent {
             batch.update(doc(this.firestoreATC, pro.path), {
               mandatory: pro.mandatory,
               studioid: pro.studioid ?? null,
-              assigned_to: (this.mapStudio[pro.studioid] ?? {})["participants"]?.map(e => doc(this.firestoreDefault,"profile_data",e)) ?? null
+              assigned_to: (this.mapStudio[pro.studioid] ?? {})["participants"]?.map(e => doc(this.firestoreATC,"profile_data",e)) ?? null
             })
           }
         }

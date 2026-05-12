@@ -171,9 +171,9 @@ export class PickForMentoringComponent implements OnDestroy {
   }
   
   markATCvalidate(atcid, validator){
-    var validatorPath = [...(validator ?? []).map(e => e.path), doc(this.firestoreDefault, "profile_data", this.loggedinID).path]
+    var validatorPath = [...(validator ?? []).map(e => e.path), doc(this.firestoreATC, "profile_data", this.loggedinID).path]
     validatorPath = Array.from(new Set(validatorPath))
-    var validatorRef = validatorPath.map(e => doc(this.firestoreDefault, e))
+    var validatorRef = validatorPath.map(e => doc(this.firestoreATC, e))
     updateDoc(doc(this.firestoreATC, "atc_to_validate", atcid), {
       status: "validated",
       validator: validatorRef
@@ -239,7 +239,7 @@ export class PickForMentoringComponent implements OnDestroy {
       lastupdated: serverTimestamp(),
       atcid : atc.atcid,
       profileid: atc.profileid,
-      author: atc.author,
+      author: (atc.author ?? []).map(e => doc(this.firestoreDefault, e.path)),
       prescription_date: atc.prescription_date.toDate(),
       mentoringnote: null,
       from: from,

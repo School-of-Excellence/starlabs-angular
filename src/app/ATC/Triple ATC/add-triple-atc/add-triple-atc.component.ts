@@ -598,7 +598,7 @@ export class AddTripleATCComponent implements OnDestroy {
       // var authorlevel = {}
       for (let j = 0; j < this.author.length; j++) {
         const element = this.author[j];
-        authorref.push(doc(this.firestoreDefault, element))
+        authorref.push(doc(this.firestoreATC, element))
         // authorlevel[element.split('/')[1]] = this.mapProfile[this.firestore.doc(element).ref.id].level
       }
       console.log(authorref)
@@ -692,18 +692,18 @@ export class AddTripleATCComponent implements OnDestroy {
           // var assignlevel = {}
           for (let a = 0; a < atcAdjustment.procedure[j].assigned_to.length; a++) {
             const profilePath = atcAdjustment.procedure[j].assigned_to[a]
-            assignref.push(doc(this.firestoreDefault, profilePath))
-            // assignlevel[profilePath.split('/')[1]] = this.mapProfile[this.firestoreDefault.doc(profilePath).ref.id].level
+            assignref.push(doc(this.firestoreATC, profilePath))
+            // assignlevel[profilePath.split('/')[1]] = this.mapProfile[this.firestoreATC.doc(profilePath).ref.id].level
           }
           // console.log(assignlevel)
-          console.log(atcAdjustment.procedure[j].recommended_to != null ? doc(this.firestoreDefault, atcAdjustment.procedure[j].recommended_to) : null)
+          console.log(atcAdjustment.procedure[j].recommended_to != null ? doc(this.firestoreATC, atcAdjustment.procedure[j].recommended_to) : null)
           console.log(assignref.length != 0 ? assignref : null)
 
           var procedureData = {
-            name: doc(this.firestoreDefault, atcAdjustment.procedure[j].name),
+            name: doc(this.firestoreATC, atcAdjustment.procedure[j].name),
             assigned_to: assignref.length != 0 ? assignref : null,
             // level: assignlevel,
-            // recommended_to: atcAdjustment.procedure[j].recommended_to != null ? this.firestore.doc(atcAdjustment.procedure[j].recommended_to).ref : null,
+            // recommended_to: atcAdjustment.procedure[j].recommended_to != null ? this.firestoreATC.doc(atcAdjustment.procedure[j].recommended_to).ref : null,
             status: atcAdjustment.procedure[j].completed ? "completed" : "yet to start",
             created: serverTimestamp(),
             mandatory: atcAdjustment.procedure[j].mandatory,

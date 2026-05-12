@@ -522,7 +522,7 @@ export class ViewAssignedATCComponent {
 
     var newRecord = {
       bigactivity: bigactivity,
-      assigned_to: assigned.map(e => doc(this.firestoreDefault, "profile_data/"+e)),
+      assigned_to: assigned.map(e => doc(this.firestoreATC, "profile_data/"+e)),
       "status": "completed",
       "last_activity": new Date(this.newProcedureValue["lastactivity"])
     }

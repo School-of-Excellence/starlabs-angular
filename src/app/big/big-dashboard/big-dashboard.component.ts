@@ -539,7 +539,7 @@ export class BigDashboardComponent {
     // console.time("getATCWrittenData");
     const firestoreATC = getFirestore("firestore-atc")
     for (let i = 0; i < this.participantlist.length; i=i+10) {
-      const arrayofprofileref = this.participantlist.slice(i,i+10).map(e => doc(this.firestore, "profile_data", e['profileid']) );
+      const arrayofprofileref = this.participantlist.slice(i,i+10).map(e => doc(firestoreATC, "profile_data", e['profileid']) );
       await getDocs(query(
         collection(firestoreATC, "atc_alpha"),
         where("author", "array-contains-any", arrayofprofileref),
@@ -587,7 +587,7 @@ export class BigDashboardComponent {
       } else {
         console.log(this.selectedMarathon['docid']);
         this.cohorts = this.cohortsList.filter(e => 
-          e['marathonref'].id === this.selectedMarathon['docid']
+          e['marathonref']?.id === this.selectedMarathon['docid']
         );
         return this.cohorts;
       }

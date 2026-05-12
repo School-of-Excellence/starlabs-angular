@@ -804,44 +804,44 @@ export class QueueEventHealthComponent {
 
     try {
       const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
-        // ATC ALPHA (VALID)
-        const firestoreATC = getFirestore("firestore-atc")
-        if (this.atcAlphaUnsub) this.atcAlphaUnsub();
-        this.atcAlphaUnsub = onSnapshot(
-          query(
-            collection(firestoreATC, 'atc_alpha'),
-            where('isdelete', '==', false)
-          ),
-          (snap) => {
-            this.atcAlphaRecords = snap.docs.map(d => ({
-              source: 'atc_alpha',
-              profileid: d.data()['profileid'],
-              queueid: d.data()['queueid'] ?? null,
-              prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
-            }));
+      // ATC ALPHA (VALID)
+      // const firestoreATC = getFirestore("firestore-atc")
+      // if (this.atcAlphaUnsub) this.atcAlphaUnsub();
+      // this.atcAlphaUnsub = onSnapshot(
+      //   query(
+      //     collection(firestoreATC, 'atc_alpha'),
+      //     where('isdelete', '==', false)
+      //   ),
+      //   (snap) => {
+      //     this.atcAlphaRecords = snap.docs.map(d => ({
+      //       source: 'atc_alpha',
+      //       profileid: d.data()['profileid'],
+      //       queueid: d.data()['queueid'] ?? null,
+      //       prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
+      //     }));
 
-            this.mergeAtcsAndRebuild();
-          }
-        );
+      //     this.mergeAtcsAndRebuild();
+      //   }
+      // );
 
-        // ---- ATC TO VALIDATE (LIVE) ----
-        if (this.atcValidateUnsub) this.atcValidateUnsub();
+      // // ---- ATC TO VALIDATE (LIVE) ----
+      // if (this.atcValidateUnsub) this.atcValidateUnsub();
 
-        this.atcValidateUnsub = onSnapshot(
-          query(
-            collection(firestoreATC, 'atc_to_validate'),
-            where('isdelete', '==', false)
-          ),
-          (snap) => {
-            this.atcValidateRecords = snap.docs.map(d => ({
-              source: 'atc_to_validate',
-              profileid: d.data()['profileid'],
-              queueid: d.data()['queueid'] ?? null,
-              prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
-            }));
-            this.mergeAtcsAndRebuild();
-          }
-        );
+      // this.atcValidateUnsub = onSnapshot(
+      //   query(
+      //     collection(firestoreATC, 'atc_to_validate'),
+      //     where('isdelete', '==', false)
+      //   ),
+      //   (snap) => {
+      //     this.atcValidateRecords = snap.docs.map(d => ({
+      //       source: 'atc_to_validate',
+      //       profileid: d.data()['profileid'],
+      //       queueid: d.data()['queueid'] ?? null,
+      //       prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
+      //     }));
+      //     this.mergeAtcsAndRebuild();
+      //   }
+      // );
 
       //  LIVE TOKEN LISTENER
       this.tokenUnsub = onSnapshot(

@@ -108,13 +108,13 @@ export class ParticipantAELComponent implements OnInit {
   }
  
   async getPrescribedParticipant(){
+    const firestoreATC = getFirestore("firestore-atc")
     console.log("ATC From", this.startDate, this.endDate)
     var profileref = null
     if(this.selectedBigParticipant != "all" && this.selectedBigParticipant != null){
-      profileref = doc(this.firestoreDefault, "profile_data", this.selectedBigParticipant);
+      profileref = doc(firestoreATC, "profile_data", this.selectedBigParticipant);
     }
     try{
-    const firestoreATC = getFirestore("firestore-atc")
     let atcQuery = query(
       collection(firestoreATC, "atc_alpha"), where("type", "==", "online"),  where("isdelete", "==", false), where("prescription_date", ">=", this.startDate), where("prescription_date", "<=", this.endDate)
     );

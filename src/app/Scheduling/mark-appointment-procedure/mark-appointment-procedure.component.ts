@@ -60,7 +60,7 @@ export class MarkAppointmentProcedureComponent implements OnInit {
   async getATC(){
     const firestoreATC = getFirestore("firestore-atc")
     var data = []
-    var specialistRef = this.specialist.map(e => doc(this.firestore, "profile_data/"+e))
+    var specialistRef = this.specialist.map(e => doc(firestoreATC, "profile_data/"+e))
     var collectionRef = collection(firestoreATC, "atc_alpha")
     var queryFilter = query(collectionRef, where("profileid", "==", this.profileid), where("implementationagent", "array-contains-any", this.specialist), where("isdelete", "==", false))
     await getDocs(queryFilter).then(async atclist=>{

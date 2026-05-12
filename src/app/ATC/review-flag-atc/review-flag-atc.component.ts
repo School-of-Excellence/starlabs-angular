@@ -247,7 +247,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
     var result = await firstValueFrom(dialog.afterClosed())
     let validators = []
     var resultList = result ?? []
-    resultList.forEach((e:any) => validators.push(e.profile_ref))
+    resultList.forEach((e:any) => validators.push(doc(this.firestoreATC, e.profile_ref.path)))
     updateDoc(doc(this.firestoreATC, "atc_to_validate", atcid), {
       status: "validated",
       validator: validators
