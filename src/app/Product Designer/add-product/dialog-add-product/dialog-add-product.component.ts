@@ -1,5 +1,5 @@
 import { Component, ElementRef, Inject, ViewChild } from '@angular/core';
-import { collection, deleteDoc, doc, DocumentReference, Firestore, getDocs, orderBy, query, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, deleteDoc, doc, DocumentReference, Timestamp, Firestore, getDocs, orderBy, query, setDoc, updateDoc } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../../loading-progress/loading-progress.component';
@@ -74,7 +74,7 @@ export class DialogAddProductComponent {
   deliveryPlanningOption = ["normal", "priority"]
   atcModelList = []
   videos = [];
-  attachments: Array<{ name: string; type: string; url: string }> = [];
+  attachments: Array<{ name: string; type: string; size: number; uploadedAt: Timestamp; url: string }> = [];
   readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
   uploadProgress: number | null = null;
 
@@ -339,7 +339,7 @@ export class DialogAddProductComponent {
           );
         });
         const url = await getDownloadURL(uploadTask.snapshot.ref);
-        this.attachments = [...this.attachments, { name: file.name, type: file.type, url }];
+        this.attachments = [...this.attachments, { name: file.name, type: file.type, size: file.size, uploadedAt: Timestamp.now(),url }];
         this.uploadProgress = null;
       } catch (err) {
         console.error('upload error:', err);
