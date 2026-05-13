@@ -21,16 +21,26 @@ import { MatInputModule } from '@angular/material/input';
   styleUrl: './form-template-preview.component.css'
 })
 export class FormTemplatePreviewComponent {
+
   previewData: any[] = [];
   reviewNotes: string = '';
-  notesForm;
-  reviewAccess;
-  participantAssignmentId;
-  constructor(public dialogRef: MatDialogRef<FormTemplatePreviewComponent>,@Inject(MAT_DIALOG_DATA) public data: any,    private fb: FormBuilder,) {
+  notesForm: any;
+  reviewAccess: boolean;
+  participantAssignmentId: string;
+  loggedInProfileId: string;
+  profileId: string;
+
+  constructor(public dialogRef: MatDialogRef<FormTemplatePreviewComponent>,@Inject(MAT_DIALOG_DATA) public data: any, private fb: FormBuilder,) {
+    
     this.reviewAccess = data.reviewaccess;
     this.participantAssignmentId = data.participantassignmentid;
+    this.loggedInProfileId = this.data.loginid;
+    this.profileId = this.data.profileid;
+
     console.log(this.data);
     
+    console.log(this.loggedInProfileId);
+    console.log(this.profileId);
   }
 
   ngOnInit(): void {

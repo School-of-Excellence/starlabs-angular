@@ -47,7 +47,7 @@
   
   <div class="preview-container">
     <!-- Show Confirm Submission only when reviewAccess is false -->
-    <div class="preview-actions" *ngIf="!reviewAccess">
+    <div class="preview-actions" *ngIf="this.loggedInProfileId == this.profileId">
       <button mat-stroked-button (click)="onCancel()" class="cancel-button">
         <mat-icon>arrow_back</mat-icon>
         <span>Edit Form</span>
@@ -60,7 +60,7 @@
     </div>
   
     <!-- Show Review section only when reviewAccess is true -->
-    <div *ngIf="reviewAccess" class="review-section">
+    <div *ngIf="this.loggedInProfileId != this.profileId" class="review-section">
       <div class="review-header">
         <mat-icon class="header-icon">rate_review</mat-icon>
         <h3>Review &amp; Notes</h3>
@@ -104,7 +104,7 @@
   
           <div class="action-buttons">
             <button mat-raised-button color="warn" type="button" (click)="onConfirm('rework')"
-              class="button-css rework-btn">
+              class="button-css complete-btn">
               <mat-icon>replay</mat-icon>
               <span>Re-Work</span>
             </button>
