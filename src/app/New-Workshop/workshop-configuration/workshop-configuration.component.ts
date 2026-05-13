@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Firestore, doc, setDoc, updateDoc, docSnapshots, DocumentSnapshot, collection, query, where, collectionSnapshots, getDocs, orderBy, collectionData, limit } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
-import { Observable, Subject } from 'rxjs';
-import { debounceTime, takeUntil } from 'rxjs/operators';
+import { Observable, Subject, firstValueFrom } from 'rxjs';
+import { debounceTime, filter, take, takeUntil } from 'rxjs/operators';
 import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule ,AbstractControl, FormControl} from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -639,8 +639,16 @@ onTemplateFilterChange(selectedIds: string[]): void {
 }
 async ngOnInit() {
   try {
-    const roles = await this.guard.getRoles();
-    this.loggedinProfile = roles["profile_ref"].id;
+    const uid = await firstValueFrom(this.guard.uid$.pipe(filter((v): v is string => !!v), take(1)));
+    if (uid) {
+      const roles = await this.guard.getRoles();
+      this.loggedinProfile = roles["profile_ref"].id;
+    }
+  } catch (error) {
+    console.error('Error loading roles:', error);
+  }
+
+  try {
     const chatgroupsRef = collection(this.firestore, 'supportchat');
     const q = query(chatgroupsRef, where('type', '==', 'group'));
     const querySnapshot = await getDocs(q);

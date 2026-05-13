@@ -14,6 +14,7 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EiflixBannerComponent } from '../eiflix-banner/eiflix-banner.component';
+import { WorkshopDialogComponent } from '../workshop-dialog/workshop-dialog.component';
 
 @Component({
   selector: 'app-workshops',
@@ -116,6 +117,23 @@ export class WorkshopsComponent {
       maxHeight: '100vh',
       autoFocus: false,
       panelClass: 'eiflix-banner-dialog'
+    });
+  }
+  openRefferalcodeDialog() {
+    const dialogRef = this.dialog.open(WorkshopDialogComponent, {
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe(async (value: string | undefined) => {
+      if (!value) return;
+      try {
+        const ref = doc(this.firestore, 'static meta data', 'Subscriber Code');
+        await updateDoc(ref, { referralcode: value });
+        this.snackBar.open('Referral code updated successfully!', 'Close', { duration: 2000 });
+      } catch (error) {
+        console.error('Error updating referral code:', error);
+        this.snackBar.open('Error updating referral code. Please try again.', 'Close', { duration: 3000 });
+      }
     });
   }
 
