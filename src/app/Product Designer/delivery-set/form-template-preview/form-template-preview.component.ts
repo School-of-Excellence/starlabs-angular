@@ -3,24 +3,73 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { CommonModule, formatDate } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { FormGroup, FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule  , FormsModule} from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 
 @Component({
   selector: 'app-form-template-preview',
   imports: [
     CommonModule,
     MatIconModule,
-    MatButtonModule
+    ReactiveFormsModule,
+    FormsModule,
+    MatFormFieldModule,
+    MatInputModule,
   ],
   templateUrl: './form-template-preview.component.html',
   styleUrl: './form-template-preview.component.css'
 })
 export class FormTemplatePreviewComponent {
-  previewData: any[] = [];
 
-  constructor(public dialogRef: MatDialogRef<FormTemplatePreviewComponent>,@Inject(MAT_DIALOG_DATA) public data: any) {}
+  previewData: any[] = [];
+  reviewNotes: string = '';
+  notesForm: any;
+  reviewAccess: boolean;
+  participantAssignmentId: string;
+  loggedInProfileId: string;
+  profileId: string;
+
+  constructor(public dialogRef: MatDialogRef<FormTemplatePreviewComponent>,@Inject(MAT_DIALOG_DATA) public data: any, private fb: FormBuilder,) {
+    
+    this.reviewAccess = data.reviewaccess;
+    this.participantAssignmentId = data.participantassignmentid;
+    this.loggedInProfileId = this.data.loginid;
+    this.profileId = this.data.profileid;
+
+    console.log(this.data);
+    
+    console.log(this.loggedInProfileId);
+    console.log(this.profileId);
+  }
 
   ngOnInit(): void {
     this.preparePreviewData();
+    this.initForm()
+  }
+  
+  initForm() {
+    this.notesForm = this.fb.group({
+      notes: this.fb.array([
+        this.createNoteControl()
+      ])
+    });
+  }
+
+  get notesArray() {
+    return this.notesForm.get('notes') as FormArray;
+  }
+
+  createNoteControl() {
+    return this.fb.control('', Validators.required);
+  }
+
+  addNote() {
+    this.notesArray.push(this.createNoteControl());
+  }
+
+  removeNote(index: number) {
+    this.notesArray.removeAt(index);
   }
 
   preparePreviewData(): void {
@@ -71,7 +120,12 @@ export class FormTemplatePreviewComponent {
     this.dialogRef.close(false);
   }
 
-  onConfirm(): void {
-    this.dialogRef.close(true);
+  onConfirm(status): void {
+    let data = {
+      status: status,
+      reviewnotes: this.reviewNotes,
+      confirmed: true,
+    }
+    this.dialogRef.close(data);
   }
 }
