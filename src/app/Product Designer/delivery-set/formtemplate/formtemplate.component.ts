@@ -112,6 +112,19 @@ export class FormtemplateComponent {
   private connectivity = inject(ConnectivityGuardService);
   private unregisterConnectivity: (() => void) | null = null;
 
+  reviewLastForm: boolean;
+  viewFilledForm: boolean;
+  viewCompleted: boolean;
+  reviewNotes: [];
+  reviewAccess: boolean = false;
+  submissionAccess: boolean = false;
+  currentstatus: any;
+  loggedInProfileId: any = null;
+  notesForm: FormGroup;
+  cohortsref: any;
+  marathonref: any;
+  participantAssignmentId: any;
+
   constructor(
     private route : ActivatedRoute,
     private dialog : MatDialog,
@@ -119,6 +132,26 @@ export class FormtemplateComponent {
     private router : Router,
     public sanitizer: DomSanitizer
   ) {
+
+    if(this.route.snapshot.queryParams['participantAssignmentId']){
+      console.log('QueryParams', this.route.snapshot.queryParams);
+      
+      this.auth.getRoles().then(async roles => {
+        if (roles["ah"] || roles["admin"] || roles["developer"]) {
+          this.reviewAccess = true;
+        }else{
+          this.reviewAccess = false;
+        }
+        if (roles['profile_ref'].id === this.route.snapshot.queryParams['profileid']) {
+          this.submissionAccess = true;
+        }
+        this.queueId = this.route.snapshot.queryParams['queueid']
+        this.loggedInProfileId = roles['profile_ref'].id;
+      });
+    }else{
+      console.log('Not a B!G Activity');
+    }
+
     this.deliveryForm = this.fb.group({})
     this.draftDocid = doc(collection(this.firestoreForms,"temporary_forms")).id;
   }
@@ -132,6 +165,15 @@ export class FormtemplateComponent {
   }
 
   async ngOnInit() {
+
+    if(this.route.snapshot.queryParams['participantAssignmentId']){
+      getDoc(doc(this.firestoreForms, 'big participants assignments', this.participantAssignmentId)).then(res => {
+        this.currentstatus = res.data()['status'];
+        this.cohortsref = res.data()['cohortsref'];
+        this.marathonref = res.data()['marathonref'];
+      });
+    }
+
     // Register with the shared connectivity guard. The service will open a
     // blocking dialog on bad connection and call this save callback first.
     this.unregisterConnectivity = this.connectivity.register(async () => {
@@ -434,7 +476,9 @@ export class FormtemplateComponent {
       maxHeight: "90vh",
       data: {
         formData: this.submittedClientForm,
-        formValues: value
+        formValues: value,
+        reviewaccess: this.reviewAccess,
+        participantassignmentid:this.participantAssignmentId
       },
       disableClose: true
     });
@@ -664,13 +708,15 @@ export class FormtemplateComponent {
       maxWidth: '95vw',
       data: {
         formData: this.submittedClientForm,
-        formValues: value
+        formValues: value,
+        reviewaccess: this.reviewAccess,
+        participantassignmentid:this.participantAssignmentId
       },
       disableClose: true
     });
 
-    previewRef.afterClosed().subscribe(async (confirmed) => {
-      if (confirmed) {
+    previewRef.afterClosed().subscribe(async (data) => {
+      if (data.confirmed) {
         const loadingRef = this.dialog.open(LoadingProgressComponent, {
           data: { msg: "Submitting Please Wait ..." },
           disableClose: true
@@ -752,6 +798,21 @@ export class FormtemplateComponent {
 
           // Update the document using merge option
           await setDoc(existingFormDocRef, this.submittedClientForm, { merge: true });
+
+          const activityref = doc(this.firestoreForms, 'bigformassignment', this.submittedClientForm['docid']);
+          const formTemplate = this.submittedClientForm['formid'];
+
+          if(this.route.snapshot.queryParams['participantAssignmentId']){
+            await updateDoc(doc(this.firestoreForms, "big participants assignments", this.participantAssignmentId), {
+              status: data.status,
+              activityref: activityref,
+              formtemplate: formTemplate
+            }).then(() => {
+              console.log("status updated ");
+            }).catch(err => {
+              console.log(err)
+            });
+          }
 
           loadingRef.close();
 
