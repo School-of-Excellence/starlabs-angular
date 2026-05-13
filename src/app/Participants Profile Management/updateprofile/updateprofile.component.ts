@@ -36,7 +36,9 @@ export class UpdateprofileComponent {
   loading:boolean = false
   newprofile:boolean
   existingProfile = []
-  profileForm: FormGroup 
+  profileForm: FormGroup
+  emailLocked: boolean = false;
+  originalProfile: any;
 
   noWhitespaceValidator(control: AbstractControl): ValidationErrors | null {
     if (control.value != null && control.value.trim().length === 0) {
@@ -60,8 +62,7 @@ export class UpdateprofileComponent {
       enableahcrm:[false,{}],
       testuser:[false,{}],
     })
-
-
+    this.originalProfile = dialogData.profile;
     console.log(dialogData)
     this.existingProfile = dialogData.existingprofile
     this.newprofile = dialogData.profile == null
@@ -69,7 +70,7 @@ export class UpdateprofileComponent {
       var data = dialogData.profile
       var splitName = data["name"].trim().split(" ")
       this.profileForm.patchValue({
-        // name: data.name,        
+        // name: data.name,
         firstname: data.firstname ?? (splitName.length > 1 ? splitName.slice(0, splitName.length - 1).join(" ") : splitName[0]),
         lastname: data.lastname ?? splitName.length > 1 ? splitName[splitName.length -1] : null,
         dateofbirth: data.dateofbirth ? data.dateofbirth.toDate() : null,
@@ -82,9 +83,178 @@ export class UpdateprofileComponent {
         testuser: data.testuser ?? false
       })
     }
+    if (this.dialogData.profile?.user_ref) {
+      this.emailLocked = true;
+      this.profileForm.get('email')?.disable();
+    }
   }
 
   ngOnInit() {
+  }
+
+  async changeEmail() {
+    const input = prompt('Enter new email');
+    if (!input) return;
+    const newEmail = input.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      alert('Please enter a valid email address');
+      return;
+    }
+    console.log('Entered Email:', newEmail);
+    const profileId = this.dialogData.profile.profileid;
+    const profileRef = doc(this.firestore, 'profile_data', profileId);
+    const oldProfile = { ...this.dialogData.profile };
+    const data: any = this.dialogData.profile;
+    const currentEmail = (data.email || '').toLowerCase();
+    console.log('Old Email:', currentEmail);
+    if (newEmail === currentEmail) {
+      alert('Same email already exists');
+      return;
+    }
+
+    const existingMap = data.user_ref_existing || {};
+    const currentUid = data.user_ref?.id || null;
+    if (existingMap.hasOwnProperty(newEmail)) {
+      const uid = existingMap[newEmail];
+      const updatedMap = { ...existingMap };
+      updatedMap[currentEmail] = currentUid;
+      await setDoc(profileRef, {
+        email: newEmail,
+        user_ref: doc(this.firestore, 'user_data', uid),
+        user_ref_existing: updatedMap
+      }, { merge: true });
+      var salesCRMURL = null
+      var watsonURL = null
+
+      if (environment.firebase.projectId === "starlabs-test") {
+        salesCRMURL = "https://us-central1-salescrm-test-19.cloudfunctions.net/updateprofilebio";
+        watsonURL = "https://us-central1-watson-test-19.cloudfunctions.net/updateprofilebio"
+      } else {
+        salesCRMURL = 'https://us-central1-salesleadcrm.cloudfunctions.net/updateprofilebio';
+        watsonURL = 'https://us-central1-watsonproduction-becde.cloudfunctions.net/updateprofilebio';
+      }
+
+      let postData = {
+        newData : {
+          profileid: profileId,
+          name: this.profileForm.get('firstname')?.value + " " + this.profileForm.get('lastname')?.value,
+          firstname: this.profileForm.get('firstname')?.value,
+          lastname: this.profileForm.get('lastname')?.value,
+          email: newEmail,
+          number: this.profileForm.get('number')?.value,
+          countrycode: this.profileForm.get('countrycode')?.value
+        },
+        oldData:{
+          profileid: oldProfile.profileid,
+          name: oldProfile.name,
+          firstname: oldProfile.firstname,
+          lastname: oldProfile.lastname,
+          email: oldProfile.email,
+          number: oldProfile.number,
+          countrycode: oldProfile.countrycode
+        }
+      }
+      console.log('CRM Payload (REVERT):', postData);
+      this.http.post(salesCRMURL, postData).subscribe({
+        next: (res) => console.log('SalesCRM success', res),
+        error: (err) => console.log('SalesCRM error', err)
+      });
+
+      this.http.post(watsonURL, postData).subscribe({
+        next: (res) => console.log('Watson success', res),
+        error: (err) => console.log('Watson error', err)
+      });
+
+      this.dialogData.profile.email = newEmail;
+      this.dialogData.profile.user_ref = doc(this.firestore, 'user_data', uid);
+      this.profileForm.patchValue({ email: newEmail });
+      // this.originalProfile = { ...this.dialogData.profile };
+
+      this.profileForm.controls['email'].disable();
+      this.emailLocked = true;
+      alert('Email reverted');
+      return;
+    }
+
+   const alreadyExists = this.existingProfile.some(p => p.email?.toLowerCase() === newEmail && p.profileid !== profileId);
+   const existsInHistory = this.existingProfile.some(p => p.profileid !== profileId && Object.keys(p.user_ref_existing || {}).includes(newEmail));
+
+    if (alreadyExists || existsInHistory) {
+      const owner = this.existingProfile.find(p => p.profileid !== profileId && (p.email?.toLowerCase() === newEmail || Object.keys(p.user_ref_existing || {}).includes(newEmail)));
+      if(owner?.email?.toLowerCase() === newEmail){
+        alert(`${newEmail} is currently used by ${owner?.name}`);
+      } else {
+        alert(`${newEmail} is linked with ${owner?.name}`);
+      }
+      return;
+    }
+    const updatedMap = { ...existingMap };
+    if (currentUid) {
+      updatedMap[currentEmail] = currentUid;
+    }
+    await setDoc(profileRef, {
+      email: newEmail,
+      user_ref: null,
+      user_ref_existing: updatedMap
+    }, { merge: true });
+    var salesCRMURL = null
+    var watsonURL = null
+    if (environment.firebase.projectId === "starlabs-test") {
+      salesCRMURL = "https://us-central1-salescrm-test-19.cloudfunctions.net/updateprofilebio";
+      watsonURL = "https://us-central1-watson-test-19.cloudfunctions.net/updateprofilebio"
+    } else {
+      salesCRMURL = 'https://us-central1-salesleadcrm.cloudfunctions.net/updateprofilebio';
+      watsonURL = 'https://us-central1-watsonproduction-becde.cloudfunctions.net/updateprofilebio';
+    }
+
+    let postData = {
+      newData : {
+        profileid: profileId,
+        name: this.profileForm.get('firstname')?.value + " " + this.profileForm.get('lastname')?.value,
+        firstname: this.profileForm.get('firstname')?.value,
+        lastname: this.profileForm.get('lastname')?.value,
+        email: newEmail,
+        number: this.profileForm.get('number')?.value,
+        countrycode: this.profileForm.get('countrycode')?.value
+      },
+      oldData:{
+        profileid: oldProfile.profileid,
+        name: oldProfile.name,
+        firstname: oldProfile.firstname,
+        lastname: oldProfile.lastname,
+        email: oldProfile.email,
+        number: oldProfile.number,
+        countrycode: oldProfile.countrycode
+      }
+    }
+    console.log('CRM Payload (Normal):', postData);
+    this.http.post(salesCRMURL, postData).subscribe({
+      next: (res) => console.log('SalesCRM success', res),
+      error: (err) => console.log('SalesCRM error', err)
+    });
+
+    this.http.post(watsonURL, postData).subscribe({
+      next: (res) => console.log('Watson success', res),
+      error: (err) => console.log('Watson error', err)
+    });
+
+    this.dialogData.profile.email = newEmail;
+    this.dialogData.profile.user_ref = null;
+    this.dialogData.profile.user_ref_existing = updatedMap;
+    this.profileForm.patchValue({ email: newEmail });
+    // this.originalProfile = { ...this.dialogData.profile };
+
+    this.profileForm.controls['email'].enable();
+    this.emailLocked = false;
+    alert('Email updated');
+    this.dialogRef.close();
+  }
+
+  getFilteredEmails(): string[] {
+    const map = this.dialogData.profile?.user_ref_existing || {};
+    const currentEmail = this.dialogData.profile?.email?.toLowerCase();
+    return Object.keys(map).filter(email => email.toLowerCase() !== currentEmail).sort();
   }
 
   async validation():Promise<string>{
@@ -101,6 +271,14 @@ export class UpdateprofileComponent {
       }
       else if(validateEmailDuplicate){
         result = "Email ID already exists!"
+      }
+      else if(this.existingProfile.some(p => p.profileid !== this.dialogData.profile?.profileid && (p.email?.toLowerCase() === email || Object.keys(p.user_ref_existing || {}).includes(email)))){
+        const owner = this.existingProfile.find(p => p.profileid !== this.dialogData.profile?.profileid && (p.email?.toLowerCase() === email || Object.keys(p.user_ref_existing || {}).includes(email)));
+        if(owner.email?.toLowerCase() === email){
+          result = `${email} is currently used by ${owner.name}`
+        } else {
+          result = `${email} is linked with ${owner.name}`
+        }
       }
       else if(this.dialogData.profile != null && this.dialogData.profile.email != email.toLowerCase() && this.dialogData.profile.user_ref != null){
         result = this.dialogData.profile.email + " has already registered as Firebase user"
@@ -119,14 +297,14 @@ export class UpdateprofileComponent {
   }
 
   async createProfile(){
-    var profilevalue = this.profileForm.value
+    var profilevalue = this.profileForm.getRawValue();
     profilevalue["email"] = profilevalue["email"].toLowerCase()
     console.log(profilevalue)
     try {
       if(this.profileForm.valid){
         this.loading = true
         var profile_id = this.newprofile ? doc(this.firestore, 'profile_data').id : this.dialogData.profile.profileid;
-        var role_id = this.newprofile ? doc(this.firestore, 'users_roles').id : this.dialogData.profile.role_ref.id;
+        var role_id = this.newprofile ? doc(this.firestore, 'users_roles').id : (this.dialogData.profile.role_ref?.id || this.dialogData.profile.profileid);
         var validation = await this.validation()
         if(validation == null){
           if(this.newprofile){
@@ -145,7 +323,21 @@ export class UpdateprofileComponent {
           const metadataRef = doc(this.firestore, "participant metadata", profile_id)
 
           var batch = writeBatch(this.firestore)
-          batch.set(profile_dataRef, profilevalue, {merge: true})
+          const latestData: any = this.dialogData.profile || {};
+          const existingMap = latestData.user_ref_existing || {};
+          const typedEmail = profilevalue["email"].toLowerCase();
+          if (existingMap.hasOwnProperty(typedEmail)) {
+            const restoredUid = existingMap[typedEmail];
+            if (restoredUid && typeof restoredUid === 'string' && restoredUid.trim() !== '') {
+              profilevalue["user_ref"] = doc(this.firestore, 'user_data', restoredUid);
+            }
+          } else {
+            profilevalue["user_ref"] = latestData.user_ref || null;
+          }
+          batch.set(profile_dataRef, {
+            ...profilevalue,
+            user_ref_existing: latestData.user_ref_existing || {}
+          }, { merge: true });
           batch.set(users_rolesRef, {
             name : profilevalue.name,
             profile_ref : profile_dataRef,
@@ -195,17 +387,16 @@ export class UpdateprofileComponent {
                   countrycode:profilevalue.countrycode
                 },
                 oldData:{
-                  profileid:this.dialogData.profile.profileid,
-                  name:this.dialogData.profile.name,
-                  firstname:this.dialogData.profile.firstname,
-                  lastname:this.dialogData.profile.lastname,
-                  email:this.dialogData.profile.email,
-                  number:this.dialogData.profile.number,
-                  countrycode:this.dialogData.profile.countrycode
+                  profileid: this.originalProfile.profileid,
+                  name: this.originalProfile.name,
+                  firstname: this.originalProfile.firstname,
+                  lastname: this.originalProfile.lastname,
+                  email: this.originalProfile.email,
+                  number: this.originalProfile.number,
+                  countrycode: this.originalProfile.countrycode
                 }
               }
-              console.log(postData);
-              
+              // console.log('CRM Payload (SUBMIT):', postData);
               var promises = Promise.all([
                 this.http.post(salesCRMURL, postData).subscribe({
                   next: (response) => {
