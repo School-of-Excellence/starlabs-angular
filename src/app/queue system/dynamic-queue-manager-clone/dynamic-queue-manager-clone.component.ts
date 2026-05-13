@@ -57,6 +57,7 @@ interface NotificationEvent {
   message: string;
   title:   string;
   logdate: any;
+  templateName?: string;
 }
 
 interface ProfileNotificationSummary {
@@ -214,6 +215,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private storage = inject(Storage);
 
   pendingInvitationTokenIds: Set<string> = new Set();
+  pendingInvitationPairingMap: { [tokenId: string]: string[] } = {};
 
   showMoveMenu: { [key: string]: boolean } = {};
   showTokenMenu: { [key: string]: boolean } = {};
@@ -331,11 +333,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   selectedTimelineToken: any = null;
   showTimelineDialog: boolean = false;
   // notes filter
-  notesDropdownOpen: boolean = false;
-  notesDateRangeStart: Date | null = null;
-  notesDateRangeEnd: Date | null = null;
-  showNotesListModal: boolean = false;
-  filteredNotesList: any[] = [];
+  showNotesListModal = false;
+  notesSearch = '';
+  notesDateStart: Date | null = null;
+  notesDateEnd: Date | null = null;
+  notesData: any[] = [];  
 
   // Add this property
   isRoundRobinRunning = false;
@@ -375,6 +377,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   private shouldScrollTracks = false;
   timelineSearchQuery = '';
   selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
+  selectedWhatsappPreview: { profileId: string; item: NotificationEvent } | null = null;
 
   // keep unsubscribe handles to tear down on close
   private timelineUnsubs: (() => void)[] = [];
@@ -445,7 +448,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.eventParticipationDropdownOpen = false;
       this.arenaEventDropdownOpen = false;
       this.atcDropdownOpen = false;
-      this.notesDropdownOpen = false;
     }
     //dharshan
     if (!target.closest('.time-slot-dropdown-wrapper')) {
@@ -540,6 +542,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   hasPendingInvitation(token: any): boolean {
     return !!token?.docid && this.pendingInvitationTokenIds.has(token.docid);
+  }
+
+  getPendingInvitationPairingNames(token: any): string {
+    if (!token?.docid) return '';
+    const pairing = this.pendingInvitationPairingMap[token.docid] ?? [];
+    const names = pairing
+      .map(pid => this.mapProfileData[pid]?.['name'])
+      .filter((n: string) => !!n);
+    return names.join(', ');
   }
 
   getTokenHighlight(profileId: string): 'orange' | 'none' {
@@ -1722,21 +1733,31 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     })
 
     this.pendingInvitationTokenIds = new Set();
+    this.pendingInvitationPairingMap = {};
     collectionData(query(
       collection(this.firestore, "studioinvitation"),
       where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue["docid"])),
       where("clientresponse", "==", null)
     )).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(invitations => {
       const now = Date.now();
-      this.pendingInvitationTokenIds = new Set(
-        invitations
-          .filter(inv => {
-            const expiry = inv['expirydate']?.toDate ? inv['expirydate'].toDate() : inv['expirydate'];
-            return !expiry || expiry.getTime() >= now;
-          })
-          .map(inv => inv['tokenref']?.id)
-          .filter(id => !!id)
-      );
+      const activeInvitations = invitations.filter(inv => {
+        const expiry = inv['expirydate']?.toDate ? inv['expirydate'].toDate() : inv['expirydate'];
+        return !expiry || expiry.getTime() >= now;
+      });
+      const tokenIds = new Set<string>();
+      const pairingMap: { [tokenId: string]: string[] } = {};
+      for (const inv of activeInvitations) {
+        const tokenId = inv['tokenref']?.id;
+        if (!tokenId) continue;
+        tokenIds.add(tokenId);
+        const pairing: string[] = inv['specialistpairing']
+          ?? this.mapStudio[inv['studioid']]?.['pairing']
+          ?? this.mapStudio[inv['studioid']]?.['participants']
+          ?? [];
+        pairingMap[tokenId] = pairing;
+      }
+      this.pendingInvitationTokenIds = tokenIds;
+      this.pendingInvitationPairingMap = pairingMap;
     })
 
     // collectionData(query(collection(this.firestore, "queue generation", this.selectedQueue['docid'], "stagechat"), where("senderprofileid", '==', this.profileid), where("pinned", '==', true), orderBy("date", "desc")), { idField: 'id' }).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(async snap => {
@@ -4899,9 +4920,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     
     const dueReminders: any[] = [];
     
+    
     this.reminders.forEach(reminder => {
       const reminderDate = reminder.date?.toDate();
-      if (!reminderDate) return;      
+      if (!reminderDate) return;  
+      if (reminder.status === 'completed') return;    
       if (this.shownReminderIds.has(reminder.docid)) return;      
       const alreadyInPopup = this.dueRemindersToShow.some(r => r.docid === reminder.docid);
       if (alreadyInPopup) return;
@@ -4935,38 +4958,54 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.dueRemindersToShow = [];
   }
   
-  buildNotesList() {
-    if (!this.notesDateRangeStart || !this.notesDateRangeEnd) return;
-    const start = this.notesDateRangeStart;
-    const end = new Date(this.notesDateRangeEnd);
-    end.setHours(23, 59, 59, 999);
-    const result: any[] = [];
-    this.allTokensData.forEach(token => {
-      if (!token.notesList?.length || token.tokenstatus !== 'Active') return;
-      token.notesList.forEach((note: any) => {
-        const noteDate = note.updatedon instanceof Date ? note.updatedon : note.updatedon?.toDate?.();
-        if (!noteDate || noteDate < start || noteDate > end) return;
-        result.push({
-          tokennumber: token.tokennumber,
-          name: this.mapProfileData[token.profile_id]?.['name'] || '',
-          text: note.text,
-          date: noteDate,
-          authorName: this.mapProfileData[note.author]?.['name'] || '',
-          stage: note.stage || ''
-        });
-      });
-    });
-    result.sort((a, b) => b.date.getTime() - a.date.getTime());
-    this.filteredNotesList = result;
+  openNotesModal() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    this.notesSearch = '';
+    this.notesDateStart = today;
+    this.notesDateEnd = today;
     this.showNotesListModal = true;
+    this.buildNotesGrouped();
   }
 
-  closeNotesListModal() {
+  buildNotesGrouped() {
+    const map = new Map<string, any>();
+
+    const end = this.notesDateEnd ? new Date(this.notesDateEnd) : null;
+    if (end) end.setHours(23, 59, 59, 999);
+
+    const searchTerm = this.notesSearch.toLowerCase().trim();
+
+    for (const token of this.allTokensData) {
+      if (!token.notesList?.length || token.tokenstatus !== 'Active') continue;
+
+      const name = this.mapProfileData[token.profile_id]?.['name'] || '';
+      if (searchTerm && !name.toLowerCase().includes(searchTerm)) continue;
+
+      for (const note of token.notesList) {
+        const date: Date = note.updatedon?.toDate?.() ?? note.updatedon;
+        if (!date) continue;
+
+        if (this.notesDateStart && date < this.notesDateStart) continue;
+        if (end && date > end) continue;
+
+        if (!map.has(token.profile_id)) {
+          map.set(token.profile_id, { token, notes: [] });
+        }
+
+        map.get(token.profile_id).notes.push({ note, date });
+      }
+    }
+
+    this.notesData = Array.from(map.values());
+  }
+
+  closeNotesModal() {
     this.showNotesListModal = false;
-    this.notesDropdownOpen = false;
-    this.notesDateRangeStart = null;
-    this.notesDateRangeEnd = null;
-    this.filteredNotesList = [];
+    this.notesSearch = '';
+    this.notesDateStart = null;
+    this.notesDateEnd = null;
+    this.notesData = [];
   }
 
   getActiveFilterCount(): number {
@@ -5415,6 +5454,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   closeQueueTimeline() {
     this.showTimelineOverlay = false;
     this.selectedEmailPreview = null;
+    this.selectedWhatsappPreview = null;
     this.timelineUnsubs.forEach(u => u());
     this.timelineUnsubs = [];
   }
@@ -5544,6 +5584,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       const sent: string[] = data['sent'] || [];
       const failed: string[] = data['failed'] || [];
 
+      const template = data['body'] || data['message'] || '';
+      const parameterConfig = data['parameterConfig'] || data['parameterconfig'] || [];
+      const templateName = data['template_name'] || data['templateName'] || '';
+
       sent.forEach(phone => {
         const profileId = numbersmap[phone];
         if (!profileId) return;
@@ -5552,9 +5596,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         entry.totalSuccess++;
         entry.timeline.push({
           channel: 'whatsapp', status: 'success',
-          message: data['message'] || '',
+          message: this.renderWhatsappMessage(template, parameterConfig, profileId),
           title: data['title'] || '',
           logdate: data['date'],
+          templateName,
         });
       });
 
@@ -5566,9 +5611,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         entry.totalFailed++;
         entry.timeline.push({
           channel: 'whatsapp', status: 'failure',
-          message: data['message'] || '',
+          message: this.renderWhatsappMessage(template, parameterConfig, profileId),
           title: data['title'] || '',
           logdate: data['date'],
+          templateName,
         });
       });
     });
@@ -5641,6 +5687,31 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }, 50);
   }
 
+  renderWhatsappMessage(template: string, parameterConfig: any[], profileId: string): string {
+    if (!template) return '';
+    if (!Array.isArray(parameterConfig) || parameterConfig.length === 0) return template;
+
+    const metadata: Record<string, any> = this.participantMetaDataMap[profileId] || {};
+    const profile: Record<string, any> = (this.mapProfileData[profileId] as Record<string, any>) || {};
+    const datamodel: Record<string, any> = {};
+
+    for (const param of parameterConfig) {
+      const name = param?.['name'];
+      if (!name) continue;
+      let value: any = '';
+      const fillType = param?.['fillType'];
+      if (fillType === 'metadata') {
+        const field = param?.['metadataField'];
+        value = (field != null ? (metadata[field] ?? profile[field]) : undefined) ?? '';
+      } else if (fillType === 'static') {
+        value = param?.['staticValue'] ?? '';
+      }
+      datamodel[name] = value;
+    }
+
+    return this.renderMessage(template, datamodel);
+  }
+
   renderMessage(template: string, datamodel: Record<string, any>): string {
     if (!template || !datamodel) return template || '';
 
@@ -5695,6 +5766,17 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.selectedEmailPreview = null;
     } else {
       this.selectedEmailPreview = { profileId, item };
+    }
+  }
+
+  toggleWhatsappPreview(item: NotificationEvent, profileId: string) {
+    if (
+      this.selectedWhatsappPreview?.profileId === profileId &&
+      this.selectedWhatsappPreview?.item === item
+    ) {
+      this.selectedWhatsappPreview = null;
+    } else {
+      this.selectedWhatsappPreview = { profileId, item };
     }
   }
 

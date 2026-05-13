@@ -1,7 +1,8 @@
-import { Component, OnInit, Injector, runInInjectionContext, OnDestroy , NgZone} from '@angular/core';
+import { Component, OnInit, Injector, runInInjectionContext, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormBuilder, FormGroup, FormArray, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, doc, Firestore, getDocs, getDoc, limit, orderBy, query, startAfter, where, addDoc, serverTimestamp, Timestamp,updateDoc } from '@angular/fire/firestore';
+import { collection, doc, Firestore, getDocs, getDoc, limit, orderBy, query, startAfter, where, addDoc, serverTimestamp, Timestamp,updateDoc,getCountFromServer } from '@angular/fire/firestore';
+import { Storage, ref as storageRef, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -53,8 +54,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   mapJourneys: any = {};
   mapEventCount: any = {};
   mapLastVideo: { [profileid: string]: { eventName: string; date: Date | null } } = {}; 
-  mapVideoCount: { [profileid: string]: { events: number; interviews: number; testimonials: number } } = {};
-
+  mapVideoCount: { [profileid: string]: { [type: string]: number } } = {};
   // Pagination
   pageSize = 50;
   currentPage = 0;
@@ -77,6 +77,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     type: 'event' | 'video';
     eventName: string;
     date: Date | null;
+    videoRecordedDate?: Date | null
     videoUrl?: string;
     videoTitle?: string;
     hasVideo?: boolean;
@@ -84,6 +85,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     videoType?: string;
     docId?: string;
     linkedEventName?: string | null;
+    remarks?: string | null;
     extraVideos?: { videoUrl: string; videoTitle: string; docId: string; videoType: string }[];
   }[] = [];
   dragCardIndex: number | null = null;
@@ -94,15 +96,21 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   showImageOverlay = false;
   previewImageUrl = '';
   previewImageName = '';
+  previewProfileMetadataId = '';
+  previewProfileId = '';
+  imageUploading = false;
+  pendingImageFile: File | null = null;
+  pendingImagePreviewUrl = '';
+  originalImageUrl = '';
 
   // ADD VIDEO
   showAddVideoOverlay = false;
   addVideoParticipantCtrl = new FormControl('');
   addVideoFilteredParticipants: any[] = [];
-  liveEvents: { id: string; name: string }[] = [];
   addVideoSubmitted = false;
   addVideoForm!: FormGroup;
   private addVideoSearchSub: Subscription | null = null;
+  showVideoPlayer = false;
 
   // NOTE OVERLAY
   showNoteOverlay = false;
@@ -118,7 +126,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   showEditVideoOverlay = false;
   editVideoIndex: number | null = null;
   editVideoForm!: FormGroup;
-  editVideoSaving = false;;
+  editVideoSaving = false;
 
   // Bulk import
   activeTab: 'manual' | 'bulk' = 'manual';
@@ -130,6 +138,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     type: string;
     eventName: string;
     videoUrl: string;
+    remarks?: string;
     participantName?: string;
     profileid?: string;
     eventId?: string;
@@ -141,29 +150,26 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   showBulkErrorDialog = false;
   bulkErrorMessages: string[] = [];
   bulkImportProcessed = false;
+  //journey filter
   journeyOptions: { id: string; name: string }[] = [];
   selectedJourneyFilters: string[] = [];
   journeyFilterCtrl = new FormControl('');
   filteredJourneys: { id: string; name: string }[] = [];
-
-  summaryStats = {
-    totalParticipants: 0,
-    totalEvents: 0,
-    totalInterviews: 0,
-    totalTestimonials: 0, 
-  };
-
+  journeyTypeFilter: 'all' | 'active' | 'last' = 'all';
+  //summary counts
+  summaryStats = {totalParticipants: 0,videoCounts: {} as { [type: string]: number },};
   showVideoOverlay = false;
   overlayVideoUrl = '';
   overlayVideoTitle = '';
   activeWatchIndex: string | null = null;
-  journeyTypeFilter: 'all' | 'active' | 'last' = 'all';
+  //event filter
   showEventFilterDropdown = false;
   selectedEventFilters: string[] = [];
-  eventFilterOptions: { id: string; name: string }[] = [];
+  liveevent: { id: string; name: string; startDate: any }[] = [];
   eventFilterDropdownTop = 0;
   eventFilterDropdownLeft = 0;
   copiedEventId: string | null = null;
+  //video event filter
   showVideoFilterDropdown = false;
   selectedVideoFilters: string[] = [];
   videoFilterDropdownTop = 0;
@@ -171,7 +177,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   eventFilterSearchCtrl = new FormControl('');
   filteredEventFilterOptions: { id: string; name: string }[] = [];
   videoFilterSearchCtrl = new FormControl('');
-  filteredVideoFilterOptions: { id: string; name: string }[] = [];
   private pendingLogEventIndex: number | null = null;
   // LOG FILTER
   logEventFilterOptions: { id: string; name: string }[] = [];
@@ -181,33 +186,40 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   filteredLogEventOptions: { id: string; name: string }[] = [];
   private logEventFilterSub: Subscription | null = null;
   showJourneyTypeDropdown = false;
+  showOnlyWithVideos = false;
+  exportLoading = false;
   journeyFilterDropdownTop = 0;
   journeyFilterDropdownLeft = 0;
+  // Delete
+  showDeleteVideoOverlay = false;
+  deleteVideoCardIndex: number | null = null;
+  deleteVideoIndex: number | null = null;
+  deleteVideoSaving = false;
+  //video types
+  videoTypeMap: { [key: string]: string } = {
+    'Event': 'Event',
+    'Interview': 'Interview',
+    'Testimonial': 'Testimonial',
+  };
+  videoTypeKeys = Object.keys(this.videoTypeMap);
 
-  
   constructor(
     private firestore: Firestore,
+    private storage: Storage,
     private guard: AuthguardService,
-    private router: Router,
-    private injector: Injector,
     private fb: FormBuilder,
-    private ngZone: NgZone
-
   ) {}
 
   ngOnInit() {
     this.guard.getRoles().then(async (roles) => {
       this.loggedInProfileId = roles['profile_ref'].id ?? null;
-      await this.fetchParticipants();
-      this.fetchEventFilterOptions();
+      await Promise.all([
+        this.fetchParticipants(),
+        this.fetchLiveEvent()
+      ]);
       this.fetchRecords();
     });
-
-    // Debounced participant filter search
-    this.participantSearchSub = this.participantFilterCtrl.valueChanges.pipe(
-      debounceTime(300),
-      distinctUntilChanged()
-    ).subscribe((search) => {
+    this.participantSearchSub = this.participantFilterCtrl.valueChanges.pipe(debounceTime(300),distinctUntilChanged()).subscribe((search) => {
       this.filterParticipants(search || '');
     });
   }
@@ -216,9 +228,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.participantSearchSub?.unsubscribe();
     this.addVideoSearchSub?.unsubscribe();
     this.eventFilterSearchSub?.unsubscribe();  
-    this.videoFilterSearchSub?.unsubscribe();
     this.logEventFilterSub?.unsubscribe();
-  
   }
 
   // Fetch participants for filter dropdown
@@ -261,11 +271,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       })).sort((a, b) => a.name.localeCompare(b.name));
 
       this.filteredJourneys = [...this.journeyOptions];
-
-      this.journeyFilterCtrl.valueChanges.pipe(
-        debounceTime(200),
-        distinctUntilChanged()
-      ).subscribe((search) => {
+      this.journeyFilterCtrl.valueChanges.pipe(debounceTime(200),distinctUntilChanged()).subscribe((search) => {
         const lower = (search || '').toLowerCase();
         this.filteredJourneys = this.journeyOptions.filter(j =>
           j.name.toLowerCase().includes(lower)
@@ -275,40 +281,24 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.fetchSummaryStats();
   }
 
-  getJourneyFilteredIds(): string[] {
-    if (!this.selectedJourneyFilters.length) return [];
-    return Object.entries(this.mapProfiles)
-      .filter(([, profile]: [string, any]) =>
-        this.selectedJourneyFilters.includes(profile['activejourney']) ||
-        this.selectedJourneyFilters.includes(profile['lastcompletedjourney'])
-      )
-      .map(([id]) => id);
-  }
-
-  getJourneyTypeFilteredIds(): string[] {
-    if (this.journeyTypeFilter === 'all') return [];
-
+  getFilteredProfileIds(): string[] {
     return Object.entries(this.mapProfiles)
       .filter(([, profile]: [string, any]) => {
-        if (this.journeyTypeFilter === 'active') {
-          return !!profile['activejourney'];
-        } else if (this.journeyTypeFilter === 'last') {
-          return !profile['activejourney'] && !!profile['lastcompletedjourney'];
-        }
-        return true;
-      })
-      .map(([id]) => id);
+        // Journey name filter
+        const matchesJourney = !this.selectedJourneyFilters.length ||
+          this.selectedJourneyFilters.includes(profile['activejourney']) ||
+          this.selectedJourneyFilters.includes(profile['lastcompletedjourney']);
+
+        // Journey type filter
+        const matchesType =
+          this.journeyTypeFilter === 'all' ||
+          (this.journeyTypeFilter === 'active' && !!profile['activejourney']) ||
+          (this.journeyTypeFilter === 'last' && !profile['activejourney'] && !!profile['lastcompletedjourney']);
+
+        return matchesJourney && matchesType;
+      }).map(([id]) => id);
   }
 
-  onParticipantFilterChange() {
-    this.resetPagination();
-    this.fetchRecords();
-  }
-
-  onJourneyFilterChange() {
-    this.resetPagination();
-    this.fetchRecords();
-  }
   // Fetch event counts
   async fetchEventCounts(records: any[]) {
     const profileIds = records.map((r) => r['profileid']).filter(Boolean);
@@ -321,13 +311,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
     const chunks = this.chunkArray(profileIds, 30);
     const snaps = await Promise.all(
-      chunks.map((chunk) => getDocs(query( collection(this.firestore, 'event participation request'), where('status', '==', 'attended'), where('profileid', 'in', chunk) )) ) );
+    chunks.map((chunk) => getDocs(query( collection(this.firestore, 'event participation request'), where('status', '==', 'attended'), where('profileid', 'in', chunk) )) ) );
     snaps.forEach((snap) => {
       snap.docs.forEach((d) => {
         const profileid = d.data()['profileid'];
         const eventref = d.data()['eventref'];
         const metadataId = profileIdToMetadataId[profileid];
-        // Store by metadataId so HTML row['id'] lookup works correctly
         if (metadataId && eventref?.path?.startsWith('event collection/')) {
           this.mapEventCount[metadataId] = (this.mapEventCount[metadataId] || 0) + 1;
         }
@@ -350,139 +339,95 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       )))
     );
 
-    // Group ALL videos by profileid first
-    const allByProfile: { [profileid: string]: any[] } = {};
     snaps.forEach((snap) => {
       snap.docs.forEach((d) => {
         const profileid = d.data()['profileid'];
         const type = d.data()['type'];
+        if (!profileid) return;
+        if (!this.mapVideoCount[profileid]) {
+          this.mapVideoCount[profileid] = {};
+        }
+        if (type) {
+          this.mapVideoCount[profileid][type] = (this.mapVideoCount[profileid][type] || 0) + 1;
+        }
+        // First occurrence per profileid 
+        if (!this.mapLastVideo[profileid]) {
+          let eventName = d.data()['title'] || '—';
+          let date: Date | null = null;
 
-        if (profileid) {
-          // Collect all for sorting
-          if (!allByProfile[profileid]) {
-            allByProfile[profileid] = [];
+          if (d.data()['eventref']?.path) {
+            const eventId = d.data()['eventref'].path.replace('event collection/', '');
+            const found = this.liveevent.find(e => e.id === eventId);
+            if (found) eventName = found.name;
           }
-          allByProfile[profileid].push({ ...d.data(), docId: d.id });
 
-          // Count by type
-          if (!this.mapVideoCount[profileid]) {
-            this.mapVideoCount[profileid] = { events: 0, interviews: 0, testimonials: 0 };
-          }
-          if (type === 'Event') {
-            this.mapVideoCount[profileid].events++;
-          } else if (type === 'Interview') {
-            this.mapVideoCount[profileid].interviews++;
-          } else if (type === 'Testimonial') {
-            this.mapVideoCount[profileid].testimonials++;
-          }
+          const rawDate = d.data()['recordeddate'] || null;
+          if (rawDate?.toDate) date = rawDate.toDate();
+          else if (rawDate) date = new Date(rawDate);
+
+          this.mapLastVideo[profileid] = { eventName, date };
         }
       });
     });
-
-    // For each profileid, pick the latest video by recordeddate
-    await Promise.all(
-      Object.entries(allByProfile).map(async ([profileid, videos]) => {
-        // Sort descending by recordeddate, nulls last
-        videos.sort((a, b) => {
-          const dateA = a['recordeddate']?.toDate?.() ?? (a['recordeddate'] ? new Date(a['recordeddate']) : null);
-          const dateB = b['recordeddate']?.toDate?.() ?? (b['recordeddate'] ? new Date(b['recordeddate']) : null);
-          if (!dateA && !dateB) return 0;
-          if (!dateA) return 1;  // nulls go last
-          if (!dateB) return -1;
-          return dateB.getTime() - dateA.getTime();
-        });
-
-        const latest = videos[0];
-        let eventName = latest['title'] || '—';
-        let date: Date | null = null;
-
-        // Try to get event name from eventref
-        if (latest['eventref']?.path) {
-          try {
-            const eventDoc = await runInInjectionContext(
-              this.injector, () => getDoc(latest['eventref'])
-            );
-            if (eventDoc.exists()) {
-              eventName = eventDoc.data()['name'] || latest['title'] || '—';
-            }
-          } catch (e) {}
-        }
-
-        // Parse date
-        const rawDate = latest['recordeddate'] || null;
-        if (rawDate?.toDate) date = rawDate.toDate();
-        else if (rawDate) date = new Date(rawDate);
-
-        this.mapLastVideo[profileid] = { eventName, date };
-      })
-    );
   }
 
   async fetchSummaryStats() {
-    const snap = await getDocs(query(
-      collection(this.firestore, 'participant videos'),
-      where('delete', '==', false)
-    ));
-
-    let events = 0, interviews = 0, testimonials = 0;
-    snap.docs.forEach((d) => {
-      const type = d.data()['type'];
-      if (type === 'Event') events++;
-      else if (type === 'Interview') interviews++;
-      else if (type === 'Testimonial') testimonials++;
-    });
-
-    this.ngZone.run(() => {
-      this.summaryStats = {
-        totalParticipants: this.participantOptions.length,
-        totalEvents: events,
-        totalInterviews: interviews,
-        totalTestimonials: testimonials,
-      };
-    });
-  }
-
-  // Fetch profile data
-  async fetchProfileData(records: any[]) {
-    const profileIdSet = new Set<string>();
-    records.forEach((r) => {
-      if (r['profileid']) profileIdSet.add(r['profileid']);
-    });
-
-    if (profileIdSet.size === 0) return;
-
-    const chunks = this.chunkArray([...profileIdSet], 30);
-    const snaps = await Promise.all(
-      chunks.map((chunk) =>
-        getDocs(query(
-          collection(this.firestore, 'profile_data'),
-          where('__name__', 'in', chunk)
+    const counts = await Promise.all(
+      this.videoTypeKeys.map((type) =>
+        getCountFromServer(query(
+          collection(this.firestore, 'participant videos'),
+          where('delete', '==', false),
+          where('type', '==', type)
         ))
       )
     );
 
-    const profileDataMap: any = {};
+    const videoCounts: { [type: string]: number } = {};
+    this.videoTypeKeys.forEach((type, index) => {
+      videoCounts[type] = counts[index].data().count;
+    });
+
+    this.summaryStats = {
+      totalParticipants: this.participantOptions.length,
+      videoCounts,
+    };
+  }
+
+  // Fetch profile photo
+  async fetchProfilePhotos(records: any[]) {
+    const profileIds = records.map((r) => r['profileid']).filter(Boolean);
+    if (profileIds.length === 0) return;
+
+    const profileIdToMetadataId: { [profileid: string]: string } = {};
+    records.forEach((r) => {
+      if (r['profileid']) profileIdToMetadataId[r['profileid']] = r.id;
+    });
+
+    const chunks = this.chunkArray(profileIds, 30);
+    const snaps = await Promise.all(
+      chunks.map((chunk) =>
+        getDocs(query(
+          collection(this.firestore, 'profile_data'),
+          where('profileid', 'in', chunk)
+        ))
+      )
+    );
+
     snaps.forEach((snap) => {
       snap.docs.forEach((d) => {
+        const profileid = d.data()['profileid'];
         const photo = d.data()['profile'] || null;
         const profileImg = d.data()['profileimg'] || null;
         const resolvedPhoto = photo?.includes('profile-image-png-14') ? null : photo;
-        profileDataMap[d.id] = {
-          photo: resolvedPhoto || profileImg,
-          mobile: (d.data()['countrycode'] || '') + (d.data()['number'] || ''),
-          email: d.data()['email'] || '',
-
-        };
+        const resolvedProfileImg = profileImg?.includes('profile-image-png-14') ? null : profileImg;
+        const metadataId = profileIdToMetadataId[profileid];
+        if (metadataId) {
+          this.mapProfiles[metadataId] = {
+            ...this.mapProfiles[metadataId],
+            photo: resolvedProfileImg || resolvedPhoto || null,
+          };
+        }
       });
-    });
-
-    records.forEach((r) => {
-      if (r['profileid'] && profileDataMap[r['profileid']]) {
-        this.mapProfiles[r.id] = {
-          ...this.mapProfiles[r.id],
-          ...profileDataMap[r['profileid']],
-        };
-      }
     });
   }
 
@@ -496,13 +441,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.filteredParticipants = this.participantOptions.filter((p) =>
       p.name?.toLowerCase().includes(lower)
     );
-  }
-
-
-
-  applyFilters() {
-    this.resetPagination();
-    this.fetchRecords();
   }
 
   openJourneyTypeDropdown(event: MouseEvent) {
@@ -610,6 +548,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.selectedEventFilters = [];
     this.selectedVideoFilters = [];
     this.journeyTypeFilter = 'all';
+    this.showOnlyWithVideos = false;
     this.showJourneyTypeDropdown = false;          
     this.eventFilterSearchCtrl.setValue('');   
     this.videoFilterSearchCtrl.setValue('');   
@@ -628,14 +567,16 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   }
 
   private async fetchSupportingData(records: any[]) {
+    this.mapEventCount = {};
+    this.mapLastVideo = {};
+    this.mapVideoCount = {};
     await Promise.all([
-      this.fetchProfileData(records),
+      this.fetchProfilePhotos(records),
       this.fetchEventCounts(records),
       this.fetchLastVideos(records),
     ]);
   }
 
- //pagination
   private buildBaseQuery(idChunk?: string[], startAfterDoc?: any) {
     const ref = collection(this.firestore, 'participant metadata');
     const constraints: any[] = [orderBy('name', 'asc')];
@@ -673,122 +614,94 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       .map(([id]) => id);
   }
 
+  private async executeQuery(snap: any, totalCount?: number) {
+    this.records = snap.docs.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
+    await this.fetchSupportingData(this.records);
+    this.lastDoc = snap.docs[snap.docs.length - 1] || null;
+    this.pageCache.set(this.currentPage, snap.docs);
+    this.totalRecords = totalCount ?? (
+      snap.docs.length < this.pageSize
+        ? this.currentPage * this.pageSize + snap.docs.length
+        : (this.currentPage + 2) * this.pageSize
+    );
+    this.summaryStats = {
+      ...this.summaryStats,
+      totalParticipants: this.showOnlyWithVideos
+        ? this.totalRecords
+        : this.participantOptions.length,
+    };
+    this.loading = false;
+    this.initialLoading = false;
+  }
+
   async fetchRecords(startAfterDoc?: any) {
     this.loading = true;
-
     let selectedIds = this.selectedParticipants.map((p) => p.id);
-
-    // Apply journey name filter
-    if (this.selectedJourneyFilters.length) {
-      const journeyIds = this.getJourneyFilteredIds();
-      selectedIds = selectedIds.length > 0
-        ? selectedIds.filter(id => journeyIds.includes(id))
-        : journeyIds;
+    if (this.selectedJourneyFilters.length || this.journeyTypeFilter !== 'all') {
+      const filteredIds = this.getFilteredProfileIds();
+      selectedIds = selectedIds.length > 0? selectedIds.filter(id => filteredIds.includes(id)): filteredIds;
     }
-
-    // Apply journey TYPE filter (active / last)
-    if (this.journeyTypeFilter !== 'all') {
-      const typeIds = this.getJourneyTypeFilteredIds();
-      selectedIds = selectedIds.length > 0
-        ? selectedIds.filter(id => typeIds.includes(id))
-        : typeIds;
-    }
-
     // Apply event filter
     if (this.selectedEventFilters.length) {
       const eventIds = await this.getEventFilteredIds();
-      selectedIds = selectedIds.length > 0
-        ? selectedIds.filter(id => eventIds.includes(id))
-        : eventIds;
+      selectedIds = selectedIds.length > 0? selectedIds.filter(id => eventIds.includes(id)): eventIds;
     }
-
     // Apply video filter
     if (this.selectedVideoFilters.length) {
       const videoIds = await this.getVideoFilteredIds();
-      selectedIds = selectedIds.length > 0
-        ? selectedIds.filter(id => videoIds.includes(id))
-        : videoIds;
+      selectedIds = selectedIds.length > 0? selectedIds.filter(id => videoIds.includes(id)): videoIds;
     }
 
-    const noFilters = !this.selectedParticipants.length &&
-                    !this.selectedJourneyFilters.length &&
-                    !this.selectedEventFilters.length &&
-                    !this.selectedVideoFilters.length&&
-                    this.journeyTypeFilter === 'all';
+    if (this.showOnlyWithVideos) {
+      const withVideoIds = await this.getParticipantsWithVideos();
+      selectedIds = selectedIds.length > 0? selectedIds.filter(id => withVideoIds.includes(id)): withVideoIds;
+    }
+
+    const noFilters = !this.selectedParticipants.length &&!this.selectedJourneyFilters.length &&!this.selectedEventFilters.length &&!this.selectedVideoFilters.length&&this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos;
     if (noFilters) {
-      this.executeSingleQuery(this.buildBaseQuery(undefined, startAfterDoc));
-      return;
-    }
+        const snap = await getDocs(this.buildBaseQuery(undefined, startAfterDoc));
+        await this.executeQuery(snap);
+        return;
+      }
 
-    if (selectedIds.length === 0) {
-      this.ngZone.run(() => {
+      if (selectedIds.length === 0) {
         this.records = [];
         this.totalRecords = 0;
         this.loading = false;
         this.initialLoading = false;
-      });
-      return;
+        return;
+      }
+
+      if (selectedIds.length <= 30) {
+        const snap = await getDocs(this.buildBaseQuery(selectedIds, startAfterDoc));
+        await this.executeQuery(snap);
+        return;
+      }
+
+      const chunks = this.chunkArray(selectedIds, 30);
+      const snapshots = await Promise.all(chunks.map((chunk) => getDocs(this.buildBaseQuery(chunk, startAfterDoc))));
+      const allDocs = snapshots.flatMap((s) => s.docs);
+      allDocs.sort((a, b) =>
+        (a.data()['name'] || '').toLowerCase().localeCompare((b.data()['name'] || '').toLowerCase())
+      );
+      const paginated = allDocs.slice(0, this.pageSize);
+      await this.executeQuery({ docs: paginated }, allDocs.length);
+    }
+ 
+    async getParticipantsWithVideos(): Promise<string[]> {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'participant videos'),
+        where('delete', '==', false)
+      ));
+      const profileIds = new Set<string>(
+        snap.docs.map(d => d.data()['profileid']).filter(Boolean)
+      );
+      return Object.entries(this.mapProfiles)
+        .filter(([, profile]: [string, any]) => profileIds.has(profile['profileid']))
+        .map(([id]) => id);
     }
 
-    if (selectedIds.length <= 30) {
-      this.executeSingleQuery(this.buildBaseQuery(selectedIds, startAfterDoc));
-      return;
-    }
-
-    const chunks = this.chunkArray(selectedIds, 30);
-    Promise.all(chunks.map((chunk) => getDocs(this.buildBaseQuery(chunk, startAfterDoc))))
-      .then(async (snapshots) => {
-        const allDocs = snapshots.flatMap((s) => s.docs);
-        allDocs.sort((a, b) =>
-          (a.data()['name'] || '').toLowerCase().localeCompare((b.data()['name'] || '').toLowerCase())
-        );
-        const paginated = allDocs.slice(0, this.pageSize);
-        this.records = paginated.map((d) => ({ id: d.id, ...(d.data() as any) }));
-        this.resetSupportingMaps();
-        await this.fetchSupportingData(this.records);
-        this.lastDoc = paginated[paginated.length - 1] || null;
-        this.pageCache.set(this.currentPage, paginated as any);
-        this.totalRecords = allDocs.length;
-        this.ngZone.run(() => {
-          this.loading = false;
-          this.initialLoading = false;
-        });
-      });
-  }
-
-  private executeSingleQuery(q: any) {
-    getDocs(q)
-      .then(async (snap) => {
-        this.records = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
-        this.resetSupportingMaps();
-        await this.fetchSupportingData(this.records);
-        this.lastDoc = snap.docs[snap.docs.length - 1] || null;
-        this.pageCache.set(this.currentPage, snap.docs as any);
-        // FIX #6 — accurate totalRecords for 3000+ participants
-        if (snap.docs.length < this.pageSize) {
-          this.totalRecords = this.currentPage * this.pageSize + snap.docs.length;
-        } else {
-          this.totalRecords = (this.currentPage + 2) * this.pageSize;
-        }
-        this.ngZone.run(() => {
-          this.loading = false;
-          this.initialLoading = false;
-        });
-      })
-      .catch((err) => {
-        console.error('Error fetching records:', err);
-        this.loading = false;
-        this.initialLoading = false;
-      });
-  }
-
-  private resetSupportingMaps() {
-    this.mapEventCount = {};
-    this.mapLastVideo = {};
-    this.mapVideoCount = {};
-  }
-
-  onPageChange(event: PageEvent) {
+   onPageChange(event: PageEvent) {
     if (event.pageSize !== this.pageSize) {
       this.pageSize = event.pageSize;
       this.resetPagination();
@@ -800,8 +713,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       if (this.pageCache.has(this.currentPage)) {
         const cached = this.pageCache.get(this.currentPage)!;
         this.records = cached.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
-        this.resetSupportingMaps();
-        this.fetchSupportingData(this.records);
+        this.fetchSupportingData(this.records).catch(err => console.error('Error fetching supporting data:', err));
       } else {
         this.fetchRecords(this.lastDoc);
       }
@@ -810,12 +722,11 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       const cached = this.pageCache.get(this.currentPage)!;
       this.records = cached.map((d: any) => ({ id: d.id, ...(d.data() as any) }));
       this.lastDoc = cached[cached.length - 1];
-      this.resetSupportingMaps();
-      this.fetchSupportingData(this.records);
+      this.fetchSupportingData(this.records).catch(err => console.error('Error fetching supporting data:', err));
     }
   }
 
-  private resetPagination() {
+  resetPagination() {
     this.currentPage = 0;
     this.lastDoc = null;
     this.pageCache.clear();
@@ -877,50 +788,61 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     });
 
     // Build event items
-    const eventItems = await Promise.all(
-      eventSnap.docs
-        .filter((d) => {
+    const eventItems = eventSnap.docs
+      .filter((d) => {
           const eventref = d.data()['eventref'];
           return eventref?.path?.startsWith('event collection/');
         })
-        .map(async (d) => {
-          const data = d.data();
-          const eventref = data['eventref'];
-          let eventName = 'Unknown Event';
-          let date: Date | null = null;
-
-          try {
-            const eventDoc = await runInInjectionContext(this.injector, () => getDoc(eventref));
-            if (eventDoc.exists()) {
-              eventName = eventDoc.data()['name'] || 'Unknown Event';
-              const rawDate = eventDoc.data()['start_date'] || null;
-              if (rawDate?.toDate) date = rawDate.toDate();
-              else if (rawDate) date = new Date(rawDate);
-            }
-          } catch (e) {}
-
-          const matchedVideos = videoByEventRef[eventref.path] || [];
-          const matchedVideo = matchedVideos[0] || null;
-
-          return {
-            type: 'event' as const,
-            eventName,
-            date,
-            hasVideo: matchedVideos.length > 0,
-            videoUrl: matchedVideo ? matchedVideo['videourl'] : null,
-            videoTitle: matchedVideo?.['title'] || null,
-            eventId: eventref.path,
-            docId: matchedVideo?.['docId'] || null,
-            videoType: matchedVideo?.['type'] || null,
-            extraVideos: matchedVideos.slice(1).map((v: any) => ({
+      .map((d) => {
+        const data = d.data();
+        const eventref = data['eventref'];
+        let eventName = 'Unknown Event';
+        let date: Date | null = null;
+        const eventId = eventref.path.replace('event collection/', '');
+        const found = this.liveevent.find(e => e.id === eventId);
+        if (found) {
+          eventName = found.name;
+          const rawDate = found.startDate;
+          if (rawDate?.toDate) date = rawDate.toDate();
+          else if (rawDate) date = new Date(rawDate);
+        }
+        const matchedVideos = videoByEventRef[eventref.path] || [];
+        const matchedVideo = matchedVideos[0] || null;
+        let videoRecordedDate: Date | null = null;
+        if (matchedVideo) {
+          const rawVideoDate = matchedVideo['recordeddate'] || null;
+          if (rawVideoDate?.toDate) videoRecordedDate = rawVideoDate.toDate();
+          else if (rawVideoDate) videoRecordedDate = new Date(rawVideoDate);
+        }
+        return {
+          type: 'event' as const,
+          eventName,
+          date,
+          hasVideo: matchedVideos.length > 0,
+          videoUrl: matchedVideo ? matchedVideo['videourl'] : null,
+          videoTitle: matchedVideo?.['title'] || null,
+          eventId: eventref.path,
+          docId: matchedVideo?.['docId'] || null,
+          videoType: matchedVideo?.['type'] || null,
+          remarks: matchedVideo?.['remarks'] || null,
+          extraVideos: matchedVideos.slice(1).map((v: any) => {
+            let extraDate: Date | null = null;
+            const rawExtraDate = v['recordeddate'] || null;
+            if (rawExtraDate?.toDate) extraDate = rawExtraDate.toDate();
+            else if (rawExtraDate) extraDate = new Date(rawExtraDate);
+            return {
               videoUrl: v['videourl'],
               videoTitle: v['title'] || 'Untitled',
               docId: v['docId'],
               videoType: v['type'] || null,
-            })),
-          };
-        })
-    );
+              recordedDate: extraDate,
+              eventId: eventref.path,
+              remarks: v['remarks'] || null,
+            };
+          }),
+        };
+      })
+    
 
     // Build standalone video items (Interview/Testimonial)
     const videoItems = standaloneVideos.map((v) => {
@@ -935,6 +857,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         videoUrl: v['videourl'],
         videoTitle: v['title'],
         videoType: v['type'],
+        remarks: v['remarks'] || null,
         docId: v['docId'] || null,
 
       };
@@ -945,23 +868,15 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     const unmatchedEntries = Object.entries(videoByEventRef)
       .filter(([path]) => !matchedEventPaths.has(path));
 
-    const unmatchedEventVideos = await Promise.all(
-      unmatchedEntries.flatMap(([path, videos]) =>
-        videos.map(async (v: any) => {
-          let date: Date | null = null;
-          if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
-          else if (v['recordeddate']) date = new Date(v['recordeddate']);
+    const unmatchedEventVideos = unmatchedEntries.flatMap(([path, videos]) =>
+      videos.map((v: any) => {
+        let date: Date | null = null;
+        if (v['recordeddate']?.toDate) date = v['recordeddate'].toDate();
+        else if (v['recordeddate']) date = new Date(v['recordeddate']);
 
-          // Fetch actual event name from Firestore
-          let linkedEventName: string | null = null;
-          try {
-            const eventDoc = await runInInjectionContext(this.injector, () =>
-              getDoc(doc(this.firestore, path))
-            );
-            if (eventDoc.exists()) {
-              linkedEventName = eventDoc.data()['name'] || null;
-            }
-          } catch (e) {}
+        const eventId = path.replace('event collection/', '');
+        const found = this.liveevent.find(e => e.id === eventId);
+        const linkedEventName = found?.name || null;
 
           return {
             type: 'video' as const,
@@ -972,11 +887,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             videoTitle: v['title'],
             videoType: v['type'],
             docId: v['docId'] || null,
-            linkedEventName,   // <-- new field
+            linkedEventName,  
+            eventId: path,
+            remarks: v['remarks'] || null,
             extraVideos: [],
           };
-        })
-      )
+      })
     );
 
     // Merge and sort by date desc
@@ -998,8 +914,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         return (orderMap.get(keyA) ?? 999) - (orderMap.get(keyB) ?? 999);
       });
     }
-
-    this.ngZone.run(() => {
     this.logEvents = allItems;
     this.filteredLogEvents = [...allItems];
     this.selectedLogEventFilter = [];
@@ -1027,9 +941,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         o.name.toLowerCase().includes(lower)
       );
     });
-
     this.logLoading = false;
-    });
   }
 
   onCardDragStart(event: DragEvent, i: number) {
@@ -1087,16 +999,114 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.closeNote();
   }
 
-  openImage(photo: string, name: string) {
+  openImage(photo: string, name: string, metadataId: string = '', profileid: string = '') {
     this.previewImageUrl = photo || 'https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/profile-image-png-14.png?alt=media&token=ce6361d2-690c-4742-bba7-dbb90e193080';
     this.previewImageName = name;
+    this.previewProfileMetadataId = metadataId;
+    this.previewProfileId = profileid;
+    this.originalImageUrl = this.previewImageUrl;
+    this.pendingImageFile = null;
+    this.pendingImagePreviewUrl = '';
     this.showImageOverlay = true;
   }
 
   closeImage() {
+    if (this.imageUploading) return;
     this.showImageOverlay = false;
     this.previewImageUrl = '';
     this.previewImageName = '';
+    this.previewProfileMetadataId = '';
+    this.previewProfileId = '';
+    this.originalImageUrl = '';
+    this.clearPendingImage();
+  }
+
+  triggerImageUpload(input: HTMLInputElement) {
+    if (this.imageUploading) return;
+    input.value = '';
+    input.click();
+  }
+
+  onProfileImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      input.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size should be less than 5MB');
+      input.value = '';
+      return;
+    }
+
+    this.clearPendingImage();
+    this.pendingImageFile = file;
+    this.pendingImagePreviewUrl = URL.createObjectURL(file);
+    this.previewImageUrl = this.pendingImagePreviewUrl;
+    input.value = '';
+  }
+
+  cancelPendingImage() {
+    if (this.imageUploading) return;
+    this.previewImageUrl = this.originalImageUrl;
+    this.clearPendingImage();
+  }
+
+  private clearPendingImage() {
+    if (this.pendingImagePreviewUrl) {
+      URL.revokeObjectURL(this.pendingImagePreviewUrl);
+    }
+    this.pendingImageFile = null;
+    this.pendingImagePreviewUrl = '';
+  }
+
+  async confirmUploadImage() {
+    if (this.imageUploading || !this.pendingImageFile) return;
+
+    const file = this.pendingImageFile;
+    const metadataId = this.previewProfileMetadataId;
+    const profileid = this.previewProfileId || metadataId;
+    const profileName = this.previewImageName || profileid;
+    if (!profileid) {
+      alert('Unable to identify profile for upload');
+      return;
+    }
+
+    this.imageUploading = true;
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${profileName}/profile/${safeName} ${new Date().toISOString()}`;
+      const ref = storageRef(this.storage, path);
+      const snap = await uploadBytes(ref, file);
+      const url = await getDownloadURL(snap.ref);
+
+      await Promise.all([
+        updateDoc(doc(this.firestore, 'profile_data', profileid), { profileimg: url }),
+        updateDoc(doc(this.firestore, 'participant metadata', profileid), { profileimg: url }),
+      ]);
+
+      if (metadataId) {
+        this.mapProfiles[metadataId] = {
+          ...this.mapProfiles[metadataId],
+          photo: url,
+          profileimg: url,
+        };
+      }
+
+      this.originalImageUrl = url;
+      this.previewImageUrl = url;
+      this.clearPendingImage();
+      alert('Image uploaded successfully');
+    } catch (err) {
+      console.error('Profile image upload failed', err);
+      alert('Failed to upload image');
+    } finally {
+      this.imageUploading = false;
+    }
   }
 
   // VIDEO PLAYER
@@ -1108,8 +1118,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       .replace(/[?&]raw=\d/, '')
       + (url.includes('?') ? '&' : '?') + 'raw=1';
   }
-
-  showVideoPlayer = false;
 
   openVideoPlayer(url: string, title: string = '') {
     this.showVideoPlayer = false;
@@ -1171,6 +1179,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       type: ['', Validators.required],
       eventId: [''],
       videoUrl: ['', Validators.required],
+      remarks: [''],
     });
   }
 
@@ -1179,8 +1188,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.addVideoForm = this.buildAddVideoForm();
     this.addVideoFilteredParticipants = [...this.participantOptions];
     this.showAddVideoOverlay = true;
-    this.fetchLiveEvents();
-
     if (this.addVideoSearchSub) {
       this.addVideoSearchSub.unsubscribe();
     }
@@ -1204,7 +1211,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.bulkImportProcessed = false;
     this.bulkImportLoading = false;
     this.bulkImportSaving = false;
-    this.pendingLogEventIndex = null; // ← add this
+    this.pendingLogEventIndex = null; 
     if (this.addVideoSearchSub) {
       this.addVideoSearchSub.unsubscribe();
       this.addVideoSearchSub = null;
@@ -1232,7 +1239,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
     this.showAddVideoOverlay = true;
     this.pendingLogEventIndex = this.logEvents.indexOf(event);
-    this.fetchLiveEvents();
 
     if (this.addVideoSearchSub) {
       this.addVideoSearchSub.unsubscribe();
@@ -1248,58 +1254,27 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     });
   }
 
-  async fetchLiveEvents() {
+  async fetchLiveEvent() {
+    if (this.liveevent.length > 0) return;
     const snap = await getDocs(
       query(collection(this.firestore, 'event collection'), orderBy('name', 'asc'))
     );
-    this.liveEvents = snap.docs.map((d) => ({
+    this.liveevent = snap.docs.map((d) => ({
       id: d.id,
       name: d.data()['name'] || 'Unnamed Event',
-    }));
-  }
-
-  async fetchEventFilterOptions() {
-    if (this.eventFilterOptions.length > 0) return;
-    const snap = await getDocs(
-      query(collection(this.firestore, 'event collection'), orderBy('name', 'asc'))
-    );
-    this.eventFilterOptions = snap.docs.map((d) => ({
-      id: d.id,
-      name: d.data()['name'] || 'Unnamed Event',
+      startDate: d.data()['start_date'] || null
     }));
 
-    this.filteredEventFilterOptions = [...this.eventFilterOptions];
-    this.filteredVideoFilterOptions = [...this.eventFilterOptions];
+    this.filteredEventFilterOptions = [...this.liveevent];
 
     this.eventFilterSearchSub = this.eventFilterSearchCtrl.valueChanges.pipe(
       debounceTime(200), distinctUntilChanged()
     ).subscribe((search) => {
       const lower = (search || '').toLowerCase();
-      this.filteredEventFilterOptions = this.eventFilterOptions.filter(e =>
+      this.filteredEventFilterOptions = this.liveevent.filter(e =>
         e.name.toLowerCase().includes(lower)
       );
     });
-
-    this.videoFilterSearchSub = this.videoFilterSearchCtrl.valueChanges.pipe(
-      debounceTime(200), distinctUntilChanged()
-    ).subscribe((search) => {
-      const lower = (search || '').toLowerCase();
-      this.filteredVideoFilterOptions = this.eventFilterOptions.filter(e =>
-        e.name.toLowerCase().includes(lower)
-      );
-    });
-  }
-
-  addVideoEntry() {
-    this.entriesArray.push(this.buildEntry());
-  }
-
-  removeVideoEntry(index: number) {
-    this.entriesArray.removeAt(index);
-  }
-
-  onEntryTypeChange(entry: FormGroup) {
-    entry.get('eventId')?.setValue('');
   }
 
   async saveVideo() {
@@ -1327,6 +1302,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type: entry.type,
             eventref: eventRef,
             videourl: entry.videoUrl,
+            remarks: entry.remarks || null,
             uploadedon: serverTimestamp(),
             uploadedby: this.loggedInProfileId,
             delete: false,
@@ -1334,38 +1310,35 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         })
       );
 
-      this.ngZone.run(() => {
-        // Live-update the log card if opened from log overlay
-        if (this.showLogOverlay && this.pendingLogEventIndex !== null) {
-          const idx = this.pendingLogEventIndex;
-          const firstEntry = formValue.entries[0];
-          const updated = [...this.logEvents];
-          const current = updated[idx] as any;
-
-          updated[idx] = {
-            ...current,
-            videoTitle: firstEntry.title,
-            videoUrl: firstEntry.videoUrl,
-            videoType: firstEntry.type,
-            hasVideo: !!firstEntry.videoUrl,
-            docId: savedRefs[0].id,
-            date: firstEntry.recordedDate
-              ? new Date(firstEntry.recordedDate)
-              : current.date,
-            extraVideos: formValue.entries.slice(1).map((e: any, i: number) => ({
-              videoUrl: e.videoUrl,
-              videoTitle: e.title,
-              docId: savedRefs[i + 1].id,
-              videoType: e.type,
-            })),
-          };
-          this.logEvents = [...updated];
-          this.pendingLogEventIndex = null;
-        }
-
-        this.closeAddVideo();
-        this.fetchRecords();
-      });
+      if (this.showLogOverlay && this.pendingLogEventIndex !== null) {
+        const idx = this.pendingLogEventIndex;
+        const firstEntry = formValue.entries[0];
+        const updated = [...this.logEvents];
+        const current = updated[idx] as any;
+        updated[idx] = {
+          ...current,
+          videoTitle: firstEntry.title,
+          videoUrl: firstEntry.videoUrl,
+          videoType: firstEntry.type,
+          hasVideo: !!firstEntry.videoUrl,
+          docId: savedRefs[0].id,
+          remarks: firstEntry.remarks || null,
+          date: firstEntry.recordedDate
+            ? new Date(firstEntry.recordedDate)
+            : current.date,
+          extraVideos: formValue.entries.slice(1).map((e: any, i: number) => ({
+            videoUrl: e.videoUrl,
+            videoTitle: e.title,
+            docId: savedRefs[i + 1].id,
+            videoType: e.type,
+            remarks: e.remarks || null,
+          })),
+        };
+        this.logEvents = [...updated];
+        this.pendingLogEventIndex = null;
+      }
+      this.closeAddVideo();
+      this.fetchRecords();
 
     } catch (err) {
       console.error('Error saving video:', err);
@@ -1374,22 +1347,43 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   openEditVideo(event: any, i: number) {
     this.editVideoIndex = i;
-    this.editVideoForm = this.fb.group({
-      docId: [event.docId || ''],
-      title: [event.videoTitle || event.eventName || '', Validators.required],
-      recordedDate: [event.date || null],
-      type: [event.videoType || 'Event', Validators.required],
-      eventId: [
-        event.eventId
-          ? event.eventId.replace('event collection/', '')
-          : '',
-      ],
-      videoUrl: [event.videoUrl || '', Validators.required],
-    });
-    this.showEditVideoOverlay = true;
-    this.fetchLiveEvents();
-  }
+    const allVideos = [
+      {
+        docId: event.docId || '',
+        title: event.videoTitle || event.eventName || '',
+        recordedDate: event.videoRecordedDate ?? null,
+        type: event.videoType || 'Event',
+        eventId: event.eventId ? event.eventId.replace('event collection/', '') : '',
+        videoUrl: event.videoUrl || '',
+        remarks: event.remarks || '',
+      },
+      ...(event['extraVideos'] || []).map((v: any) => ({
+        docId: v.docId || '',
+        title: v.videoTitle || '',
+        recordedDate: v.recordedDate ?? null,
+        type: v.videoType || 'Event',
+        eventId: v.eventId ? v.eventId.replace('event collection/', '') : '',
+        videoUrl: v.videoUrl || '',
+        remarks: v.remarks || '',
+      }))
+    ];
 
+    this.editVideoForm = this.fb.group({
+      entries: this.fb.array(
+        allVideos.map(v => this.fb.group({
+          docId: [v.docId],
+          title: [v.title, Validators.required],
+          recordedDate: [v.recordedDate],
+          type: [v.type, Validators.required],
+          eventId: [v.eventId],
+          videoUrl: [v.videoUrl, Validators.required],
+          remarks: [v.remarks],
+        }))
+      )
+    });
+      this.showEditVideoOverlay = true;
+
+  }
   closeEditVideo() {
     this.showEditVideoOverlay = false;
     this.editVideoIndex = null;
@@ -1401,80 +1395,115 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     if (!this.editVideoForm.valid) return;
     this.editVideoSaving = true;
 
-    const val = this.editVideoForm.value;
-    const existingDocId = val.docId;
+    const entries = (this.editVideoForm.get('entries') as FormArray).value;
 
     try {
-      const eventRef = val.eventId
-        ? doc(this.firestore, 'event collection', val.eventId)
-        : null;
+      await Promise.all(
+        entries.map((val: any) => {
+          const eventRef = val.eventId
+            ? doc(this.firestore, 'event collection', val.eventId)
+            : null;
 
-      let resolvedDocId = existingDocId;
+          return updateDoc(doc(this.firestore, 'participant videos', val.docId), {
+            title: val.title,
+            recordeddate: val.recordedDate
+              ? Timestamp.fromDate(new Date(val.recordedDate))
+              : null,
+            type: val.type,
+            eventref: eventRef,
+            videourl: val.videoUrl,
+            remarks: val.remarks || null,
+          });
+        })
+      );
 
-      if (existingDocId) {
-        // UPDATE existing video doc
-        await updateDoc(doc(this.firestore, 'participant videos', existingDocId), {
-          title: val.title,
-          recordeddate: val.recordedDate
-            ? Timestamp.fromDate(new Date(val.recordedDate))
-            : null,
-          type: val.type,
-          eventref: eventRef,
-          videourl: val.videoUrl,
-        });
-      } else {
-        // CREATE new video doc (event card had no video yet)
-        const profileid = this.currentLogProfileId;
-        const newRef = await addDoc(collection(this.firestore, 'participant videos'), {
-          profileid: profileid,
-          title: val.title,
-          recordeddate: val.recordedDate
-            ? Timestamp.fromDate(new Date(val.recordedDate))
-            : null,
-          type: val.type,
-          eventref: eventRef,
-          videourl: val.videoUrl,
-          uploadedon: serverTimestamp(),
-          uploadedby: this.loggedInProfileId,
-          delete: false,
-        });
-        resolvedDocId = newRef.id;
-      }
-
-    this.ngZone.run(() => {
       if (this.editVideoIndex !== null) {
         const updated = [...this.logEvents];
         const current = updated[this.editVideoIndex] as any;
-
-        // Find the linked event name from liveEvents if eventId is set
-        const linkedEvent = val.eventId
-          ? this.liveEvents.find(e => e.id === val.eventId)
-          : null;
+        const [primary, ...extras] = entries;
+        const linkedEvent = primary.eventId? this.liveevent.find((e: any) => e.id === primary.eventId): null;
 
         updated[this.editVideoIndex] = {
           ...current,
-          videoTitle: val.title,
-          eventName: current.type === 'video' ? val.title : current.eventName,
-          date: val.recordedDate ? new Date(val.recordedDate) : current.date,
-          videoType: val.type,
-          eventId: val.eventId
-            ? `event collection/${val.eventId}`
-            : null,
+          videoTitle: primary.title,
+          eventName: current.type === 'video' ? primary.title : current.eventName,
+          date: primary.recordedDate ? new Date(primary.recordedDate) : current.date,
+          videoType: primary.type,
+          eventId: primary.eventId ? `event collection/${primary.eventId}` : null,
           linkedEventName: linkedEvent ? linkedEvent.name : null,
-          videoUrl: val.videoUrl,
-          hasVideo: !!val.videoUrl,
-          docId: resolvedDocId,
-          extraVideos: current.extraVideos || [],
+          videoUrl: primary.videoUrl,
+          hasVideo: !!primary.videoUrl,
+          docId: primary.docId,
+          remarks: primary.remarks || null,
+          extraVideos: extras.map((e: any) => ({
+            docId: e.docId,
+            videoUrl: e.videoUrl,
+            videoTitle: e.title,
+            videoType: e.type,
+            recordedDate: e.recordedDate ? new Date(e.recordedDate) : null,
+            eventId: e.eventId ? `event collection/${e.eventId}` : null,
+            remarks: e.remarks || null,
+          })),
         };
+
         this.logEvents = [...updated];
       }
       this.closeEditVideo();
       this.fetchRecords();
-    });
 
     } catch (err) {
       console.error('Error saving video:', err);
       this.editVideoSaving = false;
+    }
+  }
+
+  openDeleteVideo(cardIndex: number) {
+    const card = this.logEvents[cardIndex] as any;
+    this.deleteVideoCardIndex = cardIndex;
+    if (card.extraVideos?.length > 0) {
+      this.showDeleteVideoOverlay = true;
+    } else {
+      this.deleteVideoIndex = 0;
+      this.Delete();
+    }
+  }
+
+  closeDeleteVideo() {
+    this.showDeleteVideoOverlay = false;
+    this.deleteVideoCardIndex = null;
+    this.deleteVideoIndex = null;
+    this.deleteVideoSaving = false;
+  }
+
+  async Delete() {
+    const confirmed = confirm('Are you sure you want to delete this video?');
+    if (!confirmed) {
+      this.closeDeleteVideo();
+      return;
+    }
+
+    if (this.deleteVideoCardIndex === null || this.deleteVideoIndex === null) return;
+    this.deleteVideoSaving = true;
+    const card = this.logEvents[this.deleteVideoCardIndex] as any;
+    const docIdToDelete = this.deleteVideoIndex === 0? card.docId: card.extraVideos[this.deleteVideoIndex - 1]?.docId;
+
+    if (!docIdToDelete) {
+      this.deleteVideoSaving = false;
+      return;
+    }
+
+    try {
+      await updateDoc(doc(this.firestore, 'participant videos', docIdToDelete), {
+        delete: true
+      });
+      this.closeDeleteVideo();
+      await Promise.all([
+        this.loadEventLog(this.currentLogProfileId),
+        this.fetchRecords()
+      ]);
+    } catch (err) {
+      console.error('Error deleting video:', err);
+      this.deleteVideoSaving = false;
     }
   }
 
@@ -1493,7 +1522,8 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         'Recorded Date (Optional) - Format: YYYY-MM-DD',
         'Type (Required) - Event / Interview / Testimonial',
         'Event Name (Optional) - Must exactly match database name',
-        'Video URL (Required)'
+        'Video URL (Required)',
+        'Remarks (Optional)'
       ],
       ['john@example.com', 'Pre Video', '2026-01-15', 'Event', 'BIG Accelerator', 'https://dropbox.com/video1'],
       ['jane@example.com', 'Interview Jan 2026', '2026-01-20', 'Interview', '', 'https://dropbox.com/video2'],
@@ -1503,7 +1533,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     const ws = XLSX.utils.aoa_to_sheet(sampleData);
     ws['!cols'] = [
       { wch: 25 }, { wch: 20 }, { wch: 35 },
-      { wch: 40 }, { wch: 45 }, { wch: 40 }
+      { wch: 40 }, { wch: 45 }, { wch: 40 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sample');
@@ -1546,14 +1576,8 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
         // Skip header row
         const dataRows = rows.slice(1).filter((r) => r.some((cell) => cell));
-
-        // Fetch all participant metadata emails at once
-        const emailMap = await this.buildEmailToParticipantMap();
-
-        // Fetch all events for name matching
-        const eventNameMap = await this.buildEventNameMap();
-
-        this.ngZone.run(() => {
+        const emailMap = this.buildEmailToParticipantMap();
+        const eventNameMap = this.buildEventNameMap();
         this.bulkPreviewRows = dataRows.map((row) => {
           const email = String(row[0] || '').trim().toLowerCase();
           const title = String(row[1] || '').trim();
@@ -1561,7 +1585,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           const type = String(row[3] || '').trim();
           const eventName = String(row[4] || '').trim();
           const videoUrl = String(row[5] || '').trim();
-
+          const remarks  = String(row[6] || '').trim();
           const errors: string[] = [];
 
           // Parse recorded date
@@ -1583,8 +1607,8 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           if (!title) errors.push('Title is missing');
           if (!videoUrl) errors.push('Video URL is missing');
           if (!type) errors.push('Type is missing');
-          if (!['Event', 'Interview', 'Testimonial'].includes(type)) {
-            errors.push(`Type must be Event, Interview or Testimonial (got: "${type}")`);
+          if (!Object.keys(this.videoTypeMap).includes(type)) {
+            errors.push(`Type must be one of: ${Object.keys(this.videoTypeMap).join(', ')} (got: "${type}")`);
           }
 
           // Match participant
@@ -1609,6 +1633,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type,
             eventName,
             videoUrl,
+            remarks,
             participantName: participant?.name || '',
             profileid: participant?.profileid || '',
             eventId,
@@ -1628,8 +1653,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           );
           this.showBulkErrorDialog = true;
         }
-      });
-
       } catch (err) {
         this.bulkErrorMessages = ['Failed to parse Excel file. Please check the format.'];
         this.showBulkErrorDialog = true;
@@ -1639,32 +1662,27 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     reader.readAsArrayBuffer(file);
   }
 
-  private async buildEmailToParticipantMap(): Promise<{
-    [email: string]: { name: string; profileid: string; metadataId: string }
-  }> {
-    const snap = await getDocs(
-      collection(this.firestore, 'participant metadata')
-    );
+  private buildEmailToParticipantMap() {
     const map: { [email: string]: { name: string; profileid: string; metadataId: string } } = {};
-    snap.docs.forEach((d) => {
-      const email = (d.data()['email'] || '').toString().trim().toLowerCase();
+    this.participantOptions.forEach((p) => {
+      const profile = this.mapProfiles[p.id];
+      const email = (profile?.['email'] || '').toString().trim().toLowerCase();
       if (email) {
         map[email] = {
-          name: d.data()['name'] || '',
-          profileid: d.data()['profileid'] || '',
-          metadataId: d.id,
+          name: p.name || '',
+          profileid: profile?.['profileid'] || '',
+          metadataId: p.id,
         };
       }
     });
     return map;
   }
 
-  private async buildEventNameMap(): Promise<{ [name: string]: string }> {
-    const snap = await getDocs(collection(this.firestore, 'event collection'));
+  private buildEventNameMap() {
     const map: { [name: string]: string } = {};
-    snap.docs.forEach((d) => {
-      const name = (d.data()['name'] || '').toString().trim().toLowerCase();
-      if (name) map[name] = d.id;
+    this.liveevent.forEach((e) => {
+      const name = e.name.trim().toLowerCase();
+      if (name) map[name] = e.id;
     });
     return map;
   }
@@ -1672,20 +1690,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   async saveBulkImport() {
     const validRows = this.bulkPreviewRows.filter((r) => r.status === 'valid');
     if (validRows.length === 0) return;
-
     this.bulkImportSaving = true;
-
     try {
       await Promise.all(
         validRows.map((row) => {
-          const eventRef = row.eventId
-            ? doc(this.firestore, 'event collection', row.eventId)
-            : null;
-
-          const recordedDate = row.recordedDate
-            ? Timestamp.fromDate(new Date(row.recordedDate))
-            : null;
-
+          const eventRef = row.eventId ? doc(this.firestore, 'event collection', row.eventId): null;
+          const recordedDate = row.recordedDate? Timestamp.fromDate(new Date(row.recordedDate)): null;
           return addDoc(collection(this.firestore, 'participant videos'), {
             profileid: row.profileid,
             title: row.title,
@@ -1693,18 +1703,16 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type: row.type,
             eventref: eventRef,
             videourl: row.videoUrl,
+            remarks: row.remarks || null,
             uploadedon: serverTimestamp(),
             uploadedby: this.loggedInProfileId,
             delete: false,
           });
         })
       );
-
-    this.ngZone.run(() => {
       this.bulkImportSaving = false;
       this.closeAddVideo();
       this.fetchRecords();
-    });
     } catch (err) {
       console.error('Bulk import error:', err);
       this.bulkErrorMessages = ['Error saving videos. Please try again.'];
@@ -1712,10 +1720,144 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       this.bulkImportSaving = false;
     }
   }
-
   closeBulkErrorDialog() {
     this.showBulkErrorDialog = false;
     this.bulkErrorMessages = [];
   }
 
+  async exportToExcel() {
+    this.exportLoading = true;
+    try {
+      let selectedIds = this.selectedParticipants.map((p) => p.id);
+      if (this.selectedJourneyFilters.length || this.journeyTypeFilter !== 'all') {
+        const filteredIds = this.getFilteredProfileIds();
+        selectedIds = selectedIds.length > 0? selectedIds.filter(id => filteredIds.includes(id)): filteredIds;
+      }
+      if (this.selectedEventFilters.length) {
+        const eventIds = await this.getEventFilteredIds();
+        selectedIds = selectedIds.length > 0? selectedIds.filter(id => eventIds.includes(id)): eventIds;
+      }
+      if (this.selectedVideoFilters.length) {
+        const videoIds = await this.getVideoFilteredIds();
+        selectedIds = selectedIds.length > 0? selectedIds.filter(id => videoIds.includes(id)): videoIds;
+      }
+      if (this.showOnlyWithVideos) {
+        const withVideoIds = await this.getParticipantsWithVideos();
+        selectedIds = selectedIds.length > 0? selectedIds.filter(id => withVideoIds.includes(id)): withVideoIds;
+      }
+      const allParticipants = selectedIds.length > 0
+        ? selectedIds.map(id => ({
+            metadataId: id,
+            name: this.participantOptions.find(p => p.id === id)?.name || '',
+            email: this.mapProfiles[id]?.['email'] || '',
+            profileid: this.mapProfiles[id]?.['profileid'] || '',
+          })).filter(p => p.profileid)
+        : this.participantOptions.map(p => ({
+            metadataId: p.id,
+            name: p.name || '',
+            email: this.mapProfiles[p.id]?.['email'] || '',
+            profileid: this.mapProfiles[p.id]?.['profileid'] || '',
+          })).filter(p => p.profileid);
+      const profileIds = allParticipants.map(p => p.profileid);
+      const chunks = this.chunkArray(profileIds, 30);
+      const snaps = await Promise.all(
+            chunks.map(chunk => getDocs(query(
+              collection(this.firestore, 'participant videos'),
+              where('profileid', 'in', chunk),
+              where('delete', '==', false)
+            )))
+          );
+      const videoMap: { [profileid: string]: { label: string; url: string; date: Date | null }[] } = {};
+      snaps.forEach(snap => {
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const profileid = data['profileid'];
+          if (!profileid) return;
+          if (!videoMap[profileid]) videoMap[profileid] = [];
+          let label = data['title'] || 'Untitled';
+          if (data['eventref']?.path) {
+            const eventId = data['eventref'].path.replace('event collection/', '');
+            const found = this.liveevent.find(e => e.id === eventId);
+            if (found) label = found.name;
+          }
+          let date: Date | null = null;
+          const rawDate = data['recordeddate'] || null;
+          if (rawDate?.toDate) date = rawDate.toDate();
+          else if (rawDate) date = new Date(rawDate);
+          videoMap[profileid].push({ label, url: data['videourl'] || '', date });
+        });
+      });
+      Object.keys(videoMap).forEach(profileid => {
+        videoMap[profileid].sort((a, b) => {
+          if (!a.date && !b.date) return 0;
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return a.date.getTime() - b.date.getTime();
+        });
+      });
+      const maxVideos = Math.max(0, ...Object.values(videoMap).map(v => v.length));
+      const headers = [
+        'Name',
+        'Email',
+        'Video Count',
+        ...Array.from({ length: maxVideos }, (_, i) => `Video ${i + 1}`)
+      ];
+
+      const rows = allParticipants
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(p => {
+          const videos = videoMap[p.profileid] || [];
+          return [
+            p.name,
+            p.email,
+            videos.length,
+            ...videos.map(v => `${v.label}: ${v.url}`),
+            ...Array(Math.max(0, maxVideos - videos.length)).fill(''),
+          ];
+        });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = [
+        { wch: 25 },
+        { wch: 30 },
+        { wch: 12 },
+        ...Array(maxVideos).fill({ wch: 60 }),
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Participant Videos');
+      const fileName = `participant_videos_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      this.exportLoading = false;
+    }
+  }
+
+  getTotalVideoCount(profileid: string): number {
+    if (!profileid || !this.mapVideoCount[profileid]) return 0;
+    return Object.values(this.mapVideoCount[profileid]).reduce((sum, count) => sum + count, 0);
+  }
+    onParticipantFilterChange() {
+    this.resetPagination();
+    this.fetchRecords();
+  }
+
+  onJourneyFilterChange() {
+    this.resetPagination();
+    this.fetchRecords();
+  }
+
+  addVideoEntry() {
+    this.entriesArray.push(this.buildEntry());
+  }
+
+  removeVideoEntry(index: number) {
+    this.entriesArray.removeAt(index);
+  }
+
+  onEntryTypeChange(entry: FormGroup) {
+    entry.get('eventId')?.setValue('');
+  }
 }

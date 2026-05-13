@@ -604,7 +604,8 @@ export class BookAppointmentComponent implements OnInit {
           cancelled: false,
           created: serverTimestamp(),
           loggedid: this.loggedinPID,
-          productid: this.selectedAppointment.productid
+          productid: this.selectedAppointment.productid,
+          // participantproductid: this.selectedUser
         }
         
         batch.set(appointmentDoc, appointmentData)

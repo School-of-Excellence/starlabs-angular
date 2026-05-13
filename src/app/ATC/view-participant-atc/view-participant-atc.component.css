@@ -374,6 +374,72 @@
   color: #bdbdbd;
 }
 
+.status-icon.autogeneralized {
+  color: #7c3aed;
+}
+
+.procedure-block {
+  background: #f5f5f5;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.procedure-block:last-child {
+  margin-bottom: 0;
+}
+
+.procedure-block.deleted {
+  opacity: 0.5;
+  background: #ffebee;
+}
+
+.procedure-block > .procedure-row {
+  background: transparent;
+  margin-bottom: 0;
+}
+
+.procedure-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px 36px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: #eef2ff;
+}
+
+.procedure-status-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.procedure-status-value {
+  font-weight: 600;
+}
+
+.procedure-status-text.status-pending {
+  background: #f3f4f6;
+}
+.procedure-status-text.status-pending .procedure-status-value {
+  color: #6b7280;
+}
+
+.procedure-status-text.status-completed {
+  background: #ecfdf5;
+}
+.procedure-status-text.status-completed .procedure-status-value {
+  color: #047857;
+}
+
+.procedure-status-text.status-autogeneralized {
+  background: #f5f3ff;
+}
+.procedure-status-text.status-autogeneralized .procedure-status-value {
+  color: #6d28d9;
+}
+
 .assigned-info {
   font-size: 12px;
   color: #666;

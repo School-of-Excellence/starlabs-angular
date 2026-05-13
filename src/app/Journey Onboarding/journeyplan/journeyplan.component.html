@@ -493,6 +493,40 @@
     </div>
   </div>
 
+  <!-- SECTION: Participant Onboarding -->
+  <div class="section-card" *ngIf="participantJourneyData != null">
+    <div class="section-label-bar">
+      <mat-icon class="section-bar-icon">rocket_launch</mat-icon>
+      <span>Participant Onboarding</span>
+    </div>
+
+    <div class="onboard-box">
+      <div class="onboard-journey">
+        <mat-icon>route</mat-icon>
+        <span>{{ mapjourneyname[participantJourneyData["journeyref"].id] }}</span>
+      </div>
+
+      <div class="onboard-status onboard-success" *ngIf="participantJourneyData['onboarded']">
+        <mat-icon>verified</mat-icon>
+        <span>Participant Onboarded</span>
+      </div>
+
+      <div class="onboard-status onboard-blocked"
+        *ngIf="!participantJourneyData['onboarded'] && participantJourneyData['paymentplan'] == null">
+        <mat-icon>lock</mat-icon>
+        <span>Payment plan not updated — cannot onboard yet</span>
+      </div>
+
+      <div class="onboard-status onboard-ready"
+        *ngIf="!participantJourneyData['onboarded'] && participantJourneyData['paymentplan']">
+        <span>Ready to onboard this participant</span>
+        <button mat-raised-button (click)="markOnboarded()">
+          <mat-icon>task_alt</mat-icon> Mark as Onboarded
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- SINGLE BOTTOM BUTTON — unchanged -->
   <div class="bottom-action-bar">
     <button mat-raised-button class="btn-update-plan" (click)="updateParticipantPlan()">
