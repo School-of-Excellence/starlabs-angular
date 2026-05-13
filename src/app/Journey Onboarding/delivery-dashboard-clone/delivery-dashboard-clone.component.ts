@@ -3,8 +3,7 @@ import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule }
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
-import { Observable, Subscription, combineLatest, firstValueFrom } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Observable, Subscription, combineLatest } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
@@ -16,12 +15,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import * as XLSX from 'xlsx';
-import { MatDatepickerModule, MatDateRangePicker } from '@angular/material/datepicker';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { isPast } from 'date-fns';
 
 interface TableHeader {
     key: string;
@@ -183,7 +181,6 @@ export class DeliveryDashboardCloneComponent {
     groupedByProfileAll: { [profileId: string]: any[] } = {};
     groupedByStageProfileAll: any = {};
     groupedByProfileFiltered: { [profileId: string]: any[] } = {};
-    // bonusPackageIds: Set<string> = new Set();
     bonusPackageIds: Set<{ id: string; package: string }> = new Set();
     addonsPackageIds: Set<{ id: string; package: string }> = new Set();
     groupedBonus: { [key: string]: any[] } = {};
@@ -273,10 +270,6 @@ export class DeliveryDashboardCloneComponent {
 
     showHiddenCompletionProducts: boolean = false;
 
-    get funnelProfileIds(): string[] {
-        return Object.keys(this.funnelModalProfiles);
-    }
-
     private allFetchedAppointments: any[] = [];
     journeyFlowLoading: boolean = false;
     journeyMonthPicker = new FormControl<Date>(new Date());
@@ -309,51 +302,61 @@ export class DeliveryDashboardCloneComponent {
 
     };
 
+    productsSubscription: Subscription;
     searchName: string = '';
     filteredOriginalData: any = {};
-
-    // *Abishek Vimal
-
-    // Search participant
     showSearchBar = false;
     showTable = false;
     expandedSections: string[] = [];
     filteredCardsMap: { [key: number]: any[] } = {};
     productParticipantData = [];
-    totalEligible: any[] = [];
-    pastMonth: any[] = [];
-    thisMonth: any[] = [];
-    nextMonth: any[] = [];
-    onBoarded = [];
-    upcomingDIAppointments = [];
-    report = [];
-    celebrationCall = [];
     selectedProductLabel: string = "";
+
     appointmentMap = new Map();
     allAppointments = [];
     typeNameMap = new Map();
     appointmentTypes$: any;
     appointmentTypes: any[] = [];
     mappedAppointmentTypes: any[] = [];
+
+    selectedFlowProduct = "";
+    mapProductGroupId: any = [];
+    stages: any = [];
+    tableData: any[] = [];
+    filteredParticipantData: any = {};
+    selectedProductType: string = '';
+    selectedColumns: string[] = [];
+
     private appointmentsSubscription: Subscription | null = null;
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
     private ticketRequestSubscription: Subscription;
-    
 
-    columns = [
-        "Total Eligible",
-        "Request",
-        "Pre-Process Form",
-        "Diagnostics",
-        "Implementation",
-        "Post-Process Form",
-        "Review",
-        "Completion"
-    ]
+    columns = {
+        "eiStarterPack": [
+            "Total Eligible",
+            "Past Month",
+            "This Month",
+            "Next Month",
+            "Onboarded",
+            "Pre-Process",
+            "D&I Appointments",
+            "Report",
+            "Celebration Call"
+        ],
 
-    selectedFlowProduct = "";
-    mapProductGroupId: any = [];
+        "criticalSupport": [
+            "Total Eligible",
+            "Request",
+            "Pre-Process Form",
+            "Diagnostics",
+            "Implementation",
+            "Post-Process Form",
+            "Review",
+            "Completion"
+        ]
+    };
+
     products = [
         { label: 'WiSH', value: 'WiSH' },
         { label: 'A&H Light', value: 'A&H Light' },
@@ -365,16 +368,23 @@ export class DeliveryDashboardCloneComponent {
         }
     ];
 
-    stages = [
-        'Pre-Process',
-        'Diagnostics',
-        'Implementation',
-        'Post-Process Form',
-        'Review'
-    ];
+    stagesConfig: any = {
+        'Critical Support': [
+            'Pre-Process',
+            'Diagnostics',
+            'Implementation',
+            'Post-Process Form',
+            'Review'
+        ],
+        'EI Starter Pack': [
+            'Welcome Call',
+            'Diagnostics',
+            'Implementation',
+            'Post Session Check-in',
+            'Celebration Call'
+        ]
+    };
 
-    tableData: any[] = [];
-    filteredParticipantData: any = {};
     searchedParticipantHeaders: string[] = [
         'Name',
         'Email',
@@ -389,6 +399,7 @@ export class DeliveryDashboardCloneComponent {
         'Completed',
         'Needs Validation'
     ];
+
     categoryColumnMap: { [category: string]: string } = {
         initiatedToday: 'initiated',
         welcomeCall: 'welcomeCall',
@@ -410,7 +421,6 @@ export class DeliveryDashboardCloneComponent {
     completedCount = 0;
 
     mapMetaData: any = {};
-    mapProfileData: any = {};
     mapjourneyname: any = {};
     mapProductName: any = {};
     modeMap: any = {};
@@ -441,51 +451,47 @@ export class DeliveryDashboardCloneComponent {
     slotOverview: SlotOverview = { totalSlots: 0, booked: 0, available: 0, bookingRate: 0 };
     slotsByProduct: SlotByProduct[] = [];
     specialistData: SpecialistRow[] = [];
-    private isFiltering = false;
 
     currentMonth: number = new Date().getMonth();
     currentYear: number = new Date().getFullYear();
 
-    productSubscriptions: Subscription[] = [];
-    productData: any = {
-        totalEligible: [],
-        request: [],
-        preprocess: [],
-        diagnostics: [],
-        implementation: [],
-        postForm: [],
-        review: [],
-        completion: []
-    }
-
-    participantLoading = false;
-
-    constructor(
-        private firestore: Firestore,
-        private cdr: ChangeDetectorRef,
-        private dialog: MatDialog,
-        private guard: AuthguardService,
-        private router: Router,
-        private fb: FormBuilder,
-        private injector: Injector,
-        private datepipe: DatePipe,
-    ) {
-        this.filterForm = this.fb.group({
-            search: [''],
-            journey: [[]],
-            product: [[]]
-        });
-
-    }
     addonsPackageLookup: Record<string, string> = {};
     bonusPackageLookup: Record<string, string> = {};
+
     sortDirection: { [key: number]: 'asc' | 'desc' } = {};
     ticketRequest: any[] = [];
     ticketSubscription: any;
     selectedFilter: string = 'recent';
     selectedStageFilter: string = '';
-    openAppointmentModal = false;
     selectedStage = '';
+
+    openAppointmentModal = false;
+    participantLoading = false;
+
+    productData: any = {
+        eiStarterPack: {
+            totalEligible: [],
+            pastMonth: [],
+            thisMonth: [],
+            nextMonth: [],
+            onBoarded: [],
+            upcomingDIAppointments: [],
+            reports: [],
+            celebrationCall: []
+        },
+
+        criticalSupport: {
+            totalEligible: [],
+            request: [],
+            preprocess: [],
+            diagnostics: [],
+            implementation: [],
+            postForm: [],
+            review: [],
+            completion: []
+        }
+    };
+
     stageData: any = {
         diagnostics: {
             all: [],
@@ -506,6 +512,24 @@ export class DeliveryDashboardCloneComponent {
             overdue: []
         }
     };
+
+    constructor(
+        private firestore: Firestore,
+        private cdr: ChangeDetectorRef,
+        private dialog: MatDialog,
+        private guard: AuthguardService,
+        private router: Router,
+        private fb: FormBuilder,
+        private injector: Injector,
+        private datepipe: DatePipe,
+    ) {
+        this.filterForm = this.fb.group({
+            search: [''],
+            journey: [[]],
+            product: [[]]
+        });
+
+    }
 
     async ngOnInit() {
         this.setCurrentMonth();
@@ -538,7 +562,6 @@ export class DeliveryDashboardCloneComponent {
                 ))
             );
 
-            // this.bonusPackageIds = new Set(bonusPackageSnap.docs.map((d) => d.id));
             this.bonusPackageIds = new Set(
                 bonusPackageSnap.docs.map(d => ({
                     id: d.id,
@@ -746,7 +769,8 @@ export class DeliveryDashboardCloneComponent {
 
                     if (packageId && this.bonusPackageIds.has(packageId)) {
                         (groupedBonus[productId] ||= []).push(item);
-                    } else if (packageId && this.addonsPackageIds.has(packageId)) {
+                    }
+                    else if (packageId && this.addonsPackageIds.has(packageId)) {
                         (groupedAddons[productId] ||= []).push(item);
                     }
                     else {
@@ -804,15 +828,28 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
+        this.productData = {};
+
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
+        this.stages = this.stagesConfig[product] || [];
+
         if (this.allAppointments?.length === 0) {
             await this.filterAppointmentsByType();
             await this.FilterReportData(productId);
-            await this.fetchTicketRiseParticipants();
+            if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
-        await this.filterProductData(productId);
-        await this.filterStageData();
+
+        if (product === 'EI Starter Pack') {
+            this.selectedColumns = this.columns.eiStarterPack;
+            await this.filterProductData('eiStarterPack', product, productId);
+        }
+        else if (product === 'Critical Support') {
+            this.selectedColumns = this.columns.criticalSupport;
+            await this.filterProductData('criticalSupport', product, productId);
+        }
+
+        if (product === 'Critical Support') await this.filterStageData();
         this.participantLoading = false;
     }
 
@@ -904,116 +941,241 @@ export class DeliveryDashboardCloneComponent {
         });
     }
 
-    async filterProductData(productId: string) {
+    async filterProductData(productType: string, product: string, productId: string) {
+        let productData: any = {
+            eiStarterPack: {
+                totalEligible: [],
+                pastMonth: [],
+                thisMonth: [],
+                nextMonth: [],
+                onBoarded: [],
+                upcomingDIAppointments: [],
+                reports: [],
+                celebrationCall: []
+            },
 
-        let productData = {
-            totalEligible: [],
-            request: this.ticketRequest?.length
-                ? [...this.ticketRequest]
-                : [],
-            preprocess: [],
-            diagnostics: [],
-            implementation: [],
-            postForm: [],
-            review: [],
-            completion: []
-        }
+            criticalSupport: {
+                totalEligible: [],
+                request: this.ticketRequest.length ? this.ticketRequest : [],
+                preprocess: [],
+                diagnostics: [],
+                implementation: [],
+                postForm: [],
+                review: [],
+                completion: []
+            }
+        };
 
+        this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
+        try {
+            const totalEligible = this.getCardGroupedFiltered(productId);
+            if (productType === 'criticalSupport') {
+                productData.criticalSupport.totalEligible = [...totalEligible];
+            }
+            else if (productType === 'eiStarterPack') {
+                for (let data of totalEligible) {
+                    const { status, tentativestart } = data;
 
-        let totalEligible = this.getCardGroupedFiltered(productId);
-        productData.totalEligible = totalEligible;
+                    if (status === null || status === "initiated") {
+                        if (!tentativestart) productData.totalEligible.push(data);
+                        else if (tentativestart) {
+                            const date = tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData);
+                        }
+                    }
+                };
+            }
 
-        const ongoingData = this.funnelData[productId]?.ongoing;
+            // Total Eligible
+            const ongoingData = this.funnelData[productId]?.ongoing || [];
 
-        if (ongoingData.length > 0) {
             for (let data of ongoingData) {
-                let mergedData;
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
+                await Promise.all(
+                    appointments.map(async (appointment) => {
+                        if (!appointment.appointmentTypeName) {
+                            appointment.appointmentTypeName =
+                                await this.resolveAppointmentType(appointment);
+                        }
+                    })
+                );
 
                 const attendedAppointments = appointments.filter(app => app.attended === true || app.status === 'submitted');
+                let mergedData = {
+                    ...data,
+                    allappointments: appointments
+                };
 
                 if (attendedAppointments.length === 0) {
-                    mergedData = {
-                        ...data,
-                        allappointments: appointments
+                    if (productType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
+                    if (productType === 'eiStarterPack') {
+                        if (!data.tentativestart) {
+                            productData.eiStarterPack.totalEligible.push(mergedData);
+                        } else {
+                            const date = data.tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData);
+                        }
                     }
-                    productData.totalEligible.push(mergedData);
                 }
                 else if (attendedAppointments.length > 0) {
-                    const reviewAppointment = attendedAppointments.find(app =>
-                        app.appointmentTypeName?.toLowerCase() === `critical support review`
-                    );
-                    const postprocessAppointment = attendedAppointments.find(app =>
-                        app.formname?.toLowerCase() === 'critical support post form'
-                    )
-                    const implementationAppointment = attendedAppointments.find(app =>
-                        app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
-                    );
+                    // ========================= EI STARTER PACK =========================
+                    if (productType === 'eiStarterPack') {
+                        const celebrationCallAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
+                        );
+                        const reportAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === `${product.toLowerCase()} post session check-in`
+                        );
+                        const implementationAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
+                        );
 
-                    const diagnosticsAppointment = attendedAppointments.find(app =>
-                        app.appointmentTypeName?.toLowerCase() === `critical support diagnostics`
-                    );
+                        const diagnosticsAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} diagnostics`
+                        );
 
-                    const preprocessAppointment = attendedAppointments.find(app =>
-                        app.formname?.toLowerCase() === 'critical support request'
-                    )
+                        const welcomeCallAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} welcome call`
+                        );
 
-                    if (reviewAppointment) {
-                        mergedData = {
-                            ...data,
-                            ...reviewAppointment,
-                            allappointments: appointments
-                        };
-                        productData.review.push(mergedData);
+                        if (celebrationCallAppointment) {
+                            productData.eiStarterPack.celebrationCall.push({
+                                ...mergedData,
+                                ...celebrationCallAppointment
+                            });
+                        }
+                        else if (reportAppointment) {
+                            productData.eiStarterPack.reports.push({
+                                ...mergedData,
+                                ...reportAppointment
+                            });
+
+                        }
+                        else if (implementationAppointment || diagnosticsAppointment) {
+                            productData.eiStarterPack.upcomingDIAppointments.push({
+                                ...mergedData,
+                                ...(implementationAppointment || diagnosticsAppointment)
+                            });
+
+                        } else if (welcomeCallAppointment) {
+                            productData.eiStarterPack.onBoarded.push({
+                                ...mergedData,
+                                ...welcomeCallAppointment
+                            });
+                        }
                     }
-                    else if (postprocessAppointment) {
-                        mergedData = {
-                            ...data,
-                            ...postprocessAppointment,
-                            allappointments: appointments
-                        };
-                        productData.postForm.push(mergedData);
-                    }
-                    else if (implementationAppointment) {
-                        mergedData = {
-                            ...data,
-                            ...implementationAppointment,
-                            allappointments: appointments
-                        };
-                        productData.implementation.push(mergedData);
-                    }
-                    else if (diagnosticsAppointment) {
-                        mergedData = {
-                            ...data,
-                            ...diagnosticsAppointment,
-                            allappointments: appointments
-                        };
-                        productData.diagnostics.push(mergedData);
-                    }
-                    else if (preprocessAppointment) {
-                        mergedData = {
-                            ...data,
-                            ...preprocessAppointment,
-                            allappointments: appointments
-                        };
-                        productData.preprocess.push(mergedData);
+                    // ========================= CRITICAL SUPPORT =========================
+                    else if (productType === 'criticalSupport') {
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `critical support review`
+                        );
+
+                        const postprocessAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === 'critical support post form'
+                        );
+
+                        const implementationAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
+                        );
+
+                        const diagnosticsAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === 'critical support diagnostics'
+                        );
+
+                        const preprocessAppointment = attendedAppointments.find(app =>
+                            app.formname?.toLowerCase() === 'critical support request'
+                        );
+
+                        if (reviewAppointment) {
+                            productData.criticalSupport.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
+                            });
+                        }
+                        else if (postprocessAppointment) {
+                            productData.criticalSupport.postForm.push({
+                                ...mergedData,
+                                ...postprocessAppointment
+                            });
+                        }
+                        else if (implementationAppointment) {
+                            productData.criticalSupport.implementation.push({
+                                ...mergedData,
+                                ...implementationAppointment
+                            });
+                        }
+                        else if (diagnosticsAppointment) {
+                            productData.criticalSupport.diagnostics.push({
+                                ...mergedData,
+                                ...diagnosticsAppointment
+                            });
+                        }
+                        else if (preprocessAppointment) {
+                            productData.criticalSupport.preprocess.push({
+                                ...mergedData,
+                                ...preprocessAppointment
+                            });
+                        }
                     }
                 }
             }
+
+            // ========================= COMPLETED DATA =========================
+            const completedData = this.funnelData[productId]?.completed || [];
+
+            for (let data of completedData) {
+                let appointments = Array.from(allAppointments.values() || [])
+                    .filter((app: any) => app.participantproductid === data.docid);
+                data = {
+                    ...data,
+                    allappointments: appointments
+                };
+
+                if (productType === 'eiStarterPack') {
+                    productData.eiStarterPack.celebrationCall.push(data);
+                }
+
+                if (productType === 'criticalSupport') {
+                    productData.criticalSupport.completion.push(data);
+                }
+            }
+            Object.assign(this.productData, productData);
+            this.updateFilteredCards();
+        } catch (err) {
+            console.log("error filtering data", err);
+        }
+    }
+
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
+        let mergedData: any;
+        if (allappointments !== null && allappointments?.length > 0) {
+            mergedData = { ...data, allappointments: allappointments }
+        } else {
+            mergedData = data;
         }
 
-        const completion = this.funnelData[productId].completed;
-        for (let data of completion) {
-            let appointments = Array.from(allAppointments.values() || [])
-                .filter((app: any) => app.participantproductid === data.docid);
-
-            data = { ...data, allappointments: appointments };
-            productData.completion.push(data);
+        if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
+            productData.eiStarterPack.thisMonth.push(mergedData);
         }
-        Object.assign(this.productData, productData);
-        this.updateFilteredCards();
+        else if (
+            (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
+            (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
+        ) {
+            productData.eiStarterPack.pastMonth.push(mergedData);
+        }
+        else if (
+            (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
+            (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
+        ) {
+            productData.eiStarterPack.nextMonth.push(mergedData);
+        }
+        else productData.eiStarterPack.totalEligible.push(mergedData);
     }
 
     async fetchTicketRiseParticipants() {
@@ -1037,32 +1199,6 @@ export class DeliveryDashboardCloneComponent {
             }
         });
         this.ticketRequestSubscription.add(sub);
-    }
-
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
-        let mergedData: any;
-        if (allappointments !== null && allappointments?.length > 0) {
-            mergedData = { ...data, allappointments: allappointments }
-        } else {
-            mergedData = data;
-        }
-
-        if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
-            productData.thisMonth.push(mergedData);
-        }
-        else if (
-            (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
-            (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
-        ) {
-            productData.pastMonth.push(mergedData);
-        }
-        else if (
-            (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
-            (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
-        ) {
-            productData.nextMonth.push(mergedData);
-        }
-        else productData.totalEligible.push(mergedData);
     }
 
     async FilterReportData(productId: string) {
@@ -1125,7 +1261,7 @@ export class DeliveryDashboardCloneComponent {
             if (this.selectedProductLabel) await this.selectProduct(this.selectedProductLabel);
         });
         this.formsSubscription.add(sub);
-    }
+    };
 
     getAppointmentsByStage(stage: string, appointments: any[]) {
         if (!appointments?.length) return [];
@@ -1138,6 +1274,8 @@ export class DeliveryDashboardCloneComponent {
                 typeName = 'Pre-Process';
             } else if (app?.formname === 'Critical Support Post Form') {
                 typeName = 'Post-Process Form'
+            } else if (app?.formname === 'EI Starter Pack Post Session Check-in') {
+                typeName = 'Post Session Check-in';
             }
             return typeName.toLowerCase().includes(stage.toLowerCase());
         });
@@ -1246,16 +1384,31 @@ export class DeliveryDashboardCloneComponent {
 
     updateFilteredCards() {
         const search = this.searchText?.toLowerCase().trim() || '';
-        const sources: any = {
-            0: this.productData.totalEligible || [],
-            1: this.productData.request || [],
-            2: this.productData.preprocess || [],
-            3: this.productData.diagnostics || [],
-            4: this.productData.implementation || [],
-            5: this.productData.postForm || [],
-            6: this.productData.review || [],
-            7: this.productData.completion || []
-        };
+        let sources: any = {};
+        if (this.selectedProductType === 'eiStarterPack') {
+            sources = {
+                0: this.productData.eiStarterPack.totalEligible || [],
+                1: this.productData.eiStarterPack.pastMonth || [],
+                2: this.productData.eiStarterPack.thisMonth || [],
+                3: this.productData.eiStarterPack.nextMonth || [],
+                4: this.productData.eiStarterPack.onBoarded || [],
+                6: this.productData.eiStarterPack.upcomingDIAppointments || [],
+                7: this.productData.eiStarterPack.report || [],
+                8: this.productData.eiStarterPack.celebrationCall || []
+            };
+        }
+        else if (this.selectedProductType === 'criticalSupport') {
+            sources = {
+                0: this.productData.criticalSupport.totalEligible || [],
+                1: this.productData.criticalSupport.request || [],
+                2: this.productData.criticalSupport.preprocess || [],
+                3: this.productData.criticalSupport.diagnostics || [],
+                4: this.productData.criticalSupport.implementation || [],
+                5: this.productData.criticalSupport.postForm || [],
+                6: this.productData.criticalSupport.review || [],
+                7: this.productData.criticalSupport.completion || []
+            };
+        }
 
         Object.keys(sources).forEach((key: any) => {
             const data = sources[key];
@@ -2082,6 +2235,10 @@ export class DeliveryDashboardCloneComponent {
         return Object.keys(this.currentGroupedByProfile);
     }
 
+    get funnelProfileIds(): string[] {
+        return Object.keys(this.funnelModalProfiles);
+    }
+
     openModal(productId: string, type: 'all' | 'filtered' | 'bonus' | 'purchased' | 'noteligible') {
         this.selectedProductId = productId;
         this.modalType = type;
@@ -2115,19 +2272,34 @@ export class DeliveryDashboardCloneComponent {
     onFilterChange(selectedFilter: string) {
         this.selectedFilter = selectedFilter;
         const stageKey = this.selectedStage?.toLowerCase();
-        const stage = this.stageData[stageKey];
+        const stage = this.stageData?.[stageKey];
 
-        if (!stage) return;
-        // Scheduled 
-        if (this.selectedStageFilter === 'Scheduled') {
-            this.groupedByStageProfileAll =
-                stage[selectedFilter] || stage.all;
+        if (!stage) {
+            this.groupedByStageProfileAll = [];
+            return;
         }
+        // Scheduled
+        if (this.selectedStageFilter === 'Scheduled') {
+            const data = stage[selectedFilter] || stage.all || [];
 
+            this.groupedByStageProfileAll = this.selectedProductId
+                ? data.filter(
+                    (item: any) => item.productId === this.selectedProductId
+                )
+                : data;
+        }
         // Awaiting
         // else if (this.selectedStageFilter === 'Awaiting') {
-        //     this.groupedByStageProfileAll =
-        //         stage.awaiting?.[selectedFilter] || stage.awaiting?.all || [];
+        //     const data =
+        //         stage.awaiting?.[selectedFilter] ||
+        //         stage.awaiting?.all ||
+        //         [];
+
+        //     this.groupedByStageProfileAll = this.selectedProductId
+        //         ? data.filter(
+        //               (item: any) => item.productId === this.selectedProductId
+        //           )
+        //         : data;
         // }
     }
 
@@ -2334,25 +2506,13 @@ export class DeliveryDashboardCloneComponent {
             this.mapMetaData[metaData['profileid']] = metaData;
         }
 
-        const profileDataSnap = await runInInjectionContext(this.injector, () =>
-            getDocs(query(collection(this.firestore, 'profile_data'), orderBy('name', 'asc')))
-        );
-        for (const doc of profileDataSnap.docs) {
-            const profileData = doc.data();
-
-            if (!profileData?.['name']) continue;
-
-            this.mapProfileData[doc.id] = {
-                ...profileData,
-                profileid: doc.id
-            };
-        }
         this.modeMap = tempModeMap;
         this.loadingStates.metadata = true;
 
         // Fetch dependent data
         await this.fetchDFUProductData();
     }
+
 
     applyProductFilter() {
         const productKeywordsMap: any = {
@@ -2566,7 +2726,6 @@ export class DeliveryDashboardCloneComponent {
         this.updateFilteredCards();
     }
 
-    productsSubscription: Subscription;
 
     async loadModes() {
         const now = new Date();
@@ -4100,12 +4259,12 @@ export class DeliveryDashboardCloneComponent {
                 return card?.tentativestart ? new Date(card.tentativestart.seconds * 1000) : null;
             case 1: // Request
                 return card?.status?.date ? new Date(card.status.date.seconds * 1000) : null;
-            case 2:
+            case 2: // Completion
                 return card?.date ? new Date(card.date.seconds * 1000) : null;
             case 3: // Diagnostics
             case 4: // Implementation
             case 6: // Review
-                return card?.appointmentend ? new Date(card.appointmentend.seconds * 1000) : null;
+                return card?.endtime ? new Date(card.endtime.seconds * 1000) : null;
             default:
                 const displayDate = this.showParticipantActiveDate(card);
                 return displayDate ? new Date(displayDate) : null;
@@ -4173,6 +4332,7 @@ export class DeliveryDashboardCloneComponent {
         this.selectedProductLabel = "";
         this.filteredCardsMap = {};
         this.productData = {};
+        this.selectedProductType = '';
         // this.ticketRequest = [];
         this.stageData = {}
     }

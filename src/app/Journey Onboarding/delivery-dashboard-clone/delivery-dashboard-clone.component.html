@@ -394,45 +394,6 @@
   </div>
 
   <!-- ========== STAGE MODAL ========== -->
-  <!-- <div class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="modal-header-left">
-          <h3>{{ this.selectedStage }} {{ this.selectedStageFilter }} Participants -
-          </h3>
-          <span class="modal-count">{{ groupedByStageProfileAll.length }} profiles</span>
-        </div>
-        <div class="modal-header-right">
-          <select *ngIf="selectedStageFilter === 'Scheduled'" [(ngModel)]="selectedFilter" (change)="onFilterChange()">
-            <option value="recent">Recent</option>
-            <option value="all">All</option>
-          </select>
-          <button class="modal-close" (click)="closeStageModal()">✕</button>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
-          <div class="profile-header">
-            <span class="participant-index">{{ i + 1 }}</span>
-            <span class="participant-name">{{ mapMetaData[app.profileid]?.['name'] || app.profileid }}</span>
-          </div>
-          <div class="profile-products">
-            <div class="product-tag">
-              <span class="status-tag ongoing">{{ selectedStageFilter === 'Scheduled' ? 'Scheduled' : 'Not
-                Scheduled'}}</span>
-              <span *ngIf="selectedStageFilter === 'Scheduled'">
-                <span class="fw-bold">Start: </span>
-                <span>{{ app.starttime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
-                <span class="fw-bold ps-2">End: </span>
-                <span>{{ app.endtime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div> -->
-
   <div *ngIf="openAppointmentModal" class="modal-overlay">
     <div class="modal-content">
       <div class="diag-modal-header">
@@ -447,27 +408,22 @@
           </svg>
         </button>
       </div>
-
       <!-- Filter Tabs -->
       <div class="diag-tabs">
         <button class="diag-tab" [class.active]="selectedFilter === 'all'" (click)="onFilterChange('all')">
           All
         </button>
-
         <button class="diag-tab" [class.active]="selectedFilter === 'today'" (click)="onFilterChange('today')">
           Today
         </button>
-
         <button class="diag-tab" [class.active]="selectedFilter === 'tomorrow'" (click)="onFilterChange('tomorrow')">
           Tomorrow
         </button>
-
         <button class="diag-tab" [class.active]="selectedFilter === 'overdue'" (click)="onFilterChange('overdue')">
           <span class="diag-tab-dot"></span>
           Missed / Overdue
         </button>
       </div>
-
       <!-- List -->
       <div class="diag-modal-list" id="diagModalList">
         <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
@@ -600,7 +556,8 @@
                     <div class="specialist-name">{{ specialist.name }}</div>
                     <div class="specialist-role">{{ specialist.role }}</div>
                   </td>
-                  <td><span class="sp-product-tag" [ngClass]="specialist.productClass">{{ specialist.product }}</span>
+                  <td><span class="sp-product-tag" [ngClass]="specialist.productClass">{{ specialist.product
+                      }}</span>
                   </td>
                   <td class="fw-600">{{ specialist.appointmentsGiven }}</td>
                   <td><span class="blue-bold">{{ specialist.booked }}</span></td>
@@ -678,7 +635,7 @@
         <!-- Product Selector -->
         <div class="filter-tabs">
           <button *ngFor="let p of products" class="tab" [class.active]="selectedProductLabel === p.label"
-            (click)="selectProduct(p.label)" [disabled]="!['Critical Support'].includes(p.label)">
+            (click)="selectProduct(p.label)" [disabled]="!['EI Starter Pack', 'Critical Support'].includes(p?.label)">
             {{ p.label }}
           </button>
         </div>
@@ -692,7 +649,7 @@
         <div class="spinner"></div>
       </div>
       <ng-container *ngIf="!participantLoading">
-        <div class="column" *ngFor="let col of columns; let i = index">
+        <div class="column" *ngFor="let col of selectedColumns; let i = index">
           <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
             <div class="header-col">
               <div class="d-flex filter-asc" (click)="sortColumn(i)">
@@ -700,11 +657,7 @@
                   <span class="col-title">{{ col }}</span>
                 </div>
                 <div class="filter-asc ps-2">
-                  <i class="fas text-black-50 filter-asc" [ngClass]="{
-         'fa-sort': !sortDirection[i],
-         'fa-sort-up': sortDirection[i] === 'asc',
-         'fa-sort-down': sortDirection[i] === 'desc'
-       }">
+                  <i class="fas text-black-50 filter-asc" [ngClass]="{'fa-sort': !sortDirection[i], 'fa-sort-up': sortDirection[i] === 'asc', 'fa-sort-down': sortDirection[i] === 'desc'}">
                   </i>
                 </div>
               </div>
@@ -778,7 +731,7 @@
                         <span class="detail-label">Specialist: </span>
                         <span class="detail-val">
                           {{
-                          mapProfileData[
+                          mapMetaData[
                           (c.hosts[0]?.path || c.hosts[0]).split('/').pop()
                           ]?.name
                           }}
@@ -952,7 +905,8 @@
                 <tr>
                   <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
                     [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
-                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
+                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span>
+                  </th>
                 </tr>
               </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
             </table>
@@ -975,7 +929,8 @@
                 <tr>
                   <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
                     [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
-                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
+                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span>
+                  </th>
                 </tr>
               </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
             </table>
@@ -998,7 +953,8 @@
                 <tr>
                   <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
                     [style.width]="header.width"><input *ngIf="header.key === 'checkbox'" type="checkbox"
-                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span></th>
+                      class="pm-table-checkbox"><span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span>
+                  </th>
                 </tr>
               </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
             </table>
@@ -1036,14 +992,16 @@
                   <div *ngIf="participant['generalnotes']?.length > 0"><span
                       (click)="viewNotes(participant, header.key)" class="pm-note-text"
                       matTooltip="{{ participant['generalnotes'][participant['generalnotes'].length - 1].note }}">{{
-                      participant['generalnotes'][participant['generalnotes'].length - 1].note | slice:0:20 }}...</span>
+                      participant['generalnotes'][participant['generalnotes'].length - 1].note | slice:0:20
+                      }}...</span>
                   </div>
                 </div>
               </span>
               <span *ngIf="header.key === 'financialdata'" class="pm-status-pill"
                 [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-Not Scheduled': participant[header.key] === 'Not Scheduled'}">{{
                 participant[header.key] === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED' }}</span>
-              <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata'] ===
+              <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata']
+                ===
                 'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up' }}</span>
               <button *ngIf="header.key === 'action'" class="pm-initiate-btn"
                 (click)="openParticipantPurchase(participant)">INITIATE NOW</button>
@@ -1114,7 +1072,8 @@
         <div class="ch-product-card" *ngFor="let product of getCompletionProductsVisible()"
           [style.--pc]="product.color">
           <div class="ch-pc-head">
-            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{ product.icon
+            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{
+              product.icon
               }}</span>
             <div>
               <div class="ch-pc-name">{{ product.name }}</div>
@@ -1124,7 +1083,8 @@
           <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
           <div class="ch-pc-big-lbl">Completed</div>
           <div class="ch-pc-stats">
-            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong></div>
+            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong>
+            </div>
             <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
                 }}</strong>
             </div>
@@ -1155,7 +1115,8 @@
         <div class="ch-product-card ch-hidden-card" *ngFor="let product of getCompletionProductsHidden()"
           [style.--pc]="product.color">
           <div class="ch-pc-head">
-            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{ product.icon
+            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{
+              product.icon
               }}</span>
             <div>
               <div class="ch-pc-name">{{ product.name }}</div>
@@ -1166,7 +1127,8 @@
           <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
           <div class="ch-pc-big-lbl">Completed</div>
           <div class="ch-pc-stats">
-            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong></div>
+            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong>
+            </div>
             <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
                 }}</strong>
             </div>

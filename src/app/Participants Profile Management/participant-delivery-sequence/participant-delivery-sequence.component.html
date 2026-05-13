@@ -85,7 +85,7 @@
                 <input matInput [(ngModel)]="participantProducts[selectedProductIndex].statusdate[participantProducts[selectedProductIndex].status]" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
                 <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                 <mat-datepicker #picker></mat-datepicker>
-              </mat-form-field> 
+              </mat-form-field>
               <div cdkDropList class="example-list" (cdkDropListDropped)="DeliverySequenceDrop($event)">
                 <div class="example-box" *ngFor="let delivery of participantProducts[selectedProductIndex].delivery; let i = index" cdkDrag [cdkDragDisabled]="loading">
                   <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
