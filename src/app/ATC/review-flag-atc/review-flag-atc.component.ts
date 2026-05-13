@@ -1,5 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
-import { arrayUnion, collection, collectionData, collectionSnapshots, doc, docSnapshots, Firestore, orderBy, query, updateDoc, where } from '@angular/fire/firestore';
+import { arrayUnion, collection, collectionData, collectionSnapshots, doc, docSnapshots, getFirestore, orderBy, query, updateDoc, where } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
@@ -39,6 +39,9 @@ import { MatExpansionModule } from '@angular/material/expansion';
   styleUrl: './review-flag-atc.component.css'
 })
 export class ReviewFlagATCComponent implements OnDestroy {
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
   loggedinID: string
   loading:boolean
   mapProfile = {}
@@ -87,7 +90,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
   alphaSubscription = new Subject<void>();
   validateToSubscription = new Subject<void>();
 
-  constructor(public guard: AuthguardService, public firestore: Firestore, public router: Router, public matdialog: MatDialog, public snackBar: MatSnackBar) {
+  constructor(public guard: AuthguardService, public router: Router, public matdialog: MatDialog, public snackBar: MatSnackBar) {
     this.loading = true
     guard.getRoles().then(roles=>{
       this.loggedinID = roles.profile_ref.id
@@ -114,7 +117,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
 
   fetchData(){
     this.guard.getProcedureMap().then(data => this.mapProcedure = data)
-    var collectionRef = collection(this.firestore, "users_roles")
+    var collectionRef = collection(this.firestoreDefault, "users_roles")
     var queryRef = query(collectionRef, orderBy("name"))
     collectionData(queryRef).pipe(
       takeUntil(this.profileSubscription)
@@ -161,7 +164,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
   async getATC(){
     this.loading = true
 
-    var alphaCollectionRef = collection(this.firestore, "atc_alpha")
+    var alphaCollectionRef = collection(this.firestoreATC, "atc_alpha")
     var alphaQueryRef = query(alphaCollectionRef, where("isdelete", "==", false), where("type", "==", "online"), orderBy("prescription_date", "desc"))    
     collectionData(alphaQueryRef).pipe(
       takeUntil(this.alphaSubscription)
@@ -172,7 +175,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
       var flagEnhanceList = []
       for (let i = 0; i < atc.length; i++) {
         const data = atc[i];
-        data["atcpath"] = doc(this.firestore, "atc_alpha", data["atcid"]).path
+        data["atcpath"] = doc(this.firestoreATC, "atc_alpha", data["atcid"]).path
         if(data["flagtype"] == "finalreview"){
           finalReviewList.push(data)
         }
@@ -193,7 +196,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
       this.filterATC()
     })
 
-    var toValidateCollectionRef = collection(this.firestore, "atc_to_validate")
+    var toValidateCollectionRef = collection(this.firestoreATC, "atc_to_validate")
     var toValidateQueryRef = query(toValidateCollectionRef, where("isdelete", "==", false), where("type", "==", "online"), where("status", "==", "atc given"), orderBy("prescription_date", "desc"))
 
     collectionData(toValidateQueryRef).pipe(
@@ -202,7 +205,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
       var validateList = []
       for (let i = 0; i < atc.length; i++) {
         const data = atc[i];
-        data["atcpath"] = doc(this.firestore, "atc_to_validate", data["atcid"]).path
+        data["atcpath"] = doc(this.firestoreATC, "atc_to_validate", data["atcid"]).path
         validateList.push(data)
       }
       this.validateATC = validateList
@@ -244,8 +247,8 @@ export class ReviewFlagATCComponent implements OnDestroy {
     var result = await firstValueFrom(dialog.afterClosed())
     let validators = []
     var resultList = result ?? []
-    resultList.forEach((e:any) => validators.push(e.profile_ref))
-    updateDoc(doc(this.firestore, "atc_to_validate", atcid), {
+    resultList.forEach((e:any) => validators.push(doc(this.firestoreATC, e.profile_ref.path)))
+    updateDoc(doc(this.firestoreATC, "atc_to_validate", atcid), {
       status: "validated",
       validator: validators
     }).catch(err =>{
@@ -290,7 +293,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
 
     this.mapATCtranscription[atcid] = this.mapATCtranscription[atcid] || []
     var transcription = this.mapATCtranscription[atcid]
-    var adjCollection = collection(this.firestore, atcData["atcpath"], "corrections")
+    var adjCollection = collection(this.firestoreATC, atcData["atcpath"], "corrections")
     var adjSubscription = collectionSnapshots(adjCollection).pipe(
       takeUntil(this.alphaSubscription),
       debounceTime(300),
@@ -310,7 +313,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
             procedure: []
           })
         }
-        var procedureCollectionRef = collection(this.firestore, adjDoc.ref.path, "procedures")
+        var procedureCollectionRef = collection(this.firestoreATC, adjDoc.ref.path, "procedures")
         var proSubscription = collectionSnapshots(procedureCollectionRef).pipe(
           takeUntil(this.alphaSubscription),
           debounceTime(300),
@@ -336,14 +339,14 @@ export class ReviewFlagATCComponent implements OnDestroy {
     var noteid = atcData["notesid"]
     var mentoringid = atcData["mentoringid"]
     if(noteid && !this.mapATCnotes[noteid]){
-      docSnapshots(doc(this.firestore, "atc_notes", noteid)).pipe(
+      docSnapshots(doc(this.firestoreATC, "atc_notes", noteid)).pipe(
         takeUntil(this.alphaSubscription),
       ).subscribe(doc =>{
         this.mapATCnotes[doc.id] = doc.data()
       })
     }
     if(mentoringid && !this.mapATCnotes[mentoringid]){
-      docSnapshots(doc(this.firestore, "pick_for_mentoring", mentoringid)).pipe(
+      docSnapshots(doc(this.firestoreDefault, "pick_for_mentoring", mentoringid)).pipe(
         takeUntil(this.alphaSubscription),
         debounceTime(300),
       ).subscribe(doc =>{
@@ -368,7 +371,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
           date: new Date().toString(),
           type: type
         })
-        updateDoc(doc(this.firestore, atc["atcpath"]), {
+        updateDoc(doc(this.firestoreATC, atc["atcpath"]), {
           flagtype: type,
           flagcomment: commentData
         }).then(() =>{
