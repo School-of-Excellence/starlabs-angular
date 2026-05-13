@@ -421,7 +421,6 @@ export class DeliveryDashboardCloneComponent {
     completedCount = 0;
 
     mapMetaData: any = {};
-    mapProfileData: any = {};
     mapjourneyname: any = {};
     mapProductName: any = {};
     modeMap: any = {};
@@ -4260,12 +4259,12 @@ export class DeliveryDashboardCloneComponent {
                 return card?.tentativestart ? new Date(card.tentativestart.seconds * 1000) : null;
             case 1: // Request
                 return card?.status?.date ? new Date(card.status.date.seconds * 1000) : null;
-            case 2:
+            case 2: // Completion
                 return card?.date ? new Date(card.date.seconds * 1000) : null;
             case 3: // Diagnostics
             case 4: // Implementation
             case 6: // Review
-                return card?.appointmentend ? new Date(card.appointmentend.seconds * 1000) : null;
+                return card?.endtime ? new Date(card.endtime.seconds * 1000) : null;
             default:
                 const displayDate = this.showParticipantActiveDate(card);
                 return displayDate ? new Date(displayDate) : null;
