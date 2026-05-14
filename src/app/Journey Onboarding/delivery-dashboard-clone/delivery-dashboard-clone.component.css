@@ -137,7 +137,7 @@ html {
   border: 1px solid #dde1ee;
   border-radius: 8px;
   padding: 7px 12px;
-   font-family: inherit;
+  font-family: inherit;
   font-size: 13px;
   color: #4f5b7a;
   cursor: pointer;
@@ -176,7 +176,7 @@ html {
   border-radius: 6px;
   border: none;
   background: transparent;
-   font-family: inherit;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   color: #4f5b7a;
@@ -425,6 +425,12 @@ html {
 }
 
 .s-completed {
+  background: #f0fdf4;
+  color: #4ade80;
+  color: #16a34a;
+}
+
+.s-ticketraised {
   background: #f0fdf4;
   color: #4ade80;
   color: #16a34a;
@@ -840,7 +846,7 @@ html {
 }
 
 .metric-num {
-   font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
   font-size: 15px;
   font-weight: 500;
   color: #141928;
@@ -1194,8 +1200,26 @@ html {
 .modal-header {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
   border-bottom: 1px solid #e5e7eb;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.modal-header-left {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .modal-header h3 {
@@ -1208,6 +1232,7 @@ html {
 .modal-count {
   margin-left: 8px;
   background: #ecfdf5;
+  width: fit-content;
   color: #059669;
   font-size: 12px;
   font-weight: 600;
@@ -1307,7 +1332,7 @@ html {
 
 .status-tag.completed {
   background: #e3f2fd;
-  color: #1565c0;
+  color: #2e7d32;
 }
 
 .status-tag.initiated {
@@ -1316,8 +1341,8 @@ html {
 }
 
 .status-tag.ongoing {
-  background: #f3e5f5;
-  color: #7b1fa2;
+  background: #f0f6ff;
+  color: #3b82f6;
 }
 
 .status-tag.na {
@@ -2258,7 +2283,7 @@ table.specialist-table tr:hover td {
 .search-box input {
   border: none;
   outline: none;
-   font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 13px;
   color: var(--text);
   background: transparent;
@@ -2512,6 +2537,8 @@ table.specialist-table tr:hover td {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -2528,13 +2555,19 @@ table.specialist-table tr:hover td {
 .col-header {
   padding: 12px 14px 11px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: space-between;
   gap: 8px;
   font-family: 'Plus Jakarta Sans', sans-serif;
   border: 1px solid #e2e8f0;
   border-left: 3px solid var(--colColor);
   border-radius: 10px;
+}
+
+.header-col {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .col-header-left {
@@ -3224,7 +3257,7 @@ table.specialist-table tr:hover td {
   cursor: pointer;
   border-radius: 4px;
   font-size: 12px;
-   font-family: 'DM Sans', 'Montserrat', sans-serif;
+  font-family: 'DM Sans', 'Montserrat', sans-serif;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -3253,7 +3286,7 @@ table.specialist-table tr:hover td {
   cursor: pointer;
   border-radius: 4px;
   font-size: 12px;
-   font-family: 'DM Sans', 'Montserrat', sans-serif;
+  font-family: 'DM Sans', 'Montserrat', sans-serif;
   min-width: 32px;
   text-align: center;
 }
@@ -3802,4 +3835,325 @@ table.specialist-table tr:hover td {
   to {
     transform: rotate(360deg);
   }
+}
+
+.custom-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 40px 10px 14px;
+  min-width: 180px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom dropdown arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+
+.custom-select:hover {
+  border-color: #9ca3af;
+}
+
+.custom-select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.custom-select option {
+  font-family: 'DM Sans', sans-serif;
+  padding: 10px;
+}
+
+.filter-asc {
+  cursor: pointer;
+}
+
+.col-mini-stats {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mini-stat {
+  flex: 1;
+  background-color: #e5dfda;
+  border-radius: 6px;
+  padding: 5px 8px;
+  text-align: center;
+  width: fit-content;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.mini-stat:hover {
+  background-color: #d6d0cb;
+}
+
+.mini-stat-val {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mini-stat-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ─── Modal Overlay ─────────────────────────────── */
+.diag-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 24, 22, 0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.diag-modal-overlay.open {
+  display: flex;
+}
+
+/* ─── Modal Container ───────────────────────────── */
+.diag-modal {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 560px;
+  /* max-height: 80vh; */
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  /* overflow: hidden; */
+  animation: modalIn 0.18s ease;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Modal Header ──────────────────────────────── */
+.diag-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.diag-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.diag-modal-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.diag-modal-count {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: var(--blue-light);
+  color: var(--blue-dark);
+}
+
+.diag-modal-count.awaiting-count {
+  background: var(--coral-light);
+  color: var(--coral-dark);
+}
+
+.diag-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.12s;
+}
+
+.diag-modal-close:hover {
+  background: var(--bg);
+}
+
+/* ─── Filter Tabs ───────────────────────────────── */
+.diag-tabs {
+  display: flex;
+  gap: 0;
+  padding: 12px 20px 0;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.diag-tab {
+  padding: 7px 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.diag-tab.active {
+  color: var(--blue-dark);
+  border-bottom-color: var(--blue);
+  font-weight: 600;
+}
+
+.diag-tab:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+.diag-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+  flex-shrink: 0;
+}
+
+/* ─── Modal List ────────────────────────────────── */
+.diag-modal-list {
+  overflow-y: auto;
+  padding: 12px 20px 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── Profile Row ───────────────────────────────── */
+.profile-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--card);
+  transition: box-shadow 0.15s;
+}
+
+.profile-row:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ─── Profile Header ────────────────────────────── */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.participant-index {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.participant-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ─── Profile Products ──────────────────────────── */
+.profile-products {
+  padding-left: 32px;
+}
+
+.product-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ─── Status Tags ───────────────────────────────── */
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.status-tag.scheduled {
+  background: var(--blue-light);
+  color: var(--blue-dark);
+}
+
+.status-tag.not-scheduled {
+  background: var(--coral-light);
+  color: var(--coral-dark);
+}
+
+/* ─── Bold helpers ──────────────────────────────── */
+.fw-bold {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ps-2 {
+  padding-left: 8px;
+}
+
+.diag-tab.active {
+  background-color: #6b6560;
+  color: white;
 }

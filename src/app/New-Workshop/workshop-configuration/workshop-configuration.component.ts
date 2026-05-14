@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Firestore, doc, setDoc, updateDoc, docSnapshots, DocumentSnapshot, collection, query, where, collectionSnapshots, getDocs, orderBy, collectionData, limit } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
-import { Observable, Subject } from 'rxjs';
-import { debounceTime, takeUntil } from 'rxjs/operators';
+import { Observable, Subject, firstValueFrom } from 'rxjs';
+import { debounceTime, filter, take, takeUntil } from 'rxjs/operators';
 import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule ,AbstractControl, FormControl} from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -25,6 +25,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 import { A, COMMA, ENTER } from '@angular/cdk/keycodes';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -153,6 +154,7 @@ interface CurriculumItem {
     MatSelectModule,
     MatTabsModule,
     MatTooltipModule,
+    MatMenuModule,
     DragDropModule,
     NgxEditorModule,
     MatSlideToggleModule,
@@ -637,8 +639,16 @@ onTemplateFilterChange(selectedIds: string[]): void {
 }
 async ngOnInit() {
   try {
-    const roles = await this.guard.getRoles();
-    this.loggedinProfile = roles["profile_ref"].id;
+    const uid = await firstValueFrom(this.guard.uid$.pipe(filter((v): v is string => !!v), take(1)));
+    if (uid) {
+      const roles = await this.guard.getRoles();
+      this.loggedinProfile = roles["profile_ref"].id;
+    }
+  } catch (error) {
+    console.error('Error loading roles:', error);
+  }
+
+  try {
     const chatgroupsRef = collection(this.firestore, 'supportchat');
     const q = query(chatgroupsRef, where('type', '==', 'group'));
     const querySnapshot = await getDocs(q);
@@ -943,6 +953,8 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       facilitatorprofiles:[[],],
       selectedgroup: [''],
       enrollwattimessage: [''],
+      loginlogchannel:['workshop-logs'],
+      workshopactivitychannel:['workshop-logs'],
       selectedjourneys: [[],],
       selectedtiers: [[],],
       categoriesforthisworkshop:[[],],
@@ -1574,12 +1586,16 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     return (curriculumGroup.get('challenges'));
   }
 
-  addSubChallenge(curriculumGroup) {
+  addSubChallenge(curriculumGroup, afterIndex?: number) {
     const challengeIndex = this.challengesArray.controls.indexOf(curriculumGroup);
-    const activityIndex = this.getChallengeArray(curriculumGroup).length;
+    const challengeArray = this.getChallengeArray(curriculumGroup);
+    const insertIndex = (afterIndex === undefined || afterIndex === null)
+      ? challengeArray.length
+      : afterIndex + 1;
+    const newChallengeId = this.generateId();
     const challengeGroup = this.fb.group({
-      challengeid: [this.generateId()], 
-      zoomattend: [[]], 
+      challengeid: [newChallengeId],
+      zoomattend: [[]],
       name: ['',],
       description: ['',],
       type:['',],
@@ -1615,8 +1631,19 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       
     });
 
-    this.getChallengeArray(curriculumGroup).push(challengeGroup);
-    this.initializeNoteEditor(challengeIndex, activityIndex);
+    if (insertIndex >= challengeArray.length) {
+      challengeArray.push(challengeGroup);
+    } else {
+      challengeArray.insert(insertIndex, challengeGroup);
+    }
+    this.initializeNoteEditor(challengeIndex, insertIndex);
+    this.rebuildActivityIds();
+    setTimeout(() => {
+      const el = document.querySelector(`[data-activity-id="${newChallengeId}"]`) as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
   }
   // removeSubChallenge(curriculumGroup, index) {
   //   const confirmDelete = confirm("Are you sure you want to delete this sub-challenge?");
@@ -2047,6 +2074,8 @@ private rebuildActivityIds(): void {
         facilitatorprofiles: data['facilitatorprofiles'] || [],
         selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
+        loginlogchannel: data['loginlogchannel'] || 'workshop-logs',
+        workshopactivitychannel: data['workshopactivitychannel'] || 'workshop-logs',
         mailTemplate: data['mailTemplate'] || null,
         selectedjourneys: data['selectedjourneys'] || [],
         selectedtiers: data['selectedtiers'] || [],
@@ -2214,7 +2243,9 @@ private rebuildActivityIds(): void {
         facilitator: this.settingsForm.get('facilitator')?.value || false,
         facilitatorprofiles: this.settingsForm.get('facilitatorprofiles')?.value || [],
         selectedgroup: this.settingsForm.get('selectedgroup')?.value || null,
+        loginlogchannel: this.settingsForm.get('loginlogchannel')?.value || null,
         enrollwattimessage: this.settingsForm.get('enrollwattimessage')?.value || null,
+        workshopactivitychannel: this.settingsForm.get('workshopactivitychannel')?.value || null,
         mailTemplate: this.settingsForm.get('mailTemplate')?.value || null,
         testusers: this.settingsForm.get('testusers')?.value || [],
         selectedjourneys: this.settingsForm.get('selectedjourneys')?.value || [],

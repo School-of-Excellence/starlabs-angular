@@ -18,7 +18,7 @@
                   </div>
                 </span> -->
               </mat-card-title>
-            </mat-card-header> <br>
+            </mat-card-header><br>
         <mat-card-content>
           <form [formGroup]="detailPageForm" class="detail-form enrollment-form">
             <div class="form-section">
@@ -483,7 +483,8 @@
                         <div cdkDropList (cdkDropListDropped)="dropChallenge(curriculum, $event)" formArrayName="challenges">
                           <div *ngFor="let sub of getChallengeArray(curriculum).controls; let j = index"
                             cdkDrag [cdkDragDisabled]="settingsForm.get('active')?.value"
-                            [formGroupName]="j" class="challenge-item-card">
+                            [formGroupName]="j" class="challenge-item-card"
+                            [attr.data-activity-id]="sub.get('challengeid')?.value">
 
                             <div class="challenge-item-header">
                               <mat-icon
@@ -754,9 +755,24 @@
                             <mat-divider></mat-divider>
                           </div>
                         </div>
-                        <button mat-stroked-button class="btn-primary-outline" (click)="addSubChallenge(curriculum)">
-                          <mat-icon>add</mat-icon> Add Activity
-                        </button>
+                        <ng-container *ngIf="getChallengeArray(curriculum).controls.length; else firstAddBtn">
+                          <button mat-stroked-button class="btn-primary-outline"
+                            [matMenuTriggerFor]="addActivityMenu">
+                            <mat-icon>add</mat-icon> Add Activity
+                          </button>
+                          <mat-menu #addActivityMenu="matMenu">
+                            <button mat-menu-item type="button"
+                              *ngFor="let act of getChallengeArray(curriculum).controls; let j = index"
+                              (click)="addSubChallenge(curriculum, j)">
+                              After {{ act.get('name')?.value || 'Activity ' + (j + 1) }}
+                            </button>
+                          </mat-menu>
+                        </ng-container>
+                        <ng-template #firstAddBtn>
+                          <button mat-stroked-button class="btn-primary-outline" (click)="addSubChallenge(curriculum)">
+                            <mat-icon>add</mat-icon> Add Activity
+                          </button>
+                        </ng-template>
                       </div>
                       <div *ngIf="curriculum.get('type')?.value === 'zoomcall'" class="form-row">
                         <mat-form-field appearance="outline" class="full-width">
@@ -811,6 +827,10 @@
                     </mat-card-content>
 
                     <mat-card-actions align="end">
+                      <button mat-icon-button (click)="toggleChallenge(i)"
+                        [matTooltip]="challengeExpanded[i] ? 'Collapse' : 'Expand'">
+                        <mat-icon>{{ challengeExpanded[i] ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
+                      </button>
                       <button mat-icon-button class="btn-danger-icon" (click)="removeCurriculum(i)">
                         <mat-icon>delete</mat-icon>
                       </button>
@@ -1092,7 +1112,7 @@
                             </mat-select>
                             <mat-hint>Selected {{ settingsForm.get('cohortsforthisworkshop')?.value?.length || 0 }} Cohort</mat-hint>
                           </mat-form-field>
-                          <mat-form-field appearance="outline" class="w-100">
+                          <!-- <mat-form-field appearance="outline" class="w-100">
                             <mat-label>Select Category for Cohort</mat-label>
                             <mat-select formControlName="cohortcategoriesforthisworkshop" multiple (selectionChange)="onCohortCategorySelectionChange($event)">
                               <mat-option *ngFor="let categories of workshopCategories" [value]="categories.id"
@@ -1101,7 +1121,7 @@
                               </mat-option>
                             </mat-select>
                             <mat-hint>Selected {{ settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length || 0 }} Category</mat-hint>
-                          </mat-form-field>
+                          </mat-form-field> -->
                           <div *ngIf="settingsForm.get('cohortcategoriesforthisworkshop')?.value?.length > 0">
                             <mat-chip-set>
                               <ng-container *ngFor="let categories of workshopCategories">
@@ -1227,7 +1247,23 @@
               </mat-tab>
               <mat-tab label="Communication">
                 <div class="settings-tab-body">
-
+                  <div class="form-section">
+                    <h3 class="section-title">Workshop Slack Channel for Logs</h3>
+                    <div class="form-row">
+                      <!-- <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Workshop Default log & New User Log</mat-label>
+                        <mat-select formControlName="loginlogchannel">
+                          <mat-option *ngFor="let channel of ['workshop-logs','workshop-subscriber']" [value]="channel">{{channel}}</mat-option>
+                        </mat-select>
+                      </mat-form-field> -->
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Workshop Activity log</mat-label>
+                        <mat-select formControlName="workshopactivitychannel">
+                          <mat-option *ngFor="let channel of ['workshop-logs','workshop-subscriber-activity']" [value]="channel">{{channel}}</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+                  </div>
                   <div class="form-section">
                     <h3 class="section-title">Workshop Mail Template</h3>
                     <div formGroupName="mailTemplate" class="comm-section-body">
@@ -1345,6 +1381,5 @@
           </div>
         </mat-card-content>
       </mat-card>
-
   </div>
 </div>
