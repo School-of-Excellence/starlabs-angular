@@ -101,7 +101,7 @@ export class DevTestMicComponent implements OnInit, OnDestroy {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.accessKey = environment.picovoiceAccessKey
+    this.accessKey = (environment as any).picovoiceAccessKey || '';
     // Pre-warm DF3 model so Mode 2/3 init is faster
     if (!this.df3.isInitialized()) {
       this.df3.init(this.suppressionLevel).catch(() => {});

@@ -167,3 +167,264 @@
       justify-content: center;
     }
   }
+
+  .preview-container {
+  width: 100%;
+  padding: 16px 0;
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 16px;
+
+  .cancel-button,
+  .confirm-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 20px;
+    height: 42px;
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    transition: all 0.25s ease;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .confirm-button {
+    box-shadow: 0 2px 8px rgba(63, 81, 181, 0.25);
+
+    &:hover {
+      box-shadow: 0 4px 14px rgba(63, 81, 181, 0.35);
+      transform: translateY(-1px);
+    }
+  }
+}
+
+.review-section {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+  .review-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #eee;
+
+    .header-icon {
+      color: #3f51b5;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #2c2c2c;
+    }
+  }
+}
+
+.notes-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: #f9fafc;
+  border-radius: 10px;
+  border: 1px solid #ececf2;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:hover {
+    border-color: #c5cae9;
+    background: #fbfcff;
+  }
+
+  .note-number {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #3f51b5;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 14px;
+  }
+
+  .note-input {
+    flex: 1;
+    min-width: 0;
+
+    .textarea {
+      resize: vertical;
+      min-height: 60px;
+      line-height: 1.5;
+    }
+  }
+
+  .note-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+
+    .action-btn {
+      width: 36px;
+      height: 36px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+  }
+}
+
+.button-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 42px;
+    border-radius: 8px;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .button-css {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 42px;
+    padding: 0 22px;
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    transition: all 0.25s ease;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    &:hover:not([disabled]) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  .rework-btn {
+    background: #fff;
+    color: #d32f2f;
+    border: 1.5px solid #d32f2f;
+    box-shadow: none;
+
+    &:hover:not([disabled]) {
+      background: #ffebee;
+    }
+  }
+
+  .complete-btn {
+    box-shadow: 0 2px 8px rgba(63, 81, 181, 0.25);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .preview-actions {
+    flex-direction: column;
+
+    .cancel-button,
+    .confirm-button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .note-item {
+    flex-wrap: wrap;
+
+    .note-actions {
+      flex-direction: row;
+      margin-top: 0;
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+
+  .button-container {
+    flex-direction: column;
+    align-items: stretch;
+
+    .action-buttons {
+      flex-direction: column;
+    }
+
+    .button-css,
+    .back-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+}

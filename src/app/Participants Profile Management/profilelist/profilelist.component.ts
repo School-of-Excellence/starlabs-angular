@@ -1,6 +1,6 @@
 
 import { trigger, state, style, transition, animate } from '@angular/animations';
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, Injector, runInInjectionContext } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -52,7 +52,6 @@ import { MatNativeDateModule } from '@angular/material/core';
       transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
     ]),
   ]
-  
 })
 export class ProfilelistComponent {
   @ViewChild(MatSort) matsort:MatSort
@@ -77,13 +76,13 @@ export class ProfilelistComponent {
   // firestore collection reference
   // dataBufferSubscription: Subscription;
   // profileDataSubscription : Subscription
-  constructor(public guard: AuthguardService, public router:Router, public firestore: Firestore, public dialog: MatDialog, public snackbar: MatSnackBar) {
-    
+  constructor(public guard: AuthguardService, public router:Router, public firestore: Firestore,private injector: Injector , public dialog: MatDialog, public snackbar: MatSnackBar) {
+
     guard.getRoles().then(async roles=>{
       this.loggedinProfileRoles = roles
       this.developerAccess = roles.developer ?? false
       console.log(this.developerAccess, 'developerAccess');
-      
+
       // if(roles.admin || roles.ah || roles.integrator){
         // presistent caching
         const profileCollection = collection(this.firestore,'profile_data')
@@ -92,10 +91,8 @@ export class ProfilelistComponent {
           profilequery,
           (snapshot) => {
             console.log("Snapshot received, changes:", snapshot.docChanges().length);
-            
             snapshot.docChanges().forEach((change) => {
-              console.log("Change type:", change.type); // 'added', 'modified', 'removed'
-              
+              // console.log("Change type:", change.type); // 'added', 'modified', 'removed'
               if (!this.onScreenrefreshed) {
                 if (change.type === 'added') {
                   console.log("added");
@@ -117,7 +114,6 @@ export class ProfilelistComponent {
                 this.listofprofiledata.push(change.doc.data());
               }
             });
-            
             this.onScreenrefreshed = false;
             this.tableData.data = this.listofprofiledata;
             this.tableData.sort = this.matsort;
@@ -127,11 +123,8 @@ export class ProfilelistComponent {
             console.error("Snapshot error:", error);
           }
         );
-        
         // Store unsubscribe function for cleanup
         this.unsubscribeProfile = unsubscribe;
-            
-          
 
         const userrolesCollection = collection(this.firestore, 'users_roles')
         collectionData(userrolesCollection , {idField: 'id'}).pipe(takeUntil(this.subscription)).subscribe(roles => {
@@ -152,8 +145,6 @@ export class ProfilelistComponent {
             console.log(this.roleList);
           }
         })
-        
-        
       // }
       // else{
       //   router.navigateByUrl('/')
@@ -175,9 +166,7 @@ export class ProfilelistComponent {
     if (!Array.isArray(this.profilerole[profileId].productowner)) {
       this.profilerole[profileId].productowner = [];
     }
-    
     const arr = this.profilerole[profileId].productowner;
-    
     if (checked && !arr.includes(owner)) {
       arr.push(owner);
     } else if (!checked) {
@@ -185,15 +174,12 @@ export class ProfilelistComponent {
       if (index > -1) arr.splice(index, 1);
     }
   }
-  
   ngAfterViewInit(){
-   
   }
 
   ngOnDestroy(){
     this.subscription.complete()
     this.subscription.next()
-  
     // this.dataBufferSubscription?.unsubscribe()
     // this.profileDataSubscription?.unsubscribe()
   }
@@ -217,22 +203,46 @@ export class ProfilelistComponent {
       myoperatoruid : this.myoperatoruid,
       myoperatornumber : this.myoperatornumber,
     }).then(()=>{
-      console.log("Updated My Operator Data"); 
+      console.log("Updated My Operator Data");
     }).catch((error)=>{
       console.log("Oops Error While Updating My Operator");
     });
-    
   }
 
-  updateProfile(profile){
+  // updateProfile(profile){
+  //   this.dialog.open(UpdateprofileComponent, {
+  //     data: {
+  //       profile: profile,
+  //       existingprofile: this.tableData.data
+  //     },
+  //     autoFocus: false,
+  //     disableClose: true
+  //   })
+  // }
+
+  async updateProfile(profile: any) {
+    const profileRef = doc(this.firestore, 'profile_data', profile.profileid);
+    const freshSnap = await runInInjectionContext(this.injector, () => getDoc(profileRef));
+    const freshData = freshSnap.data();
+    // console.log('user_ref_existing in fresh data:', freshData['user_ref_existing']);
+    const freshProfile = {
+      ...freshData,
+      profileid: profile.profileid,
+      user_ref: freshData['user_ref'] || null
+    };
+    // console.log('fresh user_ref:', freshProfile['user_ref']);
+    // console.log('fresh user_ref id:', freshProfile['user_ref']?.id);
+
     this.dialog.open(UpdateprofileComponent, {
       data: {
-        profile: profile,
+        profile: freshProfile,
         existingprofile: this.tableData.data
       },
+      maxHeight: "90vh",
+      maxWidth: "90vw",
       autoFocus: false,
       disableClose: true
-    })
+    });
   }
 
   updateRole(profileid, rolepath){
@@ -296,13 +306,11 @@ export class ProfilelistComponent {
     profileStatus.atcAssigned = (await getDocs(query(atcCollection, where('implementationagent', 'array-contains', profileid)))).size != 0
     profileStatus.appointmentGiven = (await getDocs(query(appointments, where("bookedby", "==", profileref)))).size != 0
     profileStatus.ApptRole = (await getDocs(query(rolesRef, where("assigned_eis", "array-contains", profileref)))).size != 0
-    
     const profileRoleRef = doc(this.firestore, profile["role_ref"]["path"])
     await getDoc(profileRoleRef).then(role => {
       var roleDate = role.data()
       profileStatus.majorRole = (roleDate["changeagent"] || roleDate["eis"] || roleDate["admin"] || roleDate["ah"] || roleDate["superadmin"])
     })
-    
     const journeyproductpurchase = collection(this.firestore, "journeyproductpurchase")
     const participantsproduct = collection(this.firestore, 'participantsproduct')
     const EISzoomcontact = doc(this.firestore, 'EISzoomcontact', profileid)
@@ -320,8 +328,6 @@ export class ProfilelistComponent {
     profileStatus.availability = (await getDocs(query(availability, where("profileref", "==", profileref)))).docs.length != 0
     profileStatus.eventprofile = (await getDocs(query(events_profiles, where("profile_ref", "==", profileref)))).docs.length != 0
     profileStatus.formbyclient = (await getDocs(query(formsByClient, where("profileid", "==", profileid)))).docs.length != 0
-
-    
     var condition = Object.values(profileStatus).filter(e => e)
     if(condition.length != 0){
       alert(JSON.stringify(profileStatus))
