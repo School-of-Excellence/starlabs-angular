@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
-import { collection, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference } from '@angular/fire/firestore';
 import { BehaviorSubject, combineLatestWith, debounceTime, firstValueFrom, map, Subject, Subscription, takeUntil } from 'rxjs';
 import { SelectValidatorComponent } from '../select-validator/select-validator.component';
 import { FormsModule } from '@angular/forms';
@@ -125,12 +125,9 @@ export class ViewPrescribedATCComponent {
   atcModelList:any[] = []
   startDate!: Date;
   endDate!: Date;
-
-  firestoreDefault = getFirestore() // Default Firestore
-  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
   
   constructor(
-    // public firestore: Firestore,
+    public firestore: Firestore,
     public router: Router,
     public guard: AuthguardService,
     public matdialog: MatDialog,
@@ -224,7 +221,7 @@ export class ViewPrescribedATCComponent {
     // });
 
     // Load user roles
-    var roleCollection = collection(this.firestoreDefault, "users_roles")
+    var roleCollection = collection(this.firestore, "users_roles")
     var roleQuery = query(roleCollection, orderBy("name"))
     collectionData(roleQuery).pipe(takeUntil(this.metaSubscription)).subscribe(userRoles => {
       const assignerList = [];
@@ -262,7 +259,7 @@ export class ViewPrescribedATCComponent {
     });
 
     // Load procedures
-    var procedureCollection = collection(this.firestoreDefault, "procedures")
+    var procedureCollection = collection(this.firestore, "procedures")
     collectionChanges(procedureCollection).pipe(takeUntil(this.metaSubscription)).subscribe(procedures => {
       procedures.forEach(doc => {
         this.procedureMap[doc.doc.ref.path] = doc.doc.data()['name'];
@@ -270,7 +267,7 @@ export class ViewPrescribedATCComponent {
     });
 
     // Load big activity
-    var bigactivityCollection = collection(this.firestoreDefault, "bigactivity")
+    var bigactivityCollection = collection(this.firestore, "bigactivity")
     collectionData(bigactivityCollection).pipe(takeUntil(this.metaSubscription)).subscribe(activity => {
       const assigned = [];
       const activityDoc = [];
@@ -288,7 +285,7 @@ export class ViewPrescribedATCComponent {
     });
 
     // Load adjustment awareness data
-    var awarnessDoc = doc(this.firestoreDefault, "classify/adjustment_awareness")
+    var awarnessDoc = doc(this.firestore, "classify/adjustment_awareness")
     getDoc(awarnessDoc).then(snap => {
       if (snap.exists()) {
         this.adjustmentAwarenessDetail = snap.data();
@@ -296,7 +293,7 @@ export class ViewPrescribedATCComponent {
     });
 
     // Load queue data
-    var queueRef = query(collection(this.firestoreDefault, "queue generation"), orderBy("queueenddate", "desc"))
+    var queueRef = query(collection(this.firestore, "queue generation"), orderBy("queueenddate", "desc"))
     getDocs(queueRef).then(snap => {
       if(snap.docs.length != 0){
         this.queueList = snap.docs.map(e => e.data())
@@ -304,7 +301,7 @@ export class ViewPrescribedATCComponent {
     })
 
     // Load Products
-    var productRef = collection(this.firestoreDefault, "products");
+    var productRef = collection(this.firestore, "products");
     getDocs(productRef).then(snap => {
       if (snap.docs.length) {
         this.mapProducts = Object.fromEntries(
@@ -314,7 +311,7 @@ export class ViewPrescribedATCComponent {
     });
 
     //atcmodel 
-    const atcModelRef = collection(this.firestoreDefault,"atc model")
+    const atcModelRef = collection(this.firestore,"atc model")
     getDocs(atcModelRef).then(snap => {
       if(snap.docs.length != 0){
         this.atcModelList = snap.docs.map(e => e.data())
@@ -338,8 +335,8 @@ export class ViewPrescribedATCComponent {
       this.selectedPrescribers.push(`profile_data/${this.profileID}`);
     }
 
-    var alphaCollection: CollectionReference = collection(this.firestoreATC, "atc_alpha")
-    var toValidateCollection: CollectionReference = collection(this.firestoreATC, "atc_to_validate")
+    var alphaCollection: CollectionReference = collection(this.firestore, "atc_alpha")
+    var toValidateCollection: CollectionReference = collection(this.firestore, "atc_to_validate")
     let filters: QueryFilterConstraint[] = [
       where("isdelete", "==", false),
       where("type", "==", "online")
@@ -351,7 +348,7 @@ export class ViewPrescribedATCComponent {
 
     if (this.selectedPrescribers.length > 0) {
       const prescriberRefs = this.selectedPrescribers.map(p =>
-        doc(this.firestoreDefault, p)
+        doc(this.firestore, p)
       );
       filters.push(
         where("author", "array-contains-any", prescriberRefs)
@@ -371,7 +368,7 @@ export class ViewPrescribedATCComponent {
 
     if (this.selectedMentors && this.selectedMentors.length > 0) {
       // const mentorRefs = this.selectedMentors.map((m: string) =>
-      //   doc(this.firestoreDefault, m)
+      //   doc(this.firestore, m)
       // );
 
       const mentorFilters = this.mentoringActivityList.map(activity =>
@@ -393,7 +390,7 @@ export class ViewPrescribedATCComponent {
     //   orderBy("prescription_date", "desc")
     // ]
     // if (this.selectedPrescriber != null) {
-    //   queryList.push(where("author", "array-contains", doc(this.firestoreDefault, this.selectedPrescriber)))
+    //   queryList.push(where("author", "array-contains", doc(this.firestore, this.selectedPrescriber)))
     // }
     // if (this.selectedParticipant != null) {
     //   queryList.push(where("profileid", "==", this.selectedParticipant))
@@ -588,7 +585,7 @@ export class ViewPrescribedATCComponent {
     this.endDate = this.selectedQueue['queueenddate']?.toDate();
 
     const queueName = this.selectedQueue['queuename'].trim();
-    const eventsRef = collection(this.firestoreDefault, 'arena events');
+    const eventsRef = collection(this.firestore, 'arena events');
     const eventsQuery = query(
       eventsRef,
       where('eventname', '==', queueName),
@@ -663,7 +660,7 @@ export class ViewPrescribedATCComponent {
   //   var profileid = atcSlice.map(e => e.data()["profileid"]).filter(e => !((this.profileMap[e] || {})["profileid"]))
   //   profileid = Array.from(new Set(profileid))
   //   if (profileid.length != 0) {
-  //     var profileCollection = collection(this.firestoreDefault, "profile_data")
+  //     var profileCollection = collection(this.firestore, "profile_data")
   //     var profileQuery = query(profileCollection, where("profileid", "in", profileid))
   //     getDocs(profileQuery).then(list => {
   //       for (let i = 0; i < list.docs.length; i++) {
@@ -719,7 +716,7 @@ export class ViewPrescribedATCComponent {
 
       while (currentEditedFrom) {
         try {
-          const snap = await getDoc(doc(this.firestoreATC, currentEditedFrom.path));
+          const snap = await getDoc(doc(this.firestore, currentEditedFrom.path));
           if (!snap || !snap.exists()) break;
 
           const data = snap.data();
@@ -750,7 +747,7 @@ export class ViewPrescribedATCComponent {
     var mentoringid = atcData["mentoringid"]
     console.log(this.mapNotesSubscription[noteid], this.mapNotesSubscription[mentoringid])
     if (noteid && !this.mapNotesSubscription[noteid]) {
-      var noteSubscription = docSnapshots(doc(this.firestoreATC, "atc_notes/" + noteid)).pipe(
+      var noteSubscription = docSnapshots(doc(this.firestore, "atc_notes/" + noteid)).pipe(
         takeUntil(this.atcAlphaSubscription),
       ).subscribe(doc => {
         this.mapATCnotes[doc.id] = doc.data()
@@ -758,7 +755,7 @@ export class ViewPrescribedATCComponent {
       this.mapNotesSubscription[noteid] = noteSubscription
     }
     if (mentoringid && !this.mapNotesSubscription[mentoringid]) {
-      var mentorSubscription = docSnapshots(doc(this.firestoreDefault, "pick_for_mentoring/" + mentoringid)).pipe(
+      var mentorSubscription = docSnapshots(doc(this.firestore, "pick_for_mentoring/" + mentoringid)).pipe(
         takeUntil(this.atcAlphaSubscription),
         debounceTime(300),
       ).subscribe(doc => {
@@ -809,7 +806,7 @@ export class ViewPrescribedATCComponent {
     this.mapATCtranscription[atc.id] = this.mapATCtranscription[atc.id] || { view: true, transcription: [] }
     this.mapATCtranscription[atc.id]["view"] = true
     var transcription = this.mapATCtranscription[atc.id]["transcription"]
-    var adjSubscription = collectionSnapshots(collection(this.firestoreATC, atc.ref.path + "/corrections")).pipe(
+    var adjSubscription = collectionSnapshots(collection(this.firestore, atc.ref.path + "/corrections")).pipe(
       takeUntil(this.metaSubscription),
       debounceTime(300),
     ).subscribe(adjustmentSnapshot => {
@@ -827,7 +824,7 @@ export class ViewPrescribedATCComponent {
             procedure: []
           })
         }
-        var proSubscription = collectionSnapshots(collection(this.firestoreATC, adjDoc.ref.path + "/procedures")).pipe(
+        var proSubscription = collectionSnapshots(collection(this.firestore, adjDoc.ref.path + "/procedures")).pipe(
           takeUntil(this.metaSubscription),
           debounceTime(300),
         ).subscribe(procedureSnapshot => {
@@ -870,7 +867,7 @@ export class ViewPrescribedATCComponent {
   updateAwarenessValue(adjustment: QueryDocumentSnapshot<any>) {
     console.log(adjustment.ref.path, this.newAwarenessValue)
     if (![null, undefined].includes(this.newAwarenessValue["awarenessdetail"]) && ![null, undefined].includes(this.newAwarenessValue["potentialyears"])) {
-      updateDoc(doc(this.firestoreATC, adjustment.ref.path), {
+      updateDoc(doc(this.firestore, adjustment.ref.path), {
         awarenessdetail: this.newAwarenessValue["awarenessdetail"]["value"],
         awareness: this.newAwarenessValue["awarenessdetail"]["aware"],
         potentialyears: this.newAwarenessValue["potentialyears"],
@@ -892,7 +889,7 @@ export class ViewPrescribedATCComponent {
     }
     else {
       activityKeys.forEach(activity => {
-        assigned[activity] = procedureData["bigactivity"][activity].map(e => doc(this.firestoreDefault, "profile_data/" + e).path)
+        assigned[activity] = procedureData["bigactivity"][activity].map(e => doc(this.firestore, "profile_data/" + e).path)
       })
     }
 
@@ -917,7 +914,7 @@ export class ViewPrescribedATCComponent {
     var assigned = []
     Object.keys(this.newProcedureValue["bigactivity"]).forEach(activity => {
       if ((this.newProcedureValue["bigactivity"][activity] || []).length != 0) {
-        bigactivity[activity] = this.newProcedureValue["bigactivity"][activity].map(e => doc(this.firestoreDefault, e).id)
+        bigactivity[activity] = this.newProcedureValue["bigactivity"][activity].map(e => doc(this.firestore, e).id)
         assigned = [...assigned, ...this.newProcedureValue["bigactivity"][activity]]
       }
     })
@@ -926,7 +923,7 @@ export class ViewPrescribedATCComponent {
       status: ["autogeneralized", "completed"].includes(this.newProcedureValue["status"]) ? "completed" : "yet to start",
       mandatory: this.newProcedureValue["mandatory"],
       bigactivity: bigactivity,
-      assigned_to: assigned.map(e => doc(this.firestoreDefault, e)),
+      assigned_to: assigned.map(e => doc(this.firestore, e)),
       last_activity: this.newProcedureValue["lastactivity"] != null ? new Date(this.newProcedureValue["lastactivity"]) : null
     }
     console.log("Rew Record", newRecord)
@@ -937,7 +934,7 @@ export class ViewPrescribedATCComponent {
     else if (newRecord.status != "completed") {
       newRecord.last_activity = null
     }
-    updateDoc(doc(this.firestoreATC, procedure.ref.path), newRecord).catch(err => {
+    updateDoc(doc(this.firestore, procedure.ref.path), newRecord).catch(err => {
       console.log("Err Update", err)
     })
     this.clearUpdateEdit()
@@ -962,7 +959,7 @@ export class ViewPrescribedATCComponent {
     let validators = []
     var resultList = result ?? []
     resultList.forEach((e: any) => validators.push(e.profile_ref))
-    updateDoc(doc(this.firestoreATC, "atc_to_validate/" + atcid), {
+    updateDoc(doc(this.firestore, "atc_to_validate/" + atcid), {
       status: "validated",
       validator: validators
     }).catch(err => {
