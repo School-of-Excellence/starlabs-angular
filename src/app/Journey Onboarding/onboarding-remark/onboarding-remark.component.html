@@ -18,13 +18,17 @@
   <!-- ══ Adding Notes ══ -->
   <div *ngIf="participantjourneyproduct['addnotes'] === true" class="single-col-body">
     <div class="onboarding-report">
-      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}}</b></p>
-      <br><p><b style="color:#0C6385;">Notes</b></p>
+      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' :
+          [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+          mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+      <br>
+      <p><b style="color:#0C6385;">Notes</b></p>
       <div class="notes-container">
         <mat-form-field appearance="outline" class="textareafield">
           <textarea matInput placeholder="Type Here" [(ngModel)]="generalnote" rows="8"></textarea>
         </mat-form-field>
-        <button type="button" class="submit-button" [disabled]="[null,undefined,''].includes(generalnote)" (click)="addnotes()">Add Note</button>
+        <button type="button" class="submit-button" [disabled]="[null,undefined,''].includes(generalnote)"
+          (click)="addnotes()">Add Note</button>
       </div>
     </div>
   </div>
@@ -32,8 +36,11 @@
   <!-- ══ View Notes ══ -->
   <div *ngIf="participantjourneyproduct['viewnotes'] === true" class="single-col-body">
     <div class="onboarding-report">
-      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}}</b></p>
-      <br><p><b style="color:#0C6385;">Notes</b></p>
+      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' :
+          [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+          mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+      <br>
+      <p><b style="color:#0C6385;">Notes</b></p>
       <div class="displaynotes" *ngIf="participantjourneyproduct['allnotes']">
         <div *ngFor="let note of participantjourneyproduct['allnotes']">
           <div style="width:90%;padding-bottom:10px">
@@ -49,10 +56,17 @@
   <!-- ══ View Report ══ -->
   <div *ngIf="participantjourneyproduct['viewreport'] === true" class="single-col-body">
     <div class="onboarding-report">
-      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}}</b></p>
-      <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' : [null,undefined,''].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' : mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></p>
-      <p *ngIf="!participantjourneyproduct['onboardedby'] && participantjourneyproduct['onboardedby'].length != 0">Journey Coach : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardedby'][0]?.id) ? '...' : mapProfile[participantjourneyproduct['onboardedby'][0]?.id]}}</b></p>
-      <p>Onboarded Date : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardingscheduled']) ? '...' : participantjourneyproduct['onboardingscheduled'].toDate() | date:"medium"}}</b></p>
+      <p>Participant : <b>{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' :
+          [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+          mapProfile[participantjourneyproduct['profileid']]}}</b></p>
+      <p>Journey : <b>{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' :
+          [null,undefined,''].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' :
+          mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></p>
+      <p *ngIf="!participantjourneyproduct['onboardedby'] && participantjourneyproduct['onboardedby'].length != 0">
+        Journey Coach : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardedby'][0]?.id) ? '...' :
+          mapProfile[participantjourneyproduct['onboardedby'][0]?.id]}}</b></p>
+      <p>Onboarded Date : <b>{{[null,undefined,''].includes(participantjourneyproduct['onboardingscheduled']) ? '...' :
+          participantjourneyproduct['onboardingscheduled'].toDate() | date:"medium"}}</b></p>
       <br>
       <p><b style="color:#0C6385;">Report Log</b></p>
       <div class="displaynotes" *ngIf="participantjourneyproduct['onboardingreportlog']">
@@ -69,8 +83,11 @@
         <div *ngFor="let opportunity of participantjourneyproduct['opportunities']">{{opportunity}}</div>
       </div>
       <div *ngIf='participantjourneyproduct.orientationstatus === "attended"' class="user-info">
-        <span class="username">{{mapProfile[participantjourneyproduct['profileid']]}}</span> Onboarded to <strong>{{mapjourneyname[participantjourneyproduct['journeyref'].id]}}</strong> on
-        <span class="date" *ngIf="![null,undefined,''].includes(participantjourneyproduct['onboardingscheduled'])">{{participantjourneyproduct['onboardingscheduled'].toDate() | date:'dd-MMM-yyyy'}}</span>
+        <span class="username">{{mapProfile[participantjourneyproduct['profileid']]}}</span> Onboarded to
+        <strong>{{mapjourneyname[participantjourneyproduct['journeyref'].id]}}</strong> on
+        <span class="date"
+          *ngIf="![null,undefined,''].includes(participantjourneyproduct['onboardingscheduled'])">{{participantjourneyproduct['onboardingscheduled'].toDate()
+          | date:'dd-MMM-yyyy'}}</span>
         <span class="owner">{{mapProfile[participantjourneyproduct['onboardedby'][0].id]}}</span>
       </div>
       <div *ngIf="![null,undefined,'',false].includes(participantjourneyproduct['salenotes'])" class="sales-note">
@@ -103,11 +120,25 @@
 
       <!-- Info block -->
       <div class="info-block">
-        <div class="info-row"><span class="info-label">Participant</span><b class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}}</b></div>
-        <div class="info-row"><span class="info-label">Journey</span><b class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' : [null,undefined,''].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' : mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></div>
-        <div class="info-row" *ngIf="![null,undefined,''].includes(participantjourneyproduct['onboardedby']) && participantjourneyproduct['onboardedby'].length != 0"><span class="info-label">Journey Coach</span><b class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['onboardedby'][0]?.id) ? '...' : mapProfile[participantjourneyproduct['onboardedby'][0]?.id]}}</b></div>
-        <div class="info-row"><span class="info-label">Scheduled Date</span><b class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['onboardingscheduled']) ? 'Not-Scheduled' : participantjourneyproduct['onboardingscheduled'].toDate() | date:'medium'}}</b></div>
-        <div class="info-row"><span class="info-label">Onboarded Date</span><b class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['onboardedtime']) ? '...' : participantjourneyproduct['onboardedtime'] | date:'medium'}}</b></div>
+        <div class="info-row"><span class="info-label">Participant</span><b
+            class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' :
+            [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+            mapProfile[participantjourneyproduct['profileid']]}}</b></div>
+        <div class="info-row"><span class="info-label">Journey</span><b
+            class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['journeyref']) ? '...' :
+            [null,undefined,''].includes(mapjourneyname[participantjourneyproduct['journeyref'].id]) ? '...' :
+            mapjourneyname[participantjourneyproduct['journeyref'].id]}}</b></div>
+        <div class="info-row"
+          *ngIf="![null,undefined,''].includes(participantjourneyproduct['onboardedby']) && participantjourneyproduct['onboardedby'].length != 0">
+          <span class="info-label">Journey Coach</span><b
+            class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['onboardedby'][0]?.id) ? '...' :
+            mapProfile[participantjourneyproduct['onboardedby'][0]?.id]}}</b></div>
+        <div class="info-row"><span class="info-label">Scheduled Date</span><b
+            class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['onboardingscheduled']) ?
+            'Not-Scheduled' : participantjourneyproduct['onboardingscheduled'].toDate() | date:'medium'}}</b></div>
+        <div class="info-row"><span class="info-label">Onboarded Date</span><b
+            class="info-value">{{[null,undefined,''].includes(participantjourneyproduct['onboardedtime']) ? '...' :
+            participantjourneyproduct['onboardedtime'] | date:'medium'}}</b></div>
       </div>
 
       <div class="section-divider"></div>
@@ -123,7 +154,8 @@
             <mat-label>Journey Status</mat-label>
             <mat-select [(ngModel)]="currentJourneyStatus" [disabled]="true">
               <mat-option [value]="null">Clear Status</mat-option>
-              <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
+              <mat-option *ngFor="let option of journeystatusOption"
+                [value]="option.toLowerCase()">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
@@ -136,7 +168,8 @@
             <mat-label>Journey Status</mat-label>
             <mat-select [(ngModel)]="previouseJourneyStatus" [disabled]="true">
               <mat-option [value]="null">Clear Status</mat-option>
-              <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
+              <mat-option *ngFor="let option of journeystatusOption"
+                [value]="option.toLowerCase()">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
@@ -154,20 +187,26 @@
       </div>
 
       <!-- Specialist / Date / Time -->
-      <div *ngIf="participantjourneyproduct['onboarded'] == true && [null,undefined,''].includes(participantjourneyproduct['appointmentid']) && [null,undefined,''].includes(participantjourneyproduct['onboardingscheduled'])" class="field-group">
+      <div
+        *ngIf="participantjourneyproduct['onboarded'] == true && [null,undefined,''].includes(participantjourneyproduct['appointmentid']) && [null,undefined,''].includes(participantjourneyproduct['onboardingscheduled'])"
+        class="field-group">
         <mat-form-field appearance="outline" class="full-width-field">
           <mat-label>Select Specialist</mat-label>
           <mat-select [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
             <mat-option *ngFor="let member of ahmember.sort()" [value]="member.profile_ref">{{member.name}}</mat-option>
           </mat-select>
         </mat-form-field>
-        <p class="field-error" *ngIf="[null,undefined,''].includes(participantjourneyproduct['onboardedby']) || participantjourneyproduct['onboardedby'].length == 0">Please select a specialist</p>
+        <p class="field-error"
+          *ngIf="[null,undefined,''].includes(participantjourneyproduct['onboardedby']) || participantjourneyproduct['onboardedby'].length == 0">
+          Please select a specialist</p>
         <div class="field-row-pair">
           <div class="flex-field">
             <mat-form-field appearance="outline" class="full-width-field">
               <mat-label>Scheduled Date</mat-label>
-              <input matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()" placeholder="MM/DD/YYYY">
-              <mat-datepicker-toggle matSuffix [for]="picker"><mat-icon matDatepickerToggleIcon>calendar_today</mat-icon></mat-datepicker-toggle>
+              <input matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()"
+                placeholder="MM/DD/YYYY">
+              <mat-datepicker-toggle matSuffix [for]="picker"><mat-icon
+                  matDatepickerToggleIcon>calendar_today</mat-icon></mat-datepicker-toggle>
               <mat-datepicker #picker></mat-datepicker>
             </mat-form-field>
             <p class="field-error" *ngIf="[null,undefined,''].includes(selectedDate)">Please select a Date</p>
@@ -199,7 +238,7 @@
         <span class="section-label">Referral</span>
         <mat-chip-listbox [(ngModel)]="participantjourneyproduct['referral']">
           @for (status of ['Yes', 'No']; track status) {
-            <mat-chip-option>{{status}}</mat-chip-option>
+          <mat-chip-option>{{status}}</mat-chip-option>
           }
         </mat-chip-listbox>
       </div>
@@ -230,7 +269,10 @@
           ⚠ Please select an email template in the right panel first.
         </p>
         <p *ngIf="sendOnboardingEmail && selectedTemplate" class="send-email-hint">
-          <b>{{selectedTemplate.templatename}}</b> will be sent for {{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' : [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' : mapProfile[participantjourneyproduct['profileid']]}} and 
+          <b>{{selectedTemplate.templatename}}</b> will be sent for
+          {{[null,undefined,''].includes(participantjourneyproduct['profileid']) ? '...' :
+          [null,undefined,''].includes(mapProfile[participantjourneyproduct['profileid']]) ? '...' :
+          mapProfile[participantjourneyproduct['profileid']]}} and
           <span *ngIf="selectedCcChips.length > 0"> · CC: {{selectedCcChips.join(', ')}}</span>
           <span *ngIf="selectedBccChips.length > 0"> · BCC: {{selectedBccChips.join(', ')}}</span>
         </p>
@@ -282,31 +324,27 @@
         </div>
 
         <!-- ── Non-fixed: custom template search ── -->
-        <div *ngIf="!isFixedJourney && !emailTemplateLoading" class="custom-search-wrapper" (click)="$event.stopPropagation()">
+        <div *ngIf="!isFixedJourney && !emailTemplateLoading" class="custom-search-wrapper"
+          (click)="$event.stopPropagation()">
           <label class="custom-label">Email Template</label>
           <div class="custom-search-box" [class.has-value]="!!selectedTemplate">
             <mat-icon class="search-prefix-icon">search</mat-icon>
-            <input
-              class="custom-search-input"
-              type="text"
-              [(ngModel)]="templateSearchQuery"
-              (input)="onTemplateSearchChange()"
-              (focus)="onTemplateInputFocus()"
-              placeholder="Search template by name or alias…"
-              autocomplete="off">
+            <input class="custom-search-input" type="text" [(ngModel)]="templateSearchQuery"
+              (input)="onTemplateSearchChange()" (focus)="onTemplateInputFocus()"
+              placeholder="Search template by name or alias…" autocomplete="off">
             <button *ngIf="selectedTemplate" class="search-clear-btn" (click)="clearTemplate($event)">
               <mat-icon>close</mat-icon>
             </button>
           </div>
           <!-- dropdown -->
           <div *ngIf="templateDropdownOpen && templateSearchResults.length > 0" class="custom-dropdown">
-            <div *ngFor="let tmpl of templateSearchResults"
-                 class="custom-dropdown-item"
-                 (mousedown)="selectTemplate(tmpl, $event)">
+            <div *ngFor="let tmpl of templateSearchResults" class="custom-dropdown-item"
+              (mousedown)="selectTemplate(tmpl, $event)">
               <div class="dd-name">{{tmpl.templatename}}</div>
               <div class="dd-meta">
                 <span class="dd-alias">{{tmpl.templatealias}}</span>
-                <span class="dd-status" [class.approved]="tmpl.postmarkstatus === 'approved'">{{tmpl.postmarkstatus}}</span>
+                <span class="dd-status"
+                  [class.approved]="tmpl.postmarkstatus === 'approved'">{{tmpl.postmarkstatus}}</span>
               </div>
             </div>
           </div>
@@ -348,24 +386,19 @@
                   <button class="gmail-chip-remove" (click)="removeCcChip(chip)">×</button>
                 </span>
                 <div class="gmail-recipient-input-wrap">
-                  <input
-                    class="gmail-recipient-input"
-                    type="text"
-                    [(ngModel)]="ccSearchQuery"
-                    (input)="onCcSearchChange()"
-                    (focus)="onCcInputFocus($event)"
-                    placeholder="{{selectedCcChips.length === 0 ? 'Add CC recipients…' : ''}}"
-                    autocomplete="off">
+                  <input class="gmail-recipient-input" type="text" [(ngModel)]="ccSearchQuery"
+                    (input)="onCcSearchChange()" (focus)="onCcInputFocus($event)"
+                    placeholder="{{selectedCcChips.length === 0 ? 'Add CC recipients…' : ''}}" autocomplete="off">
                   <!-- CC dropdown -->
                   <div *ngIf="ccDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
                     <div *ngIf="ccEmailsLoading" class="gmail-dd-loading">
                       <mat-progress-spinner [diameter]="14" strokeWidth="2" mode="indeterminate"></mat-progress-spinner>
                       Loading…
                     </div>
-                    <div *ngIf="!ccEmailsLoading && ccFilteredEmails.length === 0" class="gmail-dd-empty">No emails found</div>
-                    <div *ngFor="let email of ccFilteredEmails"
-                         class="gmail-dd-item"
-                         (mousedown)="addCcEmail(email, $event)">
+                    <div *ngIf="!ccEmailsLoading && ccFilteredEmails.length === 0" class="gmail-dd-empty">No emails
+                      found</div>
+                    <div *ngFor="let email of ccFilteredEmails" class="gmail-dd-item"
+                      (mousedown)="addCcEmail(email, $event)">
                       <mat-icon class="gmail-dd-icon">person</mat-icon>
                       {{email}}
                     </div>
@@ -385,24 +418,19 @@
                   <button class="gmail-chip-remove" (click)="removeBccChip(chip)">×</button>
                 </span>
                 <div class="gmail-recipient-input-wrap">
-                  <input
-                    class="gmail-recipient-input"
-                    type="text"
-                    [(ngModel)]="bccSearchQuery"
-                    (input)="onBccSearchChange()"
-                    (focus)="onBccInputFocus($event)"
-                    placeholder="{{selectedBccChips.length === 0 ? 'Add BCC recipients…' : ''}}"
-                    autocomplete="off">
+                  <input class="gmail-recipient-input" type="text" [(ngModel)]="bccSearchQuery"
+                    (input)="onBccSearchChange()" (focus)="onBccInputFocus($event)"
+                    placeholder="{{selectedBccChips.length === 0 ? 'Add BCC recipients…' : ''}}" autocomplete="off">
                   <!-- BCC dropdown -->
                   <div *ngIf="bccDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
                     <div *ngIf="ccEmailsLoading" class="gmail-dd-loading">
                       <mat-progress-spinner [diameter]="14" strokeWidth="2" mode="indeterminate"></mat-progress-spinner>
                       Loading…
                     </div>
-                    <div *ngIf="!ccEmailsLoading && bccFilteredEmails.length === 0" class="gmail-dd-empty">No emails found</div>
-                    <div *ngFor="let email of bccFilteredEmails"
-                         class="gmail-dd-item"
-                         (mousedown)="addBccEmail(email, $event)">
+                    <div *ngIf="!ccEmailsLoading && bccFilteredEmails.length === 0" class="gmail-dd-empty">No emails
+                      found</div>
+                    <div *ngFor="let email of bccFilteredEmails" class="gmail-dd-item"
+                      (mousedown)="addBccEmail(email, $event)">
                       <mat-icon class="gmail-dd-icon">person</mat-icon>
                       {{email}}
                     </div>
@@ -414,7 +442,8 @@
 
           <!-- Subject -->
           <div class="gmail-field-row gmail-subject-row">
-            <input class="gmail-subject-input" type="text" [value]="selectedTemplate.subject" readonly placeholder="Subject">
+            <input class="gmail-subject-input" type="text" [value]="selectedTemplate.subject" readonly
+              placeholder="Subject">
           </div>
 
           <!-- Body -->
@@ -467,9 +496,9 @@
                     <span class="gmail-attach-name">{{att.name}}</span>
                     <!-- Source badge -->
                     <span class="gmail-attach-source-badge"
-                          [style.background]="getSourceBadgeColor(att['_source']) + '18'"
-                          [style.color]="getSourceBadgeColor(att['_source'])"
-                          [style.borderColor]="getSourceBadgeColor(att['_source']) + '44'">
+                      [style.background]="getSourceBadgeColor(att['_source']) + '18'"
+                      [style.color]="getSourceBadgeColor(att['_source'])"
+                      [style.borderColor]="getSourceBadgeColor(att['_source']) + '44'">
                       {{getSourceBadge(att['_source'])}}
                     </span>
                   </div>
@@ -479,18 +508,13 @@
                 <!-- Actions -->
                 <div class="gmail-attach-actions">
                   <!-- Open link (only for URL-based, not data: URLs) -->
-                  <a *ngIf="att.url && !att.url.startsWith('data:')"
-                    [href]="att.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="gmail-attach-action-btn"
-                    title="Open">
+                  <a *ngIf="att.url && !att.url.startsWith('data:')" [href]="att.url" target="_blank"
+                    rel="noopener noreferrer" class="gmail-attach-action-btn" title="Open">
                     <mat-icon>open_in_new</mat-icon>
                   </a>
                   <!-- Remove -->
                   <button class="gmail-attach-action-btn gmail-attach-remove-btn"
-                          (click)="removeMailAttachment(att['_id'])"
-                          title="Remove attachment">
+                    (click)="removeMailAttachment(att['_id'])" title="Remove attachment">
                     <mat-icon>close</mat-icon>
                   </button>
                 </div>
@@ -524,7 +548,8 @@
                 <mat-icon>check_circle</mat-icon>
                 Email Sent!
               </div>
-              <button *ngIf="!emailSent" class="gmail-send-btn" [disabled]="!canSendEmail || emailSending" (click)="sendEmail()">
+              <button *ngIf="!emailSent" class="gmail-send-btn" [disabled]="!canSendEmail || emailSending"
+                (click)="sendEmail()">
                 Send
                 <mat-icon class="gmail-send-icon">send</mat-icon>
               </button>
@@ -798,7 +823,4 @@
         <button type="button" class="submit-button" [ngStyle]="{'background-color': validateOnboard() ? '#e0e0e0' : '#0056b3'}" mat-stroked-button [disabled]="validateOnboard()" (click)="onSubmit()">Submit</button>
       </div>
     </div>
-</div>
-
-    
-   -->
+</div> -->
