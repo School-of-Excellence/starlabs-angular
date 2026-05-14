@@ -1,5 +1,5 @@
 <div style="padding: 20px;">
-    <form class="loginform" [formGroup]="profileForm" (ngSubmit)="createProfile()">    
+    <form class="loginform" [formGroup]="profileForm">
       <h5 class="title">{{this.newprofile ? 'Create' : 'Update'}} Profile</h5>
       <!-- <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Name</mat-label>
@@ -37,7 +37,7 @@
         <!-- <mat-error *ngIf="profileForm.get('dateofbirth').hasError('required')">
           Date of Birth is <strong>required</strong>
         </mat-error> -->
-      </mat-form-field>    
+      </mat-form-field>
       <br>
       <mat-form-field class="countrycode" appearance="outline">
         <mat-label>Code</mat-label>
@@ -57,16 +57,28 @@
         </mat-error>
       </mat-form-field>
       <br>
-      <mat-form-field class="inputfields" appearance="outline">
-        <mat-label>Email</mat-label>
-        <input matInput type="email" formControlName="email">
-        <mat-error *ngIf="profileForm.get('email').hasError('required')">
-          Email is <strong>required</strong>
-        </mat-error>
-        <mat-error *ngIf="profileForm.get('email').hasError('email')">
-          <strong>Invalid</strong> Format
-        </mat-error>
-      </mat-form-field>
+      <div class="email-container">
+        <mat-form-field class="inputfields" appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+          <mat-error *ngIf="profileForm.get('email').hasError('required')">
+            Email is <strong>required</strong>
+          </mat-error>
+          <mat-error *ngIf="profileForm.get('email').hasError('email')">
+            <strong>Invalid</strong> Format
+          </mat-error>
+        </mat-form-field>
+        <!-- Change Email Button -->
+        <button *ngIf="emailLocked" mat-stroked-button color="primary" type="button" class="change-email-btn" (click)="changeEmail()">
+          Change Email
+        </button>
+      </div>
+      <div *ngIf="getFilteredEmails().length > 0" style="margin-top: 10px; font-size: 13px; color: rgb(0, 0, 0);">
+        <strong>linked emails:</strong>
+        <div *ngFor="let email of getFilteredEmails()" style="margin-left: 8px;">
+          • {{ email }}
+        </div>
+      </div>
       <br>
       <mat-checkbox formControlName="deliveryonhold">Delivery Onhold</mat-checkbox>
       <br>
@@ -79,7 +91,7 @@
       <br>
       <div class="actionbox">
         <button class="closebtn" mat-stroked-button type="button" (click)="close()" [disabled]="loading">Close</button>
-        <button class="submitbtn" mat-stroked-button type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Submit'}}</button>
+        <button class="submitbtn" mat-stroked-button type="button" (click)="createProfile()" [disabled]="loading">{{loading ? 'Updating....' : 'Submit'}}</button>
       </div>
     </form>
 </div>
