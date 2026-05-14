@@ -195,16 +195,28 @@
               </mat-option>
             </mat-select>
           </mat-form-field>&nbsp;&nbsp;
+          <div [ngModelGroup]="'subscriptionstart'" name="subscriptionstart" #nameCtrl="ngModelGroup">
+            <mat-form-field appearance="outline" style="min-width: 300px;">
+              <mat-label>Subscription Start Date Range</mat-label>
+              <mat-date-range-input [rangePicker]="subscriptionstartpicker">
+                <input matStartDate [(ngModel)]="filterdata['subscriptionstart']['start']" name="start" placeholder="Start date">
+                <input matEndDate [(ngModel)]="filterdata['subscriptionstart']['end']"  name="end" (dateChange)="returnFilterText()" placeholder="End date">
+              </mat-date-range-input>
+              <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
+              <mat-datepicker-toggle matIconSuffix [for]="subscriptionstartpicker"></mat-datepicker-toggle>
+              <mat-date-range-picker #subscriptionstartpicker></mat-date-range-picker>
+            </mat-form-field>
+          </div>&nbsp;&nbsp;
           <div [ngModelGroup]="'subscriptionend'" name="subscriptionend" #nameCtrl="ngModelGroup">
             <mat-form-field appearance="outline" style="min-width: 300px;">
               <mat-label>Subscription End Date Range</mat-label>
-              <mat-date-range-input [rangePicker]="picker">
+              <mat-date-range-input [rangePicker]="subscriptionendpicker">
                 <input matStartDate [(ngModel)]="filterdata['subscriptionend']['start']" name="start" placeholder="Start date">
                 <input matEndDate [(ngModel)]="filterdata['subscriptionend']['end']"  name="end" (dateChange)="returnFilterText()" placeholder="End date">
               </mat-date-range-input>
               <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
-              <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-              <mat-date-range-picker #picker></mat-date-range-picker>
+              <mat-datepicker-toggle matIconSuffix [for]="subscriptionendpicker"></mat-datepicker-toggle>
+              <mat-date-range-picker #subscriptionendpicker></mat-date-range-picker>
             </mat-form-field>
           </div>&nbsp;&nbsp;
           <!-- <mat-form-field appearance="outline" style="min-width:300px;">
@@ -656,7 +668,7 @@
             <!-- <span *ngIf="column.startsWith('consumed') || column.startsWith('unconsumed')">{{getColumnForTableHeader(column)}}</span> -->
           </th>
           <td [ngClass]="{'remarks-column': column === 'remarks'}" mat-cell *matCellDef="let element">
-            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth' , 'purchase' ,'UP! count','CPM count'].includes(column)">{{element[column]}}</span>
+            <span *ngIf="!['select','subscriptionend','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','purchasedate','name','kyj','activejourney','higherorderpurchase','lastcompletedjourney','lastsubscribedjourney','atcmodel','productcount','productevent','eiflix','solarvoice','generalcontent', 'queueevent', 'remarks', 'lastpaymentdate','consumedproducts', 'unconsumedproducts', 'activeproduct', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier', 'profiletags' ,'dateofbirth' , 'purchase' ,'UP! count','CPM count' , 'atccount' , 'emi status' , 'paymentplan'].includes(column)">{{element[column]}}</span>
             <span *ngIf="['consumedproducts', 'unconsumedproducts', 'activeproduct', 'profiletags', 'addons', 'gifts', 'bonus', 'forms', 'reports', 'events', 'queue', 'tier'].includes(column)">
               <ng-container *ngIf="element[column]">
                
@@ -668,8 +680,8 @@
             </span>
             
             <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate' , 'dateofbirth'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate') : null)}}</span>
-            <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/userprofile/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
-            <!-- <span *ngIf="column == 'atccount'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span> -->
+            <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+            <span *ngIf="column == 'atccount'">{{element[column] ?? 0}}</span>
             <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <!-- <span *ngIf="column == 'activejourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->
             <span *ngIf="['activejourney','lastcompletedjourney', 'lastsubscribedjourney','higherorderpurchase'].includes(column)">{{mapfiltervalues[element[column]]}}</span>
@@ -751,6 +763,9 @@
             <!-- up count , cpm count -->
              <span *ngIf="column === 'UP! count'">{{getUpLiveCount(element['profileid'])}}</span>
              <span *ngIf="column === 'CPM count'">{{getCPMCount(element['profileid'])}}</span>
+
+             <!-- EMI Status -->
+            <span *ngIf="column === 'emi status'">{{element['financedata']?.paymentstatus}}</span>
           </td>
         </ng-container>
 
