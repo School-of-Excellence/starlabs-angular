@@ -22,15 +22,29 @@
       </mat-form-field>
     </div>
 
+    <!-- Group Status Tabs -->
+    <div class="group-tabs">
+      <button class="group-tab" [class.active]="selectedTabIndex === 0" (click)="onTabChange(0)">
+        <mat-icon>chat</mat-icon>
+        <span>Active Groups</span>
+        <span class="tab-count" *ngIf="filteredActiveChatList.length > 0">{{ filteredActiveChatList.length }}</span>
+      </button>
+      <button class="group-tab" [class.active]="selectedTabIndex === 1" (click)="onTabChange(1)">
+        <mat-icon>archive</mat-icon>
+        <span>Inactive Groups</span>
+        <span class="tab-count" *ngIf="filteredInactiveChatList.length > 0">{{ filteredInactiveChatList.length }}</span>
+      </button>
+    </div>
+
     <!-- Loading Spinner -->
     <div *ngIf="chatlistloading" class="loading-container">
       <mat-spinner diameter="40"></mat-spinner>
       <p class="montserratfont">Loading chats...</p>
     </div>
 
-    <!-- Chat List -->
-    <div class="chat-list" *ngIf="!chatlistloading">
-      <div *ngFor="let chat of filteredChatList; trackBy: trackByMessageId" class="chat-item"
+    <!-- Active Groups List -->
+    <div class="chat-list" *ngIf="!chatlistloading && selectedTabIndex === 0">
+      <div *ngFor="let chat of filteredActiveChatList; trackBy: trackByMessageId" class="chat-item"
         [class.selected]="selectedChat.docid === chat.docid" [class.pinned]="chat.pinned" (click)="selectChat(chat)">
 
         <div class="chat-content">
@@ -59,15 +73,7 @@
                 <mat-icon *ngIf="chat.pinned" class="pinned-icon">push_pin</mat-icon>
               </div>
             </div>
-
           </div>
-
-          <!-- <div class="pin-container">
-            <button mat-icon-button class="pin-button" [class.pinned]="chat.pinned"
-              (click)="hideGroup(chat)" matTooltip="{{ 'Hide Group' }}">
-              <mat-icon>{{ 'delete' }}</mat-icon>
-            </button>
-          </div> -->
 
           <!-- Pin Icon -->
           <div class="pin-container">
@@ -76,15 +82,60 @@
               <mat-icon>{{ chat.pinned ? 'push_pin' : 'push_pin' }}</mat-icon>
             </button>
           </div>
-
         </div>
-
       </div>
 
-      <!-- Empty State -->
-      <div *ngIf="filteredChatList.length === 0 && !chatlistloading" class="empty-state">
+      <!-- Empty State - Active -->
+      <div *ngIf="filteredActiveChatList.length === 0 && !chatlistloading" class="empty-state">
         <mat-icon>{{ searchQuery ? 'search_off' : 'chat' }}</mat-icon>
-        <p>{{ searchQuery ? 'No chats found' : 'No chats available' }}</p>
+        <p>{{ searchQuery ? 'No active groups found' : 'No active groups' }}</p>
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">
+          Clear Search
+        </button>
+      </div>
+    </div>
+
+    <!-- Inactive Groups List -->
+    <div class="chat-list" *ngIf="!chatlistloading && selectedTabIndex === 1">
+      <div *ngFor="let chat of filteredInactiveChatList; trackBy: trackByMessageId" class="chat-item inactive-chat-item"
+        [class.selected]="selectedChat.docid === chat.docid" (click)="selectChat(chat)">
+
+        <div class="chat-content">
+          <!-- Chat Avatar -->
+          <div class="chat-avatar inactive" [matTooltip]="chat.chatname">
+            <img [src]="chat.chatprofile">
+            <div class="inactive-overlay">
+              <mat-icon>archive</mat-icon>
+            </div>
+          </div>
+
+          <!-- Chat Info -->
+          <div class="chat-info">
+            <div class="chat-header">
+              <h3 class="chat-name">{{ chat.chatname }}</h3>
+              <span class="chat-time">{{ formatChatTime(chat.time) }}</span>
+            </div>
+
+            <div class="chat-preview">
+              <span class="last-message" [innerHTML]="truncateMessage(chat.message)"></span>
+              <span class="inactive-badge">Inactive</span>
+            </div>
+          </div>
+
+          <!-- Restore Icon (only for admins) -->
+          <div class="pin-container" *ngIf="adminRole || chatAdmin">
+            <button mat-icon-button class="restore-button" (click)="restoreGroup($event, chat)"
+              matTooltip="Restore Group">
+              <mat-icon>restore</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State - Inactive -->
+      <div *ngIf="filteredInactiveChatList.length === 0 && !chatlistloading" class="empty-state">
+        <mat-icon>{{ searchQuery ? 'search_off' : 'archive' }}</mat-icon>
+        <p>{{ searchQuery ? 'No inactive groups found' : 'No inactive groups' }}</p>
         <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">
           Clear Search
         </button>
@@ -105,12 +156,21 @@
 
     <!-- Chat Selected -->
     <div *ngIf="selectedChat.docid" class="chat-area">
+      <!-- Inactive Banner -->
+      <div *ngIf="isInactiveChatSelected" class="inactive-banner">
+        <mat-icon>info</mat-icon>
+        <span>This group is inactive. You can view messages but cannot send new ones.</span>
+      </div>
+
       <!-- Chat Header -->
       <div class="chat-header-bar">
         <div class="chat-header-info">
           <img [src]="selectedChat.chatprofile" class="header-avatar">
           <div class="header-text">
-            <h3>{{ selectedChat.chatname }}</h3>
+            <h3>
+              {{ selectedChat.chatname }}
+              <span *ngIf="isInactiveChatSelected" class="inactive-tag">(Inactive)</span>
+            </h3>
             <p>{{ selectedChat.members?.length }} members • {{ selectedChat.chattype }}</p>
           </div>
         </div>
@@ -141,7 +201,8 @@
           <button mat-icon-button matTooltip="Chat Info">
             <mat-icon>info</mat-icon>
           </button>
-          <button mat-icon-button [matMenuTriggerFor]="chatMenu" matTooltip="More options">
+          <button mat-icon-button [matMenuTriggerFor]="chatMenu" matTooltip="More options"
+            *ngIf="!isInactiveChatSelected">
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #chatMenu="matMenu">
@@ -173,27 +234,8 @@
         </button>
       </div>
 
-      <!-- Pinned Messages Section - Integrated in Chat -->
+      <!-- Pinned Messages Section -->
       <div *ngIf="showPinnedSection && getPinnedMessages().length > 0" class="pinned-messages-section">
-        <!-- Pinned Messages Header -->
-        <!-- <div class="pinned-section-header">
-          <div class="pinned-section-title">
-            <mat-icon class="pinned-icon">push_pin</mat-icon>
-            <span>{{ getPinnedMessages().length }} Pinned Message{{ getPinnedMessages().length !== 1 ? 's' : ''
-              }}</span>
-          </div>
-          <div class="pinned-section-actions">
-            <button mat-icon-button (click)="unpinAllMessages()" matTooltip="Unpin All Messages"
-              [disabled]="getPinnedMessages().length === 0" class="unpin-all-btn">
-              <mat-icon>clear_all</mat-icon>
-            </button>
-            <button mat-icon-button (click)="togglePinnedSection()" matTooltip="Hide Pinned Messages">
-              <mat-icon>expand_less</mat-icon>
-            </button>
-          </div>
-        </div> -->
-
-        <!-- Pinned Messages List -->
         <div class="pinned-section-content">
           <div class="pinned-messages-grid">
             <div *ngFor="let message of getPinnedMessages().slice(0, maxPinnedDisplay); trackBy: trackByMessageId"
@@ -213,7 +255,7 @@
                   </div>
                 </div>
                 <button mat-icon-button (click)="$event.stopPropagation(); pinMessage(message)"
-                  matTooltip="Unpin Message" class="card-unpin-btn">
+                  matTooltip="Unpin Message" class="card-unpin-btn" *ngIf="!isInactiveChatSelected">
                   <mat-icon>close</mat-icon>
                 </button>
               </div>
@@ -277,7 +319,8 @@
       </div>
 
       <!-- Messages Area -->
-      <div class="messages-container" #messageContainer [class.with-pinned]="showPinnedSection">
+      <div class="messages-container" #messageContainer [class.with-pinned]="showPinnedSection"
+        [class.read-only]="isInactiveChatSelected">
         <!-- Loading Messages -->
         <div *ngIf="messagesLoading" class="loading-messages">
           <mat-spinner diameter="30"></mat-spinner>
@@ -304,18 +347,7 @@
               <!-- Message Container -->
               <div class="message-container">
                 <!-- Selection Checkbox -->
-                <div *ngIf="selectionMode && message.isMyMessage" class="message-checkbox">
-                  <!-- <mat-checkbox 
-                [checked]="selectedMessages.has(message.docid)"
-                (change)="toggleMessageSelection(message)">
-              </mat-checkbox> -->
-                </div>
-
-                <!-- Avatar for other messages -->
-                <!-- <div *ngIf="![null,undefined].includes(mapProfileuid[message.sender_uid]['profile'])"
-                  class="message-avatar">
-                  <img [src]="mapProfileuid[message.sender_uid]['profile']">
-                </div> -->
+                <div *ngIf="selectionMode && message.isMyMessage" class="message-checkbox"></div>
 
                 <div class="message-bubble">
                   <!-- Pinned Indicator -->
@@ -327,7 +359,7 @@
                     <b>{{mapProfileuid[message.sender_uid]['name']}}</b>
                   </p>
 
-                  <!-- Message Actions Menu -->
+                  <!-- Message Actions Menu - hidden in inactive chats except for copy & receipts -->
                   <div *ngIf="!selectionMode" class="message-actions">
                     <button mat-icon-button [matMenuTriggerFor]="messageMenu" class="message-menu-trigger">
                       <mat-icon>more_vert</mat-icon>
@@ -341,16 +373,17 @@
                         <mat-icon>visibility</mat-icon>
                         <span class="montserratfont">Read / Un-Read</span>
                       </button>
-                      <button *ngIf="message.isMyMessage" mat-menu-item (click)="deleteSingleMessage(message)"
-                        class="delete-option">
+                      <button *ngIf="message.isMyMessage && !isInactiveChatSelected" mat-menu-item
+                        (click)="deleteSingleMessage(message)" class="delete-option">
                         <mat-icon>delete</mat-icon>
                         <span class="montserratfont">Delete</span>
                       </button>
-                      <button mat-menu-item (click)="enterSelectionMode(); toggleMessageSelection(message)">
+                      <button mat-menu-item *ngIf="!isInactiveChatSelected"
+                        (click)="enterSelectionMode(); toggleMessageSelection(message)">
                         <mat-icon>checklist</mat-icon>
                         <span class="montserratfont">Select</span>
                       </button>
-                      <button mat-menu-item *ngIf="adminRole" (click)="pinMessage(message)">
+                      <button mat-menu-item *ngIf="adminRole && !isInactiveChatSelected" (click)="pinMessage(message)">
                         <mat-icon>push_pin</mat-icon>
                         <span class="montserratfont">{{message.pinned ? 'UNPIN' : 'PIN'}}</span>
                       </button>
@@ -404,13 +437,14 @@
           <div *ngIf="groupedMessages.length === 0" class="empty-messages">
             <mat-icon>chat_bubble_outline</mat-icon>
             <p>No messages yet</p>
-            <p>Start the conversation!</p>
+            <p *ngIf="!isInactiveChatSelected">Start the conversation!</p>
+            <p *ngIf="isInactiveChatSelected">This group is inactive.</p>
           </div>
         </div>
       </div>
 
-      <!-- File Preview Area -->
-      <div *ngIf="attachedFiles.length > 0" class="file-preview-area" #previewContainer>
+      <!-- File Preview Area - hidden for inactive chats -->
+      <div *ngIf="attachedFiles.length > 0 && !isInactiveChatSelected" class="file-preview-area" #previewContainer>
         <div class="preview-header">
           <h4>Attached Files ({{ attachedFiles.length }})</h4>
           <button mat-icon-button (click)="attachedFiles = []" matTooltip="Clear All">
@@ -442,9 +476,9 @@
         </div>
       </div>
 
-      <!-- Message Input -->
-      <div class="message-input-area" [class.drag-over]="dragOver" (dragover)="onDragOver($event)"
-        (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+      <!-- Message Input - HIDDEN for inactive chats -->
+      <div *ngIf="!isInactiveChatSelected" class="message-input-area" [class.drag-over]="dragOver"
+        (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
 
         <!-- Drag & Drop Overlay -->
         <div *ngIf="dragOver" class="drag-overlay">
@@ -453,7 +487,7 @@
         </div>
 
         <div style="position: relative;width: 25vw;">
-          <!-- Mentions popup - positioned absolutely to overlay -->
+          <!-- Mentions popup -->
           <div *ngIf="showMentionsList && filteredMembers.length > 0" class="mentions-popup">
             <div *ngFor="let member of filteredMembers" class="mention-user-item" #mentionItem
               (mousedown)="$event.preventDefault(); selectMention(member)" style="display: flex; align-items: center; padding: 8px 12px; 
@@ -464,7 +498,6 @@
               (mouseleave)="mentionItem.style.backgroundColor='transparent'">
 
               <div style="display: flex; flex-direction: row; align-items: center; width: 100%;">
-
                 <div *ngIf="member.profile" style="margin-right: 12px; flex-shrink: 0;">
                   <img style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" [src]="member.profile"
                     [alt]="member.name">
@@ -478,7 +511,6 @@
               </div>
             </div>
           </div>
-
         </div>
 
         <div class="input-container">
@@ -512,6 +544,12 @@
             <mat-icon *ngIf="!uploadingFiles">send</mat-icon>
           </button>
         </div>
+      </div>
+
+      <!-- Read-only footer for inactive chats -->
+      <div *ngIf="isInactiveChatSelected" class="inactive-footer">
+        <mat-icon>lock</mat-icon>
+        <span>Messaging is disabled for inactive groups</span>
       </div>
     </div>
   </div>

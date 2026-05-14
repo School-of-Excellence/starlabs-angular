@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Firestore, doc, setDoc, updateDoc, docSnapshots, DocumentSnapshot, collection, query, where, collectionSnapshots, getDocs, orderBy, collectionData, limit } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
-import { Observable, Subject } from 'rxjs';
-import { debounceTime, takeUntil } from 'rxjs/operators';
+import { Observable, Subject, firstValueFrom } from 'rxjs';
+import { debounceTime, filter, take, takeUntil } from 'rxjs/operators';
 import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule ,AbstractControl, FormControl} from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +23,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 import { A, COMMA, ENTER } from '@angular/cdk/keycodes';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -35,6 +38,7 @@ import { QuizComponent } from '../quiz/quiz.component';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 import { AuthguardService } from '../../authguard.service';
 import { WorkshopCategoryComponent } from '../workshop-category/workshop-category.component';
+import { UploadEpisodeDialogComponent } from '../../content/episodes-dashboard/upload-episode-dialog/upload-episode-dialog.component';
 
 interface WorkshopConfig {
   detailpage?: {
@@ -109,6 +113,7 @@ interface CurriculumItem {
   type: 'zoomcall' | 'challenge' | '';
   zoomlink?: string;
   completedzoomurl?: string;
+  zoomvideoref?: any;
   // status?: 'completed' | null; 
   status?: 'completed'; 
   hidezoom?:boolean;
@@ -147,6 +152,9 @@ interface CurriculumItem {
     MatSnackBarModule,
     MatRadioModule,
     MatSelectModule,
+    MatTabsModule,
+    MatTooltipModule,
+    MatMenuModule,
     DragDropModule,
     NgxEditorModule,
     MatSlideToggleModule,
@@ -160,6 +168,33 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
   editors: { [key: string]: Editor } = {};
   noteeditors: { [key: string]: Editor } = {};
   assignmenteditors: { [key: string]: Editor } = {};
+  cpwelcomeeditors: { [key: string]: Editor } = {};
+  cpwelcomeFields = [
+    {
+      key: 'abovediagnosticsheading',
+      label: 'Above Diagnostics Welcome Heading',
+      placeholder: 'Enter heading to show for abovediagnostics .',
+      hint: 'Shown to Above Diagnostics participants when they enrolled',
+    },
+    {
+      key: 'abovediagnosticsdescription',
+      label: 'Above Diagnostics Welcome Description',
+      placeholder: 'Enter Description to show for abovediagnostics .',
+      hint: 'Shown to Above Diagnostics participants when they enrolled',
+    },
+    {
+      key: 'facilitatorheading',
+      label: 'Facilitators Welcome Heading',
+      placeholder: 'Enter heading to show for Facilitators .',
+      hint: 'Shown to Facilitators participants when they enrolled',
+    },
+    {
+      key: 'facilitatordescription',
+      label: 'Facilitators Welcome Description',
+      placeholder: 'Enter Description to show for Facilitators .',
+      hint: 'Shown to Facilitators participants when they enrolled',
+    },
+  ];
   noterichTextContents: { [key: string]: string } = {};
   assignmentrichTextContents: { [key: string]: string } = {};
   recentTemplates = [];
@@ -604,8 +639,16 @@ onTemplateFilterChange(selectedIds: string[]): void {
 }
 async ngOnInit() {
   try {
-    const roles = await this.guard.getRoles();
-    this.loggedinProfile = roles["profile_ref"].id;
+    const uid = await firstValueFrom(this.guard.uid$.pipe(filter((v): v is string => !!v), take(1)));
+    if (uid) {
+      const roles = await this.guard.getRoles();
+      this.loggedinProfile = roles["profile_ref"].id;
+    }
+  } catch (error) {
+    console.error('Error loading roles:', error);
+  }
+
+  try {
     const chatgroupsRef = collection(this.firestore, 'supportchat');
     const q = query(chatgroupsRef, where('type', '==', 'group'));
     const querySnapshot = await getDocs(q);
@@ -691,6 +734,9 @@ async ngOnInit() {
     this.richTextFields.forEach(field => {
       this.editors[field.key] = new Editor();
       this.richTextContents[field.key] = '';
+    });
+    this.cpwelcomeFields.forEach(field => {
+      this.cpwelcomeeditors[field.key] = new Editor();
     });
     this.workshopId = this.route.snapshot.paramMap.get('id');
     if (this.workshopId) {
@@ -856,6 +902,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     Object.values(this.editors).forEach(editor => editor?.destroy());
     Object.values(this.noteeditors).forEach(editor => editor?.destroy());
     Object.values(this.assignmenteditors).forEach(editor => editor?.destroy());
+    Object.values(this.cpwelcomeeditors).forEach(editor => editor?.destroy());
     this.subscription.next();
     this.subscription.complete();
   }
@@ -884,6 +931,12 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
           this.fb.control({value:'',disabled:true})
         ])
       }),
+      cpwelcomemessage: this.fb.group({
+        abovediagnosticsdescription: [''],
+        abovediagnosticsheading: [''],
+        facilitatordescription: [''],
+        facilitatorheading: [''],
+      }),
       newusersonly:[false],
       journeybased: [false],
       tierbased:[false],
@@ -900,6 +953,8 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       facilitatorprofiles:[[],],
       selectedgroup: [''],
       enrollwattimessage: [''],
+      loginlogchannel:['workshop-logs'],
+      workshopactivitychannel:['workshop-logs'],
       selectedjourneys: [[],],
       selectedtiers: [[],],
       categoriesforthisworkshop:[[],],
@@ -1193,6 +1248,11 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     return value;
   }
 
+  compareRefs = (a: any, b: any): boolean => {
+    if (!a || !b) return a === b;
+    return a.path === b.path;
+  };
+
     getFormArray(key: string): FormArray {
       return this.detailPageForm.get(key) as FormArray;
     }
@@ -1250,6 +1310,17 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
 
   onMenuChange(menu: 'detailpage' | 'challenges'  | 'challengesettings' |'payment'): void {
     this.selectedMenu = menu;
+  }
+
+  private readonly tabMenuMap: Array<'detailpage' | 'challenges' | 'challengesettings'> = ['detailpage', 'challenges', 'challengesettings'];
+
+  get selectedTabIndex(): number {
+    const idx = this.tabMenuMap.indexOf(this.selectedMenu as any);
+    return idx >= 0 ? idx : 0;
+  }
+
+  onTabChange(index: number): void {
+    this.onMenuChange(this.tabMenuMap[index]);
   }
   drop(event: CdkDragDrop<FormArray>, key: string): void {
     if (event.previousIndex === event.currentIndex) return;
@@ -1477,6 +1548,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       status: [undefined],
       hidezoom: [null],
       completedzoomurl:[''],
+      zoomvideoref: [null],
       headicon:[''],
       heading: [''],
       subheading: [''],
@@ -1514,12 +1586,16 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     return (curriculumGroup.get('challenges'));
   }
 
-  addSubChallenge(curriculumGroup) {
+  addSubChallenge(curriculumGroup, afterIndex?: number) {
     const challengeIndex = this.challengesArray.controls.indexOf(curriculumGroup);
-    const activityIndex = this.getChallengeArray(curriculumGroup).length;
+    const challengeArray = this.getChallengeArray(curriculumGroup);
+    const insertIndex = (afterIndex === undefined || afterIndex === null)
+      ? challengeArray.length
+      : afterIndex + 1;
+    const newChallengeId = this.generateId();
     const challengeGroup = this.fb.group({
-      challengeid: [this.generateId()], 
-      zoomattend: [[]], 
+      challengeid: [newChallengeId],
+      zoomattend: [[]],
       name: ['',],
       description: ['',],
       type:['',],
@@ -1555,8 +1631,19 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       
     });
 
-    this.getChallengeArray(curriculumGroup).push(challengeGroup);
-    this.initializeNoteEditor(challengeIndex, activityIndex);
+    if (insertIndex >= challengeArray.length) {
+      challengeArray.push(challengeGroup);
+    } else {
+      challengeArray.insert(insertIndex, challengeGroup);
+    }
+    this.initializeNoteEditor(challengeIndex, insertIndex);
+    this.rebuildActivityIds();
+    setTimeout(() => {
+      const el = document.querySelector(`[data-activity-id="${newChallengeId}"]`) as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
   }
   // removeSubChallenge(curriculumGroup, index) {
   //   const confirmDelete = confirm("Are you sure you want to delete this sub-challenge?");
@@ -1750,6 +1837,7 @@ private rebuildActivityIds(): void {
       zoomattend: [challenge['zoomattend'] || []],
       zoomlink: [challenge.zoomlink || ''],
       completedzoomurl: [challenge.completedzoomurl || ''],
+      zoomvideoref: [challenge.zoomvideoref || null],
       // status: [challenge.status ?? null],
       status: [challenge.status || undefined],
       hidezoom: [challenge.hidezoom ?? false],
@@ -1970,6 +2058,12 @@ private rebuildActivityIds(): void {
           workshopDays: data['evergreenWorkshopMeta']?.workshopDays ?? null,
           lastChallengeMessage: data['evergreenWorkshopMeta']?.lastChallengeMessage ?? '',
         },
+        cpwelcomemessage: {
+          abovediagnosticsdescription: data['cpwelcomemessage']?.abovediagnosticsdescription ?? '',
+          abovediagnosticsheading: data['cpwelcomemessage']?.abovediagnosticsheading ?? '',
+          facilitatordescription: data['cpwelcomemessage']?.facilitatordescription ?? '',
+          facilitatorheading: data['cpwelcomemessage']?.facilitatorheading ?? '',
+        },
         newusersonly: data['newusersonly'] || false,
         journeybased: data['journeybased'] || false,
         tierbased: data['tierbased'] || false,
@@ -1980,6 +2074,8 @@ private rebuildActivityIds(): void {
         facilitatorprofiles: data['facilitatorprofiles'] || [],
         selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
+        loginlogchannel: data['loginlogchannel'] || 'workshop-logs',
+        workshopactivitychannel: data['workshopactivitychannel'] || 'workshop-logs',
         mailTemplate: data['mailTemplate'] || null,
         selectedjourneys: data['selectedjourneys'] || [],
         selectedtiers: data['selectedtiers'] || [],
@@ -2138,6 +2234,7 @@ private rebuildActivityIds(): void {
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
         evergreenWorkshop: this.settingsForm.get('evergreenWorkshop')?.value || false,
         evergreenWorkshopMeta: this.settingsForm.get('evergreenWorkshopMeta')?.value ?? null,
+        cpwelcomemessage: this.settingsForm.get('cpwelcomemessage')?.value ?? null,
         newusersonly: this.settingsForm.get('newusersonly')?.value || false,
         journeybased: this.settingsForm.get('journeybased')?.value || false,
         tierbased: this.settingsForm.get('tierbased')?.value || false,
@@ -2146,7 +2243,9 @@ private rebuildActivityIds(): void {
         facilitator: this.settingsForm.get('facilitator')?.value || false,
         facilitatorprofiles: this.settingsForm.get('facilitatorprofiles')?.value || [],
         selectedgroup: this.settingsForm.get('selectedgroup')?.value || null,
+        loginlogchannel: this.settingsForm.get('loginlogchannel')?.value || null,
         enrollwattimessage: this.settingsForm.get('enrollwattimessage')?.value || null,
+        workshopactivitychannel: this.settingsForm.get('workshopactivitychannel')?.value || null,
         mailTemplate: this.settingsForm.get('mailTemplate')?.value || null,
         testusers: this.settingsForm.get('testusers')?.value || [],
         selectedjourneys: this.settingsForm.get('selectedjourneys')?.value || [],
@@ -2525,4 +2624,12 @@ dropCategory(event: CdkDragDrop<string[]>): void {
   moveItemInArray(currentOrder, event.previousIndex, event.currentIndex);
   this.settingsForm.get('categoriesforthisworkshop')?.setValue(currentOrder);
 }
+  openUploadDialog() {
+    this.dialog.open(UploadEpisodeDialogComponent, {
+      width: '95vw',
+      maxWidth: '1400px',
+      height: '90vh',
+      panelClass: 'upload-episode-dialog-panel',
+    });
+  }
 }

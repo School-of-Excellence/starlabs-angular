@@ -520,14 +520,16 @@ export class ParticipantAssignmentBoardComponent {
   }
 
   fillForm(activity: any) {
+    console.log(activity);
+
     const formTemplateId = activity.selectedform;
     const profileId = activity.profileId;
     const assignmentId = activity.docid;
     const participantAssignmentId = activity.participantAssignmentId;
     const activityLog = activity.activityLog;
     
-    let url = `/formbasedsubmission?id=${formTemplateId}&type=form&queueid=${assignmentId}&profileid=${profileId}&participantAssignmentId=${participantAssignmentId}`;
-    
+    // let url = `/formbasedsubmission?id=${formTemplateId}&type=form&queueid=${assignmentId}&profileid=${profileId}&participantAssignmentId=${participantAssignmentId}`;
+    let url = `/formtemplate?id=${formTemplateId}&type=form&queueid=${assignmentId}&profileid=${profileId}&participantAssignmentId=${participantAssignmentId}`;
     if (activityLog && activityLog.length > 0) {
       const encodedNotes = encodeURIComponent(JSON.stringify(activityLog[activityLog.length - 1].notes));
       url += `&reviewLast=true&reviewNotes=${encodedNotes}`;
@@ -538,6 +540,8 @@ export class ParticipantAssignmentBoardComponent {
   }
 
   reviewLastForm(activity: any){
+    console.log(activity);
+    
     const formtemplateid = activity.formtemplate;
     const profileId = activity.profileId;
     const activityref = activity.activityref;
@@ -546,9 +550,11 @@ export class ParticipantAssignmentBoardComponent {
     let url;
     const encodedNotes = encodeURIComponent(JSON.stringify(summary));
     if (activity.originalStatus === 'completed') {
-      url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;  
+      // url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;  
+      url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;  
     } else {
-      url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;  
+      // url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;  
+      url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;  
     }
     window.open(url.toString(),"_blank") 
   }
@@ -646,6 +652,7 @@ export class ParticipantAssignmentBoardComponent {
   }
 
   shouldShowButton(activity: any): boolean {
+    if(activity?.assignmenttype === 'Manual Assignment') return false;
     // Always show button for review, rework, and completed
     if (['review', 'rework', 'completed'].includes(this.selectedStatus)) {
       return true;

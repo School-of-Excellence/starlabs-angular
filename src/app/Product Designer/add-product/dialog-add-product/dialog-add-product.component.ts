@@ -1,9 +1,9 @@
 import { Component, ElementRef, Inject, ViewChild } from '@angular/core';
-import { collection, deleteDoc, doc, DocumentReference, Firestore, getDocs, orderBy, query, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, deleteDoc, doc, DocumentReference, Timestamp, Firestore, getDocs, orderBy, query, setDoc, updateDoc } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { LoadingProgressComponent } from '../../../loading-progress/loading-progress.component';
-import { ref, uploadBytes, getDownloadURL, deleteObject, Storage } from '@angular/fire/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject, Storage, uploadBytesResumable } from '@angular/fire/storage';
 import { NgIf, NgFor, CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -34,7 +34,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     MatRadioModule,
     MatSelectModule,
     MatTableModule,
-    
+
   ],
   templateUrl: './dialog-add-product.component.html',
   styleUrl: './dialog-add-product.component.css'
@@ -64,7 +64,7 @@ export class DialogAddProductComponent {
     "After Extended Performance Mode",
     "Snooze Mode",
     "Investment Mode"
-  ] 
+  ]
   productimage : any  = {
     file : null,
     previewurl:null,
@@ -74,6 +74,10 @@ export class DialogAddProductComponent {
   deliveryPlanningOption = ["normal", "priority"]
   atcModelList = []
   videos = [];
+  attachments: Array<{ name: string; type: string; size: number; uploadedAt: Timestamp; url: string }> = [];
+  readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
+  uploadProgress: number | null = null;
+
   get loadingDialog(){
     return this.dialog.open(LoadingProgressComponent,{
       data:{
@@ -115,11 +119,13 @@ export class DialogAddProductComponent {
           modeflow: data.modeflow ?? [],
           // category:data.category ?? []
           selfbooking: data?.selfbooking ?? false,
-          playlist : data.playlist ?? []
+          playlist : data.playlist ?? [],
         })
-        this.productimage.url = data.image
+        this.productimage.url = data.image;
+        this.attachments = data.attachments ?? []
+
       }
-    }   
+    }
     this.productFetch()
     /////////// end
   }
@@ -129,7 +135,7 @@ export class DialogAddProductComponent {
     const getProduct = await getDocs(productsRef)
     for (let i = 0; i < getProduct.docs.length; i++) {
       const doc = getProduct.docs[i]
-      const productName = doc.data()['product']  
+      const productName = doc.data()['product']
       const docmatch = this.productarray.some((item: string) => item === productName);
       if (!docmatch) {
         this.productarray.push(productName);
@@ -185,7 +191,7 @@ export class DialogAddProductComponent {
       const getdeliveryevents = await getDocs(deliveryeventsQuery)
       let queueList = []
       for (let i = 0; i < getdeliveryevents.docs.length; i++) {
-        const doc = getdeliveryevents.docs[i]  
+        const doc = getdeliveryevents.docs[i]
         queueList.push({
           deliveryname: doc.data()["queuename"],
           deliverypath: doc.ref.path,
@@ -201,7 +207,7 @@ export class DialogAddProductComponent {
       const getdeliveryqueue = await getDocs(deliveryqueueQuery)
       let eventList = []
       for (let i = 0; i < getdeliveryqueue.docs.length; i++) {
-        const doc = getdeliveryqueue.docs[i]  
+        const doc = getdeliveryqueue.docs[i]
         eventList.push({
           deliveryname: doc.data()["eventname"],
           deliverypath: doc.ref.path,
@@ -251,7 +257,8 @@ export class DialogAddProductComponent {
   }
   ///on form submit
   async onformsubmit(value) {
-    this.addProductForm.reset();
+    // this.addProductForm.reset();
+    console.log('attachments:', this.attachments);
     let loading = this.loadingDialog
     const productData = {
       product: value.product,
@@ -271,7 +278,8 @@ export class DialogAddProductComponent {
       type: value.type ?? null,
       modeflow: value.modeflow,
       selfbooking: value.selfbooking,
-      playlist: (value.playlist ?? []).length == 0 ? value.playlist : null
+      playlist: (value.playlist ?? []).length == 0 ? value.playlist : null,
+      attachments: this.attachments
     };
     if (this.data !== null) {
       const productDoc = doc(this.afs, "products", this.data.id);
@@ -304,6 +312,45 @@ export class DialogAddProductComponent {
         loading.close()
       })
     }
+  }
+
+  async onAttachmentSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    for (const file of Array.from(input.files)) {
+      if (file.size > this.MAX_FILE_SIZE) {
+        alert(`"${file.name}" exceeds 5MB`);
+        continue;
+      }
+      try {
+        this.uploadProgress = 0;
+        const storageRef = ref(this.storage, `products/attachments/${Date.now()}_${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              this.uploadProgress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            },
+            (error) => {
+              console.error('upload error:', error);
+              reject(error);
+            },
+            () => resolve()
+          );
+        });
+        const url = await getDownloadURL(uploadTask.snapshot.ref);
+        this.attachments = [...this.attachments, { name: file.name, type: file.type, size: file.size, uploadedAt: Timestamp.now(),url }];
+        this.uploadProgress = null;
+      } catch (err) {
+        console.error('upload error:', err);
+        this.uploadProgress = null;
+      }
+    }
+    input.value = '';
+  }
+
+  removeAttachment(index: number) {
+    this.attachments.splice(index, 1);
   }
   //////
   ondelete(id){
@@ -339,7 +386,7 @@ export class DialogAddProductComponent {
       const uploadResult = await uploadBytes(storageRef, this.productimage.file);
       const downloadURL = await getDownloadURL(uploadResult.ref);
       this.productimage.url = downloadURL;
-      
+
       console.log("image uploaded successfully");
     } catch (error) {
       console.error("Error uploading image:", error);

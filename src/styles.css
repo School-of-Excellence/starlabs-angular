@@ -156,3 +156,12 @@ body {
     transform: translateY(0);
   }
 }
+
+.fullscreen-dialog .mat-mdc-dialog-surface {
+  border-radius: 10px !important;
+  overflow: auto !important;
+  height: 100%;
+  display: flex;
+  width: 80vw;
+  flex-direction: column;
+}
