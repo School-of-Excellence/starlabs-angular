@@ -87,7 +87,7 @@
           <img class="avatar avatar-img"
               [src]="mapProfiles[row['id']]?.photo || 'https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/profile-image-png-14.png?alt=media&token=ce6361d2-690c-4742-bba7-dbb90e193080'"
               [alt]="row['name']"
-              (click)="openImage(mapProfiles[row['id']]?.photo, row['name']); $event.stopPropagation()">
+              (click)="openImage(mapProfiles[row['id']]?.photo, row['name'], row['id'], mapProfiles[row['id']]?.['profileid']); $event.stopPropagation()">
             <div class="participant-info">
               <span class="participant-name">{{ row['name'] }}</span>
               <span class="participant-mobile" *ngIf="mapProfiles[row['id']]?.email">
@@ -562,11 +562,36 @@
   <!-- Image Preview Overlay -->
   <div class="overlay-backdrop" *ngIf="showImageOverlay" (click)="closeImage()">
     <div class="image-preview-panel" (click)="$event.stopPropagation()">
-      <button class="image-close-btn" (click)="closeImage()">
+      <button class="image-close-btn" (click)="closeImage()" [disabled]="imageUploading">
         <mat-icon>close</mat-icon>
       </button>
       <img class="preview-image" [src]="previewImageUrl" [alt]="previewImageName">
       <div class="preview-name">{{ previewImageName }}</div>
+      <input #profileImageInput type="file" accept="image/*" hidden (change)="onProfileImageSelected($event)">
+      <div class="image-edit-actions" *ngIf="previewProfileId || previewProfileMetadataId">
+        <ng-container *ngIf="!pendingImageFile; else pendingActions">
+          <button class="image-edit-btn"
+                  [disabled]="imageUploading"
+                  (click)="triggerImageUpload(profileImageInput)">
+            <mat-icon>edit</mat-icon>
+            <span>Edit Image</span>
+          </button>
+        </ng-container>
+        <ng-template #pendingActions>
+          <button class="image-edit-btn ghost"
+                  [disabled]="imageUploading"
+                  (click)="cancelPendingImage()">
+            <mat-icon>close</mat-icon>
+            <span>Cancel</span>
+          </button>
+          <button class="image-edit-btn"
+                  [disabled]="imageUploading"
+                  (click)="confirmUploadImage()">
+            <mat-icon>{{ imageUploading ? 'hourglass_empty' : 'cloud_upload' }}</mat-icon>
+            <span>{{ imageUploading ? 'Uploading...' : 'Upload' }}</span>
+          </button>
+        </ng-template>
+      </div>
     </div>
   </div>
 
