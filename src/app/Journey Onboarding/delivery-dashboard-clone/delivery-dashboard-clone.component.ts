@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core'; // getFireStore
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -351,8 +351,8 @@ export class DeliveryDashboardCloneComponent {
             "Pre-Process Form",
             "Diagnostics",
             "Implementation",
-            "Post-Process Form",
             "Review",
+            "Post-Process Form",
             "Completion"
         ]
     };
@@ -373,8 +373,8 @@ export class DeliveryDashboardCloneComponent {
             'Pre-Process',
             'Diagnostics',
             'Implementation',
+            'Review',
             'Post-Process Form',
-            'Review'
         ],
         'EI Starter Pack': [
             'Welcome Call',
@@ -488,8 +488,8 @@ export class DeliveryDashboardCloneComponent {
             preprocess: [],
             diagnostics: [],
             implementation: [],
-            postForm: [],
             review: [],
+            postForm: [],
             completion: []
         }
     };
@@ -979,8 +979,8 @@ export class DeliveryDashboardCloneComponent {
                 preprocess: [],
                 diagnostics: [],
                 implementation: [],
-                postForm: [],
                 review: [],
+                postForm: [],
                 completion: []
             }
         };
@@ -1091,12 +1091,13 @@ export class DeliveryDashboardCloneComponent {
                     }
                     // ========================= CRITICAL SUPPORT =========================
                     else if (productType === 'criticalSupport') {
-                        const reviewAppointment = attendedAppointments.find(app =>
-                            app.appointmentTypeName?.toLowerCase() === `critical support review`
-                        );
 
                         const postprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support post form'
+                        );
+
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `critical support review`
                         );
 
                         const implementationAppointment = attendedAppointments.find(app =>
@@ -1108,19 +1109,20 @@ export class DeliveryDashboardCloneComponent {
                         );
 
                         const preprocessAppointment = attendedAppointments.find(app =>
-                            app.formname?.toLowerCase() === 'critical support request'
+                            app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-                        if (reviewAppointment) {
-                            productData.criticalSupport.review.push({
-                                ...mergedData,
-                                ...reviewAppointment
-                            });
-                        }
-                        else if (postprocessAppointment) {
+                       
+                        if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
                                 ...postprocessAppointment
+                            });
+                        }
+                        else if (reviewAppointment) {
+                            productData.criticalSupport.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
                             });
                         }
                         else if (implementationAppointment) {
@@ -1289,7 +1291,7 @@ export class DeliveryDashboardCloneComponent {
             let typeName = '';
             if (app?.appointmentTypeName) {
                 typeName = app.appointmentTypeName;
-            } else if (app?.formname === 'Critical Support Request') {
+            } else if (app?.formname === 'Critical Support Pre Form') {
                 typeName = 'Pre-Process';
             } else if (app?.formname === 'Critical Support Post Form') {
                 typeName = 'Post-Process Form'
@@ -1337,7 +1339,7 @@ export class DeliveryDashboardCloneComponent {
     resolveAppointmentType(appointment: any) {
         // If it's from forms
         if (appointment?.formid) {
-            if (appointment?.formname === 'Critical Support Request') return 'Pre-Process';
+            if (appointment?.formname === 'Critical Support Pre Form') return 'Pre-Process';
             else if (appointment?.formname === 'Critical Support Post Form') return 'Post-Process Form';
             else if (appointment?.formname === 'Post Session Check-in') return 'Post Session Check-in';
         }
@@ -1423,8 +1425,8 @@ export class DeliveryDashboardCloneComponent {
                 2: this.productData.criticalSupport.preprocess || [],
                 3: this.productData.criticalSupport.diagnostics || [],
                 4: this.productData.criticalSupport.implementation || [],
-                5: this.productData.criticalSupport.postForm || [],
-                6: this.productData.criticalSupport.review || [],
+                5: this.productData.criticalSupport.review || [],
+                6: this.productData.criticalSupport.postForm || [],
                 7: this.productData.criticalSupport.completion || []
             };
         }
