@@ -132,15 +132,18 @@ export class FormtemplateComponent {
     private router : Router,
     public sanitizer: DomSanitizer
   ) {
-    
+
     console.log('QueryParams', this.route.snapshot.queryParams);
     this.profileid = this.route.snapshot.queryParams['profileid'] || null;
-    this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
+    // this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
+    this.participantAssignmentId = this.route.snapshot.queryParams['participantAssignmentId'] ?? null;
 
     if(this.route.snapshot.queryParams['participantAssignmentId']){
-      this.participantAssignmentId = this.route.snapshot.queryParams['participantAssignmentId']
       this.auth.getRoles().then(async roles => {
-        if (roles["ah"] || roles["admin"] || roles["developer"]) {
+        this.loggedInProfileId = roles['profile_ref'].id;
+        const isParticipantBoard = this.route.snapshot.queryParams['source'] == 'participant';
+        const isReworkMode = !this.route.snapshot.queryParams['viewFilledForm'] && !this.route.snapshot.queryParams['viewCompleted'];
+        if ((roles["ah"] || roles["admin"] || roles["developer"]) && roles['profile_ref'].id !== this.profileid && !isParticipantBoard && !isReworkMode) {
           this.reviewAccess = true;
         }else{
           this.reviewAccess = false;
@@ -167,7 +170,7 @@ export class FormtemplateComponent {
   }
 
   async ngOnInit() {
-
+    this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     if(this.participantAssignmentId){
       getDoc(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId)).then(res => {
         this.currentstatus = res.data()['status'];
@@ -188,7 +191,7 @@ export class FormtemplateComponent {
       await this._performAutoSave(this.deliveryForm.getRawValue());
     });
      // Get queue ID from route params
-    this.formpatch = ![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ? true : (![null,undefined].includes(this.participantformtemplateid) ? true : false)
+    this.formpatch = (![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ||this.route.snapshot.queryParams['viewFilledForm'] === 'true' ||this.route.snapshot.queryParams['viewCompleted'] === 'true' ||![null,undefined].includes(this.participantformtemplateid));
 
     // Get user ID and roles in constructor
     await this.initializeUserData();
@@ -300,7 +303,8 @@ export class FormtemplateComponent {
             }
           }
           //formpatch ended
-          if (this.formpatch) {
+          const isRework = this.route.snapshot.queryParams['viewFilledForm'] !== 'true' && this.route.snapshot.queryParams['viewCompleted'] !== 'true';
+          if (this.formpatch && !isRework) {
             this.deliveryForm.disable({ emitEvent: false });
           }
           this.showcontent = true
@@ -331,18 +335,14 @@ export class FormtemplateComponent {
   }
 
   private async initializeQueueData() {
-    console.log(this.queueId);
-    
     try {
-      // Get queue document
       const queueDocRef = doc(this.firestoreDefault, 'queue generation', this.queueId);
-      const queueDoc = await getDoc(queueDocRef);
+      const queueDoc = await getDoc(doc(this.firestoreDefault, 'queue generation', this.queueId));
 
       if (queueDoc.exists()) {
         this.queueData = queueDoc.data();
       }
 
-      // Get participant queue token
       const tokenCollectionRef = collection(this.firestoreDefault, 'queue_token');
       const tokenQuery = query(
         tokenCollectionRef,
@@ -450,7 +450,7 @@ export class FormtemplateComponent {
   }
 
   async onSubmit(value: any) {
-    
+
     if (this.deliveryForm.invalid) {
       this.deliveryForm.markAllAsTouched();
       // ng-reflect-* attrs are stripped in prod, and .ng-invalid is also on the <form>/group
@@ -480,11 +480,12 @@ export class FormtemplateComponent {
       data: {
         formData: this.submittedClientForm,
         formValues: value,
-        reviewaccess: this.reviewAccess,
+        reviewaccess: false,
         participantassignmentid:this.participantAssignmentId,
         validate: false,
         loginid: this.loggedInProfileId,
-        profileid: this.profileid
+        profileid: this.profileid,
+        viewOnly: this.route.snapshot.queryParams['viewFilledForm'] === 'true' || this.route.snapshot.queryParams['viewCompleted'] === 'true'
       },
       disableClose: true
     });
@@ -517,8 +518,13 @@ export class FormtemplateComponent {
 
       // Handle queue-related data
       let nextstage = null;
-      if (this.queueId) {
-        await this.handleQueueSubmission();
+      if (this.participantAssignmentId) {
+        this.submittedClientForm['bigparticipantassignmentref'] = doc(this.firestoreForms, 'big participants assignments', this.participantAssignmentId);
+      } else if (this.queueId) {
+        if (this.participantQueueToken === undefined) await this.initializeQueueData();
+        const queueDocRef = doc(this.firestoreForms, 'queue generation', this.queueId);
+        this.submittedClientForm['queueref'] = queueDocRef;
+        this.submittedClientForm['queuetokenref'] = this.participantQueueToken ? doc(this.firestoreForms, 'queue_token', this.participantQueueToken.docid) : null;
         nextstage = await this.getNextStage();
       }
 
@@ -647,7 +653,8 @@ export class FormtemplateComponent {
     const formDocRef = doc(this.firestoreForms, 'formsByClient', this.submittedClientForm['docid']);
     await setDoc(formDocRef, this.submittedClientForm);
 
-    const activityref = doc(this.firestoreDefault, 'bigformassignment', this.submittedClientForm['docid']);
+    // const activityref = doc(this.firestoreDefault, 'bigformassignment', this.submittedClientForm['docid']);
+    const activityref = doc(this.firestoreDefault, 'formsByClient', this.submittedClientForm['docid']);
     const formTemplate = this.submittedClientForm['formid'];
 
     if(this.participantAssignmentId){
@@ -727,10 +734,11 @@ export class FormtemplateComponent {
     const previewRef = this.dialog.open(FormTemplatePreviewComponent, {
       width: '800px',
       maxWidth: '95vw',
+      maxHeight: '90vh',
       data: {
         formData: this.submittedClientForm,
         formValues: value,
-        reviewaccess: this.reviewAccess,
+        reviewaccess: false,
         participantassignmentid:this.participantAssignmentId,
         validate: false,
         loginid: this.loggedInProfileId,
@@ -749,11 +757,12 @@ export class FormtemplateComponent {
         try {
           // Get existing form data and create log entry
           const patchDataPath = this.route.snapshot.queryParams['patchdata'];
-          const existingFormDocRef = doc(this.firestoreDefault, patchDataPath);
+          const originalDocId = patchDataPath.split('/').pop();
+          const pathParts = patchDataPath.split('/');
+          const existingFormDocRef = doc(this.firestoreForms, pathParts[0], pathParts[1]);
           const existingFormDoc = await getDoc(existingFormDocRef);
 
           if (existingFormDoc.exists()) {
-            // Create log entry in formsByClient log collection
             const logDocRef = doc(this.firestoreForms, 'formsByClient log', this.draftDocid);
             await setDoc(logDocRef, existingFormDoc.data());
           }
@@ -808,11 +817,11 @@ export class FormtemplateComponent {
           console.log('this submitedclientform : ',this.submittedClientForm);
 
           // Set form metadata
-          this.submittedClientForm['docid'] = this.draftDocid;
+          // this.submittedClientForm['docid'] = this.draftDocid;
 
           // Get user roles for editedby field
           const roles = await this.auth.getRoles();
-          this.submittedClientForm["editedby"] = roles.profile_ref.id;
+
 
           this.submittedClientForm['date'] = new Date();
           this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
@@ -823,6 +832,14 @@ export class FormtemplateComponent {
           // Update the document using merge option
           await setDoc(existingFormDocRef, this.submittedClientForm, { merge: true });
 
+          // Update big participants assignments status
+          if (this.participantAssignmentId) {
+            await updateDoc(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId), {
+              status: 'review',
+              activityref: doc(this.firestoreDefault, 'formsByClient', originalDocId),
+              formtemplate: this.inlineFormId ?? this.patchformid ?? null
+            });
+          }
           loadingRef.close();
 
         } catch (error) {
@@ -914,7 +931,7 @@ export class FormtemplateComponent {
 
   async getFormsOption() {
     console.log(this.patchformid);
-    
+
     if(this.formpatch) {
       console.log("This is a preview form. Drafts are disabled.")
       return

@@ -29,16 +29,18 @@ export class FormTemplatePreviewComponent {
   participantAssignmentId: string;
   loggedInProfileId: string;
   profileId: string;
+  viewOnly: boolean = false;
 
   constructor(public dialogRef: MatDialogRef<FormTemplatePreviewComponent>,@Inject(MAT_DIALOG_DATA) public data: any, private fb: FormBuilder,) {
-    
+
     this.reviewAccess = data.reviewaccess;
     this.participantAssignmentId = data.participantassignmentid;
     this.loggedInProfileId = this.data.loginid;
     this.profileId = this.data.profileid;
+    this.viewOnly = data.viewOnly || false;
 
     console.log(this.data);
-    
+
     console.log(this.loggedInProfileId);
     console.log(this.profileId);
   }
@@ -47,7 +49,7 @@ export class FormTemplatePreviewComponent {
     this.preparePreviewData();
     this.initForm()
   }
-  
+
   initForm() {
     this.notesForm = this.fb.group({
       notes: this.fb.array([
@@ -75,7 +77,7 @@ export class FormTemplatePreviewComponent {
   preparePreviewData(): void {
     const formArray = this.data.formData.formarray;
     const formValues = this.data.formValues;
-    
+
     // Filter out fields with values to display
     this.previewData = formArray
       .filter(field => !['label', 'video', 'audio'].includes(field.type))
@@ -123,7 +125,7 @@ export class FormTemplatePreviewComponent {
   onConfirm(status): void {
     let data = {
       status: status,
-      reviewnotes: this.reviewNotes,
+      reviewnotes: this.notesArray.value,
       confirmed: true,
     }
     this.dialogRef.close(data);

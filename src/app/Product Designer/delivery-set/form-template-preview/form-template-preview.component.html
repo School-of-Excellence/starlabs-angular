@@ -4,29 +4,29 @@
     <h2>Review Your Submission</h2>
     <p>Please review your answers before final submission.</p>
   </div>
-  
+
   <div class="preview-content">
     <div *ngFor="let field of previewData" class="preview-field">
       <ng-container *ngIf="field.value !== null && field.value !== undefined && field.value !== ''">
         <div class="preview-field-name">{{field.fieldname}}</div>
-        
+
         <!-- Display simple text/number/email values -->
         <div *ngIf="isSimpleValue(field.value)" class="preview-field-value">
           {{field.value}}
         </div>
-        
+
         <!-- Display date values properly formatted -->
         <div *ngIf="isDateValue(field.value)" class="preview-field-value">
           {{formatDate(field.value)}}
         </div>
-        
+
         <!-- Display array of strings (for multi-select) -->
         <div *ngIf="isArrayOfStrings(field.value)" class="preview-field-value">
           <ul class="preview-list">
             <li *ngFor="let item of field.value">{{item}}</li>
           </ul>
         </div>
-        
+
         <!-- Display complex arrays (form arrays) -->
         <div *ngIf="isFormArray(field.value)" class="preview-field-value">
           <div *ngFor="let arrayItem of field.value; let i = index" class="preview-array-item">
@@ -44,10 +44,10 @@
       </ng-container>
     </div>
   </div>
-  
+
   <div class="preview-container">
     <!-- Show Confirm Submission only when reviewAccess is false -->
-    <div class="preview-actions" *ngIf="this.loggedInProfileId == this.profileId">
+    <div class="preview-actions" *ngIf="!reviewAccess && !viewOnly">
       <button mat-stroked-button (click)="onCancel()" class="cancel-button">
         <mat-icon>arrow_back</mat-icon>
         <span>Edit Form</span>
@@ -58,19 +58,26 @@
         <span>Confirm Submission</span>
       </button>
     </div>
-  
+    <!-- close button shown when admin opens their own form from validate screen -->
+    <div class="preview-actions" *ngIf="!reviewAccess && viewOnly">
+      <button mat-stroked-button (click)="onCancel()" class="cancel-button">
+        <mat-icon>close</mat-icon>
+        <span>Close</span>
+      </button>
+    </div>
+
     <!-- Show Review section only when reviewAccess is true -->
-    <div *ngIf="this.loggedInProfileId != this.profileId" class="review-section">
+    <div *ngIf="reviewAccess && loggedInProfileId !== profileId" class="review-section">
       <div class="review-header">
         <mat-icon class="header-icon">rate_review</mat-icon>
         <h3>Review &amp; Notes</h3>
       </div>
-  
+
       <form [formGroup]="notesForm" class="notes-form">
         <div formArrayName="notes" class="notes-container">
           <div *ngFor="let note of notesArray.controls; let i = index" class="note-item">
             <div class="note-number">{{ i + 1 }}</div>
-  
+
             <mat-form-field appearance="outline" class="note-input">
               <mat-label>Add a note...</mat-label>
               <textarea matInput [formControlName]="i" class="textarea" rows="3"
@@ -80,14 +87,14 @@
                 Note is required
               </mat-error>
             </mat-form-field>
-  
+
             <div class="note-actions">
               <button mat-mini-fab color="primary" type="button" matTooltip="Add another note"
                 *ngIf="i === notesArray.length - 1 && notesArray.at(i).value?.trim()" (click)="addNote()"
                 class="action-btn add-button">
                 <mat-icon>add</mat-icon>
               </button>
-  
+
               <button mat-mini-fab color="warn" type="button" matTooltip="Remove this note" *ngIf="notesArray.length > 1"
                 (click)="removeNote(i)" class="action-btn remove-button">
                 <mat-icon>remove</mat-icon>
@@ -95,20 +102,20 @@
             </div>
           </div>
         </div>
-  
+
         <div class="button-container">
           <button mat-stroked-button (click)="onCancel()" type="button" class="back-btn">
             <mat-icon>arrow_back</mat-icon>
             <span>Back</span>
           </button>
-  
+
           <div class="action-buttons">
             <button mat-raised-button color="warn" type="button" (click)="onConfirm('rework')"
               class="button-css complete-btn">
               <mat-icon>replay</mat-icon>
               <span>Re-Work</span>
             </button>
-  
+
             <button mat-raised-button color="primary" type="submit" (click)="onConfirm('completed')"
               class="button-css complete-btn">
               <mat-icon>check_circle</mat-icon>
