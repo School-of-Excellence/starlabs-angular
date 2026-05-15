@@ -193,7 +193,7 @@ export class ParticipantsAnalyticsComponent {
   computeColumns = ['UP! count' , 'CPM count'];
   nonColumnArrayString = ['activejourney' , 'lastcompletedjourney']
   columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray, ...this.computeColumns,
-  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'journey', 'consumedproductcount', 'unconsumedproductcount' , 'emi status']
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'journey', 'consumedproductcount', 'unconsumedproductcount' , 'emi status' , 'journeyonboarding']
   filterText = null
   showSectionType = null
   savedfilterquery: any = []
@@ -1028,7 +1028,6 @@ export class ParticipantsAnalyticsComponent {
   async onDataSearch() {
     let loadingref = this.loading
     let data = Object.assign({}, this.filterdata);
-    console.log(data)
     for (const key in data) {
       if (data[key] === null || data[key] === undefined) delete data[key]
       else if (this.range.includes(key)) {
@@ -1587,7 +1586,6 @@ export class ParticipantsAnalyticsComponent {
         value.data.forEach((profile: any) => {
           const purchaseRef = profile['customerstatus'] === 'active' ? profile['purchaseref'] : profile['customerstatus'] === 'non active' ? profile['lastsubscribedpurchaseref'] : null;
           if(!purchaseRef) return
-          console.log(purchaseRef.id)
           const docRef = doc(this.firestore, "participantjourneyproduct" , purchaseRef.id);
           getDoc(docRef).then(snap => {
               const element = snap.data();
@@ -3028,6 +3026,237 @@ export class ParticipantsAnalyticsComponent {
     } 
     return ''
   }
+
+
+  async openCheckListForQueueEvent(){
+    let loadingref = this.loading
+    const data = [];
+    const queueTokenSnapMap = {};
+
+    const queueRef = collection(this.firestore, 'queue_token');
+    const q = query(queueRef,
+      where("tokenstatus", "==", "Active"),
+      where("stagestatus", "==", "Approved"),
+      where("currentstage", "==", "Completed"))
+
+    const queueTokenSnap = await getDocs(q);
+
+
+    for(let doc of queueTokenSnap.docs){
+      const data = doc.data();
+      const profileid = data['profile_id'];
+      if(![null , undefined , ''].includes(data['profile_id'])){
+        queueTokenSnapMap[profileid] = queueTokenSnapMap[profileid] ?? [];
+        queueTokenSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("Metadata not found for", metadata);
+        continue;
+      }
+
+      const queueToken = queueTokenSnapMap[profileid] ?? [];
+
+      metadata["queueevent"] =
+        metadata["queueevent"] || {};
+
+      var profileQueueAttended = {};
+      for (let i = 0; i < queueToken.length; i++) {
+        const attendedData = queueToken[i];
+        profileQueueAttended[attendedData["productref"].id] = profileQueueAttended[attendedData["productref"].id] || [];
+        profileQueueAttended[attendedData["productref"].id].push( attendedData["queueref"].id, );
+      }
+
+      let queue = '';
+
+      Object.entries(profileQueueAttended).forEach(([key , value])=>{
+        const product = this.mapfiltervalues[key] ?? '';
+        // console.log(this.mapfiltervalues[(value as []).at(0)])
+        const queues = (value as []).map((queue)=>this.mapfiltervalues[queue]).toString();
+        queue += `${product} : ${queues}\n`
+      })
+
+      data.push({
+        name: metadata.name ?? '',
+        email: metadata.email ?? '',
+        queueevent: queue,
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Queue Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'queueevent', header: 'Queue Event' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+   async openCheckListForHigherOrderPurchase(){
+    let loadingref = this.loading
+    const data = [];
+    const participantJourneyProductSnapMap = {};
+
+    const q = query(collection(this.firestore , 'participantjourneyproduct'));
+    const participantJourneyProductSnap = await getDocs(q);
+
+    for(let doc of participantJourneyProductSnap.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        participantJourneyProductSnapMap[profileid] = participantJourneyProductSnapMap[profileid] ?? [];
+        participantJourneyProductSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("No Profile id : ", metadata['name']);
+        continue;
+      }
+      
+      let higherOrderPurchase = null;
+      var liveJourney = null;
+
+      var journeyProductProfile = participantJourneyProductSnapMap[profileid] ?? [];
+
+      var activeJourneyList = journeyProductProfile.filter(
+        (e) =>
+          [null, "initiated", "ongoing", "completed"].includes(
+            e["journeystatus"],
+          ) && ![null, undefined, ""].includes(e["journeyref"]),
+      );
+
+      if (activeJourneyList.length != 0) {
+        var ongoingJourney = [];
+        var completedjourney = [];
+        activeJourneyList.forEach((journeyElement) => {
+          if (
+            [null, "initiated", "ongoing"].includes(
+              journeyElement["journeystatus"],
+            )
+          ) {
+            ongoingJourney.push(journeyElement);
+          } else if (journeyElement["journeystatus"] == "completed") {
+            completedjourney.push(journeyElement);
+          }
+        });
+
+        if (completedjourney.length != 0) {
+          if (ongoingJourney.length == 0) {
+            liveJourney = completedjourney[0];
+          }
+        }
+
+        if (ongoingJourney.length != 0) {
+          ongoingJourney = ongoingJourney.sort(
+            (a, b) =>
+              b["subscriptionend"].toDate() - a["subscriptionend"].toDate(),
+          );
+          var currentOngoing = ongoingJourney.find(
+            (e) => e["journeystatus"] == "ongoing",
+          );
+          var currentInitiated = ongoingJourney.find(
+            (e) => e["journeystatus"] == "initiated",
+          );
+          if (![null, undefined].includes(currentOngoing)) {
+            liveJourney = currentOngoing;
+          } else if (![null, undefined].includes(currentInitiated)) {
+            liveJourney = currentInitiated;
+          } else {
+            liveJourney = ongoingJourney[0];
+          }
+        }
+
+        higherOrderPurchase = activeJourneyList.reduce(
+          (higherOrderJourney, currentJourney) => {
+            if (
+              ![null, undefined].includes(
+                this.mapfiltervalues[currentJourney["journeyref"].id],
+              ) &&
+              ![null, undefined].includes(
+                this.mapfiltervalues[higherOrderJourney["journeyref"].id],
+              ) &&
+              ![null, undefined].includes(
+                this.mapfiltervalues[currentJourney["journeyref"].id]["sequence"],
+              ) &&
+              ![null, undefined].includes(
+                this.mapfiltervalues[higherOrderJourney["journeyref"].id]["sequence"],
+              )
+            ) {
+              return this.mapfiltervalues[currentJourney["journeyref"].id]["sequence"] <
+                this.mapfiltervalues[higherOrderJourney["journeyref"].id]["sequence"]
+                ? currentJourney
+                : higherOrderJourney;
+            }
+            else if (![null, undefined].includes(
+              this.mapfiltervalues[higherOrderJourney["journeyref"].id],
+            ) && ![null, undefined].includes(
+              this.mapfiltervalues[higherOrderJourney["journeyref"].id]["sequence"],
+            )) {
+              return higherOrderJourney
+            } else {
+              return currentJourney;
+            }
+          },
+        );
+      }
+      let higherOrderPurchaseJourney = ![null, undefined].includes(
+        higherOrderPurchase,
+      )
+        ? higherOrderPurchase["journeyref"].id
+        : null;
+
+      data.push({
+        name: metadata["name"],
+        email: metadata["email"],
+        higherorderpurchase: higherOrderPurchaseJourney,
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Queue Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'higherorderpurchase', header: 'Higher Order Purchase' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
 
   // rawProductsData
 

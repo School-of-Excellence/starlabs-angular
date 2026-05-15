@@ -14,6 +14,8 @@
       <button mat-menu-item (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
       <button mat-menu-item (click)="patchCustomerStatus()">Customer Status</button>
       <button mat-menu-item (click)="navigateTochecklists('watsonstatus')">Watson Status</button>
+      <button mat-menu-item (click)="openCheckListForQueueEvent()">Queue Event</button>
+      <button mat-menu-item (click)="openCheckListForHigherOrderPurchase()">Corrected HigherOrderPurchase</button>
     </mat-menu>
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">

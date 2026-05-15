@@ -18,10 +18,10 @@
             <tr *ngFor="let row of processedTableData; let i = index" 
                 [class.even-row]="i % 2 === 0">
               <td *ngFor="let column of columns" class="table-cell">
-                <span *ngIf="column.key === 'name'">{{row[column.key]}}</span>
+                <span *ngIf="!['activejourney','lastcompletedjourney', 'higherorderpurchase' , 'journey'].includes(column.key)">{{row[column.key]}}</span>
                 <span *ngIf="['activejourney','lastcompletedjourney', 'higherorderpurchase' , 'journey'].includes(column.key)">{{mapjourney[row[column.key]]}}</span>
-                <span *ngIf="column.key === 'customerstatus'">{{row[column.key]}}</span>
-                <span *ngIf="column.key === 'financialstatus'">{{row[column.key]}}</span>
+                <!-- <span *ngIf="column.key === 'customerstatus'">{{row[column.key]}}</span>
+                <span *ngIf="column.key === 'financialstatus'">{{row[column.key]}}</span> -->
               </td>
             </tr>
           </tbody>
@@ -30,7 +30,7 @@
     </mat-dialog-content>
     
     <mat-dialog-actions class="dialog-actions" style="float: right;">
-      <!-- <button mat-button (click)="export()">Export</button> -->
+      <button mat-button (click)="exportDialog()">Export</button>
       <button mat-button (click)="close()">Close</button>
     </mat-dialog-actions>
 </div>
