@@ -10,9 +10,9 @@
   <!-- Header -->
   <div class="header">
     <div class="header-content">
-      @if (participantProfile()?.profileimg || participantProfile()?.profile) {
-        <img class="profile-img" 
-             [src]="participantProfile()?.profileimg || participantProfile()?.profile" 
+      @if (participantProfile()?.profile || participantProfile()?.profileimg) {
+        <img class="profile-img"
+             [src]="participantProfile()?.profile || participantProfile()?.profileimg"
              alt="Profile">
       } @else {
         <div class="profile-placeholder">
@@ -151,28 +151,42 @@
                     <div class="procedures-container">
                       <div class="procedures-title">Procedures:</div>
                       @for (proc of item.procedures; track proc.id; let procIdx = $index) {
-                        <div class="procedure-row" [class.deleted]="proc.data['isdelete']">
-                          <span class="proc-number">{{ procIdx + 1 }}.</span>
-                          <span class="proc-name">{{ getProcedureName(proc.data['name']) }}</span>
-                          
-                          @if (proc.data['mandatory']) {
-                            <span class="mandatory-tag">Mandatory</span>
-                          }
-                          
-                          @if (proc.data['status'] === 'completed') {
-                            <mat-icon class="status-icon completed">check_circle</mat-icon>
-                          } @else {
-                            <mat-icon class="status-icon pending">radio_button_unchecked</mat-icon>
-                          }
+                        <div class="procedure-block" [class.deleted]="proc.data['isdelete']">
+                          <div class="procedure-row">
+                            <span class="proc-number">{{ procIdx + 1 }}.</span>
+                            <span class="proc-name">{{ getProcedureName(proc.data['name']) }}</span>
 
-                          @if (proc.data['assigned_to']?.length) {
-                            <span class="assigned-info">
-                              (Assigned: {{ getAssignedNames(proc.data['assigned_to']) }})
-                            </span>
-                          }
+                            @if (proc.data['mandatory']) {
+                              <span class="mandatory-tag">Mandatory</span>
+                            }
 
-                          @if (proc.data['isdelete']) {
-                            <span class="deleted-tag">Deleted</span>
+                            @if (proc.data['autogeneralized']) {
+                              <mat-icon class="status-icon autogeneralized">auto_awesome</mat-icon>
+                            } @else if (proc.data['status'] === 'completed') {
+                              <mat-icon class="status-icon completed">check_circle</mat-icon>
+                            } @else {
+                              <mat-icon class="status-icon pending">radio_button_unchecked</mat-icon>
+                            }
+
+                            @if (proc.data['assigned_to']?.length) {
+                              <span class="assigned-info">
+                                (Assigned: {{ getAssignedNames(proc.data['assigned_to']) }})
+                              </span>
+                            }
+
+                            @if (proc.data['isdelete']) {
+                              <span class="deleted-tag">Deleted</span>
+                            }
+                          </div>
+
+                          @if (!proc.data['isdelete']) {
+                            @let status = getProcedureStatus(proc.data);
+                            <div class="procedure-status-text" [class.status-pending]="status === null" [class.status-completed]="status === 'completed'" [class.status-autogeneralized]="status === 'autogeneralized'">
+                              <span class="procedure-status-label">Status:</span>
+                              <span class="procedure-status-value">
+                                {{ status === 'completed' ? 'Completed' : status === 'autogeneralized' ? 'Auto Generalized' : 'Still Pending' }}
+                              </span>
+                            </div>
                           }
                         </div>
                       }

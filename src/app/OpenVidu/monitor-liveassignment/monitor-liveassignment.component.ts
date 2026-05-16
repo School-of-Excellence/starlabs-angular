@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, signal } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { LocalVideoTrack, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent } from 'livekit-client';
+import { ConnectionQuality, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track } from 'livekit-client';
 import { collection, collectionData, Firestore, limit, query, where } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { OpenviduVideoElementComponent } from '../openvidu-video-element/openvidu-video-element.component';
@@ -11,6 +11,7 @@ import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvid
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { MatDialog } from '@angular/material/dialog';
 import { InstanceStatusService, InfrastructureStatus } from '../../instance-status.service';
+import { MatIconModule } from '@angular/material/icon';
 
 
 type TrackInfo = {
@@ -24,7 +25,8 @@ type TrackInfo = {
   imports: [
     CommonModule,
     OpenviduVideoElementComponent,
-    OpenviduAudioElementComponent
+    OpenviduAudioElementComponent,
+    MatIconModule
   ],
   templateUrl: './monitor-liveassignment.component.html',
   styleUrl: './monitor-liveassignment.component.css'
@@ -44,6 +46,14 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   listeningRoom: string
 
   ghostID: " - Ghost" = " - Ghost"
+
+  // Per-participant state — compound key "roomId:::identity"
+  participantsMute    = signal<Map<string, boolean>>(new Map());
+  participantsQuality = signal<Map<string, ConnectionQuality>>(new Map());
+  activeSpeakersMap: { [roomId: string]: string[] } = {};
+
+  // Room connection state — true while connecting, false once connected
+  roomConnecting = signal<Map<string, boolean>>(new Map());
 
   infraStatus: InfrastructureStatus | null = null;
   infraActionInProgress = false;
@@ -108,16 +118,35 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
   async joinRoom(roomName:string){
     // Initialize a new Room object
-    const room = new Room();
+    const room = new Room({
+      adaptiveStream: true,
+      reconnectPolicy: {
+        nextRetryDelayInMs: (context) => {
+          const delays = [1_000, 2_000, 5_000, 10_000];
+          return delays[Math.min(context.retryCount, delays.length - 1)];
+        }
+      }
+    });
     this.roomConnections.set(roomName, room);
     this.mapOpenViduRooms.update((value) =>{
       value.set(roomName, new Map())
       return value;
     })
+    this.roomConnecting.update(m => { m.set(roomName, true); return m; });
+
+    // Block audio subscriptions by default — only subscribe when actively listening
+    room.on(
+      RoomEvent.TrackPublished,
+      (publication: RemoteTrackPublication) => {
+        if (publication.kind === Track.Kind.Audio) {
+          publication.setSubscribed(this.listeningRoom === roomName);
+        }
+      }
+    );
 
     // Handle incoming remote tracks
     room.on(
-      RoomEvent.TrackSubscribed, 
+      RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         this.mapOpenViduRooms.update((value) => {
           value.get(roomName).set(publication.trackSid, {
@@ -162,9 +191,13 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     room.on(
       RoomEvent.ParticipantDisconnected,
       (participant: RemoteParticipant) => {
+        // Clean up per-participant state immediately
+        this.participantsMute.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
+        this.participantsQuality.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
+
         // Count non-ghost participants
         const participantJoined = (this.mapOpenViduRoom[roomName] ?? {})["participantjoined"] ?? []
-        
+
         // ✅ CHANGED: Use participants instead of remoteParticipants (v1.x)
         const nonGhostParticipants = Array.from(room.participants.values()).filter(
           (p: RemoteParticipant) => !p.identity.includes(this.ghostID) && participantJoined.includes(p.identity)
@@ -178,6 +211,35 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       }
     );
 
+    // Track mute state
+    room.on(RoomEvent.TrackMuted, (publication, participant: Participant) => {
+      if (publication.kind === Track.Kind.Audio)
+        this.participantsMute.update(m => { m.set(`${roomName}:::${participant.identity}`, true); return m; });
+    });
+
+    room.on(RoomEvent.TrackUnmuted, (publication, participant: Participant) => {
+      if (publication.kind === Track.Kind.Audio)
+        this.participantsMute.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
+    });
+
+    // Track network quality
+    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
+      this.participantsQuality.update(m => { m.set(`${roomName}:::${participant.identity}`, quality); return m; });
+    });
+
+    // Track active speakers
+    room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+      this.activeSpeakersMap = { ...this.activeSpeakersMap, [roomName]: speakers.map(s => s.identity) };
+    });
+
+    // Seed initial mute + quality for participants who join after Monitor connects
+    room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+      const key = `${roomName}:::${participant.identity}`;
+      const isMuted = Array.from(participant.audioTracks.values()).some(p => p.isMuted);
+      if (isMuted) this.participantsMute.update(m => { m.set(key, true); return m; });
+      this.participantsQuality.update(m => { m.set(key, participant.connectionQuality); return m; });
+    });
+
     try {
       // Request a new token
       const response = await this.getToken(roomName);
@@ -187,11 +249,19 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       // await ensures we wait until initial signaling is done
       await room.connect(response.url, response.token);
       console.log('Room connected:', this.loggedinProfileid);
+      this.roomConnecting.update(m => { m.set(roomName, false); return m; });
 
-      // Enable camera 
-      await room.localParticipant.setCameraEnabled(false);
-      // Enable Microphone
-      await room.localParticipant.setMicrophoneEnabled(false);
+      // Seed initial mute + quality state for participants already in the room
+      room.participants.forEach((participant: RemoteParticipant) => {
+        const key = `${roomName}:::${participant.identity}`;
+        const isMuted = Array.from(participant.audioTracks.values()).some(p => p.isMuted);
+        if (isMuted) this.participantsMute.update(m => { m.set(key, true); return m; });
+        this.participantsQuality.update(m => { m.set(key, participant.connectionQuality); return m; });
+      });
+
+      // Ghost observer — LiveKit does not publish camera/mic unless explicitly enabled
+      // await room.localParticipant.setCameraEnabled(false);
+      // await room.localParticipant.setMicrophoneEnabled(false);
 
     } catch (error: any) {
       // Handle connection errors gracefully
@@ -269,7 +339,24 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   async leaveRoom(RoomId) {
     const room = this.roomConnections.get(RoomId);
     if (!room) return;
-  
+
+    // Clear all per-room participant state
+    this.participantsMute.update(m => {
+      for (const key of Array.from(m.keys()))
+        if (key.startsWith(`${RoomId}:::`)) m.delete(key);
+      return m;
+    });
+    this.participantsQuality.update(m => {
+      for (const key of Array.from(m.keys()))
+        if (key.startsWith(`${RoomId}:::`)) m.delete(key);
+      return m;
+    });
+    delete this.activeSpeakersMap[RoomId];
+    this.roomConnecting.update(m => { m.delete(RoomId); return m; });
+
+    // Stop listening if the user was watching this room
+    if (this.listeningRoom === RoomId) this.toggleListening(RoomId);
+
     // Remove all event listeners before disconnect
     room?.removeAllListeners();
 
@@ -284,11 +371,22 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   }
 
   toggleListening(roomId: string) {
-    if (this.listeningRoom === roomId) {
-      this.listeningRoom = null;
-    } else {
-      this.listeningRoom = roomId;
-    }
+    const prev = this.listeningRoom;
+    this.listeningRoom = (prev === roomId) ? null : roomId;
+
+    // Unsubscribe audio from the room we stopped listening to
+    if (prev) this.setAudioSubscription(prev, false);
+
+    // Subscribe audio for the room we are now listening to
+    if (this.listeningRoom) this.setAudioSubscription(this.listeningRoom, true);
+  }
+
+  private setAudioSubscription(roomId: string, subscribe: boolean) {
+    const room = this.roomConnections.get(roomId);
+    if (!room) return;
+    room.participants.forEach(participant => {
+      participant.audioTracks.forEach(pub => pub.setSubscribed(subscribe));
+    });
   }
 
   getVideoParticipantCount(room: MapIterator<TrackInfo>): number {
@@ -439,5 +537,24 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     if (status === 'stable') return 'state-stable';
     if (status === 'scaling-up' || status === 'scaling-down') return 'state-transitioning';
     return 'state-unknown';
+  }
+
+  isParticipantMuted(roomId: string, identity: string): boolean {
+    return this.participantsMute().get(`${roomId}:::${identity}`) ?? false;
+  }
+
+  isActiveSpeaker(roomId: string, identity: string): boolean {
+    return (this.activeSpeakersMap[roomId] ?? []).includes(identity);
+  }
+
+  /** Mobile-style signal bars — mirrors JoinOpenviduCallComponent.getNetworkBars(). */
+  getNetworkBars(roomId: string, identity: string): { bars: number; color: string } {
+    const quality = this.participantsQuality().get(`${roomId}:::${identity}`);
+    switch (quality) {
+      case ConnectionQuality.Excellent: return { bars: 4, color: '#4caf50' };
+      case ConnectionQuality.Good:      return { bars: 3, color: '#ffb300' };
+      case ConnectionQuality.Poor:      return { bars: 1, color: '#e53935' };
+      default:                          return { bars: 0, color: '#888' };
+    }
   }
 }

@@ -187,11 +187,12 @@ export class ParticipantsAnalyticsComponent {
   object = ['customersupport', 'customersupportcategory']
   number = ['atccount', 'totaladjustmentaware', 'totaladjustmentunaware']
   stringarray = ['atcmodel']
-  arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'activejourney', 'financialstatus', 'customerstatus', 'lastcompletedjourney', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
+  arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'financialstatus', 'customerstatus', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
   stringmaparray = ['productevent', 'queueevent']
-  numbermapnumber = ['productcount']
-  columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray,
-  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'], 'totalpurchasevalue', 'totalpaid', 'balance', 'emi', 'journey', 'consumedproductcount', 'unconsumedproductcount']
+  numbermapnumber = ['productcount'];
+  computeColumns = ['UP! count' , 'CPM count'];
+  columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray, ...this.computeColumns,
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'journey', 'consumedproductcount', 'unconsumedproductcount']
   filterText = null
   showSectionType = null
   savedfilterquery: any = []
@@ -414,7 +415,6 @@ export class ParticipantsAnalyticsComponent {
       modesSnap,
       productsSnap,
       tagsSnap,
-      participantProductSnap,
       metadataSnap
     ] = await Promise.all([
       getDocs(collection(this.firestore, "searchquery")),
@@ -426,7 +426,6 @@ export class ParticipantsAnalyticsComponent {
       getDocs(collection(this.firestore, "modes")),
       getDocs(collection(this.firestore, "products")),
       getDocs(collection(this.firestore, "participant tags")),
-      getDocs(collection(this.firestore, "participantsproduct")),
       getDocs(query(collection(this.firestore, "participant metadata"), orderBy('name')))
     ]);
 
@@ -2173,17 +2172,36 @@ export class ParticipantsAnalyticsComponent {
         // Handle KYJ column (remove link, just show value)
         else if (column === 'kyj') {
           formattedRow[column] = element[column];
+        } else if (column === 'journey') {
+          formattedRow[column] = element['customerstatus'] === 'active' ? this.mapfiltervalues[element['activejourney']] : ['non active' , 'discontinued'].includes(element['customerstatus']) ? this.mapfiltervalues[element['lastcompletedjourney']] : ''
+        } else if (column === 'age') {
+          formattedRow[column] = this.calculateAge(element['dateofbirth']);
+        }
+        else if (['consumedproductcount', 'unconsumedproductcount'].includes(column)) {
+          const type = column === 'consumedproductcount' ? 'consumedCount' : 'unConsumedCount';
+          for (let product of this.getProductForParticipant(element['profileid'], type)) {
+            const header = `${column}( ${this.productMap[product.key]?.product} )`;
+            formattedRow[header] = product?.count;
+          }
         }
         else if (column.startsWith('consumedcount') || column.startsWith('unconsumedcount')) {
           const [type, productId, comparison, count] = column.split('-');
           const participant = this.participantProductMap[element['profileid']] || '';
           const header = `${type}( ${this.mapfiltervalues[productId]} )` || 'N/A';
 
-          if (type === 'consumed') {
-            formattedRow[header] = participant[productId].consumedCount;
+          if (type === 'consumedcount') {
+            formattedRow[header] = participant[productId]?.consumedCount;
           } else {
-            formattedRow[header] = participant[productId].unConsumedCount;
+            formattedRow[header] = participant[productId]?.unConsumedCount;
           }
+        } else if (this.computeColumns.includes(column)) {
+          let value: any = 0;
+          if (column === 'UP! count') {
+            value = this.getUpLiveCount(element['profileid']);
+          } else {
+            value = this.getCPMCount(element['profileid']);
+          }
+          formattedRow[column] = value;
         }
         // Default case for other columns
         else {
@@ -2928,6 +2946,28 @@ export class ParticipantsAnalyticsComponent {
     date.setFullYear(currentDate.getFullYear());
     console.log(date, currentDate)
     return date <= currentDate ? age + 1 : age;
+  }
+
+  getUpLiveCount(profileId : string) : number | string{
+    if([null , undefined , ''].includes(profileId) || !this.participantProductMap[profileId]){
+      return 0;
+    }
+
+    return ['0ayiNALL1HDVvCXDHcZ4' , 'N0MhGQnxP9S8TdavuRJR' , 'Rq9cu2Z3FSuILXdwYtca'].reduce((total , productId)=>{
+      const count =  this.participantProductMap[profileId][productId]?.consumedCount || 0;
+      return total + count;
+    } , 0);
+  }
+
+  getCPMCount(profileId : string) : number | string{
+    if([null , undefined , ''].includes(profileId) || !this.participantProductMap[profileId]){
+      return 0;
+    }
+
+    return ['AED3TRIhKpyCtIWQvQMc' , 'TnlqL6gUvDSx105YIPC5' , 'TxnrP4kevFZCPHFtxj7Z' , 'ZvANGjeQnKeIbGXiY0un'].reduce((total , productId)=>{
+      const count =  this.participantProductMap[profileId][productId]?.consumedCount || 0;
+      return total + count;
+    } , 0);
   }
 
   // rawProductsData

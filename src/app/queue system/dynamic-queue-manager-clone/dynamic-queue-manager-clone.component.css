@@ -3685,6 +3685,37 @@ button[matMenuTriggerFor] {
   background-color: rgba(255, 165, 0, 0.15) !important;
 }
 
+.token-pending-invitation {
+  border: 2px solid #2e7d32 !important;
+  background-color: rgba(46, 125, 50, 0.12) !important;
+  animation: pendingInvitationPulse 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+.pending-invitation-badge {
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 2;
+}
+
+@keyframes pendingInvitationPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(46, 125, 50, 0); }
+}
+
 
 .dfu-chip {
   background-color: rgba(255, 165, 0, 0.15) !important;
@@ -4371,18 +4402,16 @@ button[matMenuTriggerFor] {
   justify-content: center;
   gap: 4px;
 }
-/* REMINDER NOTIFICATION POPUP */
 
 .reminder-notification-overlay {
   position: fixed;
   bottom: 30px;
   right: 30px;
   z-index: 99999;
-  max-width: 420px;
-  width: 100%;
-  max-height: 80vh;        
-  display: flex;           
-  flex-direction: column;  
+  width: 400px;
+  max-width: calc(100vw - 40px);
+  display: flex;
+  flex-direction: column;
 }
 
 .reminder-notification-popup-multi {
@@ -4390,66 +4419,64 @@ button[matMenuTriggerFor] {
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   overflow: hidden;
-  display: flex;            /* ADD THIS */
-  flex-direction: column;   /* ADD THIS */
-  max-height: 80vh;         /* ADD THIS */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
   animation: slideInRight 0.3s ease-out;
 }
 
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(100px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(100px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .reminder-notification-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px;
+  padding: 14px 16px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  flex-shrink: 0; 
 }
 
 .reminder-bell-icon {
-  font-size: 24px;
-  width: 24px;
-  height: 24px;
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
   animation: bellRing 1s ease-in-out;
+  flex-shrink: 0;
 }
 
 @keyframes bellRing {
   0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-15deg); }
-  75% { transform: rotate(15deg); }
+  25%       { transform: rotate(-15deg); }
+  75%       { transform: rotate(15deg); }
 }
 
 .reminder-notification-header h3 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
+  color: white;
 }
 
 .reminder-count-badge {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 12px;
   padding: 2px 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .close-all-btn {
   color: white !important;
   opacity: 0.9;
+  flex-shrink: 0;
 }
 
 .close-all-btn:hover {
@@ -4458,13 +4485,21 @@ button[matMenuTriggerFor] {
 }
 
 .reminder-notification-content-multi {
-  max-height: none;    /* CHANGE THIS - remove fixed height */
+  flex: 1;           
+  min-height: 0;     
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;             /* ADD THIS */
+  gap: 8px;
+}
+
+.reminder-notification-footer {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid #e0e0e0;
+  text-align: right;
+  background: #fafafa;
 }
 
 .reminder-card {
@@ -4472,24 +4507,24 @@ button[matMenuTriggerFor] {
   border: 1px solid #e0e0e0;
   border-radius: 10px;
   overflow: hidden;
+  flex-shrink: 0; 
 }
 
 .reminder-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: #f5f5f5;
   border-bottom: 1px solid #e0e0e0;
 }
 
 .reminder-number {
-  font-weight: 700;
-  color: #e65100;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 13px;
   background: #667eea;
   color: white;
-  padding: 3px 10px;
+  padding: 2px 10px;
   border-radius: 10px;
 }
 
@@ -4497,35 +4532,35 @@ button[matMenuTriggerFor] {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
   color: #666;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .reminder-time mat-icon {
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .reminder-card-body {
-  padding: 12px 14px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   background: white;
 }
 
 .reminder-info-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .info-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
   color: #667eea;
   flex-shrink: 0;
   margin-top: 2px;
@@ -4534,11 +4569,12 @@ button[matMenuTriggerFor] {
 .info-content {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+  min-width: 0; 
 }
 
 .info-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: #999;
   text-transform: uppercase;
@@ -4547,33 +4583,39 @@ button[matMenuTriggerFor] {
 
 .info-value {
   font-size: 13px;
-  color: #667eea;
+  color: #333;
   font-weight: 500;
+  word-break: break-word;
 }
 
 .context-text {
+  color: #555;
+  font-weight: 400;
   line-height: 1.4;
 }
 
 .reminder-card-actions {
-  padding: 8px 14px;
+  padding: 6px 10px;
   border-top: 1px solid #e0e0e0;
   display: flex;
   justify-content: flex-end;
+  gap: 4px;
   background: #fafafa;
 }
 
 .reminder-card-actions button {
   color: #667eea;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  height: 30px;
+  line-height: 30px;
 }
 
 .reminder-card-actions button mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  margin-right: 4px;
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  margin-right: 3px;
 }
 /* Filter sidenav */
 .filter-sidenav .panel-header {
@@ -6110,4 +6152,379 @@ button[matMenuTriggerFor] {
   color: #333;
   max-height: 320px;
   overflow-y: auto;
+}
+
+.whatsapp-preview-box {
+  margin-top: 10px;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  animation: fadeIn 0.15s ease;
+}
+
+.whatsapp-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #ecfdf5;
+  border-bottom: 1px solid #a7f3d0;
+}
+
+.whatsapp-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.whatsapp-preview-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #a0aec0;
+  transition: color 0.15s;
+}
+
+.whatsapp-preview-close:hover { color: #059669; }
+
+.whatsapp-preview-close mat-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.whatsapp-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border-bottom: 1px solid #a7f3d0;
+  font-size: 12px;
+  color: #065f46;
+}
+
+.whatsapp-preview-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.whatsapp-preview-meta-item mat-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: #059669;
+}
+
+.whatsapp-preview-meta-label {
+  font-weight: 600;
+}
+
+.whatsapp-preview-meta-value {
+  color: #1f2937;
+}
+
+.whatsapp-preview-body {
+  padding: 16px 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+  max-height: 360px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/*notes */
+.notes-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  background: white;
+  border: 1.5px solid #1976d2;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s;
+  user-select: none;
+}
+.notes-chip:hover { 
+ background: #e3f2fd;
+ box-shadow: 0 2px 6px rgba(25,118,210,0.2);
+ }
+
+.notes-chip-badge {
+  background: rgba(255,255,255,0.25);
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notes-modal {
+  position: relative;
+  pointer-events: all;
+  background: #fff;
+  border-radius: 12px;
+  width: 88vw;
+  max-width: 920px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+.notes-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.notes-overlay-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: all;
+}
+.notes-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+.notes-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.notes-modal-title mat-icon { color: #1a6b3c; }
+.notes-total-badge {
+  background: white;
+  border: 1.5px solid #1976d2;
+  color: #1976d2;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.notes-modal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #fafafa;
+  border-bottom: 1px solid #eee;
+  flex-wrap: wrap;
+}
+.notes-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+.notes-search-wrap mat-icon 
+ { 
+  color: #999; 
+  font-size: 18px; 
+  width: 18px; 
+  height: 18px;
+ }
+.notes-search-wrap input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+}
+.notes-search-wrap button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  color: #aaa;
+}
+.notes-date-field {
+  font-size: 13px;
+  margin: 0; 
+}
+.notes-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* flat table */
+.notes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.notes-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #f0f0f0;
+  white-space: nowrap;
+}
+.notes-table td {
+  padding: 10px;
+  border-bottom: 1px solid #f5f5f5;
+  vertical-align: top;
+  color: #333;
+}
+.notes-table tr:hover td { background: #fafafa; }
+.td-num { color: #bbb; font-size: 12px; width: 32px; }
+.td-name { font-weight: 500; white-space: nowrap; }
+.td-note {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+.td-date { white-space: nowrap; color: #666; }
+.td-stage { color: #999; font-size: 12px; }
+
+/* grouped view */
+.notes-group {
+  margin-bottom: 16px;
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.notes-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #e3f2fd;
+  border-bottom: 1px solid #bbdefb;
+}
+.notes-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #1565c0;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.notes-group-name { 
+  font-weight: 600; 
+  font-size: 14px; 
+  color: #1a237e;  
+  flex: 1; 
+}
+.notes-group-pill {
+  background: #1565c0;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.notes-row {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.notes-row:last-child { 
+  border-bottom: none; 
+}
+.notes-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.notes-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #888;
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.notes-stage mat-icon { 
+  font-size: 11px; 
+  width: 11px; 
+  height: 11px; 
+}
+.notes-token {
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.notes-date { 
+  font-size: 11px;
+  color: #999;
+ }
+
+.notes-author { 
+  font-size: 11px; 
+  color: #555;  
+  font-style: italic; 
+}
+.notes-text { 
+  font-size: 13px; 
+  color: #333; 
+  line-height: 1.5; 
+  margin: 0 0 4px;
+  white-space: normal;      
+  overflow: visible;         
+  text-overflow: unset;      
+  word-break: break-word;    
+}
+
+.notes-stage mat-icon {
+  font-size: 11px; 
+  width: 11px; 
+  height: 11px; 
+}
+
+.notes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: #bbb;
+  gap: 8px;
 }

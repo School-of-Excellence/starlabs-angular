@@ -2,38 +2,33 @@
   <mat-progress-bar mode="indeterminate"></mat-progress-bar>
 </div>
 
-<div *ngIf="!loading" style="padding: 20px;">
+<div *ngIf="!loading" class="dialog-wrapper">
 
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <h4 style="text-align: center; flex: 1;">
-      {{ data != null ? 'Edit Evolution Mapping Video url to ' + mapProfile[data.profileid] : 'Add Evolution Mapping Video url to Participant' }}
-    </h4>
-
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <button mat-icon-button color="primary" (click)="fileInput.click()" title="Import Excel/CSV">
+  <!-- Header -->
+  <div class="dialog-header">
+    <div class="header-left">
+      <span class="header-icon">🎬</span>
+      <h4 class="header-title">
+        {{ data != null ? 'Edit Evolution Mapping — ' + mapProfile[data.profileid] : 'Add Evolution Mapping Video' }}
+      </h4>
+    </div>
+    <div class="header-actions">
+      <!-- <button mat-icon-button color="primary" (click)="fileInput.click()" title="Import Excel/CSV">
         <mat-icon>file_upload</mat-icon>
       </button>
-
-      <input
-        type="file"
-        #fileInput
-        accept=".csv,.xls,.xlsx"
-        (change)="onFileSelected($event)"
-        hidden
-      />
-
-      <span style="font-size: 13px; color: gray;">
-        💡 Use <strong>CSV format</strong> only — Columns:
-        <em>1️⃣ Email</em>, <em>2️⃣ Title</em>, <em>3️⃣ Video URL</em>
-      </span>
+      <input type="file" #fileInput accept=".csv,.xls,.xlsx" (change)="onFileSelected($event)" hidden />
+      <span class="csv-hint">💡 <strong>CSV</strong>: Email · Title · Video URL</span> -->
+      <button mat-icon-button class="close-btn" (click)="closeDialog()" title="Close">
+        <mat-icon>close</mat-icon>
+      </button>
     </div>
   </div>
 
-  <hr>
+  <hr class="divider">
 
-  <!-- Preview Table -->
-  <div *ngIf="importPreview.length > 0" style="margin-top: 20px;">
-    <h4>Preview Imported Data ({{importPreview.length}} entries)</h4>
+  <!-- Bulk Import Preview Table -->
+  <div *ngIf="importPreview.length > 0" class="import-preview">
+    <h4>Preview Imported Data ({{ importPreview.length }} entries)</h4>
     <table mat-table [dataSource]="importPreview" class="mat-elevation-z2 full-width">
       <ng-container matColumnDef="email">
         <th mat-header-cell *matHeaderCellDef>Email</th>
@@ -54,52 +49,169 @@
           <ng-template #notfound><span style="color: red;">No match</span></ng-template>
         </td>
       </ng-container>
-
       <tr mat-header-row *matHeaderRowDef="['email', 'title', 'videourl', 'profile']"></tr>
       <tr mat-row *matRowDef="let row; columns: ['email', 'title', 'videourl', 'profile'];"></tr>
     </table>
-
-    <div style="margin-top: 15px; text-align: center;">
-      <button mat-raised-button color="primary" (click)="uploadBulk()" [disabled]="disableButton">Upload Bulk</button>&nbsp;&nbsp;
+    <div class="bulk-actions">
+      <button mat-raised-button color="primary" (click)="uploadBulk()" [disabled]="disableButton">Upload Bulk</button>
       <button mat-raised-button color="warn" (click)="importPreview = []">Clear</button>
     </div>
+    <hr class="divider">
   </div>
 
-  <hr>
- <div class="flex-container">
-   <mat-form-field appearance="outline" class="flex-item">
-     <mat-select placeholder="Select Participant Name" [disabled]="data!=null" [(ngModel)]="selectedProfile" (ngModelChange)="onSelect($event)">
-       <ngx-mat-select-search
-         [(ngModel)]="searchTerm"
-         (keyup)="filterOptions()"
-         [ngModelOptions]="{standalone: true}"
-         [placeholderLabel]="'Search'"
-         [noEntriesFoundLabel]="'No matching records found'"
-         ngDefaultControl>
-       </ngx-mat-select-search>
-       <mat-option *ngFor="let key of filteredKeys" [value]="key">
-         {{ mapProfile[key] }}
-       </mat-option>
-     </mat-select>
-   </mat-form-field>
-   <mat-form-field appearance="outline" class="flex-item">
-     <mat-label>Title</mat-label>
-     <input matInput [(ngModel)]="title" placeholder="Enter a title">
-   </mat-form-field>
-   <mat-form-field appearance="outline" class="flex-item">
-     <mat-label>Recorded Date</mat-label>
-     <input matInput [matDatepicker]="startDatePicker" [(ngModel)]="recordedDate" placeholder="Choose a recorded date">
-     <mat-datepicker-toggle matSuffix [for]="startDatePicker"></mat-datepicker-toggle>
-     <mat-datepicker #startDatePicker></mat-datepicker>
-   </mat-form-field>
- </div>
- <mat-form-field appearance="outline" class="full-width">
-   <mat-label>Video URL</mat-label>
-   <input matInput [(ngModel)]="videourl" placeholder="Paste a video URL">
- </mat-form-field>
- <br>
- <div style="display: flex; justify-content: center">
-   <button (click)="addEvolution()" mat-raised-button color="primary" [disabled]="disableButton"> {{data!=null ? 'update' : 'submit'}}</button> &nbsp;&nbsp;&nbsp;
-   <button (click)="closeDialog()" mat-raised-button color="warn">close</button>
- </div>
+  <div class="dialog-body">
+    <div class="left-col">
+      <!-- Participant Selector -->
+      <div class="step-block">
+        <p class="step-label">
+          <span class="step-badge">1</span> Select Participant
+        </p>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-select
+            placeholder="Search and select participant..."
+            [disabled]="data != null"
+            [(ngModel)]="selectedProfile"
+            (ngModelChange)="onSelect($event)">
+            <mat-option>
+              <ngx-mat-select-search
+                [(ngModel)]="searchTerm"
+                (keyup)="filterOptions()"
+                [ngModelOptions]="{standalone: true}"
+                [placeholderLabel]="'Search participant'"
+                [noEntriesFoundLabel]="'No matching records found'"
+                ngDefaultControl>
+              </ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let key of filteredKeys" [value]="key">
+              {{ mapProfile[key] }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <!-- Select Type -->
+      <div class="step-block" *ngIf="selectedProfile && videoTypes.length > 0">
+        <p class="step-label">
+          <span class="step-badge">2</span> Select Video Type
+        </p>
+        <div class="video-title-list">
+          <div
+            *ngFor="let type of videoTypes"
+            class="video-title-card"
+            [class.selected]="selectedType === type"
+            (click)="onTypeSelect(type)">
+            <mat-icon class="card-icon">video_label</mat-icon>
+            <div class="card-info">
+              <span class="card-title">{{ type }}</span>
+              <span class="card-date">{{ getTypeCount(type) }} video(s)</span>
+            </div>
+            <mat-icon class="check-icon" *ngIf="selectedType === type">check_circle</mat-icon>
+          </div>
+        </div>
+      </div>
+
+      <!--  Select Video from type -->
+      <div class="step-block" *ngIf="selectedType && filteredVideoOptions.length > 0">
+        <!-- Select All / Clear All — Add mode only -->
+        <div *ngIf="data == null" class="select-all-row">
+          <button mat-stroked-button color="primary" (click)="selectAllVideos()">
+            <mat-icon>done_all</mat-icon> Select All
+          </button>
+        </div>
+        <div class="video-title-list">
+          <div
+            *ngFor="let v of filteredVideoOptions"
+            class="video-title-card"
+            [class.selected]="isVideoSelected(v.title)"
+            (click)="onVideoTitleSelect(v)">
+            <mat-icon class="card-icon">play_circle_outline</mat-icon>
+            <div class="card-info">
+              <span class="card-title">{{ v.title }}</span>
+              <span class="card-date" *ngIf="v.recordeddate">
+                {{ (v.recordeddate?.toDate ? v.recordeddate.toDate() : v.recordeddate) | date: 'mediumDate' }}
+              </span>
+              <span class="card-date no-date" *ngIf="!v.recordeddate">No date</span>
+            </div>
+            <mat-icon class="check-icon" *ngIf="isVideoSelected(v.title)">check_circle</mat-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Preview -->
+    <div class="right-col">
+      <div *ngIf="data != null && editVideoTitle && editVideoUrl" class="step-block video-preview-block">
+        <p class="step-label">
+          <span class="step-badge">3</span> Video Preview
+        </p>
+        <div class="video-player-wrapper">
+          <app-video-player *ngIf="showPlayer" [videoUrl]="editVideoUrl"></app-video-player>
+        </div>
+        <div style="margin-top: 12px;">
+          <mat-form-field appearance="outline" style="width: 100%;">
+            <mat-label>Title</mat-label>
+            <input matInput [(ngModel)]="title" placeholder="Enter title">
+          </mat-form-field>
+        </div>
+        <div style="margin-top: 8px;">
+          <mat-form-field appearance="outline" style="width: 100%;">
+            <mat-label>Recorded Date</mat-label>
+            <input matInput [matDatepicker]="datePicker" [(ngModel)]="recordedDate" placeholder="Choose recorded date">
+            <mat-datepicker-toggle matSuffix [for]="datePicker"></mat-datepicker-toggle>
+            <mat-datepicker #datePicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+        <div class="dialog-actions">
+          <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
+            <mat-icon>save</mat-icon> Update Mapping
+          </button>
+        </div>
+      </div>
+      <div *ngIf="data == null && selectedVideos.size > 0" class="step-block video-preview-block">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+          <p class="step-label" style="margin: 0;">
+            Selected Videos
+            <span class="selection-count-badge">{{ selectedVideos.size }}</span>
+          </p>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <!-- <button mat-stroked-button color="warn" (click)="clearAllVideos()">
+              <mat-icon>clear_all</mat-icon> Clear All
+            </button> -->
+            <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
+              <mat-icon>add_circle</mat-icon>
+              Save Mapping{{ selectedVideos.size > 1 ? 's' : '' }}
+            </button>
+          </div>
+        </div>
+        <div *ngIf="previewVideo" style="margin-bottom: 12px; display: flex; flex-direction: column; align-items: center;">
+          <app-video-player *ngIf="showPreviewPlayer" [videoUrl]="previewVideo.videourl"></app-video-player>
+          <div class="video-meta" style="margin-top: 8px;">
+            <span class="meta-item"><mat-icon>title</mat-icon> {{ previewVideo.title }}</span>
+            <span class="meta-item" *ngIf="previewVideo.recordedDate"><mat-icon>event</mat-icon> {{ previewVideo.recordedDate | date: 'mediumDate' }}</span>
+          </div>
+        </div>
+        <div class="selected-video-list">
+          <div *ngFor="let v of getSelectedVideoObjects()" class="selected-video-row" style="cursor: pointer;"(click)="onVideoTitleSelect(v, true)">
+            <mat-icon class="selected-video-icon" [style.color]="previewVideo?.title === v.title ? '#1976d2' : ''">
+              {{ previewVideo?.title === v.title ? 'play_circle' : 'check_circle' }}
+            </mat-icon>
+            <div class="selected-video-info">
+              <span class="selected-video-title">{{ v.title }}</span>
+              <span class="selected-video-date" *ngIf="v.recordeddate">
+                {{ (v.recordeddate?.toDate ? v.recordeddate.toDate() : v.recordeddate) | date: 'mediumDate' }}
+              </span>
+              <span class="selected-video-date no-date" *ngIf="!v.recordeddate">No date</span>
+            </div>
+            <button mat-icon-button color="warn" (click)="removeSelectedVideo(v.title); $event.stopPropagation()" title="Remove">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="data == null && selectedVideos.size === 0 && selectedType" class="step-block empty-state">
+        <mat-icon style="font-size: 48px; color: #ccc;">video_library</mat-icon>
+        <p style="color: #999; margin-top: 8px;">Select one or more videos from the left</p>
+      </div>
+    </div>
+  </div>
 </div>

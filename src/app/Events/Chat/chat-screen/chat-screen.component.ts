@@ -22,6 +22,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatInputModule } from '@angular/material/input';
+import { MatTabsModule } from '@angular/material/tabs';
 import { LinebreaksPipe, LinkPipe, EnhancedMessagePipe } from "../../../custompipe.pipe";
 import { AuthguardService } from '../../../authguard.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -52,6 +53,7 @@ interface MessageGroup {
     MatInputModule,
     MatCheckboxModule,
     MatProgressSpinner,
+    MatTabsModule,
     ReactiveFormsModule,
     LinebreaksPipe,
     LinkPipe,
@@ -79,13 +81,20 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   mapRoles: any = {};
   subscription = {};
 
-  supportchatList: any[] = [];
-  filteredChatList: any[] = [];
+  // Active and Inactive chat lists
+  activeChatList: any[] = [];
+  inactiveChatList: any[] = [];
+  filteredActiveChatList: any[] = [];
+  filteredInactiveChatList: any[] = [];
+
+  // Tab control - 0 = Active, 1 = Inactive
+  selectedTabIndex: number = 0;
+
   messages: any[] = [];
   filteredMessages: any[] = [];
   groupedMessages: MessageGroup[] = [];
-  profileList =[];
-  userListId=[];
+  profileList = [];
+  userListId = [];
 
   showMentionsList: boolean = false;
   filteredMembers: any[] = [];
@@ -147,40 +156,36 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       var profileID = roles['profile_ref'].id
       this.chatAdmin = roles['chatxadmin'] ?? false
       this.adminRole = roles['admin'] ?? false;
-      // if (roles.admin || roles.chatxadmin || roles.participant) {
-        const userRef = doc(this.firestore, 'user_data', this.guard.uid);
-        const profileDataSnap = await getDocs(query(collection(this.firestore, 'profile_data'), where('user_ref', '==', userRef)));
-        if (!profileDataSnap.empty) {
-          this.currentuserData = profileDataSnap.docs[0].data();
-          this.currentuserData['uid'] = this.currentuserData['user_ref'].id || null;
-          this.loadSupportChat();
+      const userRef = doc(this.firestore, 'user_data', this.guard.uid);
+      const profileDataSnap = await getDocs(query(collection(this.firestore, 'profile_data'), where('user_ref', '==', userRef)));
+      if (!profileDataSnap.empty) {
+        this.currentuserData = profileDataSnap.docs[0].data();
+        this.currentuserData['uid'] = this.currentuserData['user_ref'].id || null;
+        this.loadSupportChat();
+      }
+
+      //fetch profilelist and user list
+      collectionSnapshots(query(this.profiledataCollection, orderBy('name', 'asc'))).pipe(takeUntil(this.destroy$)).subscribe((profileDoc) => {
+        this.profileList = [];
+        this.userListId = [];
+        for (let i = 0; i < profileDoc.length; i++) {
+          const element = profileDoc[i].data();
+          this.profileList.push(profileDoc[i].id);
+          if (element['user_ref'] != null || element['user_ref'] != undefined) {
+            this.userListId.push(element['user_ref'].id);
+            this.mapProfileuid[element['user_ref'].id] = element
+          }
         }
+      });
 
-        //fetch profilelist and user list
-        collectionSnapshots(query(this.profiledataCollection,orderBy('name','asc'))).pipe(takeUntil(this.destroy$)).subscribe((profileDoc)=>{
-          this.profileList = [];
-          this.userListId=[];
-          for (let i = 0; i < profileDoc.length; i++) {
-            const element = profileDoc[i].data();
-            this.profileList.push(profileDoc[i].id);
-            if(element['user_ref'] != null || element['user_ref'] != undefined){
-              this.userListId.push(element['user_ref'].id);
-              this.mapProfileuid[element['user_ref'].id] = element
-            }
-          }
-        });
-
-         //fetch userroles
-        // this.firestore.collection('users_roles',ref=>ref.orderBy('name','asc')).snapshotChanges()
-        collectionData(query(collection(this.firestore, 'users_roles'),orderBy('name', 'asc'))).pipe(takeUntil(this.destroy$)).subscribe((user)=>{
-          this.mapRoles={};
-          for (let i = 0; i < user.length; i++) {
-            const element = user[i];
-            this.mapRoles[element['profile_ref'].id] = element;
-          }
-        });
-
-      // }
+      //fetch userroles
+      collectionData(query(collection(this.firestore, 'users_roles'), orderBy('name', 'asc'))).pipe(takeUntil(this.destroy$)).subscribe((user) => {
+        this.mapRoles = {};
+        for (let i = 0; i < user.length; i++) {
+          const element = user[i];
+          this.mapRoles[element['profile_ref'].id] = element;
+        }
+      });
     });
   }
 
@@ -198,64 +203,147 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Returns true when the currently selected chat is in the Inactive tab
+   * (isdelete === true). Used in the template to hide the message input.
+   */
+  get isInactiveChatSelected(): boolean {
+    return !!this.selectedChat && this.selectedChat.isdelete === true;
+  }
+
   loadSupportChat() {
     this.chatlistloading = true;
-    let Query;
-    if(this.chatAdmin == true || this.adminRole == true){
-      Query = query(this.supportchatCollection, where('isdelete', '==', false), orderBy('last_modification', 'desc'))
-    }else{
-      Query = query(this.supportchatCollection, where('members', 'array-contains', this.currentuserData['user_ref'].id), where('isdelete', '==', false), orderBy('last_modification', 'desc'))
+    let activeQuery;
+    let inactiveQuery;
+
+    if (this.chatAdmin == true || this.adminRole == true) {
+      activeQuery = query(
+        this.supportchatCollection,
+        where('isdelete', '==', false),
+        orderBy('last_modification', 'desc')
+      );
+      inactiveQuery = query(
+        this.supportchatCollection,
+        where('isdelete', '==', true),
+        orderBy('last_modification', 'desc')
+      );
+    } else {
+      activeQuery = query(
+        this.supportchatCollection,
+        where('members', 'array-contains', this.currentuserData['user_ref'].id),
+        where('isdelete', '==', false),
+        orderBy('last_modification', 'desc')
+      );
+      inactiveQuery = query(
+        this.supportchatCollection,
+        where('members', 'array-contains', this.currentuserData['user_ref'].id),
+        where('isdelete', '==', true),
+        orderBy('last_modification', 'desc')
+      );
     }
 
-    collectionSnapshots(Query).pipe(takeUntil(this.destroy$)).subscribe({
+    // Subscribe to active chats
+    collectionSnapshots(activeQuery).pipe(takeUntil(this.destroy$)).subscribe({
       next: (chat) => {
-        var chatlist = [];
-        for (let i = 0; i < chat.length; i++) {
-          const element = chat[i].data();
-          element['created'] = element['created_on']
-          element['chatname'] = element['group_name']
-          element['docref'] = chat[i].ref
-          element['docid'] = chat[i].ref.id
-          element['chattype'] = 'supportchat'
-          element['chatprofile'] = element['group_profile']
-          element['read_by'] = element['last_read_by']
-          element['pending'] = [null, undefined].includes(element['last_pending']) ? [] : element['last_pending']
-          element['senderuid'] = element['last_sender_uid']
-          element['message'] = [null, undefined].includes(element['last_message']) ? "...." : element['last_message']
-          element['files'] = [null, undefined].includes(element['files']) ? [] : element['files']
-          element['time'] = element['last_modification']
-          element['pinned'] = [null, undefined].includes(element['pinned']) ? false : element['pinned']
-          
-          // Check if current user has unread messages
-          element['hasUnreadMessages'] = element['pending'].includes(this.currentuserData['uid']);
-          
-          chatlist.push(element);
-        }
-        // Sort by pinned first, then by last modification
-        this.supportchatList = chatlist.sort((a, b) => {
-          if (a.pinned && !b.pinned) return -1;
-          if (!a.pinned && b.pinned) return 1;
-          return b.last_modification.seconds - a.last_modification.seconds;
-        });
-        this.filteredChatList = [...this.supportchatList];
+        this.activeChatList = this.mapChatList(chat);
+        this.applySearchFilter();
         this.chatlistloading = false;
       },
       error: (error) => {
-        console.log("error while fetching supportchat", error);
+        console.log("error while fetching active supportchat", error);
         this.chatlistloading = false;
+      }
+    });
+
+    // Subscribe to inactive chats
+    collectionSnapshots(inactiveQuery).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (chat) => {
+        this.inactiveChatList = this.mapChatList(chat);
+        this.applySearchFilter();
+      },
+      error: (error) => {
+        console.log("error while fetching inactive supportchat", error);
       }
     });
   }
 
-  filterChats() {
-    if (!this.searchQuery.trim()) {
-      this.filteredChatList = [...this.supportchatList];
-    } else {
-      this.filteredChatList = this.supportchatList.filter(chat =>
-        chat.chatname.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        chat.message.toLowerCase().includes(this.searchQuery.toLowerCase())
-      );
+  /**
+   * Common mapping logic shared by active and inactive chat subscriptions.
+   * Keeps the shape of each chat object identical to the original implementation.
+   */
+  private mapChatList(chat: any[]): any[] {
+    var chatlist = [];
+    for (let i = 0; i < chat.length; i++) {
+      const element = chat[i].data();
+      element['created'] = element['created_on']
+      element['chatname'] = element['group_name']
+      element['docref'] = chat[i].ref
+      element['docid'] = chat[i].ref.id
+      element['chattype'] = 'supportchat'
+      element['chatprofile'] = element['group_profile']
+      element['read_by'] = element['last_read_by']
+      element['pending'] = [null, undefined].includes(element['last_pending']) ? [] : element['last_pending']
+      element['senderuid'] = element['last_sender_uid']
+      element['message'] = [null, undefined].includes(element['last_message']) ? "...." : element['last_message']
+      element['files'] = [null, undefined].includes(element['files']) ? [] : element['files']
+      element['time'] = element['last_modification']
+      element['pinned'] = [null, undefined].includes(element['pinned']) ? false : element['pinned']
+
+      // Check if current user has unread messages
+      element['hasUnreadMessages'] = element['pending'].includes(this.currentuserData['uid']);
+
+      chatlist.push(element);
     }
+    // Sort: pinned first, then by last modification
+    return chatlist.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      const aTime = a.last_modification?.seconds ?? 0;
+      const bTime = b.last_modification?.seconds ?? 0;
+      return bTime - aTime;
+    });
+  }
+
+  /**
+   * Called whenever search input changes OR when chat lists update.
+   * Filters both lists in parallel so that switching tabs is instant.
+   */
+  filterChats() {
+    this.applySearchFilter();
+  }
+
+  private applySearchFilter() {
+    const q = this.searchQuery.trim().toLowerCase();
+
+    if (!q) {
+      this.filteredActiveChatList = [...this.activeChatList];
+      this.filteredInactiveChatList = [...this.inactiveChatList];
+      return;
+    }
+
+    const matches = (chat: any) =>
+      (chat.chatname && chat.chatname.toLowerCase().includes(q)) ||
+      (chat.message && chat.message.toLowerCase().includes(q));
+
+    this.filteredActiveChatList = this.activeChatList.filter(matches);
+    this.filteredInactiveChatList = this.inactiveChatList.filter(matches);
+  }
+
+  /**
+   * Tab change handler. When the user switches tabs we clear any
+   * currently selected chat so the right pane reflects the active tab.
+   */
+  onTabChange(index: number) {
+    this.selectedTabIndex = index;
+    // Clear selection when switching tabs to avoid showing a chat from the other list
+    this.selectedChat = {};
+    this.unsubscribe();
+    this.messages = [];
+    this.filteredMessages = [];
+    this.groupedMessages = [];
+    this.exitSelectionMode();
+    this.showMessageSearch = false;
+    this.messageSearchQuery = '';
   }
 
   filterMessages() {
@@ -337,10 +425,13 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
         this.filteredMessages = [...this.messages];
         this.groupMessagesByDate();
         this.messagesLoading = false;
-        
-        // Mark messages as read
-        this.markMessagesAsRead(selectedChat);
-        
+
+        // Only mark messages as read if this is an ACTIVE chat.
+        // Inactive (deleted) chats are read-only.
+        if (!this.isInactiveChatSelected) {
+          this.markMessagesAsRead(selectedChat);
+        }
+
         // Scroll to bottom after messages load
         setTimeout(() => this.scrollToBottom(), 100);
       },
@@ -358,7 +449,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
     this.filteredMessages.forEach(message => {
       const messageDate = this.getDateString(message.time);
-      
+
       if (messageDate !== currentDate) {
         if (currentGroup) {
           groups.push(currentGroup);
@@ -382,37 +473,37 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   getDateString(timestamp: any): string {
     if (!timestamp) return '';
-    
+
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp.seconds * 1000);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (this.isSameDay(date, today)) {
       return 'Today';
     } else if (this.isSameDay(date, yesterday)) {
       return 'Yesterday';
     } else {
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
     }
   }
 
   isSameDay(date1: Date, date2: Date): boolean {
     return date1.getDate() === date2.getDate() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getFullYear() === date2.getFullYear();
+      date1.getMonth() === date2.getMonth() &&
+      date1.getFullYear() === date2.getFullYear();
   }
 
   // Double tap message selection
   onMessageTap(message: any, event: Event) {
     const currentTime = new Date().getTime();
     const tapLength = currentTime - this.lastTap;
-    
+
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       event.preventDefault();
@@ -423,11 +514,13 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
         this.toggleMessageSelection(message);
       }
     }
-    
+
     this.lastTap = currentTime;
   }
 
   handleDoubleTap(message: any) {
+    // Disable selection in inactive chats
+    if (this.isInactiveChatSelected) return;
     if (!this.selectionMode) {
       this.enterSelectionMode();
     }
@@ -436,6 +529,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   // Message selection methods
   enterSelectionMode() {
+    if (this.isInactiveChatSelected) return;
     this.selectionMode = true;
     this.selectedMessages.clear();
   }
@@ -459,6 +553,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   async deleteSelectedMessages() {
     if (this.selectedMessages.size === 0) return;
+    if (this.isInactiveChatSelected) return;
 
     const batch = writeBatch(this.firestore);
     const messagesToDelete = Array.from(this.selectedMessages);
@@ -480,6 +575,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   async deleteSingleMessage(message: any) {
     if (!message.isMyMessage) return;
+    if (this.isInactiveChatSelected) return;
 
     try {
       await deleteDoc(doc(this.supportchatCollection, this.selectedChat.docid, 'messages', message.docid));
@@ -491,6 +587,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   }
 
   async pinMessage(message: any) {
+    if (this.isInactiveChatSelected) return;
     const pinnedValue = [null, undefined, "", false].includes(message.pinned) ? true : false;
     try {
       await updateDoc(doc(this.supportchatCollection, this.selectedChat.docid, 'messages', message.docid), {
@@ -525,16 +622,16 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   getReadByUsers(message: any): any[] {
     if (!message.read_by || !this.selectedChat.members) return [];
-    
-    return this.selectedChat.members.filter((memberId: string) => 
+
+    return this.selectedChat.members.filter((memberId: string) =>
       message.read_by.includes(memberId)
     );
   }
 
   getPendingUsers(message: any): any[] {
     if (!message.pending || !this.selectedChat.members) return [];
-    
-    return this.selectedChat.members.filter((memberId: string) => 
+
+    return this.selectedChat.members.filter((memberId: string) =>
       message.pending.includes(memberId)
     );
   }
@@ -547,6 +644,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   onDragOver(event: DragEvent) {
     event.preventDefault();
+    if (this.isInactiveChatSelected) return;
     this.dragOver = true;
   }
 
@@ -558,14 +656,15 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   onDrop(event: DragEvent) {
     event.preventDefault();
     this.dragOver = false;
+    if (this.isInactiveChatSelected) return;
     const files = event.dataTransfer?.files;
     if (files) {
       this.processFiles(files);
     }
   }
 
-  openSnackBar(message:string,action:string) {
-    this.snackBar.open(message,action,{ duration: 2000})
+  openSnackBar(message: string, action: string) {
+    this.snackBar.open(message, action, { duration: 2000 })
   }
 
   processFiles(files: FileList) {
@@ -713,7 +812,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       // Archives
       'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'
     ];
-    
+
     return allowedTypes.includes(file.type) || file.size <= 10 * 1024 * 1024; // 10MB limit
   }
 
@@ -751,10 +850,10 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       for (const attachedFile of this.attachedFiles) {
         const fileName = `${Date.now()}_${attachedFile.filename}`;
         const storageRef = ref(this.storage, `chat-files/${this.selectedChat.docid}/${fileName}`);
-        
+
         const snapshot = await uploadBytes(storageRef, attachedFile.file);
         const downloadURL = await getDownloadURL(snapshot.ref);
-        
+
         uploadedFiles.push({
           filename: attachedFile.filename,
           filetype: attachedFile.filetype,
@@ -785,13 +884,13 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   async togglePinChat(event: Event, chat: any) {
     event.stopPropagation(); // Prevent chat selection when clicking pin
-    
+
     try {
       const newPinnedState = !chat.pinned;
       await updateDoc(chat.docref, {
         pinned: newPinnedState
       });
-      
+
       this.snackBar.open(
         newPinnedState ? 'Chat pinned successfully' : 'Chat unpinned successfully',
         'Close',
@@ -809,13 +908,45 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
     this.localstorageMessage(chat.docid);
   }
 
+  /**
+   * Restore an inactive group back to active by setting isdelete = false.
+   */
+  async restoreGroup(event: Event, chat: any) {
+    event.stopPropagation();
+    if (!confirm("Restore this group back to Active?")) return;
+
+    try {
+      await updateDoc(doc(this.firestore, 'supportchat', chat.docid), {
+        isdelete: false
+      });
+      this.snackBar.open('Group restored to Active', 'Close', { duration: 2000 });
+
+      // If the restored chat is currently selected, clear it (it will reappear in Active tab)
+      if (this.selectedChat?.docid === chat.docid) {
+        this.selectedChat = {};
+        this.unsubscribe();
+        this.messages = [];
+        this.filteredMessages = [];
+        this.groupedMessages = [];
+      }
+    } catch (error) {
+      console.error('Error restoring group:', error);
+      this.snackBar.open('Error restoring group', 'Close', { duration: 2000 });
+    }
+  }
+
   async sendMessage() {
+    // Block sending in inactive chats
+    if (this.isInactiveChatSelected) {
+      this.snackBar.open('This group is inactive. Sending messages is disabled.', 'Close', { duration: 2000 });
+      return;
+    }
     if ((!this.newMessage.trim() && this.attachedFiles.length === 0) || !this.selectedChat.docid) return;
 
     try {
       const messageId = doc(collection(this.firestore, 'temp')).id;
       const messagesCollection = collection(this.supportchatCollection, this.selectedChat.docid, 'messages');
-      
+
       // Upload files if any
       const uploadedFiles = await this.uploadFiles();
       const { processedMessage, mentionedUsers } = this.processMentions(this.newMessage);
@@ -852,13 +983,13 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       this.mentionMappings.clear();
       this.attachedFiles = [];
       setTimeout(() => this.scrollToBottom(), 100);
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
       this.snackBar.open('Error sending message', 'Close', { duration: 2000 });
     }
   }
-  
+
   async buildGroup(value: any, docID: string) {
     const membersList = value.members;
     if (membersList.length < 2) {
@@ -902,22 +1033,22 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   }
 
   //edit group function
-  editGroup(groupdata: any): void{
-    var groupDialog = this.dialog.open(CreateGroupDialogComponent,{
-      disableClose:true,
-      height:'80vh',
+  editGroup(groupdata: any): void {
+    var groupDialog = this.dialog.open(CreateGroupDialogComponent, {
+      disableClose: true,
+      height: '80vh',
       width: '70vw',
-      data:{
-        profilelist : this.profileList,
-        userlist : this.userListId,
-        groupData : groupdata,
-        mapUser : this.mapProfileuid,
+      data: {
+        profilelist: this.profileList,
+        userlist: this.userListId,
+        groupData: groupdata,
+        mapUser: this.mapProfileuid,
       }
     });
 
-    groupDialog.afterClosed().toPromise().then(async(result)=>{
-      if(result != null){
-        console.log('Dialog result:', result); 
+    groupDialog.afterClosed().toPromise().then(async (result) => {
+      if (result != null) {
+        console.log('Dialog result:', result);
         const docId = groupdata ? groupdata['docid'] : doc(collection(this.firestore, 'temp')).id;
         await this.buildGroup(result, docId);
 
@@ -925,12 +1056,13 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
           this.selectedChat.members = result.members;
           console.log('Updated selectedChat members:', this.selectedChat.members);
         }
-        
+
         if (groupdata) {
-          const chatIndex = this.supportchatList.findIndex(chat => chat.docid === groupdata['docid']);
-          if (chatIndex !== -1) {
-            this.supportchatList[chatIndex].members = result.members;
-            this.filteredChatList = [...this.supportchatList];
+          // Update the appropriate cached list (active in this case, since we don't edit inactive groups)
+          const idx = this.activeChatList.findIndex(chat => chat.docid === groupdata['docid']);
+          if (idx !== -1) {
+            this.activeChatList[idx].members = result.members;
+            this.applySearchFilter();
           }
         }
       }
@@ -939,22 +1071,31 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   // Handle group icon click for editing
   onGroupIconClick(event: Event, groupdata: any): void {
-    event.stopPropagation(); 
-    
+    event.stopPropagation();
+
+    // Don't allow editing for inactive groups
+    if (groupdata.isdelete === true) {
+      return;
+    }
+
     if (!this.canEditGroup(groupdata)) {
       this.openSnackBar('You don\'t have permission to edit this group', 'OK');
       return;
     }
-    
+
     this.editGroup(groupdata);
   }
 
   // Check if user can edit the group
   canEditGroup(groupdata: any): boolean {
-    if(this.chatAdmin){
+    // Inactive groups cannot be edited
+    if (groupdata.isdelete === true) {
+      return false;
+    }
+    if (this.chatAdmin) {
       return true;
     }
-    
+
     if (groupdata.creator_uid === this.currentuserData['uid']) {
       return true;
     }
@@ -966,7 +1107,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -979,35 +1120,35 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   formatTime(timestamp: any): string {
     if (!timestamp) return '';
-    
+
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp.seconds * 1000);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     });
   }
 
   formatChatTime(timestamp: any): string {
     if (!timestamp) return '';
-    
+
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp.seconds * 1000);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    
+
     if (hours < 24) {
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
     } else if (hours < 168) { // Less than a week
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
       });
     }
   }
@@ -1045,10 +1186,10 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   // Utility method to get message read status
   getMessageReadStatus(message: any): string {
     if (!message.read_by || !this.selectedChat.members) return '';
-    
+
     const totalMembers = this.selectedChat.members.length;
     const readByCount = message.read_by.length;
-    
+
     if (readByCount === totalMembers) {
       return 'Read by all';
     } else if (readByCount > 1) {
@@ -1069,9 +1210,9 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
     const cursorPosition = event.target.selectionStart;
     const textBeforeCursor = inputValue.substring(0, cursorPosition);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
+
     console.log('Input changed:', { inputValue, cursorPosition, textBeforeCursor, lastAtIndex });
-    
+
     if (lastAtIndex !== -1) {
       const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
       if (charBeforeAt === ' ' || lastAtIndex === 0) {
@@ -1093,14 +1234,14 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       this.filteredMembers = [];
       return;
     }
-    
+
     const members = this.selectedChat.members
       .filter((memberId: string) => memberId !== this.currentuserData['uid'])
       .map((memberId: string) => this.mapProfileuid[memberId])
-      .filter((profile: any) => profile && profile.name && 
+      .filter((profile: any) => profile && profile.name &&
         profile.name.toLowerCase().includes(query.toLowerCase())
       );
-      
+
     this.filteredMembers = members;
     console.log('Filtered members:', this.filteredMembers);
   }
@@ -1108,27 +1249,27 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   selectMention(member: any) {
     const textarea = this.messageInput.nativeElement.querySelector('textarea');
     const currentValue = this.newMessage;
-    
+
     const beforeAt = currentValue.substring(0, this.mentionStartPosition);
     const afterAt = currentValue.substring(this.mentionStartPosition + 1);
-    
+
     const spaceIndex = afterAt.indexOf(' ');
     const afterMention = spaceIndex !== -1 ? afterAt.substring(spaceIndex) : '';
-    
+
     // Get profile ID instead of user ID
     const profileId = member.profileid || member.profile_id; // Adjust based on your data structure
-    
+
     this.newMessage = beforeAt + `@${member.name} ` + afterMention;
     this.showMentionsList = false;
-    
+
     if (!this.mentionMappings) {
       this.mentionMappings = new Map();
     }
     this.mentionMappings.set(`@${member.name}`, profileId);
-    
+
     setTimeout(() => {
       textarea.focus();
-      const newPos = beforeAt.length + member.name.length + 2; 
+      const newPos = beforeAt.length + member.name.length + 2;
       textarea.setSelectionRange(newPos, newPos);
     }, 10);
   }
@@ -1136,10 +1277,10 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   processMentions(message: string): { processedMessage: string; mentionedUsers: string[] } {
     const mentionedUsers: string[] = [];
     let processedMessage = message;
-    
+
     console.log('Processing message:', message);
     console.log('Available mappings:', Array.from(this.mentionMappings.entries()));
-    
+
     // Process each mention mapping
     if (this.mentionMappings && this.mentionMappings.size > 0) {
       this.mentionMappings.forEach((profileId, mentionText) => {
@@ -1154,7 +1295,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
     } else {
       console.log('No mappings available');
     }
-    
+
     return { processedMessage, mentionedUsers };
   }
 
@@ -1173,17 +1314,17 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
         return;
       }
     }
-    
+
     if (event.key === 'Enter' && !event.shiftKey && !this.showMentionsList) {
       event.preventDefault();
       this.sendMessage();
     }
   }
 
-  async hideGroup(chat){
-    if(confirm("Sure, Do you want to delete?")){
-      await updateDoc(doc(this.firestore, 'supportchat',chat.id),{
-        isdelete : true
+  async hideGroup(chat) {
+    if (confirm("Sure, Do you want to delete?")) {
+      await updateDoc(doc(this.firestore, 'supportchat', chat.id), {
+        isdelete: true
       });
     }
   }

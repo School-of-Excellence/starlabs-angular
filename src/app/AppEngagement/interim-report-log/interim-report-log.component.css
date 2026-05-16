@@ -397,9 +397,14 @@ table {
   white-space: pre-wrap;
 }
 
-.actionitem {
+.actionitem , .actions-items-wrap{
   display: flex;
   gap: 20px;
+}
+
+.actions-items-wrap{
+  justify-content: space-between;
+  align-items: center;
 }
 
 .report.active {

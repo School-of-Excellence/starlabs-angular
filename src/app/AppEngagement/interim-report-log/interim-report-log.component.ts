@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule , DatePipe} from '@angular/common';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { arrayUnion, collection, collectionData, doc, Firestore, getDocs, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, updateDoc, where, setDoc } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
@@ -27,6 +27,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { environment } from '../../../environments/environment.development';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
+import * as XLSX from 'xlsx';
+
 
 @Component({
   selector: 'app-interim-report-log',
@@ -49,7 +51,8 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
     NgxMatSelectSearchModule
   ],
   templateUrl: './interim-report-log.component.html',
-  styleUrl: './interim-report-log.component.css'
+  styleUrl: './interim-report-log.component.css',
+  providers : [DatePipe]
 })
 export class InterimReportLogComponent implements OnInit, OnDestroy {
 
@@ -148,7 +151,8 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     private dialog: MatDialog,
     private storage: Storage,
     private _snackBar: MatSnackBar,
-    private http: HttpClient
+    private http: HttpClient,
+    private datePipe : DatePipe
   ) {
     const logStartDate = new Date();
     const logEndDate = new Date();
@@ -399,29 +403,11 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       const show = new Set<string>();
 
       this.records = this.allLetters.filter((item) => {
-        if (show.has(item.id)) return false;
-
-        this.records = this.allLetters.filter((item) => {
-          if (this.selectedFilterTypes.includes('happy') && item.liked === true)
-            return true;
-          if (this.selectedFilterTypes.includes('attention') && item.tagged === true)
-            return true;
-          if (this.selectedFilterTypes.includes('opportunity') && item.opportunity === true)
-            return true;
-          if (this.selectedFilterTypes.includes('critical') && item.critical === true)
-            return true;
-          return false;
-
-        });
-        return true;
-      });
-
-      this.records = this.allLetters.filter((item) => {
         const match =
-          (!this.selectedFilterTypes.includes('happy') || item.liked === true) &&
-          (!this.selectedFilterTypes.includes('attention') || item.tagged === true) &&
-          (!this.selectedFilterTypes.includes('opportunity') || item.opportunity === true) &&
-          (!this.selectedFilterTypes.includes('critical') || item.critical === true);
+          (this.selectedFilterTypes.includes('happy') && item.liked === true) ||
+          (this.selectedFilterTypes.includes('attention') && item.tagged === true) ||
+          (this.selectedFilterTypes.includes('opportunity') && item.opportunity === true) ||
+          (this.selectedFilterTypes.includes('critical') && item.critical === true);
 
         if (!match) return false;
 
@@ -434,7 +420,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       });
     }
 
-
+  
 
   fetchAskAH() { this.resetPagination(); this.fetchRecords(); }
   fetchLoveLetter() { this.resetPagination(); this.fetchRecords(); }
@@ -445,6 +431,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   onTabChange(event: MatTabChangeEvent) {
     this.activeTab = event.index;
     this.selectedRecords = [];
+    this.selectedFilterTypes = [];
 
     switch (event.index) {
       case 0: this.fetchAskAH(); break;
@@ -575,14 +562,14 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       this.fetchRecords();
     }
   }
-
+  
   private resetPagination() {
     this.currentPage = 0;
     this.lastDoc = null;
     this.pageCache.clear();
     this.totalRecords = 0;
   }
-
+  
   toggleLike(row: any) {
     const newValue = !row.liked;
     row.liked = newValue;
@@ -924,6 +911,32 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  exportTable() {
+    if (this.logDataSource.filteredData.length === 0) {
+      alert('No Logs Found');
+      return;
+    }
+    console.log( this.logDataSource)
+    const exportData = this.logDataSource.filteredData.map((log) => ({
+      'name': log["name"],
+      'email' : this.mapParticipantMetaData[log['profileid'] || '']?.email ?? '' , 
+      'reports done': log["reportlist"],
+      'last update': this.datePipe.transform(log["lastupdate"], 'MMMM d, y, h:mm a'),
+      'status': log["status"],
+      'due date': this.datePipe.transform(log["duedate"]),
+      'remainder date': this.datePipe.transform(log["remainderdate"]),
+      'lock date': this.datePipe.transform(log["lockdate"]),
+      'send date': this.datePipe.transform(log["createdon"], 'medium')
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Participants');
+
+    const fileName = `$interim_report_log${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
   }
 
 }

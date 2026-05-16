@@ -18,6 +18,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTabsModule } from '@angular/material/tabs';
 import { UserAnalyticsDialogComponent } from './user-analytics-dialog/user-analytics-dialog.component';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 @Component({
   selector: 'app-content-analytics',
@@ -35,7 +36,8 @@ import { UserAnalyticsDialogComponent } from './user-analytics-dialog/user-analy
     MatIconModule,
     MatSelectModule,
     MatTabsModule,
-    MatDialogModule
+    MatDialogModule,
+    MatSlideToggleModule
   ],  templateUrl: './content-analytics.component.html',
   styleUrl: './content-analytics.component.css'
 })
@@ -49,7 +51,8 @@ export class ContentAnalyticsComponent {
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
   // displayedColumns: string[] = ['profileid','from','lastwatchedtime','logdate','totalruntime','totaltimespend','type','videoname'];
-  displayedColumns: string[] = ['logdate','profileid','from','videoname','platform_name','totalruntime','lastwatchedtime','totaltimespend','type','playlist','status'];
+  displayedColumns: string[] = ['actions','logdate','profileid','from','videoname','platform_name','totalruntime','lastwatchedtime','totaltimespend','type','playlist','status'];
+  // displayedColumns: string[] = ['logdate','profileid','from','videoname','platform_name','totalruntime','lastwatchedtime','totaltimespend','type','playlist','status'];
   contentData = new MatTableDataSource();
   startDate: Date;
   endDate: Date;
@@ -88,16 +91,16 @@ export class ContentAnalyticsComponent {
   tierCompletionMap: any = {};
   tierParticipantSummary: any = {};
   journeyWiseData: any = {};
+  showDuplicatesOnly = false;
 
+  allTierCompletionMap: any = {};
+  allTierParticipantSummary: any = {};
+  allTierStats: typeof this.tierStats = {};
+  allTierSearchQuery = '';
+  allTierViewMode: 'series' | 'participant' = 'participant';
+  allCardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
+  allTierLoading = false;
 
-    allTierCompletionMap: any = {};
-    allTierParticipantSummary: any = {};
-    allTierStats: typeof this.tierStats = {};
-    allTierSearchQuery = '';
-    allTierViewMode: 'series' | 'participant' = 'participant';
-    allCardViewMode: { [tierId: string]: 'series' | 'participant' } = {};
-    allTierLoading = false;
-  
   constructor(
     public firestore: Firestore,
     private guard : AuthguardService,
@@ -746,6 +749,7 @@ export class ContentAnalyticsComponent {
       totaltimespend:null,
       platform_name:null
     }
+    this.showDuplicatesOnly = false;
     this.onFilter(this.filterValue)
   }
 
@@ -817,10 +821,26 @@ export class ContentAnalyticsComponent {
           if (snapshot.metadata.fromCache) return;
 
           this.contentAnalytics = [];
+          const logDates: { [key: string]: string } = {};
           snapshot.docs.forEach(e => {
             let element = e.data();
             element["docid"] = e.id;
             element['live'] = false;
+            //delete
+            // const logdate = element['logdate'];
+            const logdate = element['logdate']?.seconds ?? element['logdate']?.toMillis?.() ?? 0;
+            const videoid = element['videoid'] ?? '';
+            const profileid = element['profileid'] ?? '';
+            const totaltimespend = element['totaltimespend'] ?? '';
+            const combine = `${logdate}_${videoid}_${totaltimespend}_${profileid}`;
+            // console.log('combine:', combine, 'logdate:', logdate, 'videoid:', videoid, 'totaltimespend:', totaltimespend);
+            if (logDates[combine]) {
+              element['isDuplicate'] = true;
+            } else {
+              logDates[combine] = e.id;
+              element['isDuplicate'] = false;
+            }
+            // console.log('combine:', combine, 'isDuplicate:', element['isDuplicate'], 'docid:', e.id);
             this.contentAnalytics.push(element);
           });
 
@@ -954,7 +974,17 @@ export class ContentAnalyticsComponent {
     this.subscription.complete();
   }
 
-
+  async deleteRow(row: any) {
+    if (!row['docid']) return;
+    const confirmDelete = confirm('Are you sure you want to delete this duplicate?');
+    if (!confirmDelete) return;
+    const { doc, deleteDoc } = await import('@angular/fire/firestore');
+    const docRef = doc(this.firestore, 'content analytics', row['docid']);
+    await deleteDoc(docRef);
+    this.contentAnalytics = this.contentAnalytics.filter(c => c['docid'] !== row['docid']);
+    this.contentData.data = [...this.contentAnalytics];
+    this.getUniqueUser();
+  }
   applyNameFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
     this.contentData.filter = filterValue;
@@ -1112,7 +1142,8 @@ export class ContentAnalyticsComponent {
     let filterFunction = (data:any, filter:any):boolean => {
       let e = data
       let value = JSON.parse(filter);
-      return (![null,undefined].includes(value['name']) ? (
+      return (this.showDuplicatesOnly ? e['isDuplicate'] === true : true) &&
+      (![null,undefined].includes(value['name']) ? (
       (this.mapProfile[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) ||
       (this.mapProfileNew[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0)): true)&& 
       (value['startdate'] != null && value['enddate'] != null ? (e['logdate'].toDate() > new Date(new Date(value['startdate']).setHours(0,0,0,0)) && e['logdate'].toDate() < new Date(new Date(value['enddate']).setHours(23,59,59,59))) : true) &&

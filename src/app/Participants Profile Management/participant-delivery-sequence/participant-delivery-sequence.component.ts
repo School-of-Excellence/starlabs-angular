@@ -81,13 +81,13 @@ export class ParticipantDeliverySequenceComponent {
     guard.getRoles().then(async roles => {
       this.developer = roles["developer"] ?? false
       // if (roles["admin"] || roles["ah"] || roles["integrator"] || roles["scheduler"] || this.developer) {
-        await this.mapData().then(() => {
-          route.params.subscribe(data => {
-            this.routerProfileid = data['pid']
-            this.selectedProfileid = data['pid']
-            this.onProfileSelect()
-          })
+      await this.mapData().then(() => {
+        route.params.subscribe(data => {
+          this.routerProfileid = data['pid']
+          this.selectedProfileid = data['pid']
+          this.onProfileSelect()
         })
+      })
       // }
       // else {
       //   this.router.navigateByUrl("/")
@@ -99,12 +99,13 @@ export class ParticipantDeliverySequenceComponent {
   }
 
   getParticipantAppointment() {
-    getDocs(query(collection(this.firestore, "appointments"), where("bookedby", "==", doc(this.firestore, "profile_data", this.selectedProfileid)), orderBy("starttime"))).then(appt => {
+    getDocs(query(collection(this.firestore, "appointments"), where("bookedby", "==", doc(this.firestore, "profile_data", this.selectedProfileid)), orderBy("starttime"))).then(appt => { // this
       for (let i = 0; i < appt.docs.length; i++) {
         const doc = appt.docs[i];
-        this.clientAppointment.push(doc)
+        this.clientAppointment.push(doc);
       }
     })
+    console.log("client appointment", this.clientAppointment);
   }
 
   scrollUp() {
@@ -346,10 +347,14 @@ export class ParticipantDeliverySequenceComponent {
   }
 
   deleteDeliverable(index, activityname, sequenceRef) {
-    if (confirm("Sure, Do you want to remove '" + activityname + "' from this delivery List")) {
-      this.participantProducts[this.selectedProductIndex].delivery.splice(index, 1)
-      this.mapDeliveryDoc[sequenceRef]["delete"] = true
-      this.clearDeliveryData()
+    if (this.selectedAppointments.length === 0) {
+      if (confirm("Sure, Do you want to remove '" + activityname + "' from this delivery List")) {
+        this.participantProducts[this.selectedProductIndex].delivery.splice(index, 1)
+        this.mapDeliveryDoc[sequenceRef]["delete"] = true
+        this.clearDeliveryData()
+      }
+    } else {
+      alert("You cannot remove this delivery because appointments are booked for it. If you want to remove it, please cancel those appointments first.");
     }
   }
 
@@ -380,7 +385,7 @@ export class ParticipantDeliverySequenceComponent {
   onDeliverySelect(index) {
     if (this.selectDeliveryIndex != index) {
       this.selectDeliveryIndex = index
-      var fileref = this.mapDeliveryDoc[this.participantProducts[this.selectedProductIndex].delivery[this.selectDeliveryIndex].sequenceref.path]["fileref"] ?? []
+      var fileref = this.mapDeliveryDoc[this.participantProducts[this.selectedProductIndex].delivery[this.selectDeliveryIndex].sequenceref.path]["fileref"] ?? [] // this
       console.log(fileref)
       var appts = []
       for (let i = 0; i < fileref.length; i++) {
@@ -388,6 +393,7 @@ export class ParticipantDeliverySequenceComponent {
         appts.push(file.id)
       }
       this.selectedAppointments = appts
+      console.log("selected appointments", this.selectedAppointments);
       // this.scrollUp()
     }
   }
@@ -398,18 +404,26 @@ export class ParticipantDeliverySequenceComponent {
     }
   }
 
-  returnExistingAppt(appt) {
-    return this.clientAppointment.filter(e => e.data()["appointment"]["path"] == appt)
+  returnExistingAppt(appt) { // this
+    this.clientAppointment.filter(e => console.log(e.data()));
+    const filtered = this.clientAppointment.filter(
+      e => e.data()["appointment"]["path"] == appt
+    );
+
+    console.log("filtered appointments", filtered);
+    return filtered;
   }
 
   onAppointmentSelection() {
-    console.log(this.selectedAppointments)
+    console.log("selected appointments", this.selectedAppointments)
     var ref = []
     for (let i = 0; i < this.selectedAppointments.length; i++) {
       const element = this.selectedAppointments[i];
       ref.push(doc(this.firestore, "appointments", element))
     }
+    console.log("ref", ref);
     this.mapDeliveryDoc[this.participantProducts[this.selectedProductIndex].delivery[this.selectDeliveryIndex].sequenceref.path]["fileref"] = ref
+    console.log("map delivery doc", this.mapDeliveryDoc);
     // this.mapDeliveryDoc[this.participantProducts[this.selectedProductIndex].delivery[this.selectDeliveryIndex].sequenceref.path]["type"] = "appointment"
   }
 
@@ -500,9 +514,9 @@ export class ParticipantDeliverySequenceComponent {
       const deliveryList = products[i]["delivery"];
       for (let j = 0; j < deliveryList.length; j++) {
         const delivery = deliveryList[j];
-        var deliverable = this.mapDeliveryDoc[delivery["sequenceref"].path]
-        deliverable["status"] = delivery["status"]
-        deliverable["type"] = delivery["type"]
+        var deliverable = this.mapDeliveryDoc[delivery["sequenceref"].path];
+        deliverable["status"] = delivery["status"];
+        deliverable["type"] = delivery["type"];
         // console.log(delivery, deliverable)
         setDoc(doc(this.firestore, delivery["sequenceref"].path), deliverable, { merge: true }).then(() => {
           totalwrites += 1

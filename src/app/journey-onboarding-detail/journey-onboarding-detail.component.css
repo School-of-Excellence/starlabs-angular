@@ -187,7 +187,7 @@
 .upload-label { font-size: 12px; color: #9fa8da; font-weight: 500; }
 
 .img-preview {
-  max-height: 160px;
+  max-height: 40px;
   max-width: 100%;
   border-radius: 6px;
   object-fit: contain;
@@ -385,29 +385,32 @@
 /* ── Mobile Preview Frame ──────────────────────────── */
 .preview-page {
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: flex-start;
-  padding: 2px 0;
-  background: #f0f0f5;
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
 }
 
 .mobile-frame {
-  width: 344px;
-  background: #fff;
-  border-radius: 40px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 0 0 10px #1a1a1a;
+  width: 280px;
+  height: 560px;
+  border-radius: 36px;
+  border: 8px solid #1a1a1a;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 600px;
   position: relative;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  flex-shrink: 0;
 }
 
 .mobile-screen {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 560px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
 }
 
 /* Hero with background video/image */
@@ -536,17 +539,28 @@
 }
 /* ─── Detail Layout (preview left + modal right) ─────────────── */
 .detail-layout {
+  display: none;
   position: fixed;
   inset: 0;
-  z-index: 999;
-  display: flex;
-  align-items: stretch;
-  pointer-events: none;
-  visibility: hidden;
+  z-index: 1000;
+  background: rgba(0,0,0,0.5);
 }
+
 .detail-layout--open {
-  pointer-events: auto;
-  visibility: visible;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.fill-details-btn {
+  width: 100%;
+  margin-top: 4px;
+  border-color: #C6168D !important;
+  color: #C6168D !important;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Left preview pane */
@@ -557,7 +571,7 @@
   justify-content: center;
   background: rgba(15, 15, 30, 0.72);
   backdrop-filter: blur(4px);
-  margin-left: -800px;
+  margin-left: -200px;
   padding: 10px 10px;
   overflow-y: auto;
   /* slide in from left when open */
@@ -735,8 +749,9 @@
 }
 .mobile-screen {
   position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  height: 560px;   /* match whatever height your phone frame uses */
   background: #fff;
 }
 
@@ -917,4 +932,60 @@
   font-size: 8.5px;
   color: #555;
   line-height: 1.5;
+}
+
+/* ── Save toast ──────────────────────────── */
+.save-toast {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1b5e20;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  animation: slideDown 0.25s ease;
+}
+.save-toast__icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* ── Error banner ───────────────────────── */
+.save-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #b71c1c;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.save-error-banner button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
