@@ -24,18 +24,21 @@
   </mat-form-field>
 
   <div style="display: flex; gap: 10px; margin-top: 10px;">
-    <button 
-      mat-raised-button 
-      color="primary" 
-      (click)="saveCategory()" 
-      [disabled]="nameControl.invalid"
-      style="flex: 1;">
-      {{ isEditMode ? 'Update' : 'Create' }}
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="saveCategory()"
+      [disabled]="nameControl.invalid || isSaving"
+      style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+      <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
+      <span *ngIf="!isSaving">{{ isEditMode ? 'Update' : 'Create' }}</span>
+      <span *ngIf="isSaving">{{ isEditMode ? 'Updating...' : 'Creating...' }}</span>
     </button>
-    
-    <button 
-      mat-button 
+
+    <button
+      mat-button
       (click)="cancel()"
+      [disabled]="isSaving"
       style="flex: 1;">
       Cancel
     </button>

@@ -602,7 +602,7 @@ export class BookAppointmentComponent implements OnInit{
           created: serverTimestamp(),
           loggedid: this.loggedinPID,
           productid: this.selectedAppointment.productid,
-          participantproductid: this.selectedUser
+          // participantproductid: this.selectedUser
         }
         batch.set(appointmentDoc, appointmentData)
         await batch.commit().then(async(doc)=>{

@@ -2,14 +2,15 @@
 
   <!-- Header -->
   <div class="header">
-    <div class="badge">DeepFilterNet3 vs Koala · Noise Cancellation Comparison</div>
+    <div class="badge">DeepFilterNet3 · Koala · Noise Cancellation Lab</div>
     <h1>Noise Cancellation Test</h1>
     <p class="subtitle">
-      Record raw + DeepFilterNet3 + Koala simultaneously from the same mic — then compare quality side by side.
+      Three modes — File, Live Mic, Recording. Each shows RAW (browser EC/NS), DeepFilterNet3, and Koala side-by-side.
+      After recording, run PESQ / STOI analysis via the local Python quality server.
     </p>
   </div>
 
-  <!-- Status Banner -->
+  <!-- Status Banner (Modes 2 + 3) -->
   <div class="status-banner"
     [class.live]="status === 'live'"
     [class.loading]="status === 'loading'"
@@ -22,17 +23,16 @@
     {{ statusMessage }}
   </div>
 
-  <!-- ── Config Section ── -->
+  <!-- ── Configuration ── -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">⚙️</span>
       Configuration
     </div>
 
-    <!-- Picovoice Access Key -->
     <div class="config-row">
       <label class="config-label">
-        Picovoice Access Key
+        Picovoice Access Key (required for Koala)
         <a class="key-link" href="https://console.picovoice.ai/" target="_blank">Get free key ↗</a>
       </label>
       <input class="key-input" type="password" [(ngModel)]="accessKey"
@@ -40,7 +40,6 @@
         [disabled]="isBusy || isRecording || isLive" />
     </div>
 
-    <!-- DF3 Suppression -->
     <div class="config-row">
       <label class="config-label">DeepFilterNet3 Suppression Level</label>
       <div class="slider-row">
@@ -55,23 +54,25 @@
     </div>
   </div>
 
-  <!-- ── File Comparison Mode (Mode 1) ── -->
+  <!-- ════════════════════════════════════════════════════════════
+       MODE 1 — File Upload
+       ════════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">📂</span>
-      Mode 1 — File Comparison
-      <span class="section-hint">Feed an audio file through DeepFilterNet3 — compare input vs output</span>
+      Mode 1 — File Upload
+      <span class="section-hint">Upload a file · RAW + DF3 (offline) + Koala (real-time) · all hearable</span>
     </div>
 
     <div class="config-row" *ngIf="fileStatus !== 'loading'">
-      <label class="config-label">Select audio file (e.g. Raw.webm)</label>
+      <label class="config-label">Select audio file (WAV / MP3 / WebM / MP4…)</label>
       <input type="file" accept="audio/*,video/webm,video/mp4"
+        class="file-input"
         (change)="onFileSelected($event)"
-        [disabled]="isFileProcessing || isBusy || isRecording || isLive"
-        class="file-input" />
+        [disabled]="isFileProcessing || isBusy || isRecording || isLive" />
     </div>
 
-    <!-- Progress / status -->
+    <!-- File status + dual progress bars -->
     <div class="status-banner"
       [class.loading]="fileStatus === 'loading'"
       [class.done]="fileStatus === 'done'"
@@ -79,55 +80,73 @@
       *ngIf="fileStatusMsg">
       <span class="dot" [class.pulse]="fileStatus === 'loading'"></span>
       {{ fileStatusMsg }}
-      <span *ngIf="fileStatus === 'loading'" class="progress-pct"> {{ fileProgress }}%</span>
     </div>
 
-    <!-- Progress bar -->
-    <div class="progress-bar-wrap" *ngIf="fileStatus === 'loading'">
-      <div class="progress-bar-fill" [style.width.%]="fileProgress"></div>
+    <div class="progress-dual" *ngIf="fileStatus === 'loading'">
+      <div class="progress-row">
+        <span class="progress-label">🟢 DF3</span>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill df3-fill" [style.width.%]="fileProgress.df3"></div>
+        </div>
+        <span class="progress-pct">{{ fileProgress.df3 }}%</span>
+      </div>
+      <div class="progress-row" *ngIf="accessKey.trim()">
+        <span class="progress-label">🔵 Koala</span>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill koala-fill" [style.width.%]="fileProgress.koala"></div>
+        </div>
+        <span class="progress-pct">{{ fileProgress.koala }}%</span>
+      </div>
     </div>
 
-    <!-- Result players -->
-    <div class="players-three" *ngIf="fileStatus === 'done'">
+    <!-- Three-column results -->
+    <div class="three-col" *ngIf="resultMode === 'file' && results">
 
-      <div class="player-card raw">
-        <div class="player-label"><span>🔴</span> Input (Raw)</div>
-        <div class="player-sub">Original file — no processing</div>
-        <audio [src]="fileInputUrl!" controls *ngIf="fileInputUrl"></audio>
+      <div class="channel-card raw-card">
+        <div class="channel-label raw-label">🔴 RAW (Original File)</div>
+        <div class="channel-sub">Unprocessed · 16-bit PCM · 48 kHz</div>
+        <audio [src]="results.raw.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('raw')">⬇ Download</button>
       </div>
 
-      <div class="player-card df3">
-        <div class="player-label"><span>🟢</span> DeepFilterNet3 Output</div>
-        <div class="player-sub">Processed WAV · {{ suppressionLevel }}/100 suppression · {{ (fileProcessingMs / 1000).toFixed(1) }}s to process</div>
-        <audio [src]="fileOutputUrl!" controls *ngIf="fileOutputUrl"></audio>
+      <div class="channel-card df3-card">
+        <div class="channel-label df3-label">🟢 DeepFilterNet3</div>
+        <div class="channel-sub">ONNX offline · suppression {{ suppressionLevel }}/100 · 48 kHz</div>
+        <audio [src]="results.df3.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('df3')">⬇ Download</button>
+      </div>
+
+      <div class="channel-card koala-card">
+        <div class="channel-label koala-label">🔵 Koala (Picovoice)</div>
+        <div class="channel-sub">WASM real-time · 16 kHz output</div>
+        <audio [src]="results.koala.url" controls *ngIf="results.koala.url"></audio>
+        <div class="placeholder" *ngIf="!results.koala.url">No access key — Koala skipped</div>
+        <button class="btn-dl" (click)="downloadWav('koala')" *ngIf="results.koala.url">⬇ Download</button>
       </div>
 
     </div>
 
-    <div class="info-hint" *ngIf="fileStatus === 'idle'">
-      <p>Tip: use <strong>Raw.webm</strong> as input and compare the DF3 output against <strong>Processed.webm</strong> — the Krisp-quality reference. Both files are in <code>/assets/</code>.</p>
-    </div>
+    <!-- Quality analysis (file mode — RAW is the reference) -->
+    <ng-container *ngIf="resultMode === 'file' && results">
+      <div class="analysis-bar">
+        <button class="btn btn-primary" (click)="runQualityAnalysis()"
+          [disabled]="quality?.analyzing">
+          {{ quality?.analyzing ? '⏳ Analysing…' : '▶ Run PESQ / STOI Analysis' }}
+        </button>
+        <span class="analysis-hint">Requires <code>python quality_server.py</code> running on port 8000</span>
+      </div>
+      <ng-container *ngTemplateOutlet="qualityTable"></ng-container>
+    </ng-container>
   </div>
 
-  <!-- ── Live Preview ── -->
+  <!-- ════════════════════════════════════════════════════════════
+       MODE 2 — Live Mic
+       ════════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎧</span>
-      Mode 2 — Live Preview
-      <span class="section-hint">Hear one filter at a time through headphones</span>
-    </div>
-
-    <!-- Filter selector -->
-    <div class="filter-toggle" *ngIf="!isLive">
-      <label class="toggle-label">Preview with:</label>
-      <label class="radio-opt" [class.active]="liveFilter === 'df3'">
-        <input type="radio" [(ngModel)]="liveFilter" value="df3" [disabled]="isBusy" />
-        DeepFilterNet3
-      </label>
-      <label class="radio-opt" [class.active]="liveFilter === 'koala'">
-        <input type="radio" [(ngModel)]="liveFilter" value="koala" [disabled]="isBusy" />
-        Koala
-      </label>
+      Mode 2 — Live Mic
+      <span class="section-hint">Hear all three channels simultaneously · toggle each on/off · level meters</span>
     </div>
 
     <div class="controls" *ngIf="!isLive">
@@ -140,171 +159,187 @@
     <div class="live-controls" *ngIf="isLive">
       <div class="live-indicator">
         <span class="live-dot"></span>
-        LIVE — {{ liveFilter === 'df3' ? 'DeepFilterNet3' : 'Koala' }} Active
+        LIVE — RAW (browser EC/NS) · DeepFilterNet3 · Koala all running
       </div>
-      <button class="btn btn-stop" (click)="stopLivePreview()">■ Stop Preview</button>
+      <button class="btn btn-stop" (click)="stopLivePreview()">■ Stop</button>
+    </div>
+
+    <!-- Three live channels (always shown while live) -->
+    <div class="three-col" *ngIf="isLive">
+
+      <div class="channel-card raw-card">
+        <div class="channel-label raw-label">🔴 RAW — Browser EC/NS</div>
+        <div class="channel-sub">echoCancellation · noiseSuppression · autoGainControl ON</div>
+        <button class="hear-btn" [class.muted]="!liveHear.raw" (click)="toggleHear('raw')">
+          {{ liveHear.raw ? '🔊 Hearing' : '🔇 Muted' }}
+        </button>
+        <div class="meter-bar">
+          <div class="meter-fill raw-fill" [style.width.%]="meterPct(liveLevels.raw)"></div>
+        </div>
+        <div class="meter-val">{{ liveLevels.raw }} dBFS</div>
+      </div>
+
+      <div class="channel-card df3-card">
+        <div class="channel-label df3-label">🟢 DeepFilterNet3</div>
+        <div class="channel-sub">ONNX AudioWorklet · no browser processing on source</div>
+        <button class="hear-btn" [class.muted]="!liveHear.df3" (click)="toggleHear('df3')">
+          {{ liveHear.df3 ? '🔊 Hearing' : '🔇 Muted' }}
+        </button>
+        <div class="meter-bar">
+          <div class="meter-fill df3-fill" [style.width.%]="meterPct(liveLevels.df3)"></div>
+        </div>
+        <div class="meter-val">{{ liveLevels.df3 }} dBFS</div>
+      </div>
+
+      <div class="channel-card koala-card">
+        <div class="channel-label koala-label">🔵 Koala (Picovoice)</div>
+        <div class="channel-sub">WASM · ~150 ms latency · input level shown</div>
+        <button class="hear-btn" [class.muted]="!liveHear.koala" (click)="toggleHear('koala')">
+          {{ liveHear.koala ? '🔊 Hearing' : '🔇 Muted' }}
+        </button>
+        <div class="meter-bar">
+          <div class="meter-fill koala-fill" [style.width.%]="meterPct(liveLevels.koala)"></div>
+        </div>
+        <div class="meter-val">{{ liveLevels.koala }} dBFS</div>
+      </div>
+
     </div>
   </div>
 
-  <!-- ── A/B/C Recording ── -->
+  <!-- ════════════════════════════════════════════════════════════
+       MODE 3 — Recording
+       ════════════════════════════════════════════════════════════ -->
   <div class="section">
     <div class="section-title">
       <span class="section-icon">🎙️</span>
-      Mode 3 — A/B/C Comparison Recording
-      <span class="section-hint">Records Raw + DeepFilterNet3 + Koala simultaneously from the same mic</span>
+      Mode 3 — Recording
+      <span class="section-hint">Records RAW + DF3 + Koala simultaneously · lossless WAV · PESQ/STOI analysis</span>
     </div>
 
     <div class="controls" *ngIf="!isRecording">
-      <button class="btn btn-record" (click)="startABCRecording()"
+      <button class="btn btn-record" (click)="startRecording()"
         [disabled]="isLive || isBusy">
         ⏺ Start Recording
       </button>
     </div>
 
-    <div class="controls" *ngIf="isRecording">
-      <button class="btn btn-stop" (click)="stopABCRecording()">
-        ■ Stop &amp; Compare
-      </button>
+    <div class="live-controls" *ngIf="isRecording">
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        Recording — {{ recordDuration }}s · RAW + DeepFilterNet3 + Koala
+      </div>
+      <button class="btn btn-stop" (click)="stopRecording()">■ Stop &amp; Save</button>
     </div>
 
-    <!-- Three-way players -->
-    <div class="players-three" *ngIf="rawUrl || df3Url || koalaUrl">
+    <!-- Three-column playback results -->
+    <div class="three-col" *ngIf="resultMode === 'record' && results">
 
-      <div class="player-card raw">
-        <div class="player-label"><span>🔴</span> Raw Microphone</div>
-        <div class="player-sub">No processing</div>
-        <audio [src]="rawUrl!" controls *ngIf="rawUrl"></audio>
-        <div class="placeholder" *ngIf="!rawUrl">—</div>
+      <div class="channel-card raw-card">
+        <div class="channel-label raw-label">🔴 RAW — Browser EC/NS</div>
+        <div class="channel-sub">Browser built-in processing · 16-bit PCM · 48 kHz</div>
+        <audio [src]="results.raw.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('raw')">⬇ Download</button>
       </div>
 
-      <div class="player-card df3">
-        <div class="player-label"><span>🟢</span> DeepFilterNet3</div>
-        <div class="player-sub">ONNX · AudioWorklet</div>
-        <audio [src]="df3Url!" controls *ngIf="df3Url"></audio>
-        <div class="placeholder loading-ph" *ngIf="!df3Url && status === 'processing'">Processing…</div>
-        <div class="placeholder" *ngIf="!df3Url && status !== 'processing'">—</div>
+      <div class="channel-card df3-card">
+        <div class="channel-label df3-label">🟢 DeepFilterNet3</div>
+        <div class="channel-sub">ONNX AudioWorklet · suppression {{ suppressionLevel }}/100 · 48 kHz</div>
+        <audio [src]="results.df3.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('df3')">⬇ Download</button>
       </div>
 
-      <div class="player-card koala">
-        <div class="player-label"><span>🔵</span> Koala (Picovoice)</div>
-        <div class="player-sub">WASM · 16 kHz WAV</div>
-        <audio [src]="koalaUrl!" controls *ngIf="koalaUrl"></audio>
-        <div class="placeholder loading-ph" *ngIf="!koalaUrl && status === 'processing'">Processing…</div>
-        <div class="placeholder" *ngIf="!koalaUrl && status !== 'processing'">—</div>
+      <div class="channel-card koala-card">
+        <div class="channel-label koala-label">🔵 Koala (Picovoice)</div>
+        <div class="channel-sub">WASM · 16 kHz output</div>
+        <audio [src]="results.koala.url" controls></audio>
+        <button class="btn-dl" (click)="downloadWav('koala')">⬇ Download</button>
       </div>
 
     </div>
+
+    <!-- Quality analysis (record mode — RAW is the reference) -->
+    <ng-container *ngIf="resultMode === 'record' && results">
+      <div class="analysis-bar">
+        <button class="btn btn-primary" (click)="runQualityAnalysis()"
+          [disabled]="quality?.analyzing">
+          {{ quality?.analyzing ? '⏳ Analysing…' : '▶ Run PESQ / STOI Analysis' }}
+        </button>
+        <span class="analysis-hint">Requires <code>python quality_server.py</code> running on port 8000</span>
+      </div>
+      <ng-container *ngTemplateOutlet="qualityTable"></ng-container>
+    </ng-container>
   </div>
 
-  <!-- ── Comparison Report ── -->
-  <div class="section report-section" *ngIf="df3Metrics">
-    <div class="section-title">
-      <span class="section-icon">📊</span>
-      Comparison Report
-      <span class="section-hint">Measured automatically during the recording session</span>
+  <!-- ════════════════════════════════════════════════════════════
+       Shared Quality Table Template
+       ════════════════════════════════════════════════════════════ -->
+  <ng-template #qualityTable>
+
+    <!-- Server offline warning -->
+    <div class="server-offline" *ngIf="quality?.serverError">
+      ⚠️ {{ quality!.serverError }}
     </div>
 
-    <div class="metrics-grid">
+    <!-- Metrics table -->
+    <div class="quality-grid" *ngIf="quality && !quality.serverError && !quality.analyzing">
 
-      <!-- DF3 metrics -->
-      <div class="metrics-col">
-        <div class="metrics-header df3-header">🟢 DeepFilterNet3</div>
-        <table class="metrics-table">
-          <tbody>
-            <tr><td class="ml">Init Time</td><td class="mv">{{ df3Metrics.initTimeMs }} ms</td></tr>
-            <tr><td class="ml">Graph Setup</td><td class="mv">{{ df3Metrics.setupMs }} ms</td></tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr><td class="ml">Raw Energy</td><td class="mv">{{ df3Metrics.rawEnergyDb }} dBFS</td></tr>
-            <tr><td class="ml">Clean Energy</td><td class="mv">{{ df3Metrics.cleanEnergyDb }} dBFS</td></tr>
-            <tr>
-              <td class="ml">Noise Reduction</td>
-              <td class="mv">
-                <span class="nr-value" [class.nr-positive]="df3Metrics.noiseReductionDb > 0" [class.nr-negative]="df3Metrics.noiseReductionDb <= 0">
-                  {{ df3Metrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ df3Metrics.noiseReductionDb }} dB
-                </span>
-              </td>
-            </tr>
-            <tr><td class="ml separator" colspan="2"></td></tr>
-            <tr><td class="ml">Sample Rate</td><td class="mv">{{ df3Metrics.sampleRate }} Hz</td></tr>
-            <tr><td class="ml">Config</td><td class="mv">{{ df3Metrics.extraInfo }}</td></tr>
-          </tbody>
-        </table>
+      <div class="quality-header-row">
+        <div></div>
+        <div class="qh df3-qh">🟢 DeepFilterNet3</div>
+        <div class="qh koala-qh">🔵 Koala</div>
+        <div class="qh">Scale</div>
       </div>
 
-      <!-- VS divider + Koala metrics (only when Koala was active) -->
-      <ng-container *ngIf="koalaMetrics">
-        <div class="vs-col">
-          <div class="vs-badge">VS</div>
+      <div class="quality-row">
+        <div class="qm-label">PESQ (MOS-LQO)</div>
+        <div class="qm-val" [class]="pesqColor(quality.df3?.pesq ?? null)">
+          {{ quality.df3 ? quality.df3.pesq : '—' }}
         </div>
-
-        <div class="metrics-col">
-          <div class="metrics-header koala-header">🔵 Koala (Picovoice)</div>
-          <table class="metrics-table">
-            <tbody>
-              <tr><td class="ml">Init Time</td><td class="mv">{{ koalaMetrics.initTimeMs }} ms</td></tr>
-              <tr><td class="ml">Capture Setup</td><td class="mv">{{ koalaMetrics.setupMs }} ms</td></tr>
-              <tr><td class="ml separator" colspan="2"></td></tr>
-              <tr><td class="ml">Raw Energy</td><td class="mv">{{ koalaMetrics.rawEnergyDb }} dBFS</td></tr>
-              <tr><td class="ml">Clean Energy</td><td class="mv">{{ koalaMetrics.cleanEnergyDb }} dBFS</td></tr>
-              <tr>
-                <td class="ml">Noise Reduction</td>
-                <td class="mv">
-                  <span class="nr-value" [class.nr-positive]="koalaMetrics.noiseReductionDb > 0" [class.nr-negative]="koalaMetrics.noiseReductionDb <= 0">
-                    {{ koalaMetrics.noiseReductionDb > 0 ? '▼' : '▲' }} {{ koalaMetrics.noiseReductionDb }} dB
-                  </span>
-                </td>
-              </tr>
-              <tr><td class="ml separator" colspan="2"></td></tr>
-              <tr><td class="ml">Sample Rate</td><td class="mv">{{ koalaMetrics.sampleRate }} Hz</td></tr>
-              <tr><td class="ml">Config</td><td class="mv">{{ koalaMetrics.extraInfo }}</td></tr>
-            </tbody>
-          </table>
+        <div class="qm-val" [class]="pesqColor(quality.koala?.pesq ?? null)">
+          {{ quality.koala ? quality.koala.pesq : '—' }}
         </div>
-      </ng-container>
-    </div>
+        <div class="qm-scale">-0.5 → 4.5</div>
+      </div>
 
-    <!-- Winner banner (only when both filters ran) -->
-    <div class="winner-banner" *ngIf="koalaMetrics">
-      <span class="winner-label">📈 Higher Noise Reduction:</span>
-      <span class="winner-name">
-        {{ df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? '🟢 DeepFilterNet3' : '🔵 Koala' }}
-        ({{ (df3Metrics!.noiseReductionDb >= koalaMetrics.noiseReductionDb ? df3Metrics!.noiseReductionDb : koalaMetrics.noiseReductionDb) }} dB)
-      </span>
-    </div>
+      <div class="quality-row">
+        <div class="qm-label">STOI</div>
+        <div class="qm-val" [class]="pesqColor((quality.df3?.stoi ?? 0) * 4.5)">
+          {{ quality.df3 ? quality.df3.stoi : '—' }}
+        </div>
+        <div class="qm-val" [class]="pesqColor((quality.koala?.stoi ?? 0) * 4.5)">
+          {{ quality.koala ? quality.koala.stoi : '—' }}
+        </div>
+        <div class="qm-scale">0 → 1.0</div>
+      </div>
 
-    <!-- Notes + Download -->
-    <div class="notes-row">
-      <label class="notes-label">Notes — Subjective Observations</label>
-      <textarea class="notes-area" [(ngModel)]="userNotes" rows="3"
-        placeholder="e.g. DF3 removed fan hum better, Koala preserved voice more naturally…"></textarea>
-    </div>
+      <div class="quality-row">
+        <div class="qm-label">Rating</div>
+        <div class="qm-rating">{{ quality.df3?.pesq_label ?? '—' }}</div>
+        <div class="qm-rating">{{ quality.koala?.pesq_label ?? '—' }}</div>
+        <div></div>
+      </div>
 
-    <div class="download-row">
-      <button class="btn btn-download" (click)="downloadReport()">
-        ⬇ Download Comparison Report JSON
-      </button>
-      <span class="download-hint">noise-filter-comparison-&lt;timestamp&gt;.json</span>
     </div>
-  </div>
+  </ng-template>
 
-  <!-- How it works (idle only) -->
-  <div class="info-card" *ngIf="status === 'idle'">
+  <!-- How it works (idle) -->
+  <div class="info-card" *ngIf="status === 'idle' && !results && fileStatus === 'idle'">
     <div class="info-title">How it works</div>
     <div class="info-row">
       <span class="step-chip">1</span>
-      <span>Get a <strong>free Picovoice access key</strong> at <a href="https://console.picovoice.ai/" target="_blank">console.picovoice.ai</a> — no credit card, takes 30 seconds.</span>
+      <span><strong>Mode 1 — File:</strong> Upload any audio. RAW + DF3 (offline) + Koala (real-time) outputs produced. All three hearable and downloadable.</span>
     </div>
     <div class="info-row">
       <span class="step-chip">2</span>
-      <span>Paste the key above, set your <strong>DF3 suppression level</strong>, then use <strong>Live Preview</strong> to hear each filter individually.</span>
+      <span><strong>Mode 2 — Live:</strong> All three channels run simultaneously in real time. Toggle each channel's speaker on/off independently. Level meters show noise reduction live.</span>
     </div>
     <div class="info-row">
       <span class="step-chip">3</span>
-      <span><strong>A/B/C Recording</strong> records Raw + DeepFilterNet3 + Koala simultaneously from the same mic — the fairest comparison possible.</span>
+      <span><strong>Mode 3 — Recording:</strong> Records all three simultaneously as lossless WAV. After stopping, run PESQ/STOI quality analysis via the local Python server.</span>
     </div>
     <div class="info-row">
       <span class="step-chip">4</span>
-      <span>Listen to all three players, check the <strong>metrics report</strong>, and <strong>download JSON</strong> with both filter results for your records.</span>
+      <span><strong>PESQ/STOI:</strong> Start <code>python quality_server.py</code> in a terminal. Click "Run Analysis" — scores appear in ~2 seconds. RAW is the reference signal.</span>
     </div>
   </div>
 

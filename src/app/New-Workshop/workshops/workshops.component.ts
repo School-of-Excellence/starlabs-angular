@@ -14,6 +14,7 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EiflixBannerComponent } from '../eiflix-banner/eiflix-banner.component';
+import { WorkshopDialogComponent } from '../workshop-dialog/workshop-dialog.component';
 
 @Component({
   selector: 'app-workshops',
@@ -110,10 +111,29 @@ export class WorkshopsComponent {
 
   openEiflixBannerDialog() {
     this.dialog.open(EiflixBannerComponent, {
-      width: '900px',
-      maxHeight: '90vh',
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
       autoFocus: false,
       panelClass: 'eiflix-banner-dialog'
+    });
+  }
+  openRefferalcodeDialog() {
+    const dialogRef = this.dialog.open(WorkshopDialogComponent, {
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe(async (value: string | undefined) => {
+      if (!value) return;
+      try {
+        const ref = doc(this.firestore, 'static meta data', 'Subscriber Code');
+        await updateDoc(ref, { referralcode: value });
+        this.snackBar.open('Referral code updated successfully!', 'Close', { duration: 2000 });
+      } catch (error) {
+        console.error('Error updating referral code:', error);
+        this.snackBar.open('Error updating referral code. Please try again.', 'Close', { duration: 3000 });
+      }
     });
   }
 
@@ -123,6 +143,14 @@ export class WorkshopsComponent {
 
   async onWorkshopStatusChange(workshop: any, event: any): Promise<void> {
     const isActive = event.checked;
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(
+      `Are you sure you want to ${isActive ? 'activate' : 'deactivate'} "${title}"?`
+    );
+    if (!confirmed) {
+      event.source.checked = !isActive;
+      return;
+    }
     try {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
       await updateDoc(workshopRef, { active: isActive });
@@ -140,6 +168,14 @@ export class WorkshopsComponent {
 
   async onWorkshopCompletedChange(workshop: any, event: any): Promise<void> {
     const isCompleted = event.checked;
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(
+      `Are you sure you want to mark "${title}" as ${isCompleted ? 'completed' : 'pending'}?`
+    );
+    if (!confirmed) {
+      event.source.checked = !isCompleted;
+      return;
+    }
     try {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
       await updateDoc(workshopRef, { workshopcompleted: isCompleted });

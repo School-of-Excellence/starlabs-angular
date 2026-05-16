@@ -103,13 +103,13 @@
       <h1 class="dash-title">Content Upload</h1>
       <p class="dash-sub">Manage video content library</p>
     </div>
-    <div class="actions">
+    <div class="actions" style="display:flex; gap:10px;">
       <button class="btn-primary" (click)="newContent()">
       <mat-icon>add</mat-icon>
       <span>New Content</span>
     </button>
     <button class="btn-primary" (click)="exportToExcel()">
-      <mat-icon>add</mat-icon>
+      <mat-icon>download</mat-icon>
       <span>Export</span>
     </button>
     </div>
@@ -131,7 +131,7 @@
 
         <!-- S No -->
         <ng-container matColumnDef="serialNo">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-sno">#</th>
+          <th mat-header-cell *matHeaderCellDef class="col-sno">#</th>
           <td mat-cell *matCellDef="let data; let i = index" class="col-sno">
             <div class="sno-cell">
               <span class="c-date">{{ i + 1 }}</span>
@@ -176,15 +176,21 @@
         </ng-container>
         <!-- Thumbnail Size -->
         <ng-container matColumnDef="thumbnailsize">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Thumb Size</th>
+          <th mat-header-cell *matHeaderCellDef class="col-size">Thumb Size</th>
           <td mat-cell *matCellDef="let row" class="col-size">
             <span class="c-size">{{ row.thumbnailsize / 1000 | number:'1.0-0' }} KB</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Duration</th>
+          <td mat-cell *matCellDef="let row" class="col-size">
+            <span class="c-size">{{ formatDuration(row.duration) }}</span>
           </td>
         </ng-container>
 
         <!-- Available -->
         <ng-container matColumnDef="available">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Available</th>
+          <th mat-header-cell *matHeaderCellDef>Available</th>
           <td mat-cell *matCellDef="let row">
             <span class="status-badge" [class.active]="row.available" [class.deleted]="!row.available">
               {{ row.available ? 'Yes' : 'No' }}
@@ -194,7 +200,7 @@
 
         <!-- Converted to HLS -->
         <ng-container matColumnDef="convertedtohls">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>HLS</th>
+          <th mat-header-cell *matHeaderCellDef>HLS</th>
           <td mat-cell *matCellDef="let row">
             <span class="status-badge" (dblclick)="uploadToPublitio(row)" [class.active]="row.convertedtohls" [class.deleted]="!row.convertedtohls">
               {{ row.convertedtohls ? 'Yes' : 'No' }}
@@ -207,7 +213,7 @@
 
         <!-- Tags -->
         <ng-container matColumnDef="tags">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-tags">Tags</th>
+          <th mat-header-cell *matHeaderCellDef class="col-tags">Tags</th>
           <td mat-cell *matCellDef="let row" class="col-tags">
             <div class="tags-wrap">
               <span class="chip chip-sm" *ngFor="let tag of row.tags || []">{{ mapTaxonomy[tag] }}</span>

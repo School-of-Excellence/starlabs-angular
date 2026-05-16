@@ -9,7 +9,11 @@ import {
   updateDoc,
   getDoc,
   setDoc,
-  onSnapshot
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  getDocs,
+  serverTimestamp
 } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from '@angular/fire/storage';
 import { MatCardModule } from '@angular/material/card';
@@ -27,20 +31,25 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { MatDialogRef } from '@angular/material/dialog';
 
 
 interface Banner {
+  id?: string;
   title: string;
   description: string;
   seriesRefId: string;
   seriesName?: string;
   buttonname: string;
-  externallink:string;
+  externallink: string;
   path: string;
   imageUrl: string;
+  imageUrlApp: string;
   videoUrl: string;
   timestamp: number;
   enable: boolean;
+  enableapp: boolean;
+  order?: number;
 }
 
 @Component({
@@ -78,16 +87,17 @@ export class EiflixBannerComponent implements AfterViewInit {
   seriesList: any[] = [];
 
   imagePreview: string | null = null;
+  imagePreviewApp: string | null = null;
   videoPreview: string | null = null;
 
   isUploading = false;
   uploadProgress = 0;
 
-  displayedColumns: string[] = ['image', 'title', 'description', 'seriesName', 'actions'];
+  displayedColumns: string[] = ['drag', 'image', 'title', 'seriesName', 'status', 'actions'];
   dataSource = new MatTableDataSource<Banner>([]);
   searchText = '';
 
-  priority;
+  priority: string = 'workshop';
 
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
@@ -97,15 +107,18 @@ export class EiflixBannerComponent implements AfterViewInit {
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private storage: Storage,
+    private dialogRef: MatDialogRef<EiflixBannerComponent>
   ) {
     this.form = this.fb.group({
       title: ['', Validators.required],
       description: ['', Validators.required],
       path: ['DeepLink', Validators.required],
-      enable:[true, Validators.required],
+      enable: [true, Validators.required],
+      enableapp: [true, Validators.required],
       seriesId: [''],
       externallink: [''],
       image: [null, Validators.required],
+      imageApp: [null, Validators.required],
       video: [null, Validators.required],
       buttonname: ['']
     });
@@ -117,35 +130,36 @@ export class EiflixBannerComponent implements AfterViewInit {
   ngAfterViewInit() {
     this.dataSource.sort = this.sort;
     this.dataSource.paginator = this.paginator;
-    
-    // Custom filter predicate
     this.dataSource.filterPredicate = (data: Banner, filter: string) => {
       const searchStr = filter.toLowerCase();
       return data.title.toLowerCase().includes(searchStr) ||
-             data.description.toLowerCase().includes(searchStr) ||
-             (data.seriesName?.toLowerCase().includes(searchStr) || false)
+        data.description.toLowerCase().includes(searchStr) ||
+        (data.seriesName?.toLowerCase().includes(searchStr) || false);
     };
   }
 
-  loadSeries() {
+  async loadSeries() {
     const seriesRef = collection(this.firestore, 'series');
-    collectionData(seriesRef, { idField: 'id' }).subscribe(data => {
-      this.seriesList = data;
-      // Update series names in table data
-      this.updateSeriesNames();
-    });
+    const snapshot = await getDocs(seriesRef);
+    this.seriesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    this.updateSeriesNames();
   }
 
-  loadBanners() {
+  async loadPriority() {
     const docRef = doc(this.firestore, 'static meta data', 'EiFlix Banner');
-    onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const banners = docSnap.data()['banner'] || [];
-        this.priority = docSnap.data()['priority'] || 'workshop';
-        this.dataSource.data = banners;
-        this.updateSeriesNames();
-      }
-    });
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      this.priority = docSnap.data()['priority'] || 'workshop';
+    }
+  }
+  async loadBanners() {
+    const bannerRef = collection(this.firestore, 'eiflixbanner');
+    const snapshot = await getDocs(bannerRef);
+    const data: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    data.sort((a, b) => (a.order || 0) - (b.order || 0));
+    this.dataSource.data = data;
+    this.updateSeriesNames();
+    this.loadPriority();
   }
 
   updateSeriesNames() {
@@ -154,7 +168,7 @@ export class EiflixBannerComponent implements AfterViewInit {
         const series = this.seriesList.find(s => s.id === banner.seriesRefId);
         return {
           ...banner,
-          seriesName: series?.seriesName || 'Unknown'
+          seriesName: series?.seriesName || (banner.path === 'DeepLink' ? 'Unknown' : null)
         };
       });
       this.dataSource.data = updatedData;
@@ -183,6 +197,16 @@ export class EiflixBannerComponent implements AfterViewInit {
     }
   }
 
+  onImageSelectedApp(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.form.patchValue({ imageApp: file });
+      const reader = new FileReader();
+      reader.onload = () => this.imagePreviewApp = reader.result as string;
+      reader.readAsDataURL(file);
+    }
+  }
+
   onVideoSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
@@ -192,16 +216,16 @@ export class EiflixBannerComponent implements AfterViewInit {
       reader.readAsDataURL(file);
     }
   }
+
   onPathChange() {
     const path = this.form.get('path')?.value;
 
     if (path === 'DeepLink') {
       this.form.get('externallink')?.setValue('');
       this.form.get('externallink')?.clearValidators();
-      
+
       this.form.get('seriesId')?.setValidators([Validators.required]);
       this.form.get('seriesId')?.setValue('');
-
     } else if (path === 'External Link') {
       this.form.get('seriesId')?.setValue('');
       this.form.get('seriesId')?.clearValidators();
@@ -218,26 +242,28 @@ export class EiflixBannerComponent implements AfterViewInit {
     const formValue = this.form.value;
 
     if (!formValue.title || !formValue.description) {
-      this.snackBar.open("Please fill all fields", "OK", { duration: 2000 });
+      this.snackBar.open('Please fill all fields', 'OK', { duration: 2000 });
       return;
     }
 
     this.isUploading = true;
-    this.uploadProgress = 0;
 
     try {
-      const docRef = doc(this.firestore, 'static meta data', 'EiFlix Banner');
-      const docSnap = await getDoc(docRef);
+      const bannerRef = collection(this.firestore, 'eiflixbanner');
+      const isEdit = !!this.editingBanner?.id;
 
-      let existing: Banner[] = docSnap.exists() ? docSnap.data()['banner'] || [] : [];
+      let imageUrl = isEdit ? (this.editingBanner!.imageUrl || '') : '';
+      let imageUrlApp = isEdit ? (this.editingBanner!.imageUrlApp || '') : '';
+      let videoUrl = isEdit ? (this.editingBanner!.videoUrl || '') : '';
 
-      let imageUrl = this.editingBanner?.imageUrl || '';
-      let videoUrl = this.editingBanner?.videoUrl || '';
-
-      // Only upload if NEW FILE selected
       if (formValue.image instanceof File) {
         const imageRef = ref(this.storage, `eiflixbanner/images/${Date.now()}_${formValue.image.name}`);
         imageUrl = await this.uploadWithProgress(imageRef, formValue.image, 0, 50);
+      }
+
+      if (formValue.imageApp instanceof File) {
+        const imageRef = ref(this.storage, `eiflixbanner/images/${Date.now()}_${formValue.imageApp.name}`);
+        imageUrlApp = await this.uploadWithProgress(imageRef, formValue.imageApp, 0, 50);
       }
 
       if (formValue.video instanceof File) {
@@ -245,53 +271,56 @@ export class EiflixBannerComponent implements AfterViewInit {
         videoUrl = await this.uploadWithProgress(videoRef, formValue.video, 50, 100);
       }
 
-      const updatedBanner: Banner = {
+      const payload: any = {
         title: formValue.title,
         description: formValue.description,
         path: formValue.path,
-        enable: formValue.enable,
-        seriesRefId: formValue.seriesId,
+        enable: formValue.enable ?? true,
+        enableapp: formValue.enableapp ?? true,
+        seriesRefId: formValue.seriesId || '',
         buttonname: formValue.buttonname || '',
         externallink: formValue.externallink || '',
-        imageUrl: imageUrl,
-        videoUrl: videoUrl,
-        timestamp: this.currentEditIndex !== null 
-          ? this.editingBanner!.timestamp
-          : Date.now()
+        imageUrl: imageUrl || '',
+        imageUrlApp: imageUrlApp || '',
+        videoUrl: videoUrl || '',
+        timestamp: serverTimestamp()
       };
 
-      if (this.currentEditIndex !== null) {
-        existing[this.currentEditIndex] = updatedBanner;
+      if (isEdit) {
+        await updateDoc(doc(this.firestore, 'eiflixbanner', this.editingBanner!.id!), payload);
+        this.snackBar.open('Banner updated!', 'OK', { duration: 2000 });
       } else {
-        existing.push(updatedBanner);
+        const snapshot = await getDocs(bannerRef);
+        let maxOrder = 0;
+        snapshot.forEach((docSnap) => {
+          const data: any = docSnap.data();
+          if (data.order && data.order > maxOrder) {
+            maxOrder = data.order;
+          }
+        });
+        await addDoc(bannerRef, { ...payload, order: maxOrder + 1 });
+        this.snackBar.open('Banner added!', 'OK', { duration: 2000 });
       }
 
-      await updateDoc(docRef, { banner: existing });
-
-      this.snackBar.open(
-        this.currentEditIndex !== null ? "Banner updated successfully!" : "Banner saved successfully!",
-        "OK", 
-        { duration: 2000 }
-      );
-
+      await this.loadBanners();
       this.resetForm();
-      this.currentEditIndex = null;
-      this.editingBanner = null;
+
     } catch (error) {
-      console.error('Error saving banner:', error);
-      this.snackBar.open("Error saving banner", "OK", { duration: 2000 });
+      console.error(error);
+      this.snackBar.open('Error saving banner', 'OK', { duration: 2000 });
     } finally {
       this.isUploading = false;
-      this.uploadProgress = 0;
     }
   }
 
-
   resetForm() {
     this.form.reset({
-      path: 'DeepLink'
+      path: 'DeepLink',
+      enable: true,
+      enableapp:true
     });
     this.imagePreview = null;
+    this.imagePreviewApp = null;
     this.videoPreview = null;
     this.currentEditIndex = null;
     this.editingBanner = null;
@@ -305,51 +334,35 @@ export class EiflixBannerComponent implements AfterViewInit {
       title: banner.title,
       description: banner.description,
       path: banner.path,
-      enable: banner.enable,
+      enable: banner.enable ?? false,
+      enableapp: banner.enableapp ?? false,
       seriesId: banner.seriesRefId || '',
       externallink: banner.externallink || '',
       buttonname: banner.buttonname || ''
     });
 
     this.imagePreview = banner.imageUrl;
+    this.imagePreviewApp = banner.imageUrlApp;
     this.videoPreview = banner.videoUrl;
 
     this.tabGroup.selectedIndex = 0;
   }
 
-  async deleteBanner(banner: Banner, index: number) {
-    if (!confirm('Are you sure you want to delete this banner?')) return;
+  async togglePlatform(banner: any, platform: 'web' | 'app') {
+    const field = platform === 'web' ? 'enable' : 'enableapp';
+    const newValue = !banner[field];
+    await updateDoc(doc(this.firestore, 'eiflixbanner', banner.id), {
+      [field]: newValue
+    });
+    banner[field] = newValue;
+  }
 
-    try {
-      if (banner.imageUrl) {
-        try {
-          const imageRef = ref(this.storage, banner.imageUrl);
-          await deleteObject(imageRef);
-        } catch (e) {
-          console.log('Image already deleted or not found');
-        }
-      }
-      if (banner.videoUrl) {
-        try {
-          const videoRef = ref(this.storage, banner.videoUrl);
-          await deleteObject(videoRef);
-        } catch (e) {
-          console.log('Video already deleted or not found');
-        }
-      }
-      const docRef = doc(this.firestore, 'static meta data', 'EiFlix Banner');
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        let banners: Banner[] = docSnap.data()['banner'] || [];
-        banners = banners.filter((_, i) => i !== index);
-        await updateDoc(docRef, { banner: banners });
-        this.snackBar.open("Banner deleted successfully!", "OK", { duration: 2000 });
-      }
-    } catch (error) {
-      console.error('Error deleting banner:', error);
-      this.snackBar.open("Error deleting banner", "OK", { duration: 2000 });
-    }
+  async deleteBanner(banner: any, index?: number) {
+    if (!confirm('Delete this banner?')) return;
+    await deleteDoc(doc(this.firestore, 'eiflixbanner', banner.id));
+    await this.loadBanners();
+    this.snackBar.open('Deleted!', 'OK', { duration: 2000 });
+    
   }
 
   formatDate(timestamp: number): string {
@@ -390,20 +403,6 @@ export class EiflixBannerComponent implements AfterViewInit {
       );
     });
   }
-  async toggleEnable(banner: Banner) {
-    const docRef = doc(this.firestore, 'static meta data', 'EiFlix Banner');
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) return;
-
-    let banners: Banner[] = docSnap.data()['banner'] || [];
-    const index = banners.findIndex(b => b.timestamp === banner.timestamp);
-
-    if (index !== -1) {
-      banners[index].enable = !banners[index].enable;
-      await updateDoc(docRef, { banner: banners });
-      this.snackBar.open("Status changed!", "OK", { duration: 2000 });
-    }
-  }
 
   private getMimeType(filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -425,28 +424,37 @@ export class EiflixBannerComponent implements AfterViewInit {
   }
 
   dropTable(event: CdkDragDrop<Banner[]>) {
-    const prev = [...this.dataSource.data];
     moveItemInArray(this.dataSource.data, event.previousIndex, event.currentIndex);
     this.dataSource.data = [...this.dataSource.data];
     this.saveBannerOrder();
   }
 
   async saveBannerOrder() {
-    const docRef = doc(this.firestore, 'static meta data', 'EiFlix Banner');
     try {
-      await updateDoc(docRef, { banner: this.dataSource.data });
+      const updates = this.dataSource.data.map((banner, index) => {
+        return updateDoc(
+          doc(this.firestore, 'eiflixbanner', banner.id!),
+          { order: index + 1 }
+        );
+      });
+
+      await Promise.all(updates);
       this.snackBar.open('Order updated!', 'OK', { duration: 1500 });
     } catch (e) {
       this.snackBar.open('Failed to update order', 'OK', { duration: 2500 });
     }
   }
+
   async workshopPriority() {
     const docRef = doc(this.firestore, 'static meta data', 'EiFlix Banner');
     try {
       await updateDoc(docRef, { priority: this.priority });
       this.snackBar.open('Priority updated!', 'OK', { duration: 1500 });
     } catch (e) {
-      this.snackBar.open('Failed to update order', 'OK', { duration: 2500 });
+      this.snackBar.open('Failed to update priority', 'OK', { duration: 2500 });
     }
+  }
+  closeDialog() {
+    this.dialogRef.close();
   }
 }

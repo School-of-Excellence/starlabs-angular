@@ -29,6 +29,7 @@ import * as XLSX from 'xlsx';
 import { MatChipInputEvent } from '@angular/material/chips';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { getDoc } from 'firebase/firestore';
 
 // Per-variable source type
 export type VariableSource = 'static' | 'analytics' | 'sheet';
@@ -180,6 +181,7 @@ export class EmailInputComponent {
       this.auth.getRoles().then((e: any) => this.bufferDoc.createdby = e['profile_ref'].id);
       this.auth.getProfileMap().then((e: any) => this.mapProfileEmail = e.mapEmailData);
       this.fetchTemplates();
+      this.fetchPostmarkSenders();
       this.fetchProfiles();
       this.fetchQueuedEmails();
     } else {
@@ -194,8 +196,19 @@ export class EmailInputComponent {
     this.destroy$.complete();
   }
 
-  // ─── Firestore ───────────────────────────────────────────────────────────────
+  fetchPostmarkSenders(){
+    docData(doc(this.firestore,'classify','postmarkserver')).subscribe((senders)=>{
+      console.log('Sender Emails:',senders);
+      
+      this.fromEmails = senders['senderemails'] || [
+        'starlabs@excellenceinstallation.com',
+        'support@intl.soexcellence.com'
+      ];
+    });
+  }
 
+
+  // ─── Firestore ───────────────────────────────────────────────────────────────
   async fetchTemplates() {
     const q = query(
       collection(this.firestore, 'email templates'),

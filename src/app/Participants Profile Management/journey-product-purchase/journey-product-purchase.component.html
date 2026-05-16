@@ -22,6 +22,10 @@
           </mat-form-field>
   
           <mat-form-field class="inputfield" appearance="outline">
+            <mat-label>Purchase Date</mat-label>
+            <input matInput [value]="journey.purchasedate ? (journey.purchasedate | date) : ''" disabled>
+          </mat-form-field>
+          <mat-form-field class="inputfield" appearance="outline">
             <mat-label>Subscription Start</mat-label>
             <input matInput [(ngModel)]="journey.subscriptionstart" [matDatepicker]="pickerstart" (click)="pickerstart.open()" autocomplete="off">
             <mat-datepicker-toggle matSuffix [for]="pickerstart"></mat-datepicker-toggle>
@@ -98,6 +102,10 @@
             <mat-hint class="text-danger" *ngIf="validationMode && purchase.watsonpurchaseid == null">
               Required
             </mat-hint>
+          </mat-form-field>
+          <mat-form-field class="inputfield" appearance="outline">
+            <mat-label>Purchase Date</mat-label>
+            <input matInput [value]="purchase.purchasedate ? (purchase.purchasedate | date) : ''" disabled>
           </mat-form-field>
           <mat-form-field *ngIf="purchase.purchasetype == 'product'" class="inputfield" appearance="outline">
             <mat-label>Subscription Start</mat-label>

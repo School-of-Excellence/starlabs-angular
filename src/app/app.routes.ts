@@ -267,9 +267,8 @@ export const routes: Routes = [
   {path: 'bigeventmentor', loadComponent: () => import('./New-Workshop/bigeventmentor/bigeventmentor.component').then(m => m.BigeventmentorComponent),canActivate:[authGuard]},
   // Evolution Mapping
   {path: 'evolutionmapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
-  {path: 'evolutionmappingnew', loadComponent: () => import('./EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component').then(m => m.EvolutionMappingNewComponent), canActivate:[authGuard]},
+  {path: 'participant_videos_mapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component').then(m => m.EvolutionMappingNewComponent), canActivate:[authGuard]},
   {path: 'participantevolution', loadComponent: () => import('./EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component').then(m => m.ParticipantEvolutionMappingComponent), canActivate:[authGuard]},
-  {path: 'evolutionmappingv2', loadComponent: () => import('./EvolutionMapping/evolution-mapping-v2/evolution-mapping-v2.component').then(m => m.EvolutionMappingV2Component), canActivate:[authGuard]},
   // Taxonomy
   {path: 'updateprofiletaxonomy', loadComponent: () => import('./AppEngagement/taxonomy/update-adjustment-taxonomy/update-adjustment-taxonomy.component').then(m => m.UpdateAdjustmentTaxonomyComponent), canActivate:[authGuard]},
 
@@ -319,6 +318,9 @@ export const routes: Routes = [
 
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
+
+  {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
+
 ];
 
 // import { Routes } from '@angular/router';

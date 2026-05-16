@@ -169,14 +169,64 @@
     </div>
   
     
+    <!-- Expanded profile image overlay -->
+    <div *ngIf="expandedImage" class="image-lightbox" (click)="expandedImage = null">
+      <button type="button" class="image-lightbox__close" (click)="expandedImage = null; $event.stopPropagation()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <img class="image-lightbox__img" [src]="expandedImage" (click)="$event.stopPropagation()" alt="Profile image">
+    </div>
+
     <!-- Live Assignment -->
     <div *ngIf="liveAssignment != null">
       <div class="mainheading">
-        <span class="title h5">You are with Participant "{{mapProfile[liveAssignment["token"]?.profile_id]}}" {{liveAssignment["stagename"]}} Stage</span><br>
-        <div class="studiopeople font-italic">
-          <span>Participant Product:</span>
-          <span> {{liveAssignment["token"]?.productname}}</span>
-          <span *ngIf="liveAssignment['token']?.variationid != null"> - ({{mapVariationName[liveAssignment['token']?.variationid]}})</span>
+        <div class="profile-card">
+          <div class="profile-card__cover">
+            <span class="profile-card__eyebrow">You are with</span>
+          </div>
+
+          <div class="profile-card__avatar"
+            [class.profile-card__avatar--image]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+            [class.profile-card__avatar--clickable]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+            (click)="(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile) && (expandedImage = (mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile))">
+            <img *ngIf="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+              [src]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
+              [alt]="mapProfile[liveAssignment['token']?.profile_id]">
+            <span *ngIf="!(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile)">
+              {{ (mapProfile[liveAssignment["token"]?.profile_id] || '?').charAt(0) | uppercase }}
+            </span>
+            <span class="profile-card__status-dot"></span>
+          </div>
+
+          <div class="profile-card__body">
+            <h3 class="profile-card__name">{{ mapProfile[liveAssignment["token"]?.profile_id] }}</h3>
+            <div class="profile-card__role">
+              <mat-icon>workspace_premium</mat-icon>
+              {{ liveAssignment["stagename"] }} Stage
+            </div>
+
+            <div *ngIf="participantUPVisitLabel" class="profile-card__up-chip">
+              <mat-icon>celebration</mat-icon>
+              They are {{ participantUPVisitLabel }} at uP!
+            </div>
+
+            <div class="profile-card__divider"></div>
+
+            <div class="profile-card__info">
+              <div class="profile-card__info-row">
+                <mat-icon class="profile-card__info-icon">inventory_2</mat-icon>
+                <div class="profile-card__info-content">
+                  <span class="profile-card__info-label">Product</span>
+                  <span class="profile-card__info-value">
+                    {{ liveAssignment["token"]?.productname }}
+                    <span *ngIf="liveAssignment['token']?.variationid != null" class="profile-card__info-sub">
+                      · {{ mapVariationName[liveAssignment['token']?.variationid] }}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <!-- (<span class="studiopeople" *ngFor="let specialist of liveAssignment['pairing']; let i = index">{{mapProfile[specialist]}}{{i+1 == liveAssignment['pairing'].length ? '' : ', '}}</span>) -->
         <div class="statusmessage" *ngIf="ongoingQueue['zoomlinkrequired'] != false && [false,undefined].includes(ongoingQueue['enablezoommeetingsdk']) && selectedStudio['openvidu'] != true">
@@ -204,7 +254,7 @@
         <div class="w-100 text-left">
           <button mat-stroked-button (click)="inviteMore(false)">Invite More Participant in this Studio</button>
         </div>
-  
+
         <!-- form -->
         <div *ngIf="participantForm.length != 0" class="widgetbox mat-elevation-z2">
           <span class="actiontitle">Forms submitted by the Participant</span>
@@ -247,6 +297,57 @@
             </button>
           </div>
   
+          <!-- Get Previous ATC (only on Diagnostics stage) -->
+          <div class="previous-atc-card" *ngIf="liveAssignment['participantid'] && liveAssignment['stagename']?.toLowerCase() === 'diagnostics'" [class.previous-atc-card--open]="showPreviousATC">
+            <button type="button" class="previous-atc-toggle" (click)="showPreviousATC = !showPreviousATC" [attr.aria-expanded]="showPreviousATC">
+              <span class="previous-atc-toggle__icon">
+                <mat-icon>history</mat-icon>
+              </span>
+              <span class="previous-atc-toggle__text">
+                <span class="previous-atc-toggle__title">Previous ATC History</span>
+                <span class="previous-atc-toggle__subtitle">Show all the previous ATC prescribed to {{ mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+              </span>
+              <mat-icon class="previous-atc-toggle__chevron">{{ showPreviousATC ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            <div class="previous-atc-body" *ngIf="showPreviousATC">
+              <app-view-participant-atc [profileid]="liveAssignment['participantid']"></app-view-participant-atc>
+            </div>
+          </div>
+
+          <!-- Show Love Letter (only on Diagnostics stage) -->
+          <div class="previous-atc-card love-letter-card" *ngIf="liveAssignment['participantid'] && liveAssignment['stagename']?.toLowerCase() === 'diagnostics'" [class.previous-atc-card--open]="showLoveLetter">
+            <button type="button" class="previous-atc-toggle" (click)="toggleLoveLetter()" [attr.aria-expanded]="showLoveLetter">
+              <span class="previous-atc-toggle__icon">
+                <mat-icon>favorite</mat-icon>
+              </span>
+              <span class="previous-atc-toggle__text">
+                <span class="previous-atc-toggle__title">Love Letters</span>
+                <span class="previous-atc-toggle__subtitle">Show all the love letters from {{ mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+              </span>
+              <mat-icon class="previous-atc-toggle__chevron">{{ showLoveLetter ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            <div class="previous-atc-body" *ngIf="showLoveLetter">
+              <div *ngIf="loveLetterLoading" class="love-letter-loading">Loading love letters...</div>
+              <div *ngIf="!loveLetterLoading && loveLetterList.length === 0" class="love-letter-empty">
+                <mat-icon>inbox</mat-icon>
+                <span>No love letters found for this participant.</span>
+              </div>
+              <div *ngIf="!loveLetterLoading && loveLetterList.length > 0" class="love-letter-list">
+                <div class="love-letter-item" *ngFor="let letter of loveLetterList; let i = index">
+                  <div class="love-letter-item__header">
+                    <span class="love-letter-item__index">{{ i + 1 }}.</span>
+                    <span class="love-letter-item__name">{{ mapProfile[letter.profileid] || mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+                    <span class="love-letter-item__date">
+                      {{ (letter.created?.toDate ? letter.created.toDate() : letter.created) | date:'medium' }}
+                    </span>
+                  </div>
+                  <div class="love-letter-item__label">Love Letter</div>
+                  <div class="love-letter-item__content" [innerHTML]="letter.loveletter || '-'"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Prescribed Alpha ATC List -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('prescribedvalidatedatc')">
             <span class="actiontitle">ATC Prescribed to the Participant</span>
