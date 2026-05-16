@@ -55,6 +55,7 @@ export class JourneyEntryComponent implements OnInit {
   atcModelList = []
   videos = []
   attachments: Array<{ name: string; type: string; size: number; uploadedAt: Timestamp; url: string }> = [];
+  sequenceno : number = 0;
   readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
   uploadProgress: number | null = null;
 
@@ -96,6 +97,7 @@ export class JourneyEntryComponent implements OnInit {
           playlist : data.playlist ?? []
         })
         this.attachments = data.attachments ?? [];
+        this.sequenceno = data['sequence'] ?? 0;
       }
     }
     this.loadJourneyData()
@@ -170,7 +172,8 @@ export class JourneyEntryComponent implements OnInit {
       type: value.type ?? null,
       atcmodel: value.atcmodel ?? null,
       playlist : (value.playlist ?? []).length == 0 ? null : value.playlist,
-      attachments: this.attachments
+      attachments: this.attachments,
+      sequence : this.sequenceno
     };
     if(this.data !== null){
       const jouneyDoc = doc(this.journeyCollection,this.data.id)
