@@ -1,11 +1,11 @@
-import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { CommonModule, formatDate } from '@angular/common';
+import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -34,6 +34,9 @@ interface purchaseProduct {
   unlimited: any
   participantproductid: any
   deliverytype: any
+  rowlogs?: any
+  _initiationNote?: string
+  _statusBefore?: any
 }
 
 interface ParticipantPurchase {
@@ -48,6 +51,9 @@ interface ParticipantPurchase {
   watsonpurchaseid: any
   watsonpurchaselabel: any
   products: Array<purchaseProduct>
+  journeyproductlogs?: any
+  purchaselogs?: any
+  removedProductLogs?: any
 }
 
 
@@ -71,6 +77,7 @@ interface ParticipantPurchase {
     MatNativeDateModule,
     MatSelectModule,
     MatDividerModule,
+    MatDialogModule,
     CdkDropList,
     DragDropModule
   ],
@@ -120,6 +127,52 @@ export class JourneyProductPurchaseComponent {
   // mapProductDelivery = {}
   mapMinimumRequiredAmount:any = {}
   watsonDatabase: any;
+  loggedinprofileid = null
+  pendingChanges = []
+  pendingDeletes = []
+  fieldLabels = {
+    participantsproduct: {
+      journeyref: "Journey",
+      productref: "Product",
+      packageref: "Package",
+      tentativestart: "Tentative Start",
+      minimumpayment: "Minimum Payment",
+      status: "Product Status",
+      subscriptionstart: "Subscription Start",
+      subscriptionend: "Subscription End",
+      unlimited: "Unlimited",
+      deliverytype: "Delivery Option"
+    },
+    journeyproductpurchase: {
+      watsonpurchaseid: "Watson Purchase",
+      watsonpurchaselabel: "Watson Label",
+      journeyref: "Journey",
+      purchasetype: "Purchase Type"
+    },
+    participantjourneyproduct: {
+      journeystatus: "Journey Status",
+      subscriptionstart: "Subscription Start",
+      subscriptionend: "Subscription End",
+      journeyref: "Journey"
+    }
+  }
+  excludedLogFields = ["Products", "Participant Products"]
+  collectionLabels = {
+    participantsproduct: "Product",
+    journeyproductpurchase: "Purchase",
+    participantjourneyproduct: "Journey Product"
+  }
+  purchaseLogs = []
+  mapDocLogs = {}
+  mapPurchaseDoc = {}
+  mapJourneyProductDoc = {}
+  mapProfileNames = {}
+  historyExpanded = {}
+  removedLogs = []
+  allRemovedEntries = []
+  showRemovedLogs = false
+
+  @ViewChild('confirmInitiateDialog') confirmInitiateDialog!: TemplateRef<any>
 
   constructor(
     public router: Router,
@@ -186,6 +239,12 @@ export class JourneyProductPurchaseComponent {
         this.mapProductDeliveryType[data["product"].id] = (data["deliveryoptions"] ?? []).map(e => e["deliverytype"])
       }
       console.log(this.mapProductDeliveryType)
+    })
+    this.guard.username().then(profile=>{
+      this.loggedinprofileid = profile?.["profileid"] ?? null
+    })
+    this.guard.getProfileMap().then(profileMap=>{
+      this.mapProfileNames = profileMap?.["map"] ?? {}
     })
   }
 
@@ -259,12 +318,15 @@ export class JourneyProductPurchaseComponent {
         mapPurchase[doc.id] = doc.data()
       }
     })
+    this.mapPurchaseDoc = mapPurchase
+    this.mapJourneyProductDoc = {}
     await getDocs(query(collection(this.firestore,"participantjourneyproduct"), where("profileid", "==", this.profileid))).then(clientjourney=>{
       // var journeyProductlist:Array<purchaseJourney> = []
       var PurchaseboxList:Array<ParticipantPurchase> = []
       for (let i = 0; i < clientjourney.docs.length; i++) {
         const journeyproduct = clientjourney.docs[i];
-        const journeyproductdata = journeyproduct.data(); 
+        const journeyproductdata = journeyproduct.data();
+        this.mapJourneyProductDoc[journeyproduct.id] = journeyproductdata
         // journeyProductlist.push({
         //   docid: journeyproductdata["docid"],
         //   journeyref: journeyproductdata["journeyref"]?.id ?? null,
@@ -319,6 +381,106 @@ export class JourneyProductPurchaseComponent {
     })
     // console.log("journey box", this.participantJourneyProducts)
     console.log("Purchase box", this.participantPurchase)
+    await this.loadPurchaseLogs()
+  }
+
+  async loadPurchaseLogs(){
+    await getDocs(query(collection(this.firestore,"participant purchase logs"), where("profileid", "==", this.profileid))).then(logs=>{
+      this.purchaseLogs = logs.docs.map(e => e.data()).sort((a, b) =>
+        (b["date"]?.toDate?.()?.getTime?.() ?? 0) - (a["date"]?.toDate?.()?.getTime?.() ?? 0)
+      )
+      this.buildDocLogMap()
+    }).catch(err=>{
+      console.log(err)
+    })
+  }
+
+  buildDocLogMap(){
+    var map = {}
+    var removed = []
+    for (let i = 0; i < this.purchaseLogs.length; i++) {
+      const log = this.purchaseLogs[i]
+      const changes = log["changes"] ?? []
+      for (let j = 0; j < changes.length; j++) {
+        const change = changes[j]
+        const docid = change["docid"]
+        if(docid == null) continue
+        const fields = change["fields"] ?? {}
+        const visibleFieldKeys = Object.keys(fields).filter(k => !this.excludedLogFields.includes(k))
+        if(change["action"] == "updated" && visibleFieldKeys.length == 0) continue
+        const entry = {
+          date: log["date"],
+          loggedinprofile: log["loggedinprofile"],
+          collection: change["collection"],
+          docid: docid,
+          action: change["action"],
+          label: change["label"] ?? "",
+          journey: change["journey"] ?? "",
+          note: change["note"] ?? "",
+          parentPurchaseref: change["parentPurchaseref"] ?? "",
+          parentJourneyProductref: change["parentJourneyProductref"] ?? "",
+          fields: fields,
+          fieldKeys: visibleFieldKeys
+        }
+        if(change["action"] == "removed"){
+          removed.push(entry)
+        }
+        else{
+          if(map[docid] == null) map[docid] = []
+          map[docid].push(entry)
+        }
+      }
+    }
+    removed.sort((a, b) =>
+      (b["date"]?.toDate?.()?.getTime?.() ?? 0) - (a["date"]?.toDate?.()?.getTime?.() ?? 0)
+    )
+    this.mapDocLogs = map
+    this.allRemovedEntries = removed
+    this.attachRowLogs()
+  }
+
+  attachRowLogs(){
+    var purchaseByRef = {}
+    for(let i = 0; i < this.participantPurchase.length; i++){
+      const p = this.participantPurchase[i]
+      p["removedProductLogs"] = []
+      if(p["purchaseref"]) purchaseByRef[p["purchaseref"]] = p
+    }
+    var orphans = []
+    const removedEntries = this.allRemovedEntries ?? []
+    for(let i = 0; i < removedEntries.length; i++){
+      const e = removedEntries[i]
+      const parent = e["parentPurchaseref"] ? purchaseByRef[e["parentPurchaseref"]] : null
+      if(parent && e["collection"] == "participantsproduct"){
+        parent["removedProductLogs"].push(e)
+      } else {
+        orphans.push(e)
+      }
+    }
+    this.removedLogs = orphans
+    for (let i = 0; i < this.participantPurchase.length; i++) {
+      const purchase = this.participantPurchase[i]
+      purchase["journeyproductlogs"] = this.mergeLogs(purchase["participantjourneyproductref"])
+      purchase["purchaselogs"] = this.mergeLogs(purchase["purchaseref"])
+      const products = purchase["products"] ?? []
+      for (let j = 0; j < products.length; j++) {
+        products[j]["rowlogs"] = this.mergeLogs(products[j]["participantproductid"])
+      }
+    }
+  }
+
+  mergeLogs(...docids){
+    var entries = []
+    for (let i = 0; i < docids.length; i++) {
+      const id = docids[i]
+      if(id != null && this.mapDocLogs[id] != null){
+        entries = entries.concat(this.mapDocLogs[id])
+      }
+    }
+    entries.sort((a, b) =>
+      (b["date"]?.toDate?.()?.getTime?.() ?? 0) - (a["date"]?.toDate?.()?.getTime?.() ?? 0)
+    )
+    return entries
   }
 
   onJourneyChange(journeyindex){
@@ -403,14 +565,18 @@ export class JourneyProductPurchaseComponent {
             }
             else{
               this.participantPurchase.splice(journeyindex, 1)
+              var journeyName = this.purchaseLabel(selectedJourney)
               if(selectedJourney.purchaseref != null){
                 this.documentToDelete.push(doc(this.firestore,"journeyproductpurchase",selectedJourney.purchaseref).path)
+                this.collectDelete("journeyproductpurchase", selectedJourney.purchaseref, journeyName, journeyName)
               }
               if(selectedJourney.participantjourneyproductref != null){
                 this.documentToDelete.push(doc(this.firestore,"participantjourneyproduct",selectedJourney.participantjourneyproductref).path)
+                this.collectDelete("participantjourneyproduct", selectedJourney.participantjourneyproductref, journeyName, journeyName)
               }
               journeyproduct.filter(e => e.participantproductid != null).forEach(p =>{
                 this.documentToDelete.push(doc(this.firestore,"participantsproduct",p.participantproductid).path)
+                this.collectDelete("participantsproduct", p.participantproductid, this.productLabel(p), journeyName, selectedJourney.purchaseref, selectedJourney.participantjourneyproductref)
               })
             }
             this.loadingWidget.close()
@@ -446,11 +612,13 @@ export class JourneyProductPurchaseComponent {
       }
       else{
         this.loadingWidget = this.loadingDialog("Removing Product.....")
+        var selectedJourney = this.participantPurchase[journeyindex]
         await this.validateANDdeleteProduct(journeyindex, productindex).then(value=>{
           if(value){
             this.participantPurchase[journeyindex].products.splice(productindex, 1)
             if(selectedProduct.participantproductid != null){
               this.documentToDelete.push(doc(this.firestore,"participantsproduct",selectedProduct.participantproductid).path)
+              this.collectDelete("participantsproduct", selectedProduct.participantproductid, this.productLabel(selectedProduct), this.purchaseLabel(selectedJourney), selectedJourney.purchaseref, selectedJourney.participantjourneyproductref)
             }
           }
           else{
@@ -541,7 +709,8 @@ export class JourneyProductPurchaseComponent {
           subscriptionstart: purchase.subscriptionstart,
           subscriptionend: purchase.subscriptionend,
           unlimited: product.unlimited ?? false,
-          deliverytype: product['deliverytype'] ?? null
+          deliverytype: product['deliverytype'] ?? null,
+          _initiationNote: product['_initiationNote'] ?? null
         })
 
         // if(product["status"] == "initiated" && (product["delivery"] ?? []).length == 0){
@@ -586,6 +755,7 @@ export class JourneyProductPurchaseComponent {
 
   updateProduct(){
     this.loadingWidget = this.loadingDialog("Saving Purchase.....")
+    this.pendingChanges = []
     var write = 0
     for (let i = 0; i < this.participantProductList.length; i++) {
       const product = this.participantProductList[i];
@@ -611,6 +781,13 @@ export class JourneyProductPurchaseComponent {
         productData = {...productData, ...additionalData}
       }
       console.log(product["participantproductid"], " ---- ", productData)
+      this.collectChange("participantsproduct", product["participantproductid"], this.mapParticipantProducts[product["participantproductid"]] ?? null, productData)
+      if(product["_initiationNote"]){
+        var lastEntry = this.pendingChanges[this.pendingChanges.length - 1]
+        if(lastEntry && lastEntry["docid"] === product["participantproductid"]){
+          lastEntry["note"] = product["_initiationNote"]
+        }
+      }
       setDoc(doc(this.firestore,"participantsproduct",product["participantproductid"]),productData,{merge: true}).then(() =>{
         write += 1
         if(write == this.participantProductList.length){
@@ -671,10 +848,12 @@ export class JourneyProductPurchaseComponent {
       }
       console.log("journeyproductpurchase", "-----", purchaseData)
       console.log("participantjourneyproduct", "-----", journeyproductData)
+      this.collectChange("journeyproductpurchase", purchase["purchaseref"], this.mapPurchaseDoc[purchase["purchaseref"]] ?? null, purchaseData)
+      this.collectChange("participantjourneyproduct", purchase["participantjourneyproductref"], this.mapJourneyProductDoc[purchase["participantjourneyproductref"]] ?? null, journeyproductData)
       setDoc(doc(this.firestore,"journeyproductpurchase",purchase["purchaseref"]),purchaseData, {merge: true}).then(()=>{
         write +=1
         if(write == (this.participantPurchase.length * 2)){
-          this.updateDeliverySequence() 
+          this.updateDeliverySequence()
         }
       }).catch(err=>{
         console.log(err)
@@ -699,6 +878,7 @@ export class JourneyProductPurchaseComponent {
     await this.guard.updateDeliverySequence(this.profileid, this.participantProductList).catch(err=>{
       console.log(err)
     })
+    await this.writePurchaseLog()
     this.deleteDocuments()
     // await this.firestore.collection("participantdeliverysequence").doc(this.profileid).get().toPromise().then(async sequence=>{
     //   var mapProductDelivery = {}
@@ -752,6 +932,160 @@ export class JourneyProductPurchaseComponent {
     this.loadingWidget?.close()
     this.location.back()
     // this.router.navigateByUrl("/participant profiles")
+  }
+
+  normalizeForDiff(value){
+    if(value == null) return null
+    if(typeof value.path === 'string' && typeof value.id === 'string') return value.path
+    if(typeof value.toDate === 'function') return value.toDate().toISOString()
+    if(value instanceof Date) return value.toISOString()
+    if(Array.isArray(value)) return value.map(v => this.normalizeForDiff(v))
+    if(typeof value === 'object'){
+      var obj = {}
+      Object.keys(value).sort().forEach(k => obj[k] = this.normalizeForDiff(value[k]))
+      return obj
+    }
+    return value
+  }
+
+  collectChange(collectionName, docid, oldData, newData){
+    var isNew = oldData == null
+    var fields = {}
+    var labels = this.fieldLabels[collectionName] ?? {}
+    Object.keys(newData).forEach(key => {
+      var label = labels[key]
+      if(label == null) return
+      var oldVal = this.normalizeForDiff(oldData ? oldData[key] : null)
+      var newVal = this.normalizeForDiff(newData[key])
+      if(JSON.stringify(oldVal) !== JSON.stringify(newVal)){
+        fields[label] = { old: oldVal ?? null, new: newVal ?? null }
+      }
+    })
+    if(isNew || Object.keys(fields).length > 0){
+      this.pendingChanges.push({
+        collection: collectionName,
+        docid: docid,
+        action: isNew ? "added" : "updated",
+        fields: fields
+      })
+    }
+  }
+
+  collectDelete(collectionName, docid, label, journey, parentPurchaseref?, parentJourneyProductref?){
+    if(docid == null) return
+    this.pendingDeletes.push({
+      collection: collectionName,
+      docid: docid,
+      action: "removed",
+      label: label ?? "",
+      journey: journey ?? "",
+      parentPurchaseref: parentPurchaseref ?? "",
+      parentJourneyProductref: parentJourneyProductref ?? "",
+      fields: {}
+    })
+  }
+
+  productLabel(product){
+    var name = this.mapProduct[product["productref"]] ?? product["productref"] ?? "Product"
+    var pkg = this.mapPackage[product["packageref"]]
+    return pkg ? (name + " / " + pkg) : name
+  }
+
+  purchaseLabel(purchase){
+    if(purchase["purchasetype"] == "journey"){
+      return this.mapJourney[purchase["journeyref"]] ?? "Journey"
+    }
+    return purchase["watsonpurchaselabel"] ?? "Product Purchase"
+  }
+
+  captureStatus(product, opened){
+    if(opened){
+      product._statusBefore = product.status
+    }
+  }
+
+  findInitiatedConflicts(product){
+    var conflicts = []
+    for(let i = 0; i < this.participantPurchase.length; i++){
+      const products = this.participantPurchase[i].products ?? []
+      for(let j = 0; j < products.length; j++){
+        const p = products[j]
+        if(p === product) continue
+        if(p.status === 'initiated' || p.status === 'ongoing'){
+          conflicts.push({ label: this.productLabel(p), status: p.status })
+        }
+      }
+    }
+    return conflicts
+  }
+
+  onProductStatusChange(product, newStatus){
+    if(newStatus !== 'initiated'){
+      delete product._initiationNote
+      return
+    }
+    const conflicts = this.findInitiatedConflicts(product)
+    if(conflicts.length === 0){
+      delete product._initiationNote
+      return
+    }
+    const productName = this.productLabel(product)
+    this.dialog.open(this.confirmInitiateDialog, {
+      data: { conflicts, productName },
+      width: '460px'
+    }).afterClosed().subscribe(result => {
+      if(result === true){
+        product._initiationNote = 'Initiated while ' + conflicts.map(c => c.label + ' (' + c.status + ')').join(', ')
+      }
+      else{
+        product.status = product._statusBefore ?? null
+        delete product._initiationNote
+      }
+    })
+  }
+
+  async writePurchaseLog(){
+    var allChanges = this.pendingChanges.concat(this.pendingDeletes)
+    if(allChanges.length == 0) return
+    var logRef = doc(collection(this.firestore, "participant purchase logs"))
+    var logData = {
+      docid: logRef.id,
+      profileid: this.profileid,
+      loggedinprofile: this.loggedinprofileid,
+      date: new Date(),
+      changes: allChanges
+    }
+    await setDoc(logRef, logData).then(()=>{
+      this.purchaseLogs.unshift(logData)
+      this.buildDocLogMap()
+    }).catch(err=>{
+      console.log(err)
+    })
+    this.pendingChanges = []
+    this.pendingDeletes = []
+  }
+
+  formatLogDate(date){
+    var d = date?.toDate ? date.toDate() : date
+    if(d == null) return ""
+    return formatDate(d, 'dd/MM/yyyy, h:mm a', 'en-US', '+0530')
+  }
+
+  formatLogValue(value){
+    if(value == null || value === "") return "—"
+    if(value === true) return "Yes"
+    if(value === false) return "No"
+    if(Array.isArray(value)) return value.map(v => this.formatLogValue(v)).join(", ")
+    if(typeof value === 'string'){
+      if(/^\d{4}-\d{2}-\d{2}T/.test(value)){
+        return formatDate(new Date(value), 'dd/MM/yyyy', 'en-US', '+0530')
+      }
+      if(value.startsWith("journey/")) return this.mapJourney[value.split("/")[1]] ?? value
+      if(value.startsWith("products/")) return this.mapProduct[value.split("/")[1]] ?? value
+      if(value.startsWith("package/")) return this.mapPackage[value.split("/")[1]] ?? value
+    }
+    if(typeof value === 'object') return JSON.stringify(value)
+    return value
   }
 
   purchaseExchange(currentPurchaseIndex,productIndex,selectedPurchaseIndex){

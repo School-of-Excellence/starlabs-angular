@@ -1,7 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, Inject, OnInit } from '@angular/core';
-import { collection, doc, Firestore, getDocs, serverTimestamp, updateDoc, writeBatch } from '@angular/fire/firestore';
+import { collection, doc, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -11,6 +11,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MarkAppointmentProcedureComponent } from '../mark-appointment-procedure/mark-appointment-procedure.component';
+import { AddDeliveryActivitiesComponent } from '../add-delivery-activities/add-delivery-activities.component';
+import { ConfirmComponent } from '../../DialogBox/confirm/confirm.component';
 
 @Component({
   selector: 'app-mark-appointment-status',
@@ -181,6 +183,69 @@ export class MarkAppointmentStatusComponent implements OnInit {
     }
   }
 
+  async promptForLastDeliveryExtension() {
+    const apptRef = doc(this.firestore, "appointments", this.data["bookingid"])
+    const deliverableQuery = query(
+      collection(this.firestore, "deliverables"),
+      where("fileref", "array-contains", apptRef)
+    )
+    const deliverableSnap = await getDocs(deliverableQuery)
+
+    for (const deliverableDoc of deliverableSnap.docs) {
+      const deliverableData = deliverableDoc.data()
+      const profileid = deliverableData["profileid"]
+      const participantproductid = deliverableData["participantproductid"]
+      if (!profileid || !participantproductid) continue
+
+      const sequenceRef = doc(this.firestore, "participantdeliverysequence", profileid)
+      const sequenceSnap = await getDoc(sequenceRef)
+      if (!sequenceSnap.exists()) continue
+
+      const products: any[] = sequenceSnap.data()["products"] ?? []
+      const productEntry = products.find(p => p["participantproductid"] === participantproductid)
+      if (!productEntry) continue
+
+      const delivery: any[] = productEntry["delivery"] ?? []
+      if (delivery.length === 0) continue
+
+      const lastSequenceRef = delivery[delivery.length - 1]?.["sequenceref"]
+      if (!lastSequenceRef || lastSequenceRef.path !== deliverableDoc.ref.path) continue
+
+      let productName = "this product"
+      const productRef = productEntry["productref"]
+      if (productRef) {
+        try {
+          const productDoc = await getDoc(productRef)
+          productName = (productDoc.data() as any)?.["product"] ?? productName
+        } catch (err) {
+          console.log("Failed to fetch product name", err)
+        }
+      }
+
+      const confirmRef = this.dialog.open(ConfirmComponent, {
+        data: {
+          title: "Last Delivery Reached",
+          message: `This is the last delivery for '${productName}'. Do you want to add new delivery activities to this product?`,
+          confirmText: "Yes, Add Activities",
+          cancelText: "No"
+        },
+        disableClose: true,
+        autoFocus: false,
+        width: "420px"
+      })
+      const wantsToAdd = await confirmRef.afterClosed().toPromise()
+      if (!wantsToAdd) continue
+
+      const dialogRef = this.dialog.open(AddDeliveryActivitiesComponent, {
+        data: { profileid, participantproductid, productName },
+        disableClose: true,
+        autoFocus: false,
+        width: "60vw"
+      })
+      await dialogRef.afterClosed().toPromise()
+    }
+  }
+
   async updateAppointmentStatus(){
     var splitStart = this.start.split(":")
     var newStart = new Date(new Date(this.data["starttime"].toDate()).setHours(splitStart[0], splitStart[1]))
@@ -190,11 +255,25 @@ export class MarkAppointmentStatusComponent implements OnInit {
     console.log(newEnd)
     var totalMinutes = ((newEnd.getHours()*60 + newEnd.getMinutes()) - (newStart.getHours()*60 + newStart.getMinutes()))
 
+    if(!this.attended){
+      if (this.data['journeycoach'] == true || this.data['onboarding'] == true) {
+        const Ref = doc(this.firestore,'participantjourneyproduct', (this.data['participantjourneyproductid'] ?? this.data['participantjourneyproduct']))
+        updateDoc(Ref, {
+          onboardingscheduled: null,
+          onreschedule: true,
+        })
+      }
+    }
+
+    if (this.attended && !this.data['journeycoach'] && !this.data['onboarding']) {
+      await this.promptForLastDeliveryExtension()
+    }
+
     var appointmentDoc = doc(this.firestore, "appointments/"+this.data["bookingid"])
     await updateDoc(appointmentDoc, {
       attended: this.attended,
       cancelled: !this.attended,
-      cancelledon: !this.attended ? serverTimestamp() : null, 
+      cancelledon: !this.attended ? serverTimestamp() : null,
       cancelledreason: !this.attended ? this.cancelledReason : null,
       appointmentstart: newStart,
       appointmentend: newEnd,
@@ -215,6 +294,7 @@ export class MarkAppointmentStatusComponent implements OnInit {
     if(this.completedProcedure.length != 0){
       await batch.commit()
     }
+
     this.dialogRef.close()
 
     /*

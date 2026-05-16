@@ -49,6 +49,30 @@
           <button mat-icon-button *ngIf="journey.purchaseref == null || journey.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
             <mat-icon>remove</mat-icon>
           </button>
+          <button mat-icon-button *ngIf="journey.journeyproductlogs?.length > 0" class="iconbtn" (click)="historyExpanded[journey.participantjourneyproductref] = !historyExpanded[journey.participantjourneyproductref]">
+            <mat-icon>history</mat-icon>
+          </button>
+          <div class="rowhistory" *ngIf="historyExpanded[journey.participantjourneyproductref] && journey.journeyproductlogs?.length > 0">
+            <div class="log-card" *ngFor="let entry of journey.journeyproductlogs" [ngClass]="'is-'+entry.action">
+              <div class="log-head">
+                <span class="meta">{{formatLogDate(entry.date)}}</span>
+                <span class="meta">·</span>
+                <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
+                <span class="chip" [ngClass]="entry.action">{{entry.action}}</span>
+              </div>
+              <div class="changes" *ngIf="entry.fieldKeys.length > 0">
+                <span class="change-line" *ngFor="let field of entry.fieldKeys">
+                  <span class="k">{{field}}:</span>
+                  <span class="old">{{formatLogValue(entry.fields[field].old)}}</span>
+                  <span class="arrow">→</span>
+                  <span class="new">{{formatLogValue(entry.fields[field].new)}}</span>
+                </span>
+              </div>
+              <div class="changes" *ngIf="entry.fieldKeys.length == 0">
+                <span class="change-line muted">No field changes</span>
+              </div>
+            </div>
+          </div>
         </div>
         <button class="btn border border-success text-success mb-4" (click)="newPurchase('journey')">Add Purchase</button>
       </div>
@@ -96,6 +120,51 @@
           <button mat-icon-button *ngIf="purchase.purchaseref == null || purchase.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
             <mat-icon>remove</mat-icon>
           </button>
+          <button mat-icon-button *ngIf="purchase.purchaselogs?.length > 0" class="iconbtn" (click)="historyExpanded[purchase.purchaseref] = !historyExpanded[purchase.purchaseref]">
+            <mat-icon>history</mat-icon>
+          </button>
+          <div class="rowhistory" *ngIf="historyExpanded[purchase.purchaseref] && purchase.purchaselogs?.length > 0">
+            <div class="log-card" *ngFor="let entry of purchase.purchaselogs" [ngClass]="'is-'+entry.action">
+              <div class="log-head">
+                <span class="meta">{{formatLogDate(entry.date)}}</span>
+                <span class="meta">·</span>
+                <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
+                <span class="chip" [ngClass]="entry.action">{{entry.action}}</span>
+              </div>
+              <div class="changes" *ngIf="entry.fieldKeys.length > 0">
+                <span class="change-line" *ngFor="let field of entry.fieldKeys">
+                  <span class="k">{{field}}:</span>
+                  <span class="old">{{formatLogValue(entry.fields[field].old)}}</span>
+                  <span class="arrow">→</span>
+                  <span class="new">{{formatLogValue(entry.fields[field].new)}}</span>
+                </span>
+              </div>
+              <div class="changes" *ngIf="entry.fieldKeys.length == 0">
+                <span class="change-line muted">No field changes</span>
+              </div>
+            </div>
+          </div>
+          <div class="removed-inline" *ngIf="purchase.removedProductLogs?.length > 0">
+            <h6 class="removed-title">Removed Products</h6>
+            <div class="log-card is-removed" *ngFor="let entry of purchase.removedProductLogs">
+              <div class="log-head">
+                <span class="meta">{{formatLogDate(entry.date)}}</span>
+                <span class="meta">·</span>
+                <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
+                <span class="chip removed">removed</span>
+              </div>
+              <div class="changes">
+                <span class="change-line">
+                  <span class="k">Item:</span>
+                  <span class="v">{{entry.label || '—'}}</span>
+                </span>
+                <span class="change-line">
+                  <span class="k">Doc ID:</span>
+                  <span class="docid">{{entry.docid}}</span>
+                </span>
+              </div>
+            </div>
+          </div>
           <div *ngFor="let product of purchase.products; let j = index">
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Product</mat-label>
@@ -130,9 +199,13 @@
             </mat-form-field>  
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Product Status</mat-label>
-              <mat-select [(ngModel)]="product.status">
-                <mat-option [value]="null">Clear Status</mat-option>
-                <mat-option *ngFor="let option of productstatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
+              <mat-select [(ngModel)]="product.status"
+                          (openedChange)="captureStatus(product, $event)"
+                          (selectionChange)="onProductStatusChange(product, $event.value)">
+                <mat-option [value]="null" [disabled]="!product.status">Clear Status</mat-option>
+                <mat-option *ngFor="let option of productstatusOption"
+                            [value]="option.toLowerCase()"
+                            [disabled]="!product.status && option.toLowerCase() != 'initiated'">{{option}}</mat-option>
               </mat-select>
             </mat-form-field>
   
@@ -156,11 +229,36 @@
             <button mat-icon-button class="iconbtn" *ngIf="(product.participantproductid == null || product.status == null) && purchase.products.length != 1" (click)="removeProduct(i, j)">
               <mat-icon>remove</mat-icon>
             </button>
+            <button mat-icon-button class="iconbtn" *ngIf="product.rowlogs?.length > 0" (click)="historyExpanded[product.participantproductid] = !historyExpanded[product.participantproductid]">
+              <mat-icon>history</mat-icon>
+            </button>
+            <div class="rowhistory" *ngIf="historyExpanded[product.participantproductid] && product.rowlogs?.length > 0">
+              <div class="log-card" *ngFor="let entry of product.rowlogs" [ngClass]="'is-'+entry.action">
+                <div class="log-head">
+                  <span class="meta">{{formatLogDate(entry.date)}}</span>
+                  <span class="meta">·</span>
+                  <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
+                  <span class="chip" [ngClass]="entry.action">{{entry.action}}</span>
+                </div>
+                <div class="changes" *ngIf="entry.fieldKeys.length > 0">
+                  <span class="change-line" *ngFor="let field of entry.fieldKeys">
+                    <span class="k">{{field}}:</span>
+                    <span class="old">{{formatLogValue(entry.fields[field].old)}}</span>
+                    <span class="arrow">→</span>
+                    <span class="new">{{formatLogValue(entry.fields[field].new)}}</span>
+                  </span>
+                </div>
+                <div class="changes" *ngIf="entry.fieldKeys.length == 0">
+                  <span class="change-line muted">No field changes</span>
+                </div>
+                <div class="change-note" *ngIf="entry.note">{{entry.note}}</div>
+              </div>
+            </div>
           </div>
           <mat-divider class="mb-4" *ngIf="i+1 != participantPurchase.length"></mat-divider>
         </div>
       </div>
-    
+
       <div>
         <button class="btn border border-success text-success mb-3" (click)="newPurchase('product')">
           Add Add-Ons
@@ -230,4 +328,23 @@
         </div>
       </div>
     </div>
+
+
 </div>
+
+<ng-template #confirmInitiateDialog let-data>
+  <h2 mat-dialog-title>Confirm Initiation</h2>
+  <mat-dialog-content>
+    <p>The following product(s) are currently <strong>initiated</strong> or <strong>ongoing</strong>:</p>
+    <ul class="conflict-list">
+      <li *ngFor="let item of data.conflicts">
+        {{item.label}} <span class="conflict-status">({{item.status}})</span>
+      </li>
+    </ul>
+    <p>Are you sure you want to initiate <strong>{{data.productName}}</strong>?</p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button [mat-dialog-close]="false">Cancel</button>
+    <button mat-flat-button color="primary" [mat-dialog-close]="true">Yes, Initiate</button>
+  </mat-dialog-actions>
+</ng-template>

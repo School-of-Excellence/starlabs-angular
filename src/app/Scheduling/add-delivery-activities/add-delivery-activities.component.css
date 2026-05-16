@@ -1,0 +1,44 @@
+.loading {
+  font-style: italic;
+  color: grey;
+  padding: 20px;
+}
+
+.mainscreen {
+  padding: 20px;
+  width: 100%;
+}
+
+.heading {
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: rgb(0, 50, 67);
+  margin-bottom: 10px;
+}
+
+.subheading {
+  text-align: center;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.fullfield {
+  width: 100%;
+}
+
+.actionbox {
+  text-align: right;
+  margin-top: 10px;
+}
+
+.closebtn {
+  color: red;
+}
+
+.submitbtn {
+  color: white;
+  background-color: green;
+  margin-left: 20px;
+}
