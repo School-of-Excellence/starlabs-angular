@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { collection, deleteDoc, doc, Firestore, getDocs, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, deleteDoc, doc, Firestore, Timestamp, getDocs, setDoc, updateDoc } from '@angular/fire/firestore';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatChipsModule } from '@angular/material/chips';
@@ -12,6 +12,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatChipInputEvent } from '@angular/material/chips';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
+import { Storage, ref, uploadBytes, getDownloadURL, uploadBytesResumable } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-journey-entry',
@@ -53,6 +54,10 @@ export class JourneyEntryComponent implements OnInit {
 
   atcModelList = []
   videos = []
+  attachments: Array<{ name: string; type: string; size: number; uploadedAt: Timestamp; url: string }> = [];
+  sequenceno : number = 0;
+  readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
+  uploadProgress: number | null = null;
 
   // collectionVariables
   journeyCollection;
@@ -66,6 +71,7 @@ export class JourneyEntryComponent implements OnInit {
     public dialogref: MatDialogRef<JourneyEntryComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private fb : FormBuilder,
+    private storage: Storage,
     private afs: Firestore
   ){
     this.journeyCollection = collection(this.afs, 'journey');
@@ -90,6 +96,8 @@ export class JourneyEntryComponent implements OnInit {
           atcmodel : data.atcmodel ?? null,
           playlist : data.playlist ?? []
         })
+        this.attachments = data.attachments ?? [];
+        this.sequenceno = data['sequence'] ?? 0;
       }
     }
     this.loadJourneyData()
@@ -154,7 +162,7 @@ export class JourneyEntryComponent implements OnInit {
 
   async onformsubmit(value){
     console.log(value);
-    
+
     const journeyData = {
       journey: value.journey,
       originalfee: value.originalfee,
@@ -163,7 +171,9 @@ export class JourneyEntryComponent implements OnInit {
       journeyupgrades: value.journeyupgrades,
       type: value.type ?? null,
       atcmodel: value.atcmodel ?? null,
-      playlist : (value.playlist ?? []).length == 0 ? null : value.playlist
+      playlist : (value.playlist ?? []).length == 0 ? null : value.playlist,
+      attachments: this.attachments,
+      sequence : this.sequenceno
     };
     if(this.data !== null){
       const jouneyDoc = doc(this.journeyCollection,this.data.id)
@@ -181,6 +191,45 @@ export class JourneyEntryComponent implements OnInit {
       console.log("Form successfully submitted");
       this.dialogref.close();
     }
+  }
+
+  async onAttachmentSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    for (const file of Array.from(input.files)) {
+      if (file.size > this.MAX_FILE_SIZE) {
+        alert(`"${file.name}" exceeds 5MB`);
+        continue;
+      }
+      try {
+        this.uploadProgress = 0;
+        const storageRef = ref(this.storage, `journey/attachments/${Date.now()}_${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              this.uploadProgress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            },
+            (error) => {
+              console.error('upload error:', error);
+              reject(error);
+            },
+            () => resolve()
+          );
+        });
+        const url = await getDownloadURL(uploadTask.snapshot.ref);
+        this.attachments = [...this.attachments, { name: file.name, type: file.type, size: file.size, uploadedAt: Timestamp.now(),url }];
+        this.uploadProgress = null;
+      } catch (err) {
+        console.error('upload error:', err);
+        this.uploadProgress = null;
+      }
+    }
+    input.value = '';
+  }
+
+  removeAttachment(index: number) {
+    this.attachments.splice(index, 1);
   }
 
   ondelete(id){

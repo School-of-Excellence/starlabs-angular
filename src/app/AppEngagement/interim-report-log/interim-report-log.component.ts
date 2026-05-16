@@ -916,26 +916,23 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
   exportTable() {
     if (this.logDataSource.filteredData.length === 0) {
       alert('No Logs Found');
-      return;
+      return; 
     }
-    console.log( this.logDataSource)
     const exportData = this.logDataSource.filteredData.map((log) => ({
       'name': log["name"],
       'email' : this.mapParticipantMetaData[log['profileid'] || '']?.email ?? '' , 
       'reports done': log["reportlist"],
-      'last update': this.datePipe.transform(log["lastupdate"], 'MMMM d, y, h:mm a'),
+      'last update': this.datePipe.transform(log["lastupdate"], 'medium'),
       'status': log["status"],
-      'due date': this.datePipe.transform(log["duedate"]),
-      'remainder date': this.datePipe.transform(log["remainderdate"]),
-      'lock date': this.datePipe.transform(log["lockdate"]),
+      'due date': this.datePipe.transform(log["duedate"] , 'mediumDate'),
+      'remainder date': this.datePipe.transform(log["remainderdate"] , 'mediumDate'),
+      'lock date': this.datePipe.transform(log["lockdate"] , 'mediumDate'),
       'send date': this.datePipe.transform(log["createdon"], 'medium')
     }))
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Participants');
-
     const fileName = `$interim_report_log${new Date().toISOString().split('T')[0]}.xlsx`;
-
     XLSX.writeFile(workbook, fileName);
   }
 

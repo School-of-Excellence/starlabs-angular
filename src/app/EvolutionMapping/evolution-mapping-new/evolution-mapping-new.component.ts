@@ -2,6 +2,7 @@ import { Component, OnInit, Injector, runInInjectionContext, OnDestroy } from '@
 import { CommonModule } from '@angular/common';
 import { FormControl, FormBuilder, FormGroup, FormArray, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { collection, doc, Firestore, getDocs, getDoc, limit, orderBy, query, startAfter, where, addDoc, serverTimestamp, Timestamp,updateDoc,getCountFromServer } from '@angular/fire/firestore';
+import { Storage, ref as storageRef, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -95,6 +96,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   showImageOverlay = false;
   previewImageUrl = '';
   previewImageName = '';
+  previewProfileMetadataId = '';
+  previewProfileId = '';
+  imageUploading = false;
+  pendingImageFile: File | null = null;
+  pendingImagePreviewUrl = '';
+  originalImageUrl = '';
 
   // ADD VIDEO
   showAddVideoOverlay = false;
@@ -198,6 +205,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   constructor(
     private firestore: Firestore,
+    private storage: Storage,
     private guard: AuthguardService,
     private fb: FormBuilder,
   ) {}
@@ -411,11 +419,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         const photo = d.data()['profile'] || null;
         const profileImg = d.data()['profileimg'] || null;
         const resolvedPhoto = photo?.includes('profile-image-png-14') ? null : photo;
+        const resolvedProfileImg = profileImg?.includes('profile-image-png-14') ? null : profileImg;
         const metadataId = profileIdToMetadataId[profileid];
         if (metadataId) {
           this.mapProfiles[metadataId] = {
             ...this.mapProfiles[metadataId],
-            photo: resolvedPhoto || profileImg || null,
+            photo: resolvedProfileImg || resolvedPhoto || null,
           };
         }
       });
@@ -990,16 +999,114 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.closeNote();
   }
 
-  openImage(photo: string, name: string) {
+  openImage(photo: string, name: string, metadataId: string = '', profileid: string = '') {
     this.previewImageUrl = photo || 'https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/profile-image-png-14.png?alt=media&token=ce6361d2-690c-4742-bba7-dbb90e193080';
     this.previewImageName = name;
+    this.previewProfileMetadataId = metadataId;
+    this.previewProfileId = profileid;
+    this.originalImageUrl = this.previewImageUrl;
+    this.pendingImageFile = null;
+    this.pendingImagePreviewUrl = '';
     this.showImageOverlay = true;
   }
 
   closeImage() {
+    if (this.imageUploading) return;
     this.showImageOverlay = false;
     this.previewImageUrl = '';
     this.previewImageName = '';
+    this.previewProfileMetadataId = '';
+    this.previewProfileId = '';
+    this.originalImageUrl = '';
+    this.clearPendingImage();
+  }
+
+  triggerImageUpload(input: HTMLInputElement) {
+    if (this.imageUploading) return;
+    input.value = '';
+    input.click();
+  }
+
+  onProfileImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      input.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size should be less than 5MB');
+      input.value = '';
+      return;
+    }
+
+    this.clearPendingImage();
+    this.pendingImageFile = file;
+    this.pendingImagePreviewUrl = URL.createObjectURL(file);
+    this.previewImageUrl = this.pendingImagePreviewUrl;
+    input.value = '';
+  }
+
+  cancelPendingImage() {
+    if (this.imageUploading) return;
+    this.previewImageUrl = this.originalImageUrl;
+    this.clearPendingImage();
+  }
+
+  private clearPendingImage() {
+    if (this.pendingImagePreviewUrl) {
+      URL.revokeObjectURL(this.pendingImagePreviewUrl);
+    }
+    this.pendingImageFile = null;
+    this.pendingImagePreviewUrl = '';
+  }
+
+  async confirmUploadImage() {
+    if (this.imageUploading || !this.pendingImageFile) return;
+
+    const file = this.pendingImageFile;
+    const metadataId = this.previewProfileMetadataId;
+    const profileid = this.previewProfileId || metadataId;
+    const profileName = this.previewImageName || profileid;
+    if (!profileid) {
+      alert('Unable to identify profile for upload');
+      return;
+    }
+
+    this.imageUploading = true;
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${profileName}/profile/${safeName} ${new Date().toISOString()}`;
+      const ref = storageRef(this.storage, path);
+      const snap = await uploadBytes(ref, file);
+      const url = await getDownloadURL(snap.ref);
+
+      await Promise.all([
+        updateDoc(doc(this.firestore, 'profile_data', profileid), { profileimg: url }),
+        updateDoc(doc(this.firestore, 'participant metadata', profileid), { profileimg: url }),
+      ]);
+
+      if (metadataId) {
+        this.mapProfiles[metadataId] = {
+          ...this.mapProfiles[metadataId],
+          photo: url,
+          profileimg: url,
+        };
+      }
+
+      this.originalImageUrl = url;
+      this.previewImageUrl = url;
+      this.clearPendingImage();
+      alert('Image uploaded successfully');
+    } catch (err) {
+      console.error('Profile image upload failed', err);
+      alert('Failed to upload image');
+    } finally {
+      this.imageUploading = false;
+    }
   }
 
   // VIDEO PLAYER
