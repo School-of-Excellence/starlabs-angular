@@ -1823,6 +1823,16 @@
               (click)="timelineSearchQuery = ''">
         <mat-icon>close</mat-icon>
       </button>
+
+      <button type="button"
+              class="timeline-filter-chip"
+              [class.active]="showOnlyFailedLast"
+              (click)="showOnlyFailedLast = !showOnlyFailedLast"
+              matTooltip="Show only profiles whose last communication on any channel failed">
+        <mat-icon class="timeline-filter-chip-icon">error_outline</mat-icon>
+        <span>Last failed</span>
+        <mat-icon *ngIf="showOnlyFailedLast" class="timeline-filter-chip-check">check</mat-icon>
+      </button>
     </div>
 
     <!-- Body -->
@@ -1839,7 +1849,11 @@
            class="timeline-empty-state">
         <mat-icon class="timeline-empty-icon">notifications_off</mat-icon>
         <p class="timeline-empty-text">
-          {{ timelineSearchQuery ? 'No results for "' + timelineSearchQuery + '"' : 'No notifications found for this queue' }}
+          {{ timelineSearchQuery
+              ? 'No results for "' + timelineSearchQuery + '"'
+              : (showOnlyFailedLast
+                  ? 'No profiles with a failed last communication'
+                  : 'No notifications found for this queue') }}
         </p>
       </div>
 

@@ -6036,6 +6036,41 @@ button[matMenuTriggerFor] {
   height: 16px !important;
 }
 
+.timeline-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-left: 4px;
+  border: 1px solid #e0d6f5;
+  border-radius: 999px;
+  background: #fff;
+  color: #6c3fc5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.timeline-filter-chip:hover {
+  background: #f4eefc;
+}
+
+.timeline-filter-chip.active {
+  background: #6c3fc5;
+  border-color: #6c3fc5;
+  color: #fff;
+}
+
+.timeline-filter-chip-icon,
+.timeline-filter-chip-check {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
 /* ── Serial number column ───────────────────────────────────────────────── */
 .col-serial {
   width: 36px !important;

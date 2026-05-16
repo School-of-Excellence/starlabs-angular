@@ -64,6 +64,7 @@
                 <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
                 <span class="chip" [ngClass]="entry.action">{{entry.action}}</span>
               </div>
+              <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
               <div class="changes" *ngIf="entry.fieldKeys.length > 0">
                 <span class="change-line" *ngFor="let field of entry.fieldKeys">
                   <span class="k">{{field}}:</span>
@@ -139,6 +140,7 @@
                 <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
                 <span class="chip" [ngClass]="entry.action">{{entry.action}}</span>
               </div>
+              <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
               <div class="changes" *ngIf="entry.fieldKeys.length > 0">
                 <span class="change-line" *ngFor="let field of entry.fieldKeys">
                   <span class="k">{{field}}:</span>
@@ -248,6 +250,7 @@
                   <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
                   <span class="chip" [ngClass]="entry.action">{{entry.action}}</span>
                 </div>
+                <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
                 <div class="changes" *ngIf="entry.fieldKeys.length > 0">
                   <span class="change-line" *ngFor="let field of entry.fieldKeys">
                     <span class="k">{{field}}:</span>
@@ -259,7 +262,7 @@
                 <div class="changes" *ngIf="entry.fieldKeys.length == 0">
                   <span class="change-line muted">No field changes</span>
                 </div>
-                <div class="change-note" *ngIf="entry.note">{{entry.note}}</div>
+                <div class="change-note" *ngIf="entry.initiationNote">{{entry.initiationNote}}</div>
               </div>
             </div>
           </div>
@@ -288,21 +291,46 @@
             <th>Subscription Start</th>
             <th>Subscription End</th>
             <th>Status</th>
+            <th>Changes &amp; Notes</th>
           </tr>
           <tr *ngFor="let journey of participantPurchase">
             <td>{{journey.purchasetype == "journey" ? mapJourney[journey.journeyref] : 'Product Purchase'}}</td>
             <td>{{journey.subscriptionstart | date}}</td>
             <td>{{journey.subscriptionend | date}}</td>
             <td>{{journey.journeystatus}}</td>
+            <td>
+              <ng-container *ngIf="journey._changed; else purchaseUnchanged">
+                <span class="change-badge" [class.added]="journey._isNew">
+                  {{journey._isNew ? 'Added' : 'Updated'}}
+                </span>
+                <ul class="diff-list" *ngIf="journey._diff?.length">
+                  <li *ngFor="let d of journey._diff">
+                    <span class="diff-label">{{d.label}}:</span>
+                    <ng-container *ngIf="journey._isNew; else purchaseDiff">
+                      <span class="diff-new">{{formatDiffValue(d.label, d.new)}}</span>
+                    </ng-container>
+                    <ng-template #purchaseDiff>
+                      <span class="diff-old">{{formatDiffValue(d.label, d.old)}}</span>
+                      <span class="diff-arrow">→</span>
+                      <span class="diff-new">{{formatDiffValue(d.label, d.new)}}</span>
+                    </ng-template>
+                  </li>
+                </ul>
+                <input class="row-note" [(ngModel)]="journey._changeNote" placeholder="Reason for change...">
+              </ng-container>
+              <ng-template #purchaseUnchanged>
+                <span class="no-change">No changes</span>
+              </ng-template>
+            </td>
           </tr>
         </table>
       </div>
-  
+
       <h5 class="title mt-5 text-center">Participant Products</h5>
       <div class="journeytable">
         <div>
-          <table cdkDropList 
-          class="example-list" 
+          <table cdkDropList
+          class="example-list"
           (cdkDropListDropped)="drop($event)"
           [cdkDropListData]="participantProductList">
             <tr>
@@ -310,6 +338,7 @@
               <th>Product</th>
               <th>Package</th>
               <th>Status</th>
+              <th>Changes &amp; Notes</th>
             </tr>
             <tr class="example-custom-placeholder"></tr>
             <tr class="example-box" *ngFor="let product of participantProductList; let i=index" cdkDrag>
@@ -327,13 +356,71 @@
               <td>
                 {{product.status}}
               </td>
+              <td>
+                <ng-container *ngIf="product._changed; else productUnchanged">
+                  <span class="change-badge" [class.added]="product._isNew">
+                    {{product._isNew ? 'Added' : 'Updated'}}
+                  </span>
+                  <ul class="diff-list" *ngIf="product._diff?.length">
+                    <li *ngFor="let d of product._diff">
+                      <span class="diff-label">{{d.label}}:</span>
+                      <ng-container *ngIf="product._isNew; else productDiff">
+                        <span class="diff-new">{{formatDiffValue(d.label, d.new)}}</span>
+                      </ng-container>
+                      <ng-template #productDiff>
+                        <span class="diff-old">{{formatDiffValue(d.label, d.old)}}</span>
+                        <span class="diff-arrow">→</span>
+                        <span class="diff-new">{{formatDiffValue(d.label, d.new)}}</span>
+                      </ng-template>
+                    </li>
+                  </ul>
+                  <input class="row-note" [(ngModel)]="product.note" placeholder="Reason for change...">
+                </ng-container>
+                <ng-template #productUnchanged>
+                  <span class="no-change">No changes</span>
+                </ng-template>
+              </td>
             </tr>
           </table>
-          <div class="text-center mt-4">
-            <button class="cancelbtn" mat-stroked-button (click)="reviewMode = false">Go Back</button>
-            <button class="submitbtn" mat-stroked-button (click)="updateProduct()">Update Purchase</button>
-          </div>
         </div>
+      </div>
+
+      <div *ngIf="removedGroups.length > 0">
+        <h5 class="title mt-5 text-center">Removed Items</h5>
+        <div class="journeytable">
+          <table>
+            <tr>
+              <th>Type</th>
+              <th>Item</th>
+              <th>Details</th>
+              <th>Notes (required)</th>
+            </tr>
+            <tr *ngFor="let g of removedGroups">
+              <td>{{g.type === 'purchase' ? 'Purchase' : 'Product'}}</td>
+              <td>{{g.label}}</td>
+              <td>
+                <span *ngIf="g.type === 'purchase' && g.productLabels.length > 0; else dashCell">
+                  Products: {{g.productLabels.join(', ')}}
+                </span>
+                <ng-template #dashCell>—</ng-template>
+              </td>
+              <td>
+                <span class="change-badge removed-badge">Removed</span>
+                <input class="row-note" [(ngModel)]="g.note" placeholder="Reason for removal...">
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="text-center mt-4">
+        <p *ngIf="hasMissingReviewNotes" class="missing-notes-warning">
+          Please add notes for all changed and removed rows before saving.
+        </p>
+        <button class="cancelbtn" mat-stroked-button (click)="reviewMode = false">Go Back</button>
+        <button class="submitbtn" mat-stroked-button
+                [disabled]="hasMissingReviewNotes"
+                (click)="updateProduct()">Update Purchase</button>
       </div>
     </div>
 

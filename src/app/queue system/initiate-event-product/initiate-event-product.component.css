@@ -799,3 +799,57 @@ tr:hover {
 .event-actions button:hover {
   opacity: 1;
 }
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 15px;
+}
+
+.summary-success strong {
+  color: #2e7d32;
+}
+
+.summary-failed strong {
+  color: #c62828;
+}
+
+.failed-section {
+  margin-top: 16px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 12px;
+}
+
+.failed-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #c62828;
+}
+
+.failed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.failed-list li {
+  padding: 8px;
+  border-radius: 4px;
+  background: #fef5f5;
+  margin-bottom: 6px;
+}
+
+.failed-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.failed-error {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+  word-break: break-word;
+}
