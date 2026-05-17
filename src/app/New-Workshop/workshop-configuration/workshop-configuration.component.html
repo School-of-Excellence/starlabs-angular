@@ -1250,12 +1250,12 @@
                   <div class="form-section">
                     <h3 class="section-title">Workshop Slack Channel for Logs</h3>
                     <div class="form-row">
-                      <mat-form-field appearance="outline" class="full-width">
+                      <!-- <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Workshop Default log & New User Log</mat-label>
                         <mat-select formControlName="loginlogchannel">
                           <mat-option *ngFor="let channel of ['workshop-logs','workshop-subscriber']" [value]="channel">{{channel}}</mat-option>
                         </mat-select>
-                      </mat-form-field>
+                      </mat-form-field> -->
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Workshop Activity log</mat-label>
                         <mat-select formControlName="workshopactivitychannel">
@@ -1310,10 +1310,19 @@
                       <div class="setting-row">
                         <div class="setting-row-main">
                           <div class="setting-row-text">
-                            <h4 class="setting-row-title">Hero Active</h4>
-                            <p class="setting-row-desc">{{ settingsForm.get('hero')?.value ? 'Workshop Hero is active and visible' : 'Workshop Hero is inactive and hidden' }}</p>
+                            <h4 class="setting-row-title">Web Hero Active</h4>
+                            <p class="setting-row-desc">{{ settingsForm.get('hero')?.value ? 'Workshop Web Hero is active and visible' : 'Workshop Web Hero is inactive and hidden' }}</p>
                           </div>
                           <mat-slide-toggle formControlName="hero" (change)="onToggleChange('hero', $event)" color="primary"></mat-slide-toggle>
+                        </div>
+                      </div>
+                      <div class="setting-row">
+                        <div class="setting-row-main">
+                          <div class="setting-row-text">
+                            <h4 class="setting-row-title">Mobile Hero Active</h4>
+                            <p class="setting-row-desc">{{ settingsForm.get('heromobile')?.value ? 'Workshop Mobile Hero is active and visible' : 'Worksho Mobile Hero is inactive and hidden' }}</p>
+                          </div>
+                          <mat-slide-toggle formControlName="heromobile" (change)="onToggleChange('heromobile', $event)" color="primary"></mat-slide-toggle>
                         </div>
                       </div>
                       <mat-form-field appearance="outline" class="w-100">
@@ -1332,10 +1341,17 @@
                         </mat-select>
                       </mat-form-field>
                       <div class="upload-block">
-                        <p class="upload-label">Choose Image — Recommended Size: 3840 × 1350</p>
+                        <p class="upload-label">Choose Web Hero Image — Recommended Size: 3840 × 1350</p>
                         <input type="file" (change)="onHeroImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImage')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image">
+                        </div>
+                      </div>
+                      <div class="upload-block">
+                        <p class="upload-label">Choose Mobile Hero Image — Recommended Size: EiFlix Series Image Size</p>
+                        <input type="file" (change)="onHeroMobileImageUpload($event)" />
+                        <div *ngIf="settingsForm.get('heroImageMobile')?.value" class="upload-preview">
+                          <img [src]="settingsForm.get('heroImageMobile')?.value" alt="Hero Image">
                         </div>
                       </div>
                       <div class="upload-block">

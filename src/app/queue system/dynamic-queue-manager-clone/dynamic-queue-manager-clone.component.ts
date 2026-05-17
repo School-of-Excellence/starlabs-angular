@@ -398,6 +398,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   showTimelineOverlay = false;
   private shouldScrollTracks = false;
   timelineSearchQuery = '';
+  showOnlyFailedLast = false;
   selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
   selectedWhatsappPreview: { profileId: string; item: NotificationEvent } | null = null;
 
@@ -5488,6 +5489,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.profileSummaries = [];
     this.expandedProfileId = null;
     this.timelineSearchQuery = ''; // ← reset search
+    this.showOnlyFailedLast = false; // ← reset filter
     this.pushDocs = [];
     this.watiDocs = [];
     this.emailDocs = [];
@@ -5797,6 +5799,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         const id = p.profileId.toLowerCase();
         return name.includes(q) || id.includes(q);
       });
+    }
+
+    // filter to only profiles whose last comm on any channel failed
+    if (this.showOnlyFailedLast) {
+      list = list.filter(p =>
+        p.lastPushStatus === 'failure' ||
+        p.lastWaStatus === 'failure' ||
+        p.lastEmailStatus === 'failure'
+      );
     }
 
     return list;

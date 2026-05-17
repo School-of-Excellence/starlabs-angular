@@ -4,7 +4,7 @@ import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { combineLatest, Subject } from 'rxjs';
 import { map, takeUntil } from 'rxjs/operators';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -45,7 +45,8 @@ import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage'
     MatCheckboxModule,
     MatButtonModule,
     MatTooltipModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    MatDialogModule
   ],
   templateUrl: './initiate-event-product.component.html',
   styleUrl: './initiate-event-product.component.css'
@@ -112,6 +113,10 @@ export class InitiateEventProductComponent {
   missingParticipants: { name: string, email: string }[] = [];
 
   @ViewChild('participantSheet') participantSheet!: TemplateRef<any>;
+  @ViewChild('initiationSummaryDialog') initiationSummaryDialog!: TemplateRef<any>;
+
+  readonly INITIATE_CHUNK_SIZE = 20;
+  readonly INITIATE_CHUNK_DELAY_MS = 5000;
   bottomSheetSelection = new SelectionModel<string>(true, []);
   bottomSheetParticipants: any[] = [];
   private destroy$ = new Subject<void>();
@@ -405,25 +410,44 @@ export class InitiateEventProductComponent {
     }
   }
 
-  initiateEventProduct(){
-    var loading = this.dialog.open(LoadingProgressComponent, {
+  async initiateEventProduct(){
+    if(!this.validateSubmition()){
+      return
+    }
+
+    const selectedProduct = [...this.selection.selected]
+    const total = selectedProduct.length
+    const chunkSize = this.INITIATE_CHUNK_SIZE
+    const delayMs = this.INITIATE_CHUNK_DELAY_MS
+
+    const chunks: any[][] = []
+    for(let i = 0; i < total; i += chunkSize){
+      chunks.push(selectedProduct.slice(i, i + chunkSize))
+    }
+
+    const loading = this.dialog.open(LoadingProgressComponent, {
       disableClose: true,
       autoFocus: false,
-      data: {msg: "Initiating Product..."}
+      data: { msg: `Initiating 0 / ${total} participants...` }
     })
-    try {
-      var selectedProduct = this.selection.selected
-      console.log(this.selectedDeliverySet, this.selectedQueueVariation, selectedProduct)
-      var validateCondition = this.validateSubmition()
-      console.log(validateCondition)
-      if(validateCondition){
-        var batch = writeBatch(this.firestore)
-        for (let i = 0; i < selectedProduct.length; i++) {
-          const productElement = selectedProduct[i];
+
+    const succeeded: any[] = []
+    const failed: { product: any, error: string }[] = []
+
+    for(let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++){
+      const chunk = chunks[chunkIdx]
+      const processed = succeeded.length + failed.length
+      loading.componentInstance.dialogData.msg =
+        `Initiating chunk ${chunkIdx + 1} of ${chunks.length} — ${processed} / ${total} done`
+
+      try {
+        const batch = writeBatch(this.firestore)
+        for(let i = 0; i < chunk.length; i++){
+          const productElement = chunk[i]
 
           // Update Event Participation Request
-          var participationID = null
-          var eventparticipationData = {}
+          let participationID = null
+          let eventparticipationData: any = {}
           if(this.mapProfileParticipation[productElement["profileid"]]){
             participationID = this.mapProfileParticipation[productElement["profileid"]]["docid"]
             eventparticipationData = {
@@ -450,11 +474,11 @@ export class InitiateEventProductComponent {
               initiatedfrom: 'web',
             }
           }
-          var eventparticipationRef = doc(this.firestore, "event participation request", participationID)
+          const eventparticipationRef = doc(this.firestore, "event participation request", participationID)
           batch.set(eventparticipationRef, eventparticipationData, {merge: true})
 
           // Update Participants Product
-          var participantproductData = {
+          const participantproductData: any = {
             eventref: this.selectedArena["eventref"],
             arenaeventid: this.selectedArena["docid"],
             status: "initiated",
@@ -468,24 +492,57 @@ export class InitiateEventProductComponent {
           batch.update(doc(this.firestore, 'participantsproduct', productElement["docid"]), participantproductData)
         }
 
-        batch.commit().then(() =>{
-          this.selectedArena = null
-          this.resetValue()
-          loading.close()
-          alert("Success!")
-        }).catch(err =>{
-          console.log(err)
-          loading.close()
-          alert("Failed!")
-        })
+        await batch.commit()
+        succeeded.push(...chunk)
+        console.log(`Chunk ${chunkIdx + 1}/${chunks.length} committed (${chunk.length} products)`)
       }
-      else{
-        loading.close()
+      catch(err: any){
+        const errMsg = err?.message || String(err)
+        console.log(`Chunk ${chunkIdx + 1}/${chunks.length} failed:`, err)
+        for(const product of chunk){
+          failed.push({ product, error: errMsg })
+        }
       }
-    } catch (error) {
-      console.log(error)
-      loading.close()
-      alert("Something went wrong.")
+
+      if(chunkIdx < chunks.length - 1){
+        const done = succeeded.length + failed.length
+        loading.componentInstance.dialogData.msg =
+          `Waiting ${delayMs / 1000}s before next chunk... (${done} / ${total} done)`
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+      }
+    }
+
+    loading.close()
+
+    const summaryData = {
+      total,
+      successCount: succeeded.length,
+      failedCount: failed.length,
+      failedList: failed.map(f => ({
+        name: (this.mapProfile[f.product["profileid"]] ?? {})["name"] || f.product["profileid"],
+        error: f.error
+      }))
+    }
+
+    if(this.initiationSummaryDialog){
+      this.dialog.open(this.initiationSummaryDialog, {
+        width: '520px',
+        disableClose: true,
+        autoFocus: false,
+        data: summaryData
+      })
+    }
+    else{
+      console.warn("initiationSummaryDialog template not found — falling back to alert")
+      const failedNames = summaryData.failedList.map(f => `- ${f.name}: ${f.error}`).join("\n")
+      const msg = `Initiation Summary\n\nTotal: ${summaryData.total}\nSuccess: ${summaryData.successCount}\nFailed: ${summaryData.failedCount}` +
+        (failedNames ? `\n\nFailed:\n${failedNames}` : "")
+      alert(msg)
+    }
+
+    if(failed.length === 0){
+      this.selectedArena = null
+      this.resetValue()
     }
   }
 
