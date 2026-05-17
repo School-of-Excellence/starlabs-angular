@@ -42,6 +42,7 @@ import { AddPendingActionComponent } from '../../AppEngagement/app-action-pendin
 import { TagParticipantsComponent } from '../../Participants Profile Management/participants-analytics/tag-participants/tag-participants.component';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 interface SearchMatch {
@@ -100,7 +101,8 @@ interface ProfileNotificationSummary {
     MatTooltipModule,
     MatDatepickerModule,
     MatNativeDateModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
@@ -338,6 +340,26 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   notesDateStart: Date | null = null;
   notesDateEnd: Date | null = null;
   notesData: any[] = [];  
+  // Bulk Move 
+  showBulkMovePanel          = false;
+  bulkMoveInProgress         = false;
+  bulkMoveCompleted          = false;
+  bulkMoveFailed             = false;
+  bulkMoveCount              = 0;
+  bulkMoveTargetStageKey     = '';
+  bulkMoveCurrentStageObj: any = null;
+  availableStagesForBulkMove: any[] = [];
+  bulkMoveResults: { token: any; variationName: string }[] = [];
+  // Stage Activity Panel
+  showStageActivityPanel: boolean = false;
+  selectedStageForActivity: string = '';
+  selectedStageTypeForActivity: string | null = null;
+  stageActivityTab: 'cameIn' | 'wentOut' = 'cameIn';
+  stageActivityData: { cameIn: any[], wentOut: any[] } = { cameIn: [], wentOut: [] };
+  stageActivityCache: any[] | null = null;
+  stageActivityCacheQueueId: string | null = null;
+  stageActivityCacheLoading: boolean = false;
+  private stageActivityUnsub: (() => void) | null = null;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -1499,7 +1521,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     public http: HttpClient,
     public ngZone: NgZone,
     private sanitizer: DomSanitizer,
-    private router: Router
+    private router: Router,
+    private snackBar: MatSnackBar
   ) {
     guard.getRoles().then(roles => {
       this.roles = roles;
@@ -1661,6 +1684,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
 
     this.timelineUnsubs.forEach(u => u());
+    if (this.stageActivityUnsub) {
+      this.stageActivityUnsub();
+      this.stageActivityUnsub = null;
+    }
   }
 
   ngAfterViewChecked() {
@@ -1676,6 +1703,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.liveQueueSubscription.next()
     this.liveQueueSubscription.complete()
     this.liveQueueSubscription = new Subject<void>();
+
+    if (this.stageActivityUnsub) {
+      this.stageActivityUnsub();
+      this.stageActivityUnsub = null;
+    }
+    this.stageActivityCache = null;
+    this.stageActivityCacheQueueId = null;
+    this.stageActivityCacheLoading = false;
+    this.showStageActivityPanel = false;
     
     // Reset pagination and filters
     this.stageDisplayCounts = {};
@@ -4116,9 +4152,17 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     if (existingToken) {
       this.selectedTokens.delete(existingToken);
-    } else {
-      this.selectedTokens.add(token);
+      return;
     }
+
+    if (this.selectedTokens.size >= 10) {
+      this.guard.openSnackBar(
+        'Maximum 10 participants can be selected at a time', 'OK', 2000
+      );
+      return;
+    }
+
+    this.selectedTokens.add(token);
   }
 
   isTokenSelected(token: any): boolean {
@@ -5779,5 +5823,393 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.selectedWhatsappPreview = { profileId, item };
     }
   }
+
+async openBulkMovePanel(): Promise<void> {
+  const selected = this.getSelectedTokens();
+
+  if (!selected.length) {
+    this.guard.openSnackBar('Please select participants first', 'OK', 2000);
+    return;
+  }
+
+  if (selected.length > 10) {
+    this.guard.openSnackBar('Maximum 10 participants allowed for bulk move', 'OK', 2000);
+    return;
+  }
+
+  // Split DFU and non-DFU tokens
+  const dfuTokens = selected.filter(token => this.getTokenHighlight(token.profile_id) === 'orange');
+  const validTokens = selected.filter(token => this.getTokenHighlight(token.profile_id) !== 'orange');
+
+  if (dfuTokens.length > 0) {
+    const dfuNames = dfuTokens.map(t => this.mapProfileData[t.profile_id]?.['name']).join(', ');
+    this.snackBar.open(
+      `Skipping DFU participants: ${dfuNames}`,
+      'OK',
+      {
+        verticalPosition: 'top',
+        horizontalPosition: 'center',
+        panelClass: ['dfu-skip-snackbar']
+      }
+    );
+  }
+
+  if (!validTokens.length) {
+    this.guard.openSnackBar('All selected participants are DFU — no one to move', 'OK', 3000);
+    return;
+  }
+
+  // All selected tokens must belong to the same stage column
+  const sourceStage = this.stageQueue.find(s =>
+    s.tokenlist.some((t: any) => t.profile_id === validTokens[0].profile_id)
+  );
+
+  if (!sourceStage) {
+    this.guard.openSnackBar('Could not identify source stage', 'OK', 2000);
+    return;
+  }
+
+  const allSameStage = validTokens.every(token =>
+    sourceStage.tokenlist.some((t: any) => t.profile_id === token.profile_id)
+  );
+
+  if (!allSameStage) {
+    this.guard.openSnackBar(
+      'All selected participants must be from the same stage', 'OK', 3000
+    );
+    return;
+  }
+
+  // Reset state
+  this.bulkMoveCurrentStageObj    = sourceStage;
+  this.bulkMoveTargetStageKey     = '';
+  this.bulkMoveCompleted          = false;
+  this.bulkMoveInProgress         = false;
+  this.bulkMoveFailed             = false;
+  this.bulkMoveCount              = 0;
+  this.availableStagesForBulkMove = [];
+
+  this.bulkMoveResults = validTokens.map(token => ({
+    token,
+    variationName: token.variationid
+      ? (this.mapVariation[token.variationid]?.variationname ?? 'Unknown')
+      : 'Default'
+  }));
+
+  this.checkAvailablestages(
+    validTokens[0],
+    sourceStage.stagename,
+    sourceStage.type
+  );
+
+  const stageListPerToken = validTokens.map(token =>
+    token.variationid && this.mapVariation[token.variationid]
+      ? (this.mapVariation[token.variationid]['stages'] as string[]) ?? []
+      : (this.selectedQueue?.stages as string[]) ?? []
+  );
+
+  this.availableStagesForBulkMove = this.availableStages.filter(stage => {
+    const typeMatch = stage.stagename.match(/^(.*?)\s*\((.*?)\)$/);
+    const baseName  = typeMatch ? typeMatch[1].trim() : stage.stagename;
+    const stageType = typeMatch ? typeMatch[2]?.trim() : null;
+
+    if (stageType === 'Activity') return false;
+
+    return stageListPerToken.every(list => list.includes(baseName));
+  });
+
+  this.showBulkMovePanel = true;
+}
+
+async executeBulkMove(): Promise<void> {
+  const target = this.availableStagesForBulkMove.find(s => s.stagename === this.bulkMoveTargetStageKey);
+  if (!target) return;
+
+  const tokensToMove = this.bulkMoveResults.map(r => r.token);
+  if (!tokensToMove.length) return;
+
+  const fromStageName = this.bulkMoveCurrentStageObj.stagename;
+  const fromStageType = this.bulkMoveCurrentStageObj.type;
+
+  const dragIndex = this.stageQueue.findIndex(e => e.stagename === fromStageName && e.type === fromStageType);
+
+  if (dragIndex === -1) return;
+
+  let targetStageName = target.stagename;
+  let targetStageType = null;
+
+  const typeMatch = target.stagename.match(/^(.*?)\s*\((.*?)\)$/);
+  if (typeMatch) {
+    targetStageName = typeMatch[1].trim();
+    targetStageType = typeMatch[2].trim();
+  }
+
+  const dropIndex = this.stageQueue.findIndex(e =>
+    e.stagename === targetStageName &&
+    e.type === targetStageType
+  );
+
+  if (dropIndex === -1) return;
+
+  const dragStage = this.stageQueue[dragIndex];
+  const dropStage = this.stageQueue[dropIndex];
+  const dropType  = dropStage.type;
+
+  const loading = this.dialog.open(LoadingProgressComponent, {
+    data: { msg: "Moving Participants..." },
+    disableClose: true
+  });
+
+  const peopledata = {
+    type        : 'general',
+    personoption: this.specialistList,
+    mentoroption: this.specialistList,
+    shadowoption: this.specialistList,
+    multiperson : true
+  };
+
+  const dialog = this.dialog.open(PeopleInvolvedComponent, {
+    disableClose: true,
+    data        : peopledata
+  });
+
+  const result = await firstValueFrom(dialog.afterClosed());
+
+  if (result == null) {
+    loading.close();
+    return;
+  }
+
+  this.bulkMoveInProgress = true;
+
+  let batch = writeBatch(this.firestore);
+
+  try {
+    for (const token of tokensToMove) {
+      const data = {
+        previousstage      : dragStage.stagename,
+        currentstage       : dropStage.stagename,
+        logdate            : serverTimestamp(),
+        stagestatus        : "Approved",
+        quicknotes         : null,
+        cwmentoring        : null,
+        cwshadowing        : null,
+        cwperson           : null,
+        diagnosticmentoring: null,
+        diagnosticshadowing: null,
+        diagnosticperson   : null,
+        people_involved    : [...result.person ?? [], ...result.mentor ?? [], ...result.shadow ?? []],
+        arenaid            : null,
+        liveassignmentid   : null,
+        studioid           : null,
+        manuallymoved      : true,
+        status             : dropType == "Queued" ? "queued" : dropType == "Waiting" ? "ready" : null
+      };
+      const log = { ...token, ...data };
+      batch.update(doc(this.firestore, "queue_token", log.docid), log);
+      const logdocid = doc(collection(this.firestore, "queue stage log")).id;
+      log.logdocid      = logdocid;
+      log["movedby"]    = this.profileid;
+      log["movedthrough"] = 'queue manager';
+      batch.set(doc(this.firestore, "queue stage log", logdocid), log);
+    }
+
+    console.log("bulk commit started", new Date());
+
+    await batch.commit().then(() => {
+      console.log("bulk batch update done", new Date());
+
+      for (const token of tokensToMove) {
+        const tokenIndex = this.stageQueue[dragIndex].tokenlist
+          .findIndex((t: any) => t.tokennumber === token.tokennumber);
+        if (tokenIndex !== -1) {
+          const [removedToken] = this.stageQueue[dragIndex].tokenlist.splice(tokenIndex, 1);
+          this.stageQueue[dropIndex].tokenlist.push(removedToken);
+        }
+      }
+    });
+    if (dropIndex + 1 == this.stageQueue.length) {
+      console.log('working...........')
+      for (const token of tokensToMove) {
+        await this.guard.updateDeliveryStatus(doc(this.firestore, "/queue_token/" + token["docid"]).path,"completed",
+          {
+            eventRequestRef: query(
+              collection(this.firestore, 'event participation request'),
+              where('profileid', '==', token['profile_id']),
+              where('eventref',  '==', token['queueref']),
+              where('status',    '==', 'approved')
+            )
+          }
+        );
+      }
+    }
+    this.bulkMoveCount  = tokensToMove.length;
+    this.bulkMoveFailed = false;
+
+  } catch (error) {
+    console.error("Error moving tokens:", error);
+    this.bulkMoveFailed = true;
+  } finally {
+    loading.close();
+  }
+
+  this.bulkMoveInProgress = false;
+  this.bulkMoveCompleted  = true;
+}
+
+closeBulkMovePanel(): void {
+  if (this.bulkMoveInProgress) return;
+
+  if (this.bulkMoveCompleted && !this.bulkMoveFailed) {
+    this.selectedTokens.clear();
+  }
+
+  this.showBulkMovePanel          = false;
+  this.bulkMoveInProgress         = false;
+  this.bulkMoveCompleted          = false;
+  this.bulkMoveFailed             = false;
+  this.bulkMoveCount              = 0;
+  this.bulkMoveTargetStageKey     = '';
+  this.bulkMoveCurrentStageObj    = null;
+  this.availableStagesForBulkMove = [];
+  this.bulkMoveResults            = [];
+}
+
+setupStageActivityListener() {
+  if (this.stageActivityUnsub) {
+    this.stageActivityUnsub();
+    this.stageActivityUnsub = null;
+  }
+
+  if (!this.selectedQueue) return;
+
+  this.stageActivityCacheLoading = true;
+  this.stageActivityCache = null;
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const queueRef = doc(
+    this.firestore, 'queue generation', this.selectedQueue.docid
+  );
+
+  this.stageActivityUnsub = onSnapshot(
+    query(
+      collection(this.firestore, 'queue stage log'),
+      where('queueref', '==', queueRef),
+      where('logdate', '>=', Timestamp.fromDate(since))
+    ),
+    snap => {
+          this.ngZone.run(() => {
+            this.stageActivityCache = snap.docs.map(d => d.data());
+            this.stageActivityCacheQueueId = this.selectedQueue.docid;
+            this.stageActivityCacheLoading = false;
+
+            if (this.showStageActivityPanel) {
+              this.buildStageActivityData(
+                this.selectedStageForActivity,
+                this.selectedStageTypeForActivity
+              );
+            }
+          });
+        },
+        err => {
+          this.ngZone.run(() => {
+            console.error('Stage activity listener error:', err);
+            this.stageActivityCacheLoading = false;
+          });
+        }
+  );
+}
+
+openStageActivity(stageName: string, stageType: string | null, event: Event) {
+  event.stopPropagation();
+  this.selectedStageForActivity = stageName;
+  this.selectedStageTypeForActivity = stageType;
+  this.stageActivityTab = 'cameIn';
+  this.showStageActivityPanel = true;
+
+  if (this.stageActivityUnsub === null) {
+    this.setupStageActivityListener();
+    return;
+  }
+
+  if (this.stageActivityCache !== null) {
+    this.buildStageActivityData(stageName, stageType);
+  }
+}
+
+buildStageActivityData(stageName: string, stageType: string | null) {
+  const logs = this.stageActivityCache || [];
+
+  const sortDesc = (a: any, b: any) => {
+    const dateA = a['logdate']?.toDate?.() || new Date(0);
+    const dateB = b['logdate']?.toDate?.() || new Date(0);
+    return dateB.getTime() - dateA.getTime();
+  };
+
+  this.stageActivityData = {
+    cameIn: logs.filter(log => {
+      if (log['currentstage'] !== stageName) return false;
+      if (!stageType) return true;
+      if (stageType === 'Queued') {
+        return [null, 'queued', 'invited'].includes(log['status']);
+      }
+      if (stageType === 'Waiting') return log['status'] === 'ready';
+      if (stageType === 'Activity') return !!log['liveassignmentid'];
+      return true;
+    }).sort(sortDesc),
+    wentOut: logs.filter(log =>
+      log['previousstage'] === stageName
+    ).sort(sortDesc)
+  };
+}
+
+closeStageActivityPanel() {
+  this.showStageActivityPanel = false;
+  this.stageActivityData = { cameIn: [], wentOut: [] };
+}
+
+exportStageActivity() {
+  const rows: any[] = [];
+
+  this.stageActivityData.cameIn.forEach(log => {
+    rows.push({
+      direction: 'Came In',
+      name: this.mapProfileData[log['profile_id']]?.['name'] || '',
+      email: this.mapProfileData[log['profile_id']]?.['email'] || '',
+      from_stage: log['previousstage'] || '',
+      to_stage: log['currentstage'] || '',
+      time: log['logdate']?.toDate
+        ? log['logdate'].toDate().toLocaleString() : '',
+      moved_by: this.mapProfileData[log['movedby']]?.['name'] || '',
+    });
+  });
+
+  this.stageActivityData.wentOut.forEach(log => {
+    rows.push({
+      direction: 'Went Out',
+      name: this.mapProfileData[log['profile_id']]?.['name'] || '',
+      email: this.mapProfileData[log['profile_id']]?.['email'] || '',
+      from_stage: log['previousstage'] || '',
+      to_stage: log['currentstage'] || '',
+      time: log['logdate']?.toDate
+        ? log['logdate'].toDate().toLocaleString() : '',
+      moved_by: this.mapProfileData[log['movedby']]?.['name'] || '',
+    });
+  });
+
+  const headers = [
+    'direction', 'name', 'email',
+    'from_stage', 'to_stage',
+    'time', 'moved_by'
+  ];
+  const stagePart = this.selectedStageForActivity +
+    (this.selectedStageTypeForActivity
+      ? '_' + this.selectedStageTypeForActivity : '');
+
+  this.downloadFile(
+    rows, headers,
+    `Stage_Activity_24h_${stagePart}_${new Date().toDateString()}`
+  );
+}
 
 }
