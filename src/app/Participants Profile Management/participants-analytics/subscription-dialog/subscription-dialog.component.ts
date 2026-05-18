@@ -9,6 +9,9 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { AuthguardService } from '../../../authguard.service';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 
 @Component({
   selector: 'app-subscription-dialog',
@@ -20,32 +23,40 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
     MatCheckboxModule,
     MatButtonModule,
     DatePipe,
-    CommonModule
+    CommonModule,
+    MatSelectModule,
+    MatDatepickerModule
+
   ],
   templateUrl: './subscription-dialog.component.html',
   styleUrl: './subscription-dialog.component.css'
 })
 export class SubscriptionDialogComponent {
-  
-  participantdata = ["select","participant", "activejourney", "subscriptionend"]
-  dataSource:MatTableDataSource<any> = new MatTableDataSource()
+
+  participantdata = ["select", "participant", "activejourney", "subscriptionend", "customerstatus"]
+  dataSource: MatTableDataSource<any> = new MatTableDataSource()
   selection = new SelectionModel(true, []);
-  subscriptionform : FormGroup
+  subscriptionform: FormGroup;
+  mapJourney = {};
 
   constructor(
-    @Inject(MAT_DIALOG_DATA) public data:any, 
-    public dialogRef: MatDialogRef<any>, 
+    @Inject(MAT_DIALOG_DATA) public data: any,
+    public dialogRef: MatDialogRef<any>,
     private formbuilder: FormBuilder,
+    private authguard: AuthguardService,
     private firestore: Firestore
   ) {
     console.log(data);
     this.dataSource.data = data
+    authguard.getJourneyMap().then((map) => this.mapJourney = map);
   }
 
   ngOnInit(): void {
-    this.subscriptionform = this.formbuilder.group ({
-      duration: [, {validators: [Validators.required, Validators.pattern('^[1-9]\\d*$')], updateOn:"change"}],
-      reason: [, {validators: [Validators.required], updateOn:"change"}],
+    this.subscriptionform = this.formbuilder.group({
+      extendtype: ['duration', { validators: [Validators.required], updateOn: "change" }],
+      duration: [, { validators: [Validators.pattern('^[1-9]\\d*$')], updateOn: "change" }],
+      reason: [, { validators: [Validators.required], updateOn: "change" }],
+      date: [, { updateOn: "change" }]
     })
     this.selectAllRows();
   }
@@ -61,10 +72,10 @@ export class SubscriptionDialogComponent {
     return numSelected === numRows;
   }
 
- 
+
   masterToggle() {
     console.log(this.isAllSelected());
-    this.isAllSelected() ? this.selection.clear(): this.dataSource.data.forEach(row => this.selection.select(row));
+    this.isAllSelected() ? this.selection.clear() : this.dataSource.data.forEach(row => this.selection.select(row));
   }
 
   checkboxLabel(row?): string {
@@ -74,20 +85,48 @@ export class SubscriptionDialogComponent {
     return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${row.position + 1}`;
   }
 
-  cancel(){
+  cancel() {
     console.log('cancel');
     this.dialogRef.close(null)
   }
 
-  submit(){
+  submit() {
     var selectedrow = this.dataSource.data.filter(row => this.selection.isSelected(row))
     var profiledata = {
-      input : this.subscriptionform.value,
-      data : selectedrow
+      input: this.subscriptionform.value,
+      data: selectedrow
     }
     console.log(profiledata);
-    if(this.subscriptionform.valid){
+    const type = this.subscriptionform.value.extendtype;
+    if (this.subscriptionform.valid) {
+      if ((type === 'date' && [null , undefined , ''].includes(this.subscriptionform.value.date)) || (type === 'duration' && [null , undefined , ''].includes(this.subscriptionform.value.duration))) {
+        return
+      }
       this.dialogRef.close(profiledata)
     }
+  }
+
+  getJourneyForParticipant(metadata) {
+    const customerStatus = metadata['customerstatus'] ?? null;
+
+    if (customerStatus === 'active') {
+      return this.mapJourney[metadata['activejourney']];
+    } else if (customerStatus === 'non active') {
+      return this.mapJourney[metadata['lastcompletedjourney']];
+    }
+
+    return ''
+  }
+
+  getParticipantSubscriptionStatus(metadata) {
+    const customerStatus = metadata['customerstatus'] ?? null;
+
+    if (customerStatus === 'active') {
+      return metadata['subscriptionend']?.toDate() ?? '';
+    } else if (customerStatus === 'non active') {
+      return metadata['lastsubscriptionend']?.toDate() ?? '';
+    }
+
+    return ''
   }
 }
