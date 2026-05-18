@@ -314,6 +314,7 @@
                             <!-- Procedure Name -->
                             <label class="procedure-name">
                               {{k+1}}. {{procedureMap[procedureData["name"].path]}}
+                              <span class="text-success" *ngIf="procedureData['newlyadded']">(New)</span>
                             </label>
                             <!-- Assigned Author - OPTIMIZED -->
                             <label class="assigned-authors nonprintable" *ngIf="(procedureData['assigned_to'] || []).length != 0">

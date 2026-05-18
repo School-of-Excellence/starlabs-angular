@@ -6,7 +6,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { collection, collectionData, doc, docData, Firestore, query, Timestamp } from '@angular/fire/firestore';
+import { collection, collectionData, doc, docData, Firestore, getFirestore, query, Timestamp } from '@angular/fire/firestore';
 import { Subject, takeUntil, combineLatest, interval, BehaviorSubject, filter, take } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
@@ -357,8 +357,9 @@ export class ArenaDesignInsightsComponent implements OnInit, OnDestroy, AfterVie
     const startTimestamp = Timestamp.fromDate(startOfMonth);
     const endTimestamp = Timestamp.fromDate(endDate);
 
+    const firestoreATC = getFirestore("firestore-atc")
     const atcQuery = query(
-      collection(this.firestore, 'atc_alpha'),
+      collection(firestoreATC, 'atc_alpha'),
       where('prescription_date', '>=', startTimestamp),
       where('prescription_date', '<=', endTimestamp)
     );

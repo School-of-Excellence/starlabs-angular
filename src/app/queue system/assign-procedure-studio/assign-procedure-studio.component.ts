@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { collection, doc, Firestore, getDocs, limit, orderBy, query, where, writeBatch } from '@angular/fire/firestore';
+import { collection, doc, getFirestore, getDocs, limit, orderBy, query, where, writeBatch } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -42,10 +42,12 @@ export class AssignProcedureStudioComponent {
   sortedParticipants: { participant: string, profile: string, preassignedCount: number, checkin: boolean, implementationexpert: boolean }[] = [];
   sortedParticipantsByStudio: {};
   studiolist: any = [];
+
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
   constructor(
     @Inject(MAT_DIALOG_DATA) public dialogdata: any,
     public dialogref: MatDialogRef<any>,
-    public firestore: Firestore,
     public guard: AuthguardService
   ) {
 
@@ -70,8 +72,8 @@ export class AssignProcedureStudioComponent {
     
     this.loading = true
     
-    var eisRef = this.dialogdata.authorid.map(e => doc(this.firestore,'profile_data',e))
-    getDocs(query(collection(this.firestore,"atc_alpha"),where("author", "array-contains-any", eisRef),where("profileid", "==", this.dialogdata.participantid),where("isdelete", "==", false),orderBy("prescription_date", "desc"),limit(1))).then(async atc=>{
+    var eisRef = this.dialogdata.authorid.map(e => doc(this.firestoreATC, 'profile_data',e))
+    getDocs(query(collection(this.firestoreATC,"atc_alpha"),where("author", "array-contains-any", eisRef),where("profileid", "==", this.dialogdata.participantid),where("isdelete", "==", false),orderBy("prescription_date", "desc"),limit(1))).then(async atc=>{
       if(atc.size != 0){
         this.guard.getProcedureMap().then(data => this.mapProcedure = data)
         for (let i = 0; i < atc.docs.length; i++) {
@@ -166,7 +168,7 @@ export class AssignProcedureStudioComponent {
     }
     if(condition){
       var studioid = []
-      var batch = writeBatch(this.firestore)
+      var batch = writeBatch(this.firestoreATC)
       for (let i = 0; i < this.atcList.length; i++) {
         var adjustment = this.atcList[i].adjustment
         for (let j = 0; j < adjustment.length; j++) {
@@ -175,10 +177,10 @@ export class AssignProcedureStudioComponent {
           for (let k = 0; k < procedure.length; k++) {
             const pro = procedure[k];
             studioid.push(pro.studioid)
-            batch.update(doc(this.firestore, pro.path), {
+            batch.update(doc(this.firestoreATC, pro.path), {
               mandatory: pro.mandatory,
               studioid: pro.studioid ?? null,
-              assigned_to: (this.mapStudio[pro.studioid] ?? {})["participants"]?.map(e => doc(this.firestore,"profile_data",e)) ?? null
+              assigned_to: (this.mapStudio[pro.studioid] ?? {})["participants"]?.map(e => doc(this.firestoreATC,"profile_data",e)) ?? null
             })
           }
         }

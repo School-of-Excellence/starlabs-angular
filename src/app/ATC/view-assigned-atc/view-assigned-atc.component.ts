@@ -1,6 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, ViewChild } from '@angular/core';
-import { collection, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, DocumentSnapshot, Firestore, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, DocumentSnapshot, getFirestore, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Router } from '@angular/router';
@@ -38,6 +38,9 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 })
 export class ViewAssignedATCComponent {
   @ViewChild('paginator') paginator: MatPaginator;
+
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
 
   // Loading states
   loading = new BehaviorSubject<boolean>(false);
@@ -92,7 +95,6 @@ export class ViewAssignedATCComponent {
   }
   
   constructor(
-    public firestore: Firestore,
     public router: Router,
     public guard: AuthguardService,
     public matdialog: MatDialog,
@@ -166,7 +168,7 @@ export class ViewAssignedATCComponent {
   // Load reference data from firestore
   private loadReferenceData(): void {
     // Load user roles
-    var roleCollection = collection(this.firestore, "users_roles")
+    var roleCollection = collection(this.firestoreDefault, "users_roles")
     var roleQuery = query(roleCollection, or(where("changeagent", "==", true), where("eis", "==", true), where("ah", "==", true), where("admin", "==", true)))
     collectionData(roleQuery).pipe(takeUntil(this.metaSubscription)).subscribe(userRoles => {
       var nameList = [];
@@ -190,7 +192,7 @@ export class ViewAssignedATCComponent {
     });
     
     // Load procedures
-    var procedureCollection = collection(this.firestore, "procedures")
+    var procedureCollection = collection(this.firestoreDefault, "procedures")
     collectionChanges(procedureCollection).pipe(takeUntil(this.metaSubscription)).subscribe(procedures => {
       procedures.forEach(doc => {
         this.procedureMap[doc.doc.ref.path] = doc.doc.data()['name'];
@@ -198,7 +200,7 @@ export class ViewAssignedATCComponent {
     });
     
     // Load big activity
-    var bigactivityCollection = collection(this.firestore, "bigactivity")
+    var bigactivityCollection = collection(this.firestoreDefault, "bigactivity")
     collectionData(bigactivityCollection).pipe(takeUntil(this.metaSubscription)).subscribe(activity => {
       const assigned = [];
       activity.forEach(e => {
@@ -227,7 +229,7 @@ export class ViewAssignedATCComponent {
       this.selectedChangeagent = this.profileID;
     }
 
-    var alphaCollection: CollectionReference = collection(this.firestore, "atc_alpha")
+    var alphaCollection: CollectionReference = collection(this.firestoreATC, "atc_alpha")
     var queryList: Array<QueryFieldFilterConstraint | QueryOrderByConstraint | QueryLimitConstraint> = [
       where("isdelete", "==", false),
       where("type", "==", "online"),
@@ -329,7 +331,7 @@ export class ViewAssignedATCComponent {
     var profileid = atcSlice.map(e => e.data()["profileid"]).filter(e => !((this.profileMap[e] || {})["profileid"]))
     profileid = Array.from(new Set(profileid))
     if(profileid.length != 0){
-      var profileCollection = collection(this.firestore, "profile_data")
+      var profileCollection = collection(this.firestoreDefault, "profile_data")
       var profileQuery = query(profileCollection, where("profileid", "in", profileid))
       getDocs(profileQuery).then(list =>{
         for (let i = 0; i < list.docs.length; i++) {
@@ -379,7 +381,7 @@ export class ViewAssignedATCComponent {
     var mentoringid = atcData["mentoringid"]
     console.log(this.mapNotesSubscription[noteid], this.mapNotesSubscription[mentoringid])
     if(noteid && !this.mapNotesSubscription[noteid]){
-      var noteSubscription = docSnapshots(doc(this.firestore, "atc_notes/"+noteid)).pipe(
+      var noteSubscription = docSnapshots(doc(this.firestoreATC, "atc_notes/"+noteid)).pipe(
         takeUntil(this.atcAlphaSubscription),
       ).subscribe(doc =>{
         this.mapATCnotes[doc.id] = doc.data()
@@ -430,7 +432,7 @@ export class ViewAssignedATCComponent {
     this.mapATCtranscription[atc.id]["view"] = true
     var transcription = this.mapATCtranscription[atc.id]["transcription"]
 
-    var adjCollectionRef = collection(this.firestore, atc.ref.path+"/corrections")
+    var adjCollectionRef = collection(this.firestoreATC, atc.ref.path+"/corrections")
     var adjQueryList = [where("isdelete", "==", false)]
     if(this.selectedChangeagent != null){
       adjQueryList.push(where("implementationagent", "array-contains", this.selectedChangeagent))
@@ -456,10 +458,10 @@ export class ViewAssignedATCComponent {
           })
         }
 
-        var procedureCollectionRef = collection(this.firestore, adjDoc.ref.path+"/procedures")
+        var procedureCollectionRef = collection(this.firestoreATC, adjDoc.ref.path+"/procedures")
         var procedureQueryList = [where("isdelete", "==", false)]
         if(this.selectedChangeagent != null){
-          procedureQueryList.push(where("assigned_to", "array-contains", doc(this.firestore, "profile_data/"+this.selectedChangeagent)))
+          procedureQueryList.push(where("assigned_to", "array-contains", doc(this.firestoreDefault, "profile_data/"+this.selectedChangeagent)))
         }
         var procedureCollectionQuery = query(procedureCollectionRef, ...procedureQueryList)
 
@@ -520,7 +522,7 @@ export class ViewAssignedATCComponent {
 
     var newRecord = {
       bigactivity: bigactivity,
-      assigned_to: assigned.map(e => doc(this.firestore, "profile_data/"+e)),
+      assigned_to: assigned.map(e => doc(this.firestoreATC, "profile_data/"+e)),
       "status": "completed",
       "last_activity": new Date(this.newProcedureValue["lastactivity"])
     }
@@ -534,7 +536,7 @@ export class ViewAssignedATCComponent {
     }
     
     if(confirm(`Mark procedure as ${this.newProcedureValue["type"] == "autogeneralized" ? 'Auto Generalized and Completed' : 'Completed'} on ${newRecord['last_activity']}.`)){
-      updateDoc(doc(this.firestore, procedure.ref.path), newRecord).catch(err =>{
+      updateDoc(doc(this.firestoreATC, procedure.ref.path), newRecord).catch(err =>{
         console.log("Err Update", err)
       })
       this.clearUpdateEdit()
@@ -544,14 +546,14 @@ export class ViewAssignedATCComponent {
   undoProcedureComplete(procedure: DocumentSnapshot<any>, updateType){
     var newRecord = {
       "autogeneralized": false
-    }    
+    }
     if(updateType == "completed"){
       newRecord["status"] = "yet to start"
       newRecord["last_activity"] = null
     }
     console.log(newRecord)
     if(confirm(`Sure, Unmark procedure as ${updateType == "autogeneralized" ? 'Auto Generalized and Completed' : 'Completed'}.`)){
-      updateDoc(doc(this.firestore, procedure.ref.path), newRecord).catch(err =>{
+      updateDoc(doc(this.firestoreATC, procedure.ref.path), newRecord).catch(err =>{
         console.log("Err Update", err)
       })
       this.clearUpdateEdit()

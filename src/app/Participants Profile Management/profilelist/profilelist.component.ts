@@ -12,7 +12,7 @@ import { AddPurchaseComponent } from '../add-purchase/add-purchase.component';
 import { UpdateprofileComponent } from '../updateprofile/updateprofile.component';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { collection, collectionData, collectionSnapshots, deleteDoc, doc, Firestore, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionData, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, updateDoc, where } from '@angular/fire/firestore';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -73,11 +73,13 @@ export class ProfilelistComponent {
 
   loggedinProfileRoles = {}
 
+  firestoreDefault = getFirestore()
+
   // firestore collection reference
   // dataBufferSubscription: Subscription;
   // profileDataSubscription : Subscription
-  constructor(public guard: AuthguardService, public router:Router, public firestore: Firestore,private injector: Injector , public dialog: MatDialog, public snackbar: MatSnackBar) {
-
+  constructor(public guard: AuthguardService, public router:Router, public dialog: MatDialog, public snackbar: MatSnackBar) {
+    
     guard.getRoles().then(async roles=>{
       this.loggedinProfileRoles = roles
       this.developerAccess = roles.developer ?? false
@@ -85,7 +87,7 @@ export class ProfilelistComponent {
 
       // if(roles.admin || roles.ah || roles.integrator){
         // presistent caching
-        const profileCollection = collection(this.firestore,'profile_data')
+        const profileCollection = collection(this.firestoreDefault,'profile_data')
         const profilequery = query(profileCollection, orderBy('name'))
         const unsubscribe = onSnapshot(
           profilequery,
@@ -124,20 +126,21 @@ export class ProfilelistComponent {
           }
         );
         // Store unsubscribe function for cleanup
-        this.unsubscribeProfile = unsubscribe;
+        this.unsubscribeProfile = unsubscribe;            
+          
 
-        const userrolesCollection = collection(this.firestore, 'users_roles')
+        const userrolesCollection = collection(this.firestoreDefault, 'users_roles')
         collectionData(userrolesCollection , {idField: 'id'}).pipe(takeUntil(this.subscription)).subscribe(roles => {
            for (let i = 0; i < roles.length; i++) {
             const doc = roles[i];
             this.profilerole[doc["profile_ref"].id] = doc
           }
         })
-        const atcmodelcollction = collection(this.firestore, 'atc model')
+        const atcmodelcollction = collection(this.firestoreDefault, 'atc model')
         collectionData(atcmodelcollction , {idField: 'id'}).pipe(takeUntil(this.subscription)).subscribe(atcmodel => {
           this.atcmodelList = atcmodel.map(item => item['atcmodel']);
        })
-        const docref = doc(this.firestore, 'starlabs roles', 'roles')
+        const docref = doc(this.firestoreDefault, 'starlabs roles', 'roles')
         getDoc(docref).then(role => {
           if(role.exists()){
            let names = (role.data()["name"] ?? []).filter(e => this.developerAccess || !["rolemanager", "developer"].includes(e.toLowerCase())).sort((a, b) => a.localeCompare(b))
@@ -197,7 +200,7 @@ export class ProfilelistComponent {
   }
 
   updateMyOperator(profile){
-    const profiledataCollection = collection(this.firestore, 'profile_data')
+    const profiledataCollection = collection(this.firestoreDefault, 'profile_data')
     const Docref = doc(profiledataCollection, profile['profileid'])
     updateDoc(Docref, {
       myoperatoruid : this.myoperatoruid,
@@ -221,8 +224,8 @@ export class ProfilelistComponent {
   // }
 
   async updateProfile(profile: any) {
-    const profileRef = doc(this.firestore, 'profile_data', profile.profileid);
-    const freshSnap = await runInInjectionContext(this.injector, () => getDoc(profileRef));
+    const profileRef = doc(this.firestoreDefault, 'profile_data', profile.profileid);
+    const freshSnap = await getDoc(profileRef);
     const freshData = freshSnap.data();
     // console.log('user_ref_existing in fresh data:', freshData['user_ref_existing']);
     const freshProfile = {
@@ -278,7 +281,7 @@ export class ProfilelistComponent {
     })
     var profileid = profile.profileid
     var profilepath = "profile_data/"+profileid
-    var profileref = doc(this.firestore, profilepath)
+    var profileref = doc(this.firestoreDefault, profilepath)
     var profileStatus = {
       registered: profile["user_ref"] != null,
       atcPrescribed: true,
@@ -297,28 +300,32 @@ export class ProfilelistComponent {
       addpurchase: true,
       participantsproduct: true
     }
-    const atcCollection = collection(this.firestore, 'atc_alpha')
-    const appointments = collection(this.firestore, 'appointments')
-    const rolesRef = collection(this.firestore, "Roles-To-EIS")
-    const profiledataRef = doc(this.firestore, 'profile_data', profileid)
+    const firestoreATC = getFirestore("firestore-atc")
+    const atcCollection = collection(firestoreATC, 'atc_alpha')
+    const appointments = collection(this.firestoreDefault, 'appointments')
+    const rolesRef = collection(this.firestoreDefault, "Roles-To-EIS")
+    const profiledataRef = doc(this.firestoreDefault, 'profile_data', profileid)
     profileStatus.atcPrescribed = (await getDocs(query(atcCollection, where("author", "array-contains", profiledataRef)))).size != 0
     profileStatus.atcGiven = (await getDocs(query(atcCollection, where("profileid", "==", profileid)))).size != 0
     profileStatus.atcAssigned = (await getDocs(query(atcCollection, where('implementationagent', 'array-contains', profileid)))).size != 0
     profileStatus.appointmentGiven = (await getDocs(query(appointments, where("bookedby", "==", profileref)))).size != 0
     profileStatus.ApptRole = (await getDocs(query(rolesRef, where("assigned_eis", "array-contains", profileref)))).size != 0
-    const profileRoleRef = doc(this.firestore, profile["role_ref"]["path"])
+    
+    const profileRoleRef = doc(this.firestoreDefault, profile["role_ref"]["path"])
     await getDoc(profileRoleRef).then(role => {
       var roleDate = role.data()
       profileStatus.majorRole = (roleDate["changeagent"] || roleDate["eis"] || roleDate["admin"] || roleDate["ah"] || roleDate["superadmin"])
     })
-    const journeyproductpurchase = collection(this.firestore, "journeyproductpurchase")
-    const participantsproduct = collection(this.firestore, 'participantsproduct')
-    const EISzoomcontact = doc(this.firestore, 'EISzoomcontact', profileid)
-    const aggregate_EITParticipant = doc(this.firestore, 'aggregate_EITParticipant', profileid)
-    const aggregate_ReviewParticipant = doc(this.firestore, 'aggregate_ReviewParticipant', profileid)
-    const availability = collection(this.firestore, 'availability')
-    const events_profiles = collection(this.firestore, 'events_profiles')
-    const formsByClient = collection(this.firestore, 'formsByClient')
+    
+    const journeyproductpurchase = collection(this.firestoreDefault, "journeyproductpurchase")
+    const participantsproduct = collection(this.firestoreDefault, 'participantsproduct')
+    const EISzoomcontact = doc(this.firestoreDefault, 'EISzoomcontact', profileid)
+    const aggregate_EITParticipant = doc(this.firestoreDefault, 'aggregate_EITParticipant', profileid)
+    const aggregate_ReviewParticipant = doc(this.firestoreDefault, 'aggregate_ReviewParticipant', profileid)
+    const availability = collection(this.firestoreDefault, 'availability')
+    const events_profiles = collection(this.firestoreDefault, 'events_profiles')
+    const firestoreForms = getFirestore("firestore-forms")
+    const formsByClient = collection(firestoreForms, 'formsByClient')
 
     profileStatus.addpurchase = (await getDocs(query(journeyproductpurchase, where("profileid", "==", profileid)))).docs.length != 0
     profileStatus.participantsproduct  = (await getDocs(query(participantsproduct, where("profileid", "==", profileid)))).docs.length != 0
@@ -334,8 +341,8 @@ export class ProfilelistComponent {
     }
     else{
       if(confirm("Sure, Do you want to delete?")){
-        const roleRef = doc(this.firestore, profile["role_ref"]["path"])
-        const profilepathRef = doc(this.firestore,profilepath)
+        const roleRef = doc(this.firestoreDefault, profile["role_ref"]["path"])
+        const profilepathRef = doc(this.firestoreDefault,profilepath)
         await deleteDoc(roleRef)
         await deleteDoc(profilepathRef)
       }

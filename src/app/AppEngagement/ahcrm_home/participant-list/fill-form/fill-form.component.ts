@@ -1,12 +1,12 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  Firestore,
   doc,
   getDoc,
   updateDoc,
-  Timestamp
+  Timestamp,
+  getFirestore
 } from '@angular/fire/firestore';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -59,8 +59,9 @@ export class FillFormComponent implements OnInit, OnDestroy {
   validationErrors: Map<string, string> = new Map();
 
   private destroy$ = new Subject<void>();
+  firestoreForms = getFirestore('firestore-forms')
 
-  constructor(private firestore: Firestore) {}
+  constructor() {}
 
   ngOnInit(): void {
     if (this.formDocId) {
@@ -77,7 +78,7 @@ export class FillFormComponent implements OnInit, OnDestroy {
     this.loading = true;
 
     try {
-      const formRef = doc(this.firestore, 'formsByClient', this.formDocId);
+      const formRef = doc(this.firestoreForms, 'formsByClient', this.formDocId);
       const formSnap = await getDoc(formRef);
 
       if (formSnap.exists()) {
@@ -294,7 +295,7 @@ export class FillFormComponent implements OnInit, OnDestroy {
     this.saving = true;
 
     try {
-      const formRef = doc(this.firestore, 'formsByClient', this.formDocId);
+      const formRef = doc(this.firestoreForms, 'formsByClient', this.formDocId);
 
       await updateDoc(formRef, {
         formarray: this.formFields,
