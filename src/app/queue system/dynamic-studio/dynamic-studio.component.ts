@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, inject } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { QueueInvitationApprovalComponent } from '../queue-invitation-approval/queue-invitation-approval.component';
@@ -14,7 +14,7 @@ import { PreassignStudioComponent } from '../preassign-studio/preassign-studio.c
 import { HoldAlertDialogComponent } from '../hold-alert-dialog/hold-alert-dialog.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference } from '@angular/fire/firestore';
+import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -755,6 +755,7 @@ export class DynamicStudioComponent {
           this.getParticipantUPVisit()
 
           // List Form
+          const firestoreForms = getFirestore("firestore-forms")
           var mappedForm = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]?.participantform ?? []
           console.log(this.liveAssignment["participantid"], mappedForm)
           if(mappedForm.length != 0 && this.liveAssignment["token"]){
@@ -775,8 +776,9 @@ export class DynamicStudioComponent {
                 }
               }
             }
+            involvedQueueRef = involvedQueueRef.map(e => doc(firestoreForms, e.path))
             console.log("Involved Queue", involvedQueueRef.map(e => e.path))
-            await getDocs(query(collection(this.firestore,"formsByClient"), where("queueref", "in", involvedQueueRef),where("profileid", "==", this.liveAssignment["participantid"]))).then(queueform =>{
+            await getDocs(query(collection(firestoreForms,"formsByClient"), where("queueref", "in", involvedQueueRef),where("profileid", "==", this.liveAssignment["participantid"]))).then(queueform =>{
               console.log("Related Form", queueform.docs.map(e =>e.data()["formid"]))
               this.participantForm = queueform.docs.map(e =>e.data()).filter(e => mappedForm.includes(e["formid"]))
               console.log(this.participantForm)
@@ -1647,7 +1649,8 @@ export class DynamicStudioComponent {
   }
   
   viewform(form){
-    let path = doc(this.firestore, "formsByClient", form['docid']).path
+    const firestoreForms = getFirestore("firestore-forms")
+    let path = doc(firestoreForms, "formsByClient", form['docid']).path
     const url = this.router.createUrlTree(['/formtemplate'],{queryParams: {id: form.formid, type:'form', patchdata:path}})
     window.open(url.toString(), '_blank')
   }
@@ -1665,19 +1668,22 @@ export class DynamicStudioComponent {
   }
   
   async previewATC(collectiontype){
+
+    const firestoreATC = getFirestore("firestore-atc")
+
     var startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
     console.log("ATC Fetch Date", startDate, this.transferredQueue)
     
     var unvalidateQuery = this.profileRoles["mentor"] || this.profileRoles["ah"] || this.profileRoles["developer"] || true ? // Allow all Specialist to access all Queue ATC
       query(
-        collection(this.firestore, "atc_to_validate"),
+        collection(firestoreATC, "atc_to_validate"),
         where("status", "==", "atc given"),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
       ) : 
       query(
-        collection(this.firestore, "atc_to_validate"),
-        where("author", "array-contains", doc(this.firestore, "profile_data", this.profileid)),
+        collection(firestoreATC, "atc_to_validate"),
+        where("author", "array-contains", doc(firestoreATC, "profile_data", this.profileid)),
         where("status", "==", "atc given"),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
@@ -1685,13 +1691,13 @@ export class DynamicStudioComponent {
       
     var alphaQuery = this.profileRoles["mentor"] || this.profileRoles["ah"] || this.profileRoles["developer"] || true ? // Allow all Specialist to access all Queue ATC
       query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
       ) : 
       query(
-        collection(this.firestore, "atc_alpha"),
-        where("author", "array-contains", doc(this.firestore, "profile_data", this.profileid)),
+        collection(firestoreATC, "atc_alpha"),
+        where("author", "array-contains", doc(firestoreATC, "profile_data", this.profileid)),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
       );
@@ -1719,7 +1725,7 @@ export class DynamicStudioComponent {
         var notesIDList:any[] = atc.slice(i, i+10).map(e => e.data()["notesid"]).filter(e => e != null && e != undefined)
         if(notesIDList.length != 0){
           const notesQuery = query(
-            collection(this.firestore, "atc_notes"),
+            collection(firestoreATC, "atc_notes"),
             where(documentId(), "in", notesIDList)
           );
           const notes = await getDocs(notesQuery);
@@ -1760,7 +1766,7 @@ export class DynamicStudioComponent {
         }
         
         const correctionsQuery = query(
-          collection(this.firestore, atcDoc.ref.path, "corrections"),
+          collection(firestoreATC, atcDoc.ref.path, "corrections"),
           where("isdelete", "==", false)
         );
         const adjustment = await getDocs(correctionsQuery);
@@ -1775,7 +1781,7 @@ export class DynamicStudioComponent {
           }
           
           const proceduresQuery = query(
-            collection(this.firestore, adjDoc.ref.path, "procedures"),
+            collection(firestoreATC, adjDoc.ref.path, "procedures"),
             where("isdelete", "==", false)
           );
           const procedure = await getDocs(proceduresQuery);
@@ -1866,11 +1872,14 @@ export class DynamicStudioComponent {
   }
 
   async getAssignedATC(){
+
+    const firestoreATC = getFirestore("firestore-atc");
+
     var startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
     
     try {
       const atcQuery = query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("implementationagent", "array-contains", this.profileid),
         where("prescription_date", ">=", startDate)
@@ -1893,7 +1902,7 @@ export class DynamicStudioComponent {
         }
         
         const adjustmentQuery = query(
-          collection(this.firestore, atcDoc.ref.path, "corrections"),
+          collection(firestoreATC, atcDoc.ref.path, "corrections"),
           where("implementationagent", "array-contains", this.profileid)
         );
         const adjustment = await getDocs(adjustmentQuery);
@@ -1911,9 +1920,9 @@ export class DynamicStudioComponent {
           }
           
           const procedureQuery = query(
-            collection(this.firestore, adjDoc.ref.path, "procedures"),
+            collection(firestoreATC, adjDoc.ref.path, "procedures"),
             where("mandatory", "==", true),
-            where("assigned_to", "array-contains", doc(this.firestore, "profile_data", this.profileid))
+            where("assigned_to", "array-contains", doc(firestoreATC, "profile_data", this.profileid))
           );
           const procedure = await getDocs(procedureQuery);
           
@@ -1940,7 +1949,7 @@ export class DynamicStudioComponent {
             console.log(hasProcedure)
             
             if(hasProcedure && this.cwATClist[a]["atcdata"]["notesid"] != null){
-              const atcnotesDoc = await getDoc(doc(this.firestore, "atc_notes", this.cwATClist[a]["atcdata"]["notesid"]));
+              const atcnotesDoc = await getDoc(doc(firestoreATC, "atc_notes", this.cwATClist[a]["atcdata"]["notesid"]));
               if(atcnotesDoc.exists()){
                 var notesdata = atcnotesDoc.data()
                 this.cwATClist[a]["cwbrief"] = notesdata["changeworkbrief"] ?? []
@@ -1959,12 +1968,13 @@ export class DynamicStudioComponent {
   }
   
   async markProcedure(atcindex, adjindex, proindex){
+    const firestoreATC = getFirestore("firestore-atc");
     var procedure = this.cwATClist[atcindex]["adjustments"][adjindex]["procedure"][proindex]
     console.log(procedure)
     procedure["status"] = procedure["status"] == "completed" ? "yet to start" : "completed"
     
     try {
-      await updateDoc(doc(this.firestore, procedure["path"]), {
+      await updateDoc(doc(firestoreATC, procedure["path"]), {
         status: procedure["status"]
       });
     } catch (error) {
@@ -1973,6 +1983,7 @@ export class DynamicStudioComponent {
   }
   
   async assignChangeagent(validated){
+    const firestoreATC = getFirestore("firestore-atc");
     // var assignProperty = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]?.studioassignprocedureproperty ?? {}
     // var eligibleStages = (validated ? assignProperty["addvalidatedatc"] : assignProperty["addunvalidatedatc"]) ?? []
     var eligibleStages = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]["implementationstages"] ?? []
@@ -2017,7 +2028,7 @@ export class DynamicStudioComponent {
     for (let i = 0; i < allParticipants.length; i += chunkSize){
       let chunk = allParticipants.slice(i, i + chunkSize);
       console.log(this.ongoingQueue["docid"]);
-      let promise = getDocs(query(collection(this.firestore,"atc_alpha"), where('queueid', '==', this.ongoingQueue["docid"]),where('isdelete','==',false),where("implementationagent", "array-contains-any", chunk)))
+      let promise = getDocs(query(collection(firestoreATC,"atc_alpha"), where('queueid', '==', this.ongoingQueue["docid"]),where('isdelete','==',false),where("implementationagent", "array-contains-any", chunk)))
       preassigned.push(promise)
     }
     console.log(preassigned.length);
@@ -2099,13 +2110,14 @@ export class DynamicStudioComponent {
   }
   
   getTripleATC(){
+    const firestoreATC = getFirestore("firestore-atc")
     var involvedQueue = [this.ongoingQueue["docid"]]
     console.log(involvedQueue)
     if(this.transferredQueue != null) involvedQueue.push(this.transferredQueue["docid"])
     console.log(this.transferredQueue)
     
     const tripleATCQuery = query(
-      collection(this.firestore, "triple atc"),
+      collection(firestoreATC, "triple atc"),
       where("profileid", "==", this.liveAssignment["participantid"]),
       where("queueid", "in", involvedQueue),
       where("status", "==", "atc given")
@@ -2117,7 +2129,7 @@ export class DynamicStudioComponent {
   }
   
   viewTripleATC(id){
-    const url = this.router.createUrlTree(['/edit triple ATC/'+id])
+    const url = this.router.createUrlTree(['/edittripleATC/'+id])
     window.open(url.toString(), '_blank')
   }
 

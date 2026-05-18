@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject, NgZone, OnInit } from '@angular/core';
-import { doc, Firestore, updateDoc } from '@angular/fire/firestore';
+import { doc, Firestore, getFirestore, updateDoc } from '@angular/fire/firestore';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,7 +25,9 @@ export class AtcOptionComponent {
   mapProfile = {}
   assignments = []
 
-  constructor(@Inject(MAT_DIALOG_DATA) public atc, public dialogRef: MatDialogRef<any>, public firestore: Firestore,private ngZone: NgZone) {
+  firestoreATC = getFirestore("firestore-atc")
+
+  constructor(@Inject(MAT_DIALOG_DATA) public atc, public dialogRef: MatDialogRef<any>,private ngZone: NgZone) {
     this.draftOption = atc["drafts"] ?? []
     this.initiatedATC = atc["initiated"] ?? []
     this.mapProfile = atc["mapProfile"] ?? {}
@@ -49,7 +51,7 @@ export class AtcOptionComponent {
 
   deleteDraft(atcdoc, index){
     if(confirm("Sure, do you want to delete this ATC")){
-      updateDoc(doc(this.firestore, atcdoc.ref.path),{
+      updateDoc(doc(this.firestoreATC, atcdoc.ref.path),{
         delete: true
       }).catch(err =>{
         console.log(err)

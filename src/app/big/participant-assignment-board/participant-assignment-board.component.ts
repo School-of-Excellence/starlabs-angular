@@ -43,15 +43,15 @@ import { WatchVideosComponent } from '../watch-videos/watch-videos.component';
 })
 export class ParticipantAssignmentBoardComponent {
   private subscription = new Subject<void>
-  @ViewChild(MatSort) sort: MatSort;  
+  @ViewChild(MatSort) sort: MatSort;
   marathon = null;
   currentProfile: any = null;
   searchTerm: string = '';
   mapProfile: { [key: string]: string } = {};
 
-  filteredKeys: string[] = [];  
+  filteredKeys: string[] = [];
   selectedProfile: string | null = null;
-  selectedStatus = 'myactivities';  
+  selectedStatus = 'myactivities';
   loggedInProfileId:any = null
   allActivities: any[] = [];
   selectedDirective: string = '';
@@ -64,7 +64,7 @@ export class ParticipantAssignmentBoardComponent {
   bigMarathonList = [];
   mapAssignments = {}
   currentDate: Date = new Date();
-  currentTimestampSeconds: number;  
+  currentTimestampSeconds: number;
   mapParticipantAssignments = {}
   bigParticipantsAssignmentsSubscription:Subscription
 
@@ -80,7 +80,7 @@ export class ParticipantAssignmentBoardComponent {
     this.route.queryParams.subscribe(params => {
       if(params && params['profileid']){
         console.log("from url");
-        this.currentProfile = {profileid:params['profileid']} 
+        this.currentProfile = {profileid:params['profileid']}
         querycount += 1
         if(querycount >= 3){
           this.onSelect(this.currentProfile['profileid'])
@@ -89,7 +89,7 @@ export class ParticipantAssignmentBoardComponent {
       }else{
         this.authguard.username().then(async (profile) => {
           console.log("from login");
-          this.currentProfile = profile 
+          this.currentProfile = profile
           querycount += 1
           if(querycount >= 3){
             this.onSelect(this.currentProfile['profileid'])
@@ -100,7 +100,7 @@ export class ParticipantAssignmentBoardComponent {
     })
     this.authguard.getRoles().then(async roles=>{
       console.log(roles['profile_ref'].id,"roles['profile_ref'].id");
-      
+
       this.loggedInProfileId = roles['profile_ref'].id
       if(roles["developer"]){
         this.developerAccess = true;
@@ -113,17 +113,17 @@ export class ParticipantAssignmentBoardComponent {
         this.developerAccess = false;
       }
     })
-    collectionSnapshots(query(collection(this.firestore,"big assignment"), 
+    collectionSnapshots(query(collection(this.firestore,"big assignment"),
       where("status", "in", ['initiated', 'ongoing', 'completed'])
     )).pipe(takeUntil(this.subscription)).subscribe(assignmentSnap => {
       this.mapAssignments = {};
-    
+
       for (let i = 0; i < assignmentSnap.length; i++) {
         const element = assignmentSnap[i].data();
         const docId = assignmentSnap[i].id;
         this.mapAssignments[docId] = element;
       }
-    
+
       querycount += 1;
       if (querycount >= 3) {
         this.onSelect(this.currentProfile['profileid']);
@@ -154,7 +154,7 @@ export class ParticipantAssignmentBoardComponent {
   ngOnInit(): void {
     const dateOnly = new Date(this.currentDate);
     dateOnly.setHours(0, 0, 0, 0);
-    this.currentTimestampSeconds = Math.floor(dateOnly.getTime() / 1000);    
+    this.currentTimestampSeconds = Math.floor(dateOnly.getTime() / 1000);
     console.log(this.dataSource.data,"test datasource");
   }
 
@@ -169,7 +169,7 @@ export class ParticipantAssignmentBoardComponent {
   }
 
   filterOptions(): void {
-    this.filteredKeys = this.getKeys(this.mapProfile).filter(key => 
+    this.filteredKeys = this.getKeys(this.mapProfile).filter(key =>
       this.mapProfile[key].toLowerCase().includes(this.searchTerm.toLowerCase())
     );
   }
@@ -194,14 +194,14 @@ export class ParticipantAssignmentBoardComponent {
   loadParticipantAssignments(selectedMarathon: any) {
     console.log(this.currentProfile['profileid'], "current profile");
     console.log("selectedMarathon", selectedMarathon);
-    
-    collectionSnapshots(query(collection(this.firestore,"big participants assignments"), 
+
+    collectionSnapshots(query(collection(this.firestore,"big participants assignments"),
      where("profileid", "==", this.currentProfile['profileid']),where("marathonref", "==", selectedMarathon['marathonref'])))
       .pipe(takeUntil(this.subscription))
       .subscribe(assignmentsSnap => {
       this.allActivities = [];
       this.mapParticipantAssignments = {};
-      
+
       assignmentsSnap.forEach(action => {
         const participantAssignment = action.data();
         const assignmentId = participantAssignment['assignmentref'].id;
@@ -242,7 +242,7 @@ export class ParticipantAssignmentBoardComponent {
     this.allActivities.forEach(activity => {
       const startDateTime = this.createDateTime(activity.startdate, activity.startdate);
       const endDateTime = this.createDateTime(activity.enddate, activity.enddate);
-      
+
       if (activity.originalStatus === 'completed') {
         categories.completed.push(activity);
       } else if (activity.originalStatus === 'rework') {
@@ -262,13 +262,13 @@ export class ParticipantAssignmentBoardComponent {
       const aEnd = this.createDateTime(a.enddate, a.enddate);
       const bStart = this.createDateTime(b.startdate, b.startdate);
       const bEnd = this.createDateTime(b.enddate, b.enddate);
-      
+
       const aIsOngoing = now >= aStart && now <= aEnd;
       const bIsOngoing = now >= bStart && now <= bEnd;
-      
+
       if (aIsOngoing && !bIsOngoing) return -1;
       if (!aIsOngoing && bIsOngoing) return 1;
-      
+
       return aStart.getTime() - bStart.getTime();
     });
 
@@ -277,10 +277,10 @@ export class ParticipantAssignmentBoardComponent {
 
   createDateTime(date: any, time: any): Date {
     if (!date || !time) return new Date(0);
-    
+
     const d = date.toDate();
     const t = time.toDate();
-    
+
     return new Date(
       d.getFullYear(),
       d.getMonth(),
@@ -299,11 +299,11 @@ export class ParticipantAssignmentBoardComponent {
       where("profileid", "==", this.currentProfile['profileid']))).pipe(takeUntil(this.subscription)).subscribe(assignmentsSnap => {
         Object.keys(this.marathonMap).forEach(marathonId => {
           this.marathonMap[marathonId].pending = 0;
-        });      
+        });
         if (assignmentsSnap.length != 0) {
           for (let i = 0; i < assignmentsSnap.length; i++) {
             const assignmentData = assignmentsSnap[i].data();
-            const marathonRefId = assignmentData['marathonref'].id;          
+            const marathonRefId = assignmentData['marathonref'].id;
             if (assignmentData['status'] !== 'completed') {
               this.marathonMap[marathonRefId].pending++;
             }
@@ -344,7 +344,7 @@ export class ParticipantAssignmentBoardComponent {
     }
     this.dataSource.data = filteredData;;
   }
- 
+
   formatDate(date: any): string {
     if (!date) return '';
     if (date.toDate) {
@@ -352,19 +352,19 @@ export class ParticipantAssignmentBoardComponent {
     }
     return formatDate(date, 'EEE, MMM d, y, h:mm a', 'en-US');
   }
-  
+
   hasUpcomingZoomCall(): boolean {
-    return this.allActivities.some(activity => 
-      activity.assignmenttype === 'Zoom Call' && 
+    return this.allActivities.some(activity =>
+      activity.assignmenttype === 'Zoom Call' &&
       this.checkActivityStart(activity));
   }
 
   getNextZoomCall() {
-    const upcomingCalls = this.allActivities.filter(activity => 
-      activity.assignmenttype === 'Zoom Call' && 
+    const upcomingCalls = this.allActivities.filter(activity =>
+      activity.assignmenttype === 'Zoom Call' &&
       this.checkActivityStart(activity));
     if (upcomingCalls.length === 0) return null;
-    return upcomingCalls.sort((a, b) => 
+    return upcomingCalls.sort((a, b) =>
       a.startdate.toDate().getTime() - b.startdate.toDate().getTime())[0];
   }
 
@@ -384,7 +384,7 @@ export class ParticipantAssignmentBoardComponent {
         }
       }).then(() => {
         window.location.reload();
-      }); 
+      });
     } else {
       alert("not allowed")
     }
@@ -515,11 +515,13 @@ export class ParticipantAssignmentBoardComponent {
         from:'bigcohorts',
       }
     })
-    
+
     window.open(url.toString(), "_blank")
   }
 
   fillForm(activity: any) {
+    console.log(activity);
+
     console.log(activity);
 
     const formTemplateId = activity.selectedform;
@@ -527,38 +529,63 @@ export class ParticipantAssignmentBoardComponent {
     const assignmentId = activity.docid;
     const participantAssignmentId = activity.participantAssignmentId;
     const activityLog = activity.activityLog;
-    
-    // let url = `/formbasedsubmission?id=${formTemplateId}&type=form&queueid=${assignmentId}&profileid=${profileId}&participantAssignmentId=${participantAssignmentId}`;
-    let url = `/formtemplate?id=${formTemplateId}&type=form&queueid=${assignmentId}&profileid=${profileId}&participantAssignmentId=${participantAssignmentId}`;
+
+    let url = `/formtemplate?id=${formTemplateId}&type=form&queueid=${assignmentId}&profileid=${profileId}&participantAssignmentId=${participantAssignmentId}&source=participant`;
+    if (activity.originalStatus === 'rework' && activity.activityref) {
+      const activityrefId = typeof activity.activityref === 'string' ? activity.activityref.split('/').pop() : activity.activityref?.id;
+      url += `&patchdata=formsByClient/${activityrefId}`;
+    }
     if (activityLog && activityLog.length > 0) {
       const encodedNotes = encodeURIComponent(JSON.stringify(activityLog[activityLog.length - 1].notes));
       url += `&reviewLast=true&reviewNotes=${encodedNotes}`;
     }
-    console.log(url);
-    
+
     window.open(url.toString(), "_blank");
   }
 
+  // reviewLastForm(activity: any){
+  //   console.log(activity);
+
+  //   const formtemplateid = activity.formtemplate;
+  //   const profileId = activity.profileId;
+  //   const activityref = activity.activityref;
+  //   const summary = activity.summary;
+  //   const participantAssignmentId = activity.participantAssignmentId;
+  //   let url;
+  //   const encodedNotes = encodeURIComponent(JSON.stringify(summary));
+  //   if (activity.originalStatus === 'completed') {
+  //     // url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;
+  //     url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;
+  //   } else {
+  //     // url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;
+  //     url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;
+  //   }
+  //   window.open(url.toString(),"_blank")
+  // }
+
   reviewLastForm(activity: any){
     console.log(activity);
-    
+
     const formtemplateid = activity.formtemplate;
     const profileId = activity.profileId;
     const activityref = activity.activityref;
     const summary = activity.summary;
     const participantAssignmentId = activity.participantAssignmentId;
+    if (!activityref) {
+      alert('Form submission not found. Please ask the participant to resubmit.');
+      return;
+    }
+    const patchPath = 'formsByClient/' + activityref.id;
     let url;
     const encodedNotes = encodeURIComponent(JSON.stringify(summary));
     if (activity.originalStatus === 'completed') {
-      // url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;  
-      url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=" + true + "&reviewNotes=" + encodedNotes;  
+      url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + patchPath + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewCompleted=true&reviewNotes=" + encodedNotes + "&source=participant";
     } else {
-      // url = "/formbasedsubmission?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;  
-      url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + activityref.id + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=" + true;  
+      url = "/formtemplate?id=" + formtemplateid + "&type=form&patchdata=" + patchPath + "&profileid=" + profileId + "&participantAssignmentId=" + participantAssignmentId + "&viewFilledForm=true" + "&source=participant";
     }
-    window.open(url.toString(),"_blank") 
+    window.open(url.toString(),"_blank")
   }
-  
+
   checkActivityStart(activity: any): boolean {
     if (!activity?.startdate || !activity?.startdate || !activity?.enddate || !activity?.enddate) {
       return false;
@@ -607,14 +634,14 @@ export class ParticipantAssignmentBoardComponent {
 
   openPrescribeATC(activity) {
     // console.log(activity);
-    const url = this.router.createUrlTree(['/prescribeATC'], { 
-      queryParams: { 
+    const url = this.router.createUrlTree(['/prescribeATC'], {
+      queryParams: {
         validation: true,
         profileid: this.currentProfile['profileid'],
         marathonid : activity.marathonref.id,
         assignmentid : activity.docid,
         participantassignmentid : activity.participantAssignmentId
-      } 
+      }
     }).toString();
     window.open(url, '_blank');
   }
@@ -702,14 +729,14 @@ export class ParticipantAssignmentBoardComponent {
 
   prescribeTripleATC(activity) {
     // console.log(activity);
-    const url = this.router.createUrlTree(['/addtripleATC'], { 
-      queryParams: { 
+    const url = this.router.createUrlTree(['/addtripleATC'], {
+      queryParams: {
         validation: true,
         profileid: this.currentProfile['profileid'],
         marathonid : activity.marathonref.id,
         assignmentid : activity.docid,
         participantassignmentid : activity.participantAssignmentId
-      } 
+      }
     }).toString();
     window.open(url, '_blank');
   }

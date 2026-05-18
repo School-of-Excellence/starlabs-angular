@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
-import { Firestore,collection,getDocs ,collectionData,query,where, orderBy} from '@angular/fire/firestore';
+import { getFirestore, collection,getDocs ,collectionData,query,where, orderBy} from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
@@ -60,16 +60,17 @@ export class UpdateAdjustmentTaxonomyComponent implements OnInit {
 
   separatorKeysCodes: number[] = [ENTER, COMMA];
   
+  firestoreDefault = getFirestore()
+
   constructor(
-    private firestore:Firestore,
     private dialog:MatDialog,
     private _snackBar: MatSnackBar
     ){ 
-    const profileCol = collection(this.firestore, "profile_data");
+    const profileCol = collection(this.firestoreDefault, "profile_data");
     getDocs(profileCol).then(snap => {
       this.profileData = snap.docs.map(e => e.data())
     })
-      const taxonomyCol = collection(this.firestore, "atc taxonomy");
+      const taxonomyCol = collection(this.firestoreDefault, "atc taxonomy");
       this.taxonomyListSubscription = collectionData(taxonomyCol, { idField: 'id' }).subscribe(data => {
       this.taxonomyList = data;
       for (let i = 0; i < this.taxonomyList.length; i++) {
@@ -105,8 +106,9 @@ export class UpdateAdjustmentTaxonomyComponent implements OnInit {
       },
       disableClose:true
     })
+    const firestoreATC = getFirestore("firestore-atc")
     const atcAlphaQuery = query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where("profileid", "==", profileId),
         orderBy("prescription_date", "desc")
       );

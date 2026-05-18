@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, computed, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { collection, collectionData, doc, DocumentData, onSnapshot, documentId, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, onSnapshot, documentId, Firestore, getDoc, getDocs, getFirestore, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { combineLatest, firstValueFrom, Observable, Subject, Subscription } from 'rxjs';
 import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-bulk-invitation.component';
@@ -5225,6 +5225,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
   async fetchATCParticipants() {
     if (!this.selectedQueue) return;
+    const firestoreATC = getFirestore("firestore-atc")
 
     this.atcValidatedProfileIds = new Set<string>();
     this.atcUnvalidatedProfileIds = new Set<string>();
@@ -5241,7 +5242,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     const [atcAlphaSnap, atcValidateSnap] = await Promise.all([
       getDocs(query(
-        collection(this.firestore, 'atc_alpha'),
+        collection(firestoreATC, 'atc_alpha'),
         or(
           where('queueid', '==', this.selectedQueue.docid),
           and(
@@ -5251,7 +5252,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         )
       )),
       getDocs(query(
-        collection(this.firestore, 'atc_to_validate'),
+        collection(firestoreATC, 'atc_to_validate'),
         or(
           where('queueid', '==', this.selectedQueue.docid),
           and(

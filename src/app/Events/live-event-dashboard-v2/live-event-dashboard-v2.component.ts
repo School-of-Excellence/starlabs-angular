@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, ElementRef, HostListener, ViewChild, inject } from '@angular/core';
-import { collection, collectionData, Firestore, getDocs, query, where, documentId, doc, setDoc, updateDoc, getDoc } from '@angular/fire/firestore';
+import { collection, collectionData, getFirestore, getDocs, query, where, documentId, doc, setDoc, updateDoc, getDoc } from '@angular/fire/firestore';
 import { DocumentReference, orderBy } from 'firebase/firestore';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { FormsModule } from '@angular/forms';
@@ -421,7 +421,10 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
 
   loggedInProfileid
 
-  constructor(private firestore: Firestore, private elementRef: ElementRef, public dialog: MatDialog, private guard : AuthguardService, public http : HttpClient) {
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
+  constructor(private elementRef: ElementRef, public dialog: MatDialog, private guard : AuthguardService, public http : HttpClient) {
     guard.getRoles().then(roles =>{
       this.loggedInProfileid = roles["profile_ref"].id
     })
@@ -604,7 +607,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     await this.loadParticipantMetadata();
     this.subscribeToClientIssues();
 
-    await getDocs(collection(this.firestore, "journey")).then(snap => {
+    await getDocs(collection(this.firestoreDefault, "journey")).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const journeyData = snap.docs[i].data();
         journeyData['docid'] = snap.docs[i].id;
@@ -612,7 +615,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
       }
     });
 
-    collectionData(query(collection(this.firestore, "participant tags")), { idField: 'docid' }).pipe(takeUntil(this.unsubscribe$)).subscribe(tags => {
+    collectionData(query(collection(this.firestoreDefault, "participant tags")), { idField: 'docid' }).pipe(takeUntil(this.unsubscribe$)).subscribe(tags => {
       this.availableTags = tags;
       this.mapTagsName = {};
       this.mapTagsMetaData = {};
@@ -625,7 +628,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     });
     
     try {
-      const eventsSnapshot = await getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc')));
+      const eventsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'event collection'), orderBy('end_date', 'desc')));
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -773,7 +776,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     this.isLoadingCohorts = true;
     
     this.cohortsSubscription = collectionData(
-      query(collection(this.firestore, 'big cohorts'), where('eventref', '==', this.selectedEvent.docref))
+      query(collection(this.firestoreDefault, 'big cohorts'), where('eventref', '==', this.selectedEvent.docref))
     ).subscribe({
       next: (docs) => {
         console.log(docs);
@@ -855,7 +858,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     eventStartDate.setHours(0, 0, 0, 0);
     
     this.newUserDataSubscription = collectionData(
-      query(collection(this.firestore, 'new_user_data'))
+      query(collection(this.firestoreDefault, 'new_user_data'))
     ).subscribe({
       next: (docs) => {
         this.newUserDataMap = {};
@@ -969,7 +972,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     this.queueRangeEndDate = null;
     
     try {
-      const queuesSnapshot = await getDocs(query(collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc')));
+      const queuesSnapshot = await getDocs(query(collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc')));
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -1027,7 +1030,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     this.queueRangeEndDate = null;
     
     try {
-      const queuesSnapshot = await getDocs(query(collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc')));
+      const queuesSnapshot = await getDocs(query(collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc')));
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -1395,7 +1398,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     try {
       const participantsSnapshot = await getDocs(
         query(
-          collection(this.firestore, 'event participation request'),
+          collection(this.firestoreDefault, 'event participation request'),
           where('eventref', '==', this.selectedEvent!.docref),
           where('status', 'in', ['approved', 'attended'])
         )
@@ -1449,7 +1452,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
   async loadParticipantMetadata() {
     this.participantMetadataMap = {};
     try {
-      const metadataSnapshot = await getDocs(query(collection(this.firestore, 'participant metadata'), orderBy('name', 'asc')));
+      const metadataSnapshot = await getDocs(query(collection(this.firestoreDefault, 'participant metadata'), orderBy('name', 'asc')));
       metadataSnapshot.docs.forEach(doc => {
         const data = doc.data();
         this.participantMetadataMap[doc.id] = {
@@ -1475,7 +1478,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     
     this.isLoadingClientIssues = true;
     
-    getDocs(query(collection(this.firestore, 'chat config'), where(documentId(), '==', '0jqtiq3sxtbLVcEGMDhW')))
+    getDocs(query(collection(this.firestoreDefault, 'chat config'), where(documentId(), '==', '0jqtiq3sxtbLVcEGMDhW')))
       .then(configDoc => {
         if (!configDoc.empty) {
           const configData = configDoc.docs[0].data();
@@ -1484,7 +1487,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
       });
     
     this.clientIssuesSubscription = collectionData(
-      query(collection(this.firestore, 'clientissue'), where('status.status', '==', 'Open'))
+      query(collection(this.firestoreDefault, 'clientissue'), where('status.status', '==', 'Open'))
     ).subscribe({
       next: (issues) => {
         this.clientIssues = issues.map((issue: any, index) => ({
@@ -1752,7 +1755,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     }
     
     this.attendanceSubscription = collectionData(
-      query(collection(this.firestore, 'arena e-ticket log'), where('eventref', '==', this.selectedEvent.docref))
+      query(collection(this.firestoreDefault, 'arena e-ticket log'), where('eventref', '==', this.selectedEvent.docref))
     ).subscribe({
       next: (list) => {
         this.mapAttendence = {};
@@ -1820,7 +1823,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     }
     
     this.eTicketSubscription = collectionData(
-      query(collection(this.firestore, 'arena e-ticket'), where('eventref', '==', this.selectedEvent.docref),where('active','==',true))
+      query(collection(this.firestoreDefault, 'arena e-ticket'), where('eventref', '==', this.selectedEvent.docref),where('active','==',true))
     ).subscribe({
       next: (list) => {
         const scannedProfileIds = new Set<string>();
@@ -2205,7 +2208,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     
     try {
       const variationPromises = this.selectedQueueRefs.map(queueRef => 
-        getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', queueRef)))
+        getDocs(query(collection(this.firestoreDefault, 'queue variation'), where('queueref', '==', queueRef)))
       );
       
       const variationSnapshots = await Promise.all(variationPromises);
@@ -2247,7 +2250,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     }
     
     this.atcCompletedSubscription = collectionData(
-      query(collection(this.firestore, 'atc_alpha'), where('product', 'in', this.atcModels))
+      query(collection(this.firestoreATC, 'atc_alpha'), where('product', 'in', this.atcModels))
     ).subscribe({
       next: (docs) => {
         const atcCompletedDocs: AtcDocument[] = [];
@@ -2279,7 +2282,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     });
     
     this.atcToValidateSubscription = collectionData(
-      query(collection(this.firestore, 'atc_to_validate'), where('product', 'in', this.atcModels))
+      query(collection(this.firestoreATC, 'atc_to_validate'), where('product', 'in', this.atcModels))
     ).subscribe({
       next: (docs) => {
         const atcToValidateDocs: AtcDocument[] = [];
@@ -2326,13 +2329,13 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     }
     
     try {
-      const videoAskSnapshot = await getDocs(query(collection(this.firestore, 'arenavideoask'), where('eventref', '==', this.selectedEvent.docref)));
+      const videoAskSnapshot = await getDocs(query(collection(this.firestoreDefault, 'arenavideoask'), where('eventref', '==', this.selectedEvent.docref)));
       const arenavideoAskId: string[] = [];
       videoAskSnapshot.docs.forEach((doc) => { arenavideoAskId.push(doc.id); });
       
       if (arenavideoAskId.length > 0) {
         this.videoAskSubscription = collectionData(
-          query(collection(this.firestore, 'participantvideoask'), where('videoaskid', 'in', arenavideoAskId))
+          query(collection(this.firestoreDefault, 'participantvideoask'), where('videoaskid', 'in', arenavideoAskId))
         ).subscribe({
           next: (docs) => {
             const allVideoAskProfileIds: string[] = [];
@@ -2753,7 +2756,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
               url = ""
             } 
 
-            const docRef = doc(collection(this.firestore , 'wati archive'), result['archiveid']);
+            const docRef = doc(collection(this.firestoreDefault , 'wati archive'), result['archiveid']);
             await updateDoc(docRef, {
               templatestatus: "created",
               templatevalidated: true,
@@ -2793,7 +2796,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
       if(result != null && result != undefined){
         console.log(result);
         
-        const docRef = doc(collection(this.firestore,"email archive"),result['docid']);
+        const docRef = doc(collection(this.firestoreDefault,"email archive"),result['docid']);
         if(result['status'] == 'queued' || result['status'] == 'send'){
           await setDoc(docRef,result,{merge:true}).then(() => {
             this.guard.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK",600);
@@ -2923,7 +2926,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     }
     
     this.changeWorkSubscription = collectionData(
-      query(collection(this.firestore, 'livechangework'))
+      query(collection(this.firestoreDefault, 'livechangework'))
     ).subscribe({
       next: (docs) => {
         console.log(docs.length);
@@ -3200,7 +3203,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
       // Step 1: Find arena events where hero event is true for this event
       const arenaEventsSnapshot = await getDocs(
         query(
-          collection(this.firestore, 'arena events'),
+          collection(this.firestoreDefault, 'arena events'),
           where('eventref', '==', this.selectedEvent.docref),
           where('heroevent', '==', true)
         )
@@ -3313,7 +3316,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     try {
       // Step 1: Fetch videoasktags from classify collection using eventref
       const classifySnapshot = await getDoc(
-        doc(collection(this.firestore, 'classify',),'eventtags')
+        doc(collection(this.firestoreDefault, 'classify',),'eventtags')
       );
       
       if (!classifySnapshot.exists()) {
@@ -3385,7 +3388,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
   //   }
   
   //   // Get arenavideoask IDs for this event (reuse existing logic)
-  //   getDocs(query(collection(this.firestore, 'arenavideoask'), where('eventref', '==', this.selectedEvent!.docref))).then(videoAskSnapshot => {
+  //   getDocs(query(collection(this.firestoreDefault, 'arenavideoask'), where('eventref', '==', this.selectedEvent!.docref))).then(videoAskSnapshot => {
   //     const arenaVideoAskIds: string[] = [];
   //     videoAskSnapshot.docs.forEach(doc => arenaVideoAskIds.push(doc.id));
 
@@ -3395,7 +3398,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
   //     }
 
   //     this.actionQueueSubscription = collectionData(
-  //       query(collection(this.firestore, 'participantvideoask'), where('tags','array-contains-any',this.videoAskTags))
+  //       query(collection(this.firestoreDefault, 'participantvideoask'), where('tags','array-contains-any',this.videoAskTags))
   //     ).subscribe({
   //       next: (docs) => {
   //         // Reset actionQueueData
@@ -4112,7 +4115,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     try {
       // Fetch firsttimetags from classify collection, eventtags document
       const classifySnapshot = await getDoc(
-        doc(collection(this.firestore, 'classify',),'eventtags')
+        doc(collection(this.firestoreDefault, 'classify',),'eventtags')
       );
       
       if (!classifySnapshot.exists()) {
@@ -4346,7 +4349,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     this.isLoadingZones = true;
     
     this.zonesSubscription = collectionData(
-      query(collection(this.firestore, 'event participant zones'), where('eventref', '==', this.selectedEvent.docref))
+      query(collection(this.firestoreDefault, 'event participant zones'), where('eventref', '==', this.selectedEvent.docref))
     ).subscribe({
       next: (docs) => {
         this.eventParticipantZones = docs;
@@ -4481,7 +4484,7 @@ export class LiveEventDashboardV2Component implements OnInit, OnDestroy {
     
     this.draftAtcSubscription = collectionData(
       query(
-        collection(this.firestore, 'temporary_ATC'),
+        collection(this.firestoreATC, 'temporary_ATC'),
         where('delete', '==', false),
       )
     ).subscribe({
