@@ -853,3 +853,140 @@ tr:hover {
   margin-top: 2px;
   word-break: break-word;
 }
+.import-preview-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: sans-serif;
+}
+
+.import-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 20px 24px 4px;
+}
+
+.close-icon {
+  cursor: pointer;
+  color: #666;
+}
+
+.import-preview-subtitle {
+  font-size: 13px;
+  color: #888;
+  padding: 0 24px 12px;
+  margin: 0;
+}
+
+.import-summary-cards {
+  display: flex;
+  gap: 10px;
+  padding: 0 24px 16px;
+}
+
+.summary-card {
+  flex: 1;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.summary-card .card-count {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.summary-card .card-label {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.summary-card.total    { background: #eef0ff; color: #4a5af7; }
+.summary-card.will-add { background: #edfaf3; color: #27ae60; }
+.summary-card.in-queue { background: #fff8ec; color: #e67e22; }
+.summary-card.no-product { background: #fff0f0; color: #e74c3c; }
+
+.import-preview-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px;
+  max-height: 400px;
+}
+
+.section { margin-bottom: 16px; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.will-add-header  { color: #27ae60; }
+.in-queue-header  { color: #e67e22; }
+.no-product-header { color: #e74c3c; }
+
+.section-badge {
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+
+.will-add-badge   { background: #27ae60; }
+.in-queue-badge   { background: #e67e22; }
+.no-product-badge { background: #e74c3c; }
+
+.participant-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+}
+
+.will-add-card   { background: #f4fdf8; border-color: #c3f0d6; }
+.in-queue-card   { background: #fffbf2; border-color: #fde8c0; }
+.no-product-card { background: #fff5f5; border-color: #fdd0d0; }
+
+.participant-name  { font-size: 14px; font-weight: 600; color: #222; }
+.participant-email { font-size: 12px; color: #888; margin-top: 2px; }
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ready-badge { color: #27ae60; }
+.queue-badge { color: #e67e22; }
+
+.more-label {
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  padding: 6px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+.will-add-more   { background: #f4fdf8; color: #27ae60; }
+.in-queue-more   { background: #fffbf2; color: #e67e22; }
+.no-product-more { background: #fff5f5; color: #e74c3c; }
+
+.import-preview-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+}

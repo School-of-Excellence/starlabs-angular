@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
+import { CommonModule,SlicePipe } from '@angular/common';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -29,7 +29,19 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
+import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 
+interface ImportPreviewParticipant {
+  name: string;
+  email: string;
+}
+
+interface ImportPreviewData {
+  totalRows: number;
+  willBeAdded: ImportPreviewParticipant[];
+  alreadyInQueue: ImportPreviewParticipant[];
+  noProduct: ImportPreviewParticipant[];
+}
 @Component({
   selector: 'app-initiate-event-product',
   imports: [
@@ -37,6 +49,7 @@ import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage'
     MatInputModule,
     FormsModule,
     CommonModule,
+    SlicePipe,
     MatSelectModule,
     MatIconModule,
     MatTableModule,
@@ -114,6 +127,7 @@ export class InitiateEventProductComponent {
 
   @ViewChild('participantSheet') participantSheet!: TemplateRef<any>;
   @ViewChild('initiationSummaryDialog') initiationSummaryDialog!: TemplateRef<any>;
+  @ViewChild('importPreviewDialog') importPreviewDialog!: TemplateRef<any>;
 
   readonly INITIATE_CHUNK_SIZE = 20;
   readonly INITIATE_CHUNK_DELAY_MS = 5000;
@@ -121,9 +135,19 @@ export class InitiateEventProductComponent {
   bottomSheetParticipants: any[] = [];
   private destroy$ = new Subject<void>();
   private storage = inject(Storage);
-
-
-
+  importPreviewData: ImportPreviewData = {
+    totalRows: 0,
+    willBeAdded: [],
+    alreadyInQueue: [],
+    noProduct: []
+  };
+  expandedSections: Record<string, boolean> = {
+    willBeAdded: false,
+    alreadyInQueue: false,
+    noProduct: false
+  };
+  noProductSelection = new SelectionModel<string>(true, []);
+  lastImportedParticipants: { name: string, email: string }[] = [];
 
   constructor(
     public firestore: Firestore,
@@ -596,13 +620,13 @@ export class InitiateEventProductComponent {
           });
           return;
         }
-        
+
         const loading = this.dialog.open(LoadingProgressComponent, {
           disableClose: true,
           autoFocus: false,
-          data: {msg: "Importing participants..."}
+          data: { msg: "Importing participants..." }
         });
-        
+
         const reader = new FileReader();
         reader.onload = (e) => {
           const data = new Uint8Array(e.target.result as ArrayBuffer);
@@ -610,8 +634,10 @@ export class InitiateEventProductComponent {
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
           this.missingParticipants = [];
-          const excelParticipants: {name: string, email: string}[] = [];
+          const excelParticipants: { name: string, email: string }[] = [];
+
           jsonData.forEach((row: any[], index) => {
             if (index > 0 && row[0] && row[1]) {
               const name = row[0].toString().trim();
@@ -621,56 +647,77 @@ export class InitiateEventProductComponent {
               }
             }
           });
-          console.log('Excel Participants:', excelParticipants);
-          this.selection.clear();
-          const tableEmails = new Set(
-            this.participantProductList.map(p => 
-              p.email ? p.email.toString().trim().toLowerCase() : ''
-            ).filter(email => email !== '')
-          );
-          this.missingParticipants = excelParticipants.filter(
-            excelPerson => !tableEmails.has(excelPerson.email)
-          );
-          const selectedEmails = new Set<string>();
-          let matchCount = 0;
-          this.participantProductList.forEach(participant => {
-            const participantEmail = participant.email ? participant.email.toString().trim().toLowerCase() : '';
-            if (participantEmail && excelParticipants.some(p => p.email === participantEmail)) {
-              if (!selectedEmails.has(participantEmail)) {
-                if(!this.activeArray.includes(participantEmail)) {
-                  this.selection.select(participant)
-                  selectedEmails.add(participantEmail)
-                  matchCount++;
-                } else {
-                  this.alreadyInQueue.push(participant.profileid);
-                }
-                
-              }
-              // this.selection.select(participant);
-              // matchCount++;
+
+          const tableEmailMap = new Map<string, any>();
+          this.participantProductList.forEach(p => {
+            const email = p.email ? p.email.toString().trim().toLowerCase() : '';
+            if (email) tableEmailMap.set(email, p);
+          });
+
+          const activeEmailSet = new Set(this.activeArray.map(e => e.toLowerCase()));
+          const willBeAdded: ImportPreviewParticipant[] = [];
+          const alreadyInQueue: ImportPreviewParticipant[] = [];
+          const noProduct: ImportPreviewParticipant[] = [];
+          const seenEmails = new Set<string>();
+
+          excelParticipants.forEach(person => {
+            if (seenEmails.has(person.email)) return;
+            seenEmails.add(person.email);
+
+            if (activeEmailSet.has(person.email)) {
+              alreadyInQueue.push({ name: person.name, email: person.email });
+            } else if (!tableEmailMap.has(person.email)) {
+              noProduct.push({ name: person.name, email: person.email });
+            } else {
+              willBeAdded.push({ name: person.name, email: person.email });
             }
           });
-          if (matchCount > 0) {
-            this.snackbar.open(`Found and selected ${matchCount} matching participants`, 'OK', {
-              duration: 5000
-            });
-          } else {
-            this.snackbar.open('No matching participants found in the list', 'OK', {
-              duration: 5000
-            });
-          }
-          if (this.missingParticipants.length > 0) {
-            console.log('Missing participants:', this.missingParticipants);
-          }
+          this.lastImportedParticipants = excelParticipants;
+          this.importPreviewData = {
+            totalRows: excelParticipants.length,
+            willBeAdded,
+            alreadyInQueue,
+            noProduct
+          };
           loading.close();
+          const dialogRef = this.dialog.open(this.importPreviewDialog, {
+            width: '580px',
+            maxHeight: '90vh',
+            disableClose: true,
+            autoFocus: false
+          });
+          this.expandedSections = {
+            willBeAdded: false,
+            alreadyInQueue: false,
+            noProduct: false
+          };
+          this.noProductSelection.clear();
+          dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+            if (!confirmed) return;
+            // Apply selection
+            this.selection.clear();
+            let matchCount = 0;
+            const selectedEmails = new Set<string>();
+
+            this.participantProductList.forEach(participant => {
+              const participantEmail = participant.email? participant.email.toString().trim().toLowerCase(): '';
+              if (participantEmail &&willBeAdded.some(p => p.email === participantEmail) &&!selectedEmails.has(participantEmail)) {
+                this.selection.select(participant);
+                selectedEmails.add(participantEmail);
+                matchCount++;
+              }
+            });
+            this.missingParticipants = noProduct;
+
+            if (matchCount > 0) {
+              this.snackbar.open(`Selected ${matchCount} participants`, 'OK', { duration: 3000 });
+            }
+          });
         };
         reader.onerror = () => {
           loading.close();
-          this.snackbar.open('Error reading file', 'OK', {
-            duration: 5000
-          });
+          this.snackbar.open('Error reading file', 'OK', { duration: 5000 });
         };
-        
         reader.readAsArrayBuffer(file);
       }
     });
@@ -683,6 +730,98 @@ export class InitiateEventProductComponent {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Missing Participants');
     const fileName = 'Missing_Participants.xlsx';
     XLSX.writeFile(workbook, fileName);
+  }
+
+  assignProduct() {
+    const selected = this.noProductSelection.selected;
+    if (selected.length === 0) return;
+
+    const selectedParticipants = selected.map(email => ({
+      profileid: this.mapEmailData[email]?.['profileid'],
+      name: this.mapEmailData[email]?.['name'],
+      email: email
+    })).filter(p => p.profileid);
+
+    this.dialog.open(BulkAddProductsComponent, {
+      data: selectedParticipants,
+      width: '70vw',
+      disableClose: true
+      }).afterClosed().subscribe(async () => {
+      if (!this.selectedArena) return;
+
+      const savedDeliverySet = this.selectedDeliverySet;
+      const savedQueueVariation = this.selectedQueueVariation;
+
+      await this.onArenaEventSelect(this.selectedArena);
+
+      this.selectedDeliverySet = savedDeliverySet;
+      this.selectedQueueVariation = savedQueueVariation;
+
+      const tableEmailMap = new Map<string, any>();
+      this.participantProductList.forEach(p => {
+        const email = p.email?.toString().trim().toLowerCase();
+        if (email) tableEmailMap.set(email, p);
+      });
+
+      const activeEmailSet = new Set(this.activeArray.map(e => e.toLowerCase()));
+      const willBeAdded: ImportPreviewParticipant[] = [];
+      const alreadyInQueue: ImportPreviewParticipant[] = [];
+      const noProduct: ImportPreviewParticipant[] = [];
+
+      this.lastImportedParticipants.forEach(person => {
+        if (activeEmailSet.has(person.email)) {
+          alreadyInQueue.push(person);
+        } else if (!tableEmailMap.has(person.email)) {
+          noProduct.push(person);
+        } else {
+          willBeAdded.push(person);
+        }
+      });
+
+      this.importPreviewData = {
+        totalRows: this.lastImportedParticipants.length,
+        willBeAdded,
+        alreadyInQueue,
+        noProduct
+      };
+
+      this.noProductSelection.clear();
+      this.expandedSections = { willBeAdded: false, alreadyInQueue: false, noProduct: false };
+      this.dialog.closeAll();
+      this.dialog.open(this.importPreviewDialog, {
+        width: '580px',
+        maxHeight: '90vh',
+        disableClose: true,
+        autoFocus: false
+      }).afterClosed().subscribe((confirmed: boolean) => {
+        if (!confirmed) return;
+
+        this.selection.clear();
+        const selectedEmails = new Set<string>();
+        let matchCount = 0;
+
+        this.participantProductList.forEach(participant => {
+          const email = participant.email?.toString().trim().toLowerCase();
+          if (email && willBeAdded.some(p => p.email === email) && !selectedEmails.has(email)) {
+            this.selection.select(participant);
+            selectedEmails.add(email);
+            matchCount++;
+          }
+        });
+
+        this.missingParticipants = noProduct;
+        if (matchCount > 0) {
+          this.snackbar.open(`Selected ${matchCount} participants`, 'OK', { duration: 3000 });
+        }
+      });
+    });
+  }
+  toggleAllNoProduct(checked: boolean) {
+    if (checked) {
+      this.importPreviewData.noProduct.forEach(p => this.noProductSelection.select(p.email));
+    } else {
+      this.noProductSelection.clear();
+    }
   }
 
   returnEvent(){
