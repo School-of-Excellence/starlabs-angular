@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
-import { collection, Firestore, getDocs, query, where } from '@angular/fire/firestore';
+import { collection, Firestore, getDocs, getFirestore, query, where } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonModule } from '@angular/material/button';
@@ -111,7 +111,8 @@ export class ReportsDialogComponent {
       });
     });
 
-    const evolutionDataPromise = getDocs(query(collection(this.firestore, 'atc_alpha'), where('profileid', '==', this.profileid))).then((snapshot) => {
+    const firestoreATC = getFirestore("firestore-atc");
+    const evolutionDataPromise = getDocs(query(collection(firestoreATC, 'atc_alpha'), where('profileid', '==', this.profileid))).then((snapshot) => {
       console.log("Date of birth",this.dobMap[this.data.element.profileid]);
       const dobTimestamp = this.dobMap[this.data.element.profileid];
       const birthDate = new Date(dobTimestamp.seconds * 1000);

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { collection, Firestore ,collectionData, where,query,doc,getDoc,updateDoc,orderBy,onSnapshot,getDocs} from '@angular/fire/firestore';
+import { collection, getFirestore ,collectionData, where,query,doc,getDoc,updateDoc,orderBy,onSnapshot,getDocs} from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
@@ -70,12 +70,15 @@ export class EitEducationAtcComponent implements OnInit {
   participantFilterValue = ''
   statusFilterValue = ''
 
-  constructor(public guard: AuthguardService, public firestore: Firestore, public router: Router,public dialog : MatDialog) {
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
+  constructor(public guard: AuthguardService, public router: Router,public dialog : MatDialog) {
     let loadingref = this.loading
     guard.getRoles().then(roles=>{
       guard.getProfileMap().then(e => this.mapProfile = e.map)
       this.loggedinID = roles.profile_ref.id
-      const queueCollection = collection(this.firestore, "queue generation");
+      const queueCollection = collection(this.firestoreDefault, "queue generation");
       collectionData(queueCollection, { idField: 'id' }).subscribe(async snap => {        
         this.queueList = snap
         if(this.queueList.length === 0){
@@ -99,7 +102,7 @@ export class EitEducationAtcComponent implements OnInit {
   }
 
   ngOnInit(): void {
-   const proceduresRef = collection(this.firestore, 'procedures');
+   const proceduresRef = collection(this.firestoreDefault, 'procedures');
    getDocs(proceduresRef).then(async snap => {     
      for (let i = 0; i < snap.docs.length; i++) {
         const element = snap.docs[i].data();
@@ -108,7 +111,7 @@ export class EitEducationAtcComponent implements OnInit {
       }
     })
 
-    const userRolesRef = query(collection(this.firestore, 'users_roles'), orderBy('name')  );
+    const userRolesRef = query(collection(this.firestoreDefault, 'users_roles'), orderBy('name')  );
       onSnapshot(userRolesRef, async (userRolesSnap) => {
       this.mentorProfile = [];
       for (let j = 0; j < userRolesSnap.docs.length; j++) {
@@ -122,7 +125,7 @@ export class EitEducationAtcComponent implements OnInit {
 
   async getOngoingQueue(){
     let loadingref = this.loading
-    const qref = query( collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc'));
+    const qref = query( collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc'));
     await getDocs(qref).then(async queuesnapshot => {      this.ongoingQueue = queuesnapshot.docs[0].data()
       if(this.ongoingQueue['queuestartdate'].toDate() < new Date() && this.ongoingQueue['queueenddate'].toDate() > new Date()){
         loadingref.close()
@@ -161,9 +164,9 @@ export class EitEducationAtcComponent implements OnInit {
  async getParticipantList(profileId:string){
     let loadingref = this.loading
     this.participantList = []
-    let profileref = doc(this.firestore, "profile_data", profileId);
+    let profileref = doc(this.firestoreDefault, "profile_data", profileId);
     let mapParticipantsToATC={}
-    const atcAlphaQuery = query( collection(this.firestore, "atc_alpha"), where("queueid", "==", this.ongoingQueue['docid']), orderBy("prescription_date", "asc"));
+    const atcAlphaQuery = query( collection(this.firestoreATC, "atc_alpha"), where("queueid", "==", this.ongoingQueue['docid']), orderBy("prescription_date", "asc"));
     await getDocs(atcAlphaQuery).then(async alphasnap => {      
       for (let j = 0; j < alphasnap.docs.length; j++) {
         const alphaelement = alphasnap.docs[j].data();
@@ -224,7 +227,7 @@ export class EitEducationAtcComponent implements OnInit {
   getParticipantListBySelectedQueue(){
     let loadingref = this.loading
     this.queueParticipants = []
-    const atcAlphaRef = collection(this.firestore, "atc_alpha");
+    const atcAlphaRef = collection(this.firestoreATC, "atc_alpha");
     const q = query( atcAlphaRef, where("queueid", "==", this.ongoingQueue['docid']), where("type", "==", "online"));
     onSnapshot(q, async alphasnap => {      
       for (let i = 0; i < alphasnap.docs.length; i++) {
@@ -247,7 +250,7 @@ export class EitEducationAtcComponent implements OnInit {
       }
       // this.filteredParticipants = this.queueParticipants.sort((a,b)=> a.prescription_date.toDate() - b.prescription_date.toDate())
     })
-    const atcToValidateRef = collection(this.firestore, "atc_to_validate");
+    const atcToValidateRef = collection(this.firestoreATC, "atc_to_validate");
     const p = query(atcToValidateRef,where("queueid", "==", this.ongoingQueue['docid']),where("type", "==", "online"),orderBy("prescription_date", "desc"));
     onSnapshot(p, async alphasnap => {
     for (let i = 0; i < alphasnap.docs.length; i++) {
@@ -275,10 +278,10 @@ export class EitEducationAtcComponent implements OnInit {
   async getTheirATC(profileId:string){
     let loadingref = this.loading
     this.chosenParticipant = profileId
-    const profileref = doc(this.firestore, "profile_data", profileId);
+    const profileref = doc(this.firestoreDefault, "profile_data", profileId);
     this.mapATCByProfile[profileId] = []
     const q = query(
-    collection(this.firestore, "atc_to_validate"), where("queueid", "==", this.ongoingQueue['docid']), where("profileid", "==", profileref.id),  where("type", "==", "online"),  orderBy("prescription_date", "asc"));
+    collection(this.firestoreATC, "atc_to_validate"), where("queueid", "==", this.ongoingQueue['docid']), where("profileid", "==", profileref.id),  where("type", "==", "online"),  orderBy("prescription_date", "asc"));
     const alphasnap = await getDocs(q);
         for (let j = 0; j < alphasnap.docs.length; j++) {
         const alphaelement = alphasnap.docs[j].data();
@@ -298,7 +301,7 @@ export class EitEducationAtcComponent implements OnInit {
         }
       }
     
-    const atcAlphaQuery = query(collection(this.firestore, "atc_alpha"), where("queueid", "==", this.ongoingQueue['docid']), where("profileid", "==", profileref.id), where("type", "==", "online"),orderBy("prescription_date", "asc"));
+    const atcAlphaQuery = query(collection(this.firestoreATC, "atc_alpha"), where("queueid", "==", this.ongoingQueue['docid']), where("profileid", "==", profileref.id), where("type", "==", "online"),orderBy("prescription_date", "asc"));
     getDocs(atcAlphaQuery).then(async alphasnap => {
       for (let j = 0; j < alphasnap.docs.length; j++) {
         const alphaelement = alphasnap.docs[j].data();
@@ -331,7 +334,7 @@ export class EitEducationAtcComponent implements OnInit {
       atcList.push(atcdoc.atcref)
       for (let i = 0; i < atcList.length; i++) {
         const element = atcList[i];
-        const atcDocRef = doc(this.firestore, element.path); 
+        const atcDocRef = doc(this.firestoreATC, element.path); 
         const atcsnap = await getDoc(atcDocRef);             
         const atcelement = atcsnap.exists() ? atcsnap.data() : null;
         if (atcelement != null) {
@@ -399,7 +402,7 @@ export class EitEducationAtcComponent implements OnInit {
 
   onCancelATC(atc: any) {
     if (confirm("are you sure")) {
-      const atcDocRef = doc(this.firestore, atc.atcref.path); 
+      const atcDocRef = doc(this.firestoreATC, atc.atcref.path); 
       updateDoc(atcDocRef, {
         isdelete: true,
         status: 'cancelled'
@@ -421,7 +424,7 @@ export class EitEducationAtcComponent implements OnInit {
       if (atc['validator'] != null) {
         validators = [...validators, ...atc['validator']];
       }
-      const atcDocRef = doc(this.firestore, atc.atcref.path); 
+      const atcDocRef = doc(this.firestoreATC, atc.atcref.path); 
       updateDoc(atcDocRef, {
         status: 'validated',
         validator: validators
@@ -436,7 +439,7 @@ export class EitEducationAtcComponent implements OnInit {
 
   onInvalidateATC(atc: any, status: string) {
     if (confirm("are you sure")) {
-      const atcDocRef = doc(this.firestore, atc.atcref.path); 
+      const atcDocRef = doc(this.firestoreATC, atc.atcref.path); 
       updateDoc(atcDocRef, {
         isdelete: true,
         status: 'unvalidated'

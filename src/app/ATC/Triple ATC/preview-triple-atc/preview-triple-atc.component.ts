@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule, Location } from '@angular/common';
-import { collection, collectionSnapshots, doc, docData, Firestore, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, docData, getFirestore, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { Subscription } from 'rxjs';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDividerModule } from '@angular/material/divider';
@@ -59,14 +59,16 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
   participantAssignmentId:string;
   loggedInProfileId:string;
 
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private firestore: Firestore,
     private location: Location,
     public guardservice: AuthguardService,
-    
-  ) { 
+
+  ) {
 
     guardservice.getRoles().then(async roles => {
       this.loggedInProfileId = roles['profile_ref'].id
@@ -101,7 +103,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
   }
 
   fetchMetaData(): void {
-    const roleCollection = collection(this.firestore, 'users_roles');
+    const roleCollection = collection(this.firestoreDefault, 'users_roles');
     this.roleSubscription = collectionSnapshots(roleCollection).subscribe(userRoles => {
       const mentorList: string[] = [];
       userRoles.forEach(roleDoc => {
@@ -114,7 +116,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
       this.mentorProfileid = mentorList;
     });
 
-    const procedureCollection = collection(this.firestore, 'procedures');
+    const procedureCollection = collection(this.firestoreDefault, 'procedures');
     collectionSnapshots(procedureCollection).subscribe(procedures => {
       procedures.forEach(procDoc => {
         this.procedureMap[procDoc.ref.path] = procDoc.data()['name'];
@@ -125,7 +127,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
   async fetchATCData(): Promise<void> {
     this.loading = true;
     
-    const atcDocRef = doc(this.firestore, 'triple atc', this.atcid);
+    const atcDocRef = doc(this.firestoreATC, 'triple atc', this.atcid);
     this.atcSubscription = docData(atcDocRef).subscribe(async (data) => {
       if (data) {
         this.atcData = data;
@@ -139,7 +141,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
   }
 
   async fetchTranscriptions(): Promise<void> {
-    const adjCollection = collection(this.firestore, 'triple atc', this.atcid, 'corrections');
+    const adjCollection = collection(this.firestoreATC, 'triple atc', this.atcid, 'corrections');
     
     this.adjustmentSubscription = collectionSnapshots(adjCollection).subscribe(async (adjustments) => {
       this.transcriptionData = [];
@@ -157,7 +159,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
           procedure: []
         };
 
-        const procedureCollection = collection(this.firestore, adjustmentDoc.ref.path, 'procedures');
+        const procedureCollection = collection(this.firestoreATC, adjustmentDoc.ref.path, 'procedures');
         collectionSnapshots(procedureCollection).subscribe((procedureSnapshot) => {
           if (procedureSnapshot) {
             for (const procedureDoc of procedureSnapshot) {
@@ -226,7 +228,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
     if (this.actionNotes != '') {
       console.log('Rework clicked', this.actionNotes);
       const notes = this.actionNotes;
-      const activityref = doc(this.firestore, "bigformassignment", this.participantAssignmentId);
+      const activityref = doc(this.firestoreDefault, "bigformassignment", this.participantAssignmentId);
       const activitylog = [
         {
           activityreference: activityref,
@@ -235,13 +237,13 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
           reviewer: this.loggedInProfileId
         }
       ];
-      getDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId)).then(docSnapshot => {
+      getDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId)).then(docSnapshot => {
         const existingActivityLog = docSnapshot.exists() ? docSnapshot.data()['activitylog'] || [] : [];
         const updatedActivityLog = [...existingActivityLog, ...activitylog];
-        return updateDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId), {
+        return updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
           activitylog: updatedActivityLog,
           status: "rework",
-          activityref: doc(this.firestore, 'triple atc', this.atcid)
+          activityref: doc(this.firestoreATC, 'triple atc', this.atcid)
         });
       }).then(() => {
         console.log("New activity log added");
@@ -270,7 +272,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
       console.log(this.route.snapshot.queryParams['patchdata']);
       const notes = this.actionNotes;
       // Big Activity Completed
-      await updateDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId), {
+      await updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
         status: "completed",
         summary: notes
       }).then(() => {
@@ -280,7 +282,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
       });
 
       //ATC Validated
-      await updateDoc(doc(this.firestore, 'triple atc', this.atcid), {
+      await updateDoc(doc(this.firestoreATC, 'triple atc', this.atcid), {
         status: "validated",
       }).then(() => {
         console.log("completed");

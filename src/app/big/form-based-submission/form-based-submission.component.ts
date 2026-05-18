@@ -96,7 +96,7 @@ export class FormBasedSubmissionComponent {
     public sanitizer: DomSanitizer
   ) {
     this.deliveryForm = this.fb.group({})
-    this.draftDocid = doc(collection(this.afs, 'bigformassignment')).id;
+    this.draftDocid = doc(collection(this.afs, 'formsByClient')).id;
     this.auth.getRoles().then(async roles => {
       if (roles["ah"] || roles["admin"] || roles["developer"]) {
         this.reviewAccess = true;
@@ -198,8 +198,8 @@ export class FormBasedSubmissionComponent {
         this.showcontent = true
       } else if (![null, undefined].includes(this.route.snapshot.queryParams['patchdata']) || ![null, undefined].includes(this.participantformtemplateid)) {
         // console.log("view");
-        // let formsByClientPath = ![null,undefined].includes(this.participantformtemplateid) ? this.afs.collection("bigformassignment").doc(this.participantformtemplateid.docid).ref.path : null
-        let formsByClientPath = doc(this.afs, "bigformassignment", this.route.snapshot.queryParams['patchdata'])
+        // let formsByClientPath = ![null,undefined].includes(this.participantformtemplateid) ? this.afs.collection("formsByClient").doc(this.participantformtemplateid.docid).ref.path : null
+        let formsByClientPath = doc(this.afs, "formsByClient", this.route.snapshot.queryParams['patchdata'])
         getDoc(formsByClientPath).then(async formsByClientSnap => {
           // this.afs.doc(this.route.snapshot.queryParams.patchdata ?? formsByClientPath).get().toPromise().then(async formsByClientSnap => {
           //form setup start
@@ -377,8 +377,8 @@ export class FormBasedSubmissionComponent {
       this.submittedClientForm['cohortsref'] = this.cohortsref
       console.log(this.submittedClientForm);
       loadingRef.close()
-      await setDoc(doc(this.afs, 'bigformassignment', this.submittedClientForm['docid']), this.submittedClientForm).then(async () => {
-        const activityref = doc(this.afs, 'bigformassignment', this.submittedClientForm['docid']);
+      await setDoc(doc(this.afs, 'formsByClient', this.submittedClientForm['docid']), this.submittedClientForm).then(async () => {
+        const activityref = doc(this.afs, 'formsByClient', this.submittedClientForm['docid']);
         const formTemplate = this.submittedClientForm['formid'];
         await updateDoc(doc(this.afs, "big participants assignments", this.participantAssignmentId), {
           status: "review",
@@ -406,7 +406,7 @@ export class FormBasedSubmissionComponent {
         } catch (error) {
           console.error("Error deleting drafts:", error);
         }
-        let Ref = doc(this.afs, 'bigformassignment', this.submittedClientForm['docid'])
+        let Ref = doc(this.afs, 'formsByClient', this.submittedClientForm['docid'])
         if ([null, undefined].includes(this.queueId) && ![null, undefined].includes(this.route.snapshot.queryParams['data'])) {
           await updateDoc(doc(this.route.snapshot.queryParams['data']), {
             fileref: arrayUnion(Ref),
@@ -682,7 +682,7 @@ export class FormBasedSubmissionComponent {
       console.log(this.route.snapshot.queryParams['patchdata']);
       const patchKey = this.route.snapshot.queryParams['patchdata'];
       const notes = this.notesForm.value.notes;
-      const activityref = doc(this.afs, "bigformassignment", patchKey);
+      const activityref = doc(this.afs, "formsByClient", patchKey);
       const activitylog = [
         {
           activityreference: activityref,

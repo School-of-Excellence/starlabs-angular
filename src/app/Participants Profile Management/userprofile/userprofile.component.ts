@@ -10,7 +10,7 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { AelEditDialogComponent } from '../ael-edit-dialog/ael-edit-dialog.component';
-import { doc, Firestore, getDoc, getDocs, where, query, orderBy, setDoc, collectionData, updateDoc, limit, documentId, collection, FieldPath } from '@angular/fire/firestore';
+import { doc, Firestore, getDoc, getDocs, where, query, orderBy, setDoc, collectionData, updateDoc, limit, documentId, collection, FieldPath, getFirestore } from '@angular/fire/firestore';
 import { firstValueFrom, Subject, takeUntil } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -269,10 +269,11 @@ export class UserprofileComponent {
     get loading(){
       return this.dialog.open(LoadingProgressComponent,{data:{msg:'Processing Please Wait ...'},disableClose:true})
     }
+  firestoreDefault = getFirestore()
+  firestoreForms = getFirestore('firestore-forms')
 
   constructor(
     private route: ActivatedRoute,
-    public firestore: Firestore,
     private storage: Storage,
     private guard: AuthguardService,
     private datePipe: DatePipe,
@@ -433,10 +434,10 @@ export class UserprofileComponent {
       participantJourneySnap,
       participantProductsSnap,
     ] = await Promise.all([
-      getDoc(doc(this.firestore, 'profile_data', this.profileId)),
-      getDoc(doc(this.firestore, 'participant metadata', this.profileId)),
-      getDocs(query(collection(this.firestore, 'participantjourneyproduct'), where('profileid', '==', this.profileId))),
-      getDocs(query(collection(this.firestore, 'participantsproduct'), where('profileid', '==', this.profileId)))
+      getDoc(doc(this.firestoreDefault, 'profile_data', this.profileId)),
+      getDoc(doc(this.firestoreDefault, 'participant metadata', this.profileId)),
+      getDocs(query(collection(this.firestoreDefault, 'participantjourneyproduct'), where('profileid', '==', this.profileId))),
+      getDocs(query(collection(this.firestoreDefault, 'participantsproduct'), where('profileid', '==', this.profileId)))
     ]);
     // profile data
     var returnProfile = profileData.data()
@@ -472,7 +473,7 @@ export class UserprofileComponent {
   }
 
   private async fetchAELData() {
-    const collectionRef = collection(this.firestore, 'interim crossover')
+    const collectionRef = collection(this.firestoreDefault, 'interim crossover')
     getDocs(query(collectionRef, where('profileid','==',this.profileId))).then((interimCrossover)=>{
       if(interimCrossover.docs.length != 0){
         this.aeldata = []
@@ -502,9 +503,9 @@ export class UserprofileComponent {
  
 
   private async fetchEvents() {
-    const eventRef = collection(this.firestore, 'event collection');
+    const eventRef = collection(this.firestoreDefault, 'event collection');
     const snapshot = await getDocs(eventRef);
-    const queueRef = collection(this.firestore, 'queue generation');
+    const queueRef = collection(this.firestoreDefault, 'queue generation');
     const snap = await getDocs(queueRef);
     for (let i = 0; i < snapshot.docs.length; i++) {
       const element = snapshot.docs[i].data();
@@ -519,7 +520,7 @@ export class UserprofileComponent {
 
   private async fetchEventProfiles() {
     this.isloading = true
-    // const events_profilesRef = query(collection(this.firestore, 'events_profiles'), where('profile_ref', '==', doc(this.firestore, 'profile_data', this.profileId)));
+    // const events_profilesRef = query(collection(this.firestoreDefault, 'events_profiles'), where('profile_ref', '==', doc(this.firestoreDefault, 'profile_data', this.profileId)));
     // const snapshot = await getDocs(events_profilesRef);
 
     // // const eventRequestIds = snapshot.docs.filter(doc => doc.data()['eventrequest']?.id !== undefined).map(doc => doc.data()['eventrequest'].id);
@@ -536,7 +537,7 @@ export class UserprofileComponent {
     // }
 
     const eventRequestsQuery = query(
-      collection(this.firestore, 'event participation request'),
+      collection(this.firestoreDefault, 'event participation request'),
       where('profileid', '==', this.profileId)
       // where('docid', 'in', eventRequestIds)
     );
@@ -553,7 +554,7 @@ export class UserprofileComponent {
       const document = snap.docs[i];
       var data = document.data()
       allevent.push(data)
-      var eventRef = doc(this.firestore, data["eventref"].path)
+      var eventRef = doc(this.firestoreDefault, data["eventref"].path)
       if(eventRef.parent.id == "event collection"){
         eventcollectionid.push(eventRef.id)
       }
@@ -574,7 +575,7 @@ export class UserprofileComponent {
     this.isloading = false
 
     if(eventcollectionid.length != 0){
-      const eventRef = collection(this.firestore, 'event collection');
+      const eventRef = collection(this.firestoreDefault, 'event collection');
       var querylist = []
       if(eventcollectionid.length <= 30){
         querylist.push(where(documentId(), "in", eventcollectionid))
@@ -586,7 +587,7 @@ export class UserprofileComponent {
       }
     }
     if(queuecollectionid.length != 0){
-      const eventRef = collection(this.firestore, 'queue generation');
+      const eventRef = collection(this.firestoreDefault, 'queue generation');
       var querylist = []
       if(queuecollectionid.length <= 30){
         querylist.push(where(documentId(), "in", queuecollectionid))
@@ -621,7 +622,7 @@ export class UserprofileComponent {
   private async fetchClientIssues() {
     this.isloading = true
     const snapshot = await getDocs(query(
-      collection(this.firestore, 'clientissue'),
+      collection(this.firestoreDefault, 'clientissue'),
       where('clientid', '==', this.profileId)
     ));
     
@@ -633,7 +634,7 @@ export class UserprofileComponent {
 
   private async fetchForms() {
     this.isloading = true
-    await getDocs(collection(this.firestore, 'queue generation')).then(res => {
+    await getDocs(collection(this.firestoreDefault, 'queue generation')).then(res => {
       for (let i = 0; i < res.docs.length; i++) {
         const element = res.docs[i].data();
         this.mapQueue[res.docs[i].id] = element['queuename']
@@ -642,7 +643,7 @@ export class UserprofileComponent {
 
     // console.log(this.mapQueue);
     
-    const formsByClient = query(collection(this.firestore, 'formsByClient'), where('profileid', '==', this.profileId));
+    const formsByClient = query(collection(this.firestoreForms, 'formsByClient'), where('profileid', '==', this.profileId));
     const snapshot = await getDocs(formsByClient);
     this.isloading = false
     
@@ -655,7 +656,7 @@ export class UserprofileComponent {
 
   private async fetchReports() {
     this.isloading = true
-    const interimreportRef = collection(this.firestore, "interimreport log");
+    const interimreportRef = collection(this.firestoreDefault, "interimreport log");
     const snapshot = await getDocs(query(interimreportRef, where('profileid', '==', this.profileId)));
     
     const reports = snapshot.docs.map(doc => {
@@ -682,7 +683,7 @@ export class UserprofileComponent {
     this.isloading = true
     this.fetchPostCategories()
     const snapshot = await getDocs(query(
-      collection(this.firestore, 'Achievements/posts/postcollection'),
+      collection(this.firestoreDefault, 'Achievements/posts/postcollection'),
       where('profileid', '==', this.profileId)
     ));
     
@@ -692,7 +693,7 @@ export class UserprofileComponent {
         
         // Get likes count for this post
         const likesSnapshot = await getDocs(
-          collection(this.firestore, `Achievements/posts/postcollection/${doc.id}/likes`)
+          collection(this.firestoreDefault, `Achievements/posts/postcollection/${doc.id}/likes`)
         );
         
         return {
@@ -714,8 +715,8 @@ export class UserprofileComponent {
     this.mapRecordedDate = {};
     
     const [evolutionVideos, liveVideos] = await Promise.all([
-      getDocs(collection(this.firestore, 'evolutionmappingvideo')),
-      getDocs(query(collection(this.firestore, 'liveevolutionmapping'), where('profileid', '==', this.profileId)))
+      getDocs(collection(this.firestoreDefault, 'evolutionmappingvideo')),
+      getDocs(query(collection(this.firestoreDefault, 'liveevolutionmapping'), where('profileid', '==', this.profileId)))
     ]);
 
     for (let i = 0; i < evolutionVideos.docs.length; i++) {
@@ -732,7 +733,7 @@ export class UserprofileComponent {
   }
 
   private async  fetchAppointments(){
-    const snapshot = await getDocs(query(collection(this.firestore, 'appointments'), where('bookedby', '==', doc(this.firestore, 'profile_data', this.profileId))))
+    const snapshot = await getDocs(query(collection(this.firestoreDefault, 'appointments'), where('bookedby', '==', doc(this.firestoreDefault, 'profile_data', this.profileId))))
     // this.participantAppointments = snapshot.docs.map(e => e.data())
     var hostid = []
     var appointments = []
@@ -747,7 +748,7 @@ export class UserprofileComponent {
       hostid = Array.from(new Set(hostid))
       for (let i = 0; i < hostid.length; i+=30) {
         const profileid = hostid.slice(0, i+30);
-        var collectionRef = collection(this.firestore, "profile_data")
+        var collectionRef = collection(this.firestoreDefault, "profile_data")
         var queryRef = query(collectionRef, where(documentId(), "in", profileid))
         getDocs(queryRef).then(list =>{
           for (let a = 0; a < list.docs.length; a++) {
@@ -760,7 +761,7 @@ export class UserprofileComponent {
   }
 
   async fetchParticipantTouchPoint(){
-    await getDoc(doc(this.firestore, "classify", "touchpoint")).then(doc =>{
+    await getDoc(doc(this.firestoreDefault, "classify", "touchpoint")).then(doc =>{
       if(doc.exists()){
         var data = doc.data()
         this.selectedTouchPoint = Array.from(new Set(data["touchpointlist"]))
@@ -769,7 +770,7 @@ export class UserprofileComponent {
     })
     console.log("Time Delay", this.timedelayTouchPoint)
 
-    const snapshot = await getDocs(query(collection(this.firestore, 'participant touchpoint'), where('profileid', '==', this.profileId)))
+    const snapshot = await getDocs(query(collection(this.firestoreDefault, 'participant touchpoint'), where('profileid', '==', this.profileId)))
     this.touchpointList = snapshot.docs.map(e => e.data()).sort((a, b) => b["touchpointdate"].toDate() - a["touchpointdate"].toDate())
 
     this.updateTimeDelayTouchPoint(null)
@@ -811,7 +812,7 @@ export class UserprofileComponent {
   }
 
   private async fetchModes(){
-    const snapshot = await getDocs(query(collection(this.firestore, 'participant mode checklist'), where('profileid', '==', this.profileId)))
+    const snapshot = await getDocs(query(collection(this.firestoreDefault, 'participant mode checklist'), where('profileid', '==', this.profileId)))
     this.modeList = snapshot.docs.map(e => e.data())
   }
 
@@ -820,16 +821,16 @@ export class UserprofileComponent {
     console.log("Profile User Ref", this.userProfileData["user_ref"])
     if(this.userProfileData["user_ref"]){
       var uid = this.userProfileData["user_ref"].id
-      const logsSnapshot = await getDocs(query(collection(this.firestore, 'notifications', uid, 'logs'), orderBy('date', 'desc'), limit(100)));
+      const logsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'notifications', uid, 'logs'), orderBy('date', 'desc'), limit(100)));
       this.notificationList = logsSnapshot.docs.map(e => e.data())
       console.log(this.notificationList);
     }
-    // const snapshot = await getDocs(query(collection(this.firestore, 'notifications'), where('name', '==', this.mapProfile[this.profileId])))
+    // const snapshot = await getDocs(query(collection(this.firestoreDefault, 'notifications'), where('name', '==', this.mapProfile[this.profileId])))
     // if(snapshot.docs.length != 0){
     //   let notificationDoc =  snapshot.docs[0].id
     //   console.log(notificationDoc);
       
-    //   const logsSnapshot = await getDocs(query(collection(this.firestore, 'notifications', notificationDoc, 'logs'), orderBy('createdon', 'desc'), limit(100)));
+    //   const logsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'notifications', notificationDoc, 'logs'), orderBy('createdon', 'desc'), limit(100)));
     //   this.notificationList = logsSnapshot.docs.map(e => e.data())
     //   console.log(this.notificationList);
       
@@ -839,7 +840,7 @@ export class UserprofileComponent {
 
 
   private async fetchPostCategories() {
-    const snapshot = await getDocs(collection(this.firestore, 'post_categories'));
+    const snapshot = await getDocs(collection(this.firestoreDefault, 'post_categories'));
 
     for (let i = 0; i < snapshot.docs.length; i++) {
       const element = snapshot.docs[i].data();
@@ -964,8 +965,8 @@ export class UserprofileComponent {
       return; 
     }
     // if (listofprofileid.length <= 1000 ) {
-    var docid = doc(this.firestore, 'filteredtimeline profile').id;
-    const docRef = doc(this.firestore, 'filteredtimeline profile', docid)
+    var docid = doc(this.firestoreDefault, 'filteredtimeline profile').id;
+    const docRef = doc(this.firestoreDefault, 'filteredtimeline profile', docid)
     await setDoc(docRef, {
       profileid: this.loggedInProfileId,
       listofprofileid : listofparticipants,
@@ -990,7 +991,7 @@ export class UserprofileComponent {
   }
 
   onFormPreview(form:any){
-    let path = doc(this.firestore, 'formsByClient', form['docid']).path
+    let path = doc(this.firestoreForms, 'formsByClient', form['docid']).path
     const url = this.router.createUrlTree(['/formtemplate'],{queryParams:{id:form.formid,type:'form',patchdata:path}})
     // const url = this.router.navigateByUrl(`/formtemplate?id=${form.formid}&patchdata=${path}`)
     window.open(url.toString(), '_blank')
@@ -1078,7 +1079,7 @@ export class UserprofileComponent {
   // Helper methods for better organization and reusability
   private async getParticipantProduct() {
     const snapshot = await getDocs(query(
-      collection(this.firestore, 'participantsproduct'), 
+      collection(this.firestoreDefault, 'participantsproduct'), 
       where("profileid", "==", this.profileId)
     ));
   
@@ -1105,7 +1106,7 @@ export class UserprofileComponent {
   
   private async getDeliverables(participantProductId: string) {
     const snapshot = await getDocs(query(
-      collection(this.firestore, 'deliverables'),
+      collection(this.firestoreDefault, 'deliverables'),
       where("participantproductid", "==", participantProductId),
       where("type", "==", "queue"),
       where("status", "==", "ongoing")
@@ -1127,7 +1128,7 @@ export class UserprofileComponent {
     }
   
     const tokenPath = fileRef[fileRef.length - 1].path;
-    const queueTokenDoc = await getDoc(doc(this.firestore, tokenPath));
+    const queueTokenDoc = await getDoc(doc(this.firestoreDefault, tokenPath));
     
     if (!queueTokenDoc.exists()) {
       return null;
@@ -1141,7 +1142,7 @@ export class UserprofileComponent {
   }
   
   private async getQueueData(queueToken: any) {
-    const queueDataDoc = await getDoc(doc(this.firestore, queueToken['queueref'].path));
+    const queueDataDoc = await getDoc(doc(this.firestoreDefault, queueToken['queueref'].path));
     
     if (!queueDataDoc.exists()) {
       return null;
@@ -1151,7 +1152,7 @@ export class UserprofileComponent {
     this.profileJourneyProduct['queueData'] = queueData;
     
     // Set current event reference
-    this.profileJourneyProduct["currenteventref"] = doc(this.firestore, queueDataDoc.ref.path);
+    this.profileJourneyProduct["currenteventref"] = doc(this.firestoreDefault, queueDataDoc.ref.path);
     
     // Get current event name (non-blocking)
     this.getCurrentEventName(queueDataDoc.ref.path);
@@ -1161,7 +1162,7 @@ export class UserprofileComponent {
   
   private async getCurrentEventName(eventPath: string) {
     try {
-      const currentEventDoc = await getDoc(doc(this.firestore, eventPath));
+      const currentEventDoc = await getDoc(doc(this.firestoreDefault, eventPath));
       if (currentEventDoc.exists()) {
         this.profileJourneyProduct["currenteventname"] = (currentEventDoc.data() ?? {})["queuename"];
       }
@@ -1178,8 +1179,8 @@ export class UserprofileComponent {
   
     try {
       const eventSnapshot = await getDocs(query(
-        collection(this.firestore, 'event collection'),
-        where("hosts", "array-contains", doc(this.firestore, 'profile_data', this.loggedInProfileId["pid"])),
+        collection(this.firestoreDefault, 'event collection'),
+        where("hosts", "array-contains", doc(this.firestoreDefault, 'profile_data', this.loggedInProfileId["pid"])),
         where("end_date", ">=", today)
       ));
   
@@ -1189,7 +1190,7 @@ export class UserprofileComponent {
       for (const eventDoc of eventSnapshot.docs) {
         const eventData = eventDoc.data() ?? {};
         if (eventData["start_date"].toDate() <= today) {
-          this.profileJourneyProduct["currenteventref"] = doc(this.firestore, eventDoc.ref.path);
+          this.profileJourneyProduct["currenteventref"] = doc(this.firestoreDefault, eventDoc.ref.path);
           
           // Get event name (non-blocking)
           this.getEventName(eventDoc.ref.path);
@@ -1203,7 +1204,7 @@ export class UserprofileComponent {
   
   private async getEventName(eventPath: string) {
     try {
-      const currentEventDoc = await getDoc(doc(this.firestore, eventPath));
+      const currentEventDoc = await getDoc(doc(this.firestoreDefault, eventPath));
       if (currentEventDoc.exists()) {
         this.profileJourneyProduct["currenteventname"] = (currentEventDoc.data() ?? {})["name"];
       }
@@ -1247,7 +1248,7 @@ export class UserprofileComponent {
   }
   
   private setupChatSubscriptions(queueDocId: string) {
-    const queueDoc = doc(this.firestore, "queue generation", queueDocId);
+    const queueDoc = doc(this.firestoreDefault, "queue generation", queueDocId);
     const stageChatCollection = collection(queueDoc, "stagechat");
   
     // Chat messages subscription
@@ -1358,14 +1359,14 @@ export class UserprofileComponent {
 
     if(check){
 
-      let id = doc(collection(this.firestore, 'queue generation', this.profileJourneyProduct['queueData']['docid'], 'stagechat')).id;
-      const ref = doc(this.firestore, 'queue generation', this.profileJourneyProduct['queueData']['docid'], 'stagechat', id)
+      let id = doc(collection(this.firestoreDefault, 'queue generation', this.profileJourneyProduct['queueData']['docid'], 'stagechat')).id;
+      const ref = doc(this.firestoreDefault, 'queue generation', this.profileJourneyProduct['queueData']['docid'], 'stagechat', id)
       await setDoc(ref, {
         docid:id,
         stage:this.profileJourneyProduct['currentstage'],
         senderprofileid:this.loggedInProfileId,
         message: this.messageCurrentlyTyped,
-        queueref: doc(this.firestore, 'queue generation',this.profileJourneyProduct['queueData']['docid']),
+        queueref: doc(this.firestoreDefault, 'queue generation',this.profileJourneyProduct['queueData']['docid']),
         date : new Date(),
         pinned : false,
       }).then(() => {
@@ -1537,7 +1538,7 @@ export class UserprofileComponent {
     }
     try {
       const profileId = this.userData['profileid'];
-      const userRef = doc(this.firestore, 'participant metadata', profileId)
+      const userRef = doc(this.firestoreDefault, 'participant metadata', profileId)
       updateDoc(userRef, {
         customerstatus : this.selectedStatus
       }).then(() => {
