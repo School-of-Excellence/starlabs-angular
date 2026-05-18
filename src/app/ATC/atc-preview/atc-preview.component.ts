@@ -1,6 +1,6 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule, DatePipe } from "@angular/common";
-import { collection, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc } from '@angular/fire/firestore';
+import { collection, doc, getDoc, getDocs, getFirestore, orderBy, query, updateDoc } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -30,7 +30,9 @@ import { Location } from '@angular/common';
   styleUrl: './atc-preview.component.css'
 })
 export class AtcPreviewComponent {
-  private firestore = inject(Firestore);
+  // private firestore = inject(Firestore);
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
 
   atcID: string;
   marathonId: string;
@@ -99,7 +101,7 @@ export class AtcPreviewComponent {
       
       guard.getRoles().then(async roles => {
         this.loggedInProfileId = roles['profile_ref'].id
-        getDocs(collection(this.firestore, "profile_data")).then(snap => {
+        getDocs(collection(this.firestoreDefault, "profile_data")).then(snap => {
           snap.docs.map(e => this.mapProfile[e.ref.path] = e.data())
         })
         await this.fetchPreData();
@@ -112,13 +114,13 @@ export class AtcPreviewComponent {
   }
 
   ngOnInit(): void {
-    getDoc(doc(this.firestore, "classify", "adjustment_awareness")).then(snap => {
+    getDoc(doc(this.firestoreDefault, "classify", "adjustment_awareness")).then(snap => {
       this.adjustmentAwarenessDetail = snap.data();
     });
   }
 
   async fetchPreData() {
-    await getDocs(query(collection(this.firestore, "users_roles"), orderBy("name"))).then(async users => {
+    await getDocs(query(collection(this.firestoreDefault, "users_roles"), orderBy("name"))).then(async users => {
       for (let i = 0; i < users.docs.length; i++) {
         var userDoc = users.docs[i];
         var userData = userDoc.data();
@@ -126,7 +128,7 @@ export class AtcPreviewComponent {
       }
     });
 
-    await getDocs(query(collection(this.firestore, "bigactivity"), orderBy("activity", "asc"))).then(list => {
+    await getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity", "asc"))).then(list => {
       for (let i = 0; i < list.docs.length; i++) {
         const docItem = list.docs[i];
         var data = docItem.data();
@@ -149,13 +151,13 @@ export class AtcPreviewComponent {
       }
     });
 
-    await getDocs(query(collection(this.firestore, 'procedures'), orderBy('name'))).then(procedures => {
+    await getDocs(query(collection(this.firestoreDefault, 'procedures'), orderBy('name'))).then(procedures => {
       procedures.forEach(docItem => {
         this.procedureMap[docItem.ref.path] = docItem.data()['name'];
       });
     });
 
-    await getDocs(query(collection(this.firestore, "users_roles"), orderBy("name"))).then(async users => {
+    await getDocs(query(collection(this.firestoreDefault, "users_roles"), orderBy("name"))).then(async users => {
       var mentor = []
       var author = []
       for (let i = 0; i < users.docs.length; i++) {
@@ -183,17 +185,17 @@ export class AtcPreviewComponent {
   async getATC() {
     var totalProcedureRead = 0;
     
-    await getDoc(doc(this.firestore, this.collectionName, this.atcID)).then(async atcData => {
+    await getDoc(doc(this.firestoreATC, this.collectionName, this.atcID)).then(async atcData => {
       var atcDocData = atcData.data();
-      
-      getDoc(doc(this.firestore, "profile_data", atcDocData["profileid"])).then(participant => {
+
+      getDoc(doc(this.firestoreDefault, "profile_data", atcDocData["profileid"])).then(participant => {
         if (participant.exists()) {
           this.selectedParticipant = participant.data();
         }
       });
 
       if (atcDocData["notesid"] != null) {
-        await getDoc(doc(this.firestore, "atc_notes", atcDocData["notesid"])).then(async snap => {
+        await getDoc(doc(this.firestoreATC, "atc_notes", atcDocData["notesid"])).then(async snap => {
           if (snap.exists()) {
             this.existingNotes = snap.data();
             this.audioUrls = this.existingNotes['changeworkbrief'] || [];
@@ -236,7 +238,7 @@ export class AtcPreviewComponent {
         if (activitySpecialist.length != 0) {
           this.specialistsByActivity.push({
             activity: this.mapBigActivity[e],
-            specialists: activitySpecialist.map((profile: string) => this.profileMap[doc(this.firestore, profile).id])
+            specialists: activitySpecialist.map((profile: string) => this.profileMap[doc(this.firestoreDefault, profile).id])
           });
         }
       });
@@ -245,7 +247,7 @@ export class AtcPreviewComponent {
         if (e.specialist.length != 0) {
           this.specialistsByActivity.push({
             activity: this.mapBigActivity[e.activity],
-            specialists: e.specialist.map((profile: string) => this.profileMap[doc(this.firestore, profile).id])
+            specialists: e.specialist.map((profile: string) => this.profileMap[doc(this.firestoreDefault, profile).id])
           });
         }
       });
@@ -299,7 +301,7 @@ export class AtcPreviewComponent {
     if (this.actionNotes != '') {
       console.log('Rework clicked', this.actionNotes);
       const notes = this.actionNotes;
-      const activityref = doc(this.firestore, "bigformassignment", this.participantAssignmentId);
+      const activityref = doc(this.firestoreDefault, "bigformassignment", this.participantAssignmentId);
       const activitylog = [
         {
           activityreference: activityref,
@@ -308,13 +310,13 @@ export class AtcPreviewComponent {
           reviewer: this.loggedInProfileId
         }
       ];
-      getDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId)).then(docSnapshot => {
+      getDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId)).then(docSnapshot => {
         const existingActivityLog = docSnapshot.exists() ? docSnapshot.data()['activitylog'] || [] : [];
         const updatedActivityLog = [...existingActivityLog, ...activitylog];
-        return updateDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId), {
+        return updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
           activitylog: updatedActivityLog,
           status: "rework",
-          activityref: doc(this.firestore, this.collectionName, this.atcID)
+          activityref: doc(this.firestoreATC, this.collectionName, this.atcID)
         });
       }).then(() => {
         console.log("New activity log added");
@@ -342,7 +344,7 @@ export class AtcPreviewComponent {
       console.log(this.participantAssignmentId);
       console.log(this.route.snapshot.queryParams['patchdata']);
       const notes = this.actionNotes;
-      await updateDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId), {
+      await updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
         status: "completed",
         summary: notes
       }).then(() => {
@@ -373,7 +375,7 @@ export class AtcPreviewComponent {
       console.log(this.route.snapshot.queryParams['patchdata']);
       const notes = this.actionNotes;
       // Big Activity Completed
-      await updateDoc(doc(this.firestore, "big participants assignments", this.participantAssignmentId), {
+      await updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
         status: "completed",
         summary: notes
       }).then(() => {
@@ -383,7 +385,7 @@ export class AtcPreviewComponent {
       });
 
       //ATC Validated
-      await updateDoc(doc(this.firestore, this.collectionName, this.atcID), {
+      await updateDoc(doc(this.firestoreATC, this.collectionName, this.atcID), {
         status: "validated",
       }).then(() => {
         console.log("completed");

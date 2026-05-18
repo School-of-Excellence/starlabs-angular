@@ -18,7 +18,7 @@ import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
   updateDoc, Timestamp, Unsubscribe,
-  getDoc, getDocs, onSnapshot,
+  getDoc, getDocs, onSnapshot, getFirestore,
 } from '@angular/fire/firestore';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
@@ -178,10 +178,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     totalNotStarted: 0,
     totalNotStartedProfileIds: []
   };
+  firestoreDefault = getFirestore()
+  firestoreForms = getFirestore('firestore-forms')
 
   constructor(
     private route: ActivatedRoute,
-    private firestore: Firestore,
     public router: Router,
     private guard: AuthguardService,
     public dialog: MatDialog,
@@ -204,7 +205,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     for (let i = 0; i < profileIds.length; i += BATCH_SIZE) {
       const batchIds = profileIds.slice(i, i + BATCH_SIZE);
       const q = query(
-        collection(this.firestore, 'participant metadata'),
+        collection(this.firestoreDefault, 'participant metadata'),
         where('profileid', 'in', batchIds)
       );
       batches.push(getDocs(q));
@@ -225,7 +226,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   private async initializeProfileData() {
     try {
-      const userRef = collection(this.firestore, 'new_user_data');
+      const userRef = collection(this.firestoreDefault, 'new_user_data');
       const userSnap = await getDocs(userRef);
       this.mapProfileNew = {};
       userSnap.forEach(doc => {
@@ -239,7 +240,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   private initializeJourneyData() {
-    const journeyRef = collection(this.firestore, 'journey');
+    const journeyRef = collection(this.firestoreDefault, 'journey');
     getDocs(journeyRef).then(snap => {
       snap.docs.forEach(e => {
         const element = e.data();
@@ -247,7 +248,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         this.JourneyMap[element['id']] = element['journey'];
       });
     });
-    const tierRef = collection(this.firestore, 'tier');
+    const tierRef = collection(this.firestoreDefault, 'tier');
     getDocs(tierRef).then(snaptier => {
       snaptier.docs.forEach(e => {
         const element = e.data();
@@ -376,7 +377,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     let enrolledSnapshotInitialized = false;
 
-    const workshopRef = doc(this.firestore, 'workshopconfiguration', this.workshopId);
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
@@ -709,9 +710,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   async setupEnrolledParticipantsSnapshot() {
     if (!this.workshopId) return;
 
-    const workshopRef = doc(this.firestore, 'workshopconfiguration', this.workshopId);
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const enrolledQuery = query(
-      collection(this.firestore, 'workshop participant enrolled'),
+      collection(this.firestoreDefault, 'workshop participant enrolled'),
       where('workshopref', '==', workshopRef)
     );
 
@@ -768,9 +769,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     this.participantWorkshopMap.clear();
 
-    const workshopRef = doc(this.firestore, 'workshopconfiguration', this.workshopId);
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const pwQuery = query(
-      collection(this.firestore, 'participant workshop'),
+      collection(this.firestoreDefault, 'participant workshop'),
       where('workshopref', '==', workshopRef)
     );
 
@@ -1040,7 +1041,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.loadingCategories = true;
     try {
       const promises = categoryIds.map(async (catId: string) => {
-        const catDoc = await getDoc(doc(this.firestore, 'workshopcategory', catId));
+        const catDoc = await getDoc(doc(this.firestoreDefault, 'workshopcategory', catId));
         if (catDoc.exists()) {
           this.categoryNamesMap.set(catId, catDoc.data()['name'] || 'Unknown');
         }
@@ -1399,7 +1400,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const workshopId = this.workshopId;
       if (!challengeId || !workshopId) { console.error('Missing challengeId or workshopId'); return; }
       try {
-        const workshopRef = doc(this.firestore, 'workshopconfiguration', workshopId);
+        const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', workshopId);
         const updatedChallenges = [...this.workshopData.challenges];
         const challengeIndex = updatedChallenges.findIndex((c: any) => c.challengeid === challengeId);
         if (challengeIndex === -1) { console.error('Challenge not found'); return; }
@@ -1463,7 +1464,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   onFormPreview(form: any) {
-    const path = doc(this.firestore, 'formsByClient', form['docid']).path;
+    const path = doc(this.firestoreForms, 'formsByClient', form['docid']).path;
     const queryParams: any = {
       id: form.formid, type: 'form', patchdata: path,
       profileid: form.profileid, workshopref: form.workshopref,

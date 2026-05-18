@@ -1,5 +1,5 @@
 import { Component, ElementRef, NgZone, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
-import { Firestore,collection, query, orderBy, collectionData, collectionSnapshots} from '@angular/fire/firestore';
+import { getFirestore, collection, query, orderBy, collectionData, collectionSnapshots} from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { combineLatestWith, debounceTime, map, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
@@ -74,9 +74,10 @@ export class ParticipantAELComponent implements OnInit {
   acceleratorLevel = []
   startDate = null
   endDate = null
+  firestoreDefault = getFirestore()
+
   constructor(
     public guard: AuthguardService,
-    public firestore: Firestore,
     public matDialog: MatDialog,
     private cdRef: ChangeDetectorRef,
     private route: ActivatedRoute,
@@ -107,14 +108,15 @@ export class ParticipantAELComponent implements OnInit {
   }
  
   async getPrescribedParticipant(){
+    const firestoreATC = getFirestore("firestore-atc")
     console.log("ATC From", this.startDate, this.endDate)
     var profileref = null
     if(this.selectedBigParticipant != "all" && this.selectedBigParticipant != null){
-      profileref = doc(this.firestore, "profile_data", this.selectedBigParticipant);
+      profileref = doc(firestoreATC, "profile_data", this.selectedBigParticipant);
     }
     try{
     let atcQuery = query(
-      collection(this.firestore, "atc_alpha"), where("type", "==", "online"),  where("isdelete", "==", false), where("prescription_date", ">=", this.startDate), where("prescription_date", "<=", this.endDate)
+      collection(firestoreATC, "atc_alpha"), where("type", "==", "online"),  where("isdelete", "==", false), where("prescription_date", ">=", this.startDate), where("prescription_date", "<=", this.endDate)
     );
     if (profileref) {
       atcQuery = query(atcQuery, where("author", "array-contains", profileref));
@@ -149,7 +151,7 @@ export class ParticipantAELComponent implements OnInit {
     });
     if (!this.acceleratorLevelLoaded) {
       const accelQuery = query(
-        collection(this.firestore, "accelerated evolution level"),
+        collection(this.firestoreDefault, "accelerated evolution level"),
       )
       const snapshot = await getDocs(accelQuery);
       this.acceleratorLevel = snapshot.docs.map(doc => doc.data())
@@ -168,8 +170,8 @@ export class ParticipantAELComponent implements OnInit {
     //   });
     // })
   
-    const eventQuery = query(collection(this.firestore, "event collection"), orderBy("end_date", "desc"));
-    const queueQuery = query(collection(this.firestore, "queue generation"), orderBy("queueenddate", "desc"));
+    const eventQuery = query(collection(this.firestoreDefault, "event collection"), orderBy("end_date", "desc"));
+    const queueQuery = query(collection(this.firestoreDefault, "queue generation"), orderBy("queueenddate", "desc"));
     var eventSnapshot = collectionSnapshots(eventQuery)
     var queueSnapshot = collectionSnapshots(queueQuery)
     eventSnapshot.pipe(
@@ -221,7 +223,7 @@ export class ParticipantAELComponent implements OnInit {
     })
 
     const aelQuery = query(
-      collection(this.firestore, "participant AEL"),
+      collection(this.firestoreDefault, "participant AEL"),
       orderBy("created", "desc")
     );
     collectionData(aelQuery, {idField: "id"}).pipe(
@@ -365,9 +367,9 @@ export class ParticipantAELComponent implements OnInit {
     })
     try {
       if(this.selectedLiveEvent["type"] == "Live Event"){
-        const eventRef = doc(this.firestore, this.selectedLiveEvent["eventpath"]);
+        const eventRef = doc(this.firestoreDefault, this.selectedLiveEvent["eventpath"]);
         const participationQuery = query(
-          collection(this.firestore, "event participation request"),
+          collection(this.firestoreDefault, "event participation request"),
           where("eventref", "==", eventRef),
           where("status", "in", ["approved", "attended"])
         );
@@ -379,9 +381,9 @@ export class ParticipantAELComponent implements OnInit {
         this.eventParticipantList = approvedList;
       }
       else{
-        const eventRef = doc(this.firestore, this.selectedLiveEvent["eventpath"]);
+        const eventRef = doc(this.firestoreDefault, this.selectedLiveEvent["eventpath"]);
         const participationQuery = query(
-          collection(this.firestore, "queue_token"),
+          collection(this.firestoreDefault, "queue_token"),
           where("queueref", "==", eventRef),
           where("stagestatus", "==", "Approved"),
           where("tokenstatus", "==", "Active"),
@@ -419,21 +421,21 @@ export class ParticipantAELComponent implements OnInit {
         data: {msg: "Updating..."},
         disableClose: true
       })
-      const batch = writeBatch(this.firestore);
-      const participantAELDocRef = doc(this.firestore, "participant AEL", recentAEL["docid"]);
+      const batch = writeBatch(this.firestoreDefault);
+      const participantAELDocRef = doc(this.firestoreDefault, "participant AEL", recentAEL["docid"]);
       batch.update(participantAELDocRef, {
         status: "ongoing",
         tentativestart: recentAEL["created"],
         flag: "validated",
         validatedby: this.loggedinProfileData["profile_ref"].id
       })
-      const interimCrossoverQuery = query( collection(this.firestore, "interim crossover"), where("aelid", "==", recentAEL["docid"]) );
+      const interimCrossoverQuery = query( collection(this.firestoreDefault, "interim crossover"), where("aelid", "==", recentAEL["docid"]) );
       const metricSnapshot = await getDocs(interimCrossoverQuery);
       const metricData = metricSnapshot.docs.map(doc => doc.data());
         metricData.sort((a, b) => b["created"].toDate() - a["created"].toDate())
         if(metricData.length != 0){
           const latestDocId = metricData[0]["docid"];
-          const interimDocRef = doc(this.firestore, "interim crossover", latestDocId);
+          const interimDocRef = doc(this.firestoreDefault, "interim crossover", latestDocId);
           batch.update(interimDocRef, {
             validatedby: this.loggedinProfileData["profile_ref"].id
           })
@@ -451,7 +453,7 @@ export class ParticipantAELComponent implements OnInit {
     var recentAEL = row["total"][0]
     console.log(recentAEL)
     if(confirm("Sure, Mark this as Discuss Later?")){
-      const participantDocRef = doc(this.firestore, 'participant AEL', recentAEL.docid);
+      const participantDocRef = doc(this.firestoreDefault, 'participant AEL', recentAEL.docid);
       updateDoc(participantDocRef, {
         flag: "discuss later",
       })

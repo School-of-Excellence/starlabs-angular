@@ -370,6 +370,35 @@
             </div>
           </div>
 
+          <!-- From field with custom dropdown -->
+          <div class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
+            <span class="gmail-field-label">From</span>
+            <div class="gmail-recipient-content">
+              <div class="gmail-chip-wrap">
+                <span *ngIf="selectedFromEmail" class="gmail-chip">
+                  {{selectedFromEmail}}
+                  <button class="gmail-chip-remove" (click)="removeFromEmail($event)" title="Change sender">×</button>
+                </span>
+                <div *ngIf="!selectedFromEmail" class="gmail-recipient-input-wrap">
+                  <input class="gmail-recipient-input" type="text"
+                        [(ngModel)]="fromSearchQuery"
+                        (input)="onFromSearchChange()"
+                        (focus)="onFromInputFocus($event)"
+                        placeholder="Select sender email…"
+                        autocomplete="off">
+                  <div *ngIf="fromDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
+                    <div *ngIf="fromFilteredEmails.length === 0" class="gmail-dd-empty">No sender emails available</div>
+                    <div *ngFor="let email of fromFilteredEmails" class="gmail-dd-item"
+                        (mousedown)="selectFromEmail(email, $event)">
+                      <mat-icon class="gmail-dd-icon">alternate_email</mat-icon>
+                      {{email}}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- To field -->
           <div class="gmail-field-row">
             <span class="gmail-field-label">To</span>

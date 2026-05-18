@@ -6,7 +6,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { Router, RouterModule } from '@angular/router';
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc, where} from '@angular/fire/firestore';
+import { collection, collectionData, doc, getFirestore, getDoc, getDocs, orderBy, query, updateDoc, where} from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CommonModule } from '@angular/common';
@@ -209,7 +209,9 @@ export class LiveEventDashboardComponent {
   searchTerm: string = '';
   filteredProfile = "";
 
-  private firestore = inject(Firestore)
+  // private firestore = inject(Firestore)
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
   constructor(
     public guard: AuthguardService,
     public router: Router,
@@ -240,7 +242,7 @@ export class LiveEventDashboardComponent {
       this.mapJourney = e
     })
 
-    getDocs(collection(this.firestore,"products")).then(snap => {
+    getDocs(collection(this.firestoreDefault,"products")).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element = snap.docs[i].data();
         this.mapProductsNameById[element['id']] = element['product']
@@ -251,7 +253,7 @@ export class LiveEventDashboardComponent {
       }
     })
 
-    getDoc(doc(this.firestore,"temporary function access","atcaccess")).then(atcAccessSnap => {
+    getDoc(doc(this.firestoreDefault,"temporary function access","atcaccess")).then(atcAccessSnap => {
       if(atcAccessSnap.exists()){
         this.temporaryFunctionAccess = atcAccessSnap.data()['profilelist'] || []
         this.displayedColumns = this.tableColumns.map(col => col.value).filter(e => !['atcmodel','prescription_date','author','eventbreakthroughs'].includes(e));
@@ -262,7 +264,7 @@ export class LiveEventDashboardComponent {
     })
 
     // Fetch procedures
-    getDocs(collection(this.firestore,"procedures")).then(res => {
+    getDocs(collection(this.firestoreDefault,"procedures")).then(res => {
       for (let i = 0; i < res.docs.length; i++) {
         const element = res.docs[i].data();
         this.mapProcedure[res.docs[i].id] = element
@@ -270,7 +272,7 @@ export class LiveEventDashboardComponent {
     })
 
     // Fetch events
-    getDocs(query(collection(this.firestore,"event collection"),orderBy("start_date","desc"))).then(snap => {
+    getDocs(query(collection(this.firestoreDefault,"event collection"),orderBy("start_date","desc"))).then(snap => {
       for (let k = 0; k < snap.docs.length; k++) {
         const event = snap.docs[k].data();
         event['ref'] = snap.docs[k].ref;
@@ -476,7 +478,7 @@ export class LiveEventDashboardComponent {
     console.log(this.getEventDatesUntilToday);
 
     this.eventProductAtcModelList = this.form.value['atcmodel']
-    const eventProfiles = await getDocs(query(collection(this.firestore, "event participation request"), where('eventref', '==', this.form.value['event'].ref)))
+    const eventProfiles = await getDocs(query(collection(this.firestoreDefault, "event participation request"), where('eventref', '==', this.form.value['event'].ref)))
     const profileIds = []
     this.eventParticipants = []
     this.mapEventParticipantsProducts = {}
@@ -496,14 +498,14 @@ export class LiveEventDashboardComponent {
     this.filteredEventParticipants = this.eventParticipants
     // console.log("unique event participants",this.eventParticipants.length)
 
-    getDocs(query(collection(this.firestore, "arena events"), where("eventref", "==", this.form.value['event'].ref))).then(eventSnap => {
+    getDocs(query(collection(this.firestoreDefault, "arena events"), where("eventref", "==", this.form.value['event'].ref))).then(eventSnap => {
       this.productsList = eventSnap.docs.map(e => e.data()).filter(e => e['delete'] != true)
     })
 
     const promises = [];
     for (let i = 0; i < profileIds.length; i += 10) {
       const profilelist = profileIds.slice(i, i + 10);
-      const promise = getDocs(query(collection(this.firestore, "participant metadata"), where("profileid", "in", profilelist))).then(res => {
+      const promise = getDocs(query(collection(this.firestoreDefault, "participant metadata"), where("profileid", "in", profilelist))).then(res => {
         for (let j = 0; j < res.docs.length; j++) {
           const element = res.docs[j].data();
           this.mapactivejourney[element['profileid']] = element['activejourney'];
@@ -534,7 +536,7 @@ export class LiveEventDashboardComponent {
       const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59);
 
       // fetch unvalidated ATC
-      collectionData(query(collection(this.firestore, "atc_to_validate"),
+      collectionData(query(collection(this.firestoreATC, "atc_to_validate"),
         where("isdelete", "==", false),
         where("prescription_date", ">=", startDate),
         where("prescription_date", "<=", endDate),
@@ -551,7 +553,7 @@ export class LiveEventDashboardComponent {
       })
 
       // fetch Attendence
-      collectionData(query(collection(this.firestore, "arena e-ticket log"), where('eventref', '==', formValue['event'].ref)))
+      collectionData(query(collection(this.firestoreDefault, "arena e-ticket log"), where('eventref', '==', formValue['event'].ref)))
         .pipe(takeUntil(this.unsubscribe$)).subscribe(list => {
           this.mapAttendence = {}
           // this.todayAttendence = list.filter(e => new Date(e['logdate'].toDate()).toLocaleDateString('en-CA') === new Date().toLocaleDateString('en-CA')).length
@@ -573,7 +575,7 @@ export class LiveEventDashboardComponent {
         })
 
       // fetch videoAsk
-      collectionData(query(collection(this.firestore, "arenavideoask"), where('eventref', '==', formValue['event'].ref)))
+      collectionData(query(collection(this.firestoreDefault, "arenavideoask"), where('eventref', '==', formValue['event'].ref)))
         .pipe(takeUntil(this.unsubscribe$)).subscribe(videoask => {
           for (let i = 0; i < videoask.length; i++) {
             const element = videoask[i];
@@ -590,7 +592,7 @@ export class LiveEventDashboardComponent {
       this.todayBreakthrough = 0;
 
       // fetch Breakthroughs
-      collectionData(collection(this.firestore, `Achievements/${'posts'}/postcollection`))
+      collectionData(collection(this.firestoreDefault, `Achievements/${'posts'}/postcollection`))
         .pipe(takeUntil(this.unsubscribe$)).subscribe(snap => {
           this.totalBreakthroughs = snap.length;
 
@@ -640,7 +642,7 @@ export class LiveEventDashboardComponent {
 
 
       // fetch participant ael
-      collectionData(query(collection(this.firestore, "participant AEL"), orderBy("created", "desc"))).pipe(takeUntil(this.unsubscribe$)).subscribe(snap => {
+      collectionData(query(collection(this.firestoreDefault, "participant AEL"), orderBy("created", "desc"))).pipe(takeUntil(this.unsubscribe$)).subscribe(snap => {
         // this.totalAELcount = snap.length;
         this.validatedAEL = 0
         this.totalAELcount = 0
@@ -673,7 +675,7 @@ export class LiveEventDashboardComponent {
       });
 
       try {
-        collectionData(query(collection(this.firestore, "atc_alpha"),
+        collectionData(query(collection(this.firestoreATC, "atc_alpha"),
           where("isdelete", "==", false),
           where("prescription_date", ">=", startDate),
           where("prescription_date", "<=", endDate),
@@ -1560,11 +1562,11 @@ resetFilters(): void {
 
   async onDeleteATC(row){
     if(confirm("are you sure want to delete")){
-      getDoc(doc(this.firestore,"temporary function access","atcaccess")).then(async snap => {
+      getDoc(doc(this.firestoreDefault,"temporary function access","atcaccess")).then(async snap => {
         this.temporaryFunctionAccess = snap.data()['profilelist'] || []
         if(this.temporaryFunctionAccess.includes(this.loggedProfileID)){
           console.log(row['atcid'],this.mapprofile[row['profileid']],row['prescription_date'])
-          await updateDoc(doc(this.firestore,"atc_alpha",row['atcid']),{
+          await updateDoc(doc(this.firestoreATC,"atc_alpha",row['atcid']),{
             isdelete:true,
             deletedDate:new Date()
           }).then(() => {

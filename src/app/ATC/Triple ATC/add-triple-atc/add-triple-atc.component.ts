@@ -1,7 +1,7 @@
 import { Component, OnDestroy } from '@angular/core';
 import { LoadingProgressComponent } from '../../../loading-progress/loading-progress.component';
 import { firstValueFrom, Subscription } from 'rxjs';
-import { collection, collectionData, collectionSnapshots, doc, getDoc, Firestore, getDocs, or, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, getDoc, getFirestore, getDocs, or, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage } from '@angular/fire/storage';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -137,9 +137,11 @@ export class AddTripleATCComponent implements OnDestroy {
   queueList = []
   selectedQueueid = null
 
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
   constructor(
     public location: Location,
-    public firestore: Firestore,
     public storage: Storage,
     public route: ActivatedRoute,
     public router: Router,
@@ -174,7 +176,7 @@ export class AddTripleATCComponent implements OnDestroy {
         this.assignmentId = data['assignmentid']
         this.participantAssignmentId = data['participantassignmentid']
         if(this.bigActivity()){
-          getDoc(doc(this.firestore, 'big participants assignments', this.participantAssignmentId)).then((doc)=>{
+          getDoc(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId)).then((doc)=>{
             if(doc.exists()){
               if(doc.data()['status'] == 'initiated'){
                  updateDoc(doc.ref,{
@@ -232,7 +234,7 @@ export class AddTripleATCComponent implements OnDestroy {
       */
 
       // Fetch Products
-      var productCollection = collection(this.firestore, "products")
+      var productCollection = collection(this.firestoreDefault, "products")
       var productQuery = query(productCollection, orderBy("atcmodel"))
       this.productSubscription = collectionData(productQuery).subscribe(products => {
         this.productAvailable = products.filter(e => (e["atcmodel"] ?? "").trim().length != 0)
@@ -241,7 +243,7 @@ export class AddTripleATCComponent implements OnDestroy {
       })
 
       // Fetch User Roles
-      var userCollection = collection(this.firestore, "users_roles")
+      var userCollection = collection(this.firestoreDefault, "users_roles")
       var userQuery = query(userCollection, orderBy("name"))
       this.rolesSubscription = collectionData(userQuery).subscribe(userRoles => {
         var usersWithRoles = []
@@ -281,7 +283,7 @@ export class AddTripleATCComponent implements OnDestroy {
       */
 
       // Fetch changeworks
-      var procedureCollection = collection(this.firestore, "procedures")
+      var procedureCollection = collection(this.firestoreDefault, "procedures")
       var procedureQuery = query(procedureCollection, orderBy("name"))
       this.procedureSubscription = collectionSnapshots(procedureQuery).subscribe(procedureList => {
         var list = []
@@ -299,7 +301,7 @@ export class AddTripleATCComponent implements OnDestroy {
       })
 
       // Check if inside a Queue
-      var queueCollection = collection(this.firestore, "queue generation")
+      var queueCollection = collection(this.firestoreDefault, "queue generation")
       var queueQuery = query(queueCollection, orderBy("queueenddate", "desc"))
       await getDocs(queueQuery).then(async queuesnap => {
         this.queueList = queuesnap.docs.map(e => e.data())
@@ -369,11 +371,11 @@ export class AddTripleATCComponent implements OnDestroy {
     console.log("ATC Draft")
     var draftATC = []
     if (this.roles["developer"] || this.roles['transcriber'] || this.loggedinProfileid == this.participantProfileid) {
-      var temporaryCollection = collection(this.firestore, "temporary_tripleatc")
+      var temporaryCollection = collection(this.firestoreATC, "temporary_tripleatc")
       var temporaryQuery = query(temporaryCollection, where("profileid", "==", this.participantProfileid), where("delete", "==", false))
       draftATC = (await getDocs(temporaryQuery)).docs
     }
-    this.autoSaveID = doc(collection(this.firestore, 'temporary_tripleatc')).id
+    this.autoSaveID = doc(collection(this.firestoreATC, 'temporary_tripleatc')).id
     if (draftATC.length != 0) {
       var dialogRef = this.matDialog.open(AtcOptionComponent, {
         data: {
@@ -437,7 +439,7 @@ export class AddTripleATCComponent implements OnDestroy {
         // observer: this.observer,
         // transcript: this.transcript,
       }
-      setDoc(doc(this.firestore, "temporary_tripleatc", this.autoSaveID), data).catch(err => {
+      setDoc(doc(this.firestoreATC, "temporary_tripleatc", this.autoSaveID), data).catch(err => {
         console.log(err)
       })
     }
@@ -510,7 +512,7 @@ export class AddTripleATCComponent implements OnDestroy {
   }
 
   async submit() {
-    this.alphaid = doc(collection(this.firestore, 'triple atc')).id
+    this.alphaid = doc(collection(this.firestoreATC, 'triple atc')).id
     if (this.date == null || this.date == undefined) {
       alert("Enter the Date of Prescription")
     }
@@ -588,14 +590,15 @@ export class AddTripleATCComponent implements OnDestroy {
     }
     var confirmationMessage = `You are sumbitting this Triple ATC for the Queue '${queuename}'. This Triple ATC will be validated by A&H`
     if (confirm(confirmationMessage)) {
-      var batch = writeBatch(this.firestore)
+      var defaultBatch = writeBatch(this.firestoreDefault)
+      var atcBatch = writeBatch(this.firestoreATC)
       // this.loading = true
       this.loadingref = this.loadingDialog
       var authorref = []
       // var authorlevel = {}
       for (let j = 0; j < this.author.length; j++) {
         const element = this.author[j];
-        authorref.push(doc(this.firestore, element))
+        authorref.push(doc(this.firestoreATC, element))
         // authorlevel[element.split('/')[1]] = this.mapProfile[this.firestore.doc(element).ref.id].level
       }
       console.log(authorref)
@@ -612,7 +615,7 @@ export class AddTripleATCComponent implements OnDestroy {
       console.log(validatorref)
       */
       // Write on ATC Alpha
-      var notesID = doc(collection(this.firestore, 'atc_notes')).id
+      var notesID = doc(collection(this.firestoreATC, 'atc_notes')).id
       console.log(this.alphaid)
       var alphaData = {
         atcid: this.alphaid,
@@ -642,9 +645,9 @@ export class AddTripleATCComponent implements OnDestroy {
         alphaData['marathonid'] = this.marathonId
         alphaData['bigassignment'] = true;
 
-        batch.update(doc(this.firestore, 'big participants assignments', this.participantAssignmentId), {
+        defaultBatch.update(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId), {
           status: 'review',
-          activityref: doc(this.firestore, collectionName, this.alphaid),
+          activityref: doc(this.firestoreATC, collectionName, this.alphaid),
           atcdocid: this.alphaid
         });
 
@@ -652,7 +655,7 @@ export class AddTripleATCComponent implements OnDestroy {
 
       var collectionName = "triple atc"
       console.log(alphaData)
-      batch.set(doc(this.firestore, collectionName, this.alphaid), alphaData)
+      atcBatch.set(doc(this.firestoreATC, collectionName, this.alphaid), alphaData)
       var mergeAdjustment = []
       this.tripleATC.forEach(e => {
         e["atc"].forEach(f => {
@@ -682,25 +685,25 @@ export class AddTripleATCComponent implements OnDestroy {
           implementationagent: adjustmentAgent,
           perceptualposition: atcAdjustment["perceptualposition"]
         }
-        batch.set(doc(this.firestore, collectionName, this.alphaid, "corrections", adjId), adjData)
+        atcBatch.set(doc(this.firestoreATC, collectionName, this.alphaid, "corrections", adjId), adjData)
         for (let j = 0; j < atcAdjustment.procedure.length; j++) {
           var procedureID = adjId + " - " + (j + 1).toString()
           var assignref = []
           // var assignlevel = {}
           for (let a = 0; a < atcAdjustment.procedure[j].assigned_to.length; a++) {
             const profilePath = atcAdjustment.procedure[j].assigned_to[a]
-            assignref.push(doc(this.firestore, profilePath))
-            // assignlevel[profilePath.split('/')[1]] = this.mapProfile[this.firestore.doc(profilePath).ref.id].level              
+            assignref.push(doc(this.firestoreATC, profilePath))
+            // assignlevel[profilePath.split('/')[1]] = this.mapProfile[this.firestoreATC.doc(profilePath).ref.id].level
           }
           // console.log(assignlevel)
-          console.log(atcAdjustment.procedure[j].recommended_to != null ? doc(this.firestore, atcAdjustment.procedure[j].recommended_to) : null)
+          console.log(atcAdjustment.procedure[j].recommended_to != null ? doc(this.firestoreATC, atcAdjustment.procedure[j].recommended_to) : null)
           console.log(assignref.length != 0 ? assignref : null)
 
           var procedureData = {
-            name: doc(this.firestore, atcAdjustment.procedure[j].name),
+            name: doc(this.firestoreATC, atcAdjustment.procedure[j].name),
             assigned_to: assignref.length != 0 ? assignref : null,
             // level: assignlevel,
-            // recommended_to: atcAdjustment.procedure[j].recommended_to != null ? this.firestore.doc(atcAdjustment.procedure[j].recommended_to).ref : null,
+            // recommended_to: atcAdjustment.procedure[j].recommended_to != null ? this.firestoreATC.doc(atcAdjustment.procedure[j].recommended_to).ref : null,
             status: atcAdjustment.procedure[j].completed ? "completed" : "yet to start",
             created: serverTimestamp(),
             mandatory: atcAdjustment.procedure[j].mandatory,
@@ -709,10 +712,11 @@ export class AddTripleATCComponent implements OnDestroy {
             autogeneralized: false,
             product: this.product,
           }
-          batch.set(doc(this.firestore, collectionName, this.alphaid, "corrections", adjId, "procedures", procedureID), procedureData)
+          atcBatch.set(doc(this.firestoreATC, collectionName, this.alphaid, "corrections", adjId, "procedures", procedureID), procedureData)
         }
       }
-      batch.commit().then(() => {
+      atcBatch.commit().then(() => {
+        defaultBatch.commit()
         this.uploadCompleted()
       })
       console.log("Done")
@@ -759,7 +763,7 @@ export class AddTripleATCComponent implements OnDestroy {
   async uploadCompleted() {
     console.log(this.totalProcedureWritten, this.totalProcedures)
     // if(this.notesWritten){
-    updateDoc(doc(this.firestore, "temporary_tripleatc", this.autoSaveID), { delete: true }).catch(err => {
+    updateDoc(doc(this.firestoreATC, "temporary_tripleatc", this.autoSaveID), { delete: true }).catch(err => {
       console.log(err)
     })
     this.loadingref?.close()

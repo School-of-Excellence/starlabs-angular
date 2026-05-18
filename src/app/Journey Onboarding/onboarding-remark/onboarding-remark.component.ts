@@ -2,7 +2,8 @@ import { Component, Inject, HostListener, ElementRef } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import {
-  collection, doc, Firestore, getDoc, getDocs, limit, query, where, addDoc, setDoc
+  collection, doc, Firestore, getDoc, getDocs, limit, query, where, addDoc, setDoc,
+  docData
 } from '@angular/fire/firestore';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { CommonModule } from '@angular/common';
@@ -134,6 +135,12 @@ export class OnboardingRemarkComponent {
   bonusLoading: boolean = false;
   mailAttachments: Array<Object> = [];
 
+  fromEmails: [] = []
+  selectedFromEmail: string = 'fulfillment@antanoharini.com';
+  fromSearchQuery: string = '';
+  fromFilteredEmails: string[] = [];
+  fromDropdownOpen: boolean = false;
+
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
     public dialogRef: MatDialogRef<any>,
@@ -155,6 +162,15 @@ export class OnboardingRemarkComponent {
 
     getDocs(query(collection(this.firestore, 'users_roles'), where('ahmember', '==', true))).then(snap => {
       this.ahmember = snap.docs.map(e => e.data());
+    });
+
+    docData(doc(this.firestore,'classify','postmarkserver')).subscribe((senders)=>{
+      console.log('Sender Emails:',senders);
+      
+      this.fromEmails = senders['senderemails'] || [
+        'starlabs@excellenceinstallation.com',
+        'support@intl.soexcellence.com'
+      ];
     });
 
   }
@@ -227,6 +243,7 @@ export class OnboardingRemarkComponent {
     this.templateDropdownOpen = false;
     this.ccDropdownOpen = false;
     this.bccDropdownOpen = false;
+    this.fromDropdownOpen = false;
   }
 
   setCheckboxStates() {
@@ -740,7 +757,7 @@ export class OnboardingRemarkComponent {
       cc: this.selectedCcChips.join(', '),
       bcc:  this.selectedBccChips.join(', '),
       fileUrl: null,
-      from: 'starlabs@excellenceinstallation.com',
+      from: this.selectedFromEmail || 'fulfillment@antanoharini.com',
       notes: this.note || null,
       postmarktemplateid: this.selectedTemplate.postmarktemplateid || null,
       profileid: [profileId],
@@ -946,6 +963,40 @@ export class OnboardingRemarkComponent {
   }
 
   closeDialog() { this.dialogRef.close(); }
+
+  // ── FROM custom dropdown ──────────────────────────────────
+  onFromInputFocus(event: MouseEvent) {
+    event.stopPropagation();
+    this.ccDropdownOpen = false;
+    this.bccDropdownOpen = false;
+    this.templateDropdownOpen = false;
+    this.fromDropdownOpen = true;
+    this.onFromSearchChange();
+  }
+
+  onFromSearchChange() {
+    const q = this.fromSearchQuery?.toLowerCase()?.trim();
+    this.fromFilteredEmails = q
+      ? this.fromEmails.filter((e:string) => e.toLowerCase().includes(q))
+      : [...this.fromEmails];
+  }
+
+  selectFromEmail(email: string, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    if (!email) return;
+    this.selectedFromEmail = email;
+    this.fromSearchQuery = '';
+    this.fromDropdownOpen = false;
+  }
+
+  removeFromEmail(event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.selectedFromEmail = '';
+    this.fromSearchQuery = '';
+    this.onFromSearchChange();
+    this.fromDropdownOpen = true;
+  }
+
 }
 // import { Component, Inject } from '@angular/core';
 // import { MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';

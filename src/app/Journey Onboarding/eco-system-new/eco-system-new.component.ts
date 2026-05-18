@@ -1,5 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { Firestore, collection, query, where, getDocs } from '@angular/fire/firestore';
+import { collection, getFirestore, query, where, getDocs } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { Storage } from '@angular/fire/storage';
 import { MatDialog } from '@angular/material/dialog';
@@ -41,7 +41,7 @@ import { FormsModule } from '@angular/forms';
   providers: [DatePipe],
 })
 export class EcoSystemNewComponent implements OnInit {
-  private firestore = inject(Firestore);
+  firestoreDefault = getFirestore();
   private guard = inject(AuthguardService);
   private storage = inject(Storage);
   public dialog = inject(MatDialog);
@@ -567,7 +567,7 @@ export class EcoSystemNewComponent implements OnInit {
   }
 
   participantDashboard() {
-    const colRef = collection(this.firestore, 'participantdashboard');
+    const colRef = collection(this.firestoreDefault, 'participantdashboard');
     const q = query(colRef, where('customerstatus', '==', 'active'));
     getDocs(q).then(participant => {
       participant.docs.forEach(doc => {
@@ -640,7 +640,7 @@ export class EcoSystemNewComponent implements OnInit {
       ? Timestamp.fromDate(new Date(new Date(this.filter.enddate).setDate(1)))
       : Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth() + 1, 1));
 
-    const aelQuery = await getDocs(collection(this.firestore, 'accelerated evolution level'));
+    const aelQuery = await getDocs(collection(this.firestoreDefault, 'accelerated evolution level'));
     this.ael = {};
     aelQuery.docs.forEach(doc => {
       const element = doc.data();
@@ -650,8 +650,8 @@ export class EcoSystemNewComponent implements OnInit {
       };
     });
 
-    const interimQuery = await getDocs(collection(this.firestore, 'interim crossover'));
-    // const interimQuery = await getDocs(query(collection(this.firestore, 'interim crossover'),
+    const interimQuery = await getDocs(collection(this.firestoreDefault, 'interim crossover'));
+    // const interimQuery = await getDocs(query(collection(this.firestoreDefault, 'interim crossover'),
     //   where('created', '>=', startDate),
     //   where('created', '<', endDate)
     // ));
@@ -722,7 +722,7 @@ export class EcoSystemNewComponent implements OnInit {
   //   : firebase.default.firestore.Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), 1));
   //   // console.log("startDate (month-only)", startDate);
   //   // console.log("endDate (month-only)", endDate);
-  //   const aelQuery = await this.firestore.collection('accelerated evolution level').get().toPromise();
+  //   const aelQuery = await this.firestoreDefault.collection('accelerated evolution level').get().toPromise();
   //   this.ael = {};
   //   aelQuery.docs.forEach((doc) => {
   //     const element = doc.data();
@@ -731,7 +731,7 @@ export class EcoSystemNewComponent implements OnInit {
   //       startpoint: element['startpoint']
   //     };
   //   });
-  //   const interimQuery = await this.firestore.collection('interim crossover', ref =>
+  //   const interimQuery = await this.firestoreDefault.collection('interim crossover', ref =>
   //     ref
   //     .where('created', '>=', startDate)
   //     .where('created', '<', endDate)
@@ -775,7 +775,7 @@ export class EcoSystemNewComponent implements OnInit {
     this.startDate = this.filter.startdate || new Date(today.getFullYear(), today.getMonth() - 5, today.getDate());
     this.endDate = this.filter.enddate || today;
 
-    const colRef = collection(this.firestore, 'aggregate_participant_timeline');
+    const colRef = collection(this.firestoreDefault, 'aggregate_participant_timeline');
     const q = query(colRef, where('activitylist', 'array-contains-any', ['saleupgraded', 'saledowngraded', 'salecancelled']));
     getDocs(q).then(updown => {
       this.saleUpgradedCounts = {};
@@ -848,7 +848,8 @@ export class EcoSystemNewComponent implements OnInit {
     const endDate = this.filter.enddate ? Timestamp.fromDate(new Date(this.filter.enddate)) : today;
 
     if (startDate && endDate) {
-      const colRef = collection(this.firestore, 'atc_alpha');
+      const firestoreATC = getFirestore("firestore-atc")
+      const colRef = collection(firestoreATC, 'atc_alpha');
       const q = query(
         colRef,
         where('isdelete', '==', false),
@@ -1138,7 +1139,7 @@ export class EcoSystemNewComponent implements OnInit {
     this.eventNames = [];
     let allData: any[] = [];
 
-    const colRef = collection(this.firestore, 'event collection');
+    const colRef = collection(this.firestoreDefault, 'event collection');
     const q = query(colRef, where('atcmodel', '==', 'uP!'));
     getDocs(q).then(eventCollection => {
       eventCollection.docs.forEach(e => {
@@ -1182,8 +1183,8 @@ export class EcoSystemNewComponent implements OnInit {
         }
 
         const eventRefId = arenaEventcol['ref'];
-        // this.firestore.collection('events_profiles', ref => ref.where('event_ref', '==', eventRefId)).get().toPromise().then(profileSnapshot => {
-        const epColRef = collection(this.firestore, 'event participation request');
+        // this.firestoreDefault.collection('events_profiles', ref => ref.where('event_ref', '==', eventRefId)).get().toPromise().then(profileSnapshot => {
+        const epColRef = collection(this.firestoreDefault, 'event participation request');
         const epQuery = query(epColRef, where('eventref', '==', eventRefId), where('status', '==', 'attended'));
         getDocs(epQuery).then(profileSnapshot => {
           profileSnapshot.docs.forEach(profileDoc => {
@@ -1434,7 +1435,7 @@ export class EcoSystemNewComponent implements OnInit {
   //     const attendancePattern = [1, -1, 1]; // 1 = attend, -1 = skip
   //     let patternIndex = 0;
 
-  //     this.firestore.collection('event collection', ref => ref.where('atcmodel', '==', 'uP!'))
+  //     this.firestoreDefault.collection('event collection', ref => ref.where('atcmodel', '==', 'uP!'))
   //         .get().toPromise().then(eventCollection => {
   //             eventCollection.docs.forEach(e => {
   //                 let ele = e.data();
@@ -1468,7 +1469,7 @@ export class EcoSystemNewComponent implements OnInit {
   //                 if (shouldAttend) {
   //                     // Fetch profiles attending this event
   //                     const eventRefId = arenaEventcol['ref'];
-  //                     this.firestore.collection('events_profiles', ref => ref.where('event_ref', '==', eventRefId))
+  //                     this.firestoreDefault.collection('events_profiles', ref => ref.where('event_ref', '==', eventRefId))
   //                         .get().toPromise().then(profileSnapshot => {
   //                             profileSnapshot.docs.forEach(profileDoc => {
   //                                 const profileId = profileDoc.data()['profile_ref'].id;

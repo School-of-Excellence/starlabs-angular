@@ -581,9 +581,8 @@
     </div> -->
     <!-- Form submission buttons with improved styling -->
     <div class="form-actions">
-      <button *ngIf="!formpatch"  mat-raised-button  color="primary"  type="button"  (click)="onSubmit(this.deliveryForm.value)" class="submit-button">
-          <mat-icon>visibility</mat-icon>
-          Preview & Submit
+      <button *ngIf="!route.snapshot.queryParams['viewFilledForm'] && !route.snapshot.queryParams['viewCompleted']" mat-raised-button color="primary" type="button" (click)="formpatch ? onUpdate(deliveryForm.value) : onSubmit(deliveryForm.value)" class="submit-button">
+        Preview & Submit
       </button>
 
       <!-- <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'"
