@@ -250,19 +250,11 @@ export class EiflixBannerComponent implements AfterViewInit {
 
     try {
       const bannerRef = collection(this.firestore, 'eiflixbanner');
+      const isEdit = !!this.editingBanner?.id;
 
-      const snapshot = await getDocs(bannerRef);
-      let maxOrder = 0;
-      snapshot.forEach((docSnap) => {
-        const data: any = docSnap.data();
-        if (data.order && data.order > maxOrder) {
-          maxOrder = data.order;
-        }
-      });
-
-      let imageUrl = '';
-      let imageUrlApp = '';
-      let videoUrl = '';
+      let imageUrl = isEdit ? (this.editingBanner!.imageUrl || '') : '';
+      let imageUrlApp = isEdit ? (this.editingBanner!.imageUrlApp || '') : '';
+      let videoUrl = isEdit ? (this.editingBanner!.videoUrl || '') : '';
 
       if (formValue.image instanceof File) {
         const imageRef = ref(this.storage, `eiflixbanner/images/${Date.now()}_${formValue.image.name}`);
@@ -279,23 +271,38 @@ export class EiflixBannerComponent implements AfterViewInit {
         videoUrl = await this.uploadWithProgress(videoRef, formValue.video, 50, 100);
       }
 
-      await addDoc(bannerRef, {
+      const payload: any = {
         title: formValue.title,
         description: formValue.description,
         path: formValue.path,
-        enable: formValue.enable,
-        enableapp: formValue.enableapp,
-        seriesRefId: formValue.seriesId,
+        enable: formValue.enable ?? true,
+        enableapp: formValue.enableapp ?? true,
+        seriesRefId: formValue.seriesId || '',
         buttonname: formValue.buttonname || '',
         externallink: formValue.externallink || '',
-        imageUrl,
-        imageUrlApp,
-        videoUrl,
-        timestamp: serverTimestamp(),
-        order: maxOrder + 1
-      });
+        imageUrl: imageUrl || '',
+        imageUrlApp: imageUrlApp || '',
+        videoUrl: videoUrl || '',
+        timestamp: serverTimestamp()
+      };
+
+      if (isEdit) {
+        await updateDoc(doc(this.firestore, 'eiflixbanner', this.editingBanner!.id!), payload);
+        this.snackBar.open('Banner updated!', 'OK', { duration: 2000 });
+      } else {
+        const snapshot = await getDocs(bannerRef);
+        let maxOrder = 0;
+        snapshot.forEach((docSnap) => {
+          const data: any = docSnap.data();
+          if (data.order && data.order > maxOrder) {
+            maxOrder = data.order;
+          }
+        });
+        await addDoc(bannerRef, { ...payload, order: maxOrder + 1 });
+        this.snackBar.open('Banner added!', 'OK', { duration: 2000 });
+      }
+
       await this.loadBanners();
-      this.snackBar.open('Banner added!', 'OK', { duration: 2000 });
       this.resetForm();
 
     } catch (error) {
@@ -327,8 +334,8 @@ export class EiflixBannerComponent implements AfterViewInit {
       title: banner.title,
       description: banner.description,
       path: banner.path,
-      enable: banner.enable,
-      enableapp: banner.enableapp,
+      enable: banner.enable ?? false,
+      enableapp: banner.enableapp ?? false,
       seriesId: banner.seriesRefId || '',
       externallink: banner.externallink || '',
       buttonname: banner.buttonname || ''

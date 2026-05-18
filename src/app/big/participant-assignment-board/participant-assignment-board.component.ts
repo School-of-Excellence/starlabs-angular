@@ -522,6 +522,8 @@ export class ParticipantAssignmentBoardComponent {
   fillForm(activity: any) {
     console.log(activity);
 
+    console.log(activity);
+
     const formTemplateId = activity.selectedform;
     const profileId = activity.profileId;
     const assignmentId = activity.docid;
