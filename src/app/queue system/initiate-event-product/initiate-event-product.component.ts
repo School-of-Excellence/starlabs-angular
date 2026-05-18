@@ -148,6 +148,7 @@ export class InitiateEventProductComponent {
   };
   noProductSelection = new SelectionModel<string>(true, []);
   lastImportedParticipants: { name: string, email: string }[] = [];
+  filterValue = '';
 
   constructor(
     public firestore: Firestore,
@@ -575,6 +576,7 @@ export class InitiateEventProductComponent {
   }
 
   applyFilter(value){
+    this.filterValue = value;
     this.tableDatasource.filter = value
   }
 
@@ -822,6 +824,42 @@ export class InitiateEventProductComponent {
     } else {
       this.noProductSelection.clear();
     }
+  }
+  
+  getUnassignedFromSearch(): any[] {
+    if (!this.filterValue) return [];
+    const search = this.filterValue.trim().toLowerCase();
+    return Object.values(this.mapEmailData).filter((p: any) => {
+      const name = p.name?.toLowerCase() ?? '';
+      const email = p.email?.toLowerCase() ?? '';
+      return (name.includes(search) || email.includes(search)) &&
+        !this.participantProductList.some(pp => pp.email?.toLowerCase() === email);
+    });
+  }
+
+  assignProductFromSearch(participants: any[]) {
+    const selectedParticipants = participants.map(p => ({
+      profileid: p.profileid,
+      name: p.name,
+      email: p.email
+    })).filter(p => p.profileid);
+
+    if (selectedParticipants.length === 0) return;
+
+    this.dialog.open(BulkAddProductsComponent, {
+      data: selectedParticipants,
+      width: '70vw',
+      disableClose: true
+    }).afterClosed().subscribe(async () => {
+    if (!this.selectedArena) return;
+    const savedDeliverySet = this.selectedDeliverySet;
+    const savedQueueVariation = this.selectedQueueVariation;
+    await this.onArenaEventSelect(this.selectedArena);
+    this.selectedDeliverySet = savedDeliverySet;
+    this.selectedQueueVariation = savedQueueVariation;
+    this.filterValue = '';
+    this.tableDatasource.filter = '';
+  });
   }
 
   returnEvent(){

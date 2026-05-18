@@ -179,10 +179,10 @@
               <span class="select-all-text">Select All</span>
             </div>
           </div>
-
+          <input type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
           <!-- Participants List - Merged from selected stages -->
           <div class="participants-list" *ngIf="selectedStages.length > 0">
-            <div *ngFor="let token of getMergedParticipants(); let i = index" class="participant-item"
+            <div *ngFor="let token of getFilteredMergedParticipants(); let i = index" class="participant-item"
               (click)="toggleTokenSelection(token)">
 
               <!-- Checkbox -->
@@ -244,7 +244,7 @@
 
           <!-- Participants List - Single stage (when no stages selected in dropdown) -->
           <div class="participants-list" *ngIf="selectedStages.length === 0">
-            <div *ngFor="let token of getStageParticipants(selectedChatStage)?.['tokenlist']; let i = index"
+            <div *ngFor="let token of getFilteredSingleStageParticipants(); let i = index"
               class="participant-item" (click)="toggleTokenSelection(token)">
 
               <!-- Checkbox -->
