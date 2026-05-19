@@ -525,6 +525,7 @@ export class FormtemplateComponent {
         const queueDocRef = doc(this.firestoreForms, 'queue generation', this.queueId);
         this.submittedClientForm['queueref'] = queueDocRef;
         this.submittedClientForm['queuetokenref'] = this.participantQueueToken ? doc(this.firestoreForms, 'queue_token', this.participantQueueToken.docid) : null;
+        this.submittedClientForm['stagename'] = this.participantQueueToken?.['currentstage'] ?? null;
         nextstage = await this.getNextStage();
       }
 
