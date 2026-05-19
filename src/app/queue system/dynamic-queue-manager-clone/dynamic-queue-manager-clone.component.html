@@ -1823,6 +1823,15 @@
               (click)="timelineSearchQuery = ''">
         <mat-icon>close</mat-icon>
       </button>
+
+      <button *ngIf="hasActiveTimelineFilters"
+              type="button"
+              class="timeline-clear-filters"
+              (click)="clearChannelFilters()"
+              matTooltip="Clear all filters">
+        <mat-icon class="timeline-clear-filters-icon">filter_alt_off</mat-icon>
+        <span>Clear filters</span>
+      </button>
     </div>
 
     <!-- Body -->
@@ -1839,8 +1848,19 @@
            class="timeline-empty-state">
         <mat-icon class="timeline-empty-icon">notifications_off</mat-icon>
         <p class="timeline-empty-text">
-          {{ timelineSearchQuery ? 'No results for "' + timelineSearchQuery + '"' : 'No notifications found for this queue' }}
+          {{ timelineSearchQuery
+              ? 'No results for "' + timelineSearchQuery + '"'
+              : (hasActiveTimelineFilters
+                  ? 'No profiles match the current filters'
+                  : 'No notifications found for this queue') }}
         </p>
+        <button *ngIf="hasActiveTimelineFilters"
+                type="button"
+                class="timeline-clear-filters timeline-clear-filters-inline"
+                (click)="clearChannelFilters()">
+          <mat-icon class="timeline-clear-filters-icon">filter_alt_off</mat-icon>
+          <span>Clear filters</span>
+        </button>
       </div>
 
       <!-- Table -->
@@ -1855,17 +1875,59 @@
                 <mat-icon class="th-channel-icon">notifications</mat-icon>
                 Push
               </div>
+              <div class="th-filter-chips">
+                <button type="button" class="th-filter-chip success"
+                        [class.active]="channelFilters.push === 'success'"
+                        (click)="toggleChannelFilter('push', 'success')"
+                        matTooltip="Filter: last push succeeded">
+                  ✓ {{ channelLastStatusCounts.push.success }}
+                </button>
+                <button type="button" class="th-filter-chip failure"
+                        [class.active]="channelFilters.push === 'failure'"
+                        (click)="toggleChannelFilter('push', 'failure')"
+                        matTooltip="Filter: last push failed">
+                  ✗ {{ channelLastStatusCounts.push.failure }}
+                </button>
+              </div>
             </th>
             <th class="center">
               <div class="th-channel th-wa">
                 <mat-icon class="th-channel-icon">chat</mat-icon>
                 WhatsApp
               </div>
+              <div class="th-filter-chips">
+                <button type="button" class="th-filter-chip success"
+                        [class.active]="channelFilters.whatsapp === 'success'"
+                        (click)="toggleChannelFilter('whatsapp', 'success')"
+                        matTooltip="Filter: last WhatsApp succeeded">
+                  ✓ {{ channelLastStatusCounts.whatsapp.success }}
+                </button>
+                <button type="button" class="th-filter-chip failure"
+                        [class.active]="channelFilters.whatsapp === 'failure'"
+                        (click)="toggleChannelFilter('whatsapp', 'failure')"
+                        matTooltip="Filter: last WhatsApp failed">
+                  ✗ {{ channelLastStatusCounts.whatsapp.failure }}
+                </button>
+              </div>
             </th>
             <th class="center">
               <div class="th-channel th-email">
                 <mat-icon class="th-channel-icon">email</mat-icon>
                 Email
+              </div>
+              <div class="th-filter-chips">
+                <button type="button" class="th-filter-chip success"
+                        [class.active]="channelFilters.email === 'success'"
+                        (click)="toggleChannelFilter('email', 'success')"
+                        matTooltip="Filter: last email succeeded">
+                  ✓ {{ channelLastStatusCounts.email.success }}
+                </button>
+                <button type="button" class="th-filter-chip failure"
+                        [class.active]="channelFilters.email === 'failure'"
+                        (click)="toggleChannelFilter('email', 'failure')"
+                        matTooltip="Filter: last email failed">
+                  ✗ {{ channelLastStatusCounts.email.failure }}
+                </button>
               </div>
             </th>
             <th class="center">Total</th>

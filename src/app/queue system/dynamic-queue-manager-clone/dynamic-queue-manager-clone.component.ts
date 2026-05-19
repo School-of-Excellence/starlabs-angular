@@ -376,6 +376,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   showTimelineOverlay = false;
   private shouldScrollTracks = false;
   timelineSearchQuery = '';
+  channelFilters: {
+    push: 'success' | 'failure' | null;
+    whatsapp: 'success' | 'failure' | null;
+    email: 'success' | 'failure' | null;
+  } = { push: null, whatsapp: null, email: null };
   selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
   selectedWhatsappPreview: { profileId: string; item: NotificationEvent } | null = null;
 
@@ -5445,6 +5450,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.profileSummaries = [];
     this.expandedProfileId = null;
     this.timelineSearchQuery = ''; // ← reset search
+    this.channelFilters = { push: null, whatsapp: null, email: null };
     this.pushDocs = [];
     this.watiDocs = [];
     this.emailDocs = [];
@@ -5756,7 +5762,53 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       });
     }
 
+    // per-channel last-status filters (AND across channels)
+    if (this.channelFilters.push) {
+      list = list.filter(p => p.lastPushStatus === this.channelFilters.push);
+    }
+    if (this.channelFilters.whatsapp) {
+      list = list.filter(p => p.lastWaStatus === this.channelFilters.whatsapp);
+    }
+    if (this.channelFilters.email) {
+      list = list.filter(p => p.lastEmailStatus === this.channelFilters.email);
+    }
+
     return list;
+  }
+
+  get channelLastStatusCounts() {
+    const counts = {
+      push:     { success: 0, failure: 0 },
+      whatsapp: { success: 0, failure: 0 },
+      email:    { success: 0, failure: 0 },
+    };
+    this.profileSummaries.forEach(p => {
+      if (p.lastPushStatus  === 'success') counts.push.success++;
+      if (p.lastPushStatus  === 'failure') counts.push.failure++;
+      if (p.lastWaStatus    === 'success') counts.whatsapp.success++;
+      if (p.lastWaStatus    === 'failure') counts.whatsapp.failure++;
+      if (p.lastEmailStatus === 'success') counts.email.success++;
+      if (p.lastEmailStatus === 'failure') counts.email.failure++;
+    });
+    return counts;
+  }
+
+  toggleChannelFilter(channel: 'push' | 'whatsapp' | 'email', status: 'success' | 'failure') {
+    this.channelFilters[channel] = this.channelFilters[channel] === status ? null : status;
+  }
+
+  clearChannelFilters() {
+    this.channelFilters = { push: null, whatsapp: null, email: null };
+    this.timelineSearchQuery = '';
+  }
+
+  get hasActiveTimelineFilters(): boolean {
+    return !!(
+      this.timelineSearchQuery.trim() ||
+      this.channelFilters.push ||
+      this.channelFilters.whatsapp ||
+      this.channelFilters.email
+    );
   }
 
   toggleEmailPreview(item: NotificationEvent, profileId: string) {
