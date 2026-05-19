@@ -94,6 +94,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['completedParticipants', []],
   ]);
   filterOption: 'all' | 'new' | 'old' = 'all';
+  cohortTypeFilter: 'all' | 'facilitator' | 'cohort' = 'all';
   filteredParticipants: any[] = [];
   loggedinProfile: string = null;
   mapProfile: any = {};
@@ -1776,6 +1777,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       });
     }
 
+    if (this.selectedStatusInfo?.status === 'cohortParticipants') {
+      const facilitatorSet = new Set(this.facilitatorProfileIds);
+      if (this.cohortTypeFilter === 'facilitator') {
+        base = base.filter(p => facilitatorSet.has(p.profileid));
+      } else if (this.cohortTypeFilter === 'cohort') {
+        base = base.filter(p => !facilitatorSet.has(p.profileid));
+      }
+    }
+
     if (this.workshopData?.categorybased === true &&
       this.selectedStatusInfo?.status === 'notStarted') {
       const startedProfileIds = new Set(this.participantProgressList.map(p => p.profileid));
@@ -1933,6 +1943,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.cohortTypeFilter = 'all';
     this.applyFilterSide();
   }
 
@@ -2363,12 +2374,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   exportParticipants() {
-    if (!this.selectedParticipants || this.selectedParticipants.length === 0) {
+    if (!this.filteredParticipants || this.filteredParticipants.length === 0) {
       alert("No participants selected to export."); return;
     }
     const confirmDownload = window.confirm("Are you sure you want to export participants as CSV?");
     if (!confirmDownload) return;
-    const csvData = this.selectedParticipants.map((p: any) => ({
+    const csvData = this.filteredParticipants.map((p: any) => ({
       'Participant Name': p.name || 'N/A',
       'Email': p['metadata']['email'] || '',
       'Phone': p['metadata']['phonenumber'] || '',
