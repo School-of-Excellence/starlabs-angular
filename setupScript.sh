@@ -2,6 +2,12 @@
 
 set -e
 
+# Fix for Git Bash on Windows path conversion
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+    export MSYS_NO_PATHCONV=1
+    export MSYS2_ARG_CONV_EXCL="*"
+fi
+
 echo "🔥 Triggering Firebase setup workflow..."
 
 gh workflow run setupFirebase.yml
