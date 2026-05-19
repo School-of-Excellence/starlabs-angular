@@ -141,6 +141,16 @@
                     <span>Create lists will be empty. Merge is disabled.</span>
                   </div>
                 </div>
+                <div class="conflict-global-banner"
+                    *ngIf="globalConflictMap.size > 0"
+                    (click)="openConflictDialog()"
+                    style="cursor: pointer; margin-top: 12px;">
+                  <mat-icon class="conflict-banner-icon">warning</mat-icon>
+                  <div class="conflict-banner-text">
+                    <strong>Participants found in multiple lists — review &amp; resolve</strong>
+                    <span>{{ globalConflictMap.size }} participant(s) affected · Click to view</span>
+                  </div>
+                </div>
               </div>
 
               <!-- Create List Form -->
@@ -207,6 +217,16 @@
                             <mat-icon class="list-icon">folder</mat-icon>
                             <div class="list-name-wrapper">
                               <strong>{{ list.name }}</strong>
+                              <div
+                                class="conflict-badge-row"
+                                *ngIf="getListConflicts(list.docid) as conflicts"
+                                [matTooltip]="getListConflictTooltip(list.docid)"
+                                matTooltipPosition="right">
+                                <mat-icon class="conflict-icon">warning</mat-icon>
+                                <span class="conflict-label">
+                                  {{ conflicts.count }} conflict(s) in live segments
+                                </span>
+                              </div>
                               <!-- Show matched profiles indicator when filtering -->
                               <div class="matched-profiles-indicator" *ngIf="isFiltering && getMatchedProfilesInList(list).length > 0">
                                 <mat-icon>person_search</mat-icon>
@@ -246,7 +266,25 @@
                               <mat-chip 
                                 *ngIf="getMatchedProfilesInList(list).length > 3"
                                 class="more-chip">
-                                +{{ getMatchedProfilesInList(list).length - 3 }} more
+                                +{{ getMatchedProfilesInList(list).length - 3 }}
+                                </mat-chip>
+                            </mat-chip-set>
+                          </div>
+                          <!-- ── Inline conflict chip list ── -->
+                          <div class="conflict-chips-row"
+                            *ngIf="getListConflicts(list.docid) as conflicts">
+                            <mat-chip-set>
+                              <mat-chip
+                                *ngFor="let c of conflicts.conflicts.slice(0, 3)"
+                                class="conflict-chip"
+                                [matTooltip]="getConflictTooltip(c.profileId)">
+                                <mat-icon>warning</mat-icon>
+                                {{ c.profileName }}
+                              </mat-chip>
+                              <mat-chip
+                                *ngIf="conflicts.conflicts.length > 3"
+                                class="conflict-chip more">
+                                +{{ conflicts.conflicts.length - 3 }} more
                               </mat-chip>
                             </mat-chip-set>
                           </div>
@@ -300,6 +338,7 @@
                         *matRowDef="let row; columns: displayedColumns;"
                         [class.selected-row]="selectedList?.docid === row.docid"
                         [class.has-matches]="isFiltering && getMatchedProfilesInList(row).length > 0"
+                        [class.has-conflicts]="!!getListConflicts(row.docid)"
                         (click)="onSelectList(row)">
                       </tr>
 
@@ -366,6 +405,49 @@
                 </div>
 
                 <mat-divider></mat-divider>
+                <div class="panel-section conflict-panel-section"
+                  *ngIf="getConflictsForSelectedList().length > 0">
+                  <h3 class="section-title conflict-section-title">
+                    <mat-icon class="conflict-section-icon">warning</mat-icon>
+                    Live Segment Conflicts ({{ getConflictsForSelectedList().length }})
+                  </h3>
+                  <p class="conflict-description">
+                    The following participants appear in <strong>multiple live segments</strong>.
+                    Each participant should belong to only one live segment to receive the correct
+                    slot notification. Remove them from this list if they should not be here.
+                  </p>
+                  <div class="conflict-participant-list">
+                    <div
+                      class="conflict-participant-item"
+                      *ngFor="let conflict of getConflictsForSelectedList()">
+                      <div class="conflict-participant-info">
+                        <mat-icon class="cp-icon">person</mat-icon>
+                        <div class="cp-details">
+                          <span class="cp-name">{{ conflict.profileName }}</span>
+                          <span class="cp-id">ID: {{ conflict.profileId }}</span>
+                          <div class="cp-segments">
+                            <mat-chip-set>
+                              <mat-chip
+                                *ngFor="let segName of conflict.segmentNames"
+                                class="segment-chip">
+                                {{ segName }}
+                              </mat-chip>
+                            </mat-chip-set>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        mat-icon-button
+                        color="warn"
+                        (click)="removeConflictingProfile(conflict.profileId)"
+                        [disabled]="updatingList"
+                        matTooltip="Remove from this list">
+                        <mat-icon>remove_circle</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <mat-divider *ngIf="getConflictsForSelectedList().length > 0"></mat-divider>
 
                 <!-- Current Participants -->
                 <div class="panel-section">
@@ -378,12 +460,27 @@
                     <div 
                       class="participant-item" 
                       *ngFor="let profile of selectedList.profiles; let i = index"
-                      [class.matched]="isFiltering && filterProfile(profile.id)">
+                      [class.matched]="isFiltering && filterProfile(profile.id)"
+                      [class.conflicting]="isProfileConflicting(profile.id)">
                       <div class="participant-info">
                         <div class="participant-number">{{ i + 1 }}</div>
-                        <mat-icon class="participant-icon">person</mat-icon>
+                        <mat-icon
+                          *ngIf="isProfileConflicting(profile.id)"
+                          class="participant-conflict-icon"
+                          [matTooltip]="getConflictTooltip(profile.id)"
+                          matTooltipPosition="right">
+                          warning
+                        </mat-icon>
+                        <mat-icon *ngIf="!isProfileConflicting(profile.id)" class="participant-icon">
+                          person
+                        </mat-icon>
                         <div class="participant-details">
                           <span class="participant-name">{{ profile.name }}</span>
+                          <span *ngIf="isProfileConflicting(profile.id)" class="participant-conflict-detail">
+                            <mat-icon class="conflict-detail-icon">warning</mat-icon>
+                            In {{ getProfileConflict(profile.id)?.segmentNames?.length }} live segments:
+                            {{ getProfileConflict(profile.id)?.segmentNames?.join(', ') }}
+                          </span>
                           <span class="participant-email" *ngIf="profile.email">{{ profile.email }}</span>
                           <span class="participant-phone" *ngIf="profile.phone">{{ profile.phone }}</span>
                           <span class="participant-id">ID: {{ profile.id }}</span>
@@ -451,6 +548,39 @@
 
             <!-- Backdrop -->
             <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+          <div class="conflict-dialog-backdrop" 
+              *ngIf="showConflictDialog" 
+              (click)="closeConflictDialog()">
+          </div>
+
+          <div class="conflict-dialog-box" *ngIf="showConflictDialog">
+            <div class="conflict-dialog-header">
+              <div class="conflict-dialog-header-left">
+                <mat-icon style="color: #f57c00;">warning</mat-icon>
+                <span>Participants found in multiple lists — review &amp; resolve</span>
+              </div>
+              <button mat-icon-button (click)="closeConflictDialog()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <div class="conflict-dialog-body">
+              <div class="conflict-dialog-row" 
+                  *ngFor="let conflict of getAllConflictsForDialog()">
+                <div class="conflict-dialog-person">
+                  <mat-icon>person</mat-icon>
+                  <span>{{ conflict.profileName }}</span>
+                </div>
+                <mat-chip-set class="conflict-dialog-chips">
+                  <mat-chip 
+                    *ngFor="let segName of conflict.segmentNames"
+                    class="conflict-dialog-chip">
+                    {{ segName }}
+                  </mat-chip>
+                </mat-chip-set>
+              </div>
+            </div>
+          </div>
           </div>
         </div>
       </mat-tab>
