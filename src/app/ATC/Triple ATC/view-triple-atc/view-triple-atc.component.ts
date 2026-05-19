@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { collection, collectionData, collectionSnapshots, Firestore, orderBy, query, Query, QueryFieldFilterConstraint, QueryOrderByConstraint, where } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, getFirestore, orderBy, query, Query, QueryFieldFilterConstraint, QueryOrderByConstraint, where } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { AuthguardService } from '../../../authguard.service';
 import { Subscription } from 'rxjs';
@@ -85,7 +85,10 @@ export class ViewTripleATCComponent {
   queueFilterCtrl = ""
   mentorProfileid = []
 
-  constructor(public firestore: Firestore, public router: Router, public guard: AuthguardService) {
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+
+  constructor(public router: Router, public guard: AuthguardService) {
     this.reportATC = []
     this.loading = true
     guard.getRoles().then(async roles => {
@@ -107,13 +110,13 @@ export class ViewTripleATCComponent {
   }
 
   fetchMetaData(): void {
-    var queueCollection = collection(this.firestore, "queue generation")
+    var queueCollection = collection(this.firestoreDefault, "queue generation")
     var queueQuery = query(queueCollection, orderBy("queuename"))
     this.queueListSubscription = collectionData(queueQuery).subscribe(queue => {
       this.queueList = queue
     })
 
-    var roleCollection = collection(this.firestore, "users_roles")
+    var roleCollection = collection(this.firestoreDefault, "users_roles")
     var roleQuery = query(roleCollection, orderBy("name"))
     this.roleSubscription = collectionData(roleQuery).subscribe(async userRoles => {
       var mentorList = []
@@ -148,7 +151,7 @@ export class ViewTripleATCComponent {
     })
     */
 
-    var procedureCollection = collection(this.firestore, "procedures")
+    var procedureCollection = collection(this.firestoreDefault, "procedures")
     this.procedureSubscription = collectionSnapshots(procedureCollection).subscribe(procedures => {
       procedures.forEach(doc => {
         this.procedureMap[doc.ref.path] = doc.data()['name']
@@ -167,7 +170,7 @@ export class ViewTripleATCComponent {
   }
 
   fetchTripleATC() {
-    var tripleATCcollection = collection(this.firestore, "triple atc")
+    var tripleATCcollection = collection(this.firestoreATC, "triple atc")
     var queryFilter: Array<QueryOrderByConstraint | QueryFieldFilterConstraint> = [orderBy("prescription_date", "desc")]
     if (!this.superRoles) {
       this.selectedClient = this.profileID
@@ -280,7 +283,7 @@ export class ViewTripleATCComponent {
       }
       this.reportATC[i] = { ...this.reportATC[i], ...atcData }
       this.reportATC[i].authorid = atcData["author"].map(e => e.id)
-      var adjCollection = collection(this.firestore, "triple atc", atcDoc["atcid"], "corrections")
+      var adjCollection = collection(this.firestoreATC, "triple atc", atcDoc["atcid"], "corrections")
       this.AdjustmentGivenSubscription = collectionSnapshots(adjCollection).subscribe(async adjustment => {
         for (let j = 0; j < adjustment.length; j++) {
           var adjustmentDoc = adjustment[j]
@@ -295,7 +298,7 @@ export class ViewTripleATCComponent {
           this.reportATC[i].transcription[j] = { ...this.reportATC[i].transcription[j], ...adjustmentData }
           this.reportATC[i].transcription[j].adjustment = adjustmentData["name"]
           this.reportATC[i].transcription[j].adjustmentpath = adjustmentDoc.ref.path
-          var procedureCollection = collection(this.firestore, adjustmentDoc.ref.path, "procedures")
+          var procedureCollection = collection(this.firestoreATC, adjustmentDoc.ref.path, "procedures")
           this.procedureGivenSubscription = collectionSnapshots(procedureCollection).subscribe(procedure => {
             for (let k = 0; k < procedure.length; k++) {
               var procedureDoc = procedure[k]

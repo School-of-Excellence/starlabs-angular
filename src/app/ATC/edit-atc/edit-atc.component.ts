@@ -1,6 +1,6 @@
 import { Component, Injectable, inject } from '@angular/core';
 import { CommonModule, DatePipe, Location } from "@angular/common";
-import { collection, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
@@ -42,7 +42,9 @@ import { MarkdownModule } from 'ngx-markdown';
   styleUrl: './edit-atc.component.css'
 })
 export class EditAtcComponent {
-  private firestore = inject(Firestore);
+  // private firestore = inject(Firestore);
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
 
   atcID: string
   loading: boolean = true
@@ -175,7 +177,8 @@ export class EditAtcComponent {
   lastDraftSavedOn = null
   hideDraftBanner = false
 
-  firebaseBatch = writeBatch(this.firestore)
+  firebaseDefaultBatch = writeBatch(this.firestoreDefault)
+  firebaseATCBatch = writeBatch(this.firestoreATC)
 
   private subscriptionHandle = new Subject<void>()
 
@@ -253,13 +256,13 @@ export class EditAtcComponent {
   }
 
   ngOnInit(): void {
-    getDoc(doc(this.firestore, "temporary function access", "atcaccess")).then(tempAccess => {
+    getDoc(doc(this.firestoreDefault, "temporary function access", "atcaccess")).then(tempAccess => {
       if (tempAccess.exists()) this.temporaryFunctionAccess = tempAccess.data()['profilelist'] || []
     })
-    getDocs(collection(this.firestore, "profile_data")).then(snap => {
+    getDocs(collection(this.firestoreDefault, "profile_data")).then(snap => {
       this.profileList = snap.docs.map(e => e.data())
     })
-    collectionSnapshots(query(collection(this.firestore, 'procedures'), orderBy('name'))).pipe(takeUntil(this.subscriptionHandle)).subscribe(procedures => {
+    collectionSnapshots(query(collection(this.firestoreDefault, 'procedures'), orderBy('name'))).pipe(takeUntil(this.subscriptionHandle)).subscribe(procedures => {
       var list = []
       procedures.forEach(doc => {
         list.push({
@@ -270,14 +273,14 @@ export class EditAtcComponent {
       })
       this.procedureList = list
     })
-    getDocs(query(collection(this.firestore, "procedure_recommend"), orderBy("name"))).then(names => {
+    getDocs(query(collection(this.firestoreDefault, "procedure_recommend"), orderBy("name"))).then(names => {
       var list = [];
       names.forEach(type => {
         list.push(type)
       })
       this.recommendlist = list
     })
-    getDoc(doc(this.firestore, "classify", "adjustment_awareness")).then(snap => {
+    getDoc(doc(this.firestoreDefault, "classify", "adjustment_awareness")).then(snap => {
       this.adjustmentAwarenessDetail = snap.data()
     })
 
@@ -307,7 +310,7 @@ export class EditAtcComponent {
   }
 
   async fetchPreData() {
-    await getDocs(query(collection(this.firestore, "users_roles"), orderBy("name"))).then(async users => {
+    await getDocs(query(collection(this.firestoreDefault, "users_roles"), orderBy("name"))).then(async users => {
       var mentor = []
       var author = []
       for (let i = 0; i < users.docs.length; i++) {
@@ -331,7 +334,7 @@ export class EditAtcComponent {
       this.authorList = author
       console.log(this.mentorList)
     })
-    await getDocs(query(collection(this.firestore, "bigactivity"), orderBy("activity", "asc"))).then(list => {
+    await getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity", "asc"))).then(list => {
       for (let i = 0; i < list.docs.length; i++) {
         const doc = list.docs[i];
         var data = doc.data()
@@ -371,15 +374,15 @@ export class EditAtcComponent {
   async getATC() {
     var date = new Date()
     var totalProcedureRead = 0
-    await getDoc(doc(this.firestore, this.collectionName, this.atcID)).then(async atcData => {
+    await getDoc(doc(this.firestoreATC, this.collectionName, this.atcID)).then(async atcData => {
       var atcDocData = atcData.data()
-      getDoc(doc(this.firestore, "profile_data", atcDocData["profileid"])).then(participant => {
+      getDoc(doc(this.firestoreDefault, "profile_data", atcDocData["profileid"])).then(participant => {
         if (participant.exists()) {
           this.selectedParticipant = participant.data()
         }
       })
       if (atcDocData["notesid"] != null) {
-        await getDoc(doc(this.firestore, "atc_notes", atcDocData["notesid"])).then(async snap => {
+        await getDoc(doc(this.firestoreATC, "atc_notes", atcDocData["notesid"])).then(async snap => {
           if (snap.exists()) {
             this.existingNotes = snap.data()
             this.editNotes.notes = (this.existingNotes['notes'] ?? "").trim().length != 0 ? this.existingNotes['notes'] : null
@@ -514,7 +517,7 @@ export class EditAtcComponent {
     }
     this.loading = false
     var draftATC = []
-    await getDoc(doc(this.firestore, "temporary_edit_ATC", this.reportATC.atcData["atcid"])).then(draft => {
+    await getDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"])).then(draft => {
       if (draft.exists()) {
         if (draft.data()["delete"] != true) {
           draftATC = [draft]
@@ -591,7 +594,7 @@ export class EditAtcComponent {
           lastupdated: serverTimestamp()
         }
         console.log(data)
-        setDoc(doc(this.firestore, "temporary_edit_ATC", this.reportATC.atcData["atcid"]), data).then(() => {
+        setDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"]), data).then(() => {
           this.draftStatus = {
             message: "ATC Saved to Draft.",
             code: 1
@@ -1030,7 +1033,7 @@ export class EditAtcComponent {
         if (activitySpecialist.length != 0) {
           specialistData.push({
             activity: this.mapBigActivity[e],
-            specialist: activitySpecialist.map(profile => this.profileMap[doc(this.firestore, profile).id]).join(", ")
+            specialist: activitySpecialist.map(profile => this.profileMap[doc(this.firestoreATC, profile).id]).join(", ")
           })
         }
       })
@@ -1038,7 +1041,7 @@ export class EditAtcComponent {
         if (e.specialist.length != 0) {
           specialistData.push({
             activity: this.mapBigActivity[e.activity],
-            specialist: e.specialist.map(profile => this.profileMap[doc(this.firestore, profile).id]).join(", ")
+            specialist: e.specialist.map(profile => this.profileMap[doc(this.firestoreATC, profile).id]).join(", ")
           })
         }
       })
@@ -1087,7 +1090,8 @@ export class EditAtcComponent {
           this.adjustmentNewOrder = data
           console.log("Submitting.....")
           this.uploading = true
-          this.firebaseBatch = writeBatch(this.firestore)
+          this.firebaseDefaultBatch = writeBatch(this.firestoreDefault)
+          this.firebaseATCBatch = writeBatch(this.firestoreATC)
           this.updateChangeWorkBrief()
         }
       })
@@ -1140,17 +1144,17 @@ export class EditAtcComponent {
 
   async updateATCnotes(audiobrief: string[], imagenotes: string[]) {
     console.log(this.editNotes.notesedited);
-    const newATCID = doc(collection(this.firestore, 'atc_alpha')).id; // Generate ID using actual collection
+    const newATCID = doc(collection(this.firestoreATC, 'atc_alpha')).id; // Generate ID using actual collection
 
     if (audiobrief.length != 0 || imagenotes.length != 0 || this.editNotes.notesedited) {
-      const notesID = this.reportATC.notesid ?? doc(collection(this.firestore, 'atc_notes')).id;
+      const notesID = this.reportATC.notesid ?? doc(collection(this.firestoreATC, 'atc_notes')).id;
       const notesMeta = {
         notesid: notesID,
         imagenotes: imagenotes,
       };
 
-      const atcDocRef = doc(this.firestore, this.reportATC.atcpath);
-      this.firebaseBatch.update(atcDocRef, notesMeta);
+      const atcDocRef = doc(this.firestoreATC, this.reportATC.atcpath);
+      this.firebaseATCBatch.update(atcDocRef, notesMeta);
 
       let audiodata: string[] = [];
       let imagedata: string[] = [];
@@ -1159,9 +1163,9 @@ export class EditAtcComponent {
         audiodata = [...(this.existingNotes['changeworkbrief'] ?? []), ...audiobrief];
         imagedata = [...(this.existingNotes["imagenotes"] ?? []), ...imagenotes];
 
-        this.existingNotes["logid"] = doc(collection(this.firestore, 'atc_notes')).id;
-        const revisionDocRef = doc(this.firestore, "atc_notes", notesID, "revision", this.existingNotes["logid"]);
-        this.firebaseBatch.set(revisionDocRef, this.existingNotes);
+        this.existingNotes["logid"] = doc(collection(this.firestoreATC, 'atc_notes')).id;
+        const revisionDocRef = doc(this.firestoreATC, "atc_notes", notesID, "revision", this.existingNotes["logid"]);
+        this.firebaseATCBatch.set(revisionDocRef, this.existingNotes);
       }
 
       const newNotesData = {
@@ -1176,8 +1180,8 @@ export class EditAtcComponent {
         from: this.collectionName == "atc_alpha" ? "alpha" : "validation",
       };
 
-      const notesDocRef = doc(this.firestore, "atc_notes", notesID);
-      this.firebaseBatch.set(notesDocRef, newNotesData, { merge: true });
+      const notesDocRef = doc(this.firestoreATC, "atc_notes", notesID);
+      this.firebaseATCBatch.set(notesDocRef, newNotesData, { merge: true });
 
       await this.replicateATC(this.collectionName, newATCID, notesID);
     } else {
@@ -1186,7 +1190,7 @@ export class EditAtcComponent {
   }
 
   async replicateATC(finalCollection: string, newid: string, noteid: string) {
-    const atcDocRef = doc(this.firestore, this.reportATC.atcpath);
+    const atcDocRef = doc(this.firestoreATC, this.reportATC.atcpath);
     const newData = {
       ...this.reportATC.atcData,
       atcid: newid,
@@ -1229,25 +1233,25 @@ export class EditAtcComponent {
     Object.keys(this.reportATC.bigactivity).forEach(e => {
       if (this.reportATC.bigactivity[e].length != 0) {
         const activitySpecialist = this.reportATC.bigactivity[e];
-        newBigActivity[e] = activitySpecialist.map((path: string) => doc(this.firestore, path).id);
+        newBigActivity[e] = activitySpecialist.map((path: string) => doc(this.firestoreATC, path).id);
       }
     });
 
     this.selectedAdditionalActivity.forEach(additional => {
       if (additional.specialist.length != 0) {
-        newBigActivity[additional.activity] = additional.specialist.map((path: string) => doc(this.firestore, path).id);
+        newBigActivity[additional.activity] = additional.specialist.map((path: string) => doc(this.firestoreATC, path).id);
       }
     });
 
     console.log("New Big Activity", newBigActivity);
 
     this.authorActivity.forEach(activityitem => {
-      const refs = (this.reportATC.bigactivity[activityitem.docid] ?? []).map((path: string) => doc(this.firestore, path));
+      const refs = (this.reportATC.bigactivity[activityitem.docid] ?? []).map((path: string) => doc(this.firestoreATC, path));
       newAuthorRef.push(...refs);
     });
 
     this.observerActivity.forEach(activityitem => {
-      const refs = (this.reportATC.bigactivity[activityitem.docid] ?? []).map((path: string) => doc(this.firestore, path));
+      const refs = (this.reportATC.bigactivity[activityitem.docid] ?? []).map((path: string) => doc(this.firestoreATC, path));
       newObserverRef.push(...refs);
     });
 
@@ -1263,8 +1267,8 @@ export class EditAtcComponent {
     }
 
     // Batch operations
-    const finalCollectionDocRef = doc(this.firestore, finalCollection, newid);
-    this.firebaseBatch.set(finalCollectionDocRef, newData, { merge: true });
+    const finalCollectionDocRef = doc(this.firestoreATC, finalCollection, newid);
+    this.firebaseATCBatch.set(finalCollectionDocRef, newData, { merge: true });
 
     //Big Activity
     if(this.bigActivity()){
@@ -1273,9 +1277,9 @@ export class EditAtcComponent {
       newData['marathonid'] = this.marathonId
       newData['bigassignment'] = true;
 
-      this.firebaseBatch.update(doc(this.firestore, 'big participants assignments', this.participantAssignmentId), {
+      this.firebaseDefaultBatch.update(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId), {
         status: 'review',
-        activityref: finalCollectionDocRef,
+        activityref: doc(this.firestoreDefault, finalCollectionDocRef.path),
         atcdocid: finalCollectionDocRef.id
       });
     }
@@ -1283,14 +1287,14 @@ export class EditAtcComponent {
     for (let i = 0; i < this.adjustmentNewOrder.length; i++) {
       const newOrder = this.adjustmentNewOrder[i];
       const adjustmentKey = "adjustment " + ((i + 1).toString().length == 1 ? "0" + (i + 1).toString() : (i + 1).toString());
-      const adjDocRef = doc(this.firestore, finalCollection, newid, "corrections", adjustmentKey);
+      const adjDocRef = doc(this.firestoreATC, finalCollection, newid, "corrections", adjustmentKey);
       const adjPath = adjDocRef.path;
 
       if (newOrder["adjData"] != null && newOrder["adjData"] != undefined) {
         // Update Existing Adjustment
         for (let j = 0; j < newOrder.procedure.length; j++) {
           const procedureKey = adjustmentKey + " - " + ((j + 1).toString());
-          const procedureDocRef = doc(this.firestore, adjPath, "procedures", procedureKey);
+          const procedureDocRef = doc(this.firestoreATC, adjPath, "procedures", procedureKey);
           const procedurePath = procedureDocRef.path;
 
           let assignref: DocumentReference[] = [];
@@ -1298,9 +1302,9 @@ export class EditAtcComponent {
 
           Object.keys(newOrder.procedure[j].bigactivity).forEach(key => {
             (newOrder.procedure[j].bigactivity[key] ?? []).forEach((item: string) => {
-              assignref.push(doc(this.firestore, item));
+              assignref.push(doc(this.firestoreATC, item));
               procedurelevelBigActivity[key] = procedurelevelBigActivity[key] ?? [];
-              procedurelevelBigActivity[key].push(doc(this.firestore, item).id);
+              procedurelevelBigActivity[key].push(doc(this.firestoreATC, item).id);
             });
           });
 
@@ -1309,8 +1313,8 @@ export class EditAtcComponent {
           // Add New Procedures
           if (newOrder.procedure[j].newprocedure) {
             const newProcedureData = {
-              name: doc(this.firestore, newOrder.procedure[j].name),
-              recommended_to: newOrder.procedure[j].recommended_to != null ? doc(this.firestore, newOrder.procedure[j].recommended_to) : null,
+              name: doc(this.firestoreATC, newOrder.procedure[j].name),
+              recommended_to: newOrder.procedure[j].recommended_to != null ? doc(this.firestoreATC, newOrder.procedure[j].recommended_to) : null,
               assigned_to: assignref.length != 0 ? assignref : null,
               bigactivity: procedurelevelBigActivity,
               created: serverTimestamp(),
@@ -1318,13 +1322,13 @@ export class EditAtcComponent {
               isdelete: false,
               product: this.reportATC.product,
               newlyadded: true,
-              addedby: doc(this.firestore, "profile_data", this.loggedProfileID),
+              addedby: doc(this.firestoreATC, "profile_data", this.loggedProfileID),
               status: newOrder.procedure[j].completed ? "completed" : "yet to start",
               cancelled: false,
               autogeneralized: false,
-              editedby: doc(this.firestore, "profile_data", this.loggedProfileID)
+              editedby: doc(this.firestoreATC, "profile_data", this.loggedProfileID)
             };
-            this.firebaseBatch.set(procedureDocRef, newProcedureData, { merge: true });
+            this.firebaseATCBatch.set(procedureDocRef, newProcedureData, { merge: true });
           }
           // Update Procedure
           else {
@@ -1333,12 +1337,12 @@ export class EditAtcComponent {
                 ...newOrder.procedure[j].procedureData,
                 isdelete: newOrder.procedure[j].proceduredelete,
                 editedon: serverTimestamp(),
-                editedby: doc(this.firestore, "profile_data", this.loggedProfileID)
+                editedby: doc(this.firestoreATC, "profile_data", this.loggedProfileID)
               };
-              this.firebaseBatch.set(procedureDocRef, updateProcedureData, { merge: true });
+              this.firebaseATCBatch.set(procedureDocRef, updateProcedureData, { merge: true });
             } else {
               const updateProcedureData = { ...newOrder.procedure[j].procedureData };
-              this.firebaseBatch.set(procedureDocRef, updateProcedureData, { merge: true });
+              this.firebaseATCBatch.set(procedureDocRef, updateProcedureData, { merge: true });
             }
           }
         }
@@ -1363,11 +1367,11 @@ export class EditAtcComponent {
             potentialyears: newOrder.potentialyears,
             isdelete: newOrder.adjustmentdelete,
             editedon: serverTimestamp(),
-            editedby: doc(this.firestore, "profile_data", this.loggedProfileID)
+            editedby: doc(this.firestoreATC, "profile_data", this.loggedProfileID)
           };
-          this.firebaseBatch.set(adjDocRef, newAdjData, { merge: true });
+          this.firebaseATCBatch.set(adjDocRef, newAdjData, { merge: true });
         } else {
-          this.firebaseBatch.set(adjDocRef, newOrder.adjData, { merge: true });
+          this.firebaseATCBatch.set(adjDocRef, newOrder.adjData, { merge: true });
         }
       } else {
         if (newOrder.adjustment.trim().length != 0) {
@@ -1375,24 +1379,24 @@ export class EditAtcComponent {
 
           for (let j = 0; j < newOrder.procedure.length; j++) {
             const procedureKey = adjustmentKey + " - " + ((j + 1).toString());
-            const procedureDocRef = doc(this.firestore, adjPath, "procedures", procedureKey);
+            const procedureDocRef = doc(this.firestoreATC, adjPath, "procedures", procedureKey);
 
             let assignref: DocumentReference[] = [];
             const procedurelevelBigActivity: any = {};
 
             Object.keys(newOrder.procedure[j].bigactivity).forEach(key => {
               (newOrder.procedure[j].bigactivity[key] ?? []).forEach((item: string) => {
-                assignref.push(doc(this.firestore, item));
+                assignref.push(doc(this.firestoreATC, item));
                 procedurelevelBigActivity[key] = procedurelevelBigActivity[key] ?? [];
-                procedurelevelBigActivity[key].push(doc(this.firestore, item).id);
+                procedurelevelBigActivity[key].push(doc(this.firestoreATC, item).id);
               });
             });
 
             assignref = Array.from(new Set(assignref));
 
             const additionalProcedureData = {
-              name: doc(this.firestore, newOrder.procedure[j].name),
-              recommended_to: newOrder.procedure[j].recommended_to != null ? doc(this.firestore, newOrder.procedure[j].recommended_to) : null,
+              name: doc(this.firestoreATC, newOrder.procedure[j].name),
+              recommended_to: newOrder.procedure[j].recommended_to != null ? doc(this.firestoreATC, newOrder.procedure[j].recommended_to) : null,
               assigned_to: assignref.length != 0 ? assignref : null,
               bigactivity: procedurelevelBigActivity,
               created: serverTimestamp(),
@@ -1403,9 +1407,9 @@ export class EditAtcComponent {
               status: newOrder.procedure[j].completed ? "completed" : "yet to start",
               cancelled: false,
               autogeneralized: false,
-              editedby: doc(this.firestore, "profile_data", this.loggedProfileID)
+              editedby: doc(this.firestoreATC, "profile_data", this.loggedProfileID)
             };
-            this.firebaseBatch.set(procedureDocRef, additionalProcedureData);
+            this.firebaseATCBatch.set(procedureDocRef, additionalProcedureData);
           }
 
           const additionaAdjustmentData = {
@@ -1417,9 +1421,9 @@ export class EditAtcComponent {
             isdelete: false,
             newlyadded: true,
             implementationagent: adjAgent,
-            editedby: doc(this.firestore, "profile_data", this.loggedProfileID)
+            editedby: doc(this.firestoreATC, "profile_data", this.loggedProfileID)
           };
-          this.firebaseBatch.set(adjDocRef, additionaAdjustmentData);
+          this.firebaseATCBatch.set(adjDocRef, additionaAdjustmentData);
         }
       }
     }
@@ -1436,19 +1440,20 @@ export class EditAtcComponent {
         isdelete: true
       };
 
-      const originalAtcDocRef = doc(this.firestore, this.reportATC.atcpath);
-      const tempEditDocRef = doc(this.firestore, "temporary_edit_ATC", this.reportATC.atcData["atcid"]);
+      const originalAtcDocRef = doc(this.firestoreATC, this.reportATC.atcpath);
+      const tempEditDocRef = doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"]);
 
-      this.firebaseBatch.update(originalAtcDocRef, updateATCdata);
-      this.firebaseBatch.update(tempEditDocRef, { delete: true });
+      this.firebaseATCBatch.update(originalAtcDocRef, updateATCdata);
+      this.firebaseATCBatch.update(tempEditDocRef, { delete: true });
 
-      await this.firebaseBatch.commit();
+      await this.firebaseATCBatch.commit();
+      await this.firebaseDefaultBatch.commit();
 
       if (this.roles["mentor"] && !this.bigActivity()) {
         const existingValidator = Array.from(new Set([...(this.reportATC.validator ?? []), this.loggedProfileID]));
         const newATCData = {
           status: "validated",
-          validator: existingValidator.map(e => doc(this.firestore, "profile_data", e))
+          validator: existingValidator.map(e => doc(this.firestoreATC, "profile_data", e))
         };
 
         try {

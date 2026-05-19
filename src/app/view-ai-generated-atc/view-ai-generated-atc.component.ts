@@ -6,7 +6,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, query } from '@angular/fire/firestore';
+import { collection, collectionData, doc, getFirestore, getDoc, getDocs, query } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
@@ -34,6 +34,9 @@ declare var bootstrap: any;
   styleUrl: './view-ai-generated-atc.component.css'
 })
 export class ViewAiGeneratedAtcComponent implements AfterViewInit, OnDestroy {
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreForms = getFirestore(this.firestoreDefault.app, 'firestore-forms')
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
   formDataMap: Map<string, { loading: boolean; data: any[]; formName?: string }> = new Map();
   // displayedColumns: string[] = ['id', 'profileid','version', 'generateatc'];
   displayedColumns: string[] = ['id', 'profileid', 'generateatc'];
@@ -52,8 +55,7 @@ export class ViewAiGeneratedAtcComponent implements AfterViewInit, OnDestroy {
   editableSummary: string = '';
   isSavingSummary: boolean = false;
 
-  constructor(private firestore: Firestore,private router: Router,public auth: AuthguardService,
-  ) {
+  constructor(private router: Router, public auth: AuthguardService) {
     this.auth.getRoles().then(roles => {
       this.roles = roles;
       // if (
@@ -61,7 +63,7 @@ export class ViewAiGeneratedAtcComponent implements AfterViewInit, OnDestroy {
       //   roles['eis']
       // ) {
         collectionData(
-          query(collection(this.firestore, "ai_generated_atc_summary")),
+          query(collection(this.firestoreATC, "ai_generated_atc_summary")),
           { idField: 'docid' }
         )
         .pipe(takeUntil(this.unsubscribe$))
@@ -92,7 +94,7 @@ export class ViewAiGeneratedAtcComponent implements AfterViewInit, OnDestroy {
   }
 
   private loadData(): void {
-    getDocs(query(collection(this.firestore, "profile_data"))).then(snap => {
+    getDocs(query(collection(this.firestoreDefault, "profile_data"))).then(snap => {
       snap.forEach(doc => {
         const element = doc.data();
         this.mapProfile[element['profileid']] = element;
@@ -246,7 +248,7 @@ export class ViewAiGeneratedAtcComponent implements AfterViewInit, OnDestroy {
     this.formDataMap.set(docid, { loading: true, data: [], formName: 'Loading...' });
 
     try {
-      const snap = await getDoc(doc(this.firestore, "formsByClient", docid));
+      const snap = await getDoc(doc(this.firestoreForms, "formsByClient", docid));
       
       if (!snap.exists()) {
         this.formDataMap.set(docid, { loading: false, data: [], formName: 'Form Not Found' });
@@ -395,7 +397,7 @@ async saveEditedSummary(): Promise<void> {
 
   try {
     const ref = doc(
-      this.firestore,
+      this.firestoreATC,
       'ai_generated_atc_summary',
       this.selectedParticipant['docid']
     );
