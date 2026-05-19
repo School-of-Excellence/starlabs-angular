@@ -143,13 +143,50 @@
   
       <div class="mat-elevation-z2" *ngIf="selectedDeliverySet">
         <div class="action-container">
-          <div class="action-row">
+          <div class="action-row" style="align-items: flex-start;">
             <div class="action-left">
               <mat-form-field appearance="outline" class="formfield filter-field" subscriptSizing="dynamic">
                 <mat-label>Filter Participants</mat-label>
                 <input matInput [(ngModel)]="filterValue" (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
                 <mat-icon matSuffix>search</mat-icon>
               </mat-form-field>
+
+              <!-- Search Result shown outside table -->
+              <div *ngIf="filterValue.length > 0" class="search-result-box">
+
+                <div *ngIf="searchResult.alreadyInQueue.length > 0" class="search-result-group">
+                 <div class="search-result-label queue">
+                    <mat-icon>warning</mat-icon>
+                    <strong>Already in Queue</strong>
+                  </div>
+                  <div class="chip-list">
+                    <div *ngFor="let p of searchResult.alreadyInQueue" class="result-chip queue-chip"
+                      [matTooltip]="p.email">
+                      <i class="fa fa-clock-o"></i>
+                      {{p.name}}
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="searchResult.unassigned.length > 0" class="search-result-group">
+                  <div class="search-result-label unassigned">
+                    <mat-icon>person_add</mat-icon>
+                    <strong>No Product Assigned</strong>
+                  </div>
+                  <div class="chip-list">
+                    <div *ngFor="let p of searchResult.unassigned" class="result-chip unassigned-chip"
+                      [matTooltip]="p.email">
+                      {{p.name}}
+                    </div>
+                  </div>
+                  <div class="assign-btn-row">
+                    <button class="assign-btn" (click)="assignProductFromSearch(searchResult.unassigned)">
+                      Assign product ({{searchResult.unassigned.length}})
+                    </button>
+                  </div>
+                </div>
+
+              </div>
             </div>
             <div class="action-right">
               <button mat-raised-button class="btn-initiate" *ngIf="selection.selected.length != 0" (click)="initiateEventProduct()">
@@ -256,19 +293,7 @@
           <!-- Row shown when there is no matching data -->
           <tr class="mat-row" *matNoDataRow>
             <td class="mat-cell" colspan="5" class="text-secondary text-center fst-italic p-2">
-              <ng-container *ngIf="input.value.length != 0">
-                <div>No data matching "{{input.value}}"</div>
-                <ng-container *ngIf="getUnassignedFromSearch() as found">
-                  <div *ngIf="found.length > 0" style="margin-top: 8px;">
-                    <div *ngFor="let p of found" style="margin-bottom: 4px;">
-                      <strong>{{p.name}}</strong> <span class="fst-italic">({{p.email}})</span>
-                    </div>
-                    <button mat-raised-button color="warn" style="margin-top: 8px;" (click)="assignProductFromSearch(found)">
-                      Assign Product ({{found.length}})
-                    </button>
-                  </div>
-                </ng-container>
-              </ng-container>
+              <span *ngIf="input.value.length != 0">No data matching "{{input.value}}"</span>
               <span *ngIf="input.value.length == 0 && tableDatasource.data.length == 0">No participants available</span>
             </td>
           </tr>

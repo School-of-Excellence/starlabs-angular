@@ -138,7 +138,7 @@ export class ConnectivityGuardService {
           } else if (this.userDismissedWhileOffline) {
             // User dismissed while offline — open fresh restored dialog
             this.dialogRef = this.dialog.open(ConnectivityAlertComponent, {
-              disableClose: false,
+              disableClose: true,
               hasBackdrop: true,
               panelClass: 'connectivity-snackbar',
               width: '460px',
@@ -170,7 +170,7 @@ export class ConnectivityGuardService {
     if (this.dialogRef || this.handlingBadConnection) return;
     this.handlingBadConnection = true;
     this.dialogRef = this.dialog.open(ConnectivityAlertComponent, {
-          disableClose: false,
+          disableClose: true,
           hasBackdrop: true,
           panelClass: 'connectivity-snackbar',
           width: '460px',

@@ -25,6 +25,7 @@ export type DialogScreen = 'prompt' | 'waiting' | 'offline' | 'restored';
           <p class="banner-title">No internet connection</p>
         </div>
         <p class="banner-subtitle">You're offline. Continue filling the form?</p>
+        <p class="banner-subtitle">Your Draft will saved on this device</p>
         <div class="action-row">
           <button class="btn-secondary" (click)="goWaiting()">
             <mat-icon>schedule</mat-icon>
@@ -58,10 +59,9 @@ export type DialogScreen = 'prompt' | 'waiting' | 'offline' | 'restored';
           <mat-icon class="banner-icon">save</mat-icon>
           <p class="banner-title">Draft being saved on this device</p>
         </div>
-        <p class="banner-subtitle">
-          Your draft is being saved on this device. Do not refresh or close the tab.
-          You can submit the form once the network is back.
-        </p>
+        <p class="banner-subtitle">Your draft is being saved on this device.</p>
+        <p class="banner-subtitle">Do not refresh or close the tab.</p>
+        <p class="banner-subtitle">You can submit the form once the network is back.</p>
         <div class="draft-status" [ngClass]="draftStatus()">
           <ng-container [ngSwitch]="draftStatus()">
             <ng-container *ngSwitchCase="'saving'">
@@ -384,7 +384,6 @@ export class ConnectivityAlertComponent {
     if (data.startScreen) {
       this.currentScreen.set(data.startScreen);
     }
-    this.dialogRef.backdropClick().subscribe(() => this.dialogRef.close());
   }
 
   goWaiting() {

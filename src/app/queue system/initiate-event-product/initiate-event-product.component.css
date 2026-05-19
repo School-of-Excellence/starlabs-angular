@@ -990,3 +990,94 @@ tr:hover {
   padding: 16px 24px;
   border-top: 1px solid #eee;
 }
+.search-result-box {
+  margin-top: 10px;
+  border: 0.5px solid var(--color-border-tertiary, #e0e0e0);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.search-result-group {
+  padding: 12px 14px;
+}
+
+.search-result-group + .search-result-group {
+  border-top: 0.5px solid var(--color-border-tertiary, #e0e0e0);
+}
+
+.search-result-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.search-result-label.queue { color: #b45309; }
+.search-result-label.unassigned { color: #b91c1c; }
+.search-result-label mat-icon { font-size: 16px; }
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.result-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.queue-chip {
+  background: #fef3c7;
+  color: #92400e;
+  border: 0.5px solid #fcd34d;
+}
+
+.unassigned-chip {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 0.5px solid #fca5a5;
+}
+
+.queue-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border: 0.5px solid #fcd34d;
+}
+
+.assign-btn-row {
+  padding: 10px 14px;
+  border-top: 0.5px solid #e0e0e0;
+  background: #f9f9f9;
+}
+
+.assign-btn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 0.5px solid #fca5a5;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.assign-btn:hover { background: #fee2e2; }
+
+.action-right {
+  flex-shrink: 0;
+  align-items: flex-start;
+}

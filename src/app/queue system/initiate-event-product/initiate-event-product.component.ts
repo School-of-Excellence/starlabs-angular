@@ -149,6 +149,8 @@ export class InitiateEventProductComponent {
   noProductSelection = new SelectionModel<string>(true, []);
   lastImportedParticipants: { name: string, email: string }[] = [];
   filterValue = '';
+  searchResult: { unassigned: any[], alreadyInQueue: any[] } = { unassigned: [], alreadyInQueue: [] };
+
 
   constructor(
     public firestore: Firestore,
@@ -577,7 +579,9 @@ export class InitiateEventProductComponent {
 
   applyFilter(value){
     this.filterValue = value;
-    this.tableDatasource.filter = value
+    this.tableDatasource.filter = value;
+    this.searchResult = this.getUnassignedFromSearch();
+
   }
 
   isAllSelected() {
@@ -826,15 +830,22 @@ export class InitiateEventProductComponent {
     }
   }
   
-  getUnassignedFromSearch(): any[] {
-    if (!this.filterValue) return [];
+  getUnassignedFromSearch(): { unassigned: any[], alreadyInQueue: any[] } {
+    if (!this.filterValue) return { unassigned: [], alreadyInQueue: [] };
     const search = this.filterValue.trim().toLowerCase();
-    return Object.values(this.mapEmailData).filter((p: any) => {
+    const activeEmailSet = new Set(this.activeArray.map(e => e.toLowerCase()));
+
+    const notInTable = Object.values(this.mapEmailData).filter((p: any) => {
       const name = p.name?.toLowerCase() ?? '';
       const email = p.email?.toLowerCase() ?? '';
       return (name.includes(search) || email.includes(search)) &&
         !this.participantProductList.some(pp => pp.email?.toLowerCase() === email);
     });
+
+    const unassigned = notInTable.filter((p: any) => !activeEmailSet.has(p.email?.toLowerCase() ?? ''));
+    const alreadyInQueue = notInTable.filter((p: any) => activeEmailSet.has(p.email?.toLowerCase() ?? ''));
+
+    return { unassigned, alreadyInQueue };
   }
 
   assignProductFromSearch(participants: any[]) {
