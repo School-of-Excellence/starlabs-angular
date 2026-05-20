@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core'; // getFireStore
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -351,8 +351,8 @@ export class DeliveryDashboardCloneComponent {
             "Pre-Process Form",
             "Diagnostics",
             "Implementation",
-            "Post-Process Form",
             "Review",
+            "Post-Process Form",
             "Completion"
         ]
     };
@@ -373,8 +373,8 @@ export class DeliveryDashboardCloneComponent {
             'Pre-Process',
             'Diagnostics',
             'Implementation',
+            'Review',
             'Post-Process Form',
-            'Review'
         ],
         'EI Starter Pack': [
             'Welcome Call',
@@ -463,6 +463,8 @@ export class DeliveryDashboardCloneComponent {
     ticketSubscription: any;
     selectedFilter: string = 'recent';
     selectedStageFilter: string = '';
+    selectedStatus: string = 'all';
+    allFunnelModalProfiles: any = {};
     selectedStage = '';
 
     openAppointmentModal = false;
@@ -486,8 +488,8 @@ export class DeliveryDashboardCloneComponent {
             preprocess: [],
             diagnostics: [],
             implementation: [],
-            postForm: [],
             review: [],
+            postForm: [],
             completion: []
         }
     };
@@ -738,14 +740,15 @@ export class DeliveryDashboardCloneComponent {
 
                 const status = item?.status?.toLowerCase?.() || null;
                 const profileId = item?.profileid;
-                const mode = this.mapMetaData?.[profileId]?.['participantmode']?.toLowerCase?.();
+                const mode = this.mapMetaData?.[profileId]?.['participantmode']?.toLowerCase().trim();
                 const totalPaid = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpaid'] ?? '0') || 0;
                 const totalPurchaseValue = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpurchasevalue'] ?? '0') || 0;
                 const totalBalance = totalPurchaseValue - totalPaid;
                 const minPayment = parseInt(item?.['minimumpayment']) || 0;
-                const isEligible = !this.excludedModes.has(mode?.toLowerCase().trim()) && (totalBalance <= 0 || totalPaid >= minPayment);
+                const isEligible = !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
                 const statusdate = item?.statusdate || {};
                 const tentativestart = item?.tentativestart || null;
+                const packageId = item?.packageref?.id;
 
                 if (!['completed', 'ongoing'].includes(status)) {
                     (groupedAll[productId] ||= []).push(item);
@@ -764,20 +767,6 @@ export class DeliveryDashboardCloneComponent {
                     } else (groupedNotEligible[productId] ||= []).push(item);
                 }
 
-                if (isEligible) {
-                    const packageId = item?.packageref?.id;
-
-                    if (packageId && this.bonusPackageIds.has(packageId)) {
-                        (groupedBonus[productId] ||= []).push(item);
-                    }
-                    else if (packageId && this.addonsPackageIds.has(packageId)) {
-                        (groupedAddons[productId] ||= []).push(item);
-                    }
-                    else {
-                        (groupedPurchased[productId] ||= []).push(item);
-                    }
-                }
-
                 if (!funnelData[productId]) {
                     funnelData[productId] = { awaiting: [], initiated: [], started: [], ongoing: [], completed: [] };
                 }
@@ -792,6 +781,16 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 if (isEligible) {
+                    // Grouping
+                    if (packageId && this.bonusPackageIds.has(packageId)) {
+                        (groupedBonus[productId] ||= []).push(item);
+                    } else if (packageId && this.addonsPackageIds.has(packageId)) {
+                        (groupedAddons[productId] ||= []).push(item);
+                    } else {
+                        (groupedPurchased[productId] ||= []).push(item);
+                    }
+
+                    // Funnel Data
                     if (!status) {
                         funnelData[productId].awaiting.push(item);
                     } else if (status === 'initiated') {
@@ -828,7 +827,29 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
-        this.productData = {};
+
+        this.productData = {
+            eiStarterPack: {
+                totalEligible: [],
+                pastMonth: [],
+                thisMonth: [],
+                nextMonth: [],
+                onBoarded: [],
+                upcomingDIAppointments: [],
+                reports: [],
+                celebrationCall: []
+            },
+            criticalSupport: {
+                totalEligible: [],
+                request: this.ticketRequest.length ? this.ticketRequest : [],
+                preprocess: [],
+                diagnostics: [],
+                implementation: [],
+                postForm: [],
+                review: [],
+                completion: []
+            }
+        };
 
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
@@ -843,13 +864,11 @@ export class DeliveryDashboardCloneComponent {
         if (product === 'EI Starter Pack') {
             this.selectedColumns = this.columns.eiStarterPack;
             await this.filterProductData('eiStarterPack', product, productId);
-        }
-        else if (product === 'Critical Support') {
+        } else if (product === 'Critical Support') {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
+            await this.filterStageData();
         }
-
-        if (product === 'Critical Support') await this.filterStageData();
         this.participantLoading = false;
     }
 
@@ -960,8 +979,8 @@ export class DeliveryDashboardCloneComponent {
                 preprocess: [],
                 diagnostics: [],
                 implementation: [],
-                postForm: [],
                 review: [],
+                postForm: [],
                 completion: []
             }
         };
@@ -970,15 +989,15 @@ export class DeliveryDashboardCloneComponent {
         const allAppointments = this.allAppointments;
         try {
             const totalEligible = this.getCardGroupedFiltered(productId);
-            if (productType === 'criticalSupport') {
+            if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
             }
-            else if (productType === 'eiStarterPack') {
+            else if (this.selectedProductType === 'eiStarterPack') {
                 for (let data of totalEligible) {
                     const { status, tentativestart } = data;
 
                     if (status === null || status === "initiated") {
-                        if (!tentativestart) productData.totalEligible.push(data);
+                        if (!tentativestart) productData.eiStarterPack.totalEligible.push(data);
                         else if (tentativestart) {
                             const date = tentativestart.toDate();
                             const itemMonth = date.getMonth();
@@ -1011,8 +1030,8 @@ export class DeliveryDashboardCloneComponent {
                 };
 
                 if (attendedAppointments.length === 0) {
-                    if (productType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
-                    if (productType === 'eiStarterPack') {
+                    if (this.selectedProductType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
+                    if (this.selectedProductType === 'eiStarterPack') {
                         if (!data.tentativestart) {
                             productData.eiStarterPack.totalEligible.push(mergedData);
                         } else {
@@ -1072,12 +1091,13 @@ export class DeliveryDashboardCloneComponent {
                     }
                     // ========================= CRITICAL SUPPORT =========================
                     else if (productType === 'criticalSupport') {
-                        const reviewAppointment = attendedAppointments.find(app =>
-                            app.appointmentTypeName?.toLowerCase() === `critical support review`
-                        );
 
                         const postprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support post form'
+                        );
+
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `critical support review`
                         );
 
                         const implementationAppointment = attendedAppointments.find(app =>
@@ -1089,19 +1109,20 @@ export class DeliveryDashboardCloneComponent {
                         );
 
                         const preprocessAppointment = attendedAppointments.find(app =>
-                            app.formname?.toLowerCase() === 'critical support request'
+                            app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-                        if (reviewAppointment) {
-                            productData.criticalSupport.review.push({
-                                ...mergedData,
-                                ...reviewAppointment
-                            });
-                        }
-                        else if (postprocessAppointment) {
+                       
+                        if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
                                 ...postprocessAppointment
+                            });
+                        }
+                        else if (reviewAppointment) {
+                            productData.criticalSupport.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
                             });
                         }
                         else if (implementationAppointment) {
@@ -1270,7 +1291,7 @@ export class DeliveryDashboardCloneComponent {
             let typeName = '';
             if (app?.appointmentTypeName) {
                 typeName = app.appointmentTypeName;
-            } else if (app?.formname === 'Critical Support Request') {
+            } else if (app?.formname === 'Critical Support Pre Form') {
                 typeName = 'Pre-Process';
             } else if (app?.formname === 'Critical Support Post Form') {
                 typeName = 'Post-Process Form'
@@ -1318,7 +1339,7 @@ export class DeliveryDashboardCloneComponent {
     resolveAppointmentType(appointment: any) {
         // If it's from forms
         if (appointment?.formid) {
-            if (appointment?.formname === 'Critical Support Request') return 'Pre-Process';
+            if (appointment?.formname === 'Critical Support Pre Form') return 'Pre-Process';
             else if (appointment?.formname === 'Critical Support Post Form') return 'Post-Process Form';
             else if (appointment?.formname === 'Post Session Check-in') return 'Post Session Check-in';
         }
@@ -1404,8 +1425,8 @@ export class DeliveryDashboardCloneComponent {
                 2: this.productData.criticalSupport.preprocess || [],
                 3: this.productData.criticalSupport.diagnostics || [],
                 4: this.productData.criticalSupport.implementation || [],
-                5: this.productData.criticalSupport.postForm || [],
-                6: this.productData.criticalSupport.review || [],
+                5: this.productData.criticalSupport.review || [],
+                6: this.productData.criticalSupport.postForm || [],
                 7: this.productData.criticalSupport.completion || []
             };
         }
@@ -2182,9 +2203,6 @@ export class DeliveryDashboardCloneComponent {
         return date >= this.dateRangeStart && date <= this.dateRangeEnd;
     }
 
-    selectedStatus: string = 'all';
-    allFunnelModalProfiles: any = {};
-
     openFunnelModal(productId: string, type: string, event: Event) {
         event.stopPropagation();
 
@@ -2318,13 +2336,6 @@ export class DeliveryDashboardCloneComponent {
         this.avgModalProductId = productId;
         this.avgModalType = type;
         this.avgModalOpen = true;
-
-        const excludedModes = new Set([
-            'installation event mode',
-            'event mode',
-            // 'priority mode',
-            'integration mode',
-        ]);
 
         const items = this.allMatchedProductsRaw.filter((i) => i['productref']?.id === productId);
         const details = [];

@@ -461,7 +461,7 @@ export class ViewAssignedATCComponent {
         var procedureCollectionRef = collection(this.firestoreATC, adjDoc.ref.path+"/procedures")
         var procedureQueryList = [where("isdelete", "==", false)]
         if(this.selectedChangeagent != null){
-          procedureQueryList.push(where("assigned_to", "array-contains", doc(this.firestoreDefault, "profile_data/"+this.selectedChangeagent)))
+          procedureQueryList.push(where("assigned_to", "array-contains", doc(this.firestoreATC, "profile_data/"+this.selectedChangeagent)))
         }
         var procedureCollectionQuery = query(procedureCollectionRef, ...procedureQueryList)
 
