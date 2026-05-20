@@ -104,6 +104,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   error: string | null = null;
   isMovingParticipant: string | null = null;
 
+  subscriberCodes: string[] = [];
+  selectedSubscriberCode: string[] = [];
+  showReferredOnly: boolean = false;
+  allSelected = false;
+
   unsubscribes: Unsubscribe[] = [];
   private destroy$ = new Subject<void>();
   private recalculateSubject$ = new Subject<void>();
@@ -163,22 +168,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     totalNotStarted: number;
     totalNotStartedProfileIds: string[];
   } = {
-    overallAvgProgress: 0,
-    overallCompletionRate: 0,
-    categoryProgress: [],
-    cohortAvgProgress: 0,
-    cohortCompletionRate: 0,
-    cohortCompletedCount: 0,
-    facilitatorAvgProgress: 0,
-    facilitatorCompletionRate: 0,
-    facilitatorCompletedCount: 0,
-    totalActive: 0,
-    totalActiveProfileIds: [],
-    totalCompleted: 0,
-    totalCompletedProfileIds: [],
-    totalNotStarted: 0,
-    totalNotStartedProfileIds: []
-  };
+      overallAvgProgress: 0,
+      overallCompletionRate: 0,
+      categoryProgress: [],
+      cohortAvgProgress: 0,
+      cohortCompletionRate: 0,
+      cohortCompletedCount: 0,
+      facilitatorAvgProgress: 0,
+      facilitatorCompletionRate: 0,
+      facilitatorCompletedCount: 0,
+      totalActive: 0,
+      totalActiveProfileIds: [],
+      totalCompleted: 0,
+      totalCompletedProfileIds: [],
+      totalNotStarted: 0,
+      totalNotStartedProfileIds: []
+    };
   firestoreDefault = getFirestore()
   firestoreForms = getFirestore('firestore-forms')
 
@@ -281,6 +286,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.workshopId) {
       console.log('load dashboard....');
       this.loadWorkshopDashboard();
+      this.loadSubscriberCodes();
     }
   }
 
@@ -403,6 +409,43 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     this.unsubscribes.push(unsubscribe);
+  }
+
+  async loadSubscriberCodes(): Promise<void> {
+    try {
+      const ref = doc(this.firestoreDefault, 'static meta data', 'Subscriber Code');
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const data = snap.data();
+       this.subscriberCodes = Array.isArray(data?.['codes'])? [...data['codes']].reverse(): [];
+      }
+    } catch (error) {
+      console.error('Error:'+ error);
+    }
+  }
+
+  onCodeSelectionChange(event: any) {
+    const selectedValues = event.value;
+    const isAllSelected =
+      selectedValues.includes('ALL');
+    if (isAllSelected) {
+      if (this.selectedSubscriberCode.length === this.subscriberCodes.length + 1) {
+        this.selectedSubscriberCode = [];
+      } else {
+        this.selectedSubscriberCode = [
+          'ALL',
+          ...this.subscriberCodes
+        ];
+
+      }
+    } else {
+      this.selectedSubscriberCode =
+        selectedValues.filter(
+          (x: string) => x !== 'ALL'
+        );
+
+    }
+    this.applyFilterSide();
   }
 
   async sendMail() {
@@ -1284,13 +1327,18 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         }));
       this.selectedParticipants = newUserParticipants;
       this.selectedStatusInfo = {
-        status: 'totalNewUsers', challengeName: 'New Users',
-        subChallengeName: this.statusDisplayMap.get(metricType) || 'New Users',
+        status: 'totalNewUsers',
+        challengeName: 'New Users',
+        subChallengeName: 'New Users Enrolled',
         count: newUserParticipants.length
       };
       this.showParticipantPanel = true;
-      this.filterOption = 'new';
+      // ✅ Reset new user filters on open
+      this.selectedSubscriberCode = [];
+      this.showReferredOnly = false;
+      this.filterOption = 'all';
       this.applyFilterSide();
+
     } else if (metricType === 'totalNewUsersNotEnrolled') {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const notEnrolledNewUsers = Object.keys(this.mapProfileNew)
@@ -1302,11 +1350,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         }));
       this.selectedParticipants = notEnrolledNewUsers;
       this.selectedStatusInfo = {
-        status: 'totalNewUsersNotEnrolled', challengeName: 'Not Enrolled',
-        subChallengeName: 'New Users Not Enrolled', count: notEnrolledNewUsers.length
+        status: 'totalNewUsersNotEnrolled',
+        challengeName: 'Not Enrolled',
+        subChallengeName: 'New Users Not Enrolled',
+        count: notEnrolledNewUsers.length
       };
       this.showParticipantPanel = true;
-      this.filterOption = 'new';
+      // ✅ Reset new user filters on open
+      this.selectedSubscriberCode = [];
+      this.showReferredOnly = false;
+      this.filterOption = 'all';
       this.applyFilterSide();
     } else {
       const participantIds = this.metrics.get(metricType);
@@ -1380,13 +1433,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  async openNewUserDialog() {
-    const { NewusersComponent } = await import('../newusers/newusers.component');
-    this.dialog.open(NewusersComponent, {
-      data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
-      width: '90vw', height: '90vh', maxWidth: '100vw', maxHeight: '100vh'
-    });
-  }
+  // async openNewUserDialog() {
+  //   const { NewusersComponent } = await import('../newusers/newusers.component');
+  //   this.dialog.open(NewusersComponent, {
+  //     data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
+  //     width: '90vw', height: '90vh', maxWidth: '100vw', maxHeight: '100vh'
+  //   });
+  // }
 
   async openZoomDialog(zoomdata: any, index: number) {
     const { ZoomCallComponent } = await import('./zoom-call/zoom-call.component');
@@ -1809,6 +1862,43 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       }
     }
 
+    if (
+      (this.selectedStatusInfo?.status === 'totalNewUsers' ||
+        this.selectedStatusInfo?.status === 'totalNewUsersNotEnrolled') &&
+      this.selectedSubscriberCode.length > 0
+    ) {
+      base = Object.entries(this.mapProfileNew)
+        .filter(([, p]: any) =>
+          this.selectedSubscriberCode.includes(p?.refferedby) &&
+          p?.subscriber === true
+
+        )
+        .map(([profileId, p]: any) => ({
+          profileid: profileId,
+          name: p?.name || 'Unknown',
+          created: p?.created || null,
+          metadata: p
+        }));
+
+    }
+
+    if (
+      (this.selectedStatusInfo?.status === 'totalNewUsers' ||
+        this.selectedStatusInfo?.status === 'totalNewUsersNotEnrolled') &&
+      this.showReferredOnly
+    ) {
+      base = Object.entries(this.mapProfileNew)
+        .filter(([, p]: any) =>
+          p?.refferedby &&
+          p?.subscriber !== true
+        )
+        .map(([profileId, p]: any) => ({
+          profileid: profileId,
+          name: p?.name || 'Unknown',
+          created: p?.created || null,
+          metadata: p
+        }));
+    }
     this.filteredParticipants = base;
   }
 
