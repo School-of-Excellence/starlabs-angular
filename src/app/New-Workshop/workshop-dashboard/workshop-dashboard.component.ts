@@ -1867,12 +1867,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         this.selectedStatusInfo?.status === 'totalNewUsersNotEnrolled') &&
       this.selectedSubscriberCode.length > 0
     ) {
+      const enrolledProfileIds = new Set(this.enrolledParticipants.map(p => p.profileid));
+      const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
       base = Object.entries(this.mapProfileNew)
-        .filter(([, p]: any) =>
-          this.selectedSubscriberCode.includes(p?.refferedby) &&
-          p?.subscriber === true
-
-        )
+        .filter(([profileId, p]: any) => {
+          if (!this.selectedSubscriberCode.includes(p?.refferedby)) return false;
+          if (p?.subscriber !== true) return false;
+          const isEnrolled = enrolledProfileIds.has(profileId);
+          return isEnrolledView ? isEnrolled : !isEnrolled;
+        })
         .map(([profileId, p]: any) => ({
           profileid: profileId,
           name: p?.name || 'Unknown',
@@ -1887,11 +1890,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         this.selectedStatusInfo?.status === 'totalNewUsersNotEnrolled') &&
       this.showReferredOnly
     ) {
+      const enrolledProfileIds = new Set(this.enrolledParticipants.map(p => p.profileid));
+      const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
       base = Object.entries(this.mapProfileNew)
-        .filter(([, p]: any) =>
-          p?.refferedby &&
-          p?.subscriber !== true
-        )
+        .filter(([profileId, p]: any) => {
+          if (!p?.refferedby) return false;
+          if (p?.subscriber === true) return false;
+          const isEnrolled = enrolledProfileIds.has(profileId);
+          return isEnrolledView ? isEnrolled : !isEnrolled;
+        })
         .map(([profileId, p]: any) => ({
           profileid: profileId,
           name: p?.name || 'Unknown',
