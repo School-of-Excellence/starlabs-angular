@@ -2524,7 +2524,7 @@ export class ParticipantsAnalyticsComponent {
       watsonSalesMap[profileid].push(sale);
     }
 
-    for(let metadata of this.dashboardEntireData.slice(0,500)){
+    for(let metadata of this.dashboardEntireData){
 
       const profileid = metadata.profileid;
 
