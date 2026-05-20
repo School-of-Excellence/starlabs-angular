@@ -185,7 +185,7 @@ export class AddTripleATCComponent implements OnDestroy {
               };
             }
           });
-        } 
+        }
       }
     });
 
@@ -605,12 +605,12 @@ export class AddTripleATCComponent implements OnDestroy {
       /*
       var obseverref = []
       for (let k = 0; k < this.observer.length; k++) {
-        obseverref.push(this.firestore.doc(this.observer[k]).ref)                
+        obseverref.push(this.firestore.doc(this.observer[k]).ref)
       }
       console.log(obseverref)
       var validatorref = []
       for (let k = 0; k < this.validator.length; k++) {
-        validatorref.push(this.firestore.doc(this.validator[k]).ref)                
+        validatorref.push(this.firestore.doc(this.validator[k]).ref)
       }
       console.log(validatorref)
       */
@@ -639,6 +639,7 @@ export class AddTripleATCComponent implements OnDestroy {
       }
 
       //Big Activity
+      var collectionName = "triple atc"
       if(this.bigActivity()){
         alphaData['assignmentid'] = this.assignmentId
         alphaData['participantassignmentid'] = this.participantAssignmentId
@@ -647,13 +648,12 @@ export class AddTripleATCComponent implements OnDestroy {
 
         defaultBatch.update(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId), {
           status: 'review',
-          activityref: doc(this.firestoreATC, collectionName, this.alphaid),
+          activityref: doc(this.firestoreDefault, collectionName, this.alphaid),
           atcdocid: this.alphaid
         });
 
       }
 
-      var collectionName = "triple atc"
       console.log(alphaData)
       atcBatch.set(doc(this.firestoreATC, collectionName, this.alphaid), alphaData)
       var mergeAdjustment = []
