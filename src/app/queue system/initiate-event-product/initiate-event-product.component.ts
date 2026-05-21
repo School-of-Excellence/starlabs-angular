@@ -4,7 +4,7 @@ import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { combineLatest, Subject } from 'rxjs';
 import { map, takeUntil } from 'rxjs/operators';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
+import { CommonModule,SlicePipe } from '@angular/common';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -29,7 +29,19 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
+import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 
+interface ImportPreviewParticipant {
+  name: string;
+  email: string;
+}
+
+interface ImportPreviewData {
+  totalRows: number;
+  willBeAdded: ImportPreviewParticipant[];
+  alreadyInQueue: ImportPreviewParticipant[];
+  noProduct: ImportPreviewParticipant[];
+}
 @Component({
   selector: 'app-initiate-event-product',
   imports: [
@@ -37,6 +49,7 @@ import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage'
     MatInputModule,
     FormsModule,
     CommonModule,
+    SlicePipe,
     MatSelectModule,
     MatIconModule,
     MatTableModule,
@@ -45,7 +58,8 @@ import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage'
     MatCheckboxModule,
     MatButtonModule,
     MatTooltipModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    MatDialogModule
   ],
   templateUrl: './initiate-event-product.component.html',
   styleUrl: './initiate-event-product.component.css'
@@ -112,12 +126,30 @@ export class InitiateEventProductComponent {
   missingParticipants: { name: string, email: string }[] = [];
 
   @ViewChild('participantSheet') participantSheet!: TemplateRef<any>;
+  @ViewChild('initiationSummaryDialog') initiationSummaryDialog!: TemplateRef<any>;
+  @ViewChild('importPreviewDialog') importPreviewDialog!: TemplateRef<any>;
+
+  readonly INITIATE_CHUNK_SIZE = 20;
+  readonly INITIATE_CHUNK_DELAY_MS = 5000;
   bottomSheetSelection = new SelectionModel<string>(true, []);
   bottomSheetParticipants: any[] = [];
   private destroy$ = new Subject<void>();
   private storage = inject(Storage);
-
-
+  importPreviewData: ImportPreviewData = {
+    totalRows: 0,
+    willBeAdded: [],
+    alreadyInQueue: [],
+    noProduct: []
+  };
+  expandedSections: Record<string, boolean> = {
+    willBeAdded: false,
+    alreadyInQueue: false,
+    noProduct: false
+  };
+  noProductSelection = new SelectionModel<string>(true, []);
+  lastImportedParticipants: { name: string, email: string }[] = [];
+  filterValue = '';
+  searchResult: { unassigned: any[], alreadyInQueue: any[] } = { unassigned: [], alreadyInQueue: [] };
 
 
   constructor(
@@ -405,25 +437,44 @@ export class InitiateEventProductComponent {
     }
   }
 
-  initiateEventProduct(){
-    var loading = this.dialog.open(LoadingProgressComponent, {
+  async initiateEventProduct(){
+    if(!this.validateSubmition()){
+      return
+    }
+
+    const selectedProduct = [...this.selection.selected]
+    const total = selectedProduct.length
+    const chunkSize = this.INITIATE_CHUNK_SIZE
+    const delayMs = this.INITIATE_CHUNK_DELAY_MS
+
+    const chunks: any[][] = []
+    for(let i = 0; i < total; i += chunkSize){
+      chunks.push(selectedProduct.slice(i, i + chunkSize))
+    }
+
+    const loading = this.dialog.open(LoadingProgressComponent, {
       disableClose: true,
       autoFocus: false,
-      data: {msg: "Initiating Product..."}
+      data: { msg: `Initiating 0 / ${total} participants...` }
     })
-    try {
-      var selectedProduct = this.selection.selected
-      console.log(this.selectedDeliverySet, this.selectedQueueVariation, selectedProduct)
-      var validateCondition = this.validateSubmition()
-      console.log(validateCondition)
-      if(validateCondition){
-        var batch = writeBatch(this.firestore)
-        for (let i = 0; i < selectedProduct.length; i++) {
-          const productElement = selectedProduct[i];
+
+    const succeeded: any[] = []
+    const failed: { product: any, error: string }[] = []
+
+    for(let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++){
+      const chunk = chunks[chunkIdx]
+      const processed = succeeded.length + failed.length
+      loading.componentInstance.dialogData.msg =
+        `Initiating chunk ${chunkIdx + 1} of ${chunks.length} — ${processed} / ${total} done`
+
+      try {
+        const batch = writeBatch(this.firestore)
+        for(let i = 0; i < chunk.length; i++){
+          const productElement = chunk[i]
 
           // Update Event Participation Request
-          var participationID = null
-          var eventparticipationData = {}
+          let participationID = null
+          let eventparticipationData: any = {}
           if(this.mapProfileParticipation[productElement["profileid"]]){
             participationID = this.mapProfileParticipation[productElement["profileid"]]["docid"]
             eventparticipationData = {
@@ -450,11 +501,11 @@ export class InitiateEventProductComponent {
               initiatedfrom: 'web',
             }
           }
-          var eventparticipationRef = doc(this.firestore, "event participation request", participationID)
+          const eventparticipationRef = doc(this.firestore, "event participation request", participationID)
           batch.set(eventparticipationRef, eventparticipationData, {merge: true})
 
           // Update Participants Product
-          var participantproductData = {
+          const participantproductData: any = {
             eventref: this.selectedArena["eventref"],
             arenaeventid: this.selectedArena["docid"],
             status: "initiated",
@@ -468,24 +519,57 @@ export class InitiateEventProductComponent {
           batch.update(doc(this.firestore, 'participantsproduct', productElement["docid"]), participantproductData)
         }
 
-        batch.commit().then(() =>{
-          this.selectedArena = null
-          this.resetValue()
-          loading.close()
-          alert("Success!")
-        }).catch(err =>{
-          console.log(err)
-          loading.close()
-          alert("Failed!")
-        })
+        await batch.commit()
+        succeeded.push(...chunk)
+        console.log(`Chunk ${chunkIdx + 1}/${chunks.length} committed (${chunk.length} products)`)
       }
-      else{
-        loading.close()
+      catch(err: any){
+        const errMsg = err?.message || String(err)
+        console.log(`Chunk ${chunkIdx + 1}/${chunks.length} failed:`, err)
+        for(const product of chunk){
+          failed.push({ product, error: errMsg })
+        }
       }
-    } catch (error) {
-      console.log(error)
-      loading.close()
-      alert("Something went wrong.")
+
+      if(chunkIdx < chunks.length - 1){
+        const done = succeeded.length + failed.length
+        loading.componentInstance.dialogData.msg =
+          `Waiting ${delayMs / 1000}s before next chunk... (${done} / ${total} done)`
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+      }
+    }
+
+    loading.close()
+
+    const summaryData = {
+      total,
+      successCount: succeeded.length,
+      failedCount: failed.length,
+      failedList: failed.map(f => ({
+        name: (this.mapProfile[f.product["profileid"]] ?? {})["name"] || f.product["profileid"],
+        error: f.error
+      }))
+    }
+
+    if(this.initiationSummaryDialog){
+      this.dialog.open(this.initiationSummaryDialog, {
+        width: '520px',
+        disableClose: true,
+        autoFocus: false,
+        data: summaryData
+      })
+    }
+    else{
+      console.warn("initiationSummaryDialog template not found — falling back to alert")
+      const failedNames = summaryData.failedList.map(f => `- ${f.name}: ${f.error}`).join("\n")
+      const msg = `Initiation Summary\n\nTotal: ${summaryData.total}\nSuccess: ${summaryData.successCount}\nFailed: ${summaryData.failedCount}` +
+        (failedNames ? `\n\nFailed:\n${failedNames}` : "")
+      alert(msg)
+    }
+
+    if(failed.length === 0){
+      this.selectedArena = null
+      this.resetValue()
     }
   }
 
@@ -494,7 +578,10 @@ export class InitiateEventProductComponent {
   }
 
   applyFilter(value){
-    this.tableDatasource.filter = value
+    this.filterValue = value;
+    this.tableDatasource.filter = value;
+    this.searchResult = this.getUnassignedFromSearch();
+
   }
 
   isAllSelected() {
@@ -539,13 +626,13 @@ export class InitiateEventProductComponent {
           });
           return;
         }
-        
+
         const loading = this.dialog.open(LoadingProgressComponent, {
           disableClose: true,
           autoFocus: false,
-          data: {msg: "Importing participants..."}
+          data: { msg: "Importing participants..." }
         });
-        
+
         const reader = new FileReader();
         reader.onload = (e) => {
           const data = new Uint8Array(e.target.result as ArrayBuffer);
@@ -553,8 +640,10 @@ export class InitiateEventProductComponent {
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
           this.missingParticipants = [];
-          const excelParticipants: {name: string, email: string}[] = [];
+          const excelParticipants: { name: string, email: string }[] = [];
+
           jsonData.forEach((row: any[], index) => {
             if (index > 0 && row[0] && row[1]) {
               const name = row[0].toString().trim();
@@ -564,56 +653,77 @@ export class InitiateEventProductComponent {
               }
             }
           });
-          console.log('Excel Participants:', excelParticipants);
-          this.selection.clear();
-          const tableEmails = new Set(
-            this.participantProductList.map(p => 
-              p.email ? p.email.toString().trim().toLowerCase() : ''
-            ).filter(email => email !== '')
-          );
-          this.missingParticipants = excelParticipants.filter(
-            excelPerson => !tableEmails.has(excelPerson.email)
-          );
-          const selectedEmails = new Set<string>();
-          let matchCount = 0;
-          this.participantProductList.forEach(participant => {
-            const participantEmail = participant.email ? participant.email.toString().trim().toLowerCase() : '';
-            if (participantEmail && excelParticipants.some(p => p.email === participantEmail)) {
-              if (!selectedEmails.has(participantEmail)) {
-                if(!this.activeArray.includes(participantEmail)) {
-                  this.selection.select(participant)
-                  selectedEmails.add(participantEmail)
-                  matchCount++;
-                } else {
-                  this.alreadyInQueue.push(participant.profileid);
-                }
-                
-              }
-              // this.selection.select(participant);
-              // matchCount++;
+
+          const tableEmailMap = new Map<string, any>();
+          this.participantProductList.forEach(p => {
+            const email = p.email ? p.email.toString().trim().toLowerCase() : '';
+            if (email) tableEmailMap.set(email, p);
+          });
+
+          const activeEmailSet = new Set(this.activeArray.map(e => e.toLowerCase()));
+          const willBeAdded: ImportPreviewParticipant[] = [];
+          const alreadyInQueue: ImportPreviewParticipant[] = [];
+          const noProduct: ImportPreviewParticipant[] = [];
+          const seenEmails = new Set<string>();
+
+          excelParticipants.forEach(person => {
+            if (seenEmails.has(person.email)) return;
+            seenEmails.add(person.email);
+
+            if (activeEmailSet.has(person.email)) {
+              alreadyInQueue.push({ name: person.name, email: person.email });
+            } else if (!tableEmailMap.has(person.email)) {
+              noProduct.push({ name: person.name, email: person.email });
+            } else {
+              willBeAdded.push({ name: person.name, email: person.email });
             }
           });
-          if (matchCount > 0) {
-            this.snackbar.open(`Found and selected ${matchCount} matching participants`, 'OK', {
-              duration: 5000
-            });
-          } else {
-            this.snackbar.open('No matching participants found in the list', 'OK', {
-              duration: 5000
-            });
-          }
-          if (this.missingParticipants.length > 0) {
-            console.log('Missing participants:', this.missingParticipants);
-          }
+          this.lastImportedParticipants = excelParticipants;
+          this.importPreviewData = {
+            totalRows: excelParticipants.length,
+            willBeAdded,
+            alreadyInQueue,
+            noProduct
+          };
           loading.close();
+          const dialogRef = this.dialog.open(this.importPreviewDialog, {
+            width: '580px',
+            maxHeight: '90vh',
+            disableClose: true,
+            autoFocus: false
+          });
+          this.expandedSections = {
+            willBeAdded: false,
+            alreadyInQueue: false,
+            noProduct: false
+          };
+          this.noProductSelection.clear();
+          dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+            if (!confirmed) return;
+            // Apply selection
+            this.selection.clear();
+            let matchCount = 0;
+            const selectedEmails = new Set<string>();
+
+            this.participantProductList.forEach(participant => {
+              const participantEmail = participant.email? participant.email.toString().trim().toLowerCase(): '';
+              if (participantEmail &&willBeAdded.some(p => p.email === participantEmail) &&!selectedEmails.has(participantEmail)) {
+                this.selection.select(participant);
+                selectedEmails.add(participantEmail);
+                matchCount++;
+              }
+            });
+            this.missingParticipants = noProduct;
+
+            if (matchCount > 0) {
+              this.snackbar.open(`Selected ${matchCount} participants`, 'OK', { duration: 3000 });
+            }
+          });
         };
         reader.onerror = () => {
           loading.close();
-          this.snackbar.open('Error reading file', 'OK', {
-            duration: 5000
-          });
+          this.snackbar.open('Error reading file', 'OK', { duration: 5000 });
         };
-        
         reader.readAsArrayBuffer(file);
       }
     });
@@ -626,6 +736,141 @@ export class InitiateEventProductComponent {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Missing Participants');
     const fileName = 'Missing_Participants.xlsx';
     XLSX.writeFile(workbook, fileName);
+  }
+
+  assignProduct() {
+    const selected = this.noProductSelection.selected;
+    if (selected.length === 0) return;
+
+    const selectedParticipants = selected.map(email => ({
+      profileid: this.mapEmailData[email]?.['profileid'],
+      name: this.mapEmailData[email]?.['name'],
+      email: email
+    })).filter(p => p.profileid);
+
+    this.dialog.open(BulkAddProductsComponent, {
+      data: selectedParticipants,
+      width: '70vw',
+      disableClose: true
+      }).afterClosed().subscribe(async () => {
+      if (!this.selectedArena) return;
+
+      const savedDeliverySet = this.selectedDeliverySet;
+      const savedQueueVariation = this.selectedQueueVariation;
+
+      await this.onArenaEventSelect(this.selectedArena);
+
+      this.selectedDeliverySet = savedDeliverySet;
+      this.selectedQueueVariation = savedQueueVariation;
+
+      const tableEmailMap = new Map<string, any>();
+      this.participantProductList.forEach(p => {
+        const email = p.email?.toString().trim().toLowerCase();
+        if (email) tableEmailMap.set(email, p);
+      });
+
+      const activeEmailSet = new Set(this.activeArray.map(e => e.toLowerCase()));
+      const willBeAdded: ImportPreviewParticipant[] = [];
+      const alreadyInQueue: ImportPreviewParticipant[] = [];
+      const noProduct: ImportPreviewParticipant[] = [];
+
+      this.lastImportedParticipants.forEach(person => {
+        if (activeEmailSet.has(person.email)) {
+          alreadyInQueue.push(person);
+        } else if (!tableEmailMap.has(person.email)) {
+          noProduct.push(person);
+        } else {
+          willBeAdded.push(person);
+        }
+      });
+
+      this.importPreviewData = {
+        totalRows: this.lastImportedParticipants.length,
+        willBeAdded,
+        alreadyInQueue,
+        noProduct
+      };
+
+      this.noProductSelection.clear();
+      this.expandedSections = { willBeAdded: false, alreadyInQueue: false, noProduct: false };
+      this.dialog.closeAll();
+      this.dialog.open(this.importPreviewDialog, {
+        width: '580px',
+        maxHeight: '90vh',
+        disableClose: true,
+        autoFocus: false
+      }).afterClosed().subscribe((confirmed: boolean) => {
+        if (!confirmed) return;
+
+        this.selection.clear();
+        const selectedEmails = new Set<string>();
+        let matchCount = 0;
+
+        this.participantProductList.forEach(participant => {
+          const email = participant.email?.toString().trim().toLowerCase();
+          if (email && willBeAdded.some(p => p.email === email) && !selectedEmails.has(email)) {
+            this.selection.select(participant);
+            selectedEmails.add(email);
+            matchCount++;
+          }
+        });
+
+        this.missingParticipants = noProduct;
+        if (matchCount > 0) {
+          this.snackbar.open(`Selected ${matchCount} participants`, 'OK', { duration: 3000 });
+        }
+      });
+    });
+  }
+  toggleAllNoProduct(checked: boolean) {
+    if (checked) {
+      this.importPreviewData.noProduct.forEach(p => this.noProductSelection.select(p.email));
+    } else {
+      this.noProductSelection.clear();
+    }
+  }
+  
+  getUnassignedFromSearch(): { unassigned: any[], alreadyInQueue: any[] } {
+    if (!this.filterValue) return { unassigned: [], alreadyInQueue: [] };
+    const search = this.filterValue.trim().toLowerCase();
+    const activeEmailSet = new Set(this.activeArray.map(e => e.toLowerCase()));
+
+    const notInTable = Object.values(this.mapEmailData).filter((p: any) => {
+      const name = p.name?.toLowerCase() ?? '';
+      const email = p.email?.toLowerCase() ?? '';
+      return (name.includes(search) || email.includes(search)) &&
+        !this.participantProductList.some(pp => pp.email?.toLowerCase() === email);
+    });
+
+    const unassigned = notInTable.filter((p: any) => !activeEmailSet.has(p.email?.toLowerCase() ?? ''));
+    const alreadyInQueue = notInTable.filter((p: any) => activeEmailSet.has(p.email?.toLowerCase() ?? ''));
+
+    return { unassigned, alreadyInQueue };
+  }
+
+  assignProductFromSearch(participants: any[]) {
+    const selectedParticipants = participants.map(p => ({
+      profileid: p.profileid,
+      name: p.name,
+      email: p.email
+    })).filter(p => p.profileid);
+
+    if (selectedParticipants.length === 0) return;
+
+    this.dialog.open(BulkAddProductsComponent, {
+      data: selectedParticipants,
+      width: '70vw',
+      disableClose: true
+    }).afterClosed().subscribe(async () => {
+    if (!this.selectedArena) return;
+    const savedDeliverySet = this.selectedDeliverySet;
+    const savedQueueVariation = this.selectedQueueVariation;
+    await this.onArenaEventSelect(this.selectedArena);
+    this.selectedDeliverySet = savedDeliverySet;
+    this.selectedQueueVariation = savedQueueVariation;
+    this.filterValue = '';
+    this.tableDatasource.filter = '';
+  });
   }
 
   returnEvent(){

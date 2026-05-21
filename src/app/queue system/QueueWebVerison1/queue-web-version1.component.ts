@@ -10,6 +10,7 @@ import { VideoPlayerComponent } from '../../video-player/video-player.component'
 import { ParticipantEvolutionMappingComponent } from '../../EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component';
 import { FormtemplateComponent } from '../../Product Designer/delivery-set/formtemplate/formtemplate.component';
 import { ListOpenviduRoomComponent } from '../../OpenVidu/list-openvidu-room/list-openvidu-room.component';
+import { WebStudioInvitationComponent } from '../../web-studio-invitation/web-studio-invitation.component';
 @Component({
   selector: 'app-queue-web-version1',
   templateUrl: './queue-web-version1.component.html',
@@ -25,7 +26,8 @@ import { ListOpenviduRoomComponent } from '../../OpenVidu/list-openvidu-room/lis
     VideoPlayerComponent,
     ParticipantEvolutionMappingComponent,
     FormtemplateComponent,
-    ListOpenviduRoomComponent
+    ListOpenviduRoomComponent,
+    WebStudioInvitationComponent
   ],
 })
 export class QueueWebVersion1Component implements OnInit, OnDestroy {

@@ -45,7 +45,7 @@ export class QueueListComponent {
   @ViewChild(MatPaginator) paginator : MatPaginator;
   @ViewChild(MatSort) sort : MatSort;
 
-  queueColumns = ["queuename", "queuestartdate", "stages", "action","delete"]
+  queueColumns = ["menu","queuename", "queuestartdate", "stages", "action","delete"]
   queueSource = new MatTableDataSource();
   
   private subscription = new Subject<void>()
