@@ -28,6 +28,7 @@ import { environment } from '../../../environments/environment';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { CrossOverMetricsDialogComponent } from '../cross-over-metrics-dialog/cross-over-metrics-dialog.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface ColumnConfig {
   key: string;
@@ -144,7 +145,8 @@ export interface DialogContext {
     MatMenuModule,
     MatButtonToggleModule,
     MatTabsModule,
-    MatTableModule
+    MatTableModule,
+    ProfilePictureComponent
   ],
   templateUrl: './journeycoach-dashboard.component.html',
   styleUrl: './journeycoach-dashboard.component.css',

@@ -770,8 +770,19 @@
     </div>
     <div class="scroll-box" style="max-height:400px">
       <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
-        <div *ngIf="mapprofile[impact.key] != null" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" (click)="profileNavigation(impact.key)">
-          <span style="font-size:13px;font-weight:500">{{mapprofile[impact.key] || 'No Name'}}</span>
+        <div *ngIf="mapprofile[impact.key] != null"
+          style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
+          (click)="profileNavigation(impact.key)">
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <app-profile-picture
+              [profileId]="impact.key"
+              [name]="mapprofile[impact.key] || ''"
+              [size]="30">
+            </app-profile-picture>
+            <span style="font-size:13px;font-weight:500">{{mapprofile[impact.key] || 'No Name'}}</span>
+          </div>
+
           <span class="badge" style="background:var(--success)">{{impact.value}}</span>
         </div>
       </ng-container>
@@ -954,8 +965,18 @@
               </span>
 
               <!-- Name — clickable -->
-              <span *ngIf="column.header === 'Name'" class="jcd-name-link" (click)="navigatetoprofile(row['profileid'])">
-                {{ formatCellValue(row, column) }}
+              <span *ngIf="column.header === 'Name'"
+                style="display: flex; align-items: center; gap: 8px; cursor: pointer;"
+                (click)="navigatetoprofile(row['profileid'])">
+
+                <app-profile-picture
+                  [profileId]="row['profileid']"
+                  [name]="formatCellValue(row, column)"
+                  [size]="30">
+                </app-profile-picture>
+
+                <span class="jcd-name-link">{{ formatCellValue(row, column) }}</span>
+
               </span>
 
               <!-- Schedule button -->

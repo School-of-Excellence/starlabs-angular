@@ -31,6 +31,98 @@
         </ng-template>
         <div class="tab-content">
           <div class="lists-container">
+            <!-- Demerge popup -->
+            <div class="mcp-backdrop"
+                *ngIf="showDeMergeNotFoundPopup"
+                (click)="cancelDeMergePopup()">
+            </div>
+
+            <div class="mcp-popup" *ngIf="showDeMergeNotFoundPopup">
+
+              <!-- Header -->
+              <div class="mcp-header" style="background: linear-gradient(135deg, #fbe9e7 0%, #ffccbc 100%); border-bottom: 1px solid #ffab91;">
+                <div class="mcp-header-left">
+                  <div class="mcp-header-icon-wrap" style="background: #e64a19;">
+                    <mat-icon>call_split</mat-icon>
+                  </div>
+                  <div class="mcp-header-text">
+                    <span class="mcp-title" style="color: #bf360c;">Some profiles not in this list</span>
+                    <span class="mcp-subtitle" *ngIf="deMergeFoundProfiles.length === 0">
+                      None of the selected profiles exist in
+                      <strong>"{{ pendingDeMergeTargetList?.name }}"</strong>.
+                    </span>
+                  </div>
+                </div>
+                <button mat-icon-button class="mcp-close-btn" (click)="cancelDeMergePopup()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <!-- Section label -->
+              <div class="mcp-select-all-row" style="background: #fff8f6;">
+                <span style="font-size: 12px; font-weight: 600; color: #e64a19; letter-spacing: 0.4px;">
+                  NOT FOUND IN THIS LIST ({{ deMergeNotFoundProfiles.length }})
+                </span>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <!-- Not found profiles list -->
+              <div class="mcp-list">
+                <div class="mcp-row"
+                    *ngFor="let profile of deMergeNotFoundProfiles; let i = index"
+                    style="cursor: default; border-left: 3px solid #ff7043; background: #fff8f6;">
+
+                  <span class="mcp-serial" style="background: #ff7043; color: #fff;">{{ i + 1 }}</span>
+
+                  <app-profile-picture
+                    [profileId]="profile.id"
+                    [name]="profile.name"
+                    [size]="40">
+                  </app-profile-picture>
+
+                  <div class="mcp-details">
+                    <span class="mcp-name">{{ profile.name }}</span>
+                    <span class="mcp-meta">ID: {{ profile.id }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="mcp-footer">
+                <div class="mcp-footer-summary" *ngIf="deMergeFoundProfiles.length > 0">
+                  <mat-icon>info</mat-icon>
+                  <span>
+                    <strong>{{ deMergeFoundProfiles.length }}</strong> profile(s) will be removed ·
+                    <strong>{{ deMergeNotFoundProfiles.length }}</strong> not found and will be skipped
+                  </span>
+                </div>
+                <div class="mcp-footer-summary mcp-footer-none" *ngIf="deMergeFoundProfiles.length === 0">
+                  <mat-icon>do_not_disturb</mat-icon>
+                  <span>None of the selected profiles are in this list — nothing to remove</span>
+                </div>
+
+                <div class="mcp-footer-actions">
+                  <button mat-stroked-button class="mcp-cancel-btn" (click)="cancelDeMergePopup()">
+                    Cancel
+                  </button>
+                  <button
+                    mat-raised-button
+                    color="warn"
+                    class="mcp-confirm-btn"
+                    (click)="confirmDeMerge()"
+                    [disabled]="deMergeFoundProfiles.length === 0 || loading">
+                    <mat-spinner diameter="18" *ngIf="loading" class="button-spinner"></mat-spinner>
+                    <mat-icon *ngIf="!loading">call_split</mat-icon>
+                    <span>
+                      {{ loading ? 'Removing...' 
+                        : 'Proceed & Remove (' + deMergeFoundProfiles.length + ')' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
             <!-- Loading Overlay -->
             <div class="loading-overlay" *ngIf="loading">
               <mat-spinner diameter="50"></mat-spinner>
@@ -223,11 +315,10 @@
                                 [matTooltip]="getListConflictTooltip(list.docid)"
                                 matTooltipPosition="right">
                                 <mat-icon class="conflict-icon">warning</mat-icon>
-                                <span class="conflict-label">
-                                  {{ conflicts.count }} conflict(s) in live segments
-                                </span>
+                              <span class="conflict-label">
+                                {{ conflicts.count }} conflict(s) in live lists
+                              </span>
                               </div>
-                              <!-- Show matched profiles indicator when filtering -->
                               <div class="matched-profiles-indicator" *ngIf="isFiltering && getMatchedProfilesInList(list).length > 0">
                                 <mat-icon>person_search</mat-icon>
                                 <span>{{ getMatchedProfilesInList(list).length }} match(es)</span>
@@ -316,6 +407,21 @@
                             </span>
                           </button>
                           <button 
+                            mat-raised-button
+                            color="warn"
+                            class="merge-btn demerge-btn"
+                            (click)="deMergeProfiles(list, $event)"
+                            [disabled]="getDeMergeableProfileCount(list) === 0"
+                            [matTooltip]="getDeMergeableProfileCount(list) > 0 ? 
+                              'Remove ' + getDeMergeableProfileCount(list) + ' profile(s) from this list' : 
+                              'None of the selected profiles are in this list'">
+                            <mat-icon>call_split</mat-icon>
+                            De-Merge
+                            <span class="merge-count" *ngIf="getDeMergeableProfileCount(list) > 0">
+                              ({{ getDeMergeableProfileCount(list) }})
+                            </span>
+                          </button>
+                          <button 
                             mat-icon-button 
                             color="primary"
                             (click)="onSelectList(list)"
@@ -338,6 +444,7 @@
                         *matRowDef="let row; columns: displayedColumns;"
                         [class.selected-row]="selectedList?.docid === row.docid"
                         [class.has-matches]="isFiltering && getMatchedProfilesInList(row).length > 0"
+                        [class.has-conflicts]="!!getListConflicts(row.docid)"
                         [class.has-conflicts]="!!getListConflicts(row.docid)"
                         (click)="onSelectList(row)">
                       </tr>
@@ -409,16 +516,10 @@
                   *ngIf="getConflictsForSelectedList().length > 0">
                   <h3 class="section-title conflict-section-title">
                     <mat-icon class="conflict-section-icon">warning</mat-icon>
-                    Live Segment Conflicts ({{ getConflictsForSelectedList().length }})
+                    Live List Conflicts ({{ getConflictsForSelectedList().length }})
                   </h3>
-                  <p class="conflict-description">
-                    The following participants appear in <strong>multiple live segments</strong>.
-                    Each participant should belong to only one live segment to receive the correct
-                    slot notification. Remove them from this list if they should not be here.
-                  </p>
                   <div class="conflict-participant-list">
-                    <div
-                      class="conflict-participant-item"
+                    <div class="conflict-participant-item"
                       *ngFor="let conflict of getConflictsForSelectedList()">
                       <div class="conflict-participant-info">
                         <mat-icon class="cp-icon">person</mat-icon>
@@ -428,9 +529,9 @@
                           <div class="cp-segments">
                             <mat-chip-set>
                               <mat-chip
-                                *ngFor="let segName of conflict.segmentNames"
+                                *ngFor="let listName of conflict.segmentNames"
                                 class="segment-chip">
-                                {{ segName }}
+                                {{ listName }}
                               </mat-chip>
                             </mat-chip-set>
                           </div>
@@ -476,11 +577,10 @@
                         </mat-icon>
                         <div class="participant-details">
                           <span class="participant-name">{{ profile.name }}</span>
-                          <span *ngIf="isProfileConflicting(profile.id)" class="participant-conflict-detail">
-                            <mat-icon class="conflict-detail-icon">warning</mat-icon>
-                            In {{ getProfileConflict(profile.id)?.segmentNames?.length }} live segments:
-                            {{ getProfileConflict(profile.id)?.segmentNames?.join(', ') }}
-                          </span>
+                        <span *ngIf="isProfileConflicting(profile.id)" class="participant-conflict-detail">
+                          <mat-icon class="conflict-detail-icon">warning</mat-icon>
+                          Also in live list(s): {{ getProfileConflict(profile.id)?.segmentNames?.join(', ') }}
+                        </span>
                           <span class="participant-email" *ngIf="profile.email">{{ profile.email }}</span>
                           <span class="participant-phone" *ngIf="profile.phone">{{ profile.phone }}</span>
                           <span class="participant-id">ID: {{ profile.id }}</span>
@@ -548,39 +648,163 @@
 
             <!-- Backdrop -->
             <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
-          <div class="conflict-dialog-backdrop" 
-              *ngIf="showConflictDialog" 
-              (click)="closeConflictDialog()">
-          </div>
-
-          <div class="conflict-dialog-box" *ngIf="showConflictDialog">
-            <div class="conflict-dialog-header">
-              <div class="conflict-dialog-header-left">
-                <mat-icon style="color: #f57c00;">warning</mat-icon>
-                <span>Participants found in multiple lists — review &amp; resolve</span>
-              </div>
-              <button mat-icon-button (click)="closeConflictDialog()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <div class="conflict-dialog-backdrop" 
+                *ngIf="showConflictDialog" 
+                (click)="closeConflictDialog()">
             </div>
 
-            <div class="conflict-dialog-body">
-              <div class="conflict-dialog-row" 
-                  *ngFor="let conflict of getAllConflictsForDialog()">
-                <div class="conflict-dialog-person">
-                  <mat-icon>person</mat-icon>
-                  <span>{{ conflict.profileName }}</span>
+            <div class="conflict-dialog-box" *ngIf="showConflictDialog">
+              <div class="conflict-dialog-header">
+                <div class="conflict-dialog-header-left">
+                  <mat-icon style="color: #f57c00;">warning</mat-icon>
+                  <span>Participants found in multiple lists — review &amp; resolve</span>
                 </div>
-                <mat-chip-set class="conflict-dialog-chips">
-                  <mat-chip 
-                    *ngFor="let segName of conflict.segmentNames"
-                    class="conflict-dialog-chip">
-                    {{ segName }}
-                  </mat-chip>
-                </mat-chip-set>
+                <button mat-icon-button (click)="closeConflictDialog()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <div class="conflict-dialog-body">
+                <div class="conflict-dialog-row" 
+                    *ngFor="let conflict of getAllConflictsForDialog()">
+                  <div class="conflict-dialog-person">
+                    <mat-icon>person</mat-icon>
+                    <span>{{ conflict.profileName }}</span>
+                  </div>
+                  <mat-chip-set class="conflict-dialog-chips">
+                    <mat-chip 
+                      *ngFor="let segName of conflict.segmentNames"
+                      class="conflict-dialog-chip">
+                      {{ segName }}
+                    </mat-chip>
+                  </mat-chip-set>
+                </div>
               </div>
             </div>
-          </div>
+
+            <!-- Popup for the participants when there is a conflict -->
+            <div class="mcp-backdrop" 
+                 *ngIf="showMergeConflictPopup"
+                 (click)="cancelMergeConflictPopup()">
+            </div>
+
+            <div class="mcp-popup" *ngIf="showMergeConflictPopup">
+
+              <!-- Popup Header -->
+              <div class="mcp-header">
+                <div class="mcp-header-left">
+                  <div class="mcp-header-icon-wrap">
+                    <mat-icon>warning</mat-icon>
+                  </div>
+                  <div class="mcp-header-text">
+                    <span class="mcp-title">Live Segment Conflict Detected</span>
+                  </div>
+                </div>
+                <button mat-icon-button class="mcp-close-btn" (click)="cancelMergeConflictPopup()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <!-- Select-all row -->
+              <div class="mcp-select-all-row">
+                <label class="mcp-checkbox-label mcp-select-all-label">
+                  <input
+                    type="checkbox"
+                    class="mcp-native-checkbox"
+                    [checked]="allMergeConflictsSelected()"
+                    [indeterminate]="someMergeConflictsSelected()"
+                    (change)="toggleAllMergeConflicts($event)">
+                  <span class="mcp-custom-checkbox"></span>
+                  <span class="mcp-select-all-text">Select all ({{ mergeConflicts.length }})</span>
+                </label>
+                <span class="mcp-selected-count">
+                  {{ selectedMergeConflictIds.size }} selected
+                </span>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <!-- Scrollable participant list -->
+              <div class="mcp-list">
+                <div 
+                  class="mcp-row"
+                  *ngFor="let conflict of mergeConflicts; let i = index"
+                  [class.mcp-row-checked]="selectedMergeConflictIds.has(conflict.profileId)"
+                  (click)="toggleMergeConflictSelection(conflict.profileId)">
+
+                  <!-- Serial number -->
+                  <span class="mcp-serial">{{ i + 1 }}</span>
+
+                  <!-- Checkbox -->
+                  <label class="mcp-checkbox-label" (click)="$event.stopPropagation()">
+                    <input
+                      type="checkbox"
+                      class="mcp-native-checkbox"
+                      [checked]="selectedMergeConflictIds.has(conflict.profileId)"
+                      (change)="toggleMergeConflictSelection(conflict.profileId)">
+                    <span class="mcp-custom-checkbox"></span>
+                  </label>
+
+                  <app-profile-picture
+                    [profileId]="conflict['profileId']"
+                    [name]="conflict['profileName']"
+                    [size]="40">
+                  </app-profile-picture>
+
+                  <!-- Details -->
+                  <div class="mcp-details">
+                    <span class="mcp-name">{{ conflict.profileName }}</span>
+                    <span class="mcp-meta">ID: {{ conflict.profileId }}</span>
+                    <div class="mcp-from-badge">
+                      <mat-icon>folder</mat-icon>
+                      <span>Currently in: <strong>{{ conflict.conflictingListName }}</strong></span>
+                      <span class="mcp-segment-pill">
+                        <mat-icon>category</mat-icon>
+                        {{ conflict.segmentName }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Arrow indicator -->
+                  <div class="mcp-arrow" *ngIf="selectedMergeConflictIds.has(conflict.profileId)">
+                    <mat-icon>arrow_forward</mat-icon>
+                    <span>{{ pendingMergeTargetList?.name }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer Actions -->
+              <div class="mcp-footer">
+                <div class="mcp-footer-summary" *ngIf="selectedMergeConflictIds.size > 0">
+                  <mat-icon>info</mat-icon>
+                  <span>
+                    {{ selectedMergeConflictIds.size }} participant(s) will be moved ·
+                    {{ mergeConflicts.length - selectedMergeConflictIds.size }} will be skipped
+                  </span>
+                </div>
+                <div class="mcp-footer-summary mcp-footer-none" *ngIf="selectedMergeConflictIds.size === 0">
+                  <mat-icon>do_not_disturb</mat-icon>
+                  <span>No participants selected — all conflicting participants will be skipped</span>
+                </div>
+
+                <div class="mcp-footer-actions">
+                  <button mat-stroked-button class="mcp-cancel-btn" (click)="cancelMergeConflictPopup()">
+                    Cancel
+                  </button>
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    class="mcp-confirm-btn"
+                    (click)="confirmMergeWithSelection()"
+                    [disabled]="loading">
+                    <mat-spinner diameter="18" *ngIf="loading" class="button-spinner"></mat-spinner>
+                    <mat-icon *ngIf="!loading">merge</mat-icon>
+                    <span>{{ loading ? 'Merging...' : 'Confirm Merge' }}</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       </mat-tab>

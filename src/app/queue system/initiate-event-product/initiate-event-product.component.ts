@@ -29,6 +29,7 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 
 interface ImportPreviewParticipant {
@@ -59,6 +60,7 @@ interface ImportPreviewData {
     MatButtonModule,
     MatTooltipModule,
     NgxMatSelectSearchModule,
+    ProfilePictureComponent,
     MatDialogModule
   ],
   templateUrl: './initiate-event-product.component.html',

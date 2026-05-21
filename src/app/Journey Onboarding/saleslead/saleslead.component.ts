@@ -23,6 +23,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { CreateWatsonProfileComponent } from '../create-watson-profile/create-watson-profile.component';
 import { MatInputModule } from '@angular/material/input';
 import { getApp } from '@angular/fire/app';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-saleslead',
@@ -38,7 +39,8 @@ import { getApp } from '@angular/fire/app';
     MatTableModule,
     MatPaginatorModule,
     MatInputModule,
-    RouterModule
+    RouterModule,
+    ProfilePictureComponent
   ],
   templateUrl: './saleslead.component.html',
   styleUrl: './saleslead.component.css'

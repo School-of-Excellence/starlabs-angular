@@ -19,6 +19,7 @@ import { MatTabGroup, MatTab } from "@angular/material/tabs";
 import { CreateSegmentsDialogComponent } from "../create-segments-dialog/create-segments-dialog.component";
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatOptionModule } from '@angular/material/core';
+import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface Profile {
   id: string;
@@ -75,7 +76,8 @@ interface ListConflictSummary {
     MatTabGroup,
     MatTab,
     FormsModule,
-    CreateSegmentsDialogComponent
+    CreateSegmentsDialogComponent,
+    ProfilePictureComponent
   ],
   templateUrl: './manage-participantlist-dialog.component.html',
   styleUrls: ['./manage-participantlist-dialog.component.css']
@@ -107,7 +109,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   loading = false;
   submitting = false;
   updatingList = false;
-
+  
   // UI states
   showCreateForm = false;
   sidePanelOpen = false;
@@ -130,6 +132,15 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   private segmentNameMap: Map<string, string> = new Map();
 
   showConflictDialog = false;
+
+  // demerge states
+  showDeMergeNotFoundPopup = false;
+  deMergeFoundProfiles: Profile[] = [];
+  deMergeNotFoundProfiles: Profile[] = [];
+  pendingDeMergeTargetList: ParticipantList | null = null;
+   
+  // mergeconflictpopup state
+  showMergeConflictPopup = false;
 
 
   constructor(
@@ -523,7 +534,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
       this.showCreateForm = false;
       this.isListNameDuplicate = false;
       await this.loadParticipantLists();
-      await this.computeLiveSegmentConflicts();
+            await this.computeLiveSegmentConflicts();
       // Re-apply filter if active
       if (this.isFiltering) {
         this.applyFilter(this.filterForm.value);
@@ -649,68 +660,212 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   }
 
   async mergeProfiles(list: ParticipantList, event: Event): Promise<void> {
-    event.stopPropagation();
+  event.stopPropagation();
+ 
+  if (!this.externalProfileIds || this.externalProfileIds.length === 0) {
+    this.snackBar.open('No profile IDs available to merge', 'Close', { duration: 3000 });
+    return;
+  }
+ 
+  const profileIdsToMerge = this.externalProfileIds.filter(
+    id => !list.profileids.includes(id['profileid'] || id)
+  );
+ 
+  if (profileIdsToMerge.length === 0) {
+    this.snackBar.open('All profile IDs are already in this list', 'Close', { duration: 3000 });
+    return;
+  }
+ 
+  this.loading = true;
+  let conflicts: Awaited<ReturnType<typeof this.getMergeConflicts>> = [];
+  try {
+    conflicts = await this.getMergeConflicts(profileIdsToMerge, list);
+  } catch (e) {
+    console.error('Error checking merge conflicts:', e);
+  } finally {
+    this.loading = false;
+  }
+ 
+  if (conflicts.length > 0) {
+    this.pendingMergeTargetList = list;
+    this.pendingMergeProfileIds = profileIdsToMerge;
+    this.mergeConflicts = conflicts;
+    this.selectedMergeConflictIds = new Set(conflicts.map(c => c.profileId));
+    this.showMergeConflictPopup = true;
+    return; 
+  }
 
-    if (!this.externalProfileIds || this.externalProfileIds.length === 0) {
-      this.snackBar.open('No profile IDs available to merge', 'Close', { duration: 3000 });
-      return;
-    }
+  if (!confirm(`Merge ${profileIdsToMerge.length} profile(s) into "${list.name}"?`)) return;
+  await this.executeMerge(list, profileIdsToMerge, []);
+}
 
-    const profileIdsToMerge = this.externalProfileIds.filter(
-      id => !list.profileids.includes(id)
-    );
+async confirmMergeWithSelection(): Promise<void> {
+  if (!this.pendingMergeTargetList) return;
 
-    if (profileIdsToMerge.length === 0) {
-      this.snackBar.open('All profile IDs are already in this list', 'Close', { duration: 3000 });
-      return;
-    }
+  const conflictsToRemove = this.mergeConflicts.filter(
+    c => this.selectedMergeConflictIds.has(c.profileId)
+  );
+ 
+  const uncheckedConflictIds = new Set(
+    this.mergeConflicts
+      .filter(c => !this.selectedMergeConflictIds.has(c.profileId))
+      .map(c => c.profileId)
+  );
 
-    if (!confirm(`Merge ${profileIdsToMerge.length} new profile(s) into "${list.name}"?`)) {
-      return;
-    }
+  const profileIdsToActuallyMerge = this.pendingMergeProfileIds.filter(idObj => {
+    const rawId = idObj['profileid'] || idObj;
+    return !uncheckedConflictIds.has(rawId);
+  });
+ 
+  this.showMergeConflictPopup = false;
+ 
+  await this.executeMerge(
+    this.pendingMergeTargetList,
+    profileIdsToActuallyMerge,   
+    conflictsToRemove           
+  );
 
-    this.loading = true;
-    try {
-      // Update participant list document with merged profile IDs
-      const listRef = doc(this.firestore, 'participant list', list.docid);
+  this.mergeConflicts = [];
+  this.selectedMergeConflictIds = new Set();
+  this.pendingMergeTargetList = null;
+  this.pendingMergeProfileIds = [];
+}
 
-      // Add each profile ID to the array
-      for (const profileId of profileIdsToMerge) {
-        await updateDoc(listRef, {
-          profilelist: arrayUnion(profileId['profileid']),
-          updateddate: new Date()
-        });
-      }
-
+private async executeMerge(
+  list: ParticipantList,
+  profileIdsToMerge: any[],
+  conflictsToRemove: {
+    profileId: string;
+    conflictingListId: string;
+    profileName: string;
+    conflictingListName: string;
+    segmentName: string;
+  }[]
+): Promise<void> {
+  this.loading = true;
+  try {
+    if (conflictsToRemove.length > 0) {
+      const removalsByList = new Map<string, string[]>();
+      conflictsToRemove.forEach(c => {
+        if (!removalsByList.has(c.conflictingListId)) {
+          removalsByList.set(c.conflictingListId, []);
+        }
+        removalsByList.get(c.conflictingListId)!.push(c.profileId);
+      });
+ 
+      await Promise.all(
+        Array.from(removalsByList.entries()).map(async ([listId, profileIds]) => {
+          const listRef = doc(this.firestore, 'participant list', listId);
+          for (const profileId of profileIds) {
+            await updateDoc(listRef, {
+              profilelist: arrayRemove(profileId),
+              updateddate: new Date()
+            });
+          }
+        })
+      );
+ 
       this.snackBar.open(
-        `Successfully merged ${profileIdsToMerge.length} profile(s) into "${list.name}"`,
+        `Removed ${conflictsToRemove.length} participant(s) from their previous live segment list(s).`,
+        'Close', { duration: 3000 }
+      );
+    }
+ 
+    if (profileIdsToMerge.length === 0) {
+      this.snackBar.open(
+        'No profiles were merged',
+        'Close', { duration: 4000 }
+      );
+      return;
+    }
+ 
+    const listRef = doc(this.firestore, 'participant list', list.docid);
+    for (const profileId of profileIdsToMerge) {
+      await updateDoc(listRef, {
+        profilelist: arrayUnion(profileId['profileid'] || profileId),
+        updateddate: new Date()
+      });
+    }
+ 
+    this.snackBar.open(
+      `Successfully merged ${profileIdsToMerge.length} profile(s) into "${list.name}"`,
         'Close',
         { duration: 3000 }
-      );
-
-      await this.loadParticipantLists();
-      await this.computeLiveSegmentConflicts();
-
-      // Re-apply filter if active
-      if (this.isFiltering) {
-        this.applyFilter(this.filterForm.value);
-      }
-
-      // Update selected list if it's the one being merged
-      if (this.selectedList?.docid === list.docid) {
-        const updatedList = this.participantLists.find(l => l.docid === list.docid);
-        if (updatedList) {
-          this.selectedList = updatedList;
-          this.updateAvailableProfiles();
-        }
-      }
-    } catch (error) {
-      console.error('Error merging profiles:', error);
-      this.snackBar.open('Error merging profiles', 'Close', { duration: 3000 });
-    } finally {
-      this.loading = false;
+    );
+ 
+    await this.loadParticipantLists();
+    await this.computeLiveSegmentConflicts();
+ 
+    if (this.isFiltering) {
+      this.applyFilter(this.filterForm.value);
     }
+ 
+    if (this.selectedList?.docid === list.docid) {
+      const updatedList = this.participantLists.find(l => l.docid === list.docid);
+      if (updatedList) {
+        this.selectedList = updatedList;
+        this.updateAvailableProfiles();
+      }
+    }
+  } catch (error) {
+    console.error('Error merging profiles:', error);
+    this.snackBar.open('Error merging profiles', 'Close', { duration: 3000 });
+  } finally {
+    this.loading = false;
   }
+}
+
+mergeConflicts: {
+  profileId: string;
+  profileName: string;
+  conflictingListId: string;
+  conflictingListName: string;
+  segmentName: string;
+}[] = [];
+selectedMergeConflictIds = new Set<string>();
+pendingMergeTargetList: ParticipantList | null = null;
+pendingMergeProfileIds: any[] = [];  
+ 
+cancelMergeConflictPopup(): void {
+  this.showMergeConflictPopup = false;
+  this.mergeConflicts = [];
+  this.selectedMergeConflictIds.clear();
+  this.pendingMergeTargetList = null;
+  this.pendingMergeProfileIds = [];
+}
+ 
+toggleMergeConflictSelection(profileId: string): void {
+  if (this.selectedMergeConflictIds.has(profileId)) {
+    this.selectedMergeConflictIds.delete(profileId);
+  } else {
+    this.selectedMergeConflictIds.add(profileId);
+  }
+  this.selectedMergeConflictIds = new Set(this.selectedMergeConflictIds);
+}
+ 
+allMergeConflictsSelected(): boolean {
+  return (
+    this.mergeConflicts.length > 0 &&
+    this.mergeConflicts.every(c => this.selectedMergeConflictIds.has(c.profileId))
+  );
+}
+ 
+someMergeConflictsSelected(): boolean {
+  return (
+    this.selectedMergeConflictIds.size > 0 &&
+    !this.allMergeConflictsSelected()
+  );
+}
+ 
+toggleAllMergeConflicts(event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
+  if (checked) {
+    this.selectedMergeConflictIds = new Set(this.mergeConflicts.map(c => c.profileId));
+  } else {
+    this.selectedMergeConflictIds.clear();
+    this.selectedMergeConflictIds = new Set();
+  }
+}
 
   async deleteList(list: ParticipantList, event: Event): Promise<void> {
     event.stopPropagation();
@@ -765,7 +920,6 @@ export class ManageParticipantlistDialogComponent implements OnInit {
     return '';
   }
 
-  // Helper method to get profile name by ID
   getProfileName(profileId: string): string {
     const profile = this.allProfiles.find(p => p.id === profileId);
     return profile ? profile.name : 'Unknown';
@@ -775,12 +929,10 @@ export class ManageParticipantlistDialogComponent implements OnInit {
     this.selectedTabIndex = index;
   }
 
-  // Helper method to check if there are profiles available to work with
   hasExternalProfiles(): boolean {
     return this.externalProfileIds && this.externalProfileIds.length > 0;
   }
 
-  // Helper method to get the count of profiles that can be merged into a specific list
   getMergeableProfileCount(list: ParticipantList): number {
     if (!this.externalProfileIds || this.externalProfileIds.length === 0) {
       return 0;
@@ -788,7 +940,6 @@ export class ManageParticipantlistDialogComponent implements OnInit {
     return this.externalProfileIds.filter(id => !list.profileids.includes(id)).length;
   }
 
-  // Helper to get filter type label
   getFilterTypeLabel(type: string): string {
     const labels: { [key: string]: string } = {
       'all': 'All Fields',
@@ -803,4 +954,188 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   filterProfile(profileid){
     return this.matchedProfiles.some(p => p.id === profileid)
   }
+
+  async getMergeConflicts(profileIdsToMerge: any[], targetList: ParticipantList): Promise<{
+  profileId: string;
+  profileName: string;
+  conflictingListId: string;
+  conflictingListName: string;
+  segmentName: string;
+}[]> {
+  const conflicts: {
+    profileId: string;
+    profileName: string;
+    conflictingListId: string;
+    conflictingListName: string;
+    segmentName: string;
+  }[] = [];
+  const now = new Date();
+  const queueSnap = await getDocs(collection(this.firestore, 'queue generation'));
+  const liveQueueIds: string[] = [];
+  queueSnap.docs.forEach(d => {
+    const data = d.data();
+    const start: Date = data['queuestartdate']?.toDate?.() ?? null;
+    const end: Date = data['queueenddate']?.toDate?.() ?? null;
+    if (start && end && start <= now && end >= now) liveQueueIds.push(d.id);
+  });
+  if (liveQueueIds.length === 0) return [];
+  const liveSegmentIds = new Set<string>();
+  await Promise.all(liveQueueIds.map(async queueId => {
+    const planSnap = await getDocs(
+      query(collection(this.firestore, 'queue planning'), where('queueid', '==', queueId))
+    );
+    planSnap.docs.forEach(planDoc => {
+      const planning: any[] = planDoc.data()['planning'] || [];
+      planning.forEach(variation => {
+        (variation.segments || []).forEach((seg: any) => {
+          if (seg.segmentid) liveSegmentIds.add(seg.segmentid);
+        });
+      });
+    });
+  }));
+  if (liveSegmentIds.size === 0) return [];
+  const liveListMeta = new Map<string, string>(); 
+  await Promise.all(Array.from(liveSegmentIds).map(async segmentId => {
+    const segDoc = await getDoc(doc(this.firestore, 'segments', segmentId));
+    if (!segDoc.exists()) return;
+    const segData = segDoc.data();
+    const segmentName: string = segData['segmentname'] || segmentId;
+    const listIds: string[] = segData['participantlistid'] || [];
+    listIds.forEach(listId => {
+      if (listId !== targetList.docid && !liveListMeta.has(listId)) {
+        liveListMeta.set(listId, segmentName);
+      }
+    });
+  }));
+  if (liveListMeta.size === 0) return [];
+  await Promise.all(Array.from(liveListMeta.entries()).map(async ([listId, segmentName]) => {
+    const listDoc = await getDoc(doc(this.firestore, 'participant list', listId));
+    if (!listDoc.exists()) return;
+    const existingProfiles: string[] = listDoc.data()['profilelist'] || [];
+    const listName = this.participantLists.find(l => l.docid === listId)?.name || listId;
+    for (const profileIdObj of profileIdsToMerge) {
+      const rawId = profileIdObj['profileid'] || profileIdObj;
+      if (existingProfiles.includes(rawId)) {
+        const profileName = this.allProfiles.find(p => p.id === rawId)?.name || rawId;
+        const alreadyAdded = conflicts.some(
+          c => c.profileId === rawId && c.conflictingListId === listId
+        );
+        if (!alreadyAdded) {
+          conflicts.push({ profileId: rawId, profileName, conflictingListId: listId, conflictingListName: listName, segmentName });
+        }
+      }
+    }
+  }));
+  return conflicts;
+}
+
+// demerge
+getDeMergeableProfileCount(list: ParticipantList): number {
+  if (!this.externalProfileIds || this.externalProfileIds.length === 0) return 0;
+  return this.externalProfileIds.filter(idObj => {
+    const rawId = idObj['profileid'] ?? idObj;
+    return list.profileids.includes(rawId);
+  }).length;
+}
+
+async deMergeProfiles(list: ParticipantList, event: Event): Promise<void> {
+  event.stopPropagation();
+
+  if (!this.externalProfileIds || this.externalProfileIds.length === 0) {
+    this.snackBar.open('No profiles selected to de-merge', 'Close', { duration: 3000 });
+    return;
+  }
+
+  this.pendingDeMergeTargetList = list;
+  this.deMergeFoundProfiles = [];
+  this.deMergeNotFoundProfiles = [];
+
+  for (const idObj of this.externalProfileIds) {
+    const rawId = idObj['profileid'] ?? idObj;
+    const profile: Profile = this.allProfiles.find(p => p.id === rawId)
+      ?? { id: rawId, name: rawId };
+
+    if (list.profileids.includes(rawId)) {
+      this.deMergeFoundProfiles.push(profile);
+    } else {
+      this.deMergeNotFoundProfiles.push(profile);
+    }
+  }
+
+  console.log('De-merge found:', this.deMergeFoundProfiles.length, 
+              'not found:', this.deMergeNotFoundProfiles.length);
+
+  if (this.deMergeFoundProfiles.length === 0) {
+    // None are in the list — show popup to inform
+    this.showDeMergeNotFoundPopup = true;
+    return;
+  }
+
+  if (this.deMergeNotFoundProfiles.length > 0) {
+    // Some missing, some present — show popup
+    this.showDeMergeNotFoundPopup = true;
+    return;
+  }
+
+  // All profiles are present — remove directly without popup
+  await this.executeDeMerge(list, this.deMergeFoundProfiles);
+  this.cancelDeMergePopup();
+}
+
+async confirmDeMerge(): Promise<void> {
+  if (!this.pendingDeMergeTargetList) return;
+  this.showDeMergeNotFoundPopup = false;
+  await this.executeDeMerge(this.pendingDeMergeTargetList, this.deMergeFoundProfiles);
+  this.cancelDeMergePopup();
+}
+
+cancelDeMergePopup(): void {
+  this.showDeMergeNotFoundPopup = false;
+  this.deMergeFoundProfiles = [];
+  this.deMergeNotFoundProfiles = [];
+  this.pendingDeMergeTargetList = null;
+}
+
+private async executeDeMerge(list: ParticipantList, profilesToRemove: Profile[]): Promise<void> {
+  if (profilesToRemove.length === 0) {
+    this.snackBar.open('None of the selected profiles are in this list', 'Close', { duration: 3000 });
+    return;
+  }
+
+  this.loading = true;
+  try {
+    const listRef = doc(this.firestore, 'participant list', list.docid);
+    for (const profile of profilesToRemove) {
+      await updateDoc(listRef, {
+        profilelist: arrayRemove(profile.id),
+        updateddate: new Date()
+      });
+    }
+
+    this.snackBar.open(
+      `Removed ${profilesToRemove.length} profile(s) from "${list.name}"`,
+      'Close', { duration: 3000 }
+    );
+
+    await this.loadParticipantLists();
+    await this.computeLiveSegmentConflicts();
+
+    if (this.isFiltering) this.applyFilter(this.filterForm.value);
+
+    if (this.selectedList?.docid === list.docid) {
+      const updated = this.participantLists.find(l => l.docid === list.docid);
+      if (updated) {
+        this.selectedList = updated;
+        this.updateAvailableProfiles();
+      } else {
+        this.closeSidePanel();
+      }
+    }
+  } catch (error) {
+    console.error('Error de-merging profiles:', error);
+    this.snackBar.open('Error removing profiles', 'Close', { duration: 3000 });
+  } finally {
+    this.loading = false;
+  }
+}
 }
