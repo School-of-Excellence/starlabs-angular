@@ -212,7 +212,7 @@ export const routes: Routes = [
   {path: 'salesleads', loadComponent: () => import('./Journey Onboarding/saleslead/saleslead.component').then(m => m.SalesleadComponent), canActivate:[authGuard]},
   {path: 'onboardingremarks', loadComponent: () => import('./Journey Onboarding/onboarding-remark/onboarding-remark.component').then(m => m.OnboardingRemarkComponent), canActivate: [authGuard]},
   {path: 'opportunities', loadComponent: () => import('./Journey Onboarding/journeycoach-opportunities/journeycoach-opportunities.component').then(m => m.JourneycoachOpportunitiesComponent), canActivate: [authGuard]},
-  {path: 'JourneycoachDashboard-new', loadComponent: () => import('./Journey Onboarding/journeycoach-duplicate/journeycoach-duplicate.component').then(m => m.JourneycoachDuplicateComponent), canActivate:[authGuard]},
+  {path: 'JourneycoachDashboard-new', loadComponent: () => import('./Journey Onboarding/journeycoach-dashboard/journeycoach-dashboard.component').then(m => m.JourneycoachDashboardComponent), canActivate:[authGuard]},
   {path: 'productinitiated-dashboard', loadComponent: () => import('./Journey Onboarding/product-initiation-dashboard/product-initiation-dashboard.component').then(m => m.ProductInitiationDashboardComponent), canActivate:[authGuard]},
   {path: 'delivery-dashboard', loadComponent: () => import('./Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component').then(m => m.DeliveryDashboardCloneComponent), canActivate:[authGuard]},
   {path: 'overall-dashboard', loadComponent: () => import('./Journey Onboarding/overall-dashboard/overall-dashboard.component').then(m => m.OverallDashboardComponent), canActivate:[authGuard]},
@@ -320,7 +320,6 @@ export const routes: Routes = [
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
 
   {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
-
 ];
 
 // import { Routes } from '@angular/router';

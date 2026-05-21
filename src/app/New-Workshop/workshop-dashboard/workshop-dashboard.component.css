@@ -1652,3 +1652,23 @@
       transform: rotate(360deg);
     }
   }
+  .filter-section{
+  padding: 8px 0;
+}
+
+.filter-title{
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.filter-field{
+  width: 100%;
+}
+
+.referred-checkbox{
+  font-size: 13px;
+}

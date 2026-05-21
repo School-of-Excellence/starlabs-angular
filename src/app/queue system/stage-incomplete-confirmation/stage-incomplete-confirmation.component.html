@@ -20,9 +20,10 @@
   <div class="mb-4">
     <label class="form-label fw-semibold mb-2">Reason for moving this participant (visible to Queue Manager)</label>
 
-    <mat-form-field appearance="outline" class="w-100">
-      <textarea matInput rows="3" placeholder="Enter reason for moving this participant" [(ngModel)]="result.reason"></textarea>
-    </mat-form-field>
+  <mat-form-field appearance="outline" class="w-100">
+    <textarea matInput rows="3" placeholder="Enter reason for moving this participant" [formControl]="reasonControl"></textarea>
+    <mat-error>Reason is required</mat-error>
+  </mat-form-field>
   </div>
 
   <!-- Actions -->

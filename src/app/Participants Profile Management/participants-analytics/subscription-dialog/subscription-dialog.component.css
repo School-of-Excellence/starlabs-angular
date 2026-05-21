@@ -43,4 +43,32 @@ table{
 .submitbtn{
     color: white;
     background-color: green;
+    cursor: pointer;
+}
+
+.submitbtn:disabled{
+    background-color: rgba(0, 128, 0, 0.374);
+    cursor: pointer;
+
+}
+
+.header{
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    gap :10px;
+}
+
+
+
+.actions-btn{
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.actions-btn
+
+.showprofile{
+    background-color: green;
+    color: white;
 }

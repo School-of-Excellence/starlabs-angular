@@ -38,6 +38,8 @@ export class SubscriptionDialogComponent {
   selection = new SelectionModel(true, []);
   subscriptionform: FormGroup;
   mapJourney = {};
+  profilesNeedAttention = [];
+  showProfilesNeedAttention = false;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
@@ -76,6 +78,12 @@ export class SubscriptionDialogComponent {
   masterToggle() {
     console.log(this.isAllSelected());
     this.isAllSelected() ? this.selection.clear() : this.dataSource.data.forEach(row => this.selection.select(row));
+    this.updateProfilesNeedAttention();
+  }
+
+  selectRow(row){
+    this.selection.toggle(row);
+    this.updateProfilesNeedAttention();
   }
 
   checkboxLabel(row?): string {
@@ -97,13 +105,7 @@ export class SubscriptionDialogComponent {
       data: selectedrow
     }
     console.log(profiledata);
-    const type = this.subscriptionform.value.extendtype;
-    if (this.subscriptionform.valid) {
-      if ((type === 'date' && [null , undefined , ''].includes(this.subscriptionform.value.date)) || (type === 'duration' && [null , undefined , ''].includes(this.subscriptionform.value.duration))) {
-        return
-      }
-      this.dialogRef.close(profiledata)
-    }
+    this.dialogRef.close(profiledata)
   }
 
   getJourneyForParticipant(metadata) {
@@ -129,4 +131,80 @@ export class SubscriptionDialogComponent {
 
     return ''
   }
+
+  getRevisedColumn(element) {
+    const subscriptionEndDate = this.getParticipantSubscriptionStatus(element);
+    
+    if (subscriptionEndDate ===  '') {
+      return ''
+    }
+    const extendType = this.subscriptionform.get('extendtype').value;
+    let value = this.subscriptionform.get(extendType).value
+    if(extendType === 'duration'){
+      const date = new Date(subscriptionEndDate);
+      date.setMonth(date.getMonth() + value);
+      value = date; 
+    }
+    return value
+  }
+
+  get displayColumns() : string[] {
+    const extendType = this.subscriptionform.get('extendtype').value;
+    const cond = ![null , undefined , ''].includes(extendType) &&  ![null , undefined , ''].includes(this.subscriptionform.get(extendType).value)
+    return cond ? [...this.participantdata , 'extendeddate'] : this.participantdata
+  }
+
+  updateProfilesNeedAttention(){
+    const arr = [];
+    var selectedrow = this.data.filter(row => this.selection.isSelected(row));
+    selectedrow.forEach((element) => {
+      const subscriptionEndDate = this.getParticipantSubscriptionStatus(element);
+      const extendType = this.subscriptionform.get('extendtype').value;
+      let value = this.subscriptionform.get(extendType).value
+      const extendDateCond = extendType === 'date' && value && value?.getTime() < subscriptionEndDate?.getTime()
+      if( subscriptionEndDate === '' || extendDateCond){
+        arr.push(element['profileid']);
+      }
+
+    })
+    this.profilesNeedAttention = arr;
+    if(arr.length === 0){
+      this.filterTable(false)
+    }
+  }
+
+  filterTable(value : boolean){
+    this.showProfilesNeedAttention = value;
+    let data = [...this.data];
+    if(this.showProfilesNeedAttention && this.profilesNeedAttention.length > 0){
+      data = data.filter((element)=> this.profilesNeedAttention.includes(element['profileid']));
+    }
+    this.dataSource.data = data;
+  }
+  
+  disableSubmitButton(){
+    let result = this.subscriptionform.invalid;
+    const extendType = this.subscriptionform.get('extendtype').value;
+  
+    if (extendType === 'date' && ( [null , undefined , ''].includes(this.subscriptionform.value.date) || this.profilesNeedAttention.length > 0) ) {
+      result = true;
+    } else if(extendType === 'duration' && [null , undefined , ''].includes(this.subscriptionform.value.duration)){
+      result = true;
+    }
+
+    var selectedrow = this.data.filter(row => this.selection.isSelected(row));
+    if(selectedrow.length === 0){
+      result = true;
+    }
+
+    return result
+  }
+
+  onExtendTypeSelect(){
+    this.subscriptionform.get('date').setValue(null);
+    this.subscriptionform.get('duration').setValue(null);
+    this.profilesNeedAttention = [];
+    this.showProfilesNeedAttention = false;
+  }
+
 }

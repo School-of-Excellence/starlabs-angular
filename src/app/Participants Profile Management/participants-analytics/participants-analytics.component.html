@@ -14,8 +14,14 @@
       <button mat-menu-item (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
       <button mat-menu-item (click)="patchCustomerStatus()">Customer Status</button>
       <button mat-menu-item (click)="navigateTochecklists('watsonstatus')">Watson Status</button>
+      <button mat-menu-item (click)="openCheckListForProductEvent()">Product Event Event</button>
+      <button mat-menu-item (click)="openCheckListForLastAttendedEvent()">Last Attended Event</button>
       <button mat-menu-item (click)="openCheckListForQueueEvent()">Queue Event</button>
       <button mat-menu-item (click)="openCheckListForHigherOrderPurchase()">Corrected HigherOrderPurchase</button>
+      <button mat-menu-item (click)="openFirstPurchaseCheckList()">FirstPurchase CheckList</button>
+      <button mat-menu-item (click)="openCheckListForPurchase()">Overall Purchase</button>
+      <button mat-menu-item (click)="openCheckListForJourneyOnboarding()">Journey Onboarding</button>
+      <button mat-menu-item (click)="openCheckListForPaymentPlan()">Payment Plan</button>
     </mat-menu>
     <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">
@@ -638,9 +644,9 @@
           Selected Participants - {{this.selection.selected.length}}
         </span>
       </div>
-      <!-- <div>
-        <button mat-stroked-button (click)="clearCustomerStatus()">Clear CustomerStatus</button>
-      </div> -->
+      <div *ngIf="isCheckListActive">
+        <button mat-stroked-button (click)="clearCustomerStatus()" style="background-color:green; color: white">Clear CustomerStatus</button>
+      </div>
     </div>
     <div>
       <table #Table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>

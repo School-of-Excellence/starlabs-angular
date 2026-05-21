@@ -1,5 +1,7 @@
 import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, ViewChildren, QueryList, ElementRef, signal } from '@angular/core';
-import { ConnectivityGuardService } from '../../../shared/connectivity-guard.service';
+import { ConnectivityGuardService, ConnectivityState } from '../../../shared/connectivity-guard.service';
+import { LocalDraftService } from '../../../shared/local-draft.service';
+import { Subscription } from 'rxjs';
 import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites, getFirestore} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -96,9 +98,14 @@ export class FormtemplateComponent {
   // form submit
   submissionComplete: boolean = false;
   submittedFormName: string = '';
+  //draft selection dialog
+  allDrafts: any[] = [];
+  showDraftDialog: boolean = false;
+  showAllDrafts: boolean = false;
 
   @Input() isInline: boolean = false;
   @Output() formSubmitted = new EventEmitter<void>();
+  @Output() backClicked = new EventEmitter<void>();
 
   // --- Draft save status (shown in form header) ---
   draftSaveStatus: 'idle' | 'saving' | 'saved' | 'failed' = 'idle';
@@ -124,6 +131,9 @@ export class FormtemplateComponent {
   cohortsref: any;
   marathonref: any;
   participantAssignmentId: any;
+  connectivityState: ConnectivityState = 'online';
+  private connectivitySub: Subscription | null = null;
+  private localDraft = inject(LocalDraftService);
 
   constructor(
     private route : ActivatedRoute,
@@ -138,14 +148,14 @@ export class FormtemplateComponent {
     // this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.participantAssignmentId = this.route.snapshot.queryParams['participantAssignmentId'] ?? null;
 
-    if(this.route.snapshot.queryParams['participantAssignmentId']){
+    if (this.route.snapshot.queryParams['participantAssignmentId']) {
       this.auth.getRoles().then(async roles => {
         this.loggedInProfileId = roles['profile_ref'].id;
         const isParticipantBoard = this.route.snapshot.queryParams['source'] == 'participant';
         const isReworkMode = !this.route.snapshot.queryParams['viewFilledForm'] && !this.route.snapshot.queryParams['viewCompleted'];
         if ((roles["ah"] || roles["admin"] || roles["developer"]) && roles['profile_ref'].id !== this.profileid && !isParticipantBoard && !isReworkMode) {
           this.reviewAccess = true;
-        }else{
+        } else {
           this.reviewAccess = false;
         }
         if (roles['profile_ref'].id === this.profileid) {
@@ -153,10 +163,10 @@ export class FormtemplateComponent {
         }
         this.loggedInProfileId = roles['profile_ref'].id;
       });
-    }else{
+    } else {
       console.log('Not a B!G Activity');
     }
-
+    
     this.deliveryForm = this.fb.group({})
     this.draftDocid = doc(collection(this.firestoreForms,"temporary_forms")).id;
   }
@@ -166,6 +176,7 @@ export class FormtemplateComponent {
   }
 
   ngOnDestroy() {
+     this.connectivitySub?.unsubscribe();
     this.unregisterConnectivity?.();
   }
 
@@ -182,13 +193,19 @@ export class FormtemplateComponent {
     // Register with the shared connectivity guard. The service will open a
     // blocking dialog on bad connection and call this save callback first.
     this.unregisterConnectivity = this.connectivity.register(async () => {
-      if (this.formpatch) return; // preview/patch mode - no drafts
-      if (!this.showcontent || !this.deliveryForm) return;
+      if (this.formpatch || !this.showcontent || !this.deliveryForm) return;
       if (this.autoSaveDebounceTimer) {
         clearTimeout(this.autoSaveDebounceTimer);
         this.autoSaveDebounceTimer = null;
       }
       await this._performAutoSave(this.deliveryForm.getRawValue());
+    });
+
+    this.connectivitySub = this.connectivity.connectivity$.subscribe(state => {
+      this.connectivityState = state;
+      if (state === 'reconnecting') {
+        this.syncLocalDraftToFirestore();
+      }
     });
      // Get queue ID from route params
     this.formpatch = (![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ||this.route.snapshot.queryParams['viewFilledForm'] === 'true' ||this.route.snapshot.queryParams['viewCompleted'] === 'true' ||![null,undefined].includes(this.participantformtemplateid));
@@ -200,6 +217,7 @@ export class FormtemplateComponent {
     if (this.queueId) {
       await this.initializeQueueData();
     }
+    await this.getFormsOption();
   }
 
   ngAfterViewInit(){
@@ -328,7 +346,6 @@ export class FormtemplateComponent {
       const roles = await this.auth.getRoles();
       this.userProfile = roles;
       this.profileid = this.profileid ?? roles.profile_ref.id;
-      this.getFormsOption();
     } catch (error) {
       console.error('Error initializing user data:', error);
     }
@@ -420,10 +437,6 @@ export class FormtemplateComponent {
       }
       this.submittedClientForm.formarray[index]['flippingquestion']['value'] = Object.assign({},obj)
     }
-  }
-
-  onSliderValueChange(event,control,array){
-    control.value = array[event.value - 1]
   }
 
   onSliderFlippingValueChange(event,flippingvalue:string,formobj:any,index:number){
@@ -674,8 +687,9 @@ export class FormtemplateComponent {
     if (this.draftDocid) {
       const draftDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
       await deleteDoc(draftDocRef);
-      console.log("Draft deleted");
+      this.localDraft.delete(this.draftDocid);
     }
+
 
     // Handle post-submission updates
     if (!this.queueId && this.route.snapshot.queryParams['data']) {
@@ -767,54 +781,8 @@ export class FormtemplateComponent {
             const logDocRef = doc(this.firestoreForms, 'formsByClient log', this.draftDocid);
             await setDoc(logDocRef, existingFormDoc.data());
           }
-
-          // Process form array values - same logic as before
-          let n = 0;
-          for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
-            const element = this.submittedClientForm.formarray[i];
-            if (!['label', 'video', 'audio'].includes(element['type'])) {
-              element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
-                ? value[`control${n}`] : null;
-              n++;
-            }
-          }
-
-          console.log("second loop started");
-
-          // Process array type controls - same logic as before
-          for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
-            const formelement = this.submittedClientForm.formarray[i];
-
-            if (formelement['type'] === 'array' &&
-                ![null, undefined].includes(this.submittedClientForm.formarray[i]['value'])) {
-
-              // Map arraycontrol keys to field names
-              for (let j = 0; j < this.submittedClientForm.formarray[i]['value'].length; j++) {
-                const valueObj = this.submittedClientForm.formarray[i]['value'][j];
-
-                for (const key in valueObj) {
-                  const index = Object.keys(valueObj).indexOf(key);
-                  const formcontrol = `arraycontrol${index}`;
-
-                  if (formelement['array'][index] && formelement['array'][index]['fieldname']) {
-                    valueObj[formelement['array'][index]['fieldname']] = valueObj[formcontrol];
-                  }
-                }
-              }
-
-              // Remove arraycontrol keys
-              for (let j = 0; j < this.submittedClientForm.formarray[i]['value'].length; j++) {
-                const valueObj = this.submittedClientForm.formarray[i]['value'][j];
-
-                for (const key in valueObj) {
-                  const index = Object.keys(valueObj).indexOf(key);
-                  const formcontrol = `arraycontrol${index}`;
-                  delete valueObj[formcontrol];
-                }
-              }
-            }
-          }
-
+          this.processFormArrayValues(value);
+          this.processArrayTypeControls();
           console.log('this submitedclientform : ',this.submittedClientForm);
 
           // Set form metadata
@@ -863,180 +831,218 @@ export class FormtemplateComponent {
   }
 
   private async _performAutoSave(value: any) {
-    console.log(value);
-    console.log(this.submittedClientForm)
+      if (this.formpatch) return;
 
-    const myEpoch = ++this.draftSaveEpoch;
-    this.draftSaveStatus = 'saving';
-    this.draftSaveError = null;
+      const myEpoch = ++this.draftSaveEpoch;
+      this.draftSaveStatus = 'saving';
+      this.draftSaveError = null;
 
-    try {
-      // Process form array values
-      let e = 0;
-      for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
-        const element = this.submittedClientForm.formarray[i];
-
-        if (!['label', 'video', 'audio'].includes(element['type'])) {
-          console.log(value[`control${e}`]);
-          element["value"] = (value[`control${e}`] !== undefined && value[`control${e}`] !== null)
-            ? value[`control${e}`] : null;
-          e++;
-        }
+      // Stamp current field values into the form model
+      let fieldIndex = 0;
+      for (const element of this.submittedClientForm.formarray) {
+        if (['label', 'video', 'audio'].includes(element['type'])) continue;
+        element['value'] = value[`control${fieldIndex}`] ?? null;
+        fieldIndex++;
       }
 
-      // Get user roles and set profile ID
-      this.submittedClientForm['profileid'] = this.profileid
+      this.submittedClientForm['profileid'] = this.profileid;
+      this.submittedClientForm['queueid']   = this.queueId;
+      this.submittedClientForm['date']      = new Date();
+      this.submittedClientForm['docid']     = this.draftDocid;
+      this.submittedClientForm['formid']    = this.inlineFormId ?? this.patchformid ?? null;
 
-      console.log("Auto Saving Started");
-
-      // Set form metadata
-      this.submittedClientForm['queueid'] = this.queueId;
-      this.submittedClientForm['date'] = new Date();
-      this.submittedClientForm['docid'] = this.draftDocid;
-      this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
-
-      console.log(this.submittedClientForm);
-
-      // Save to temporary_forms collection using modern Firebase syntax
-      const tempFormDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
-      // Fire the local write (resolves from local cache quickly).
-      setDoc(tempFormDocRef, this.submittedClientForm, { merge: true })
-        .catch(err => {
-          console.error("setDoc failed:", err);
-          if (myEpoch === this.draftSaveEpoch) {
-            this.draftSaveStatus = 'failed';
-            this.draftSaveError = err?.message ?? 'Unknown error';
-          }
-        });
-
-      // Wait until Firestore has actually acknowledged ALL pending writes from the server.
-      // This is what guarantees the draft is really in the DB, not just queued locally.
-      await waitForPendingWrites(this.firestoreForms);
-
-      // Only the latest autoSave call may flip to 'saved' — stale earlier calls are ignored.
-      if (myEpoch === this.draftSaveEpoch) {
+      //  save locally first 
+      this.localDraft.save(this.draftDocid, this.submittedClientForm, {
+        formId:    this.submittedClientForm['formid'],
+        profileId: this.profileid,
+      });
+      if (myEpoch !== this.draftSaveEpoch) return;
+      if (!this.connectivity.isOnline) {
         this.draftSaveStatus = 'saved';
-        this.draftSavedAt = new Date();
-        console.log("Temporary form submitted (server-acked)");
+        this.draftSavedAt    = new Date();
+        return;
       }
+      // Online — push to Firestore
+      try {
+        const tempFormDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
+        await setDoc(tempFormDocRef, this.submittedClientForm, { merge: true });
 
-    } catch (error: any) {
-      console.error("Error during auto save:", error);
-      if (myEpoch === this.draftSaveEpoch) {
-        this.draftSaveStatus = 'failed';
-        this.draftSaveError = error?.message ?? 'Unknown error';
+        if (myEpoch !== this.draftSaveEpoch) return;
+
+        this.localDraft.delete(this.draftDocid);
+        this.draftSaveStatus = 'saved';
+        this.draftSavedAt    = new Date();
+      } catch (err: any) {
+        console.error('Auto-save to Firestore failed:', err);
+        if (myEpoch === this.draftSaveEpoch) {
+          this.draftSaveStatus = 'failed';
+          this.draftSaveError  = err?.message ?? 'Unknown error';
+        }
       }
-      throw error;
-    }
   }
 
-  async getFormsOption() {
-    console.log(this.patchformid);
-
-    if(this.formpatch) {
-      console.log("This is a preview form. Drafts are disabled.")
-      return
+  private async syncLocalDraftToFirestore() {
+    if (!this.localDraft.hasDraft(this.draftDocid)) {
+      this.connectivity.confirmSynced();
+      return;
     }
-    console.log("Forms Draft");
+
+    this.draftSaveStatus = 'saving';
+    const draft = this.localDraft.get(this.draftDocid);
 
     try {
-      const draftforms: QueryDocumentSnapshot[] = [];
-      console.log(this.profileid);
-
-      // Query temporary_forms collection with modern Firebase syntax
-      const tempFormsCollectionRef = collection(this.firestoreForms, 'temporary_forms');
-      const draftQuery = query(
-        tempFormsCollectionRef,
-        where('formid', '==', this.patchformid),
-        where('profileid', '==', this.profileid)
-      );
-
-      const draftSnapshot = await getDocs(draftQuery);
-      console.log(draftSnapshot.docs.length);
-
-      if (!draftSnapshot.empty) {
-        draftSnapshot.docs.forEach(draftDoc => {
-          draftforms.push(draftDoc);
-        });
-      } else {
-        console.log("No Drafts Found");
-      }
-
-      // If drafts found, patch the latest one directly (no dialog)
-      if (draftforms.length !== 0) {
-        const sortedDrafts = draftforms.sort((a, b) => {
-          const dateA = a.data()['date']?.toDate()?.getTime() ?? 0;
-          const dateB = b.data()['date']?.toDate()?.getTime() ?? 0;
-          return dateB - dateA;
-        });
-
-        const selectedDraft = sortedDrafts[0].data();
-        this.draftDocid = selectedDraft['docid'];
-
-        let h = 0;
-        for (let i = 0; i < selectedDraft['formarray'].length; i++) {
-          const element = selectedDraft['formarray'][i];
-          if (!['label', 'video', 'audio'].includes(element['type'])) {
-            element['formcontrol'] = `control${h}`;
-            h++;
-            if (!['array', 'date'].includes(element['type'])) {
-              this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
-              if (element['flipping'] === true) {
-                this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {};
-              }
-            } else if (element['type'] === 'date') {
-              const dateValue = (element['value'] !== undefined && element['value'] !== null)
-                ? element['value']?.toDate() : null;
-              this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
-            } else if (element['type'] === 'array') {
-              this.processArrayFormControl(element);
-            }
-          }
-        }
-
-        // --- Previous behaviour: open draft dialog (kept for reference) ---
-        // const form = draftforms[0].data();
-        // this.draftDocid = form['docid'];
-        //
-        // const dialogRef = this.dialog.open(FormOptionComponent, {
-        //   data: { drafts: [sortedDrafts[0]] },
-        //   disableClose: true
-        // });
-        //
-        // dialogRef.afterClosed().subscribe((result) => {
-        //   if (result && result.type === 'draft') {
-        //     const selectedDraft = result.doc.data();
-        //     this.draftDocid = selectedDraft['docid'];
-        //
-        //     let h = 0;
-        //     for (let i = 0; i < selectedDraft['formarray'].length; i++) {
-        //       const element = selectedDraft['formarray'][i];
-        //       if (!['label', 'video', 'audio'].includes(element['type'])) {
-        //         element['formcontrol'] = `control${h}`;
-        //         h++;
-        //         if (!['array', 'date'].includes(element['type'])) {
-        //           this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
-        //           if (element['flipping'] === true) {
-        //             this.submittedClientForm.formarray[i]['flippingquestion']['value'] = element['flippingquestion']['value'] || {};
-        //           }
-        //         } else if (element['type'] === 'date') {
-        //           const dateValue = (element['value'] !== undefined && element['value'] !== null)
-        //             ? element['value']?.toDate() : null;
-        //           this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
-        //         } else if (element['type'] === 'array') {
-        //           this.processArrayFormControl(element);
-        //         }
-        //       }
-        //     }
-        //   }
-        // });
-      }
-
-    } catch (error) {
-      console.error("Error getting forms option:", error);
+      const tempFormDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
+      await setDoc(tempFormDocRef, draft, { merge: true });
+      this.localDraft.delete(this.draftDocid);
+      this.draftSaveStatus = 'saved';
+      this.draftSavedAt    = new Date();
+      this.connectivity.confirmSynced();
+    } catch (err: any) {
+      console.error('Sync to Firestore failed after reconnect:', err);
+      this.draftSaveStatus = 'failed';
+      this.draftSaveError  = err?.message ?? 'Unknown error';
     }
-  }
+}
+async getFormsOption() {
+  if (this.formpatch) return;
 
+  try {
+    const drafts: any[] = [];
+    //  Collect local draft if exists
+    if (this.localDraft.hasDraft(this.draftDocid)) {
+      const localData = this.localDraft.get(this.draftDocid);
+      if (localData) {
+        drafts.push({ ...localData, _source: 'local' });
+      }
+    }
+
+    // Collect Firestore drafts
+    const tempFormsRef = collection(this.firestoreForms, 'temporary_forms');
+    const draftQuery = query(
+      tempFormsRef,
+      where('formid',    '==', this.patchformid),
+      where('profileid', '==', this.profileid)
+    );
+    const draftSnapshot = await getDocs(draftQuery);
+
+    if (!draftSnapshot.empty) {
+      const firestoreDrafts = draftSnapshot.docs
+        .map(d => ({ ...d.data(), _source: 'firestore' }))
+        .sort((a, b) => {
+          const tA = a['date']?.toDate?.()?.getTime() ?? 0;
+          const tB = b['date']?.toDate?.()?.getTime() ?? 0;
+          return tB - tA; 
+        });
+      drafts.push(...firestoreDrafts);
+    }
+
+    if (drafts.length === 0) return; 
+
+    //  Deduplicate by docid 
+    const seen = new Set<string>();
+    this.allDrafts = drafts.filter(d => {
+      if (seen.has(d['docid'])) return false;
+      seen.add(d['docid']);
+      return true;
+    });
+    this.allDrafts.sort((a, b) => {
+      const getTime = (d: any): number => {
+        if (!d) return 0;
+        if (d instanceof Date) return d.getTime();
+        if (typeof d === 'string') return new Date(d).getTime();
+        if (typeof d?.toDate === 'function') return d.toDate().getTime();
+        return 0;
+      };
+      return getTime(b['date']) - getTime(a['date']);
+    });
+
+    // Show the draft selection dialog
+    this.showDraftDialog = true;
+    this.showAllDrafts = false;
+
+  } catch (err) {
+    console.error('Error loading drafts:', err);
+  }
+}
+
+selectDraft(draft: any) {
+  this.showDraftDialog = false;
+  this.showAllDrafts = false;
+  this.draftDocid = draft['docid'];
+  this.patchFromDraftData(draft);
+}
+
+dismissDraftDialog() {
+  this.showDraftDialog = false;
+  this.showAllDrafts = false;
+}
+openDraftsDialog() {
+  if (this.allDrafts.length === 0) return;
+  this.showDraftDialog = true;
+  this.showAllDrafts = false;
+}
+
+//   async getFormsOption() { --automatic patch
+//       if (this.formpatch) return;
+
+//       try {
+//         // Local draft takes priority — it may have been written while offline
+//         if (this.localDraft.hasDraft(this.draftDocid)) {
+//           const localData = this.localDraft.get(this.draftDocid);
+//           if (localData) {
+//             this.draftDocid = localData['docid'];
+//             this.patchFromDraftData(localData);
+//             return;
+//           }
+//         }
+
+//         // Fall back to Firestore
+//         const tempFormsRef  = collection(this.firestore, 'temporary_forms');
+//         const draftQuery    = query(
+//           tempFormsRef,
+//           where('formid',    '==', this.patchformid),
+//           where('profileid', '==', this.profileid)
+//         );
+//         const draftSnapshot = await getDocs(draftQuery);
+//         if (draftSnapshot.empty) return;
+
+//         const sorted = draftSnapshot.docs.sort((a, b) => {
+//           const tA = a.data()['date']?.toDate?.()?.getTime() ?? 0;
+//           const tB = b.data()['date']?.toDate?.()?.getTime() ?? 0;
+//           return tB - tA;
+//         });
+
+//         const selectedDraft = sorted[0].data();
+//         this.draftDocid = selectedDraft['docid'];
+//         this.patchFromDraftData(selectedDraft);
+
+//       } catch (err) {
+//         console.error('Error loading draft:', err);
+//       }
+//   }
+  private patchFromDraftData(data: any) {
+    let index = 0;
+    for (let i = 0; i < data['formarray'].length; i++) {
+      const element = data['formarray'][i];
+      if (['label', 'video', 'audio'].includes(element['type'])) continue;
+
+      element['formcontrol'] = `control${index}`;
+      index++;
+
+      if (!['array', 'date'].includes(element['type'])) {
+        this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
+        if (element['flipping'] === true) {
+          this.submittedClientForm.formarray[i]['flippingquestion']['value'] =
+            element['flippingquestion']['value'] || {};
+        }
+      } else if (element['type'] === 'date') {
+        const dateValue = element['value'] != null ? element['value']?.toDate?.() ?? null : null;
+        this.deliveryForm.get(element['formcontrol'])?.patchValue(dateValue);
+      } else if (element['type'] === 'array') {
+        this.processArrayFormControl(element);
+      }
+    }
+}
   private processArrayFormControl(element: any) {
     if (!element['value'] || !Array.isArray(element['value'])) return;
 

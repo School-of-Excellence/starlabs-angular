@@ -1,26 +1,110 @@
+<!-- Draft selection dialog overlay -->
+<div class="draft-dialog-overlay" *ngIf="showDraftDialog">
+  <div class="draft-dialog">
+    <h2 class="draft-dialog-title">Select Draft</h2>
+    <div class="draft-list">
+      <!-- Always how Draft 1 -->
+      <div class="draft-item" (click)="selectDraft(allDrafts[0])">
+        <span>Draft 1 : {{ allDrafts[0]['date']?.toDate ?
+          (allDrafts[0]['date'].toDate() | date:'d MMM yyyy, HH:mm') :
+          (allDrafts[0]['date'] | date:'d MMM yyyy, HH:mm') }}
+        </span>
+      </div>
+      <button class="see-more-btn"
+              *ngIf="allDrafts.length > 1 && !showAllDrafts"
+              (click)="showAllDrafts = true">
+        See More ({{ allDrafts.length - 1 }} more)
+      </button>
+      <div class="see-more-list"
+           *ngIf="showAllDrafts"
+           [class.scrollable]="allDrafts.length - 1 > 5">
+        <div class="draft-item"
+             *ngFor="let draft of allDrafts.slice(1); let i = index"
+             (click)="selectDraft(draft)">
+          <span>Draft {{ i + 2 }} : {{ draft['date']?.toDate ?
+            (draft['date'].toDate() | date:'d MMM yyyy, HH:mm') :
+            (draft['date'] | date:'d MMM yyyy, HH:mm') }}
+          </span>
+        </div>
+      </div>
+    </div>
+    <button class="draft-close-btn" (click)="dismissDraftDialog()">
+      Close
+    </button>
+  </div>
+</div>
 <!-- Main container with responsive card-based layout -->
 <!-- Floating draft save status — OUTSIDE form-container so filter/blur doesn't affect it -->
-<div class="draft-save-indicator floating" [ngClass]="draftSaveStatus" *ngIf="!formpatch">
-  <ng-container [ngSwitch]="draftSaveStatus">
-    <ng-container *ngSwitchCase="'saving'">
-      <mat-icon class="spin">sync</mat-icon>
-      <span>Saving draft…</span>
-    </ng-container>
-    <ng-container *ngSwitchCase="'saved'">
-      <mat-icon>cloud_done</mat-icon>
-      <span>Draft saved{{ draftSavedAt ? ' at ' + (draftSavedAt | date:'shortTime') : '' }}</span>
-    </ng-container>
-    <ng-container *ngSwitchCase="'failed'">
-      <mat-icon>cloud_off</mat-icon>
-      <span>Draft save failed{{ draftSaveError ? ' — ' + draftSaveError : '' }}</span>
-    </ng-container>
-    <ng-container *ngSwitchDefault>
-      <mat-icon>cloud_queue</mat-icon>
-      <span>Draft not saved yet</span>
-    </ng-container>
-  </ng-container>
-</div>
+<div class="form-page-wrapper">
+  <div class="form-top-bar" *ngIf="!formpatch">
+    <div class="top-bar-left">
+      <button class="top-bar-back-btn" 
+              *ngIf="isInline"
+              (click)="backClicked.emit()">
+        ← Back
+      </button>
+    </div>
+    <!-- Center: Draft status -->
+    <div class="top-bar-draft-status" [ngClass]="[connectivityState, draftSaveStatus]">
+      <ng-container *ngIf="connectivityState === 'offline'">
+        <ng-container [ngSwitch]="draftSaveStatus">
+          <ng-container *ngSwitchCase="'saving'">
+            <mat-icon class="spin">sync</mat-icon>
+            <span>Saving locally…</span>
+          </ng-container>
+          <ng-container *ngSwitchCase="'saved'">
+            <mat-icon>offline_bolt</mat-icon>
+            <span>Saved locally{{ draftSavedAt ? ' at ' + (draftSavedAt | date:'HH:mm') : '' }}</span>
+          </ng-container>
+          <ng-container *ngSwitchCase="'failed'">
+            <mat-icon>cloud_off</mat-icon>
+            <span>Offline — save failed</span>
+          </ng-container>
+          <ng-container *ngSwitchDefault>
+            <mat-icon>offline_bolt</mat-icon>
+            <span>Offline — don't refresh</span>
+          </ng-container>
+        </ng-container>
+      </ng-container>
 
+      <ng-container *ngIf="connectivityState === 'reconnecting'">
+        <mat-icon class="spin">sync</mat-icon>
+        <span>Syncing to cloud…</span>
+      </ng-container>
+
+      <ng-container *ngIf="connectivityState === 'online'">
+        <ng-container [ngSwitch]="draftSaveStatus">
+          <ng-container *ngSwitchCase="'saving'">
+            <mat-icon class="spin">sync</mat-icon>
+            <span>Saving draft…</span>
+          </ng-container>
+          <ng-container *ngSwitchCase="'saved'">
+            <mat-icon>cloud_done</mat-icon>
+            <span>Saved{{ draftSavedAt ? ' at ' + (draftSavedAt | date:'HH:mm') : '' }}</span>
+          </ng-container>
+          <ng-container *ngSwitchCase="'failed'">
+            <mat-icon>cloud_off</mat-icon>
+            <span>Save failed{{ draftSaveError ? ' — ' + draftSaveError : '' }}</span>
+          </ng-container>
+          <ng-container *ngSwitchDefault>
+            <mat-icon>cloud_queue</mat-icon>
+            <span>Draft not saved yet</span>
+          </ng-container>
+        </ng-container>
+      </ng-container>
+    </div>
+
+    <!-- Right: Drafts button -->
+    <div class="top-bar-right">
+      <button class="top-bar-drafts-btn"
+              (click)="openDraftsDialog()"
+              [disabled]="allDrafts.length === 0">
+        <mat-icon>history</mat-icon>
+        <span>Drafts</span>
+      </button>
+    </div>
+
+</div>
 <div class="form-container" *ngIf="showcontent">
   <!-- Form header with improved styling -->
   <div class="form-header">
@@ -581,9 +665,10 @@
     </div> -->
     <!-- Form submission buttons with improved styling -->
     <div class="form-actions">
-      <button *ngIf="!route.snapshot.queryParams['viewFilledForm'] && !route.snapshot.queryParams['viewCompleted']" mat-raised-button color="primary" type="button" (click)="formpatch ? onUpdate(deliveryForm.value) : onSubmit(deliveryForm.value)" class="submit-button">
-        Preview & Submit
-      </button>
+    <button *ngIf="!formpatch" mat-raised-button color="primary" type="button" [disabled]="connectivityState === 'offline' || connectivityState === 'reconnecting'" [matTooltip]="connectivityState !== 'online' ? 'Please wait until internet connection is restored' : ''" matTooltipPosition="above" (click)="onSubmit(this.deliveryForm.value)" class="submit-button">
+      <mat-icon>{{ connectivityState !== 'online' ? 'cloud_off' : 'visibility' }}</mat-icon>
+      {{ connectivityState !== 'online' ? 'Waiting for connection…' : 'Preview & Submit' }}
+    </button>
 
       <!-- <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'"
         mat-raised-button

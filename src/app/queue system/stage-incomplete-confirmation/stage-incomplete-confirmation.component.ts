@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule,Validators, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -15,7 +15,8 @@ import { MatButtonModule } from '@angular/material/button';
     FormsModule,
     MatFormFieldModule,
     MatInputModule,
-    MatButtonModule
+    MatButtonModule,
+    ReactiveFormsModule
 ],
   templateUrl: './stage-incomplete-confirmation.component.html',
   styleUrl: './stage-incomplete-confirmation.component.css'
@@ -24,6 +25,7 @@ export class StageIncompleteConfirmationComponent {
 
   currentStage = null
   participantName = null
+  reasonControl = new FormControl('', Validators.required);
   result = {
     reason: "",
     preassign: true
@@ -35,6 +37,9 @@ export class StageIncompleteConfirmationComponent {
   }
 
   onsubmit(){
+    this.reasonControl.markAsTouched();
+    if (this.reasonControl.invalid) return;
+    this.result.reason = this.reasonControl.value;
     this.dialogref.close(this.result)
   }
 
