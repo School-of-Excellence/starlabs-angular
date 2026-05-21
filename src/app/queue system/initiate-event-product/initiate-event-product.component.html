@@ -143,13 +143,50 @@
   
       <div class="mat-elevation-z2" *ngIf="selectedDeliverySet">
         <div class="action-container">
-          <div class="action-row">
+          <div class="action-row" style="align-items: flex-start;">
             <div class="action-left">
               <mat-form-field appearance="outline" class="formfield filter-field" subscriptSizing="dynamic">
                 <mat-label>Filter Participants</mat-label>
-                <input matInput (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
+                <input matInput [(ngModel)]="filterValue" (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
                 <mat-icon matSuffix>search</mat-icon>
               </mat-form-field>
+
+              <!-- Search Result shown outside table -->
+              <div *ngIf="filterValue.length > 0" class="search-result-box">
+
+                <div *ngIf="searchResult.alreadyInQueue.length > 0" class="search-result-group">
+                 <div class="search-result-label queue">
+                    <mat-icon>warning</mat-icon>
+                    <strong>Already in Queue</strong>
+                  </div>
+                  <div class="chip-list">
+                    <div *ngFor="let p of searchResult.alreadyInQueue" class="result-chip queue-chip"
+                      [matTooltip]="p.email">
+                      <i class="fa fa-clock-o"></i>
+                      {{p.name}}
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="searchResult.unassigned.length > 0" class="search-result-group">
+                  <div class="search-result-label unassigned">
+                    <mat-icon>person_add</mat-icon>
+                    <strong>No Product Assigned</strong>
+                  </div>
+                  <div class="chip-list">
+                    <div *ngFor="let p of searchResult.unassigned" class="result-chip unassigned-chip"
+                      [matTooltip]="p.email">
+                      {{p.name}}
+                    </div>
+                  </div>
+                  <div class="assign-btn-row">
+                    <button class="assign-btn" (click)="assignProductFromSearch(searchResult.unassigned)">
+                      Assign product ({{searchResult.unassigned.length}})
+                    </button>
+                  </div>
+                </div>
+
+              </div>
             </div>
             <div class="action-right">
               <button mat-raised-button class="btn-initiate" *ngIf="selection.selected.length != 0" (click)="initiateEventProduct()">
@@ -256,8 +293,8 @@
           <!-- Row shown when there is no matching data -->
           <tr class="mat-row" *matNoDataRow>
             <td class="mat-cell" colspan="5" class="text-secondary text-center fst-italic p-2">
-              <span *ngIf="input.value.length != 0">No data matching the filter "{{input.value}}"</span>
-              <span *ngIf="input.value.length == 0 && tableDatasource.data.length == 0">No data matching the filter "{{input.value}}"</span>
+              <span *ngIf="input.value.length != 0">No data matching "{{input.value}}"</span>
+              <span *ngIf="input.value.length == 0 && tableDatasource.data.length == 0">No participants available</span>
             </td>
           </tr>
         </table>
@@ -333,11 +370,11 @@
 
     <div class="sheet-content">
       <div class="participant-list">
-        <div class="participant-item" 
+        <div class="participant-item"
             *ngFor="let participant of data; let i = index"
             [class.selected]="isBottomSheetSelected(participant.profileId)"
             (click)="toggleBottomSheetSelection(participant.profileId)">
-          <mat-checkbox 
+          <mat-checkbox
             [checked]="isBottomSheetSelected(participant.profileId)"
             (click)="$event.stopPropagation()"
             (change)="toggleBottomSheetSelection(participant.profileId)"
@@ -354,4 +391,159 @@
   </div>
 </ng-template>
 
+<ng-template #initiationSummaryDialog let-data>
+  <h2 mat-dialog-title>Initiation Summary</h2>
+  <mat-dialog-content>
+    <div class="summary-row">
+      <span>Total processed:</span>
+      <strong>{{ data.total }}</strong>
+    </div>
+    <div class="summary-row summary-success">
+      <span>Success:</span>
+      <strong>{{ data.successCount }}</strong>
+    </div>
+    <div class="summary-row summary-failed" *ngIf="data.failedCount > 0">
+      <span>Failed:</span>
+      <strong>{{ data.failedCount }}</strong>
+    </div>
+
+    <div *ngIf="data.failedList.length > 0" class="failed-section">
+      <h4>Failed participants</h4>
+      <ul class="failed-list">
+        <li *ngFor="let f of data.failedList">
+          <div class="failed-name">{{ f.name }}</div>
+          <div class="failed-error">{{ f.error }}</div>
+        </li>
+      </ul>
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-flat-button color="primary" mat-dialog-close>OK</button>
+  </mat-dialog-actions>
+</ng-template>
+<ng-template #importPreviewDialog let-dialogRef>
+  <div class="import-preview-container">
+
+    <!-- Header -->
+    <div class="import-preview-header">
+      <span>Import Participants – Preview</span>
+      <mat-icon class="close-icon" (click)="dialog.closeAll()">close</mat-icon>
+    </div>
+    <p class="import-preview-subtitle">Review the import summary before confirming. Skipped rows will not be added.</p>
+
+    <!-- Summary Cards -->
+    <div class="import-summary-cards">
+      <div class="summary-card total">
+        <div class="card-count">{{ importPreviewData.totalRows }}</div>
+        <div class="card-label">TOTAL ROWS</div>
+      </div>
+      <div class="summary-card will-add">
+        <div class="card-count">{{ importPreviewData.willBeAdded.length }}</div>
+        <div class="card-label">WILL BE ADDED</div>
+      </div>
+      <div class="summary-card in-queue">
+        <div class="card-count">{{ importPreviewData.alreadyInQueue.length }}</div>
+        <div class="card-label">ALREADY IN QUEUE</div>
+      </div>
+      <div class="summary-card no-product">
+        <div class="card-count">{{ importPreviewData.noProduct.length }}</div>
+        <div class="card-label">NO PRODUCT</div>
+      </div>
+    </div>
+
+    <!-- Scrollable Content -->
+    <div class="import-preview-body">
+
+      <!-- Will Be Added -->
+      <div *ngIf="importPreviewData.willBeAdded.length > 0" class="section">
+        <div class="section-header will-add-header">
+          <span>WILL BE ADDED</span>
+          <span class="section-badge will-add-badge">{{ importPreviewData.willBeAdded.length }}</span>
+        </div>
+        <ng-container *ngFor="let p of (expandedSections['willBeAdded'] ? importPreviewData.willBeAdded : (importPreviewData.willBeAdded | slice:0:3))">
+          <div class="participant-card will-add-card">
+            <div>
+              <div class="participant-name">{{ p.name }}</div>
+              <div class="participant-email">{{ p.email }}</div>
+            </div>
+            <span class="status-badge ready-badge">Ready</span>
+          </div>
+        </ng-container>
+        <div *ngIf="importPreviewData.willBeAdded.length > 3"
+            class="more-label will-add-more"
+            (click)="expandedSections['willBeAdded'] = !expandedSections['willBeAdded']"
+            style="cursor: pointer;">
+          {{ expandedSections['willBeAdded'] ? 'Show less' : '+ ' + (importPreviewData.willBeAdded.length - 3) + ' more participants...' }}
+        </div>
+      </div>
+
+      <!-- Already In Queue -->
+      <div *ngIf="importPreviewData.alreadyInQueue.length > 0" class="section">
+        <div class="section-header in-queue-header">
+          <span>ALREADY IN QUEUE</span>
+          <span class="section-badge in-queue-badge">{{ importPreviewData.alreadyInQueue.length }}</span>
+        </div>
+        <ng-container *ngFor="let p of (expandedSections['alreadyInQueue'] ? importPreviewData.alreadyInQueue : (importPreviewData.alreadyInQueue | slice:0:3))">
+          <div class="participant-card in-queue-card">
+            <div>
+              <div class="participant-name">{{ p.name }}</div>
+              <div class="participant-email">{{ p.email }}</div>
+            </div>
+            <span class="status-badge queue-badge">Already in Queue</span>
+          </div>
+        </ng-container>
+        <div *ngIf="importPreviewData.alreadyInQueue.length > 3"
+            class="more-label in-queue-more"
+            (click)="expandedSections['alreadyInQueue'] = !expandedSections['alreadyInQueue']"
+            style="cursor: pointer;">
+          {{ expandedSections['alreadyInQueue'] ? 'Show less' : '+ ' + (importPreviewData.alreadyInQueue.length - 3) + ' more participants...' }}
+        </div>
+      </div>
+
+      <!-- No Product -->
+      <div *ngIf="importPreviewData.noProduct.length > 0" class="section">
+        <div class="section-header no-product-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <mat-checkbox (change)="toggleAllNoProduct($event.checked)"
+              [checked]="noProductSelection.selected.length === importPreviewData.noProduct.length && importPreviewData.noProduct.length > 0"
+              [indeterminate]="noProductSelection.selected.length > 0 && noProductSelection.selected.length < importPreviewData.noProduct.length">
+            </mat-checkbox>
+            <span>NO PRODUCT ASSIGNED</span>
+            <span class="section-badge no-product-badge">{{ importPreviewData.noProduct.length }}</span>
+          </div>
+          <button mat-raised-button color="warn" *ngIf="noProductSelection.selected.length > 0" (click)="assignProduct()"> Assign Product ({{ noProductSelection.selected.length }})</button>
+        </div>
+
+        <ng-container *ngFor="let p of (expandedSections['noProduct']  ? importPreviewData.noProduct  : (importPreviewData.noProduct | slice:0:3))">
+          <div class="participant-card no-product-card" style="cursor:pointer" (click)="noProductSelection.toggle(p.email)">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <mat-checkbox [checked]="noProductSelection.isSelected(p.email)" (click)="$event.stopPropagation()" (change)="noProductSelection.toggle(p.email)"></mat-checkbox>
+              <div>
+                <div class="participant-name">{{ p.name }}</div>
+                <div class="participant-email">{{ p.email }}</div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <div *ngIf="importPreviewData.noProduct.length > 3"
+            class="more-label no-product-more"
+            (click)="expandedSections['noProduct'] = !expandedSections['noProduct']"
+            style="cursor:pointer;">
+          {{ expandedSections['noProduct'] ? 'Show less' : '+ ' + (importPreviewData.noProduct.length - 3) + ' more participants...' }}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="import-preview-footer">
+      <button mat-stroked-button [mat-dialog-close]="false">Cancel</button>
+      <button mat-flat-button color="primary" [disabled]="importPreviewData.willBeAdded.length === 0" [mat-dialog-close]="true">
+        Initiate Product for {{ importPreviewData.willBeAdded.length }} Participants
+      </button>
+    </div>
+
+  </div>
+</ng-template>
 
