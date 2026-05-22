@@ -71,59 +71,74 @@ export class BulkAddProductsComponent {
 
   productForm: FormGroup;
 
+  // productrefId when we call fromo initiateeventproduct
+  participants: any[] = [];
+  productrefId: string | null = null;
+
   private firestore = inject(Firestore);
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data:any, 
-    public dialogRef: MatDialogRef<BulkAddProductsComponent>,
-    private fb: FormBuilder,
-    public guard: AuthguardService,
-    private dialog: MatDialog ) {
-
-    this.productForm = this.fb.group({
-      products: this.fb.array([])
-    });
+  public dialogRef: MatDialogRef<BulkAddProductsComponent>,
+  private fb: FormBuilder,
+  public guard: AuthguardService,
+  private dialog: MatDialog) {
+  if (Array.isArray(data)) {
+    this.participants = data;
+    this.productrefId = null;
+  } else {
+    this.participants = data.participants ?? [];
+    this.productrefId = data.productrefId ?? null;
   }
+
+  this.productForm = this.fb.group({
+    products: this.fb.array([])
+  });
+}
 
   ngOnInit() {
 
-    getDocs(collection(this.firestore, "journey")).then(snap => {
-      for (let i = 0; i < snap.docs.length; i++) {
-        const element = snap.docs[i].data();
+  getDocs(collection(this.firestore, "journey")).then(snap => {
+    for (let i = 0; i < snap.docs.length; i++) {
+      const element = snap.docs[i].data();
         this.mapJourney[element['id']] = element['journey']
-      }
+    }
     })
 
-    getDocs(query(collection(this.firestore, "products"), orderBy("product", "asc"))).then((products)=> {
-      if(products.docs.length != 0) {
-        for (let i = 0; i < products.docs.length; i++) {
-          const productref = products.docs[i].ref;
-          const productdata = products.docs[i].data()
-          productdata['productref'] = productref
-          this.mapMinimumRequiredAmount[productdata["id"]] = productdata["minimumrequiredamount"]
-          this.productsList.push(productdata);
-        }
-      }
-    })
+  getDocs(query(collection(this.firestore, "products"), orderBy("product", "asc"))).then((products) => {
+    let docs = products.docs;
 
-    getDocs(query(collection(this.firestore, "package"), orderBy("package"))).then(packagelist => {
-      this.allpackageList = packagelist.docs.map((doc) => {
-        const data = doc.data();
+    if (this.productrefId) {
+      docs = docs.filter(d => d.id === this.productrefId);
+    }
+
+    for (let i = 0; i < docs.length; i++) {
+      const productref = docs[i].ref;
+      const productdata = docs[i].data();
+      productdata['productref'] = productref;
+      this.mapMinimumRequiredAmount[productdata["id"]] = productdata["minimumrequiredamount"];
+      this.productsList.push(productdata);
+    }
+  });
+
+  getDocs(query(collection(this.firestore, "package"), orderBy("package"))).then(packagelist => {
+    this.allpackageList = packagelist.docs.map((doc) => {
+      const data = doc.data();
         data['docid'] = doc.id; // Add document ID
-        return data;
-      });
+      return data;
+    });
 
       var addonOption = []
-      for (let i = 0; i < packagelist.docs.length; i++) {
+    for (let i = 0; i < packagelist.docs.length; i++) {
         const value = packagelist.docs[i].data()
         value['docid'] = packagelist.docs[i].id; // Add document ID
-        if (value["nonjourney"] ?? false) {
+      if (value["nonjourney"] ?? false) {
           addonOption.push(value)
         }
       }
       this.addonpackageList = addonOption
     })
-  }
+}
 
   get productsArray(): FormArray {
     return this.productForm.get('products') as FormArray;
@@ -272,7 +287,7 @@ export class BulkAddProductsComponent {
   async addProduct() {
     const loading = this.loading;
     this.productsArray.clear();
-    const profileIds = this.data.map(element => element.profileid);
+    const profileIds = this.participants.map(element => element.profileid);
     const BATCH_SIZE = 10;
     const journeyMap = new Map();
     const participantsWithoutJourney = []; 
@@ -304,7 +319,7 @@ export class BulkAddProductsComponent {
           
           if (!journeys || journeys.length === 0 || journeys.length > 1) {
             // No documents found for this profileId
-            const participant = this.data.find(e => e.profileid === profileId);
+            const participant = this.participants.find(e => e.profileid === profileId);
             if (participant) {
               participantsWithoutJourney.push({
                 "Name": participant['name'],
@@ -328,7 +343,7 @@ export class BulkAddProductsComponent {
     });
 
     // Now process all data with lookups instead of queries
-    this.data.forEach(element => {
+    this.participants.forEach(element => {
       const journey = journeyMap.get(element.profileid);
       
       if (journey && journey['journeyref']) {

@@ -751,9 +751,9 @@ export class InitiateEventProductComponent {
     })).filter(p => p.profileid);
 
     this.dialog.open(BulkAddProductsComponent, {
-      data: selectedParticipants,
-      width: '70vw',
-      disableClose: true
+        data: { participants: selectedParticipants, productrefId: this.selectedArena['productref'].id },
+        width: '70vw',
+        disableClose: true
       }).afterClosed().subscribe(async () => {
       if (!this.selectedArena) return;
 
@@ -860,7 +860,7 @@ export class InitiateEventProductComponent {
     if (selectedParticipants.length === 0) return;
 
     this.dialog.open(BulkAddProductsComponent, {
-      data: selectedParticipants,
+      data: { participants: selectedParticipants, productrefId: this.selectedArena['productref'].id },
       width: '70vw',
       disableClose: true
     }).afterClosed().subscribe(async () => {
