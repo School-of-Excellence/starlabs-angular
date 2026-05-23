@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core'; // getFireStore
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -334,6 +334,17 @@ export class DeliveryDashboardCloneComponent {
     private ticketRequestSubscription: Subscription;
 
     columns = {
+        "eiCustomSolutions": [
+            "Total Eligible",
+            "Past Month",
+            "This Month",
+            "Next Month",
+            "Diagnostics",
+            "Implementation",
+            "Review",
+            "Celebration Call"
+        ],
+
         "eiStarterPack": [
             "Total Eligible",
             "Past Month",
@@ -382,6 +393,12 @@ export class DeliveryDashboardCloneComponent {
             'Diagnostics',
             'Implementation',
             'Post Session Check-in',
+            'Celebration Call'
+        ],
+        'EI Solution': [
+            'Diagnostics',
+            'Implementation',
+            'Review',
             'Celebration Call'
         ]
     };
@@ -472,17 +489,27 @@ export class DeliveryDashboardCloneComponent {
     participantLoading = false;
 
     productData: any = {
+        eiCustomSolutions: {
+            totalEligible: [],
+            pastMonth: [],
+            thisMonth: [],
+            nextMonth: [],
+            diagnostics: [],
+            implementation: [],
+            review: [],
+            celebrationCall: []
+        },
         eiStarterPack: {
             totalEligible: [],
             pastMonth: [],
             thisMonth: [],
             nextMonth: [],
             onBoarded: [],
+            preprocess: [],
             upcomingDIAppointments: [],
             reports: [],
             celebrationCall: []
         },
-
         criticalSupport: {
             totalEligible: [],
             request: [],
@@ -828,8 +855,17 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
-
         this.productData = {
+            eiCustomSolutions: {
+                totalEligible: [],
+                pastMonth: [],
+                thisMonth: [],
+                nextMonth: [],
+                diagnostics: [],
+                implementation: [],
+                review: [],
+                celebrationCall: []
+            },
             eiStarterPack: {
                 totalEligible: [],
                 pastMonth: [],
@@ -861,14 +897,18 @@ export class DeliveryDashboardCloneComponent {
             await this.FilterReportData(productId);
             if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
-
+        if (product === 'EI Solution') {
+            this.selectedColumns = this.columns.eiCustomSolutions;
+            await this.filterProductData('eiCustomSolutions', product, productId);
+            await this.filterStageData('eiCustomSolutions');
+        }
         if (product === 'EI Starter Pack') {
             this.selectedColumns = this.columns.eiStarterPack;
             await this.filterProductData('eiStarterPack', product, productId);
         } else if (product === 'Critical Support') {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
-            await this.filterStageData();
+            await this.filterStageData('criticalSupport');
         }
         this.participantLoading = false;
     }
@@ -963,17 +1003,27 @@ export class DeliveryDashboardCloneComponent {
 
     async filterProductData(productType: string, product: string, productId: string) {
         let productData: any = {
+            eiCustomSolutions: {
+                totalEligible: [],
+                pastMonth: [],
+                thisMonth: [],
+                nextMonth: [],
+                diagnostics: [],
+                implementation: [],
+                review: [],
+                celebrationCall: []
+            },
             eiStarterPack: {
                 totalEligible: [],
                 pastMonth: [],
                 thisMonth: [],
                 nextMonth: [],
                 onBoarded: [],
+                preprocess: [],
                 upcomingDIAppointments: [],
                 reports: [],
                 celebrationCall: []
             },
-
             criticalSupport: {
                 totalEligible: [],
                 request: this.ticketRequest.length ? this.ticketRequest : [],
@@ -992,8 +1042,7 @@ export class DeliveryDashboardCloneComponent {
             const totalEligible = this.getCardGroupedFiltered(productId);
             if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
-            }
-            else if (this.selectedProductType === 'eiStarterPack') {
+            } else if (this.selectedProductType === 'eiStarterPack') {
                 for (let data of totalEligible) {
                     const { status, tentativestart } = data;
 
@@ -1003,7 +1052,21 @@ export class DeliveryDashboardCloneComponent {
                             const date = tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData);
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, this.selectedProductType);
+                        }
+                    }
+                };
+            } else if (this.selectedProductType === 'eiCustomSolutions') {
+                for (let data of totalEligible) {
+                    const { status, tentativestart } = data;
+
+                    if (status === null || status === "initiated") {
+                        if (!tentativestart) productData.eiCustomSolutions.totalEligible.push(data);
+                        else if (tentativestart) {
+                            const date = tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, this.selectedProductType);
                         }
                     }
                 };
@@ -1015,14 +1078,6 @@ export class DeliveryDashboardCloneComponent {
             for (let data of ongoingData) {
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
-                await Promise.all(
-                    appointments.map(async (appointment) => {
-                        if (!appointment.appointmentTypeName) {
-                            appointment.appointmentTypeName =
-                                await this.resolveAppointmentType(appointment);
-                        }
-                    })
-                );
 
                 const attendedAppointments = appointments.filter(app => app.attended === true || app.status === 'submitted');
                 let mergedData = {
@@ -1032,20 +1087,53 @@ export class DeliveryDashboardCloneComponent {
 
                 if (attendedAppointments.length === 0) {
                     if (this.selectedProductType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
-                    if (this.selectedProductType === 'eiStarterPack') {
+                    else if (this.selectedProductType === 'eiStarterPack') {
                         if (!data.tentativestart) {
                             productData.eiStarterPack.totalEligible.push(mergedData);
                         } else {
                             const date = data.tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData);
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, this.selectedProductType);
                         }
                     }
                 }
                 else if (attendedAppointments.length > 0) {
+                    // ========================= EI CUSTOM SOLUTIONS =========================
+                    if (this.selectedProductType === 'eiCustomSolutions') {
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei review`
+                        );
+                        const implementationAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei implementation`
+                        );
+
+                        const diagnosticsAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei diagnostics`
+                        );
+
+                        if (reviewAppointment) {
+                            productData.eiCustomSolutions.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
+                            });
+
+                        }
+                        else if (implementationAppointment) {
+                            productData.eiCustomSolutions.implementation.push({
+                                ...mergedData,
+                                ...implementationAppointment
+                            });
+
+                        } else if (diagnosticsAppointment) {
+                            productData.eiCustomSolutions.diagnostics.push({
+                                ...mergedData,
+                                ...diagnosticsAppointment
+                            });
+                        }
+                    }
                     // ========================= EI STARTER PACK =========================
-                    if (productType === 'eiStarterPack') {
+                    else if (this.selectedProductType === 'eiStarterPack') {
                         const celebrationCallAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
                         );
@@ -1091,7 +1179,7 @@ export class DeliveryDashboardCloneComponent {
                         }
                     }
                     // ========================= CRITICAL SUPPORT =========================
-                    else if (productType === 'criticalSupport') {
+                    else if (this.selectedProductType === 'criticalSupport') {
 
                         const postprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support post form'
@@ -1113,7 +1201,7 @@ export class DeliveryDashboardCloneComponent {
                             app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-                       
+
                         if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
@@ -1159,11 +1247,11 @@ export class DeliveryDashboardCloneComponent {
                     allappointments: appointments
                 };
 
-                if (productType === 'eiStarterPack') {
+                if (this.selectedProductType === 'eiCustomSolutions') {
+                    productData.eiCustomSolutions.celebrationCall.push(data);
+                } else if (this.selectedProductType === 'eiStarterPack') {
                     productData.eiStarterPack.celebrationCall.push(data);
-                }
-
-                if (productType === 'criticalSupport') {
+                } else if (this.selectedProductType === 'criticalSupport') {
                     productData.criticalSupport.completion.push(data);
                 }
             }
@@ -1174,7 +1262,7 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any, productType: any) {
         let mergedData: any;
         if (allappointments !== null && allappointments?.length > 0) {
             mergedData = { ...data, allappointments: allappointments }
@@ -1183,21 +1271,21 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
-            productData.eiStarterPack.thisMonth.push(mergedData);
+            productData[productType].thisMonth.push(mergedData);
         }
         else if (
             (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
         ) {
-            productData.eiStarterPack.pastMonth.push(mergedData);
+            productData[productType].pastMonth.push(mergedData);
         }
         else if (
             (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
         ) {
-            productData.eiStarterPack.nextMonth.push(mergedData);
+            productData.productType.nextMonth.push(mergedData);
         }
-        else productData.eiStarterPack.totalEligible.push(mergedData);
+        else productData[productType].totalEligible.push(mergedData);
     }
 
     async fetchTicketRiseParticipants() {
@@ -1351,12 +1439,21 @@ export class DeliveryDashboardCloneComponent {
         return match?.appointmenttype;
     }
 
-    async filterStageData() {
-        const stageConfig = [
-            { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
-            { key: 'implementation', appointmentType: 'Critical Support Implementation' },
-            { key: 'review', appointmentType: 'Critical Support Review' }
-        ];
+    async filterStageData(product: string) {
+        let stageConfig = [];
+        if (product === 'criticalSupport') {
+            stageConfig = [
+                { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
+                { key: 'implementation', appointmentType: 'Critical Support Implementation' },
+                { key: 'review', appointmentType: 'Critical Support Review' }
+            ];
+        } else if (product === 'eiCustomSolutions') {
+            stageConfig = [
+                { key: 'diagnostics', appointmentType: 'EI Diagnostics' },
+                { key: 'implementation', appointmentType: 'EI Implementation' },
+                { key: 'review', appointmentType: 'EI Review' }
+            ];
+        }
 
         stageConfig.forEach(stage => {
             this.stageData[stage.key] = this.filterAppointmentsForStage(stage.appointmentType);
@@ -1407,19 +1504,30 @@ export class DeliveryDashboardCloneComponent {
     updateFilteredCards() {
         const search = this.searchText?.toLowerCase().trim() || '';
         let sources: any = {};
-        if (this.selectedProductType === 'eiStarterPack') {
+        if (this.selectedProductType === 'eiCustomSolutions') {
+            sources = {
+                0: this.productData.eiCustomSolutions.totalEligible || [],
+                1: this.productData.eiCustomSolutions.pastMonth || [],
+                2: this.productData.eiCustomSolutions.thisMonth || [],
+                3: this.productData.eiCustomSolutions.nextMonth || [],
+                4: this.productData.eiCustomSolutions.diagnostics || [],
+                5: this.productData.eiCustomSolutions.implementation || [],
+                6: this.productData.eiCustomSolutions.review || [],
+                7: this.productData.eiCustomSolutions.celebrationCall || []
+            };
+        } else if (this.selectedProductType === 'eiStarterPack') {
             sources = {
                 0: this.productData.eiStarterPack.totalEligible || [],
                 1: this.productData.eiStarterPack.pastMonth || [],
                 2: this.productData.eiStarterPack.thisMonth || [],
                 3: this.productData.eiStarterPack.nextMonth || [],
                 4: this.productData.eiStarterPack.onBoarded || [],
+                5: this.productData.eiStarterPack.preprocess || [],
                 6: this.productData.eiStarterPack.upcomingDIAppointments || [],
                 7: this.productData.eiStarterPack.report || [],
                 8: this.productData.eiStarterPack.celebrationCall || []
             };
-        }
-        else if (this.selectedProductType === 'criticalSupport') {
+        } else if (this.selectedProductType === 'criticalSupport') {
             sources = {
                 0: this.productData.criticalSupport.totalEligible || [],
                 1: this.productData.criticalSupport.request || [],
@@ -2652,6 +2760,9 @@ export class DeliveryDashboardCloneComponent {
         else if (appointmentTypeName === 'Critical Support Diagnostics') return 'Diagnostics: ';
         else if (appointmentTypeName === 'Critical Support Implementation') return 'Implementation: ';
         else if (appointmentTypeName === 'Critical Support Review') return 'Review: ';
+        else if (appointmentTypeName === 'EI Diagnostics') return 'Diagnostics: ';
+        else if (appointmentTypeName === 'EI Implementation') return 'Implementation: ';
+        else if (appointmentTypeName === 'EI Review') return 'Review: ';
         else return '';
     }
 
@@ -2660,7 +2771,10 @@ export class DeliveryDashboardCloneComponent {
         const validAppointments = [
             `Critical Support Diagnostics`,
             `Critical Support Implementation`,
-            `Critical Support Review`
+            `Critical Support Review`,
+            `EI Diagnostics`,
+            `EI Implementation`,
+            `EI Review`
         ];
 
         if (status?.status === 'Open') return this.formatDate(status.date);
@@ -2691,7 +2805,7 @@ export class DeliveryDashboardCloneComponent {
         const diffTime = today.getTime() - date.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-        return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+        return `${diffDays} day${(diffDays !== 1 && diffDays !== 0) ? 's' : ''}`;
     }
 
     showDelayDate(c: any): string {
