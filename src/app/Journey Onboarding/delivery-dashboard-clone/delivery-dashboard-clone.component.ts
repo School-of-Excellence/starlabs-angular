@@ -392,6 +392,14 @@ export class DeliveryDashboardCloneComponent {
             "Review",
             "Post-Process Form",
             "Completion"
+        ],
+
+        "eiCustomSolutions": [
+            "Total Eligible",
+            "Diagnostics",
+            "Implementation",
+            "Review",
+            "Celebration Call"
         ]
     };
 
@@ -1058,7 +1066,7 @@ export class DeliveryDashboardCloneComponent {
         } else if (product === 'Critical Support') {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
-            await this.filterStageData();
+            await this.filterStageData('criticalSupport');
         }
         this.participantLoading = false;
         this.stagesLoading = false;
@@ -1209,7 +1217,7 @@ export class DeliveryDashboardCloneComponent {
                             const date = tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData);
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, 'eiStarterPack');
                         }
                     }
                 };
@@ -1246,7 +1254,7 @@ export class DeliveryDashboardCloneComponent {
                             const date = data.tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData);
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, 'eiStarterPack');
                         }
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
                         if (!data.tentativestart) {
@@ -1401,7 +1409,7 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any, productType: string) {
         let mergedData: any;
         if (allappointments !== null && allappointments?.length > 0) {
             mergedData = { ...data, allappointments: allappointments }
