@@ -94,7 +94,9 @@ export class QueueCreationV3Component {
     { value: "assignprocedure", name: "Assign Changeagent to Procedures" },
     { value: "viewtripleatc", name: "View Triple ATC" },
     { value: "movetonextqueue", name: "Move Participants to next month review" },
-    { value: "validateael", name: "Validate Current AEL" }
+    { value: "validateael", name: "Validate Current AEL" },
+    { value: "previousatc", name: "Previous ATC History" },
+    { value: "loveletters", name: "Love Letters" }
   ]
 
   //big activity
