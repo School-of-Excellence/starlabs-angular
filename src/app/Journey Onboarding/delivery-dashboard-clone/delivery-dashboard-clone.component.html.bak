@@ -226,84 +226,346 @@
     </button>
   </div>
 
+  <ng-container *ngIf="hiddenCardIds.length > 0">
+            <span class="dashboard-meta-sep" aria-hidden="true">&middot;</span>
+            <span class="dashboard-meta-text"><span class="dashboard-meta-num">{{ hiddenCardIds.length }}</span> hidden</span>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== FILTER STRIP (offset below header) ========== -->
+  <section class="filter-strip">
+    <div class="filter-strip-left">
+      <button class="filter-allbtn" [class.active]="selectedTimeFilter === 'all'"
+        (click)="onFilterClick(selectedTimeFilter === 'all' ? 'thismonth' : 'all')">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18" *ngIf="selectedTimeFilter === 'all'" />
+        </svg>
+        {{ selectedTimeFilter === 'all' ? 'Viewing all time' : 'Show all time' }}
+      </button>
+      <div class="date-input" (click)="picker.open()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        Date Range
+        <mat-form-field appearance="outline" class="date-range-field-hidden">
+          <mat-date-range-input [formGroup]="range" [rangePicker]="picker">
+            <input matStartDate formControlName="start" placeholder="Start date">
+            <input matEndDate formControlName="end" placeholder="End date">
+          </mat-date-range-input>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+      <div class="filter-summary-chip" *ngIf="activeFilterSummary">
+        <span class="filter-summary-dot"></span>
+        <span class="filter-summary-text">{{ activeFilterSummary }}</span>
+      </div>
+    </div>
+    <div class="filter-strip-right">
+      <mat-form-field appearance="outline" class="product-select-field" subscriptSizing="dynamic">
+        <mat-label>Products</mat-label>
+        <mat-select multiple [formControl]="productFilterControl" panelClass="product-panel" placeholder="All products">
+          <mat-select-trigger>{{ productSelectTrigger }}</mat-select-trigger>
+          <mat-option *ngFor="let p of availableCardLabels" [value]="p">{{ p }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-slide-toggle
+        [checked]="allProductsSelected"
+        (change)="toggleAllProducts($event.checked)"
+        class="product-all-toggle"
+        color="primary">
+        All
+      </mat-slide-toggle>
+    </div>
+  </section>
+
+  <!-- ========== KPI BENTO (Mission Control) ========== -->
+  <section class="kpi-bento">
+    <div class="kpi-hero">
+      <div class="kpi-hero-head">
+        <span class="kpi-hero-eyebrow">ACTIVE PIPELINE</span>
+        <span class="kpi-hero-badge"><span class="kpi-hero-badge-dot"></span>LIVE</span>
+      </div>
+      <div class="kpi-hero-stats">
+        <div class="khs-block">
+          <span class="khs-num">{{ kpiActivePipeline | number }}</span>
+          <span class="khs-lbl">Eligible</span>
+        </div>
+        <div class="khs-divider"></div>
+        <div class="khs-block">
+          <span class="khs-num">{{ kpiOngoingTotal | number }}</span>
+          <span class="khs-lbl">Ongoing</span>
+        </div>
+      </div>
+      <div class="kpi-hero-sub">across {{ visibleCardIds.length }} products</div>
+      <div class="kpi-hero-funnel">
+        <div class="khf-row" *ngFor="let cardId of visibleCardIds.slice(0, 4)">
+          <span class="khf-name">{{ getCardName(cardId) }}</span>
+          <div class="khf-track">
+            <div class="khf-fill" [style.width.%]="(getCardGroupedFiltered(cardId).length / (kpiActivePipeline || 1)) * 100"></div>
+            <div class="khf-fill khf-fill-ongoing" [style.width.%]="(getCardOngoing(cardId) / (kpiActivePipeline || 1)) * 100"></div>
+          </div>
+          <span class="khf-num">
+            {{ getCardGroupedFiltered(cardId).length | number }}<span class="khf-num-sep"> · </span><span class="khf-num-ongoing">{{ getCardOngoing(cardId) | number }}</span>
+          </span>
+        </div>
+      </div>
+      <div class="kpi-hero-glyph" aria-hidden="true">
+        <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+          <circle cx="60" cy="60" r="48" stroke="currentColor" stroke-width="1" opacity="0.15"/>
+          <circle cx="60" cy="60" r="32" stroke="currentColor" stroke-width="1" opacity="0.2"/>
+          <circle cx="60" cy="60" r="16" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+          <circle cx="60" cy="60" r="3" fill="currentColor"/>
+        </svg>
+      </div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-cell kpi-ready" [class.kpi-empty]="kpiReadyToInitiate === 0">
+        <div class="kpi-row">
+          <div class="kpi-stack">
+            <span class="kpi-label">Ready to Initiate</span>
+            <span class="kpi-value">{{ kpiReadyToInitiate | number }}</span>
+            <span class="kpi-hint">cleared, awaiting action</span>
+          </div>
+          <div class="kpi-spark">
+            <div class="kpi-spark-bar" *ngFor="let v of sparkReady"
+              [style.height.%]="(v / sparkMax(sparkReady)) * 100"
+              [class.empty]="v === 0"></div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-cell kpi-stuck" [class.kpi-empty]="kpiStuck === 0" [class.kpi-alert]="kpiStuck > 0">
+        <div class="kpi-row">
+          <div class="kpi-stack">
+            <span class="kpi-label">Stuck Cases</span>
+            <span class="kpi-value">{{ kpiStuck | number }}</span>
+            <span class="kpi-hint">need intervention</span>
+          </div>
+          <div class="kpi-spark kpi-spark-rose">
+            <div class="kpi-spark-bar" *ngFor="let v of sparkStuck"
+              [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
+              [class.empty]="v === 0"></div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-cell kpi-completed">
+        <div class="kpi-row">
+          <div class="kpi-stack">
+            <span class="kpi-label">Completed</span>
+            <span class="kpi-value">{{ kpiCompletedTotal | number }}</span>
+            <span class="kpi-hint">in selected range</span>
+          </div>
+          <div class="kpi-spark kpi-spark-violet">
+            <div class="kpi-spark-bar" *ngFor="let v of sparkCompleted"
+              [style.height.%]="(v / sparkMax(sparkCompleted)) * 100"
+              [class.empty]="v === 0"></div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-cell kpi-avg">
+        <div class="kpi-stack kpi-stack-avg">
+          <span class="kpi-label">Avg. Time</span>
+          <span class="kpi-value">{{ kpiAvgComplete }}<span class="kpi-unit">d</span></span>
+          <div class="kpi-gauge">
+            <div class="kpi-gauge-track">
+              <div class="kpi-gauge-fill" [style.width.%]="avgTimePct"
+                [class.over]="kpiAvgComplete > avgTimeTarget"></div>
+              <div class="kpi-gauge-target" [style.left.%]="100 * avgTimeTarget / Math.max(kpiAvgComplete, avgTimeTarget, 30) || 50"></div>
+            </div>
+            <span class="kpi-gauge-label">target {{ avgTimeTarget }}d</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== STATUS FOOTER (ops silhouette) ========== -->
+  <section class="status-footer" *ngIf="false">
+  </section>
+
+  <!-- ========== ACTION CENTER (Option A) ========== -->
+  <section class="action-center">
+    <div class="ac-card ac-attention">
+      <div class="ac-card-head">
+        <span class="ac-card-title">Needs your attention</span>
+        <span class="ac-card-sub">act on these first</span>
+      </div>
+      <div class="ac-attention-grid">
+        <button class="ac-tile ac-tile-stuck" [class.ac-tile-empty]="kpiStuck === 0"
+          (click)="navToAttention('stuck')"
+          [attr.aria-label]="kpiStuck + ' stuck cases. Open Participants tab.'">
+          <span class="ac-tile-num">{{ kpiStuck | number }}</span>
+          <span class="ac-tile-label">Stuck</span>
+          <span class="ac-tile-hint">14+ days no movement</span>
+          <span class="ac-tile-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+        <button class="ac-tile ac-tile-awaiting" [class.ac-tile-empty]="kpiAwaitingTotal === 0"
+          (click)="navToAttention('awaiting')"
+          [attr.aria-label]="kpiAwaitingTotal + ' awaiting initiation. Open Participants tab.'">
+          <span class="ac-tile-num">{{ kpiAwaitingTotal | number }}</span>
+          <span class="ac-tile-label">Awaiting Initiation</span>
+          <span class="ac-tile-hint">payment status pending</span>
+          <span class="ac-tile-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+        <button class="ac-tile ac-tile-ready" [class.ac-tile-empty]="kpiReadyToInitiate === 0"
+          (click)="navToAttention('ready')"
+          [attr.aria-label]="kpiReadyToInitiate + ' ready to initiate. Open Participants tab.'">
+          <span class="ac-tile-num">{{ kpiReadyToInitiate | number }}</span>
+          <span class="ac-tile-label">Ready</span>
+          <span class="ac-tile-hint">cleared, initiate now</span>
+          <span class="ac-tile-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+        <button class="ac-tile ac-tile-notconsuming" [class.ac-tile-empty]="kpiInitiatedNotConsuming === 0"
+          (click)="navToAttention('idle')"
+          [attr.aria-label]="kpiInitiatedNotConsuming + ' started but inactive. Open Participants tab.'">
+          <span class="ac-tile-num">{{ kpiInitiatedNotConsuming | number }}</span>
+          <span class="ac-tile-label">Started, not consuming</span>
+          <span class="ac-tile-hint">initiated but inactive</span>
+          <span class="ac-tile-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+    </div>
+    <div class="ac-card ac-pipeline-bar">
+      <div class="ac-card-head">
+        <span class="ac-card-title">Pipeline by product</span>
+        <span class="ac-card-sub">funnel shape per product</span>
+      </div>
+      <div class="acp-legend">
+        <span class="acp-legend-item"><span class="acp-dot acp-dot-init"></span>Init</span>
+        <span class="acp-legend-item"><span class="acp-dot acp-dot-await"></span>Await</span>
+        <span class="acp-legend-item"><span class="acp-dot acp-dot-started"></span>Started</span>
+        <span class="acp-legend-item"><span class="acp-dot acp-dot-ongoing"></span>Ongoing</span>
+        <span class="acp-legend-item"><span class="acp-dot acp-dot-done"></span>Done</span>
+      </div>
+      <div class="acp-rows">
+        <ng-container *ngFor="let cardId of visibleCardIds; trackBy: trackByCardId">
+          <ng-container *ngIf="getCardFunnel(cardId) as f">
+            <div class="acp-row">
+              <span class="acp-name" [title]="getCardName(cardId)">{{ getCardName(cardId) }}</span>
+              <div class="acp-bar" *ngIf="getCardPipelineTotal(cardId) > 0; else acpEmpty">
+                <div class="acp-seg acp-seg-init" *ngIf="f.initiated.length > 0" [style.flex]="f.initiated.length"
+                  [title]="'Init: ' + f.initiated.length"></div>
+                <div class="acp-seg acp-seg-await" *ngIf="f.awaiting.length > 0" [style.flex]="f.awaiting.length"
+                  [title]="'Await: ' + f.awaiting.length"></div>
+                <div class="acp-seg acp-seg-started" *ngIf="f.started.length > 0" [style.flex]="f.started.length"
+                  [title]="'Started: ' + f.started.length"></div>
+                <div class="acp-seg acp-seg-ongoing" *ngIf="(f.ongoing?.length || 0) > 0"
+                  [style.flex]="f.ongoing?.length || 0" [title]="'Ongoing: ' + (f.ongoing?.length || 0)"></div>
+                <div class="acp-seg acp-seg-done" *ngIf="f.completed.length > 0" [style.flex]="f.completed.length"
+                  [title]="'Done: ' + f.completed.length"></div>
+              </div>
+              <ng-template #acpEmpty>
+                <div class="acp-bar acp-bar-empty">no pipeline</div>
+              </ng-template>
+              <span class="acp-total">{{ getCardPipelineTotal(cardId) | number }}</span>
+            </div>
+          </ng-container>
+        </ng-container>
+        <div class="acp-empty-state" *ngIf="visibleCardIds.length === 0">No products in current filter.</div>
+      </div>
+    </div>
+  </section>
+
+
   <mat-tab-group class="dd-tab-group" animationDuration="200ms" dynamicHeight
                  [(selectedIndex)]="outerTabIndex"
                  (selectedTabChange)="onOuterTabChange($event)">
     <mat-tab label="Overview">
       <ng-template matTabContent>
-  <!-- ========== PRODUCT ROWS (ported from design.html) ========== -->
-  <div class="dd-products">
-    <article class="dd-prow" *ngFor="let cardId of visibleCardIds; let i = index; trackBy: trackByCardId">
-      <div class="dd-prow__id">
-        <span class="dd-prow__dot" [ngClass]="productDotClass(i)"></span>
-        <div class="dd-prow__name-block">
-          <span class="dd-prow__name">{{ getCardName(cardId) }}</span>
-          <span class="dd-prow__sub" *ngIf="getCardSubNames(cardId).length > 0">{{ getCardSubNames(cardId).join(' · ') }}</span>
+  <!-- ========== VISIBLE PRODUCT CARDS ========== -->
+  <div class="grid">
+    <div class="card" *ngFor="let cardId of visibleCardIds; trackBy: trackByCardId">
+      <div class="card-top">
+        <div class="card-title-block">
+          <div class="card-title">{{ getCardName(cardId) }}</div>
+          <div class="card-subtitle" *ngIf="getCardSubNames(cardId).length > 0">{{ getCardSubNames(cardId).join(' · ') }}</div>
+        </div>
+        <div class="card-hero clickable" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
+          <span class="card-hero-num" [class.zero]="getCardGroupedFiltered(cardId).length === 0">{{ getCardGroupedFiltered(cardId).length | number }}</span>
+          <span class="card-hero-label">Eligible</span>
         </div>
       </div>
-      <div class="dd-prow__hero" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
-        <span class="dd-prow__hero-num" [class.zero]="getCardGroupedFiltered(cardId).length === 0">{{ getCardGroupedFiltered(cardId).length | number }}</span>
-        <span class="dd-prow__hero-lbl">Eligible</span>
-      </div>
-      <div class="dd-prow__chips">
-        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
-          <span class="dd-prow__chip-num">{{ getCardGroupedAll(cardId).length | number }}</span>
-          <span class="dd-prow__chip-lbl">Overall</span>
-        </div>
-        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
-          <span class="dd-prow__chip-num" [class.zero]="getCardGroupedNotEligible(cardId).length === 0"
-                                          [class.alert]="getCardGroupedNotEligible(cardId).length > 0">{{ getCardGroupedNotEligible(cardId).length | number }}</span>
-          <span class="dd-prow__chip-lbl">Not Elig.</span>
-        </div>
-        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
-          <span class="dd-prow__chip-num" [class.zero]="getCardGroupedPurchased(cardId).length === 0">{{ getCardGroupedPurchased(cardId).length | number }}</span>
-          <span class="dd-prow__chip-lbl">Purch.</span>
-        </div>
-        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
-          <span class="dd-prow__chip-num" [class.zero]="getCardGroupedBonus(cardId).length === 0">{{ getCardGroupedBonus(cardId).length | number }}</span>
-          <span class="dd-prow__chip-lbl">Bonus</span>
-        </div>
-      </div>
-      <div class="dd-prow__funnel">
-        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
-          <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{ getCardFunnel(cardId).initiated.length }}</span>
-          <span class="dd-fstep__lbl">Init</span>
-        </div>
-        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
-          <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{ getCardFunnel(cardId).awaiting.length | number }}</span>
-          <span class="dd-fstep__lbl">Await</span>
-        </div>
-        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'started', $event)">
-          <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{ getCardFunnel(cardId).started.length }}</span>
-          <span class="dd-fstep__lbl">Started</span>
-        </div>
-        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
-          <span class="dd-fstep__pill" [class.empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
-          <span class="dd-fstep__lbl">Ongoing</span>
-        </div>
-        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'completed', $event)">
-          <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{ getCardFunnel(cardId).completed.length }}</span>
-          <span class="dd-fstep__lbl">Done</span>
-        </div>
-      </div>
-      <div class="dd-prow__time">
-        <div class="dd-ts" (click)="openCardAvgModal(cardId, 'initToStart', $event)">
-          <span class="dd-ts__val" [class.zero]="getCardAvgInitToStart(cardId) === 0">{{ getCardAvgInitToStart(cardId) }}<span class="u">d</span></span>
-          <span class="dd-ts__lbl">Init &rarr; Start</span>
-        </div>
-        <div class="dd-ts" (click)="openCardAvgModal(cardId, 'startToComplete', $event)">
-          <span class="dd-ts__val" [class.zero]="getCardAvgStartToComplete(cardId) === 0">{{ getCardAvgStartToComplete(cardId) }}<span class="u">d</span></span>
-          <span class="dd-ts__lbl">Start &rarr; Done</span>
-        </div>
-      </div>
-      <div class="dd-prow__status">
-        <button class="dd-statpill dd-statpill--ongoing" type="button"
-          (click)="openCardFunnelModal(cardId, 'ongoing', $event); $event.stopPropagation()">
-          <span class="dd-statdot dd-statdot--ongoing"></span>{{ getCardFunnel(cardId).ongoing?.length || 0 }} ongoing
+
+      <div class="chip-row">
+        <button class="chip chip-overall clickable" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedAll(cardId).length | number }}</span>
+          <span class="chip-label">Overall</span>
         </button>
-        <span class="dd-statpill"><span class="dd-statdot"></span>{{ getCardNonActiveSub(cardId) }} idle</span>
+        <button class="chip chip-noteligible clickable" [class.chip-empty]="getCardGroupedNotEligible(cardId).length === 0"
+          (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedNotEligible(cardId).length | number }}</span>
+          <span class="chip-label">Not Eligible</span>
+        </button>
+        <button class="chip chip-purchased clickable" [class.chip-empty]="getCardGroupedPurchased(cardId).length === 0"
+          (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedPurchased(cardId).length | number }}</span>
+          <span class="chip-label">Purchased</span>
+        </button>
+        <button class="chip chip-bonus clickable" [class.chip-empty]="getCardGroupedBonus(cardId).length === 0"
+          (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedBonus(cardId).length | number }}</span>
+          <span class="chip-label">Bonus</span>
+        </button>
       </div>
-    </article>
+
+      <div class="funnel-section">
+        <div class="section-label">Journey Funnel</div>
+        <div class="funnel-bars">
+          <div class="funnel-bar funnel-bar-1 clickable" [class.funnel-bar-empty]="getCardFunnel(cardId).initiated.length === 0"
+            (click)="openCardFunnelModal(cardId, 'initiated', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(cardId).initiated.length }}</span>
+            <span class="funnel-bar-label">Init</span>
+          </div>
+          <div class="funnel-bar funnel-bar-2 clickable" [class.funnel-bar-empty]="getCardFunnel(cardId).awaiting.length === 0"
+            (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(cardId).awaiting.length | number }}</span>
+            <span class="funnel-bar-label">Await</span>
+          </div>
+          <div class="funnel-bar funnel-bar-3 clickable" [class.funnel-bar-empty]="getCardFunnel(cardId).started.length === 0"
+            (click)="openCardFunnelModal(cardId, 'started', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(cardId).started.length }}</span>
+            <span class="funnel-bar-label">Started</span>
+          </div>
+          <div class="funnel-bar funnel-bar-4 clickable" [class.funnel-bar-empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0"
+            (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
+            <span class="funnel-bar-label">Ongoing</span>
+          </div>
+          <div class="funnel-bar funnel-bar-5 clickable funnel-bar-done"
+            (click)="openCardFunnelModal(cardId, 'completed', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(cardId).completed.length }}</span>
+            <span class="funnel-bar-label">Done</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="card-footer-left">
+          <div class="time-stat clickable" (click)="openCardAvgModal(cardId, 'initToStart', $event)">
+            <span class="time-stat-value" [class.zero]="getCardAvgInitToStart(cardId) === 0">{{ getCardAvgInitToStart(cardId) }}<span class="time-stat-unit">d</span></span>
+            <span class="time-stat-label">Init &rarr; Start</span>
+          </div>
+          <div class="time-stat clickable" (click)="openCardAvgModal(cardId, 'startToComplete', $event)">
+            <span class="time-stat-value" [class.zero]="getCardAvgStartToComplete(cardId) === 0">{{ getCardAvgStartToComplete(cardId) }}<span class="time-stat-unit">d</span></span>
+            <span class="time-stat-label">Start &rarr; Done</span>
+          </div>
+        </div>
+        <div class="card-footer-right">
+          <button class="sub-pill sub-pill-ongoing sub-pill-clickable" type="button"
+            (click)="openCardFunnelModal(cardId, 'ongoing', $event); $event.stopPropagation()"
+            [attr.aria-label]="(getCardFunnel(cardId).ongoing?.length || 0) + ' ongoing participants in ' + getCardName(cardId)">
+            <span class="sub-dot sub-dot-ongoing" aria-hidden="true"></span>{{ getCardFunnel(cardId).ongoing?.length || 0 }} ongoing
+          </button>
+          <span class="sub-pill"><span class="sub-dot sub-dot-inactive"></span>{{ getCardNonActiveSub(cardId) }} idle</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ========== HIDDEN PRODUCTS TOGGLE ========== -->
@@ -1487,5 +1749,4 @@
       </ng-template>
     </mat-tab>
   </mat-tab-group>
-</div><!-- /.dd-app -->
 </div>

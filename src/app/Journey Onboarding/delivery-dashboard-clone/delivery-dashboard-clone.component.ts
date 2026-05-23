@@ -1,8 +1,8 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core'; // getFireStore
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
-import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, getFirestore, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
 import { Observable, Subscription, combineLatest } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -20,6 +20,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { AnalyticsService, VelocityRow, FunnelRow, UtilizationRow } from './analytics.service';
 
 interface TableHeader {
     key: string;
@@ -131,7 +132,12 @@ export class DeliveryDashboardCloneComponent {
     @ViewChild('tabGroup') tabGroup: any;
     filterForm: FormGroup;
 
-    firestoreForm: any = getFirestore('firestore-forms');
+    // Outer mat-tab-group selectedIndex (Overview=0, Analytics=1, Participants=2)
+    outerTabIndex: number = 0;
+
+    // Stages chip loading state (5-8s data fetch needs visible feedback)
+    stagesLoading: boolean = false;
+
     // Boolean declarations
     isLoading = true;
     subscriptions: any = {};
@@ -222,8 +228,12 @@ export class DeliveryDashboardCloneComponent {
         'Test-Glimpse',
         'Breakthrough Extreme Diagnostics & Implementation',
         'Evolution Prep',
-        'A&H Custom Motherhood Excellence Solution for Wife'
+        'A&H Custom Motherhood Excellence Solution for Wife',
+        'Test new'
     ]);
+
+    // Specialist section collapsed-by-default UX state (Option A redesign)
+    specialistCollapsed = true;
 
     // Merged product groups: display name -> product names
     mergedGroups: { [groupName: string]: string[] } = {
@@ -257,10 +267,15 @@ export class DeliveryDashboardCloneComponent {
     productIdToGroup: { [productId: string]: string } = {};
     hiddenProductIds: Set<string> = new Set();
 
-    // Date filter
-    selectedTimeFilter: string = 'all';
-    dateRangeStart: Date | null = null;
-    dateRangeEnd: Date | null = null;
+    // Date filter — default to Last 30 days per sanity-check feedback
+    // (this-month was masking pipeline counts when run early in a calendar month)
+    selectedTimeFilter: string = '30days';
+    dateRangeStart: Date | null = (() => {
+        const n = new Date();
+        const today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+        return new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    })();
+    dateRangeEnd: Date | null = new Date();
     range = new FormGroup({
         start: new FormControl<Date | null>(null),
         end: new FormControl<Date | null>(null),
@@ -273,6 +288,7 @@ export class DeliveryDashboardCloneComponent {
 
     private allFetchedAppointments: any[] = [];
     journeyFlowLoading: boolean = false;
+    appointmentsAccessible: boolean = true;
     journeyMonthPicker = new FormControl<Date>(new Date());
 
     originalData = {
@@ -334,17 +350,6 @@ export class DeliveryDashboardCloneComponent {
     private ticketRequestSubscription: Subscription;
 
     columns = {
-        "eiCustomSolutions": [
-            "Total Eligible",
-            "Past Month",
-            "This Month",
-            "Next Month",
-            "Diagnostics",
-            "Implementation",
-            "Review",
-            "Celebration Call"
-        ],
-
         "eiStarterPack": [
             "Total Eligible",
             "Past Month",
@@ -393,12 +398,6 @@ export class DeliveryDashboardCloneComponent {
             'Diagnostics',
             'Implementation',
             'Post Session Check-in',
-            'Celebration Call'
-        ],
-        'EI Solution': [
-            'Diagnostics',
-            'Implementation',
-            'Review',
             'Celebration Call'
         ]
     };
@@ -489,27 +488,17 @@ export class DeliveryDashboardCloneComponent {
     participantLoading = false;
 
     productData: any = {
-        eiCustomSolutions: {
-            totalEligible: [],
-            pastMonth: [],
-            thisMonth: [],
-            nextMonth: [],
-            diagnostics: [],
-            implementation: [],
-            review: [],
-            celebrationCall: []
-        },
         eiStarterPack: {
             totalEligible: [],
             pastMonth: [],
             thisMonth: [],
             nextMonth: [],
             onBoarded: [],
-            preprocess: [],
             upcomingDIAppointments: [],
             reports: [],
             celebrationCall: []
         },
+
         criticalSupport: {
             totalEligible: [],
             request: [],
@@ -551,6 +540,7 @@ export class DeliveryDashboardCloneComponent {
         private router: Router,
         private fb: FormBuilder,
         private injector: Injector,
+        private analyticsSvc: AnalyticsService,
         private datepipe: DatePipe,
     ) {
         this.filterForm = this.fb.group({
@@ -559,6 +549,142 @@ export class DeliveryDashboardCloneComponent {
             product: [[]]
         });
 
+        this.filterForm.get('product')!.valueChanges.subscribe(() => {
+            this.onProductMultiFilterChange();
+        });
+
+    }
+
+    get productFilterControl(): FormControl {
+        return this.filterForm.get('product') as FormControl;
+    }
+
+    private shortenProductName(rawName: string): string {
+        if (!rawName) return '';
+        const norm = rawName.toLowerCase().trim();
+        const matched = (this.products || []).find((p: any) =>
+            (p?.value || '').toLowerCase().trim() === norm ||
+            (p?.label || '').toLowerCase().trim() === norm
+        );
+        return matched?.label || rawName;
+    }
+
+    cardLabelForProductId(productId: string): string {
+        const groups = this.mergedGroupIds || {};
+        for (const groupName of Object.keys(groups)) {
+            const ids = groups[groupName];
+            if (ids && (ids instanceof Set ? ids.has(productId) : (ids as any)[productId] !== undefined)) {
+                return groupName;
+            }
+        }
+        return this.shortenProductName(this.mapProductName?.[productId] || '');
+    }
+
+    // ----- Memoization for hot getters (clear via invalidateMemos()) -------
+    private _memo = new Map<string, any>();
+    private invalidateMemos(): void { this._memo.clear(); }
+    private memoGet<T>(key: string, compute: () => T): T {
+        if (!this._memo.has(key)) this._memo.set(key, compute());
+        return this._memo.get(key);
+    }
+
+    trackByCardId = (_: number, id: string) => id;
+
+    get availableCardLabels(): string[] {
+        return this.memoGet('acl', () => {
+            const labels = new Set<string>();
+            for (const item of this.allMatchedProductsRaw || []) {
+                const pid = item?.productref?.id;
+                if (!pid) continue;
+                const label = this.cardLabelForProductId(pid);
+                if (label) labels.add(label);
+            }
+            return Array.from(labels).sort();
+        });
+    }
+
+    get allProductsSelected(): boolean {
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        const all = this.availableCardLabels;
+        return all.length > 0 && sel.length === all.length;
+    }
+
+    get productFilterActive(): boolean {
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length > 0 && !this.allProductsSelected;
+    }
+
+    get productSelectTrigger(): string {
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        const all = this.availableCardLabels;
+        if (sel.length === 0 || sel.length === all.length) return 'All products';
+        if (sel.length === 1) return sel[0];
+        return `${sel.length} products selected`;
+    }
+
+    toggleAllProducts(checked: boolean) {
+        this.productFilterControl?.setValue(checked ? [...this.availableCardLabels] : []);
+    }
+
+    get activeFilterSummary(): string {
+        const parts: string[] = [];
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        const all = this.availableCardLabels;
+        if (sel.length > 0 && sel.length < all.length) {
+            parts.push(sel.length === 1 ? sel[0] : `${sel.length} products`);
+        }
+        const tf = this.selectedTimeFilter;
+        const tfLabel: Record<string, string> = {
+            today: 'Today', '7days': '7 days', '30days': '30 days',
+            thismonth: 'This month', custom: 'Custom range'
+        };
+        if (tf && tf !== 'all' && tfLabel[tf]) parts.push(tfLabel[tf]);
+        return parts.join(' · ');
+    }
+
+    itemPassesProductFilter(item: any): boolean {
+        if (!this.productFilterActive) return true;
+        const pid = item?.productref?.id;
+        if (!pid) return false;
+        const label = this.cardLabelForProductId(pid);
+        if (!label) return false;
+        return ((this.productFilterControl.value as string[]) || []).includes(label);
+    }
+
+    private resolveProductLabel(picked: string): string | null {
+        // Direct match (e.g., 'EI Starter Pack' is both card label and mapProductGroupId key)
+        if (this.mapProductGroupId?.[picked]) return picked;
+        // Indirect match: the multi-select shows the full product NAME from Firestore
+        // (e.g., 'Critical Support Diagnostics and Implementation') but
+        // mapProductGroupId is keyed by the short label (e.g., 'Critical Support').
+        const norm = (picked || '').toLowerCase().trim();
+        const found = (this.products || []).find((p: any) =>
+            (p?.value || '').toLowerCase().trim() === norm ||
+            (p?.label || '').toLowerCase().trim() === norm
+        );
+        if (found && this.mapProductGroupId?.[found.label]) return found.label;
+        return null;
+    }
+
+    async onProductMultiFilterChange() {
+        if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
+        // Filter changed → flush memoized getters (visibleCardIds, allProductIdsFromRaw, etc.)
+        this.invalidateMemos();
+        const sel = (this.productFilterControl.value as string[]) || [];
+        let known: string | null = null;
+        if (this.productFilterActive && sel.length >= 1) {
+            for (const label of sel) {
+                const resolved = this.resolveProductLabel(label);
+                if (resolved) { known = resolved; break; }
+            }
+        }
+        if (known) {
+            this.selectedProductLabel = known;
+        } else {
+            this.clearStats();
+        }
+        // applyDateFilter rebuilds gated data and (when label is set) re-runs selectProduct
+        await this.applyDateFilter();
     }
 
     async ngOnInit() {
@@ -749,6 +875,8 @@ export class DeliveryDashboardCloneComponent {
     ]);
 
     async applyDateFilter() {
+        // Invalidate memoized getters — fresh data is about to land.
+        this.invalidateMemos();
         try {
             const groupedAll = {};
             const groupedFiltered = {};
@@ -765,6 +893,7 @@ export class DeliveryDashboardCloneComponent {
             for (const item of this.allMatchedProductsRaw) {
                 const productId = item?.productref?.id;
                 if (!productId) continue;
+                if (!this.itemPassesProductFilter(item)) continue;
 
                 const status = item?.status?.toLowerCase?.() || null;
                 const profileId = item?.profileid;
@@ -844,6 +973,16 @@ export class DeliveryDashboardCloneComponent {
         } catch (err) {
             console.log("error apply date filter", err);
         }
+
+        // Universal filter: rehydrate Stages section against freshly gated data
+        if (this.selectedProductLabel) {
+            await this.selectProduct(this.selectedProductLabel);
+        }
+
+        // Repopulate the actionable cohorts (Participants tab) from the
+        // freshly gated participantsproduct data. Stage-based, not appointment-
+        // based — so it works even when the appointments read is denied.
+        this.populateActionableCohorts();
     }
 
     getConversionRate(cardId: string): number {
@@ -855,17 +994,9 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
+        this.stagesLoading = true;
+
         this.productData = {
-            eiCustomSolutions: {
-                totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
-                diagnostics: [],
-                implementation: [],
-                review: [],
-                celebrationCall: []
-            },
             eiStarterPack: {
                 totalEligible: [],
                 pastMonth: [],
@@ -897,20 +1028,17 @@ export class DeliveryDashboardCloneComponent {
             await this.FilterReportData(productId);
             if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
-        if (product === 'EI Solution') {
-            this.selectedColumns = this.columns.eiCustomSolutions;
-            await this.filterProductData('eiCustomSolutions', product, productId);
-            await this.filterStageData('eiCustomSolutions');
-        }
+
         if (product === 'EI Starter Pack') {
             this.selectedColumns = this.columns.eiStarterPack;
             await this.filterProductData('eiStarterPack', product, productId);
         } else if (product === 'Critical Support') {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
-            await this.filterStageData('criticalSupport');
+            await this.filterStageData();
         }
         this.participantLoading = false;
+        this.stagesLoading = false;
     }
 
     async filterAppointmentsByType(): Promise<void> {
@@ -983,11 +1111,24 @@ export class DeliveryDashboardCloneComponent {
                             resolve();
                         },
                         error: (err) => {
-                            console.error("Error loading appointments:", err);
+                            // Defensive degrade: a Firestore permission denial on
+                            // the 'appointments' collection means the user's role
+                            // can't read appointment-level detail. Keep the page
+                            // alive — Stages columns are sourced from
+                            // participantsproduct + funnelData and continue to work.
+                            const denied = err?.code === 'permission-denied' ||
+                                /permission|insufficient/i.test(err?.message || '');
+                            if (denied) {
+                                console.warn("Appointments not accessible for this role; degrading gracefully.", err);
+                                this.appointmentsAccessible = false;
+                                this.allAppointments = [];
+                            } else {
+                                console.error("Error loading appointments:", err);
+                            }
                             this.loadingStates.appointments = true;
                             this.journeyFlowLoading = false;
                             this.cdr.detectChanges();
-                            reject(err);
+                            resolve();
                         }
                     });
                 this.appointmentsSubscription.add(sub);
@@ -1003,27 +1144,17 @@ export class DeliveryDashboardCloneComponent {
 
     async filterProductData(productType: string, product: string, productId: string) {
         let productData: any = {
-            eiCustomSolutions: {
-                totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
-                diagnostics: [],
-                implementation: [],
-                review: [],
-                celebrationCall: []
-            },
             eiStarterPack: {
                 totalEligible: [],
                 pastMonth: [],
                 thisMonth: [],
                 nextMonth: [],
                 onBoarded: [],
-                preprocess: [],
                 upcomingDIAppointments: [],
                 reports: [],
                 celebrationCall: []
             },
+
             criticalSupport: {
                 totalEligible: [],
                 request: this.ticketRequest.length ? this.ticketRequest : [],
@@ -1042,7 +1173,8 @@ export class DeliveryDashboardCloneComponent {
             const totalEligible = this.getCardGroupedFiltered(productId);
             if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
-            } else if (this.selectedProductType === 'eiStarterPack') {
+            }
+            else if (this.selectedProductType === 'eiStarterPack') {
                 for (let data of totalEligible) {
                     const { status, tentativestart } = data;
 
@@ -1052,21 +1184,7 @@ export class DeliveryDashboardCloneComponent {
                             const date = tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, this.selectedProductType);
-                        }
-                    }
-                };
-            } else if (this.selectedProductType === 'eiCustomSolutions') {
-                for (let data of totalEligible) {
-                    const { status, tentativestart } = data;
-
-                    if (status === null || status === "initiated") {
-                        if (!tentativestart) productData.eiCustomSolutions.totalEligible.push(data);
-                        else if (tentativestart) {
-                            const date = tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, this.selectedProductType);
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData);
                         }
                     }
                 };
@@ -1078,6 +1196,14 @@ export class DeliveryDashboardCloneComponent {
             for (let data of ongoingData) {
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
+                await Promise.all(
+                    appointments.map(async (appointment) => {
+                        if (!appointment.appointmentTypeName) {
+                            appointment.appointmentTypeName =
+                                await this.resolveAppointmentType(appointment);
+                        }
+                    })
+                );
 
                 const attendedAppointments = appointments.filter(app => app.attended === true || app.status === 'submitted');
                 let mergedData = {
@@ -1087,53 +1213,20 @@ export class DeliveryDashboardCloneComponent {
 
                 if (attendedAppointments.length === 0) {
                     if (this.selectedProductType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
-                    else if (this.selectedProductType === 'eiStarterPack') {
+                    if (this.selectedProductType === 'eiStarterPack') {
                         if (!data.tentativestart) {
                             productData.eiStarterPack.totalEligible.push(mergedData);
                         } else {
                             const date = data.tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, this.selectedProductType);
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData);
                         }
                     }
                 }
                 else if (attendedAppointments.length > 0) {
-                    // ========================= EI CUSTOM SOLUTIONS =========================
-                    if (this.selectedProductType === 'eiCustomSolutions') {
-                        const reviewAppointment = attendedAppointments.find(app =>
-                            app.appointmentTypeName?.toLowerCase() === `ei review`
-                        );
-                        const implementationAppointment = attendedAppointments.find(app =>
-                            app.appointmentTypeName?.toLowerCase() === `ei implementation`
-                        );
-
-                        const diagnosticsAppointment = attendedAppointments.find(app =>
-                            app.appointmentTypeName?.toLowerCase() === `ei diagnostics`
-                        );
-
-                        if (reviewAppointment) {
-                            productData.eiCustomSolutions.review.push({
-                                ...mergedData,
-                                ...reviewAppointment
-                            });
-
-                        }
-                        else if (implementationAppointment) {
-                            productData.eiCustomSolutions.implementation.push({
-                                ...mergedData,
-                                ...implementationAppointment
-                            });
-
-                        } else if (diagnosticsAppointment) {
-                            productData.eiCustomSolutions.diagnostics.push({
-                                ...mergedData,
-                                ...diagnosticsAppointment
-                            });
-                        }
-                    }
                     // ========================= EI STARTER PACK =========================
-                    else if (this.selectedProductType === 'eiStarterPack') {
+                    if (productType === 'eiStarterPack') {
                         const celebrationCallAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
                         );
@@ -1179,7 +1272,7 @@ export class DeliveryDashboardCloneComponent {
                         }
                     }
                     // ========================= CRITICAL SUPPORT =========================
-                    else if (this.selectedProductType === 'criticalSupport') {
+                    else if (productType === 'criticalSupport') {
 
                         const postprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support post form'
@@ -1201,7 +1294,7 @@ export class DeliveryDashboardCloneComponent {
                             app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-
+                       
                         if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
@@ -1247,11 +1340,11 @@ export class DeliveryDashboardCloneComponent {
                     allappointments: appointments
                 };
 
-                if (this.selectedProductType === 'eiCustomSolutions') {
-                    productData.eiCustomSolutions.celebrationCall.push(data);
-                } else if (this.selectedProductType === 'eiStarterPack') {
+                if (productType === 'eiStarterPack') {
                     productData.eiStarterPack.celebrationCall.push(data);
-                } else if (this.selectedProductType === 'criticalSupport') {
+                }
+
+                if (productType === 'criticalSupport') {
                     productData.criticalSupport.completion.push(data);
                 }
             }
@@ -1262,7 +1355,7 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any, productType: any) {
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
         let mergedData: any;
         if (allappointments !== null && allappointments?.length > 0) {
             mergedData = { ...data, allappointments: allappointments }
@@ -1271,21 +1364,21 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
-            productData[productType].thisMonth.push(mergedData);
+            productData.eiStarterPack.thisMonth.push(mergedData);
         }
         else if (
             (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
         ) {
-            productData[productType].pastMonth.push(mergedData);
+            productData.eiStarterPack.pastMonth.push(mergedData);
         }
         else if (
             (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
         ) {
-            productData.productType.nextMonth.push(mergedData);
+            productData.eiStarterPack.nextMonth.push(mergedData);
         }
-        else productData[productType].totalEligible.push(mergedData);
+        else productData.eiStarterPack.totalEligible.push(mergedData);
     }
 
     async fetchTicketRiseParticipants() {
@@ -1324,7 +1417,7 @@ export class DeliveryDashboardCloneComponent {
                 .slice(i, i + 10)
                 .map(item => item.docid);
             const q = query(
-                collection(this.firestoreForm, 'formsByClient'),
+                collection(this.firestore, 'formsByClient'),
                 where('participantproductid', 'in', chunk)
             );
             const obs$ = runInInjectionContext(this.injector, () =>
@@ -1439,21 +1532,12 @@ export class DeliveryDashboardCloneComponent {
         return match?.appointmenttype;
     }
 
-    async filterStageData(product: string) {
-        let stageConfig = [];
-        if (product === 'criticalSupport') {
-            stageConfig = [
-                { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
-                { key: 'implementation', appointmentType: 'Critical Support Implementation' },
-                { key: 'review', appointmentType: 'Critical Support Review' }
-            ];
-        } else if (product === 'eiCustomSolutions') {
-            stageConfig = [
-                { key: 'diagnostics', appointmentType: 'EI Diagnostics' },
-                { key: 'implementation', appointmentType: 'EI Implementation' },
-                { key: 'review', appointmentType: 'EI Review' }
-            ];
-        }
+    async filterStageData() {
+        const stageConfig = [
+            { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
+            { key: 'implementation', appointmentType: 'Critical Support Implementation' },
+            { key: 'review', appointmentType: 'Critical Support Review' }
+        ];
 
         stageConfig.forEach(stage => {
             this.stageData[stage.key] = this.filterAppointmentsForStage(stage.appointmentType);
@@ -1504,30 +1588,19 @@ export class DeliveryDashboardCloneComponent {
     updateFilteredCards() {
         const search = this.searchText?.toLowerCase().trim() || '';
         let sources: any = {};
-        if (this.selectedProductType === 'eiCustomSolutions') {
-            sources = {
-                0: this.productData.eiCustomSolutions.totalEligible || [],
-                1: this.productData.eiCustomSolutions.pastMonth || [],
-                2: this.productData.eiCustomSolutions.thisMonth || [],
-                3: this.productData.eiCustomSolutions.nextMonth || [],
-                4: this.productData.eiCustomSolutions.diagnostics || [],
-                5: this.productData.eiCustomSolutions.implementation || [],
-                6: this.productData.eiCustomSolutions.review || [],
-                7: this.productData.eiCustomSolutions.celebrationCall || []
-            };
-        } else if (this.selectedProductType === 'eiStarterPack') {
+        if (this.selectedProductType === 'eiStarterPack') {
             sources = {
                 0: this.productData.eiStarterPack.totalEligible || [],
                 1: this.productData.eiStarterPack.pastMonth || [],
                 2: this.productData.eiStarterPack.thisMonth || [],
                 3: this.productData.eiStarterPack.nextMonth || [],
                 4: this.productData.eiStarterPack.onBoarded || [],
-                5: this.productData.eiStarterPack.preprocess || [],
                 6: this.productData.eiStarterPack.upcomingDIAppointments || [],
                 7: this.productData.eiStarterPack.report || [],
                 8: this.productData.eiStarterPack.celebrationCall || []
             };
-        } else if (this.selectedProductType === 'criticalSupport') {
+        }
+        else if (this.selectedProductType === 'criticalSupport') {
             sources = {
                 0: this.productData.criticalSupport.totalEligible || [],
                 1: this.productData.criticalSupport.request || [],
@@ -2009,42 +2082,263 @@ export class DeliveryDashboardCloneComponent {
     }
 
     get visibleCardIds(): string[] {
-        const allProductIds = this.allProductIdsFromRaw;
-        const seen = new Set<string>();
-        const result: string[] = [];
+        return this.memoGet('vci', () => {
+            const allProductIds = this.allProductIdsFromRaw;
+            const seen = new Set<string>();
+            const result: string[] = [];
 
-        for (const groupName of Object.keys(this.mergedGroupIds)) {
-            const groupPids = this.mergedGroupIds[groupName];
-            const hasData = [...groupPids].some((pid) => allProductIds.has(pid)); // Temporary
-            if (hasData) { // Temporary
-                result.push('group:' + groupName);
-                for (const pid of groupPids) seen.add(pid);
-            } // Temporary
-        }
+            for (const groupName of Object.keys(this.mergedGroupIds)) {
+                const groupPids = this.mergedGroupIds[groupName];
+                const hasData = [...groupPids].some((pid) => allProductIds.has(pid));
+                if (hasData) {
+                    result.push('group:' + groupName);
+                    for (const pid of groupPids) seen.add(pid);
+                }
+            }
 
-        for (const pid of allProductIds) {
-            if (seen.has(pid)) continue;
-            if (this.hiddenProductIds.has(pid)) continue;
-            result.push(pid);
-        }
+            for (const pid of allProductIds) {
+                if (seen.has(pid)) continue;
+                if (this.hiddenProductIds.has(pid)) continue;
+                result.push(pid);
+            }
 
-        return result.sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+            return result.sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+        });
     }
 
     get hiddenCardIds(): string[] {
-        const allProductIds = this.allProductIdsFromRaw;
-        return [...allProductIds]
-            .filter((pid) => this.hiddenProductIds.has(pid))
-            .sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+        return this.memoGet('hci', () => {
+            const allProductIds = this.allProductIdsFromRaw;
+            return [...allProductIds]
+                .filter((pid) => this.hiddenProductIds.has(pid))
+                .sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+        });
+    }
+
+    // ===== Option A redesign: top-of-page KPIs derived from existing data =====
+    get kpiActivePipeline(): number {
+        return this.memoGet('kpiAP', () =>
+            this.visibleCardIds.reduce(
+                (sum, id) => sum + this.getCardGroupedFiltered(id).length, 0
+            )
+        );
+    }
+    get kpiOngoingTotal(): number {
+        return this.memoGet('kpiOG', () =>
+            this.visibleCardIds.reduce(
+                (sum, id) => sum + (this.getCardFunnel(id)?.ongoing?.length || 0), 0
+            )
+        );
+    }
+    getCardOngoing(cardId: string): number {
+        return this.getCardFunnel(cardId)?.ongoing?.length || 0;
+    }
+    get kpiReadyToInitiate(): number {
+        return this.originalData?.['readyForInitiation']?.count || 0;
+    }
+    get kpiStuck(): number {
+        return this.originalData?.['stuckCases']?.count || 0;
+    }
+    get kpiAwaitingTotal(): number {
+        return this.originalData?.['awaitingInitiation']?.count || 0;
+    }
+    get kpiInitiatedNotConsuming(): number {
+        return this.originalData?.['currentJourneyInitiated']?.count || 0;
+    }
+    get kpiCompletedTotal(): number {
+        return this.getCompletionSummary().totalCompleted;
+    }
+    get kpiAvgComplete(): number {
+        return this.getCompletionSummary().avgStartToDone;
+    }
+    get hasSpecialistData(): boolean {
+        return (this.slotOverview?.totalSlots || 0) > 0;
+    }
+
+    // ===== Ported design getters (delivery-dashboard hero focuses on ongoing) =====
+    // (kpiOngoingTotal already exists above; ongoingByCard delegates to getCardOngoing)
+    ongoingByCard(cardId: string): number {
+        return this.getCardOngoing(cardId);
+    }
+    get ongoingMaxAcrossProducts(): number {
+        return Math.max(1, ...this.visibleCardIds.map(id => this.getCardOngoing(id)));
+    }
+    ongoingPctOfMax(cardId: string): number {
+        const v = this.getCardOngoing(cardId);
+        return Math.max(4, Math.round((v / this.ongoingMaxAcrossProducts) * 100));
+    }
+    // Stage column → color modifier class (Stages kanban)
+    stageColorClass(stage: string): string {
+        if (!stage) return 'col--eligible';
+        const s = stage.toLowerCase().trim();
+        if (s.includes('eligible'))      return 'col--eligible';
+        if (s.includes('request'))       return 'col--request';
+        if (s.includes('pre-process')
+         || s.includes('preprocess')
+         || s.includes('welcome'))       return 'col--preprocess';
+        if (s.includes('diagnostic'))    return 'col--diagnostic';
+        if (s.includes('implement'))     return 'col--implement';
+        if (s.includes('review'))        return 'col--review';
+        if (s.includes('complet')
+         || s.includes('post-process')
+         || s.includes('celebration')
+         || s.includes('check-in'))      return 'col--completion';
+        return 'col--eligible';
+    }
+    // Dot color class for product rows (cycles through 5-color set by index)
+    productDotClass(idx: number): string {
+        const palette = ['dot-indigo', 'dot-teal', 'dot-emerald', 'dot-amber', 'dot-violet'];
+        return palette[idx % palette.length];
+    }
+    // Participants tab count (sum across the 3 sub-cohorts)
+    get participantsTotalCount(): number {
+        return (this.originalData?.['awaitingInitiation']?.count || 0)
+             + (this.originalData?.['currentJourneyInitiated']?.count || 0)
+             + (this.originalData?.['stuckCases']?.count || 0);
+    }
+
+    // ===== Action Center → Participants tab deep-links (Batch A) =====
+    // Maps an attention tile to (outer tab index, participants sub-tab index, optional activeFilter).
+    // Tab indices: outer 0=Overview, 1=Analytics, 2=Participants
+    // Inner sub-tabs: 0=Awaiting Initiation, 1=Initiated–Not Consuming, 2=Stuck Cases
+    navToAttention(target: 'stuck' | 'awaiting' | 'ready' | 'idle') {
+        this.outerTabIndex = 2;
+        switch (target) {
+            case 'stuck':
+                this.currentTabIndex = 2;
+                this.activeFilter = 'none';
+                break;
+            case 'awaiting':
+                this.currentTabIndex = 0;
+                this.activeFilter = 'none';
+                break;
+            case 'ready':
+                this.currentTabIndex = 0;
+                this.activeFilter = 'readyForInitiation';
+                break;
+            case 'idle':
+                this.currentTabIndex = 1;
+                this.activeFilter = 'none';
+                break;
+        }
+        if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
+        // Re-trigger paginated data for the newly active sub-tab
+        try { this.filterTableData?.(); } catch { /* ignore if not ready */ }
+    }
+
+    // Human-readable active sub-tab name for the Export button label
+    get participantsActiveTabName(): string {
+        switch (this.currentTabIndex) {
+            case 0: return 'Awaiting';
+            case 1: return 'Idle';
+            case 2: return 'Stuck';
+            default: return '';
+        }
+    }
+
+    // Bulk Initiate Ready — confirmation gate (Batch B)
+    bulkInitiateReady() {
+        const readyCount = this.kpiReadyToInitiate;
+        if (readyCount === 0) {
+            alert('No participants are currently in the Ready state to initiate.');
+            return;
+        }
+        const ok = confirm(
+            `Bulk-initiate ${readyCount} participant${readyCount === 1 ? '' : 's'}?\n\n` +
+            `This will trigger the initiation flow for everyone currently in the Ready state. ` +
+            `This action cannot be undone in one click.`
+        );
+        if (!ok) return;
+        // Surface intent — actual bulk logic is not yet implemented in the backend.
+        alert(`Bulk-initiate triggered for ${readyCount} participant${readyCount === 1 ? '' : 's'}. ` +
+              `Backend wiring is pending — this is a UX-confirmed stub.`);
+    }
+
+    // First-letter monogram for a product (replaces emoji icons in Completion History).
+    // 1 word → first 2 letters; 2 words → 2 initials; 3+ words → 3 initials.
+    // Avoids collisions when several products share a common prefix
+    // (e.g., "EI Solution" vs "EI Starter Pack" both starting with "EI").
+    productMonogram(name: string): string {
+        if (!name) return '?';
+        const cleaned = name.trim().replace(/^[^a-zA-Z0-9]+/, '');
+        const parts = cleaned.split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '?';
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        if (parts.length === 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return (parts[0][0] + parts[1][0] + parts[2][0]).toUpperCase();
+    }
+
+    // Per-product pipeline total for the Action Center mini-funnel rows
+    getCardPipelineTotal(cardId: string): number {
+        const f = this.getCardFunnel(cardId);
+        return (f?.initiated?.length || 0)
+             + (f?.awaiting?.length || 0)
+             + (f?.started?.length || 0)
+             + (f?.ongoing?.length || 0)
+             + (f?.completed?.length || 0);
+    }
+
+    // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
+    private _sparkCacheKey = '';
+    private _sparkCache: { ready: number[]; stuck: number[]; completed: number[] } = { ready: [], stuck: [], completed: [] };
+    private buildSparkData() {
+        const ids = this.visibleCardIds;
+        const key = ids.join('|') + ':' + this.selectedTimeFilter;
+        if (this._sparkCacheKey === key) return this._sparkCache;
+        const ready: number[] = [];
+        const stuck: number[] = [];
+        const completed: number[] = [];
+        const stuckByProfile = new Set((this.originalData?.['stuckCases']?.data || []).map((d: any) => d?.profileid));
+        const readyByProfile = new Set((this.originalData?.['readyForInitiation']?.data || []).map((d: any) => d?.profileid));
+        for (const id of ids) {
+            const pids = this.getCardProductIds(id);
+            const items = pids.flatMap(p => this.groupedFiltered?.[p] || []);
+            const profileSet = new Set(items.map((i: any) => i?.profileid));
+            let r = 0, s = 0;
+            profileSet.forEach((pid) => {
+                if (readyByProfile.has(pid)) r++;
+                if (stuckByProfile.has(pid)) s++;
+            });
+            ready.push(r);
+            stuck.push(s);
+            completed.push(this.getCardFunnel(id)?.completed?.length || 0);
+        }
+        this._sparkCache = { ready, stuck, completed };
+        this._sparkCacheKey = key;
+        return this._sparkCache;
+    }
+    get sparkReady(): number[]     { return this.buildSparkData().ready; }
+    get sparkStuck(): number[]     { return this.buildSparkData().stuck; }
+    get sparkCompleted(): number[] { return this.buildSparkData().completed; }
+    sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
+
+    // Avg-time gauge benchmark
+    avgTimeTarget = 30;
+    get avgTimePct(): number {
+        const v = this.kpiAvgComplete || 0;
+        return Math.min(150, Math.round((v / this.avgTimeTarget) * 100));
+    }
+
+    // Live "last updated" stamp (set on construction, recomputed via getter)
+    lastUpdated = new Date();
+    get lastUpdatedRelative(): string {
+        const diff = Math.floor((Date.now() - this.lastUpdated.getTime()) / 1000);
+        if (diff < 5) return 'just now';
+        if (diff < 60) return diff + 's ago';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        return Math.floor(diff / 3600) + 'h ago';
     }
 
     get allProductIdsFromRaw(): Set<string> {
-        const ids = new Set<string>();
-        for (const item of this.allMatchedProductsRaw) {
-            const pid = item['productref']?.id;
-            if (pid) ids.add(pid);
-        }
-        return ids;
+        return this.memoGet('apidsR', () => {
+            const ids = new Set<string>();
+            for (const item of this.allMatchedProductsRaw) {
+                if (!this.itemPassesProductFilter(item)) continue;
+                const pid = item['productref']?.id;
+                if (pid) ids.add(pid);
+            }
+            return ids;
+        });
     }
 
     getCardProductIds(cardId: string): string[] {
@@ -2060,7 +2354,7 @@ export class DeliveryDashboardCloneComponent {
         if (cardId.startsWith('group:')) {
             return cardId.replace('group:', '');
         }
-        return this.mapProductName[cardId] || 'Unknown';
+        return this.shortenProductName(this.mapProductName[cardId] || '') || 'Unknown';
     }
 
     getCardSubNames(cardId: string): string[] {
@@ -2760,9 +3054,6 @@ export class DeliveryDashboardCloneComponent {
         else if (appointmentTypeName === 'Critical Support Diagnostics') return 'Diagnostics: ';
         else if (appointmentTypeName === 'Critical Support Implementation') return 'Implementation: ';
         else if (appointmentTypeName === 'Critical Support Review') return 'Review: ';
-        else if (appointmentTypeName === 'EI Diagnostics') return 'Diagnostics: ';
-        else if (appointmentTypeName === 'EI Implementation') return 'Implementation: ';
-        else if (appointmentTypeName === 'EI Review') return 'Review: ';
         else return '';
     }
 
@@ -2771,10 +3062,7 @@ export class DeliveryDashboardCloneComponent {
         const validAppointments = [
             `Critical Support Diagnostics`,
             `Critical Support Implementation`,
-            `Critical Support Review`,
-            `EI Diagnostics`,
-            `EI Implementation`,
-            `EI Review`
+            `Critical Support Review`
         ];
 
         if (status?.status === 'Open') return this.formatDate(status.date);
@@ -2805,7 +3093,7 @@ export class DeliveryDashboardCloneComponent {
         const diffTime = today.getTime() - date.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-        return `${diffDays} day${(diffDays !== 1 && diffDays !== 0) ? 's' : ''}`;
+        return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
     }
 
     showDelayDate(c: any): string {
@@ -4082,7 +4370,9 @@ export class DeliveryDashboardCloneComponent {
 
     getCompletionProducts(): CompletionProduct[] {
         const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#14b8a6', '#6366f1', '#ef4444', '#0891b2', '#be123c', '#7c3aed'];
-        const icons = ['🌱', '💡', '✨', '🔬', '🎯', '📦', '⚡', '🔮', '🎨', '🚀'];
+        // Monogram fallback: per-card monogram is computed from the product name (see productMonogram)
+        // Keep this stub for shape compatibility with downstream `product.icon` consumers.
+        const icons = ['', '', '', '', '', '', '', '', '', ''];
         const iconBgs = ['#eff6ff', '#f5f3ff', '#ecfdf5', '#fffbeb', '#f0fdfa', '#eef2ff', '#fef2f2', '#e0f2fe', '#fce7f3', '#ede9fe'];
 
         const buildProduct = (cardId: string, ci: number): CompletionProduct => {
@@ -4255,7 +4545,9 @@ export class DeliveryDashboardCloneComponent {
 
     private buildCompletionProduct(cardId: string, ci: number): CompletionProduct {
         const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#14b8a6', '#6366f1', '#ef4444', '#0891b2', '#be123c', '#7c3aed'];
-        const icons = ['🌱', '💡', '✨', '🔬', '🎯', '📦', '⚡', '🔮', '🎨', '🚀'];
+        // Monogram fallback: per-card monogram is computed from the product name (see productMonogram)
+        // Keep this stub for shape compatibility with downstream `product.icon` consumers.
+        const icons = ['', '', '', '', '', '', '', '', '', ''];
         const iconBgs = ['#eff6ff', '#f5f3ff', '#ecfdf5', '#fffbeb', '#f0fdfa', '#eef2ff', '#fef2f2', '#e0f2fe', '#fce7f3', '#ede9fe'];
 
         const funnel = this.getCardFunnel(cardId);
@@ -4481,5 +4773,275 @@ export class DeliveryDashboardCloneComponent {
         this.groupedByStageProfileAll = {};
         this.selectedFilter = 'all';
         this.selectedStageFilter = '';
+    }
+
+    // ===== Analytics tab =================================================
+
+    analyticsLoading = false;
+    analyticsLoaded = false;
+    analyticsError: string | null = null;
+    analyticsVelocity: VelocityRow[] = [];
+    analyticsFunnel: FunnelRow[] = [];
+    analyticsUtilization: UtilizationRow[] = [];
+
+    onOuterTabChange(event: any) {
+        const label = event?.tab?.textLabel || '';
+        if (label === 'Analytics' && !this.analyticsLoaded) {
+            this.loadAnalytics();
+        }
+    }
+
+    async loadAnalytics(): Promise<void> {
+        if (this.analyticsLoading) return;
+        this.analyticsLoading = true;
+        this.analyticsError = null;
+        try {
+            const sel = (this.productFilterControl?.value as string[]) || [];
+            const productIds = this.productFilterActive && sel.length > 0 ? sel : null;
+            const [velocity, funnel, utilization] = await Promise.all([
+                this.analyticsSvc.completionVelocity({ weeks: 12, productIds }),
+                this.analyticsSvc.funnelDropoff({ productIds }),
+                this.analyticsSvc.specialistUtilization({ weeks: 8 }),
+            ]);
+            this.analyticsVelocity = velocity;
+            this.analyticsFunnel = funnel;
+            this.analyticsUtilization = utilization;
+            this.analyticsLoaded = true;
+        } catch (e: any) {
+            this.analyticsError = e?.message || 'Failed to load analytics';
+            console.warn('Analytics load failed', e);
+        } finally {
+            this.analyticsLoading = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    // ---- Velocity chart view-model ----------------------------------------
+
+    get velocityChart(): {
+        weeks: string[];
+        yMax: number;
+        lines: { product: string; pathD: string; points: { x: number; y: number; count: number }[]; color: string }[];
+        width: number;
+        height: number;
+        pad: { l: number; r: number; t: number; b: number };
+    } {
+        const rows = this.analyticsVelocity;
+        const w = 720, h = 220;
+        const pad = { l: 36, r: 14, t: 12, b: 26 };
+        if (rows.length === 0) {
+            return { weeks: [], yMax: 1, lines: [], width: w, height: h, pad };
+        }
+        const weeks = Array.from(new Set(rows.map(r => r.week))).sort();
+        const products = Array.from(new Set(rows.map(r => r.product_id))).sort();
+        const palette = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#0891b2'];
+        const yMax = Math.max(1, ...rows.map(r => r.completions));
+        const plotW = w - pad.l - pad.r;
+        const plotH = h - pad.t - pad.b;
+        const xStep = weeks.length > 1 ? plotW / (weeks.length - 1) : 0;
+        const xAt = (i: number) => pad.l + i * xStep;
+        const yAt = (v: number) => pad.t + (plotH - (v / yMax) * plotH);
+        const lines = products.map((p, idx) => {
+            const points = weeks.map((wk, i) => {
+                const row = rows.find(r => r.week === wk && r.product_id === p);
+                const c = row?.completions || 0;
+                return { x: xAt(i), y: yAt(c), count: c };
+            });
+            const pathD = points
+                .map((pt, i) => (i === 0 ? `M${pt.x},${pt.y}` : `L${pt.x},${pt.y}`))
+                .join(' ');
+            return { product: p, pathD, points, color: palette[idx % palette.length] };
+        });
+        return { weeks, yMax, lines, width: w, height: h, pad };
+    }
+
+    // ---- Funnel view-model -----------------------------------------------
+
+    get funnelChart(): {
+        products: { product: string; stages: { stage: string; count: number; pct: number }[]; total: number }[];
+    } {
+        const stageOrder: FunnelRow['stage'][] = ['initiated', 'awaiting', 'started', 'ongoing', 'completed'];
+        const products = Array.from(new Set(this.analyticsFunnel.map(r => r.product_id))).sort();
+        return {
+            products: products.map(p => {
+                const stages = stageOrder.map(s => {
+                    const row = this.analyticsFunnel.find(r => r.product_id === p && r.stage === s);
+                    return { stage: s, count: row?.count || 0, pct: 0 };
+                });
+                const top = stages[0]?.count || 1;
+                stages.forEach(s => s.pct = top > 0 ? Math.round((s.count / top) * 100) : 0);
+                return { product: p, stages, total: top };
+            })
+        };
+    }
+
+    // ---- Specialist utilization view-model -------------------------------
+
+    get utilizationChart(): {
+        specialists: { specialist_id: string; profile_ref: string; weeks: { week: string; util: number; booked: number; available: number }[]; avgUtil: number }[];
+    } {
+        const bySpec = new Map<string, UtilizationRow[]>();
+        for (const r of this.analyticsUtilization) {
+            const arr = bySpec.get(r.specialist_id) || [];
+            arr.push(r);
+            bySpec.set(r.specialist_id, arr);
+        }
+        const specs: any[] = [];
+        bySpec.forEach((rows, id) => {
+            const sorted = rows.slice().sort((a, b) => a.week.localeCompare(b.week));
+            const avgUtil = sorted.length
+                ? sorted.reduce((s, r) => s + r.utilization, 0) / sorted.length
+                : 0;
+            specs.push({
+                specialist_id: id,
+                profile_ref: sorted[0]?.profile_ref || id,
+                weeks: sorted.map(r => ({
+                    week: r.week,
+                    util: r.utilization,
+                    booked: r.booked,
+                    available: r.available,
+                })),
+                avgUtil,
+            });
+        });
+        specs.sort((a, b) => b.avgUtil - a.avgUtil);
+        return { specialists: specs };
+    }
+
+    velocityWeekLabel(week: string): string {
+        // Compact label: "May 18" or just "18" depending on chart density
+        if (!week) return '';
+        const d = new Date(week);
+        const m = d.toLocaleString('en-US', { month: 'short' });
+        return `${m} ${d.getDate()}`;
+    }
+
+    utilTone(util: number): string {
+        if (util >= 0.85) return 'high';
+        if (util >= 0.6) return 'med';
+        if (util >= 0.3) return 'low';
+        return 'min';
+    }
+
+    // ===== Actionable cohorts (populates the Participants tab from stage data) =====
+    //
+    // The original populator was appointment-driven (line 2787 area), so it returned
+    // empty whenever appointments couldn't be read (permission denial) or whenever a
+    // participant had never had an appointment. This stage-based populator walks
+    // participantsproduct directly (the data the Stages section already uses) and
+    // categorizes every actionable participant into one of three buckets, mapped to
+    // the PM table's column shape.
+
+    private readonly IDLE_DAYS = 7;
+    private readonly STUCK_DAYS = 15;
+
+    private daysSinceTs(ts: any): number {
+        if (!ts) return 0;
+        const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+        if (!d || isNaN(d.getTime())) return 0;
+        return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
+    }
+
+    populateActionableCohorts(): void {
+        const awaiting: any[] = [];
+        const idle: any[] = [];
+        const stuck: any[] = [];
+
+        const rejected = new Set(['rejected', 'cancelled', 'inactive']);
+
+        for (const item of this.allMatchedProductsRaw || []) {
+            if (!this.itemPassesProductFilter(item)) continue;
+
+            const profileId = item?.profileid;
+            if (!profileId) continue;
+            const meta = this.mapMetaData?.[profileId] || {};
+            const status = (item?.status || '').toString().toLowerCase().trim();
+            if (status === 'completed' || rejected.has(status)) continue;
+
+            const mode = (meta['participantmode'] || '').toString().toLowerCase().trim();
+            const totalPaid = parseInt(meta['pp_totalpaid'] ?? '0') || 0;
+            const totalPurchaseValue = parseInt(meta['pp_totalpurchasevalue'] ?? '0') || 0;
+            const totalBalance = totalPurchaseValue - totalPaid;
+            const minPayment = parseInt(item?.['minimumpayment']) || 0;
+            const isEligible = !this.excludedModes.has(mode)
+                && (totalBalance <= 0 || totalPaid >= minPayment);
+            const financialdata = isEligible ? 'Cleared' : 'Not Scheduled';
+
+            const productId = item?.productref?.id;
+            const productName = this.shortenProductName(this.mapProductName?.[productId] || '');
+            const journeyId = item?.journeyref?.id || meta['activejourney'];
+            const journeyName = this.mapjourneyname?.[journeyId] || 'N/A';
+
+            const sd = item?.statusdate || {};
+            const onboarded = meta['onboardedtime'] || sd['initiated'] || null;
+            const initiated = sd['initiated'] || null;
+            const lastActivity = sd['ongoing'] || sd['started'] || sd['initiated'] || onboarded;
+            const lastPayment = meta['lastpaymentdate'] || meta['lastpayment'] || null;
+
+            const daysSinceOnboarded = this.daysSinceTs(onboarded);
+            const daysSinceInitiated = this.daysSinceTs(initiated);
+            const daysSinceActivity = this.daysSinceTs(lastActivity);
+
+            // --- Awaiting Initiation -------------------------------------
+            // Payment cleared (eligible), and status is null/empty (not yet initiated)
+            if (!status && isEligible) {
+                awaiting.push({
+                    profileid: profileId,
+                    journey: journeyName,
+                    onboardedtime: onboarded,
+                    waitingperiod: daysSinceOnboarded,
+                    financialdata,
+                    lastpaymentdate: lastPayment,
+                    bottleneck: 'Ready for Initiation',
+                });
+                continue;
+            }
+
+            // --- Initiated · Not Consuming -------------------------------
+            // status='initiated' and idle > IDLE_DAYS
+            if (status === 'initiated' && daysSinceInitiated >= this.IDLE_DAYS) {
+                idle.push({
+                    profileid: profileId,
+                    journey: journeyName,
+                    initiatedtime: initiated,
+                    waitingperiod: daysSinceInitiated,
+                    generalnotes: [],
+                });
+            }
+
+            // --- Stuck Cases ----------------------------------------------
+            // In any active stage (initiated/ongoing) and no movement > STUCK_DAYS
+            if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
+                const days = daysSinceActivity;
+                const escalation = days > 30 ? 'HIGH' : days > 21 ? 'MEDIUM' : 'LOW';
+                stuck.push({
+                    profileid: profileId,
+                    activejourney: journeyName,
+                    product: productName || 'N/A',
+                    appointment: 'N/A',
+                    appointmentstatus: 'N/A',
+                    issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
+                    date: lastActivity,
+                    waitingperiod: days,
+                    lastaction: status,
+                    assignedto: 'Unassigned',
+                    escalationlevel: escalation,
+                    generalnotes: [],
+                });
+            }
+        }
+
+        this.originalData['awaitingInitiation'].data  = awaiting;
+        this.originalData['awaitingInitiation'].count = awaiting.length;
+        this.originalData['currentJourneyInitiated'].data  = idle;
+        this.originalData['currentJourneyInitiated'].count = idle.length;
+        this.originalData['stuckCases'].data  = stuck;
+        this.originalData['stuckCases'].count = stuck.length;
+
+        // Pagination depends on these arrays; recalc if a table is currently mounted.
+        if (typeof this.calculatePagination === 'function') {
+            this.calculatePagination();
+            this.updatePaginatedData?.();
+        }
     }
 }
