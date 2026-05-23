@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core'; // getFireStore
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector, NgZone } from '@angular/core'; // getFireStore
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -20,7 +20,6 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { AnalyticsService, VelocityRow, FunnelRow, UtilizationRow } from './analytics.service';
 
 interface TableHeader {
     key: string;
@@ -102,6 +101,27 @@ interface SpecialistRow {
     utilizationPct: number;
     utilizationNote?: string;
     utilizationNoteColor?: string;
+}
+
+interface VelocityRow {
+    week: string;
+    product_id: string;
+    completions: number;
+}
+
+interface FunnelRow {
+    product_id: string;
+    stage: 'initiated' | 'awaiting' | 'started' | 'ongoing' | 'completed';
+    count: number;
+}
+
+interface UtilizationRow {
+    specialist_id: string;
+    profile_ref: string;
+    week: string;
+    booked: number;
+    available: number;
+    utilization: number;
 }
 
 @Component({
@@ -453,6 +473,7 @@ export class DeliveryDashboardCloneComponent {
     };
 
     specialistLoading = false;
+    specialistLoadProgress = '';   // e.g. "12 / 53"
     specialistSlotsInitialized = false;
     specialistDisplayMonth = '';
     specialistStartDate: Date | null = null;
@@ -540,8 +561,8 @@ export class DeliveryDashboardCloneComponent {
         private router: Router,
         private fb: FormBuilder,
         private injector: Injector,
-        private analyticsSvc: AnalyticsService,
         private datepipe: DatePipe,
+        private ngZone: NgZone,
     ) {
         this.filterForm = this.fb.group({
             search: [''],
@@ -688,6 +709,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async ngOnInit() {
+        this.startLastUpdatedTimer();
         this.setCurrentMonth();
         this.initializeMonthFilter();
         try {
@@ -833,6 +855,11 @@ export class DeliveryDashboardCloneComponent {
         this.appointmentsSubscription?.unsubscribe();
         this.formsSubscription?.unsubscribe();
         this.ticketRequestSubscription?.unsubscribe();
+        // Clear the "last updated" timer
+        if (this._lastUpdatedTimer) {
+            clearInterval(this._lastUpdatedTimer);
+            this._lastUpdatedTimer = null;
+        }
     }
 
     onFilterClick(filter: string) {
@@ -908,6 +935,11 @@ export class DeliveryDashboardCloneComponent {
                 const packageId = item?.packageref?.id;
 
                 if (!['completed', 'ongoing'].includes(status)) {
+                    // ── Pre-completion pool (Total, Eligible, Not Elig., Purchased, Bonus) ──
+                    // All four participant-count columns use the same base filter:
+                    // exclude completed and ongoing so the sums are consistent:
+                    //   Total = Eligible + Not Elig.
+                    //   Eligible = Purchased + Bonus
                     (groupedAll[productId] ||= []).push(item);
 
                     if (isEligible) {
@@ -921,7 +953,18 @@ export class DeliveryDashboardCloneComponent {
                                 (groupedNextMonth[productId] ||= []).push(item);
                             }
                         }
-                    } else (groupedNotEligible[productId] ||= []).push(item);
+
+                        // Purchased / Bonus split — inside same status guard so they match Eligible.
+                        // Addons are treated as Purchased (both are paid/entitled, non-bonus).
+                        if (packageId && this.bonusPackageLookup[packageId]) {
+                            (groupedBonus[productId] ||= []).push(item);
+                        } else {
+                            // Standard purchase OR addons package — both go into Purchased
+                            (groupedPurchased[productId] ||= []).push(item);
+                        }
+                    } else {
+                        (groupedNotEligible[productId] ||= []).push(item);
+                    }
                 }
 
                 if (!funnelData[productId]) {
@@ -938,16 +981,7 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 if (isEligible) {
-                    // Grouping
-                    if (packageId && this.bonusPackageIds.has(packageId)) {
-                        (groupedBonus[productId] ||= []).push(item);
-                    } else if (packageId && this.addonsPackageIds.has(packageId)) {
-                        (groupedAddons[productId] ||= []).push(item);
-                    } else {
-                        (groupedPurchased[productId] ||= []).push(item);
-                    }
-
-                    // Funnel Data
+                    // Funnel Data (includes ongoing/completed — separate from the participant-count columns)
                     if (!status) {
                         funnelData[productId].awaiting.push(item);
                     } else if (status === 'initiated') {
@@ -1686,6 +1720,25 @@ export class DeliveryDashboardCloneComponent {
         });
     };
 
+    onSpecialistExpandToggle() {
+        this.specialistCollapsed = !this.specialistCollapsed;
+        if (!this.specialistCollapsed && !this.specialistSlotsInitialized) {
+            this.initSpecialistDateRange();
+            this.loadSpecialistBaseData();
+            // Re-wire the date-range subscription so changing the picker re-fetches data
+            this.specialistRange.valueChanges.subscribe((val) => {
+                if (val.start && val.end) {
+                    this.specialistStartDate = val.start;
+                    this.specialistEndDate = val.end;
+                    this.updateSpecialistDisplayMonth();
+                    if (this.specialistSlotsInitialized) {
+                        this.fetchSpecialistSlotsAndCompute();
+                    }
+                }
+            });
+        }
+    }
+
     initSpecialistDateRange() {
         const now = new Date();
         this.specialistStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1724,12 +1777,16 @@ export class DeliveryDashboardCloneComponent {
         this.cdr.detectChanges();
 
         try {
+            console.log('[Specialist] Step 1: querying products (mode=Priority Mode)...');
             const productsSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'products'),
                     where('mode', '==', 'Priority Mode')
                 ))
             );
+
+            console.log(`[Specialist] Step 1 done: ${productsSnap.docs.length} Priority Mode products found`);
+            console.log('[Specialist] Step 2: querying productToDeliverySequence...');
 
             const deliveryPromises = productsSnap.docs.map((productDoc) =>
                 runInInjectionContext(this.injector, () =>
@@ -1767,6 +1824,9 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
 
+            console.log(`[Specialist] Step 2 done: ${activityFetchList.length} activity refs to fetch`);
+            console.log('[Specialist] Step 3: fetching activity docs...');
+
             const activityResults: { productDoc: any; productName: string; activityRef: any; snap: any }[] = [];
             const actBatchSize = 15;
 
@@ -1781,6 +1841,8 @@ export class DeliveryDashboardCloneComponent {
                 );
                 activityResults.push(...batchResults);
             }
+
+            console.log(`[Specialist] Step 3 done: ${activityResults.length} activity docs fetched`);
 
             const seenTypeIds = new Set<string>();
             this.specialistSequences = [];
@@ -1803,6 +1865,8 @@ export class DeliveryDashboardCloneComponent {
                     appointmentTypeId,
                 });
             }
+
+            console.log(`[Specialist] Step 4: ${this.specialistSequences.length} unique appointment types → querying AppointmentType-To-Roles & Roles-To-EIS...`);
 
             const roleBatchSize = 10;
 
@@ -1854,24 +1918,24 @@ export class DeliveryDashboardCloneComponent {
             }
 
             this.specialistSlotsInitialized = true;
-            await this.fetchSpecialistSlotsAndCompute();
+            // TODO: availability slot fetching disabled — too many Firestore queries (53 sequences).
+            // Uncomment when a more efficient query strategy is in place.
+            // await this.fetchSpecialistSlotsAndCompute();
+            this.specialistLoading = false;
+            this.cdr.detectChanges();
 
         } catch (error) {
             console.error('Error loading specialist base data:', error);
-
-            if (retryCount < 2) {
-                setTimeout(() => this.loadSpecialistBaseData(retryCount + 1), 2000);
-                return;
-            }
-
             this.specialistLoading = false;
             this.cdr.detectChanges();
         }
     }
 
-    async fetchSpecialistSlotsAndCompute(retryCount = 0) {
+    async fetchSpecialistSlotsAndCompute() {
         if (!this.specialistStartDate || !this.specialistEndDate) return;
 
+        const total = this.specialistSequences.length;
+        console.log(`[Specialist] Step 5: fetching availability slots for ${total} sequences sequentially, range: ${this.specialistStartDate?.toDateString()} – ${this.specialistEndDate?.toDateString()}`);
         this.specialistLoading = true;
         this.cdr.detectChanges();
 
@@ -1882,72 +1946,76 @@ export class DeliveryDashboardCloneComponent {
             const rangeEnd = new Date(this.specialistEndDate);
             rangeEnd.setHours(23, 59, 59, 999);
 
-            const results = await Promise.all(
-                this.specialistSequences.map(async (seq) => {
-                    const typeId = seq.appointmentTypeId;
-                    const roles = this.specialistRolesMap[typeId] || [];
-                    const eisMap = this.specialistEISMap[typeId] || {};
-                    const matchedSlots: any[] = [];
-                    const availabilityPromises: Promise<void>[] = [];
+            const results: any[] = [];
 
-                    for (const role of roles) {
-                        const eisProfiles = eisMap[role] || [];
+            // Process sequences one at a time — firing all 50+ × roles × EIS queries in parallel
+            // overwhelms Firestore. Sequential is slower per-query but finishes reliably.
+            for (let i = 0; i < this.specialistSequences.length; i++) {
+                const seq = this.specialistSequences[i];
+                const typeId = seq.appointmentTypeId;
+                const roles = this.specialistRolesMap[typeId] || [];
+                const eisMap = this.specialistEISMap[typeId] || {};
+                const matchedSlots: any[] = [];
 
-                        for (const eisProfile of eisProfiles) {
-                            const promise = runInInjectionContext(this.injector, () =>
-                                getDocs(query(
-                                    collection(this.firestore, 'availability'),
-                                    where('profileref', '==', doc(this.firestore, eisProfile)),
-                                    where('appointments', 'array-contains', doc(this.firestore, 'appointmenttype/' + typeId)),
-                                    where('starttime', '>=', rangeStart),
-                                    where('starttime', '<=', rangeEnd)
-                                ))
-                            ).then((snapshot) => {
-                                snapshot.forEach((slotDoc) => {
-                                    const slotArray = slotDoc.data()[typeId];
+                for (const role of roles) {
+                    const eisProfiles = eisMap[role] || [];
 
-                                    if (!Array.isArray(slotArray)) return;
+                    for (const eisProfile of eisProfiles) {
+                        const snapshot = await runInInjectionContext(this.injector, () =>
+                            getDocs(query(
+                                collection(this.firestore, 'availability'),
+                                where('profileref', '==', doc(this.firestore, eisProfile)),
+                                where('appointments', 'array-contains', doc(this.firestore, 'appointmenttype/' + typeId)),
+                                where('starttime', '>=', rangeStart),
+                                where('starttime', '<=', rangeEnd)
+                            ))
+                        );
 
-                                    for (const slot of slotArray) {
-                                        const slotStart = slot.slotstart?.toDate?.() || (slot.slotstart ? new Date(slot.slotstart) : null);
+                        snapshot.forEach((slotDoc) => {
+                            const slotArray = slotDoc.data()[typeId];
+                            if (!Array.isArray(slotArray)) return;
 
-                                        if (!slotStart || slotStart < rangeStart || slotStart > rangeEnd) continue;
+                            for (const slot of slotArray) {
+                                const slotStart = slot.slotstart?.toDate?.() || (slot.slotstart ? new Date(slot.slotstart) : null);
+                                if (!slotStart || slotStart < rangeStart || slotStart > rangeEnd) continue;
 
-                                        matchedSlots.push({
-                                            booked: slot.booked || false,
-                                            available: slot.available || false,
-                                            eisprofile: eisProfile,
-                                        });
-                                    }
+                                matchedSlots.push({
+                                    booked: slot.booked || false,
+                                    available: slot.available || false,
+                                    eisprofile: eisProfile,
                                 });
-                            });
-
-                            availabilityPromises.push(promise);
-                        }
+                            }
+                        });
                     }
+                }
 
-                    await Promise.all(availabilityPromises);
+                results.push({
+                    appointmentType: typeId,
+                    appointmentLabel: seq.appointmentType,
+                    productName: seq.productName,
+                    productId: seq.productId,
+                    slots: matchedSlots,
+                });
 
-                    return {
-                        appointmentType: typeId,
-                        appointmentLabel: seq.appointmentType,
-                        productName: seq.productName,
-                        productId: seq.productId,
-                        slots: matchedSlots,
-                    };
-                })
-            );
+                // Update progress display every 5 sequences so the user sees movement
+                if ((i + 1) % 5 === 0 || i === total - 1) {
+                    this.specialistLoadProgress = `${i + 1} / ${total}`;
+                    console.log(`[Specialist] Step 5 progress: ${i + 1}/${total}`);
+                    this.cdr.detectChanges();
+                }
+            }
 
             this.specialistAllSlots = results;
+            this.specialistLoadProgress = '';
+            const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
+            console.log(`[Specialist] Step 5 done: ${totalSlotsFetched} slots across ${results.length} sequences`);
             this.computeSpecialistDisplayData();
+            console.log(`[Specialist] Done: ${this.specialistData.length} specialists in table`);
 
         } catch (error) {
+            // Log but don't retry via setTimeout — delayed retries would set specialistLoading=true
+            // again after the analytics section has already rendered, causing a persistent spinner.
             console.error('Error fetching specialist slots:', error);
-            if (retryCount < 2) {
-                console.log(`Retrying specialist slots (attempt ${retryCount + 1})...`);
-                setTimeout(() => this.fetchSpecialistSlotsAndCompute(retryCount + 1), 2000);
-                return;
-            }
         } finally {
             this.specialistLoading = false;
             this.cdr.detectChanges();
@@ -2319,14 +2387,33 @@ export class DeliveryDashboardCloneComponent {
         return Math.min(150, Math.round((v / this.avgTimeTarget) * 100));
     }
 
-    // Live "last updated" stamp (set on construction, recomputed via getter)
+    // Live "last updated" stamp — stored string so Angular's double-check pass sees the same value.
+    // Updated every 5 s outside the Angular zone to avoid NG0100.
     lastUpdated = new Date();
-    get lastUpdatedRelative(): string {
+    lastUpdatedRelative = 'just now';
+    private _lastUpdatedTimer: ReturnType<typeof setInterval> | null = null;
+
+    private computeLastUpdatedRelative(): string {
         const diff = Math.floor((Date.now() - this.lastUpdated.getTime()) / 1000);
         if (diff < 5) return 'just now';
         if (diff < 60) return diff + 's ago';
         if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
         return Math.floor(diff / 3600) + 'h ago';
+    }
+
+    private startLastUpdatedTimer() {
+        if (this._lastUpdatedTimer) return;
+        this.ngZone.runOutsideAngular(() => {
+            this._lastUpdatedTimer = setInterval(() => {
+                const next = this.computeLastUpdatedRelative();
+                if (next !== this.lastUpdatedRelative) {
+                    this.ngZone.run(() => {
+                        this.lastUpdatedRelative = next;
+                        this.cdr.markForCheck();
+                    });
+                }
+            }, 5000);
+        });
     }
 
     get allProductIdsFromRaw(): Set<string> {
@@ -4385,7 +4472,7 @@ export class DeliveryDashboardCloneComponent {
             let purchasedCompletions = 0;
             for (const item of completedItems) {
                 const packageId = item['packageref']?.id;
-                if (packageId && this.bonusPackageIds.has(packageId)) {
+                if (packageId && this.bonusPackageLookup[packageId]) {
                     bonusCompletions++;
                 } else {
                     purchasedCompletions++;
@@ -4559,7 +4646,7 @@ export class DeliveryDashboardCloneComponent {
         let purchasedCompletions = 0;
         for (const item of completedItems) {
             const packageId = item['packageref']?.id;
-            if (packageId && this.bonusPackageIds.has(packageId)) {
+            if (packageId && this.bonusPackageLookup[packageId]) {
                 bonusCompletions++;
             } else {
                 purchasedCompletions++;
@@ -4786,7 +4873,10 @@ export class DeliveryDashboardCloneComponent {
 
     onOuterTabChange(event: any) {
         const label = event?.tab?.textLabel || '';
-        if (label === 'Analytics' && !this.analyticsLoaded) {
+        if (label === 'Analytics') {
+            // Always reload — analytics are computed in-memory so this is instant.
+            // This ensures the charts reflect the current product-filter selection.
+            this.analyticsLoaded = false;
             this.loadAnalytics();
         }
     }
@@ -4796,16 +4886,15 @@ export class DeliveryDashboardCloneComponent {
         this.analyticsLoading = true;
         this.analyticsError = null;
         try {
-            const sel = (this.productFilterControl?.value as string[]) || [];
-            const productIds = this.productFilterActive && sel.length > 0 ? sel : null;
-            const [velocity, funnel, utilization] = await Promise.all([
-                this.analyticsSvc.completionVelocity({ weeks: 12, productIds }),
-                this.analyticsSvc.funnelDropoff({ productIds }),
-                this.analyticsSvc.specialistUtilization({ weeks: 8 }),
-            ]);
+            // Use visibleCardIds (same product set as Overview) so analytics always matches.
+            const visibleProductNames = this.visibleCardIds.map(id => this.getCardName(id));
+
+            // 1. Load velocity — this is fast (in-memory compute).
+            //    Don't await specialist here: that chain is 5 collections deep and can be slow.
+            //    We load it independently so the section appears immediately.
+            const velocity = await this.completionVelocity({ weeks: 12, productIds: visibleProductNames });
             this.analyticsVelocity = velocity;
-            this.analyticsFunnel = funnel;
-            this.analyticsUtilization = utilization;
+            // funnelChart reads directly from funnelData — no separate load needed.
             this.analyticsLoaded = true;
         } catch (e: any) {
             this.analyticsError = e?.message || 'Failed to load analytics';
@@ -4814,6 +4903,12 @@ export class DeliveryDashboardCloneComponent {
             this.analyticsLoading = false;
             this.cdr.detectChanges();
         }
+
+        // 2. Specialist slot load — disabled until fetchSpecialistSlotsAndCompute is optimised.
+        // if (!this.specialistSlotsInitialized) {
+        //     this.initSpecialistDateRange();
+        //     this.loadSpecialistBaseData();
+        // }
     }
 
     // ---- Velocity chart view-model ----------------------------------------
@@ -4827,8 +4922,8 @@ export class DeliveryDashboardCloneComponent {
         pad: { l: number; r: number; t: number; b: number };
     } {
         const rows = this.analyticsVelocity;
-        const w = 720, h = 220;
-        const pad = { l: 36, r: 14, t: 12, b: 26 };
+        const w = 720, h = 234;
+        const pad = { l: 36, r: 14, t: 26, b: 26 };
         if (rows.length === 0) {
             return { weeks: [], yMax: 1, lines: [], width: w, height: h, pad };
         }
@@ -4858,19 +4953,27 @@ export class DeliveryDashboardCloneComponent {
     // ---- Funnel view-model -----------------------------------------------
 
     get funnelChart(): {
-        products: { product: string; stages: { stage: string; count: number; pct: number }[]; total: number }[];
+        products: { product: string; stages: { stage: string; label: string; count: number; pct: number; color: string }[]; total: number }[];
     } {
-        const stageOrder: FunnelRow['stage'][] = ['initiated', 'awaiting', 'started', 'ongoing', 'completed'];
-        const products = Array.from(new Set(this.analyticsFunnel.map(r => r.product_id))).sort();
+        // Uses the same funnelData as the Overview (time-filtered + product-filtered via visibleCardIds)
+        // so Analytics and Overview always agree on numbers.
+        const stageKeys = ['initiated', 'awaiting', 'started', 'ongoing', 'completed'] as const;
+        const stageLabels: Record<string, string> = { initiated: 'Initiated', awaiting: 'Awaiting', started: 'Started', ongoing: 'Ongoing', completed: 'Completed' };
+        const stageColors: Record<string, string> = { initiated: '#a78bfa', awaiting: '#fb923c', started: '#60a5fa', ongoing: '#818cf8', completed: '#34d399' };
+
         return {
-            products: products.map(p => {
-                const stages = stageOrder.map(s => {
-                    const row = this.analyticsFunnel.find(r => r.product_id === p && r.stage === s);
-                    return { stage: s, count: row?.count || 0, pct: 0 };
-                });
-                const top = stages[0]?.count || 1;
-                stages.forEach(s => s.pct = top > 0 ? Math.round((s.count / top) * 100) : 0);
-                return { product: p, stages, total: top };
+            products: this.visibleCardIds.map(cardId => {
+                const funnel = this.getCardFunnel(cardId);
+                const stages = stageKeys.map(s => ({
+                    stage: s,
+                    label: stageLabels[s],
+                    count: (funnel[s] as any[])?.length || 0,
+                    pct: 0,
+                    color: stageColors[s],
+                }));
+                const total = stages.reduce((sum, s) => sum + s.count, 0) || 1;
+                stages.forEach(s => s.pct = Math.round((s.count / total) * 100));
+                return { product: this.getCardName(cardId), stages, total };
             })
         };
     }
@@ -4921,6 +5024,215 @@ export class DeliveryDashboardCloneComponent {
         if (util >= 0.6) return 'med';
         if (util >= 0.3) return 'low';
         return 'min';
+    }
+
+    // ===== Analytics — real Firestore data =================================
+
+    /** Convert any Firestore Timestamp / Date / epoch to a JS Date, or null. */
+    private tsToDate(ts: any): Date | null {
+        if (!ts) return null;
+        if (ts?.toDate) return ts.toDate() as Date;
+        if (ts instanceof Date) return ts;
+        if (typeof ts === 'number') return new Date(ts);
+        return null;
+    }
+
+    /** Return the ISO date string (YYYY-MM-DD) for the Monday of the given date's week. */
+    private weekMonday(d: Date): string {
+        const day = new Date(d);
+        const dow = (day.getDay() + 6) % 7; // 0 = Mon … 6 = Sun
+        day.setDate(day.getDate() - dow);
+        day.setHours(0, 0, 0, 0);
+        return day.toISOString().slice(0, 10);
+    }
+
+    /**
+     * Completion Velocity — counts participants whose `statusdate.completed`
+     * timestamp falls within each of the last `weeks` calendar weeks,
+     * grouped by product name.
+     */
+    async completionVelocity(opts: { weeks: number; productIds?: string[] | null } = { weeks: 12 }): Promise<VelocityRow[]> {
+        const { weeks, productIds } = opts;
+        const today = new Date();
+        const cutoffMs = today.getTime() - weeks * 7 * 24 * 60 * 60 * 1000;
+
+        // Build optional name filter (product label or product name)
+        const filterNames = new Set<string>(
+            (productIds ?? []).map(id => id.toLowerCase().trim()).filter(Boolean)
+        );
+
+        const map = new Map<string, number>(); // "week|productName" → completion count
+
+        for (const item of this.allMatchedProductsRaw) {
+            if ((item?.status || '').toString().toLowerCase().trim() !== 'completed') continue;
+
+            const completedDate = this.tsToDate(item?.statusdate?.completed);
+            if (!completedDate || completedDate.getTime() < cutoffMs) continue;
+
+            const productName = this.mapProductName?.[item?.productref?.id] || '';
+            if (!productName) continue;
+            if (filterNames.size > 0 && !filterNames.has(productName.toLowerCase().trim())) continue;
+
+            const key = `${this.weekMonday(completedDate)}|${productName}`;
+            map.set(key, (map.get(key) || 0) + 1);
+        }
+
+        const rows: VelocityRow[] = [];
+        for (const [key, completions] of map) {
+            const sep = key.indexOf('|');
+            rows.push({ week: key.slice(0, sep), product_id: key.slice(sep + 1), completions });
+        }
+        return rows.sort((a, b) => a.week.localeCompare(b.week));
+    }
+
+    /**
+     * Funnel Drop-off — for each product, shows how many participants are
+     * currently at each pipeline stage (cumulative: each tier includes all
+     * participants at that stage AND every stage beyond it).
+     *
+     * Stage mapping (from `status` field on participantsproduct):
+     *   null / unknown → 'initiated'
+     *   'initiated' | 'awaiting' | 'started' | 'ongoing' | 'completed' → direct
+     */
+    async funnelDropoff(opts: { fromDate?: string; productIds?: string[] | null } = {}): Promise<FunnelRow[]> {
+        const { productIds } = opts;
+        const stageOrder: FunnelRow['stage'][] = ['initiated', 'awaiting', 'started', 'ongoing', 'completed'];
+        const excludedStatuses = new Set(['rejected', 'cancelled', 'inactive', 'shifted']);
+
+        const filterNames = new Set<string>(
+            (productIds ?? []).map(id => id.toLowerCase().trim()).filter(Boolean)
+        );
+
+        // Count participants by current status, per product
+        const productStageCounts = new Map<string, Map<string, number>>();
+
+        for (const item of this.allMatchedProductsRaw) {
+            const rawStatus = (item?.status || '').toString().toLowerCase().trim();
+            if (!rawStatus || excludedStatuses.has(rawStatus)) continue;
+
+            const productName = this.mapProductName?.[item?.productref?.id] || '';
+            if (!productName) continue;
+            if (filterNames.size > 0 && !filterNames.has(productName.toLowerCase().trim())) continue;
+
+            const stage: FunnelRow['stage'] = (stageOrder as string[]).includes(rawStatus)
+                ? rawStatus as FunnelRow['stage']
+                : 'initiated';
+
+            if (!productStageCounts.has(productName)) {
+                productStageCounts.set(productName, new Map());
+            }
+            const sm = productStageCounts.get(productName)!;
+            sm.set(stage, (sm.get(stage) || 0) + 1);
+        }
+
+        // Non-cumulative: each stage shows only participants currently at that exact stage.
+        // This lets the stacked bar chart show WHERE people are right now (stage distribution).
+        const rows: FunnelRow[] = [];
+        for (const [productName, stageCounts] of productStageCounts) {
+            for (let i = 0; i < stageOrder.length; i++) {
+                rows.push({ product_id: productName, stage: stageOrder[i], count: stageCounts.get(stageOrder[i]) || 0 });
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * Specialist Utilization — for each specialist (taken from `hosts[0]` on
+     * participantsproduct), counts how many participants they were actively
+     * supporting during each of the last `weeks` calendar weeks.
+     *
+     * "Active during week W" = participant's `statusdate.ongoing` (or `.started`
+     * or `.initiated`) is before week-end, AND `statusdate.completed` is either
+     * absent or after week-start.
+     *
+     * `booked`       = active participant count for the week (+ any appointments)
+     * `available`    = assumed capacity (20) − booked
+     * `utilization`  = booked / 20, capped at 1
+     */
+    async specialistUtilization(opts: { weeks: number } = { weeks: 8 }): Promise<UtilizationRow[]> {
+        const { weeks } = opts;
+        const CAPACITY = 20;
+
+        const today = new Date();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+
+        // --- Build specialist → participant list ---
+        const specMap = new Map<string, { name: string; participants: any[] }>();
+
+        for (const item of this.allMatchedProductsRaw) {
+            const rawHost = item?.hosts?.[0];
+            if (!rawHost) continue;
+
+            const hostId: string = typeof rawHost === 'string'
+                ? (rawHost.split('/').pop() || rawHost)
+                : ((rawHost?.path || '').split('/').pop() || rawHost?.id || '');
+            if (!hostId) continue;
+
+            if (!specMap.has(hostId)) {
+                const name = this.mapMetaData?.[hostId]?.['name'] || hostId;
+                specMap.set(hostId, { name, participants: [] });
+            }
+            specMap.get(hostId)!.participants.push(item);
+        }
+
+        // --- Build appointment count: "week|hostId" → count ---
+        // Link appointments to specialists via participantproductid → docid/id → hosts[0]
+        const docToHost = new Map<string, string>();
+        for (const [hostId, data] of specMap) {
+            for (const item of data.participants) {
+                const docid = item?.docid || item?.id || '';
+                if (docid) docToHost.set(docid, hostId);
+            }
+        }
+
+        const apptMap = new Map<string, number>(); // "week|hostId" → appointment count
+        for (const appt of (this.allAppointments as any[])) {
+            const ppid: string = appt?.participantproductid || appt?.productid || '';
+            const hostId = docToHost.get(ppid);
+            if (!hostId) continue;
+            const startDate = this.tsToDate(appt?.starttime || appt?.appointmentstart);
+            if (!startDate) continue;
+            const key = `${this.weekMonday(startDate)}|${hostId}`;
+            apptMap.set(key, (apptMap.get(key) || 0) + 1);
+        }
+
+        // --- Build rows ---
+        const rows: UtilizationRow[] = [];
+
+        for (const [hostId, data] of specMap) {
+            for (let w = weeks - 1; w >= 0; w--) {
+                const weekStart = new Date(monday);
+                weekStart.setDate(monday.getDate() - w * 7);
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 7);
+                const weekStr = weekStart.toISOString().slice(0, 10);
+
+                let active = 0;
+                for (const item of data.participants) {
+                    const sd = item?.statusdate || {};
+                    const ongoingDate = this.tsToDate(sd['ongoing'] || sd['started'] || sd['initiated']);
+                    if (!ongoingDate) {
+                        if (w === 0) active++; // no timestamp → assume currently active
+                        continue;
+                    }
+                    const completedDate = this.tsToDate(sd['completed']);
+                    if (ongoingDate <= weekEnd && (!completedDate || completedDate >= weekStart)) {
+                        active++;
+                    }
+                }
+
+                const apptCount = apptMap.get(`${weekStr}|${hostId}`) || 0;
+                const booked = Math.max(active, apptCount);
+                const available = Math.max(0, CAPACITY - booked);
+                const utilization = Math.round(Math.min(1, booked / CAPACITY) * 1000) / 1000;
+
+                rows.push({ specialist_id: hostId, profile_ref: data.name, week: weekStr, booked, available, utilization });
+            }
+        }
+
+        return rows;
     }
 
     // ===== Actionable cohorts (populates the Participants tab from stage data) =====
