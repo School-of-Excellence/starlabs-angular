@@ -531,6 +531,17 @@ export class DeliveryDashboardCloneComponent {
             celebrationCall: []
         },
 
+        eiCustomSolutions: {
+            totalEligible: [],
+            pastMonth: [],
+            thisMonth: [],
+            nextMonth: [],
+            diagnostics: [],
+            implementation: [],
+            review: [],
+            celebrationCall: []
+        },
+
         criticalSupport: {
             totalEligible: [],
             request: [],
@@ -1045,6 +1056,12 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
+        // Clear previous product's data immediately so stale cards don't show while loading
+        this.productData = {
+            eiStarterPack:    { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions:{ totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            criticalSupport:  { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
+        };
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
@@ -1185,6 +1202,17 @@ export class DeliveryDashboardCloneComponent {
                 diagnostics: [],
                 implementation: [],
                 reports: [],
+                celebrationCall: []
+            },
+
+            eiCustomSolutions: {
+                totalEligible: [],
+                pastMonth: [],
+                thisMonth: [],
+                nextMonth: [],
+                diagnostics: [],
+                implementation: [],
+                review: [],
                 celebrationCall: []
             },
 
@@ -1668,6 +1696,15 @@ export class DeliveryDashboardCloneComponent {
                 7: this.productData.eiStarterPack.implementation || [],
                 8: this.productData.eiStarterPack.report || [],
                 9: this.productData.eiStarterPack.celebrationCall || []
+            };
+        }
+        else if (this.selectedProductType === 'eiCustomSolutions') {
+            sources = {
+                0: this.productData.eiCustomSolutions.totalEligible || [],
+                1: this.productData.eiCustomSolutions.diagnostics || [],
+                2: this.productData.eiCustomSolutions.implementation || [],
+                3: this.productData.eiCustomSolutions.review || [],
+                4: this.productData.eiCustomSolutions.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'criticalSupport') {

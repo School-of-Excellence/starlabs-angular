@@ -8573,6 +8573,7 @@ table.specialist-table tr:hover td {
   border-radius: 50%;
 }
 :host .stages-pchip-dot-starter  { background: var(--p-emerald); }
+:host .stages-pchip-dot-ei       { background: var(--p-violet, #8b5cf6); }
 :host .stages-pchip-dot-critical { background: var(--p-amber); }
 :host .stages-pchip.active .stages-pchip-dot {
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.04);

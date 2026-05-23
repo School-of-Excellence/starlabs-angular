@@ -658,6 +658,12 @@
             <span class="stages-pchip-dot stages-pchip-dot-starter"></span>EI Starter Pack
           </button>
           <button class="stages-pchip"
+            *ngIf="!productFilterActive || (productFilterControl.value || []).includes('EI Solution')"
+            [class.active]="selectedProductLabel === 'EI Solution'"
+            (click)="selectProduct('EI Solution')">
+            <span class="stages-pchip-dot stages-pchip-dot-ei"></span>EI Solution
+          </button>
+          <button class="stages-pchip"
             *ngIf="!productFilterActive || (productFilterControl.value || []).includes('Critical Support')"
             [class.active]="selectedProductLabel === 'Critical Support'"
             (click)="selectProduct('Critical Support')">
