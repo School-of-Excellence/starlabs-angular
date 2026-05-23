@@ -635,7 +635,7 @@
         <!-- Product Selector -->
         <div class="filter-tabs">
           <button *ngFor="let p of products" class="tab" [class.active]="selectedProductLabel === p.label"
-            (click)="selectProduct(p.label)" [disabled]="!['EI Starter Pack', 'Critical Support'].includes(p?.label)">
+            (click)="selectProduct(p.label)" [disabled]="!['EI Solution', 'EI Starter Pack', 'Critical Support'].includes(p?.label)">
             {{ p.label }}
           </button>
         </div>
