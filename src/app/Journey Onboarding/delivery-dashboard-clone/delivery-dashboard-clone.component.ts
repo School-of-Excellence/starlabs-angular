@@ -352,7 +352,8 @@ export class DeliveryDashboardCloneComponent {
             "Next Month",
             "Onboarded",
             "Pre-Process",
-            "D&I Appointments",
+            "Diagnostics",
+            "Implementation",
             "Report",
             "Celebration Call"
         ],
@@ -506,7 +507,8 @@ export class DeliveryDashboardCloneComponent {
             nextMonth: [],
             onBoarded: [],
             preprocess: [],
-            upcomingDIAppointments: [],
+            diagnostics: [],
+            implementation: [],
             reports: [],
             celebrationCall: []
         },
@@ -536,6 +538,12 @@ export class DeliveryDashboardCloneComponent {
             overdue: []
         },
         review: {
+            all: [],
+            today: [],
+            tomorrow: [],
+            overdue: []
+        },
+        celebrationCall: {
             all: [],
             today: [],
             tomorrow: [],
@@ -855,39 +863,6 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
-        this.productData = {
-            eiCustomSolutions: {
-                totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
-                diagnostics: [],
-                implementation: [],
-                review: [],
-                celebrationCall: []
-            },
-            eiStarterPack: {
-                totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
-                onBoarded: [],
-                upcomingDIAppointments: [],
-                reports: [],
-                celebrationCall: []
-            },
-            criticalSupport: {
-                totalEligible: [],
-                request: this.ticketRequest.length ? this.ticketRequest : [],
-                preprocess: [],
-                diagnostics: [],
-                implementation: [],
-                postForm: [],
-                review: [],
-                completion: []
-            }
-        };
-
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
@@ -897,14 +872,15 @@ export class DeliveryDashboardCloneComponent {
             await this.FilterReportData(productId);
             if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
-        if (product === 'EI Solution') {
-            this.selectedColumns = this.columns.eiCustomSolutions;
-            await this.filterProductData('eiCustomSolutions', product, productId);
-            await this.filterStageData('eiCustomSolutions');
-        }
+
         if (product === 'EI Starter Pack') {
             this.selectedColumns = this.columns.eiStarterPack;
             await this.filterProductData('eiStarterPack', product, productId);
+            await this.filterStageData('eiStarterPack');
+        } else if (product === 'EI Solution') {
+            this.selectedColumns = this.columns.eiCustomSolutions;
+            await this.filterProductData('eiCustomSolutions', product, productId);
+            await this.filterStageData('eiCustomSolutions');
         } else if (product === 'Critical Support') {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
@@ -1020,7 +996,8 @@ export class DeliveryDashboardCloneComponent {
                 nextMonth: [],
                 onBoarded: [],
                 preprocess: [],
-                upcomingDIAppointments: [],
+                diagnostics: [],
+                implementation: [],
                 reports: [],
                 celebrationCall: []
             },
@@ -1086,10 +1063,20 @@ export class DeliveryDashboardCloneComponent {
                 };
 
                 if (attendedAppointments.length === 0) {
-                    if (this.selectedProductType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
-                    else if (this.selectedProductType === 'eiStarterPack') {
+                    if (this.selectedProductType === 'criticalSupport') {
+                        productData.criticalSupport.totalEligible.push(mergedData);
+                    } else if (this.selectedProductType === 'eiStarterPack') {
                         if (!data.tentativestart) {
                             productData.eiStarterPack.totalEligible.push(mergedData);
+                        } else {
+                            const date = data.tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, this.selectedProductType);
+                        }
+                    } else if (this.selectedProductType === 'eiCustomSolutions') {
+                        if (!data.tentativestart) {
+                            productData.eiCustomSolutions.totalEligible.push(mergedData);
                         } else {
                             const date = data.tentativestart.toDate();
                             const itemMonth = date.getMonth();
@@ -1107,7 +1094,6 @@ export class DeliveryDashboardCloneComponent {
                         const implementationAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `ei implementation`
                         );
-
                         const diagnosticsAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `ei diagnostics`
                         );
@@ -1117,14 +1103,11 @@ export class DeliveryDashboardCloneComponent {
                                 ...mergedData,
                                 ...reviewAppointment
                             });
-
-                        }
-                        else if (implementationAppointment) {
+                        } else if (implementationAppointment) {
                             productData.eiCustomSolutions.implementation.push({
                                 ...mergedData,
                                 ...implementationAppointment
                             });
-
                         } else if (diagnosticsAppointment) {
                             productData.eiCustomSolutions.diagnostics.push({
                                 ...mergedData,
@@ -1134,43 +1117,34 @@ export class DeliveryDashboardCloneComponent {
                     }
                     // ========================= EI STARTER PACK =========================
                     else if (this.selectedProductType === 'eiStarterPack') {
-                        const celebrationCallAppointment = attendedAppointments.find(app =>
-                            app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
-                        );
                         const reportAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === `${product.toLowerCase()} post session check-in`
                         );
                         const implementationAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
                         );
-
                         const diagnosticsAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} diagnostics`
                         );
-
                         const welcomeCallAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} welcome call`
                         );
 
-                        if (celebrationCallAppointment) {
-                            productData.eiStarterPack.celebrationCall.push({
-                                ...mergedData,
-                                ...celebrationCallAppointment
-                            });
-                        }
-                        else if (reportAppointment) {
+                        if (reportAppointment) {
                             productData.eiStarterPack.reports.push({
                                 ...mergedData,
                                 ...reportAppointment
                             });
-
-                        }
-                        else if (implementationAppointment || diagnosticsAppointment) {
-                            productData.eiStarterPack.upcomingDIAppointments.push({
+                        } else if (implementationAppointment) {
+                            productData.eiStarterPack.implementation.push({
                                 ...mergedData,
-                                ...(implementationAppointment || diagnosticsAppointment)
+                                ...(implementationAppointment)
                             });
-
+                        } else if (diagnosticsAppointment) {
+                            productData.eiStarterPack.diagnostics.push({
+                                ...mergedData,
+                                ...(diagnosticsAppointment)
+                            });
                         } else if (welcomeCallAppointment) {
                             productData.eiStarterPack.onBoarded.push({
                                 ...mergedData,
@@ -1180,23 +1154,18 @@ export class DeliveryDashboardCloneComponent {
                     }
                     // ========================= CRITICAL SUPPORT =========================
                     else if (this.selectedProductType === 'criticalSupport') {
-
                         const postprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support post form'
                         );
-
                         const reviewAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `critical support review`
                         );
-
                         const implementationAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
                         );
-
                         const diagnosticsAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === 'critical support diagnostics'
                         );
-
                         const preprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support pre form'
                         );
@@ -1207,26 +1176,22 @@ export class DeliveryDashboardCloneComponent {
                                 ...mergedData,
                                 ...postprocessAppointment
                             });
-                        }
-                        else if (reviewAppointment) {
+                        } else if (reviewAppointment) {
                             productData.criticalSupport.review.push({
                                 ...mergedData,
                                 ...reviewAppointment
                             });
-                        }
-                        else if (implementationAppointment) {
+                        } else if (implementationAppointment) {
                             productData.criticalSupport.implementation.push({
                                 ...mergedData,
                                 ...implementationAppointment
                             });
-                        }
-                        else if (diagnosticsAppointment) {
+                        } else if (diagnosticsAppointment) {
                             productData.criticalSupport.diagnostics.push({
                                 ...mergedData,
                                 ...diagnosticsAppointment
                             });
-                        }
-                        else if (preprocessAppointment) {
+                        } else if (preprocessAppointment) {
                             productData.criticalSupport.preprocess.push({
                                 ...mergedData,
                                 ...preprocessAppointment
@@ -1272,20 +1237,17 @@ export class DeliveryDashboardCloneComponent {
 
         if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
             productData[productType].thisMonth.push(mergedData);
-        }
-        else if (
+        } else if (
             (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
         ) {
             productData[productType].pastMonth.push(mergedData);
-        }
-        else if (
+        } else if (
             (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
         ) {
             productData.productType.nextMonth.push(mergedData);
-        }
-        else productData[productType].totalEligible.push(mergedData);
+        } else productData[productType].totalEligible.push(mergedData);
     }
 
     async fetchTicketRiseParticipants() {
@@ -1447,11 +1409,19 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'implementation', appointmentType: 'Critical Support Implementation' },
                 { key: 'review', appointmentType: 'Critical Support Review' }
             ];
+        } else if (product === 'eiStarterPack') {
+            stageConfig = [
+                { key: 'onboarded', appointmentType: 'EI Starter Pack Welcome Call' },
+                { key: 'diagnostics', appointmentType: 'EI Starter Pack Diagnostics' },
+                { key: 'implementation', appointmentType: 'EI Starter Pack Implementation' },
+                { key: 'celebration call', appointmentType: 'EI Starter Pack Celebration Call' }
+            ];
         } else if (product === 'eiCustomSolutions') {
             stageConfig = [
                 { key: 'diagnostics', appointmentType: 'EI Diagnostics' },
                 { key: 'implementation', appointmentType: 'EI Implementation' },
-                { key: 'review', appointmentType: 'EI Review' }
+                { key: 'review', appointmentType: 'EI Review' },
+                { key: 'celebration call', appointmentType: 'EI Celebration Call' }
             ];
         }
 
@@ -1523,9 +1493,10 @@ export class DeliveryDashboardCloneComponent {
                 3: this.productData.eiStarterPack.nextMonth || [],
                 4: this.productData.eiStarterPack.onBoarded || [],
                 5: this.productData.eiStarterPack.preprocess || [],
-                6: this.productData.eiStarterPack.upcomingDIAppointments || [],
-                7: this.productData.eiStarterPack.report || [],
-                8: this.productData.eiStarterPack.celebrationCall || []
+                6: this.productData.eiStarterPack.diagnostics || [],
+                7: this.productData.eiStarterPack.implementation || [],
+                8: this.productData.eiStarterPack.report || [],
+                9: this.productData.eiStarterPack.celebrationCall || []
             };
         } else if (this.selectedProductType === 'criticalSupport') {
             sources = {
