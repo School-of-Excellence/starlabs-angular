@@ -727,7 +727,7 @@
             </div>
             <div>
               <div class="col-mini-stats">
-                <ng-container *ngIf="stageData[col.toLowerCase()] as stage">
+                <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
                   <div (click)="openStageModal(col, 'Scheduled', stage.all)" class="mini-stat mini-stat-clickable"
                     title="View scheduled participants">
                     <div class="mini-stat-val" style="color:var(--blue)">
