@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
-import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, getFirestore, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
 import { Observable, Subscription, combineLatest } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -131,6 +131,7 @@ export class DeliveryDashboardCloneComponent {
     @ViewChild('tabGroup') tabGroup: any;
     filterForm: FormGroup;
 
+    firestoreForm: any = getFirestore('firestore-forms');
     // Boolean declarations
     isLoading = true;
     subscriptions: any = {};
@@ -1235,7 +1236,7 @@ export class DeliveryDashboardCloneComponent {
                 .slice(i, i + 10)
                 .map(item => item.docid);
             const q = query(
-                collection(this.firestore, 'formsByClient'),
+                collection(this.firestoreForm, 'formsByClient'),
                 where('participantproductid', 'in', chunk)
             );
             const obs$ = runInInjectionContext(this.injector, () =>
