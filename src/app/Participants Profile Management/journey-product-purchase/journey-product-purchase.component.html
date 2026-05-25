@@ -2,25 +2,22 @@
     <h5 class="text-center title">
       Participant Purchase - {{profileData["name"]}}
     </h5>
-  
+
     <div *ngIf="!reviewMode">
       <div>
         <h6 class="title">Participant Journey Product</h6>
-        <div *ngFor="let journey of participantPurchase; let i = index">
+        <div *ngFor="let journey of participantPurchase; let i = index; trackBy: trackByPurchaseRef">
           <mat-form-field class="inputfield" *ngIf="journey.purchasetype == 'journey'" appearance="outline">
             <mat-label>Journey</mat-label>
             <mat-select [(ngModel)]="journey.journeyref" (selectionChange)="onJourneyChange(i)" [disabled]="journey.purchaseref != null">
-              <mat-option *ngFor="let option of journeyList" [value]="option.id">{{option.journey}}</mat-option>
+              <mat-option *ngFor="let option of journeyList; trackBy: trackByOptionId" [value]="option.id">{{option.journey}}</mat-option>
             </mat-select>
           </mat-form-field>
           <mat-form-field class="inputfield" *ngIf="journey.purchasetype == 'product'" appearance="outline">
             <mat-label>AddOns</mat-label>
             <input matInput [(ngModel)]="journey.watsonpurchaselabel" disabled>
-            <!-- <mat-select [(ngModel)]="journey.productref" multiple disabled>
-              <mat-option *ngFor="let option of productList" [value]="option.id">{{option.product}}</mat-option>
-            </mat-select> -->
           </mat-form-field>
-  
+
           <mat-form-field class="inputfield" appearance="outline">
             <mat-label>Purchase Date</mat-label>
             <input matInput [value]="journey.purchasedate ? (journey.purchasedate | date) : ''" disabled>
@@ -47,7 +44,7 @@
             <mat-label>Journey Status</mat-label>
             <mat-select [(ngModel)]="journey.journeystatus" (selectionChange)="onJourneyUpgrade(i, $event.value)">
               <mat-option [value]="null">Clear Status</mat-option>
-              <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
+              <mat-option *ngFor="let option of journeystatusOption; trackBy: trackByIndex" [value]="option.toLowerCase()">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
           <button mat-icon-button *ngIf="journey.purchaseref == null || journey.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
@@ -57,7 +54,7 @@
             <mat-icon>history</mat-icon>
           </button>
           <div class="rowhistory" *ngIf="historyExpanded[journey.participantjourneyproductref] && journey.journeyproductlogs?.length > 0">
-            <div class="log-card" *ngFor="let entry of journey.journeyproductlogs" [ngClass]="'is-'+entry.action">
+            <div class="log-card" *ngFor="let entry of journey.journeyproductlogs; trackBy: trackByIndex" [ngClass]="'is-'+entry.action">
               <div class="log-head">
                 <span class="meta">{{formatLogDate(entry.date)}}</span>
                 <span class="meta">·</span>
@@ -66,7 +63,7 @@
               </div>
               <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
               <div class="changes" *ngIf="entry.fieldKeys.length > 0">
-                <span class="change-line" *ngFor="let field of entry.fieldKeys">
+                <span class="change-line" *ngFor="let field of entry.fieldKeys; trackBy: trackByIndex">
                   <span class="k">{{field}}:</span>
                   <span class="old">{{formatLogValue(entry.fields[field].old)}}</span>
                   <span class="arrow">→</span>
@@ -81,15 +78,15 @@
         </div>
         <button class="btn border border-success text-success mb-4" (click)="newPurchase('journey')">Add Purchase</button>
       </div>
-    
+
       <div>
         <h6 class="title">Participant Purchase</h6>
-        <div *ngFor="let purchase of participantPurchase; let i = index">
-          <span style="font-size: 1.25rem;">{{i+1}}.</span>&nbsp;&nbsp;  
+        <div *ngFor="let purchase of participantPurchase; let i = index; trackBy: trackByPurchaseRef">
+          <span style="font-size: 1.25rem;">{{i+1}}.</span>&nbsp;&nbsp;
           <mat-form-field *ngIf="purchase.purchasetype == 'journey'" class="inputfield" appearance="outline">
             <mat-label>Journey</mat-label>
             <mat-select [(ngModel)]="purchase.journeyref" (selectionChange)="onJourneyChange(i)" [disabled]="purchase.purchaseref != null">
-              <mat-option *ngFor="let option of journeyList" [value]="option.id">{{option.journey}}</mat-option>
+              <mat-option *ngFor="let option of journeyList; trackBy: trackByOptionId" [value]="option.id">{{option.journey}}</mat-option>
             </mat-select>
             <mat-hint class="text-danger" *ngIf="validationMode && purchase.journeyref == null">
               Required
@@ -98,7 +95,7 @@
           <mat-form-field class="inputfield" appearance="outline">
             <mat-label>Watson Label</mat-label>
             <mat-select [(ngModel)]="purchase.watsonpurchaseid" (selectionChange)="onWatsonPurchaseSelect(i, $event.value)">
-              <mat-option *ngFor="let option of watsonPurchaseList" [value]="option.id">{{option['product']}}</mat-option>
+              <mat-option *ngFor="let option of watsonPurchaseList; trackBy: trackByOptionId" [value]="option.id">{{option['product']}}</mat-option>
             </mat-select>
             <mat-hint class="text-danger" *ngIf="validationMode && purchase.watsonpurchaseid == null">
               Required
@@ -133,7 +130,7 @@
             <mat-icon>history</mat-icon>
           </button>
           <div class="rowhistory" *ngIf="historyExpanded[purchase.purchaseref] && purchase.purchaselogs?.length > 0">
-            <div class="log-card" *ngFor="let entry of purchase.purchaselogs" [ngClass]="'is-'+entry.action">
+            <div class="log-card" *ngFor="let entry of purchase.purchaselogs; trackBy: trackByIndex" [ngClass]="'is-'+entry.action">
               <div class="log-head">
                 <span class="meta">{{formatLogDate(entry.date)}}</span>
                 <span class="meta">·</span>
@@ -142,7 +139,7 @@
               </div>
               <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
               <div class="changes" *ngIf="entry.fieldKeys.length > 0">
-                <span class="change-line" *ngFor="let field of entry.fieldKeys">
+                <span class="change-line" *ngFor="let field of entry.fieldKeys; trackBy: trackByIndex">
                   <span class="k">{{field}}:</span>
                   <span class="old">{{formatLogValue(entry.fields[field].old)}}</span>
                   <span class="arrow">→</span>
@@ -155,31 +152,37 @@
             </div>
           </div>
           <div class="removed-inline" *ngIf="purchase.removedProductLogs?.length > 0">
-            <h6 class="removed-title">Removed Products</h6>
-            <div class="log-card is-removed" *ngFor="let entry of purchase.removedProductLogs">
-              <div class="log-head">
-                <span class="meta">{{formatLogDate(entry.date)}}</span>
-                <span class="meta">·</span>
-                <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
-                <span class="chip removed">removed</span>
-              </div>
-              <div class="changes">
-                <span class="change-line">
-                  <span class="k">Item:</span>
-                  <span class="v">{{entry.label || '—'}}</span>
-                </span>
-                <span class="change-line">
-                  <span class="k">Doc ID:</span>
-                  <span class="docid">{{entry.docid}}</span>
-                </span>
+            <button mat-icon-button class="iconbtn" (click)="historyExpanded['removed_' + purchase.purchaseref] = !historyExpanded['removed_' + purchase.purchaseref]">
+              <mat-icon>history</mat-icon>
+            </button>
+            <span class="removed-title">Removed Products ({{purchase.removedProductLogs.length}})</span>
+            <div class="rowhistory" *ngIf="historyExpanded['removed_' + purchase.purchaseref]">
+              <div class="log-card is-removed" *ngFor="let entry of purchase.removedProductLogs; trackBy: trackByIndex">
+                <div class="log-head">
+                  <span class="meta">{{formatLogDate(entry.date)}}</span>
+                  <span class="meta">·</span>
+                  <span class="user">{{mapProfileNames[entry.loggedinprofile] || entry.loggedinprofile || 'Unknown'}}</span>
+                  <span class="chip removed">removed</span>
+                </div>
+                <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
+                <div class="changes">
+                  <span class="change-line">
+                    <span class="k">Item:</span>
+                    <span class="v">{{entry.label || '—'}}</span>
+                  </span>
+                  <span class="change-line">
+                    <span class="k">Doc ID:</span>
+                    <span class="docid">{{entry.docid}}</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-          <div *ngFor="let product of purchase.products; let j = index">
+          <div *ngFor="let product of purchase.products; let j = index; trackBy: trackByProductId">
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Product</mat-label>
               <mat-select [(ngModel)]="product.productref" [disabled]="product.participantproductid != null">
-                <mat-option *ngFor="let option of productList" [value]="option.id">{{option.product}}</mat-option>
+                <mat-option *ngFor="let option of productList; trackBy: trackByOptionId" [value]="option.id">{{option.product}}</mat-option>
               </mat-select>
               <mat-hint class="text-danger" *ngIf="validationMode && product.productref == null">
                 Required
@@ -188,7 +191,7 @@
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Package</mat-label>
               <mat-select [(ngModel)]="product.packageref">
-                <mat-option *ngFor="let option of (purchase.purchasetype == 'product' ? addonpackageList : allpackageList)" [value]="option.docid">{{option.package}}</mat-option>
+                <mat-option *ngFor="let option of (purchase.purchasetype == 'product' ? addonpackageList : allpackageList); trackBy: trackByOptionId" [value]="option.docid">{{option.package}}</mat-option>
               </mat-select>
               <mat-hint class="text-danger" *ngIf="validationMode && product.packageref == null">
                 Required
@@ -206,32 +209,30 @@
               <input matInput [(ngModel)]="product.tentativestart" [matDatepicker]="pickertentative" (click)="pickertentative.open()" autocomplete="off">
               <mat-datepicker-toggle matSuffix [for]="pickertentative"></mat-datepicker-toggle>
               <mat-datepicker #pickertentative></mat-datepicker>
-            </mat-form-field>  
+            </mat-form-field>
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Product Status</mat-label>
               <mat-select [(ngModel)]="product.status"
                           (openedChange)="captureStatus(product, $event)"
                           (selectionChange)="onProductStatusChange(product, $event.value)">
                 <mat-option [value]="null" [disabled]="!product.status">Clear Status</mat-option>
-                <mat-option *ngFor="let option of productstatusOption"
+                <mat-option *ngFor="let option of productstatusOption; trackBy: trackByIndex"
                             [value]="option.toLowerCase()"
                             [disabled]="!product.status && option.toLowerCase() != 'initiated'">{{option}}</mat-option>
               </mat-select>
             </mat-form-field>
-  
-  
-            <mat-form-field *ngIf="product.status == 'initiated'" appearance="outline"> <!--&& (mapProductDelivery[product.docid] == null || mapProductDelivery[product.docid].length == 0)-->
+
+            <mat-form-field *ngIf="product.status == 'initiated'" appearance="outline">
               <mat-label>Delivery Option</mat-label>
               <mat-select [(ngModel)]="product.deliverytype">
-                <mat-option *ngFor="let list of mapProductDeliveryType[product.productref]" [value]="list"> {{list}} </mat-option>
+                <mat-option *ngFor="let list of mapProductDeliveryType[product.productref]; trackBy: trackByIndex" [value]="list"> {{list}} </mat-option>
               </mat-select>
             </mat-form-field>
-  
-  
+
             <mat-checkbox class="me-3" [(ngModel)]="product.unlimited">Unlimited</mat-checkbox>
             <button class="iconbtn" style="margin-top: 10px;" mat-button [matMenuTriggerFor]="menu" >move</button>
             <mat-menu #menu="matMenu">
-              <button *ngFor="let item of participantPurchase;let m = index" mat-menu-item [disabled]="m === i" xPosition="after" (click)="purchaseExchange(i,j,m)">{{m+1}} - {{(item['watsonpurchaselabel'])}}</button>
+              <button *ngFor="let item of participantPurchase; let m = index; trackBy: trackByPurchaseRef" mat-menu-item [disabled]="m === i" xPosition="after" (click)="purchaseExchange(i,j,m)">{{m+1}} - {{(item['watsonpurchaselabel'])}}</button>
             </mat-menu>
             <button mat-icon-button class="iconbtn" *ngIf="j+1 == purchase.products.length" (click)="newProduct(i)">
               <mat-icon>add</mat-icon>
@@ -243,7 +244,7 @@
               <mat-icon>history</mat-icon>
             </button>
             <div class="rowhistory" *ngIf="historyExpanded[product.participantproductid] && product.rowlogs?.length > 0">
-              <div class="log-card" *ngFor="let entry of product.rowlogs" [ngClass]="'is-'+entry.action">
+              <div class="log-card" *ngFor="let entry of product.rowlogs; trackBy: trackByIndex" [ngClass]="'is-'+entry.action">
                 <div class="log-head">
                   <span class="meta">{{formatLogDate(entry.date)}}</span>
                   <span class="meta">·</span>
@@ -252,7 +253,7 @@
                 </div>
                 <div class="save-note" *ngIf="entry.note">{{entry.note}}</div>
                 <div class="changes" *ngIf="entry.fieldKeys.length > 0">
-                  <span class="change-line" *ngFor="let field of entry.fieldKeys">
+                  <span class="change-line" *ngFor="let field of entry.fieldKeys; trackBy: trackByIndex">
                     <span class="k">{{field}}:</span>
                     <span class="old">{{formatLogValue(entry.fields[field].old)}}</span>
                     <span class="arrow">→</span>
@@ -275,14 +276,14 @@
           Add Add-Ons
         </button>
       </div>
-    
+
       <div class="text-center">
         <button class="btn btn-success" (click)="reviewPurchase()">
           Review Purchase
         </button>
       </div>
     </div>
-  
+
     <div *ngIf="reviewMode">
       <div class="journeytable">
         <table>
@@ -293,7 +294,7 @@
             <th>Status</th>
             <th>Changes &amp; Notes</th>
           </tr>
-          <tr *ngFor="let journey of participantPurchase">
+          <tr *ngFor="let journey of participantPurchase; trackBy: trackByPurchaseRef">
             <td>{{journey.purchasetype == "journey" ? mapJourney[journey.journeyref] : 'Product Purchase'}}</td>
             <td>{{journey.subscriptionstart | date}}</td>
             <td>{{journey.subscriptionend | date}}</td>
@@ -304,7 +305,7 @@
                   {{journey._isNew ? 'Added' : 'Updated'}}
                 </span>
                 <ul class="diff-list" *ngIf="journey._diff?.length">
-                  <li *ngFor="let d of journey._diff">
+                  <li *ngFor="let d of journey._diff; trackBy: trackByIndex">
                     <span class="diff-label">{{d.label}}:</span>
                     <ng-container *ngIf="journey._isNew; else purchaseDiff">
                       <span class="diff-new">{{formatDiffValue(d.label, d.new)}}</span>
@@ -316,7 +317,7 @@
                     </ng-template>
                   </li>
                 </ul>
-                <input class="row-note" [(ngModel)]="journey._changeNote" placeholder="Reason for change...">
+                <input class="row-note" [(ngModel)]="journey._changeNote" (ngModelChange)="recomputeMissingNotes()" placeholder="Reason for change...">
               </ng-container>
               <ng-template #purchaseUnchanged>
                 <span class="no-change">No changes</span>
@@ -341,7 +342,7 @@
               <th>Changes &amp; Notes</th>
             </tr>
             <tr class="example-custom-placeholder"></tr>
-            <tr class="example-box" *ngFor="let product of participantProductList; let i=index" cdkDrag>
+            <tr class="example-box" *ngFor="let product of participantProductList; let i=index; trackBy: trackByProductId" cdkDrag>
               <td>
                 <button class="dragbtn" mat-icon-button cdkDragHandle>
                   <mat-icon>reorder</mat-icon>
@@ -362,7 +363,7 @@
                     {{product._isNew ? 'Added' : 'Updated'}}
                   </span>
                   <ul class="diff-list" *ngIf="product._diff?.length">
-                    <li *ngFor="let d of product._diff">
+                    <li *ngFor="let d of product._diff; trackBy: trackByIndex">
                       <span class="diff-label">{{d.label}}:</span>
                       <ng-container *ngIf="product._isNew; else productDiff">
                         <span class="diff-new">{{formatDiffValue(d.label, d.new)}}</span>
@@ -374,7 +375,7 @@
                       </ng-template>
                     </li>
                   </ul>
-                  <input class="row-note" [(ngModel)]="product.note" placeholder="Reason for change...">
+                  <input *ngIf="!product._autoFromJourney" class="row-note" [(ngModel)]="product.note" (ngModelChange)="recomputeMissingNotes()" placeholder="Reason for change...">
                 </ng-container>
                 <ng-template #productUnchanged>
                   <span class="no-change">No changes</span>
@@ -395,7 +396,7 @@
               <th>Details</th>
               <th>Notes (required)</th>
             </tr>
-            <tr *ngFor="let g of removedGroups">
+            <tr *ngFor="let g of removedGroups; trackBy: trackByIndex">
               <td>{{g.type === 'purchase' ? 'Purchase' : 'Product'}}</td>
               <td>{{g.label}}</td>
               <td>
@@ -406,7 +407,7 @@
               </td>
               <td>
                 <span class="change-badge removed-badge">Removed</span>
-                <input class="row-note" [(ngModel)]="g.note" placeholder="Reason for removal...">
+                <input class="row-note" [(ngModel)]="g.note" (ngModelChange)="recomputeMissingNotes()" placeholder="Reason for removal...">
               </td>
             </tr>
           </table>
@@ -432,7 +433,7 @@
   <mat-dialog-content>
     <p>The following product(s) are currently <strong>initiated</strong> or <strong>ongoing</strong>:</p>
     <ul class="conflict-list">
-      <li *ngFor="let item of data.conflicts">
+      <li *ngFor="let item of data.conflicts; trackBy: trackByIndex">
         {{item.label}} <span class="conflict-status">({{item.status}})</span>
       </li>
     </ul>

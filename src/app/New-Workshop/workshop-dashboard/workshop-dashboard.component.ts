@@ -18,7 +18,7 @@ import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
   updateDoc, Timestamp, Unsubscribe,
-  getDoc, getDocs, onSnapshot,
+  getDoc, getDocs, onSnapshot, getFirestore,
 } from '@angular/fire/firestore';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
@@ -94,6 +94,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['completedParticipants', []],
   ]);
   filterOption: 'all' | 'new' | 'old' = 'all';
+  cohortTypeFilter: 'all' | 'facilitator' | 'cohort' = 'all';
   filteredParticipants: any[] = [];
   loggedinProfile: string = null;
   mapProfile: any = {};
@@ -102,6 +103,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   isRefreshing = false;
   error: string | null = null;
   isMovingParticipant: string | null = null;
+
+  subscriberCodes: string[] = [];
+  selectedSubscriberCode: string[] = [];
+  showReferredOnly: boolean = false;
+  allSelected = false;
 
   unsubscribes: Unsubscribe[] = [];
   private destroy$ = new Subject<void>();
@@ -162,26 +168,27 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     totalNotStarted: number;
     totalNotStartedProfileIds: string[];
   } = {
-    overallAvgProgress: 0,
-    overallCompletionRate: 0,
-    categoryProgress: [],
-    cohortAvgProgress: 0,
-    cohortCompletionRate: 0,
-    cohortCompletedCount: 0,
-    facilitatorAvgProgress: 0,
-    facilitatorCompletionRate: 0,
-    facilitatorCompletedCount: 0,
-    totalActive: 0,
-    totalActiveProfileIds: [],
-    totalCompleted: 0,
-    totalCompletedProfileIds: [],
-    totalNotStarted: 0,
-    totalNotStartedProfileIds: []
-  };
+      overallAvgProgress: 0,
+      overallCompletionRate: 0,
+      categoryProgress: [],
+      cohortAvgProgress: 0,
+      cohortCompletionRate: 0,
+      cohortCompletedCount: 0,
+      facilitatorAvgProgress: 0,
+      facilitatorCompletionRate: 0,
+      facilitatorCompletedCount: 0,
+      totalActive: 0,
+      totalActiveProfileIds: [],
+      totalCompleted: 0,
+      totalCompletedProfileIds: [],
+      totalNotStarted: 0,
+      totalNotStartedProfileIds: []
+    };
+  firestoreDefault = getFirestore()
+  firestoreForms = getFirestore('firestore-forms')
 
   constructor(
     private route: ActivatedRoute,
-    private firestore: Firestore,
     public router: Router,
     private guard: AuthguardService,
     public dialog: MatDialog,
@@ -204,7 +211,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     for (let i = 0; i < profileIds.length; i += BATCH_SIZE) {
       const batchIds = profileIds.slice(i, i + BATCH_SIZE);
       const q = query(
-        collection(this.firestore, 'participant metadata'),
+        collection(this.firestoreDefault, 'participant metadata'),
         where('profileid', 'in', batchIds)
       );
       batches.push(getDocs(q));
@@ -225,7 +232,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   private async initializeProfileData() {
     try {
-      const userRef = collection(this.firestore, 'new_user_data');
+      const userRef = collection(this.firestoreDefault, 'new_user_data');
       const userSnap = await getDocs(userRef);
       this.mapProfileNew = {};
       userSnap.forEach(doc => {
@@ -239,7 +246,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   private initializeJourneyData() {
-    const journeyRef = collection(this.firestore, 'journey');
+    const journeyRef = collection(this.firestoreDefault, 'journey');
     getDocs(journeyRef).then(snap => {
       snap.docs.forEach(e => {
         const element = e.data();
@@ -247,7 +254,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         this.JourneyMap[element['id']] = element['journey'];
       });
     });
-    const tierRef = collection(this.firestore, 'tier');
+    const tierRef = collection(this.firestoreDefault, 'tier');
     getDocs(tierRef).then(snaptier => {
       snaptier.docs.forEach(e => {
         const element = e.data();
@@ -279,6 +286,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.workshopId) {
       console.log('load dashboard....');
       this.loadWorkshopDashboard();
+      this.loadSubscriberCodes();
     }
   }
 
@@ -376,7 +384,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     let enrolledSnapshotInitialized = false;
 
-    const workshopRef = doc(this.firestore, 'workshopconfiguration', this.workshopId);
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
@@ -401,6 +409,43 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     this.unsubscribes.push(unsubscribe);
+  }
+
+  async loadSubscriberCodes(): Promise<void> {
+    try {
+      const ref = doc(this.firestoreDefault, 'static meta data', 'Subscriber Code');
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const data = snap.data();
+       this.subscriberCodes = Array.isArray(data?.['codes'])? [...data['codes']].reverse(): [];
+      }
+    } catch (error) {
+      console.error('Error:'+ error);
+    }
+  }
+
+  onCodeSelectionChange(event: any) {
+    const selectedValues = event.value;
+    const isAllSelected =
+      selectedValues.includes('ALL');
+    if (isAllSelected) {
+      if (this.selectedSubscriberCode.length === this.subscriberCodes.length + 1) {
+        this.selectedSubscriberCode = [];
+      } else {
+        this.selectedSubscriberCode = [
+          'ALL',
+          ...this.subscriberCodes
+        ];
+
+      }
+    } else {
+      this.selectedSubscriberCode =
+        selectedValues.filter(
+          (x: string) => x !== 'ALL'
+        );
+
+    }
+    this.applyFilterSide();
   }
 
   async sendMail() {
@@ -709,9 +754,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   async setupEnrolledParticipantsSnapshot() {
     if (!this.workshopId) return;
 
-    const workshopRef = doc(this.firestore, 'workshopconfiguration', this.workshopId);
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const enrolledQuery = query(
-      collection(this.firestore, 'workshop participant enrolled'),
+      collection(this.firestoreDefault, 'workshop participant enrolled'),
       where('workshopref', '==', workshopRef)
     );
 
@@ -768,9 +813,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     this.participantWorkshopMap.clear();
 
-    const workshopRef = doc(this.firestore, 'workshopconfiguration', this.workshopId);
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const pwQuery = query(
-      collection(this.firestore, 'participant workshop'),
+      collection(this.firestoreDefault, 'participant workshop'),
       where('workshopref', '==', workshopRef)
     );
 
@@ -1040,7 +1085,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.loadingCategories = true;
     try {
       const promises = categoryIds.map(async (catId: string) => {
-        const catDoc = await getDoc(doc(this.firestore, 'workshopcategory', catId));
+        const catDoc = await getDoc(doc(this.firestoreDefault, 'workshopcategory', catId));
         if (catDoc.exists()) {
           this.categoryNamesMap.set(catId, catDoc.data()['name'] || 'Unknown');
         }
@@ -1282,13 +1327,18 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         }));
       this.selectedParticipants = newUserParticipants;
       this.selectedStatusInfo = {
-        status: 'totalNewUsers', challengeName: 'New Users',
-        subChallengeName: this.statusDisplayMap.get(metricType) || 'New Users',
+        status: 'totalNewUsers',
+        challengeName: 'New Users',
+        subChallengeName: 'New Users Enrolled',
         count: newUserParticipants.length
       };
       this.showParticipantPanel = true;
-      this.filterOption = 'new';
+      // ✅ Reset new user filters on open
+      this.selectedSubscriberCode = [];
+      this.showReferredOnly = false;
+      this.filterOption = 'all';
       this.applyFilterSide();
+
     } else if (metricType === 'totalNewUsersNotEnrolled') {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const notEnrolledNewUsers = Object.keys(this.mapProfileNew)
@@ -1300,11 +1350,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         }));
       this.selectedParticipants = notEnrolledNewUsers;
       this.selectedStatusInfo = {
-        status: 'totalNewUsersNotEnrolled', challengeName: 'Not Enrolled',
-        subChallengeName: 'New Users Not Enrolled', count: notEnrolledNewUsers.length
+        status: 'totalNewUsersNotEnrolled',
+        challengeName: 'Not Enrolled',
+        subChallengeName: 'New Users Not Enrolled',
+        count: notEnrolledNewUsers.length
       };
       this.showParticipantPanel = true;
-      this.filterOption = 'new';
+      // ✅ Reset new user filters on open
+      this.selectedSubscriberCode = [];
+      this.showReferredOnly = false;
+      this.filterOption = 'all';
       this.applyFilterSide();
     } else {
       const participantIds = this.metrics.get(metricType);
@@ -1378,13 +1433,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  async openNewUserDialog() {
-    const { NewusersComponent } = await import('../newusers/newusers.component');
-    this.dialog.open(NewusersComponent, {
-      data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
-      width: '90vw', height: '90vh', maxWidth: '100vw', maxHeight: '100vh'
-    });
-  }
+  // async openNewUserDialog() {
+  //   const { NewusersComponent } = await import('../newusers/newusers.component');
+  //   this.dialog.open(NewusersComponent, {
+  //     data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
+  //     width: '90vw', height: '90vh', maxWidth: '100vw', maxHeight: '100vh'
+  //   });
+  // }
 
   async openZoomDialog(zoomdata: any, index: number) {
     const { ZoomCallComponent } = await import('./zoom-call/zoom-call.component');
@@ -1399,7 +1454,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const workshopId = this.workshopId;
       if (!challengeId || !workshopId) { console.error('Missing challengeId or workshopId'); return; }
       try {
-        const workshopRef = doc(this.firestore, 'workshopconfiguration', workshopId);
+        const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', workshopId);
         const updatedChallenges = [...this.workshopData.challenges];
         const challengeIndex = updatedChallenges.findIndex((c: any) => c.challengeid === challengeId);
         if (challengeIndex === -1) { console.error('Challenge not found'); return; }
@@ -1463,7 +1518,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   onFormPreview(form: any) {
-    const path = doc(this.firestore, 'formsByClient', form['docid']).path;
+    const path = doc(this.firestoreForms, 'formsByClient', form['docid']).path;
     const queryParams: any = {
       id: form.formid, type: 'form', patchdata: path,
       profileid: form.profileid, workshopref: form.workshopref,
@@ -1775,6 +1830,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       });
     }
 
+    if (this.selectedStatusInfo?.status === 'cohortParticipants') {
+      const facilitatorSet = new Set(this.facilitatorProfileIds);
+      if (this.cohortTypeFilter === 'facilitator') {
+        base = base.filter(p => facilitatorSet.has(p.profileid));
+      } else if (this.cohortTypeFilter === 'cohort') {
+        base = base.filter(p => !facilitatorSet.has(p.profileid));
+      }
+    }
+
     if (this.workshopData?.categorybased === true &&
       this.selectedStatusInfo?.status === 'notStarted') {
       const startedProfileIds = new Set(this.participantProgressList.map(p => p.profileid));
@@ -1798,6 +1862,50 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       }
     }
 
+    if (
+      (this.selectedStatusInfo?.status === 'totalNewUsers' ||
+        this.selectedStatusInfo?.status === 'totalNewUsersNotEnrolled') &&
+      this.selectedSubscriberCode.length > 0
+    ) {
+      const enrolledProfileIds = new Set(this.enrolledParticipants.map(p => p.profileid));
+      const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
+      base = Object.entries(this.mapProfileNew)
+        .filter(([profileId, p]: any) => {
+          if (!this.selectedSubscriberCode.includes(p?.refferedby)) return false;
+          if (p?.subscriber !== true) return false;
+          const isEnrolled = enrolledProfileIds.has(profileId);
+          return isEnrolledView ? isEnrolled : !isEnrolled;
+        })
+        .map(([profileId, p]: any) => ({
+          profileid: profileId,
+          name: p?.name || 'Unknown',
+          created: p?.created || null,
+          metadata: p
+        }));
+
+    }
+
+    if (
+      (this.selectedStatusInfo?.status === 'totalNewUsers' ||
+        this.selectedStatusInfo?.status === 'totalNewUsersNotEnrolled') &&
+      this.showReferredOnly
+    ) {
+      const enrolledProfileIds = new Set(this.enrolledParticipants.map(p => p.profileid));
+      const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
+      base = Object.entries(this.mapProfileNew)
+        .filter(([profileId, p]: any) => {
+          if (!p?.refferedby) return false;
+          if (p?.subscriber === true) return false;
+          const isEnrolled = enrolledProfileIds.has(profileId);
+          return isEnrolledView ? isEnrolled : !isEnrolled;
+        })
+        .map(([profileId, p]: any) => ({
+          profileid: profileId,
+          name: p?.name || 'Unknown',
+          created: p?.created || null,
+          metadata: p
+        }));
+    }
     this.filteredParticipants = base;
   }
 
@@ -1932,6 +2040,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.cohortTypeFilter = 'all';
     this.applyFilterSide();
   }
 
@@ -2362,12 +2471,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   exportParticipants() {
-    if (!this.selectedParticipants || this.selectedParticipants.length === 0) {
+    if (!this.filteredParticipants || this.filteredParticipants.length === 0) {
       alert("No participants selected to export."); return;
     }
     const confirmDownload = window.confirm("Are you sure you want to export participants as CSV?");
     if (!confirmDownload) return;
-    const csvData = this.selectedParticipants.map((p: any) => ({
+    const csvData = this.filteredParticipants.map((p: any) => ({
       'Participant Name': p.name || 'N/A',
       'Email': p['metadata']['email'] || '',
       'Phone': p['metadata']['phonenumber'] || '',

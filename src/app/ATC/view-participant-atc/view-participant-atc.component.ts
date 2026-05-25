@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, OnChanges, SimpleChanges, Input, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import {
-  Firestore, collection, query, where, orderBy,
+  collection, getFirestore, query, where, orderBy,
   getDocs, doc, getDoc
 } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
@@ -43,7 +43,9 @@ interface ProductGroup {
 export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy {
   @Input() profileid?: string;
 
-  private firestore = inject(Firestore);
+  // private firestore = inject(Firestore);
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
   private route = inject(ActivatedRoute);
   private guard = inject(AuthguardService);
 
@@ -127,7 +129,7 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
       this.profileMap = profileMapData.docdata;
 
       // Load participant profile
-      const profileDoc = await getDoc(doc(this.firestore, `profile_data/${profileId}`));
+      const profileDoc = await getDoc(doc(this.firestoreDefault, `profile_data/${profileId}`));
       if (profileDoc.exists()) {
         const profileData = profileDoc.data();
         this.participantProfile.set(profileData);
@@ -136,13 +138,13 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
       }
 
       // Load procedures
-      const proceduresSnap = await getDocs(collection(this.firestore, 'procedures'));
+      const proceduresSnap = await getDocs(collection(this.firestoreDefault, 'procedures'));
       proceduresSnap.forEach(docSnap => {
         this.procedureMap[docSnap.ref.path] = docSnap.data()['name'];
       });
 
       // Load big activity
-      const bigActivitySnap = await getDocs(collection(this.firestore, 'bigactivity'));
+      const bigActivitySnap = await getDocs(collection(this.firestoreDefault, 'bigactivity'));
       bigActivitySnap.forEach(docSnap => {
         const data = docSnap.data();
         this.mapBigActivity[data['docid']] = data['activity'];
@@ -167,9 +169,9 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
     ];
 
     // Fetch from both collections
-    const alphaQuery = query(collection(this.firestore, 'atc_alpha'), ...baseConstraints);
+    const alphaQuery = query(collection(this.firestoreATC, 'atc_alpha'), ...baseConstraints);
     const validateQuery = query(
-      collection(this.firestore, 'atc_to_validate'),
+      collection(this.firestoreATC, 'atc_to_validate'),
       where('status', '==', 'atc given'),
       ...baseConstraints
     );
@@ -209,10 +211,10 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
 
   private async loadTranscription(atc: ATCItem): Promise<void> {
     try {
-      const correctionsSnap = await getDocs(collection(this.firestore, `${atc.path}/corrections`));
+      const correctionsSnap = await getDocs(collection(this.firestoreATC, `${atc.path}/corrections`));
 
       const transcriptionPromises = correctionsSnap.docs.map(async (adjDoc) => {
-        const proceduresSnap = await getDocs(collection(this.firestore, `${adjDoc.ref.path}/procedures`));
+        const proceduresSnap = await getDocs(collection(this.firestoreATC, `${adjDoc.ref.path}/procedures`));
 
         return {
           adjustment: {

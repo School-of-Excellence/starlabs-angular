@@ -190,6 +190,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   private logEventFilterSub: Subscription | null = null;
   showJourneyTypeDropdown = false;
   showOnlyWithVideos = false;
+  showOnlyWithoutPhoto = false;
   exportLoading = false;
   RemarkTexts: { [entryIndex: number]: string } = {};
   journeyFilterDropdownTop = 0;
@@ -553,6 +554,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.selectedVideoFilters = [];
     this.journeyTypeFilter = 'all';
     this.showOnlyWithVideos = false;
+    this.showOnlyWithoutPhoto = false;
     this.showJourneyTypeDropdown = false;          
     this.eventFilterSearchCtrl.setValue('');   
     this.videoFilterSearchCtrl.setValue('');   
@@ -661,7 +663,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       selectedIds = selectedIds.length > 0? selectedIds.filter(id => withVideoIds.includes(id)): withVideoIds;
     }
 
-    const noFilters = !this.selectedParticipants.length &&!this.selectedJourneyFilters.length &&!this.selectedEventFilters.length &&!this.selectedVideoFilters.length&&this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos;
+    if (this.showOnlyWithoutPhoto) {
+      const withoutPhotoIds = await this.getParticipantsWithoutPhoto();
+      selectedIds = selectedIds.length > 0? selectedIds.filter(id => withoutPhotoIds.includes(id)): withoutPhotoIds;
+    }
+
+    const noFilters = !this.selectedParticipants.length &&!this.selectedJourneyFilters.length &&!this.selectedEventFilters.length &&!this.selectedVideoFilters.length&&this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos && !this.showOnlyWithoutPhoto;
     if (noFilters) {
         const snap = await getDocs(this.buildBaseQuery(undefined, startAfterDoc));
         await this.executeQuery(snap);
@@ -702,6 +709,39 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       );
       return Object.entries(this.mapProfiles)
         .filter(([, profile]: [string, any]) => profileIds.has(profile['profileid']))
+        .map(([id]) => id);
+    }
+
+    async getParticipantsWithoutPhoto(): Promise<string[]> {
+      const allProfileIds = Object.values(this.mapProfiles)
+        .map((p: any) => p?.['profileid'])
+        .filter(Boolean) as string[];
+      if (allProfileIds.length === 0) return [];
+
+      const chunks = this.chunkArray(allProfileIds, 30);
+      const snaps = await Promise.all(
+        chunks.map(chunk => getDocs(query(
+          collection(this.firestore, 'profile_data'),
+          where('profileid', 'in', chunk)
+        )))
+      );
+
+      const withPhotoSet = new Set<string>();
+      snaps.forEach(snap => {
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const photo = data['profile'] || null;
+          const profileImg = data['profileimg'] || null;
+          const resolvedPhoto = photo?.includes('profile-image-png-14') ? null : photo;
+          const resolvedProfileImg = profileImg?.includes('profile-image-png-14') ? null : profileImg;
+          if (resolvedProfileImg || resolvedPhoto) {
+            withPhotoSet.add(data['profileid']);
+          }
+        });
+      });
+
+      return Object.entries(this.mapProfiles)
+        .filter(([, profile]: [string, any]) => profile?.['profileid'] && !withPhotoSet.has(profile['profileid']))
         .map(([id]) => id);
     }
 
@@ -1768,6 +1808,10 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       if (this.showOnlyWithVideos) {
         const withVideoIds = await this.getParticipantsWithVideos();
         selectedIds = selectedIds.length > 0? selectedIds.filter(id => withVideoIds.includes(id)): withVideoIds;
+      }
+      if (this.showOnlyWithoutPhoto) {
+        const withoutPhotoIds = await this.getParticipantsWithoutPhoto();
+        selectedIds = selectedIds.length > 0? selectedIds.filter(id => withoutPhotoIds.includes(id)): withoutPhotoIds;
       }
       const allParticipants = selectedIds.length > 0
         ? selectedIds.map(id => ({

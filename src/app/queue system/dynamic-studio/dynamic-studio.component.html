@@ -297,8 +297,8 @@
             </button>
           </div>
   
-          <!-- Get Previous ATC (only on Diagnostics stage) -->
-          <div class="previous-atc-card" *ngIf="liveAssignment['participantid'] && liveAssignment['stagename']?.toLowerCase() === 'diagnostics'" [class.previous-atc-card--open]="showPreviousATC">
+          <!-- Get Previous ATC (widget-driven) -->
+          <div class="previous-atc-card" *ngIf="liveAssignment['participantid'] && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')" [class.previous-atc-card--open]="showPreviousATC">
             <button type="button" class="previous-atc-toggle" (click)="showPreviousATC = !showPreviousATC" [attr.aria-expanded]="showPreviousATC">
               <span class="previous-atc-toggle__icon">
                 <mat-icon>history</mat-icon>
@@ -314,8 +314,8 @@
             </div>
           </div>
 
-          <!-- Show Love Letter (only on Diagnostics stage) -->
-          <div class="previous-atc-card love-letter-card" *ngIf="liveAssignment['participantid'] && liveAssignment['stagename']?.toLowerCase() === 'diagnostics'" [class.previous-atc-card--open]="showLoveLetter">
+          <!-- Show Love Letter (widget-driven) -->
+          <div class="previous-atc-card love-letter-card" *ngIf="liveAssignment['participantid'] && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('loveletters')" [class.previous-atc-card--open]="showLoveLetter">
             <button type="button" class="previous-atc-toggle" (click)="toggleLoveLetter()" [attr.aria-expanded]="showLoveLetter">
               <span class="previous-atc-toggle__icon">
                 <mat-icon>favorite</mat-icon>

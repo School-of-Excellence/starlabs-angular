@@ -62,6 +62,12 @@
         <mat-icon>videocam</mat-icon>
         Has Video
       </button>
+      <button mat-stroked-button class="has-video-filter-btn"
+        [class.has-video-filter-active]="showOnlyWithoutPhoto"
+        (click)="showOnlyWithoutPhoto = !showOnlyWithoutPhoto; resetPagination(); fetchRecords()">
+        <mat-icon>no_photography</mat-icon>
+        No Profile Image
+      </button>
       <button mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
     <button class="export-btn" (click)="exportToExcel()" [disabled]="exportLoading">

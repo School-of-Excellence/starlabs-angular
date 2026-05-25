@@ -202,6 +202,7 @@
                 <div class="participant-name">
                   <i class="bi bi-person-fill"></i>
                   {{mapProfileData[token.profile_id]?.['name']}}
+                  <span class="selection-dfu-tag" *ngIf="getTokenHighlight(token.profile_id) === 'orange'">DFU</span>
                 </div>
                 <div class="participant-email">
                   <i class="bi bi-envelope"></i>
@@ -262,6 +263,7 @@
                 <div class="participant-name">
                   <i class="bi bi-person-fill"></i>
                   {{mapProfileData[token.profile_id]?.['name']}}
+                  <span class="selection-dfu-tag" *ngIf="getTokenHighlight(token.profile_id) === 'orange'">DFU</span>
                 </div>
                 <div class="participant-email">
                   <i class="bi bi-envelope"></i>
@@ -1841,17 +1843,25 @@
         </mat-select>
       </mat-form-field>
 
+      <!-- DFU warning banner -->
+      <div class="bulk-dfu-banner" *ngIf="bulkDFUCount > 0">
+        <mat-icon style="font-size:16px; width:16px; height:16px; vertical-align:middle;">info</mat-icon>
+        {{bulkDFUCount}} DFU participant(s) will be skipped
+      </div>
+
       <!-- Participants list -->
       <div class="bulk-list">
         <div class="bulk-list-head">
           <span>Name</span>
           <span>Variation</span>
+          <span></span>
         </div>
-        <div *ngFor="let r of bulkMoveResults" class="bulk-list-row">
+        <div *ngFor="let r of bulkMoveResults" class="bulk-list-row" [class.bulk-row-dfu]="r.isDFU">
           <span class="bulk-name">
             {{mapProfileData[r.token.profile_id]?.['name']}}
           </span>
           <span class="bulk-variation">{{r.variationName}}</span>
+          <span class="bulk-dfu-tag" *ngIf="r.isDFU">DFU – Skip</span>
         </div>
       </div>
 
@@ -1861,14 +1871,14 @@
         color="primary"
         class="bulk-action-btn"
         (click)="executeBulkMove()"
-        [disabled]="!bulkMoveTargetStageKey || bulkMoveInProgress">
+        [disabled]="!bulkMoveTargetStageKey || bulkMoveInProgress || bulkMovableCount === 0">
         <mat-spinner
           *ngIf="bulkMoveInProgress"
           diameter="16"
           class="btn-spinner">
         </mat-spinner>
         <span *ngIf="!bulkMoveInProgress">
-          Move {{bulkMoveResults.length}} Participant(s)
+          Move {{bulkMovableCount}} Participant(s)
         </span>
         <span *ngIf="bulkMoveInProgress">Moving...</span>
       </button>
@@ -1881,7 +1891,8 @@
         {{bulkMoveFailed ? 'error' : 'check_circle'}}
       </mat-icon>
       <p *ngIf="!bulkMoveFailed" class="done-ok">
-        ✓ {{bulkMoveCount}} participants moved successfully
+        ✓ {{bulkMovableCount}} participant(s) moved successfully
+        <span *ngIf="bulkDFUCount > 0">&nbsp;({{bulkDFUCount}} DFU skipped)</span>
       </p>
       <p *ngIf="bulkMoveFailed" class="done-fail">
         ✗ Move failed. Please try again.
@@ -1902,18 +1913,21 @@
       <div class="sa-header-left">
         <mat-icon style="color:#1976d2; font-size:22px;">people_alt</mat-icon>
         <div>
-          <span class="sa-title">{{selectedStageForActivity}}</span>
-          <span class="sa-subtitle" *ngIf="selectedStageTypeForActivity">
-            &nbsp;({{selectedStageTypeForActivity}})
-          </span>
+          <mat-select class="sa-stage-select"
+            [(ngModel)]="selectedStageForActivity"
+            (ngModelChange)="onStageActivityFilterChange($event)"
+            [disabled]="stageActivityCacheLoading">
+            <mat-option *ngFor="let s of uniqueActivityStages" [value]="s.stagename">
+              {{s.stagename}}
+            </mat-option>
+          </mat-select>
           <span class="sa-sub-label">— Last 24 hours</span>
         </div>
       </div>
       <div class="sa-header-right">
-        <span class="sa-live-badge">
-          <span class="sa-live-dot"></span>
-          Live
-        </span>
+        <button mat-icon-button matTooltip="Refresh" (click)="fetchStageActivity()" [disabled]="stageActivityCacheLoading">
+          <mat-icon>refresh</mat-icon>
+        </button>
         <button mat-stroked-button (click)="exportStageActivity()" [disabled]="stageActivityCacheLoading"
           style="font-size:12px; height:32px; line-height:32px;">
           <mat-icon style="font-size:16px; width:16px; height:16px;">
@@ -1963,7 +1977,7 @@
       <!-- Loading -->
       <div *ngIf="stageActivityCacheLoading" class="sa-loading">
         <mat-spinner diameter="28"></mat-spinner>
-        <span>Connecting to live feed...</span>
+        <span>Loading activity...</span>
       </div>
 
       <!-- Came In -->
@@ -2105,14 +2119,13 @@
         <mat-icon>close</mat-icon>
       </button>
 
-      <button type="button"
-              class="timeline-filter-chip"
-              [class.active]="showOnlyFailedLast"
-              (click)="showOnlyFailedLast = !showOnlyFailedLast"
-              matTooltip="Show only profiles whose last communication on any channel failed">
-        <mat-icon class="timeline-filter-chip-icon">error_outline</mat-icon>
-        <span>Last failed</span>
-        <mat-icon *ngIf="showOnlyFailedLast" class="timeline-filter-chip-check">check</mat-icon>
+      <button *ngIf="hasActiveTimelineFilters"
+              type="button"
+              class="timeline-clear-filters"
+              (click)="clearChannelFilters()"
+              matTooltip="Clear all filters">
+        <mat-icon class="timeline-clear-filters-icon">filter_alt_off</mat-icon>
+        <span>Clear filters</span>
       </button>
     </div>
 
@@ -2132,10 +2145,17 @@
         <p class="timeline-empty-text">
           {{ timelineSearchQuery
               ? 'No results for "' + timelineSearchQuery + '"'
-              : (showOnlyFailedLast
-                  ? 'No profiles with a failed last communication'
+              : (hasActiveTimelineFilters
+                  ? 'No profiles match the current filters'
                   : 'No notifications found for this queue') }}
         </p>
+        <button *ngIf="hasActiveTimelineFilters"
+                type="button"
+                class="timeline-clear-filters timeline-clear-filters-inline"
+                (click)="clearChannelFilters()">
+          <mat-icon class="timeline-clear-filters-icon">filter_alt_off</mat-icon>
+          <span>Clear filters</span>
+        </button>
       </div>
 
       <!-- Table -->
@@ -2150,17 +2170,59 @@
                 <mat-icon class="th-channel-icon">notifications</mat-icon>
                 Push
               </div>
+              <div class="th-filter-chips">
+                <button type="button" class="th-filter-chip success"
+                        [class.active]="channelFilters.push === 'success'"
+                        (click)="toggleChannelFilter('push', 'success')"
+                        matTooltip="Filter: last push succeeded">
+                  ✓ {{ channelLastStatusCounts.push.success }}
+                </button>
+                <button type="button" class="th-filter-chip failure"
+                        [class.active]="channelFilters.push === 'failure'"
+                        (click)="toggleChannelFilter('push', 'failure')"
+                        matTooltip="Filter: last push failed">
+                  ✗ {{ channelLastStatusCounts.push.failure }}
+                </button>
+              </div>
             </th>
             <th class="center">
               <div class="th-channel th-wa">
                 <mat-icon class="th-channel-icon">chat</mat-icon>
                 WhatsApp
               </div>
+              <div class="th-filter-chips">
+                <button type="button" class="th-filter-chip success"
+                        [class.active]="channelFilters.whatsapp === 'success'"
+                        (click)="toggleChannelFilter('whatsapp', 'success')"
+                        matTooltip="Filter: last WhatsApp succeeded">
+                  ✓ {{ channelLastStatusCounts.whatsapp.success }}
+                </button>
+                <button type="button" class="th-filter-chip failure"
+                        [class.active]="channelFilters.whatsapp === 'failure'"
+                        (click)="toggleChannelFilter('whatsapp', 'failure')"
+                        matTooltip="Filter: last WhatsApp failed">
+                  ✗ {{ channelLastStatusCounts.whatsapp.failure }}
+                </button>
+              </div>
             </th>
             <th class="center">
               <div class="th-channel th-email">
                 <mat-icon class="th-channel-icon">email</mat-icon>
                 Email
+              </div>
+              <div class="th-filter-chips">
+                <button type="button" class="th-filter-chip success"
+                        [class.active]="channelFilters.email === 'success'"
+                        (click)="toggleChannelFilter('email', 'success')"
+                        matTooltip="Filter: last email succeeded">
+                  ✓ {{ channelLastStatusCounts.email.success }}
+                </button>
+                <button type="button" class="th-filter-chip failure"
+                        [class.active]="channelFilters.email === 'failure'"
+                        (click)="toggleChannelFilter('email', 'failure')"
+                        matTooltip="Filter: last email failed">
+                  ✗ {{ channelLastStatusCounts.email.failure }}
+                </button>
               </div>
             </th>
             <th class="center">Total</th>

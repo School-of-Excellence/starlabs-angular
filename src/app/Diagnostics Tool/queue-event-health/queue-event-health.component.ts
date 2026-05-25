@@ -6,7 +6,6 @@ import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updat
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
-import { Firestore } from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-queue-event-health',
@@ -126,10 +125,11 @@ export class QueueEventHealthComponent {
     initiatedNotInQueue: 0
   };
 
+  firestoreDefault = getFirestore()
+
   constructor(
     private authService: AuthguardService,
     private router: Router,
-    public firestore: Firestore
   ) {
     this.showDashboard = true;
     this.loadQueues();
@@ -382,7 +382,7 @@ export class QueueEventHealthComponent {
       }
 
       const selectedQueueRef = doc(
-        this.firestore,
+        this.firestoreDefault,
         'queue generation',
         this.selectedQueueId
       );
@@ -406,7 +406,7 @@ export class QueueEventHealthComponent {
       //Resolve arenaeventid using eventref + productref
 
       // const arenaQuery = query(
-      //   collection(this.firestore, 'arena events'),
+      //   collection(this.firestoreDefault, 'arena events'),
       //   where('productref', '==', productRef),
       //   where('eventref', '==', selectedQueueRef),
       //   where("delete", "==", false)
@@ -427,7 +427,7 @@ export class QueueEventHealthComponent {
         Check existing event participation request
       ---------------------------------------- */
       // const epQuery = query(
-      //   collection(this.firestore, 'event participation request'),
+      //   collection(this.firestoreDefault, 'event participation request'),
       //   where('participantproductid', '==', ppid),
       //   where('arenaeventid', '==', arenaeventid)
       // );
@@ -453,7 +453,7 @@ export class QueueEventHealthComponent {
       //Create event participation request
       // Generate docID
       const epRef = doc(
-        collection(this.firestore, 'event participation request')
+        collection(this.firestoreDefault, 'event participation request')
       );
 
       // SINGLE atomic write
@@ -472,7 +472,7 @@ export class QueueEventHealthComponent {
 
       // eventparticipationid into participantsproduct
       const ppQuery = query(
-        collection(this.firestore, 'participantsproduct'),
+        collection(this.firestoreDefault, 'participantsproduct'),
         where('docid', '==', ppid)
       );
 
@@ -596,7 +596,7 @@ export class QueueEventHealthComponent {
   /* ================= LOAD QUEUES ================= */
 
   async loadQueues() {
-    const snap = await getDocs(collection(this.firestore, 'queue generation'));
+    const snap = await getDocs(collection(this.firestoreDefault, 'queue generation'));
     this.queues = snap.docs .map(d => ({
     id: d.id, ...d.data() })) .sort((a: any, b: any) => {
       if (!a.queueenddate) return 1;
@@ -630,7 +630,7 @@ export class QueueEventHealthComponent {
         if (pp.profileid) {
           try {
             const profileSnap = await getDoc(
-              doc(this.firestore, 'profile_data', pp.profileid)
+              doc(this.firestoreDefault, 'profile_data', pp.profileid)
             );
             if (profileSnap.exists()) {
               const d = profileSnap.data();
@@ -646,7 +646,7 @@ export class QueueEventHealthComponent {
         if (productRefId) {
           try {
             const productSnap = await getDoc(
-              doc(this.firestore, 'products', productRefId)
+              doc(this.firestoreDefault, 'products', productRefId)
             );
             if (productSnap.exists()) {
               const d = productSnap.data();
@@ -663,7 +663,7 @@ export class QueueEventHealthComponent {
         if (epId) {
           try {
             const epSnap = await getDoc(
-              doc(this.firestore, 'event participation request', epId)
+              doc(this.firestoreDefault, 'event participation request', epId)
             );
             if (epSnap.exists()) {
               epStatus = epSnap.data()['status'] ?? 'Found (status missing)';
@@ -723,12 +723,12 @@ export class QueueEventHealthComponent {
 
   //   if (!confirmAction) return;
 
-  //   const batch = writeBatch(this.firestore);
+  //   const batch = writeBatch(this.firestoreDefault);
 
   //   for (const record of selectedRecords) {
   //     // Update participantsproduct → cancelled
   //     if (record.ppId) {
-  //       const ppRef = doc(this.firestore, 'participantsproduct', record.ppId);
+  //       const ppRef = doc(this.firestoreDefault, 'participantsproduct', record.ppId);
   //       batch.update(ppRef, {
   //         status: 'cancelled',
   //         'statusdate.cancelled': serverTimestamp()
@@ -738,7 +738,7 @@ export class QueueEventHealthComponent {
   //     // Update event participation → unattended (only if ep exists)
   //     if (record.epId) {
   //       const epRef = doc(
-  //         this.firestore,
+  //         this.firestoreDefault,
   //         'event participation request',
   //         record.epId
   //       );
@@ -763,7 +763,7 @@ export class QueueEventHealthComponent {
 
     this.initiatedNotInQueuePpUnsub = onSnapshot(
       query(
-        collection(this.firestore, 'participantsproduct'),
+        collection(this.firestoreDefault, 'participantsproduct'),
         where('status', '==', 'initiated')
       ),
       (snap) => {
@@ -775,10 +775,10 @@ export class QueueEventHealthComponent {
       }
     );
 
-    const queueRef = doc(this.firestore, 'queue generation', queueId);
+    const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
       onSnapshot(
         query(
-          collection(this.firestore, 'arena events'),
+          collection(this.firestoreDefault, 'arena events'),
           where('eventref', '==', queueRef),
           where('delete', '==', false)
         ),
@@ -803,49 +803,50 @@ export class QueueEventHealthComponent {
     if (this.ppUnsub) this.ppUnsub();
 
     try {
-      const queueRef = doc(this.firestore, 'queue generation', queueId);
-        // ATC ALPHA (VALID)
-        if (this.atcAlphaUnsub) this.atcAlphaUnsub();
-        this.atcAlphaUnsub = onSnapshot(
-          query(
-            collection(this.firestore, 'atc_alpha'),
-            where('isdelete', '==', false)
-          ),
-          (snap) => {
-            this.atcAlphaRecords = snap.docs.map(d => ({
-              source: 'atc_alpha',
-              profileid: d.data()['profileid'],
-              queueid: d.data()['queueid'] ?? null,
-              prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
-            }));
+      const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
+      // ATC ALPHA (VALID)
+      // const firestoreATC = getFirestore("firestore-atc")
+      // if (this.atcAlphaUnsub) this.atcAlphaUnsub();
+      // this.atcAlphaUnsub = onSnapshot(
+      //   query(
+      //     collection(firestoreATC, 'atc_alpha'),
+      //     where('isdelete', '==', false)
+      //   ),
+      //   (snap) => {
+      //     this.atcAlphaRecords = snap.docs.map(d => ({
+      //       source: 'atc_alpha',
+      //       profileid: d.data()['profileid'],
+      //       queueid: d.data()['queueid'] ?? null,
+      //       prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
+      //     }));
 
-            this.mergeAtcsAndRebuild();
-          }
-        );
+      //     this.mergeAtcsAndRebuild();
+      //   }
+      // );
 
-        // ---- ATC TO VALIDATE (LIVE) ----
-        if (this.atcValidateUnsub) this.atcValidateUnsub();
+      // // ---- ATC TO VALIDATE (LIVE) ----
+      // if (this.atcValidateUnsub) this.atcValidateUnsub();
 
-        this.atcValidateUnsub = onSnapshot(
-          query(
-            collection(this.firestore, 'atc_to_validate'),
-            where('isdelete', '==', false)
-          ),
-          (snap) => {
-            this.atcValidateRecords = snap.docs.map(d => ({
-              source: 'atc_to_validate',
-              profileid: d.data()['profileid'],
-              queueid: d.data()['queueid'] ?? null,
-              prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
-            }));
-            this.mergeAtcsAndRebuild();
-          }
-        );
+      // this.atcValidateUnsub = onSnapshot(
+      //   query(
+      //     collection(firestoreATC, 'atc_to_validate'),
+      //     where('isdelete', '==', false)
+      //   ),
+      //   (snap) => {
+      //     this.atcValidateRecords = snap.docs.map(d => ({
+      //       source: 'atc_to_validate',
+      //       profileid: d.data()['profileid'],
+      //       queueid: d.data()['queueid'] ?? null,
+      //       prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null
+      //     }));
+      //     this.mergeAtcsAndRebuild();
+      //   }
+      // );
 
       //  LIVE TOKEN LISTENER
       this.tokenUnsub = onSnapshot(
         query(
-          collection(this.firestore, 'queue_token'),
+          collection(this.firestoreDefault, 'queue_token'),
           where('queueref', '==', queueRef),
           //where('tokenstatus', '==', 'Active'), where('stagestatus', '==', 'Approved')
         ),
@@ -861,7 +862,7 @@ export class QueueEventHealthComponent {
       //  LIVE PARTICIPANT PRODUCT LISTENER
       this.ppUnsub = onSnapshot(
         query(
-          collection(this.firestore, 'participantsproduct'),
+          collection(this.firestoreDefault, 'participantsproduct'),
           where('eventref', '==', queueRef)
         ),
         (ppSnap) => {
@@ -877,7 +878,7 @@ export class QueueEventHealthComponent {
 
       this.epUnsub = onSnapshot(
         query(
-        collection(this.firestore, 'event participation request'),
+        collection(this.firestoreDefault, 'event participation request'),
         where('eventref','==',queueRef)
         ),
         (epSnap) => {
@@ -1144,14 +1145,14 @@ export class QueueEventHealthComponent {
     if (!confirmAction) {
       return;
     }
-    const batch = writeBatch(this.firestore);
+    const batch = writeBatch(this.firestoreDefault);
     for (const record of selectedRecords) {
       if (
         record.tokenDocId &&
         String(record.tokenStatus).toLowerCase() !== 'inactive'
       ) {
         const tokenRef = doc(
-          this.firestore,
+          this.firestoreDefault,
           'queue_token',
           record.tokenDocId
         );
@@ -1161,7 +1162,7 @@ export class QueueEventHealthComponent {
       }
       if (record.participantproductid) {
         const ppRef = doc(
-          this.firestore,
+          this.firestoreDefault,
           'participantsproduct',
           record.participantproductid
         );
@@ -1181,7 +1182,7 @@ export class QueueEventHealthComponent {
         String(record.eventParticipationStatus).toLowerCase() !== 'unattended'
       ) {
         const epRef = doc(
-          this.firestore,
+          this.firestoreDefault,
           'event participation request',
           record.eventParticipationId
         );

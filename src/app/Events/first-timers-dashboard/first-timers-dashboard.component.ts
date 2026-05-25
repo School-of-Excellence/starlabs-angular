@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
-import { collection, collectionData, DocumentReference, Firestore, getDoc, getDocs, orderBy, query, where, doc } from '@angular/fire/firestore';
+import { collection, collectionData, DocumentReference, getDoc, getDocs, getFirestore, orderBy, query, where, doc } from '@angular/fire/firestore';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatInputModule } from '@angular/material/input';
 import { Subscription } from 'rxjs';
@@ -122,7 +122,9 @@ export class FirstTimersDashboardComponent implements OnDestroy {
   private colorIndex = 0;
   private profileAtcMap: { [profileId: string]: any } = {};
 
-  constructor(private firestore: Firestore, private cdr: ChangeDetectorRef) { }
+  firestoreDefault = getFirestore()
+
+  constructor(private cdr: ChangeDetectorRef) { }
 
   ngOnInit() { this.loadData(); }
   ngOnDestroy() { this.unsubscribeAllSubscriptions(); }
@@ -155,14 +157,14 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     this.storedEventId = this.getEventFromStorage();
     this.storedQueueId = this.getQueueFromStorage();
 
-    await getDocs(collection(this.firestore, "journey")).then(snap => {
+    await getDocs(collection(this.firestoreDefault, "journey")).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const journeyData = snap.docs[i].data();
         this.mapJourneyData[journeyData['id']] = journeyData;
       }
     });
 
-    await getDocs(query(collection(this.firestore, "participant tags"), where("tagsfor", "array-contains", "live event"))).then(snap =>{
+    await getDocs(query(collection(this.firestoreDefault, "participant tags"), where("tagsfor", "array-contains", "live event"))).then(snap =>{
       var id = []
       snap.forEach(doc =>{
         this.mapTagNames[doc.id] = doc.data()["name"]
@@ -171,14 +173,14 @@ export class FirstTimersDashboardComponent implements OnDestroy {
       this.availableTags = id
     })
 
-    // await getDoc(doc(this.firestore, "classify", "eventtags")).then(tags => {
+    // await getDoc(doc(this.firestoreDefault, "classify", "eventtags")).then(tags => {
     //   if (tags.exists()) {
     //     this.availableTags = tags.data()['firsttimetags'] || [];
     //     for (let i = 0; i < this.availableTags.length; i++) { this.mapTags[this.availableTags[i]] = []; }
     //   }
     // });
 
-    await getDocs(collection(this.firestore, "procedures")).then((procedure) => {
+    await getDocs(collection(this.firestoreDefault, "procedures")).then((procedure) => {
       if (procedure.docs.length != 0) {
         procedure.docs.forEach((data) => {
           const procedureData = data.data();
@@ -191,7 +193,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     this.loadParticipantMetadata();
 
     try {
-      const eventsSnapshot = await getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc')));
+      const eventsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'event collection'), orderBy('end_date', 'desc')));
       const today = new Date(); today.setHours(0, 0, 0, 0);
 
       eventsSnapshot.docs.forEach((doc) => {
@@ -218,7 +220,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
   // Load participant metadata
   loadParticipantMetadata() {
     try {
-      this.metadataSubscription = collectionData(query(collection(this.firestore, 'participant metadata'), orderBy('name', 'asc')), { idField: 'id' }).subscribe((metadataSnapshot) => {
+      this.metadataSubscription = collectionData(query(collection(this.firestoreDefault, 'participant metadata'), orderBy('name', 'asc')), { idField: 'id' }).subscribe((metadataSnapshot) => {
         const tempParticipantMetadataMap: { [key: string]: any } = {};
         const tempTagsMap: { [key: string]: string[] } = {};
         const tempFirstTimerIds: string[] = [];
@@ -305,7 +307,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     if (this.participantSubscription) { this.participantSubscription.unsubscribe(); this.participantSubscription = null; }
     try {
       const arenaETicketQuery = query(
-        collection(this.firestore, 'arena e-ticket'),
+        collection(this.firestoreDefault, 'arena e-ticket'),
         where('eventref', '==', this.selectedEvent!.docref)
       );
       this.participantSubscription = collectionData(arenaETicketQuery, { idField: 'id' }).subscribe((eTicketSnapshot) => {
@@ -331,7 +333,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     this.queueRangeStartDate = null; this.queueRangeEndDate = null;
 
     try {
-      const queuesSnapshot = await getDocs(query(collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc')));
+      const queuesSnapshot = await getDocs(query(collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc')));
       const today = new Date(); today.setHours(0, 0, 0, 0);
 
       queuesSnapshot.docs.forEach((doc) => {
@@ -372,7 +374,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     if (this.selectedQueues.length === 0) return;
     this.atcModels = [];
     try {
-      const variationPromises = this.selectedQueueRefs.map(queueRef => getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', queueRef))));
+      const variationPromises = this.selectedQueueRefs.map(queueRef => getDocs(query(collection(this.firestoreDefault, 'queue variation'), where('queueref', '==', queueRef))));
       const variationSnapshots = await Promise.all(variationPromises);
       let models: string[] = [];
       variationSnapshots.forEach(variationSnapshot => { variationSnapshot.docs.forEach((doc) => { models.push(doc.data()['atcmodel']); }); });
@@ -397,7 +399,8 @@ export class FirstTimersDashboardComponent implements OnDestroy {
 
   // Subscribe to atc_alpha
   private subscribeToAtcAlpha() {
-    const atcQuery = query(collection(this.firestore, 'atc_alpha'), where('product', 'in', this.atcModels), where("isdelete","==", false), where("prescription_date", ">=", this.queueRangeStartDate), where("prescription_date", "<=", this.queueRangeEndDate), orderBy("prescription_date", "desc"));
+    const firestoreATC = getFirestore("firestore-atc")
+    const atcQuery = query(collection(firestoreATC, 'atc_alpha'), where('product', 'in', this.atcModels), where("isdelete","==", false), where("prescription_date", ">=", this.queueRangeStartDate), where("prescription_date", "<=", this.queueRangeEndDate), orderBy("prescription_date", "desc"));
     this.atcSubscription = collectionData(atcQuery).subscribe({
       next: (docs) => {
         console.log("Total ATC", docs.length)
@@ -434,7 +437,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     if (!start || !end || !this.selectedEvent) return;
 
     const liveChangeWorkQuery = query(
-      collection(this.firestore, 'livechangework'),
+      collection(this.firestoreDefault, 'livechangework'),
       where('eventref', '==', this.selectedEvent.docref),
       where('createdon', '>=', start),
       where('createdon', '<=', end),
@@ -463,7 +466,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
     const end   = this.filterEndDate   || this.queueRangeEndDate;
     if (!start || !end || !this.selectedEvent) return;
     const liveQuery = query(
-      collection(this.firestore, 'livechangework'),
+      collection(this.firestoreDefault, 'livechangework'),
       where('eventref', '==', this.selectedEvent.docref),
       where('createdon', '>=', start),
       where('createdon', '<=', end),
@@ -887,7 +890,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
       currentDate.setHours(23, 59, 59, 999);
 
       const allChangeworkQuery = query(
-        collection(this.firestore, 'livechangework'),
+        collection(this.firestoreDefault, 'livechangework'),
         where('eventref', '==', this.selectedEvent.docref),
         where('createdon', '<=', currentDate),
         orderBy('createdon', 'desc')

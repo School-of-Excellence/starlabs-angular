@@ -37,6 +37,7 @@ interface purchaseProduct {
   rowlogs?: any
   _initiationNote?: string
   _statusBefore?: any
+  _autoFromJourney?: boolean
 }
 
 interface ParticipantPurchase {
@@ -496,7 +497,7 @@ export class JourneyProductPurchaseComponent {
       var mappedProduct = this.mapJourneyToProduct[this.participantPurchase[journeyindex].journeyref] ?? [null]
       for (let i = 0; i < mappedProduct.length; i++) {
         const product = mappedProduct[i];
-        this.newProduct(journeyindex, product)
+        this.newProduct(journeyindex, product, true)
       }
     }
   }
@@ -620,7 +621,7 @@ export class JourneyProductPurchaseComponent {
     }
   }
 
-  newProduct(journeyindex, productref = null){
+  newProduct(journeyindex, productref = null, autoFromJourney = false){
     this.participantPurchase[journeyindex].products.push({
       productref: productref,
       packageref: null,
@@ -629,7 +630,8 @@ export class JourneyProductPurchaseComponent {
       status: null,
       unlimited: false,
       participantproductid: null,
-      deliverytype: null
+      deliverytype: null,
+      _autoFromJourney: autoFromJourney
     })
   }
 
@@ -739,7 +741,8 @@ export class JourneyProductPurchaseComponent {
           subscriptionend: purchase.subscriptionend,
           unlimited: product.unlimited ?? false,
           deliverytype: product['deliverytype'] ?? null,
-          _initiationNote: product['_initiationNote'] ?? null
+          _initiationNote: product['_initiationNote'] ?? null,
+          _autoFromJourney: product['_autoFromJourney'] ?? false
         })
 
         // if(product["status"] == "initiated" && (product["delivery"] ?? []).length == 0){
@@ -769,6 +772,7 @@ export class JourneyProductPurchaseComponent {
       this.participantProductList.sort((a, b) => a["sequenceorder"] - b["sequenceorder"])
       this.computeReviewDiffs()
       this.computeRemovedGroups()
+      this.recomputeMissingNotes()
       console.log("Purchase", this.participantPurchase)
       console.log("Participant Product", this.participantProductList)
     }
@@ -828,18 +832,20 @@ export class JourneyProductPurchaseComponent {
     this.removedGroups = groups
   }
 
-  get hasMissingReviewNotes(): boolean {
-    if(!this.reviewMode) return false
+  hasMissingReviewNotes = false
+
+  recomputeMissingNotes(){
+    if(!this.reviewMode){ this.hasMissingReviewNotes = false; return }
     for(const p of this.participantProductList as any[]){
-      if(p._changed && !((p.note ?? '').trim())) return true
+      if(p._changed && !p._autoFromJourney && !((p.note ?? '').trim())){ this.hasMissingReviewNotes = true; return }
     }
     for(const j of this.participantPurchase as any[]){
-      if(j._changed && !((j._changeNote ?? '').trim())) return true
+      if(j._changed && !((j._changeNote ?? '').trim())){ this.hasMissingReviewNotes = true; return }
     }
     for(const g of this.removedGroups){
-      if(!((g.note ?? '').trim())) return true
+      if(!((g.note ?? '').trim())){ this.hasMissingReviewNotes = true; return }
     }
-    return false
+    this.hasMissingReviewNotes = false
   }
 
   private diffFields(collectionName: string, oldData: any, newData: any): Array<{label: string, old: any, new: any}> {
@@ -1062,7 +1068,7 @@ export class JourneyProductPurchaseComponent {
 
     const missing = []
     productSaves.forEach(s => {
-      if(s.changed && !((s.sourceProduct["note"] ?? '').trim())){
+      if(s.changed && !s.sourceProduct["_autoFromJourney"] && !((s.sourceProduct["note"] ?? '').trim())){
         const name = this.mapProduct[s.sourceProduct["productref"]] ?? 'Product'
         const pkg = this.mapPackage[s.sourceProduct["packageref"]]
         missing.push("Product: " + (pkg ? name + ' / ' + pkg : name))
@@ -1328,6 +1334,11 @@ export class JourneyProductPurchaseComponent {
     if(typeof value === 'object') return JSON.stringify(value)
     return value
   }
+
+  trackByIndex(i: number){ return i }
+  trackByPurchaseRef(i: number, item: any){ return item.participantjourneyproductref ?? i }
+  trackByProductId(i: number, item: any){ return item.participantproductid ?? i }
+  trackByOptionId(i: number, item: any){ return item.id ?? item.docid ?? i }
 
   purchaseExchange(currentPurchaseIndex,productIndex,selectedPurchaseIndex){
     // console.log(this.participantProductList);

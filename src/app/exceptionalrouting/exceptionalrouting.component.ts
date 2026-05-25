@@ -25,7 +25,8 @@ export class ExceptionalroutingComponent implements OnInit {
     '/home',
     '/content/',
     '/calendar',
-    '/recommended/'
+    '/recommended/',
+    '/workshop/'
   ];
 
   ngOnInit(): void {

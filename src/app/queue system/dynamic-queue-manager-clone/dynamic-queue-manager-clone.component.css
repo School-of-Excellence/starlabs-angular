@@ -868,6 +868,16 @@
   font-size: 16px;
 }
 
+.selection-dfu-tag {
+  font-size    : 10px;
+  font-weight  : 700;
+  color        : #e65100;
+  background   : #ffe0b2;
+  border-radius: 8px;
+  padding      : 2px 6px;
+  white-space  : nowrap;
+}
+
 .participant-email {
   display: flex;
   align-items: center;
@@ -6563,6 +6573,91 @@ button[matMenuTriggerFor] {
   color: #bbb;
   gap: 8px;
 }
+
+/* ── Channel header filter chips ─────────────────────────────────────────── */
+.th-filter-chips {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.th-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: #f4f6fb;
+  color: #6b7c85;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  line-height: 1.4;
+}
+
+.th-filter-chip:hover { background: #e9edf5; }
+
+.th-filter-chip.success {
+  color: #1f6f3a;
+  background: #e6f7eb;
+}
+.th-filter-chip.success:hover { background: #d3f0db; }
+.th-filter-chip.success.active {
+  background: #1f6f3a;
+  color: #fff;
+  border-color: #1f6f3a;
+  box-shadow: 0 1px 3px rgba(31,111,58,0.3);
+}
+
+.th-filter-chip.failure {
+  color: #a13838;
+  background: #fde2e2;
+}
+.th-filter-chip.failure:hover { background: #fbcaca; }
+.th-filter-chip.failure.active {
+  background: #a13838;
+  color: #fff;
+  border-color: #a13838;
+  box-shadow: 0 1px 3px rgba(161,56,56,0.3);
+}
+
+.timeline-clear-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e0d6f5;
+  background: #fff;
+  color: #6c3fc5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.timeline-clear-filters:hover {
+  background: #6c3fc5;
+  color: #fff;
+}
+
+.timeline-clear-filters-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.timeline-clear-filters-inline {
+  margin-top: 10px;
+  margin-left: 0;
+}
 /* Bulk Move*/
 .bulk-overlay {
   position       : fixed;
@@ -6633,15 +6728,44 @@ button[matMenuTriggerFor] {
   top                  : 0;
 }
 
+.bulk-dfu-banner {
+  display      : flex;
+  align-items  : center;
+  gap          : 6px;
+  font-size    : 12px;
+  color        : #e65100;
+  background   : #fff3e0;
+  border       : 1px solid #ffcc80;
+  border-radius: 6px;
+  padding      : 6px 10px;
+  margin-bottom: 8px;
+}
+
 .bulk-list-row {
   display              : grid;
-  grid-template-columns: 1fr 120px;
+  grid-template-columns: 1fr 120px auto;
   padding              : 9px 12px;
   align-items          : center;
   border-bottom        : 1px solid #f0f0f0;
 }
 
 .bulk-list-row:last-child { border-bottom: none; }
+
+.bulk-row-dfu {
+  opacity   : 0.6;
+  background: #fff8f0;
+}
+
+.bulk-dfu-tag {
+  font-size    : 10px;
+  font-weight  : 700;
+  color        : #e65100;
+  background   : #ffe0b2;
+  border-radius: 8px;
+  padding      : 2px 7px;
+  white-space  : nowrap;
+  margin-left  : 6px;
+}
 
 .bulk-name {
   font-size    : 13px;
@@ -6741,15 +6865,11 @@ button[matMenuTriggerFor] {
   align-items: center;
   gap: 10px;
 }
-.sa-title {
+.sa-stage-select {
   font-size: 16px;
   font-weight: 700;
   color: #1a1a2e;
-}
-.sa-subtitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1976d2;
+  min-width: 160px;
 }
 .sa-sub-label {
   font-size: 12px;
@@ -6760,30 +6880,6 @@ button[matMenuTriggerFor] {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* Live badge */
-.sa-live-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #2e7d32;
-  background: #e8f5e9;
-  border-radius: 10px;
-  padding: 3px 10px;
-}
-.sa-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #4caf50;
-  animation: sa-pulse 1.5s infinite;
-}
-@keyframes sa-pulse {
-  0%, 100% { opacity: 1; transform: scale(1);   }
-  50%       { opacity: 0.4; transform: scale(0.8); }
 }
 
 /* ── Tabs ───────────────────────────────────────────────── */

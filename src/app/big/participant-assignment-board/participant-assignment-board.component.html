@@ -1,22 +1,22 @@
 <div *ngIf="loading">
     <mat-progress-bar mode="indeterminate"></mat-progress-bar>
   </div>
-  
+
   <div *ngIf="!loading" class="dashboard-container">
-  
+
     <div class="d-flex flex-row justify-content-center">
       <span>
         <h3>Big Accelerator - Arena Activities</h3>
         <p>(Track your progress and upcoming task)</p>
       </span>
     </div>
-  
+
     <div *ngIf="developerAccess" class="d-flex flex-row justify-content-center">
       <mat-form-field appearance="outline" class="w-50">
         <mat-select placeholder="Select Participant" [(ngModel)]="selectedProfile" (ngModelChange)="onSelect($event)">
           <mat-option>
-            <ngx-mat-select-search [(ngModel)]="searchTerm" (keyup)="filterOptions()" [placeholderLabel]="'Search'" 
-              [noEntriesFoundLabel]="'No matching records found'" 
+            <ngx-mat-select-search [(ngModel)]="searchTerm" (keyup)="filterOptions()" [placeholderLabel]="'Search'"
+              [noEntriesFoundLabel]="'No matching records found'"
               ngDefaultControl
             >
           </ngx-mat-select-search>
@@ -27,7 +27,7 @@
         </mat-select>
       </mat-form-field>
     </div>
-  
+
     <div class="marathon-container">
       <div *ngFor="let marathon of this.bigMarathonList">
         <button class="marathon" [ngClass]="{'selected': selectedMarathon['marathonref']?.id === marathon.marathonref.id}" (click)="fetchMarathonData(marathon)">
@@ -35,16 +35,16 @@
           <span *ngIf="marathonMap[marathon['docid']] ? marathonMap[marathon['docid']]['pending'] > 0 : false" class="pending"><b>{{marathonMap[marathon['docid']]['pending']}}</b></span>
         </button>
       </div>
-    </div> 
+    </div>
     <br>
     <div class="filter-section">
       <div class="filter-container">
         <div class="filter-group">
           <div class="status-filters" *ngIf="this.selectedMarathon['marathonref'] && this.mapParticipantAssignments[this.selectedMarathon['marathonref'].id]">
-            
-            <button class="filter-btn" 
+
+            <button class="filter-btn"
               *ngFor="let status of  ['myactivities', 'review', 'rework', 'missed', 'completed']"
-              [ngClass]="{'active': selectedStatus === status}" 
+              [ngClass]="{'active': selectedStatus === status}"
               (click)="applyStatusFilter(status)">
               {{status === 'myactivities' ? 'My Activities' : (status | titlecase)}}
               <span *ngIf="this.mapParticipantAssignments[this.selectedMarathon['marathonref'].id][status] &&
@@ -54,16 +54,16 @@
                 {{this.mapParticipantAssignments[this.selectedMarathon['marathonref'].id][status].length}}
               </span>
             </button>
-  
+
             <input type="text" class="search-input" placeholder="Search activities..." (keyup)="applyKeywordFilter($event)">
-  
+
           </div>
         </div>
-       
+
       </div>
     </div>
-    
-  
+
+
     <div class="notification-banner" *ngIf="hasUpcomingZoomCall()">
       <div class="notification-content">
         <span class="icon">
@@ -72,12 +72,12 @@
         <span class="message">Zoom call activity is being scheduled on {{formatDate(getNextZoomCall()?.startDate)}} (Today)</span>
       </div>
     </div>
-  
+
     <div [ngClass]="dataSource.data.length === 0 ? 'activities-grid2' : 'activities-grid'">
       <div *ngIf="dataSource.data.length === 0" class="no-activities">
         <div class="empty-state">
           <span class="empty-icon">
-            <i class="far fa-calendar-check"></i> 
+            <i class="far fa-calendar-check"></i>
           </span>
           <p>No activities found</p>
         </div>
@@ -105,10 +105,10 @@
             {{isActivityOngoing(activity) ? 'Ongoing' : (selectedStatus === 'myactivities' ? 'Upcoming' : (selectedStatus | titlecase))}}
           </div>
         </div>
-        
+
         <div class="card-body">
           <h3 class="activity-title">{{activity.title}}</h3>
-          
+
           <div class="activity-dates">
             <div class="date-item">
               <span class="date-label"><i class="fas fa-play"></i> Start:</span>
@@ -119,13 +119,13 @@
               <span class="date-value">{{formatDate(activity.enddate)}}</span>
             </div>
           </div>
-          
+
           <div class="activity-directive">
             <p *ngIf="activity.directive !== null" style="font-weight: 500;color: #6c757d;">
               <i class="fa-solid fa-book-open"></i> Directive<p>
             <p class="directive-preview" *ngIf="activity.selectedForExpansion !== true">
               {{ activity.directive?.split(' ').slice(0, 10).join(' ') }}
-              <a *ngIf="activity.directive?.split(' ').length > 10" 
+              <a *ngIf="activity.directive?.split(' ').length > 10"
                  (click)="activity.selectedForExpansion = true" class="read-more">
                 Read more
               </a>
@@ -139,24 +139,24 @@
           </div>
 
           <div *ngIf="selectedStatus === 'completed'" class="activity-directive">
-            <p *ngIf="activity.summary && activity.summary.length > 0" 
+            <p *ngIf="activity.summary && activity.summary.length > 0"
                style="font-weight: 500;color: #6c757d;">
               <i class="fa-solid fa-note-sticky"></i> Completed Notes
             </p>
-            
-            <p class="directive-preview" 
-               *ngIf="activity.selectedForExpansion3 !== true && 
+
+            <p class="directive-preview"
+               *ngIf="activity.selectedForExpansion3 !== true &&
                       activity.summary && activity.summary.length > 0">
               {{ activity.summary[0]?.split(' ').slice(0, 10).join(' ') }}
-              <a *ngIf="activity.summary[0]?.split(' ').length > 10 || 
+              <a *ngIf="activity.summary[0]?.split(' ').length > 10 ||
                         activity.summary.length > 1"
                  (click)="activity.selectedForExpansion3 = true" class="read-more">
                 Read more
               </a>
             </p>
-            
-            <div class="directive-expanded" 
-                 *ngIf="activity.selectedForExpansion3 === true && 
+
+            <div class="directive-expanded"
+                 *ngIf="activity.selectedForExpansion3 === true &&
                         activity.summary && activity.summary.length > 0">
               <ul>
                 <li *ngFor="let note of activity.summary">
@@ -170,30 +170,30 @@
           </div>
 
           <div *ngIf="selectedStatus === 'rework'" class="activity-directive">
-            <p *ngIf="activity.activityLog && activity.activityLog.length > 0 && 
-                       activity.activityLog[activity.activityLog.length -1]['notes'] && 
-                       activity.activityLog[activity.activityLog.length -1]['notes'].length > 0" 
+            <p *ngIf="activity.activityLog && activity.activityLog.length > 0 &&
+                       activity.activityLog[activity.activityLog.length -1]['notes'] &&
+                       activity.activityLog[activity.activityLog.length -1]['notes'].length > 0"
                style="font-weight: 500;color: #6c757d;">
               <i class="fa-solid fa-note-sticky"></i> Rework Notes
             </p>
-            
-            <p class="directive-preview" 
-               *ngIf="activity.selectedForExpansion2 !== true && 
-                      activity.activityLog && activity.activityLog.length > 0 && 
-                      activity.activityLog[activity.activityLog.length -1]['notes'] && 
+
+            <p class="directive-preview"
+               *ngIf="activity.selectedForExpansion2 !== true &&
+                      activity.activityLog && activity.activityLog.length > 0 &&
+                      activity.activityLog[activity.activityLog.length -1]['notes'] &&
                       activity.activityLog[activity.activityLog.length -1]['notes'].length > 0">
               {{ activity.activityLog[activity.activityLog.length -1]['notes'][0]?.split(' ').slice(0, 10).join(' ') }}
-              <a *ngIf="activity.activityLog[activity.activityLog.length -1]['notes'][0]?.split(' ').length > 10 || 
+              <a *ngIf="activity.activityLog[activity.activityLog.length -1]['notes'][0]?.split(' ').length > 10 ||
                         activity.activityLog[activity.activityLog.length -1]['notes'].length > 1"
                  (click)="activity.selectedForExpansion2 = true" class="read-more">
                 Read more
               </a>
             </p>
-            
-            <div class="directive-expanded" 
-                 *ngIf="activity.selectedForExpansion2 === true && 
-                        activity.activityLog && activity.activityLog.length > 0 && 
-                        activity.activityLog[activity.activityLog.length -1]['notes'] && 
+
+            <div class="directive-expanded"
+                 *ngIf="activity.selectedForExpansion2 === true &&
+                        activity.activityLog && activity.activityLog.length > 0 &&
+                        activity.activityLog[activity.activityLog.length -1]['notes'] &&
                         activity.activityLog[activity.activityLog.length -1]['notes'].length > 0">
               <ul>
                 <li *ngFor="let note of activity.activityLog[activity.activityLog.length -1]['notes']">
@@ -214,12 +214,12 @@
               currentTimestampSeconds >= (activity.startdate.seconds - (activity.startdate.seconds % 86400)) &&
               currentTimestampSeconds <= (activity.enddate.seconds - (activity.enddate.seconds % 86400) + 86399)
             )">
-            <i *ngIf="selectedStatus !== 'completed' && selectedStatus !== 'missed'" class="fas fa-external-link-alt"></i> 
-            {{ selectedStatus === 'rework' ? 'Rework Activity' : 
-               selectedStatus === 'completed' ? 'Completed' : 
-               selectedStatus === 'review' ? 'View Submitted Activity' : 
+            <i *ngIf="selectedStatus !== 'completed' && selectedStatus !== 'missed'" class="fas fa-external-link-alt"></i>
+            {{ selectedStatus === 'rework' ? 'Rework Activity' :
+               selectedStatus === 'completed' ? 'Completed' :
+               selectedStatus === 'review' ? 'View Submitted Activity' :
                selectedStatus === 'missed' ? 'Missed' : 'Open Activity'}}
-          </button>        
+          </button>
           </div>
         </div>
 
@@ -227,17 +227,17 @@
           <div class="d-flex align-items-center">
             <button class="action-btn">
             {{'Yet To Start'}}
-          </button>        
+          </button>
           </div>
         </div> -->
         <div class="card-footer" *ngIf="shouldShowButton(activity)">
-          <div class="d-flex align-items-center">
-            <button class="action-btn" 
+          <div class="d-flex align-items-center" style="flex-direction: column; align-items: flex-start;">
+            <button class="action-btn"
               [disabled]="isButtonDisabled(activity)"
               (click)="!isButtonDisabled(activity) && performAction(activity, checkActivityStart(activity))">
-              <i *ngIf="!isButtonDisabled(activity)" class="fas fa-external-link-alt"></i> 
+              <i *ngIf="!isButtonDisabled(activity)" class="fas fa-external-link-alt"></i>
               {{ getButtonText(activity) }}
-            </button>        
+            </button>
           </div>
         </div>
       </div>

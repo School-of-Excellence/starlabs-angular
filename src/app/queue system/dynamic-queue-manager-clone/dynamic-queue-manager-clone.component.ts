@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, computed, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { collection, collectionData, doc, DocumentData, onSnapshot, documentId, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, onSnapshot, documentId, Firestore, getDoc, getDocs, getFirestore, orderBy, Query, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch,deleteDoc,or,and } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { combineLatest, firstValueFrom, Observable, Subject, Subscription } from 'rxjs';
 import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-bulk-invitation.component';
@@ -42,7 +42,6 @@ import { AddPendingActionComponent } from '../../AppEngagement/app-action-pendin
 import { TagParticipantsComponent } from '../../Participants Profile Management/participants-analytics/tag-participants/tag-participants.component';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 interface SearchMatch {
@@ -345,11 +344,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   bulkMoveInProgress         = false;
   bulkMoveCompleted          = false;
   bulkMoveFailed             = false;
-  bulkMoveCount              = 0;
   bulkMoveTargetStageKey     = '';
   bulkMoveCurrentStageObj: any = null;
   availableStagesForBulkMove: any[] = [];
-  bulkMoveResults: { token: any; variationName: string }[] = [];
+  bulkMoveResults: { token: any; variationName: string; isDFU: boolean }[] = [];
   // Stage Activity Panel
   showStageActivityPanel: boolean = false;
   selectedStageForActivity: string = '';
@@ -359,7 +357,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   stageActivityCache: any[] | null = null;
   stageActivityCacheQueueId: string | null = null;
   stageActivityCacheLoading: boolean = false;
-  private stageActivityUnsub: (() => void) | null = null;
   participantSearchTerm: string = '';
 
   // Add this property
@@ -399,7 +396,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   showTimelineOverlay = false;
   private shouldScrollTracks = false;
   timelineSearchQuery = '';
-  showOnlyFailedLast = false;
+  channelFilters: {
+    push: 'success' | 'failure' | null;
+    whatsapp: 'success' | 'failure' | null;
+    email: 'success' | 'failure' | null;
+  } = { push: null, whatsapp: null, email: null };
   selectedEmailPreview: { profileId: string; item: NotificationEvent } | null = null;
   selectedWhatsappPreview: { profileId: string; item: NotificationEvent } | null = null;
 
@@ -1523,8 +1524,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     public http: HttpClient,
     public ngZone: NgZone,
     private sanitizer: DomSanitizer,
-    private router: Router,
-    private snackBar: MatSnackBar
+    private router: Router
   ) {
     guard.getRoles().then(roles => {
       this.roles = roles;
@@ -1686,10 +1686,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
 
     this.timelineUnsubs.forEach(u => u());
-    if (this.stageActivityUnsub) {
-      this.stageActivityUnsub();
-      this.stageActivityUnsub = null;
-    }
   }
 
   ngAfterViewChecked() {
@@ -1706,10 +1702,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.liveQueueSubscription.complete()
     this.liveQueueSubscription = new Subject<void>();
 
-    if (this.stageActivityUnsub) {
-      this.stageActivityUnsub();
-      this.stageActivityUnsub = null;
-    }
     this.stageActivityCache = null;
     this.stageActivityCacheQueueId = null;
     this.stageActivityCacheLoading = false;
@@ -2851,7 +2843,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   //   this.filteredAvailableStages = [...this.availableStages];
   // }
 
-  async moveTokenToStage(token: any, fromStage: string, fromstagetype: string, toStage: string, markascompleted: any) {
+  async moveTokenToStage(token: any, fromStage: string, fromstagetype: string, toStage: string, markascompleted: any, prefilledPeople?: any) {
     console.log(fromStage, fromstagetype, toStage, markascompleted);
     let targetStageName = toStage;
     let targetStageType = null;
@@ -2880,33 +2872,29 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const dragType = dragStage.type;
     const dropType = dropStage.type;
 
-    const loading = this.dialog.open(LoadingProgressComponent, {
-      data: {
-        msg: "Moving Token " + token.tokennumber + "..."
-      },
+    const loading = prefilledPeople == null ? this.dialog.open(LoadingProgressComponent, {
+      data: { msg: "Moving Token " + token.tokennumber + "..." },
       disableClose: true
-    });
+    }) : null;
 
     let batch = writeBatch(this.firestore);
 
     try {
       if (dragIndex != dropIndex && dropType != "Activity") {
-        const peopledata = {
-          type: "general",
-          personoption: this.specialistList,
-          mentoroption: this.specialistList,
-          shadowoption: this.specialistList,
-          multiperson: true
-        };
+        let result = prefilledPeople ?? null;
 
-        const dialog = this.dialog.open(PeopleInvolvedComponent, {
-          disableClose: true,
-          data: peopledata
-        });
-
-        const result = await firstValueFrom(dialog.afterClosed());
         if (result == null) {
-          return;
+          const peopledata = {
+            type: "general",
+            personoption: this.specialistList,
+            mentoroption: this.specialistList,
+            shadowoption: this.specialistList,
+            multiperson: true
+          };
+          result = await firstValueFrom(
+            this.dialog.open(PeopleInvolvedComponent, { disableClose: true, data: peopledata }).afterClosed()
+          );
+          if (result == null) { return; }
         }
 
         if (result != null) {
@@ -3219,7 +3207,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     } catch (error) {
       console.error("Error moving token:", error);
     } finally {
-      loading.close();
+      loading?.close();
     }
   }
 
@@ -4158,9 +4146,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
 
     if (this.selectedTokens.size >= 10) {
-      this.guard.openSnackBar(
-        'Maximum 10 participants can be selected at a time', 'OK', 2000
-      );
+      this.guard.openSnackBar('Maximum 10 participants can be selected at a time', 'OK', 2000);
       return;
     }
 
@@ -5271,6 +5257,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
   async fetchATCParticipants() {
     if (!this.selectedQueue) return;
+    const firestoreATC = getFirestore("firestore-atc")
 
     this.atcValidatedProfileIds = new Set<string>();
     this.atcUnvalidatedProfileIds = new Set<string>();
@@ -5287,7 +5274,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     const [atcAlphaSnap, atcValidateSnap] = await Promise.all([
       getDocs(query(
-        collection(this.firestore, 'atc_alpha'),
+        collection(firestoreATC, 'atc_alpha'),
         or(
           where('queueid', '==', this.selectedQueue.docid),
           and(
@@ -5297,7 +5284,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         )
       )),
       getDocs(query(
-        collection(this.firestore, 'atc_to_validate'),
+        collection(firestoreATC, 'atc_to_validate'),
         or(
           where('queueid', '==', this.selectedQueue.docid),
           and(
@@ -5490,7 +5477,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.profileSummaries = [];
     this.expandedProfileId = null;
     this.timelineSearchQuery = ''; // ← reset search
-    this.showOnlyFailedLast = false; // ← reset filter
+    this.channelFilters = { push: null, whatsapp: null, email: null };
     this.pushDocs = [];
     this.watiDocs = [];
     this.emailDocs = [];
@@ -5802,16 +5789,53 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       });
     }
 
-    // filter to only profiles whose last comm on any channel failed
-    if (this.showOnlyFailedLast) {
-      list = list.filter(p =>
-        p.lastPushStatus === 'failure' ||
-        p.lastWaStatus === 'failure' ||
-        p.lastEmailStatus === 'failure'
-      );
+    // per-channel last-status filters (AND across channels)
+    if (this.channelFilters.push) {
+      list = list.filter(p => p.lastPushStatus === this.channelFilters.push);
+    }
+    if (this.channelFilters.whatsapp) {
+      list = list.filter(p => p.lastWaStatus === this.channelFilters.whatsapp);
+    }
+    if (this.channelFilters.email) {
+      list = list.filter(p => p.lastEmailStatus === this.channelFilters.email);
     }
 
     return list;
+  }
+
+  get channelLastStatusCounts() {
+    const counts = {
+      push:     { success: 0, failure: 0 },
+      whatsapp: { success: 0, failure: 0 },
+      email:    { success: 0, failure: 0 },
+    };
+    this.profileSummaries.forEach(p => {
+      if (p.lastPushStatus  === 'success') counts.push.success++;
+      if (p.lastPushStatus  === 'failure') counts.push.failure++;
+      if (p.lastWaStatus    === 'success') counts.whatsapp.success++;
+      if (p.lastWaStatus    === 'failure') counts.whatsapp.failure++;
+      if (p.lastEmailStatus === 'success') counts.email.success++;
+      if (p.lastEmailStatus === 'failure') counts.email.failure++;
+    });
+    return counts;
+  }
+
+  toggleChannelFilter(channel: 'push' | 'whatsapp' | 'email', status: 'success' | 'failure') {
+    this.channelFilters[channel] = this.channelFilters[channel] === status ? null : status;
+  }
+
+  clearChannelFilters() {
+    this.channelFilters = { push: null, whatsapp: null, email: null };
+    this.timelineSearchQuery = '';
+  }
+
+  get hasActiveTimelineFilters(): boolean {
+    return !!(
+      this.timelineSearchQuery.trim() ||
+      this.channelFilters.push ||
+      this.channelFilters.whatsapp ||
+      this.channelFilters.email
+    );
   }
 
   toggleEmailPreview(item: NotificationEvent, profileId: string) {
@@ -5844,36 +5868,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       return;
     }
 
-    if (selected.length > 10) {
-      this.guard.openSnackBar('Maximum 10 participants allowed for bulk move', 'OK', 2000);
-      return;
-    }
-
-    // Split DFU and non-DFU tokens
-    const dfuTokens = selected.filter(token => this.getTokenHighlight(token.profile_id) === 'orange');
-    const validTokens = selected.filter(token => this.getTokenHighlight(token.profile_id) !== 'orange');
-
-    if (dfuTokens.length > 0) {
-      const dfuNames = dfuTokens.map(t => this.mapProfileData[t.profile_id]?.['name']).join(', ');
-      this.snackBar.open(
-        `Skipping DFU participants: ${dfuNames}`,
-        'OK',
-        {
-          verticalPosition: 'top',
-          horizontalPosition: 'center',
-          panelClass: ['dfu-skip-snackbar']
-        }
-      );
-    }
-
-    if (!validTokens.length) {
-      this.guard.openSnackBar('All selected participants are DFU — no one to move', 'OK', 3000);
-      return;
-    }
-
     // All selected tokens must belong to the same stage column
     const sourceStage = this.stageQueue.find(s =>
-      s.tokenlist.some((t: any) => t.profile_id === validTokens[0].profile_id)
+      s.tokenlist.some((t: any) => t.profile_id === selected[0].profile_id)
     );
 
     if (!sourceStage) {
@@ -5881,40 +5878,34 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       return;
     }
 
-    const allSameStage = validTokens.every(token =>
+    const allSameStage = selected.every(token =>
       sourceStage.tokenlist.some((t: any) => t.profile_id === token.profile_id)
     );
 
     if (!allSameStage) {
-      this.guard.openSnackBar(
-        'All selected participants must be from the same stage', 'OK', 3000
-      );
+      this.guard.openSnackBar('All selected participants must be from the same stage', 'OK', 3000);
       return;
     }
 
     // Reset state
-    this.bulkMoveCurrentStageObj    = sourceStage;
-    this.bulkMoveTargetStageKey     = '';
-    this.bulkMoveCompleted          = false;
-    this.bulkMoveInProgress         = false;
-    this.bulkMoveFailed             = false;
-    this.bulkMoveCount              = 0;
+    this.bulkMoveCurrentStageObj = sourceStage;
+    this.bulkMoveTargetStageKey = '';
+    this.bulkMoveCompleted = false;
+    this.bulkMoveInProgress = false;
+    this.bulkMoveFailed = false;
     this.availableStagesForBulkMove = [];
 
-    this.bulkMoveResults = validTokens.map(token => ({
+    this.bulkMoveResults = selected.map(token => ({
       token,
       variationName: token.variationid
         ? (this.mapVariation[token.variationid]?.variationname ?? 'Unknown')
-        : 'Default'
+        : 'Default',
+      isDFU: this.getTokenHighlight(token.profile_id) === 'orange'
     }));
 
-    this.checkAvailablestages(
-      validTokens[0],
-      sourceStage.stagename,
-      sourceStage.type
-    );
+    this.checkAvailablestages(selected[0], sourceStage.stagename, sourceStage.type);
 
-    const stageListPerToken = validTokens.map(token =>
+    const stageListPerToken = selected.map(token =>
       token.variationid && this.mapVariation[token.variationid]
         ? (this.mapVariation[token.variationid]['stages'] as string[]) ?? []
         : (this.selectedQueue?.stages as string[]) ?? []
@@ -5922,7 +5913,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.availableStagesForBulkMove = this.availableStages.filter(stage => {
       const typeMatch = stage.stagename.match(/^(.*?)\s*\((.*?)\)$/);
-      const baseName  = typeMatch ? typeMatch[1].trim() : stage.stagename;
+      const baseName = typeMatch ? typeMatch[1].trim() : stage.stagename;
       const stageType = typeMatch ? typeMatch[2]?.trim() : null;
 
       if (stageType === 'Activity') return false;
@@ -5937,127 +5928,28 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const target = this.availableStagesForBulkMove.find(s => s.stagename === this.bulkMoveTargetStageKey);
     if (!target) return;
 
-    const tokensToMove = this.bulkMoveResults.map(r => r.token);
+    const tokensToMove = this.bulkMoveResults.filter(r => !r.isDFU).map(r => r.token);
     if (!tokensToMove.length) return;
 
     const fromStageName = this.bulkMoveCurrentStageObj.stagename;
     const fromStageType = this.bulkMoveCurrentStageObj.type;
-
-    const dragIndex = this.stageQueue.findIndex(e => e.stagename === fromStageName && e.type === fromStageType);
-
-    if (dragIndex === -1) return;
-
-    let targetStageName = target.stagename;
-    let targetStageType = null;
-
-    const typeMatch = target.stagename.match(/^(.*?)\s*\((.*?)\)$/);
-    if (typeMatch) {
-      targetStageName = typeMatch[1].trim();
-      targetStageType = typeMatch[2].trim();
-    }
-
-    const dropIndex = this.stageQueue.findIndex(e =>
-      e.stagename === targetStageName &&
-      e.type === targetStageType
-    );
-
-    if (dropIndex === -1) return;
-
-    const dragStage = this.stageQueue[dragIndex];
-    const dropStage = this.stageQueue[dropIndex];
-    const dropType  = dropStage.type;
 
     const loading = this.dialog.open(LoadingProgressComponent, {
       data: { msg: "Moving Participants..." },
       disableClose: true
     });
 
-    const peopledata = {
-      type        : 'general',
-      personoption: this.specialistList,
-      mentoroption: this.specialistList,
-      shadowoption: this.specialistList,
-      multiperson : true
-    };
-
-    const dialog = this.dialog.open(PeopleInvolvedComponent, {
-      disableClose: true,
-      data        : peopledata
-    });
-
-    const result = await firstValueFrom(dialog.afterClosed());
-
-    if (result == null) {
-      loading.close();
-      return;
-    }
-
     this.bulkMoveInProgress = true;
-
-    let batch = writeBatch(this.firestore);
 
     try {
       for (const token of tokensToMove) {
-        const data = {
-          previousstage      : dragStage.stagename,
-          currentstage       : dropStage.stagename,
-          logdate            : serverTimestamp(),
-          stagestatus        : "Approved",
-          quicknotes         : null,
-          cwmentoring        : null,
-          cwshadowing        : null,
-          cwperson           : null,
-          diagnosticmentoring: null,
-          diagnosticshadowing: null,
-          diagnosticperson   : null,
-          people_involved    : [...result.person ?? [], ...result.mentor ?? [], ...result.shadow ?? []],
-          arenaid            : null,
-          liveassignmentid   : null,
-          studioid           : null,
-          manuallymoved      : true,
-          status             : dropType == "Queued" ? "queued" : dropType == "Waiting" ? "ready" : null
-        };
-        const log = { ...token, ...data };
-        batch.update(doc(this.firestore, "queue_token", log.docid), log);
-        const logdocid = doc(collection(this.firestore, "queue stage log")).id;
-        log.logdocid      = logdocid;
-        log["movedby"]    = this.profileid;
-        log["movedthrough"] = 'queue manager';
-        batch.set(doc(this.firestore, "queue stage log", logdocid), log);
+        await this.moveTokenToStage(
+          token, fromStageName, fromStageType,
+          target.stagename, false,
+          { person: [], mentor: [], shadow: [] }
+        );
       }
-
-      console.log("bulk commit started", new Date());
-
-      await batch.commit().then(() => {
-        console.log("bulk batch update done", new Date());
-
-        for (const token of tokensToMove) {
-          const tokenIndex = this.stageQueue[dragIndex].tokenlist
-            .findIndex((t: any) => t.tokennumber === token.tokennumber);
-          if (tokenIndex !== -1) {
-            const [removedToken] = this.stageQueue[dragIndex].tokenlist.splice(tokenIndex, 1);
-            this.stageQueue[dropIndex].tokenlist.push(removedToken);
-          }
-        }
-      });
-      if (dropIndex + 1 == this.stageQueue.length) {
-        console.log('working...........')
-        for (const token of tokensToMove) {
-          await this.guard.updateDeliveryStatus(doc(this.firestore, "/queue_token/" + token["docid"]).path,"completed",
-            {
-              eventRequestRef: query(
-                collection(this.firestore, 'event participation request'),
-                where('profileid', '==', token['profile_id']),
-                where('eventref',  '==', token['queueref']),
-                where('status',    '==', 'approved')
-              )
-            }
-          );
-        }
-      }
-      this.bulkMoveCount  = tokensToMove.length;
       this.bulkMoveFailed = false;
-
     } catch (error) {
       console.error("Error moving tokens:", error);
       this.bulkMoveFailed = true;
@@ -6066,7 +5958,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
 
     this.bulkMoveInProgress = false;
-    this.bulkMoveCompleted  = true;
+    this.bulkMoveCompleted = true;
+  }
+
+  get bulkMovableCount(): number {
+    return this.bulkMoveResults.filter(r => !r.isDFU).length;
+  }
+
+  get bulkDFUCount(): number {
+    return this.bulkMoveResults.filter(r => r.isDFU).length;
   }
 
   closeBulkMovePanel(): void {
@@ -6076,60 +5976,43 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.selectedTokens.clear();
     }
 
-    this.showBulkMovePanel          = false;
-    this.bulkMoveInProgress         = false;
-    this.bulkMoveCompleted          = false;
-    this.bulkMoveFailed             = false;
-    this.bulkMoveCount              = 0;
-    this.bulkMoveTargetStageKey     = '';
-    this.bulkMoveCurrentStageObj    = null;
+    this.showBulkMovePanel = false;
+    this.bulkMoveInProgress = false;
+    this.bulkMoveCompleted = false;
+    this.bulkMoveFailed = false;
+    this.bulkMoveTargetStageKey = '';
+    this.bulkMoveCurrentStageObj = null;
     this.availableStagesForBulkMove = [];
-    this.bulkMoveResults            = [];
+    this.bulkMoveResults = [];
   }
 
-  setupStageActivityListener() {
-    if (this.stageActivityUnsub) {
-      this.stageActivityUnsub();
-      this.stageActivityUnsub = null;
-    }
-
+  async fetchStageActivity() {
     if (!this.selectedQueue) return;
 
     this.stageActivityCacheLoading = true;
     this.stageActivityCache = null;
 
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const queueRef = doc(
-      this.firestore, 'queue generation', this.selectedQueue.docid
-    );
+    const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue.docid);
 
-    this.stageActivityUnsub = onSnapshot(
-      query(
-        collection(this.firestore, 'queue stage log'),
-        where('queueref', '==', queueRef),
-        where('logdate', '>=', Timestamp.fromDate(since))
-      ),
-      snap => {
-            this.ngZone.run(() => {
-              this.stageActivityCache = snap.docs.map(d => d.data());
-              this.stageActivityCacheQueueId = this.selectedQueue.docid;
-              this.stageActivityCacheLoading = false;
-
-              if (this.showStageActivityPanel) {
-                this.buildStageActivityData(
-                  this.selectedStageForActivity,
-                  this.selectedStageTypeForActivity
-                );
-              }
-            });
-          },
-          err => {
-            this.ngZone.run(() => {
-              console.error('Stage activity listener error:', err);
-              this.stageActivityCacheLoading = false;
-            });
-          }
-    );
+    try {
+      const snap = await getDocs(
+        query(
+          collection(this.firestore, 'queue stage log'),
+          where('queueref', '==', queueRef),
+          where('logdate', '>=', Timestamp.fromDate(since))
+        )
+      );
+      this.stageActivityCache = snap.docs.map(d => d.data());
+      this.stageActivityCacheQueueId = this.selectedQueue.docid;
+      this.stageActivityCacheLoading = false;
+      if (this.showStageActivityPanel) {
+        this.buildStageActivityData(this.selectedStageForActivity, this.selectedStageTypeForActivity);
+      }
+    } catch (err) {
+      console.error('Stage activity fetch error:', err);
+      this.stageActivityCacheLoading = false;
+    }
   }
 
   openStageActivity(stageName: string, stageType: string | null, event: Event) {
@@ -6138,15 +6021,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.selectedStageTypeForActivity = stageType;
     this.stageActivityTab = 'cameIn';
     this.showStageActivityPanel = true;
-
-    if (this.stageActivityUnsub === null) {
-      this.setupStageActivityListener();
-      return;
-    }
-
-    if (this.stageActivityCache !== null) {
-      this.buildStageActivityData(stageName, stageType);
-    }
+    this.fetchStageActivity();
   }
 
   buildStageActivityData(stageName: string, stageType: string | null) {
@@ -6173,6 +6048,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         log['previousstage'] === stageName
       ).sort(sortDesc)
     };
+  }
+
+  get uniqueActivityStages(): any[] {
+    const seen = new Set<string>();
+    return this.stageQueue.filter((s: any) => {
+      if (s.stagename === 'Unattended Participants') return false;
+      if (seen.has(s.stagename)) return false;
+      seen.add(s.stagename);
+      return true;
+    });
+  }
+
+  onStageActivityFilterChange(stageName: string) {
+    this.selectedStageTypeForActivity = null;
+    this.buildStageActivityData(stageName, null);
   }
 
   closeStageActivityPanel() {
@@ -6223,6 +6113,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       `Stage_Activity_24h_${stagePart}_${new Date().toDateString()}`
     );
   }
+
   getFilteredMergedParticipants(): any[] {
     const tokens = this.getMergedParticipants();
     if (!this.participantSearchTerm.trim()) return tokens;

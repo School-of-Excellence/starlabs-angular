@@ -1,7 +1,7 @@
 import { SelectionModel } from '@angular/cdk/collections';
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, inject, ViewChild } from '@angular/core';
-import { arrayUnion, collection, collectionData, collectionSnapshots, deleteDoc, doc, docSnapshots, DocumentData, DocumentReference, Firestore, getDoc, getDocs, onSnapshot, or, orderBy, query, QueryDocumentSnapshot, setDoc, Unsubscribe, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { arrayUnion, collection, collectionData, collectionSnapshots, deleteDoc, doc, docSnapshots, DocumentData, DocumentReference, Firestore, getDoc, getDocs, getFirestore, onSnapshot, or, orderBy, query, QueryDocumentSnapshot, setDoc, Unsubscribe, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckbox } from '@angular/material/checkbox';
@@ -537,10 +537,11 @@ export class BigDashboardComponent {
 
   async getATCWrittenData(){
     // console.time("getATCWrittenData");
+    const firestoreATC = getFirestore("firestore-atc")
     for (let i = 0; i < this.participantlist.length; i=i+10) {
-      const arrayofprofileref = this.participantlist.slice(i,i+10).map(e => doc(this.firestore, "profile_data", e['profileid']) );
+      const arrayofprofileref = this.participantlist.slice(i,i+10).map(e => doc(firestoreATC, "profile_data", e['profileid']) );
       await getDocs(query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where("author", "array-contains-any", arrayofprofileref),
         where("isdelete", "==", false)
       )).then(async atcSnap => {
@@ -586,7 +587,7 @@ export class BigDashboardComponent {
       } else {
         console.log(this.selectedMarathon['docid']);
         this.cohorts = this.cohortsList.filter(e => 
-          e['marathonref'].id === this.selectedMarathon['docid']
+          e['marathonref']?.id === this.selectedMarathon['docid']
         );
         return this.cohorts;
       }

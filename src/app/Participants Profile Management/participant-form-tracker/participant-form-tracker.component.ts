@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { collection, doc, Firestore, getDoc, getDocs, limit, orderBy, query, startAfter, Timestamp, where } from '@angular/fire/firestore';
+import { collection, doc, Firestore, getDoc, getDocs, limit, orderBy, query, startAfter, Timestamp, where, getFirestore } from '@angular/fire/firestore';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -83,8 +83,10 @@ export class ParticipantFormTrackerComponent {
     { primary: 'loveletter', primaryLabel: 'Love Letter' },
     { primary: 'report', primaryLabel: 'uP! Life Report' },
   ];
+  firestoreDefault = getFirestore()
+  firestoreForms = getFirestore('firestore-forms')
 
-  constructor(private firestore: Firestore) { }
+  constructor() { }
 
   ngOnInit() {
     this.fetchAskAH();
@@ -96,7 +98,7 @@ export class ParticipantFormTrackerComponent {
   }
 
   fetchParticipants() {
-    getDocs(query(collection(this.firestore, 'profile_data'), orderBy("name", "asc"))).then((snap) => {
+    getDocs(query(collection(this.firestoreDefault, 'profile_data'), orderBy("name", "asc"))).then((snap) => {
       this.participantOptions = snap.docs.map((doc) => ({
         id: doc.id,
         name: doc.data()['name']
@@ -121,7 +123,7 @@ export class ParticipantFormTrackerComponent {
   }
 
   private buildQuery(collectionName: string, dateField: string, pageLimit: number, startAfterDoc?: any) {
-    const ref = collection(this.firestore, collectionName);
+    const ref = collection(this.firestoreDefault, collectionName);
     const constraints: any[] = [orderBy(dateField, 'desc')];
 
     if (this.startDate.value) {
@@ -303,8 +305,8 @@ export class ParticipantFormTrackerComponent {
         const results = await Promise.all(
           this.selectedRecords.map(async (row) => {
             const [formTemplateDoc, submittedFormDoc] = await Promise.all([
-              getDoc(doc(this.firestore, 'delivery forms', row.formid)),
-              getDoc(doc(this.firestore, 'formsByClient', row.docid))
+              getDoc(doc(this.firestoreDefault, 'delivery forms', row.formid)),
+              getDoc(doc(this.firestoreForms, 'formsByClient', row.docid))
             ]);
 
             if (!formTemplateDoc.exists() || !submittedFormDoc.exists()) return null;
@@ -406,8 +408,8 @@ export class ParticipantFormTrackerComponent {
       this.overlayFormFields = [];
 
       try {
-        const formTemplateDoc = await getDoc(doc(this.firestore, 'delivery forms', row.formid));
-        const submittedFormDoc = await getDoc(doc(this.firestore, 'formsByClient', row.docid));
+        const formTemplateDoc = await getDoc(doc(this.firestoreDefault, 'delivery forms', row.formid));
+        const submittedFormDoc = await getDoc(doc(this.firestoreForms, 'formsByClient', row.docid));
 
         if (!formTemplateDoc.exists() || !submittedFormDoc.exists()) {
           this.overlayLoading = false;
