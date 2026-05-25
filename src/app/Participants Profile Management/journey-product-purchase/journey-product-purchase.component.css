@@ -83,4 +83,234 @@
   ::ng-deep .mat-select-panel {
     max-width: 500px !important;
   }
+
+  .rowhistory{
+    margin: 4px 0 10px 0;
+    padding: 8px;
+    background-color: #fafafa;
+    border: 1px solid #e2e2e2;
+    border-radius: 4px;
+  }
+
+  .changehistory{
+    margin-top: 24px;
+    border-top: 1px solid #e2e2e2;
+    padding-top: 12px;
+  }
+
+  .history-header{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .removed-list{
+    margin-top: 8px;
+  }
+
+  .removed-inline{
+    margin: 8px 0 14px 24px;
+  }
+  .removed-title{
+    color: #c62828;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin: 6px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .log-card{
+    background: #fff;
+    border: 1px solid #e2e2e2;
+    border-left: 3px solid #b9c4ca;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+  }
+  .log-card.is-added{ border-left-color: #2e7d32; }
+  .log-card.is-updated{ border-left-color: #1565c0; }
+  .log-card.is-removed{ border-left-color: #c62828; }
+  .log-card:last-child{ margin-bottom: 0; }
+
+  .log-head{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    flex-wrap: wrap;
+  }
+  .log-head .meta{ color: #6b7c85; }
+  .log-head .user{ font-weight: 500; color: #1f2d33; }
+
+  .chip{
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .chip.added{ background: #e6f5ea; color: #2e7d32; }
+  .chip.updated{ background: #e3f0fb; color: #1565c0; }
+  .chip.removed{ background: #fbe6e6; color: #c62828; }
+
+  .log-card .changes{
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid #eef1f3;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .change-line{
+    display: block;
+    padding: 1px 0;
+  }
+  .change-line .k{
+    color: #1f2d33;
+    margin-right: 6px;
+    font-weight: 500;
+  }
+  .change-line .old{
+    display: inline-block;
+    color: #b3261e;
+    background: #fbe6e6;
+    padding: 0 6px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
+  .change-line .arrow{ color: #6b7c85; margin: 0 4px; }
+  .change-line .new{
+    display: inline-block;
+    color: #2e7d32;
+    background: #e6f5ea;
+    padding: 0 6px;
+    border-radius: 3px;
+    font-weight: 500;
+  }
+  .change-line .v{ color: #1f2d33; }
+  .change-line .docid{
+    font-family: monospace;
+    font-size: 12px;
+    color: #6b7c83;
+  }
+  .change-line.muted{ color: #6b7c85; font-style: italic; }
+
+  .change-note{
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #fff8e1;
+    border-left: 3px solid #f5b400;
+    border-radius: 3px;
+    font-size: 11.5px;
+    color: #5d4b1a;
+    line-height: 1.4;
+  }
+
+  .save-note{
+    margin-top: 6px;
+    padding: 5px 10px;
+    background: #eef4fb;
+    border-left: 3px solid #1565c0;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #1f3a5a;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .row-note{
+    width: 220px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    border: 1px solid #c9d2d7;
+    border-radius: 4px;
+    background: #fff;
+    outline: none;
+  }
+  .row-note:focus{
+    border-color: #0092c2;
+    box-shadow: 0 0 0 2px rgba(0,146,194,0.15);
+  }
+
+  .change-badge{
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #fff4d6;
+    color: #8a5a00;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+  }
+  .change-badge.added{
+    background: #dff5e1;
+    color: #1f6f3a;
+  }
+  .diff-list{
+    list-style: none;
+    margin: 0 0 8px 0;
+    padding: 0;
+    max-width: 260px;
+  }
+  .diff-list li{
+    font-size: 12px;
+    line-height: 1.5;
+    color: #1f3a5a;
+    word-break: break-word;
+  }
+  .diff-label{
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .diff-old{
+    color: #b04545;
+    text-decoration: line-through;
+  }
+  .diff-arrow{
+    color: #6b7c85;
+    margin: 0 4px;
+  }
+  .diff-new{
+    color: #1f6f3a;
+    font-weight: 500;
+  }
+  .no-change{
+    color: #95a3aa;
+    font-size: 12px;
+    font-style: italic;
+  }
+  .change-badge.removed-badge{
+    background: #fde2e2;
+    color: #a13838;
+  }
+  .missing-notes-warning{
+    color: #a13838;
+    font-size: 13px;
+    margin: 0 0 10px 0;
+  }
+  .submitbtn[disabled]{
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .conflict-list{
+    margin: 6px 0 12px 0;
+    padding-left: 20px;
+  }
+  .conflict-list li{
+    margin: 3px 0;
+  }
+  .conflict-status{
+    color: #6b7c85;
+    font-size: 12px;
+    text-transform: capitalize;
+  }
   

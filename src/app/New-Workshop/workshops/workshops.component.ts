@@ -1,6 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit} from '@angular/core';
 import { Observable } from 'rxjs';
-import { Firestore, collectionData, collection, doc, updateDoc, getDoc, addDoc, Timestamp } from '@angular/fire/firestore';
+import {
+  Firestore, collectionData, collection, doc, updateDoc,
+  getDoc, addDoc, Timestamp, getDocs
+} from '@angular/fire/firestore';
 import { MatCardModule } from '@angular/material/card';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
@@ -15,6 +18,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EiflixBannerComponent } from '../eiflix-banner/eiflix-banner.component';
 import { WorkshopDialogComponent } from '../workshop-dialog/workshop-dialog.component';
+import { NewusersComponent } from '../newusers/newusers.component';
+
 
 @Component({
   selector: 'app-workshops',
@@ -32,9 +37,12 @@ import { WorkshopDialogComponent } from '../workshop-dialog/workshop-dialog.comp
   templateUrl: './workshops.component.html',
   styleUrl: './workshops.component.css'
 })
-export class WorkshopsComponent {
+export class WorkshopsComponent implements OnInit {
   displayedColumns: string[] = ['active', 'title', 'type', 'created', 'startDate', 'endDate', 'status', 'edit'];
   workshops$: Observable<any[]>;
+  mapProfileNew: any = {};
+  mapProfile: any = {};
+  objectKeys = Object.keys;
 
   statusFilter: 'all' | 'active' | 'inactive' | 'completed' = 'all';
   sortField: 'created' | 'startDate' | 'endDate' = 'created';
@@ -51,8 +59,26 @@ export class WorkshopsComponent {
     this.workshops$ = collectionData(workshopRef, { idField: 'id' });
   }
 
-  applyFilters(): void { 
+  async ngOnInit() {
+    await this.loadNewUserData();
   }
+
+  private async loadNewUserData() {
+    try {
+      const userRef = collection(this.firestore, 'new_user_data');
+      const userSnap = await getDocs(userRef);
+      this.mapProfileNew = {};
+      userSnap.forEach(doc => {
+        const data = doc.data();
+        data['id'] = doc.id;
+        this.mapProfileNew[doc.id] = data;
+      });
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  }
+
+  applyFilters(): void { }
 
   setSortField(field: 'created' | 'startDate' | 'endDate'): void {
     if (this.sortField === field) {
@@ -102,7 +128,6 @@ export class WorkshopsComponent {
 
   async dashboardNavigation(workshop: any): Promise<void> {
     try {
-      console.log(workshop);
       window.open(`/workshop_dashboard/${workshop['id']}`, '_blank');
     } catch (error) {
       console.error('Error:', error);
@@ -119,6 +144,24 @@ export class WorkshopsComponent {
       panelClass: 'eiflix-banner-dialog'
     });
   }
+
+  async openNewUserDialog() {
+    this.dialog.open(NewusersComponent, {
+      data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
+      width: '100vw', 
+      height: '100vh', 
+      maxWidth: '100vw', 
+      maxHeight: '100vh',
+      autoFocus: false, 
+      panelClass: 'new-users-dialog'
+    });
+  }
+
+  ngOnDestroy() {
+  this.dialog.closeAll();
+}
+  
+
   openRefferalcodeDialog() {
     const dialogRef = this.dialog.open(WorkshopDialogComponent, {
       width: '400px'
