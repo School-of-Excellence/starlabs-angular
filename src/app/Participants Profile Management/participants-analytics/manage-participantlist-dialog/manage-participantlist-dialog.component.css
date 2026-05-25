@@ -1614,53 +1614,14 @@ tr.mat-row.has-conflicts:hover {
 }
 
 .mcp-native-checkbox {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-
-.mcp-custom-checkbox {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 2px solid #9e9e9e;
-  border-radius: 4px;
-  background: #ffffff;
-  transition: all 0.15s ease;
+  position: static;
+  opacity: 1;
+  width: 16px;
+  height: 16px;
+  pointer-events: auto;
+  cursor: pointer;
+  accent-color: #1976d2;
   flex-shrink: 0;
-}
-
-.mcp-native-checkbox:checked + .mcp-custom-checkbox {
-  background: #1976d2;
-  border-color: #1976d2;
-}
-
-.mcp-native-checkbox:checked + .mcp-custom-checkbox::after {
-  content: '';
-  display: block;
-  width: 5px;
-  height: 9px;
-  border: 2px solid #ffffff;
-  border-top: none;
-  border-left: none;
-  transform: rotate(45deg) translate(-1px, -1px);
-}
-
-.mcp-native-checkbox:indeterminate + .mcp-custom-checkbox {
-  background: #1976d2;
-  border-color: #1976d2;
-}
-
-.mcp-native-checkbox:indeterminate + .mcp-custom-checkbox::after {
-  content: '';
-  display: block;
-  width: 10px;
-  height: 2px;
-  background: #ffffff;
 }
 
 .mcp-list {
@@ -1893,3 +1854,159 @@ tr.mat-row.has-conflicts:hover {
   min-width: 160px;
 }
 
+.mcp-table-wrapper {
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.mcp-conflict-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.mcp-conflict-table thead tr {
+  background: #f5f5f5;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.mcp-conflict-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.mcp-conflict-table td {
+  padding: 10px 12px;
+  border-bottom: 0.5px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.mcp-conflict-table tr.mcp-row-checked td {
+  background: #f0f4ff !important;
+}
+
+.mcp-conflict-table tbody tr:hover td {
+  background: #fafafa !important;
+}
+
+.col-check { width: 40px; }
+.col-num   { width: 36px; color: #999; font-size: 12px; }
+.col-name  { min-width: 160px; }
+.col-current { min-width: 140px; }
+.col-previous { min-width: 160px; }
+
+.mcp-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-name-cell .mcp-name {
+  display: block;
+  font-weight: 500;
+  font-size: 13px;
+  color: #212121;
+}
+
+.mcp-name-cell .mcp-meta {
+  display: block;
+  font-size: 11px;
+  color: #9e9e9e;
+}
+
+.mcp-list-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mcp-list-pill mat-icon {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+}
+
+.current-pill {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.prev-pill {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+  margin-bottom: 3px;
+}
+
+.mcp-prev-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.live-status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.mat-column-liveStatus {
+  min-width: 140px;
+  border-right: 1px solid #e0e0e0;
+}
+
+th.mat-column-liveStatus {
+  border-right: 1px solid #e0e0e0;
+}
+
+.mat-column-actions {
+  padding-left: 32px !important;
+}
+
+th.mat-column-liveStatus {
+  border-right: 1px solid #e0e0e0;
+}
+
+.mat-column-actions {
+  width: auto;
+  padding-left: 24px !important;
+}
+
+.side-panel-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.side-panel-search-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #1976d2;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: #e3f2fd;
+  border-radius: 6px;
+}
+
+.side-panel-search-hint mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #1976d2;
+}

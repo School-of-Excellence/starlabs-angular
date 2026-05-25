@@ -20,6 +20,7 @@ import { CreateSegmentsDialogComponent } from "../create-segments-dialog/create-
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatOptionModule } from '@angular/material/core';
 import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
+import {  MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 interface Profile {
   id: string;
@@ -33,6 +34,7 @@ interface ParticipantList {
   name: string;
   profileids: string[];
   profiles?: Profile[];
+  live?: boolean;
 }
 
 interface FilterCriteria {
@@ -77,7 +79,8 @@ interface ListConflictSummary {
     MatTab,
     FormsModule,
     CreateSegmentsDialogComponent,
-    ProfilePictureComponent
+    ProfilePictureComponent,
+    MatSlideToggleModule
   ],
   templateUrl: './manage-participantlist-dialog.component.html',
   styleUrls: ['./manage-participantlist-dialog.component.css']
@@ -90,7 +93,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   private dialog = inject(MatDialog);
 
   // Table columns
-  displayedColumns: string[] = ['listname', 'participants', 'actions'];
+  displayedColumns: string[] = ['listname', 'participants', 'liveStatus', 'actions'];
 
   // Data
   participantLists: ParticipantList[] = [];
@@ -98,6 +101,9 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   allProfiles: Profile[] = [];
   selectedList: ParticipantList | null = null;
   availableProfilesForSelected: Profile[] = [];
+
+  // right-side panel search variable
+  sidePanelSearchTerm: string = '';
 
   // Forms
   createListForm!: FormGroup;
@@ -240,38 +246,39 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   }
 
   async loadParticipantLists(): Promise<void> {
-    try {
-      const listsRef = collection(this.firestore, 'participant list');
-      const listsSnapshot = await getDocs(query(listsRef));
+  try {
+    const listsRef = collection(this.firestore, 'participant list');
+    const listsSnapshot = await getDocs(query(listsRef));
 
-      this.participantLists = await Promise.all(
-        listsSnapshot.docs.map(async (docSnapshot) => {
-          const data = docSnapshot.data();
-          const profileids = data['profilelist'] || [];
+    this.participantLists = await Promise.all(
+      listsSnapshot.docs.map(async (docSnapshot) => {
+        const data = docSnapshot.data();
+        const profileids = data['profilelist'] || [];
 
           // Fetch profile details for each profile ID
-          const profiles = profileids.map((id: string) =>
-            this.allProfiles.find(p => p.id === id)
-          ).filter((p: Profile | undefined) => p !== undefined) as Profile[];
+        const profiles = profileids.map((id: string) =>
+          this.allProfiles.find(p => p.id === id)
+        ).filter((p: Profile | undefined) => p !== undefined) as Profile[];
 
-          return {
-            docid: docSnapshot.id,
-            name: data['listname'],
-            profileids: profileids,
-            profiles: profiles,
-            segmentid: data['segmentid'] || []
-          };
-        })
-      );
+        return {
+          docid: docSnapshot.id,
+          name: data['listname'],
+          profileids: profileids,
+          profiles: profiles,
+          segmentid: data['segmentid'] || [],
+          live: data['live'] ?? false   
+        };
+      })
+    );
 
       // Update filtered list
-      this.filteredParticipantLists = [...this.participantLists];
-      console.log('Participant lists loaded:', this.participantLists.length);
-    } catch (error) {
-      console.error('Error loading participant lists:', error);
-      throw error;
-    }
+    this.filteredParticipantLists = [...this.participantLists];
+    console.log('Participant lists loaded:', this.participantLists.length);
+  } catch (error) {
+    console.error('Error loading participant lists:', error);
+    throw error;
   }
+}
 
   async computeLiveSegmentConflicts(): Promise<void> {
   this.globalConflictMap.clear();
@@ -287,85 +294,76 @@ export class ManageParticipantlistDialogComponent implements OnInit {
       const data = d.data();
       const start: Date = data['queuestartdate']?.toDate?.() ?? null;
       const end: Date   = data['queueenddate']?.toDate?.() ?? null;
-      console.log(`Queue ${d.id}: start=${start}, end=${end}, isLive=${start && end && start <= now && end >= now}`);
-      if (start && end && start <= now && end >= now) {
-        liveQueueIds.push(d.id);
-      }
+      if (start && end && start <= now && end >= now) liveQueueIds.push(d.id);
     });
-    console.log('Live queue IDs:', liveQueueIds);
-
-    if (liveQueueIds.length === 0) {
-      console.warn('STOPPED: No live queues found.');
-      return;
-    }
 
     const liveSegmentIds = new Set<string>();
-    await Promise.all(
-      liveQueueIds.map(async (queueId) => {
+    if (liveQueueIds.length > 0) {
+      await Promise.all(liveQueueIds.map(async queueId => {
         const planSnap = await getDocs(
           query(collection(this.firestore, 'queue planning'), where('queueid', '==', queueId))
         );
         planSnap.docs.forEach(planDoc => {
           const planning: any[] = planDoc.data()['planning'] || [];
-          planning.forEach((variation, vi) => {
-            const segs = variation.segments || [];
-            segs.forEach((seg: any) => {
+          planning.forEach(variation => {
+            (variation.segments || []).forEach((seg: any) => {
               if (seg.segmentid) liveSegmentIds.add(seg.segmentid);
             });
           });
         });
-      })
-    );
-
-    if (liveSegmentIds.size === 0) {
-      return;
+      }));
     }
+    const liveListMeta = new Map<string, string>();
 
-    const profileToSegments = new Map<string, Set<string>>();
-    await Promise.all(
-      Array.from(liveSegmentIds).map(async (segmentId) => {
+    if (liveSegmentIds.size > 0) {
+      await Promise.all(Array.from(liveSegmentIds).map(async segmentId => {
         const segDoc = await getDoc(doc(this.firestore, 'segments', segmentId));
-        if (!segDoc.exists()) {
-          return;
-        }
+        if (!segDoc.exists()) return;
         const segData = segDoc.data();
         const segmentName: string = segData['segmentname'] || segmentId;
-        const participantListIds: string[] = segData['participantlistid'] || [];
         this.segmentNameMap.set(segmentId, segmentName);
+        const participantListIds: string[] = segData['participantlistid'] || [];
+        participantListIds.forEach(listId => {
+          if (!liveListMeta.has(listId)) liveListMeta.set(listId, segmentName);
+        });
+      }));
+    }
 
-        await Promise.all(
-          participantListIds.map(async (listId) => {
-            const listDoc = await getDoc(doc(this.firestore, 'participant list', listId));
-            if (!listDoc.exists()) {
-              console.warn(`Participant list ${listId} does NOT exist`);
-              return;
-            }
-            const profileIds: string[] = listDoc.data()['profilelist'] || [];
-            profileIds.forEach(profileId => {
-              if (!profileToSegments.has(profileId)) {
-                profileToSegments.set(profileId, new Set());
-              }
-              profileToSegments.get(profileId)!.add(segmentId);
-            });
-          })
-        );
-      })
-    );
+    this.participantLists.forEach(list => {
+  if (list.live === true && !liveListMeta.has(list.docid)) {
+    liveListMeta.set(list.docid, list.name);
+  }
+});
 
-    profileToSegments.forEach((segs, pid) => {
-      if (segs.size > 1) console.log(`CONFLICT: profile ${pid} in segments`, Array.from(segs));
-    });
+    if (liveListMeta.size === 0) return;
 
-    profileToSegments.forEach((segIds, profileId) => {
-      if (segIds.size > 1) {
-        const segmentIds = Array.from(segIds);
-        const segmentNames = segmentIds.map(id => this.segmentNameMap.get(id) || id);
+    const profileToLiveLists = new Map<string, { listId: string; listName: string; label: string }[]>();
+
+    await Promise.all(Array.from(liveListMeta.entries()).map(async ([listId, label]) => {
+      const listDoc = await getDoc(doc(this.firestore, 'participant list', listId));
+      if (!listDoc.exists()) return;
+      const listName = this.participantLists.find(l => l.docid === listId)?.name || listId;
+      const profileIds: string[] = listDoc.data()['profilelist'] || [];
+      profileIds.forEach(profileId => {
+        if (!profileToLiveLists.has(profileId)) profileToLiveLists.set(profileId, []);
+        profileToLiveLists.get(profileId)!.push({ listId, listName, label });
+      });
+    }));
+
+    profileToLiveLists.forEach((entries, profileId) => {
+      if (entries.length > 1) {
         const profileName = this.allProfiles.find(p => p.id === profileId)?.name || profileId;
-        this.globalConflictMap.set(profileId, { profileId, profileName, segmentIds, segmentNames });
+        this.globalConflictMap.set(profileId, {
+          profileId,
+          profileName,
+          segmentIds: entries.map(e => e.listId),
+          segmentNames: entries.map(e => e.listName)
+        });
       }
     });
 
     this.participantLists.forEach(list => {
+      if (!liveListMeta.has(list.docid)) return;
       const conflicts: SegmentConflict[] = [];
       list.profileids.forEach(profileId => {
         const conflict = this.globalConflictMap.get(profileId);
@@ -375,6 +373,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
         this.listConflictMap.set(list.docid, { count: conflicts.length, conflicts });
       }
     });
+
   } catch (error) {
     console.error('Error computing live segment conflicts:', error);
   }
@@ -519,7 +518,8 @@ export class ManageParticipantlistDialogComponent implements OnInit {
         listname: formValue.listname.trim(),
         profilelist: this.externalProfileIds.map((e) => e['profileid']) || [],
         createddate: new Date().toISOString(),
-        docid: listsRef.id
+        docid: listsRef.id,
+        live: false
       };
 
       await setDoc(listsRef, listData);
@@ -547,6 +547,57 @@ export class ManageParticipantlistDialogComponent implements OnInit {
     }
   }
 
+  async toggleListLive(list: ParticipantList, event: any): Promise<void> {
+    const newLiveValue = !list.live;
+
+    if (newLiveValue === true) {
+      const confirmed = confirm(
+        `Make "${list.name}" live?\nThis list will be marked as live List.`
+      );
+      if (!confirmed) {
+        event.source.checked = false;
+        return;
+      }
+    }
+
+    try {
+      await updateDoc(doc(this.firestore, 'participant list', list.docid), {
+        live: newLiveValue,
+        updateddate: new Date()
+      });
+
+      list.live = newLiveValue;
+
+      const filtered = this.filteredParticipantLists.find(l => l.docid === list.docid);
+      if (filtered) filtered.live = newLiveValue;
+
+      if (this.selectedList?.docid === list.docid) {
+        this.selectedList.live = newLiveValue;
+      }
+
+      this.snackBar.open(
+        `"${list.name}" is now ${newLiveValue ? 'Live' : 'Unlive'}`,
+        'Close', { duration: 2000 }
+      );
+
+      await this.computeLiveSegmentConflicts();
+
+    } catch (error) {
+      console.error('Error updating live status:', error);
+      this.snackBar.open('Error updating live status', 'Close', { duration: 3000 });
+      event.source.checked = list.live;
+    }
+  }
+
+  getFilteredParticipants(): Profile[] {
+    if (!this.selectedList?.profiles) return [];
+    const term = this.sidePanelSearchTerm.trim().toLowerCase();
+    if (!term) return this.selectedList.profiles;
+    return this.selectedList.profiles.filter(p =>
+      p.name?.toLowerCase().includes(term)
+    );
+  }
+
   onSelectList(list: ParticipantList): void {
     this.selectedList = list;
     this.sidePanelOpen = true;
@@ -571,6 +622,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   closeSidePanel(): void {
     this.sidePanelOpen = false;
     this.selectedList = null;
+    this.sidePanelSearchTerm = ''; 
     this.addProfileForm.reset();
     this.mergeProfilesForm.reset();
   }
@@ -702,10 +754,6 @@ export class ManageParticipantlistDialogComponent implements OnInit {
 async confirmMergeWithSelection(): Promise<void> {
   if (!this.pendingMergeTargetList) return;
 
-  const conflictsToRemove = this.mergeConflicts.filter(
-    c => this.selectedMergeConflictIds.has(c.profileId)
-  );
- 
   const uncheckedConflictIds = new Set(
     this.mergeConflicts
       .filter(c => !this.selectedMergeConflictIds.has(c.profileId))
@@ -716,13 +764,27 @@ async confirmMergeWithSelection(): Promise<void> {
     const rawId = idObj['profileid'] || idObj;
     return !uncheckedConflictIds.has(rawId);
   });
- 
+
+  const conflictsToRemove: { profileId: string; conflictingListId: string; profileName: string; conflictingListName: string; segmentName: string }[] = [];
+  this.mergeConflicts
+    .filter(c => this.selectedMergeConflictIds.has(c.profileId))
+    .forEach(c => {
+      c.conflictingLists.forEach(cl => {
+        conflictsToRemove.push({
+          profileId: c.profileId,
+          profileName: c.profileName,
+          conflictingListId: cl.listId,
+          conflictingListName: cl.listName,
+          segmentName: cl.segmentName
+        });
+      });
+    });
+
   this.showMergeConflictPopup = false;
- 
   await this.executeMerge(
     this.pendingMergeTargetList,
-    profileIdsToActuallyMerge,   
-    conflictsToRemove           
+    profileIdsToActuallyMerge,
+    conflictsToRemove
   );
 
   this.mergeConflicts = [];
@@ -818,9 +880,7 @@ private async executeMerge(
 mergeConflicts: {
   profileId: string;
   profileName: string;
-  conflictingListId: string;
-  conflictingListName: string;
-  segmentName: string;
+  conflictingLists: { listId: string; listName: string; segmentName: string }[];
 }[] = [];
 selectedMergeConflictIds = new Set<string>();
 pendingMergeTargetList: ParticipantList | null = null;
@@ -958,18 +1018,10 @@ toggleAllMergeConflicts(event: Event): void {
   async getMergeConflicts(profileIdsToMerge: any[], targetList: ParticipantList): Promise<{
   profileId: string;
   profileName: string;
-  conflictingListId: string;
-  conflictingListName: string;
-  segmentName: string;
+  conflictingLists: { listId: string; listName: string; segmentName: string }[];
 }[]> {
-  const conflicts: {
-    profileId: string;
-    profileName: string;
-    conflictingListId: string;
-    conflictingListName: string;
-    segmentName: string;
-  }[] = [];
   const now = new Date();
+
   const queueSnap = await getDocs(collection(this.firestore, 'queue generation'));
   const liveQueueIds: string[] = [];
   queueSnap.docs.forEach(d => {
@@ -978,55 +1030,72 @@ toggleAllMergeConflicts(event: Event): void {
     const end: Date = data['queueenddate']?.toDate?.() ?? null;
     if (start && end && start <= now && end >= now) liveQueueIds.push(d.id);
   });
-  if (liveQueueIds.length === 0) return [];
+
   const liveSegmentIds = new Set<string>();
-  await Promise.all(liveQueueIds.map(async queueId => {
-    const planSnap = await getDocs(
-      query(collection(this.firestore, 'queue planning'), where('queueid', '==', queueId))
-    );
-    planSnap.docs.forEach(planDoc => {
-      const planning: any[] = planDoc.data()['planning'] || [];
-      planning.forEach(variation => {
-        (variation.segments || []).forEach((seg: any) => {
-          if (seg.segmentid) liveSegmentIds.add(seg.segmentid);
+  if (liveQueueIds.length > 0) {
+    await Promise.all(liveQueueIds.map(async queueId => {
+      const planSnap = await getDocs(
+        query(collection(this.firestore, 'queue planning'), where('queueid', '==', queueId))
+      );
+      planSnap.docs.forEach(planDoc => {
+        const planning: any[] = planDoc.data()['planning'] || [];
+        planning.forEach(variation => {
+          (variation.segments || []).forEach((seg: any) => {
+            if (seg.segmentid) liveSegmentIds.add(seg.segmentid);
+          });
         });
       });
-    });
-  }));
-  if (liveSegmentIds.size === 0) return [];
-  const liveListMeta = new Map<string, string>(); 
-  await Promise.all(Array.from(liveSegmentIds).map(async segmentId => {
-    const segDoc = await getDoc(doc(this.firestore, 'segments', segmentId));
-    if (!segDoc.exists()) return;
-    const segData = segDoc.data();
-    const segmentName: string = segData['segmentname'] || segmentId;
-    const listIds: string[] = segData['participantlistid'] || [];
-    listIds.forEach(listId => {
-      if (listId !== targetList.docid && !liveListMeta.has(listId)) {
-        liveListMeta.set(listId, segmentName);
-      }
-    });
-  }));
+    }));
+  }
+
+  const liveListMeta = new Map<string, string>();
+
+  if (liveSegmentIds.size > 0) {
+    await Promise.all(Array.from(liveSegmentIds).map(async segmentId => {
+      const segDoc = await getDoc(doc(this.firestore, 'segments', segmentId));
+      if (!segDoc.exists()) return;
+      const segData = segDoc.data();
+      const segmentName: string = segData['segmentname'] || segmentId;
+      const listIds: string[] = segData['participantlistid'] || [];
+      listIds.forEach(listId => {
+        if (listId !== targetList.docid) liveListMeta.set(listId, segmentName);
+      });
+    }));
+  }
+
+  this.participantLists.forEach(list => {
+  if (list.live === true && list.docid !== targetList.docid && !liveListMeta.has(list.docid)) {
+    liveListMeta.set(list.docid, list.name);
+  }
+});
+
   if (liveListMeta.size === 0) return [];
+
+  const profileConflictMap = new Map<string, { listId: string; listName: string; segmentName: string }[]>();
+
   await Promise.all(Array.from(liveListMeta.entries()).map(async ([listId, segmentName]) => {
     const listDoc = await getDoc(doc(this.firestore, 'participant list', listId));
     if (!listDoc.exists()) return;
     const existingProfiles: string[] = listDoc.data()['profilelist'] || [];
     const listName = this.participantLists.find(l => l.docid === listId)?.name || listId;
     for (const profileIdObj of profileIdsToMerge) {
-      const rawId = profileIdObj['profileid'] || profileIdObj;
-      if (existingProfiles.includes(rawId)) {
-        const profileName = this.allProfiles.find(p => p.id === rawId)?.name || rawId;
-        const alreadyAdded = conflicts.some(
-          c => c.profileId === rawId && c.conflictingListId === listId
-        );
-        if (!alreadyAdded) {
-          conflicts.push({ profileId: rawId, profileName, conflictingListId: listId, conflictingListName: listName, segmentName });
-        }
-      }
+  const rawId = profileIdObj['profileid'] || profileIdObj;
+  if (existingProfiles.includes(rawId)) {
+    if (!profileConflictMap.has(rawId)) profileConflictMap.set(rawId, []);
+    const existing = profileConflictMap.get(rawId)!;
+    // Only add if this listId not already present
+    if (!existing.some(e => e.listId === listId)) {
+      existing.push({ listId, listName, segmentName });
     }
+  }
+}
   }));
-  return conflicts;
+
+  return Array.from(profileConflictMap.entries()).map(([profileId, conflictingLists]) => ({
+    profileId,
+    profileName: this.allProfiles.find(p => p.id === profileId)?.name || profileId,
+    conflictingLists
+  }));
 }
 
 // demerge
