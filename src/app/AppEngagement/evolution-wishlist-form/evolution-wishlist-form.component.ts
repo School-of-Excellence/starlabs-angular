@@ -1,6 +1,6 @@
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component} from '@angular/core';
 import { collection, doc, Firestore, getDoc, getDocs, query, updateDoc, where } from '@angular/fire/firestore';
 import { FormGroup, FormBuilder, FormControl, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -13,6 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { ActivatedRoute } from '@angular/router';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 @Component({
   selector: 'app-evolution-wishlist-form',
@@ -47,6 +48,7 @@ export class EvolutionWishlistFormComponent {
   participantModeChecklistDoc:any = null
   errormessage = "Invalid Link."
   participantname:string = null
+  knowMoreLinks: any[] = [];
   constructor(
     private fb: FormBuilder,
     private firestore: Firestore,
@@ -88,6 +90,10 @@ export class EvolutionWishlistFormComponent {
             }
           }
           this.loaded = true;
+          const linksRef = doc(firestore, 'evolutionwishlistquestions', 'knowmorelinks');
+          getDoc(linksRef).then(snap => {
+            this.knowMoreLinks = snap.exists() ? (snap.data()['links'] || []).filter(l => l.enabled) : [];
+          });
         } else {
           this.formSubmitionStatus = 'documentnull';
           this.errormessage = "Invalid link";
@@ -269,5 +275,25 @@ export class EvolutionWishlistFormComponent {
       this.formSubmitionStatus = 'submitted';
       this.loaded = true;
     });
+  }
+  getFavicon(url: string) {
+    return `https://www.google.com/s2/favicons?domain=${url}&sz=64`;
+  }
+
+  trackAndOpen(link: any) {
+    const url = link.url.startsWith('http') ? link.url : `https://${link.url}`;
+    window.open(url, '_blank');
+    if (!this.data?.docid || !this.data?.contact) return;
+    const alreadyTracked = (this.docData.contacts
+      .find(c => c.contact === this.data.contact)?.knowmoreclicks || [])
+      .some(k => k.url === link.url);
+    if (alreadyTracked) return;
+    const contacts = this.docData.contacts.map(c =>
+      c.contact === this.data.contact
+        ? { ...c, knowmoreclicks: [...(c.knowmoreclicks || []), { type: link.type, url: link.url, clickedAt: new Date() }] }
+        : c
+    );
+    this.docData.contacts = contacts;
+    updateDoc(doc(this.firestore, 'evolutionwishlistlog', this.data.docid), { contacts });
   }
 }
