@@ -11,16 +11,21 @@
 </div>
 
 <div class="dashboard-container">
-  <header class="dashboard-header">
-    <h1 class="dashboard-title">Delivery Dashboard</h1>
-    <div class="header-controls">
-      <div class="date-input" (click)="picker.open()">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <rect x="3" y="4" width="18" height="18" rx="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
+<div class="dd-app">
+
+  <!-- HEADER (ported from design.html) ===================== -->
+  <header class="dd-header">
+    <div class="dd-header__title-block">
+      <div class="dd-title-row">
+        <h1 class="dd-title">Delivery Dashboard</h1>
+        <span class="dd-live-chip"><span class="dd-live-chip__dot"></span>Live &middot; {{ lastUpdatedRelative }}</span>
+      </div>
+    </div>
+    <div class="dd-filter-bar">
+      <button class="dd-btn" [class.dd-btn--active]="selectedTimeFilter === 'all'"
+        (click)="onFilterClick('all')">All time</button>
+      <button class="dd-btn" (click)="picker.open()">
+        <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M11 2v3M5 2v3M2.5 7h11" stroke-linecap="round"/></svg>
         Date Range
         <mat-form-field appearance="outline" class="date-range-field-hidden">
           <mat-date-range-input [formGroup]="range" [rangePicker]="picker">
@@ -29,125 +34,302 @@
           </mat-date-range-input>
           <mat-date-range-picker #picker></mat-date-range-picker>
         </mat-form-field>
-      </div>
-      <div class="filter-group">
-        <button class="filter-btn" [class.active]="selectedTimeFilter === 'all'"
-          (click)="onFilterClick('all')">All</button>
-        <button class="filter-btn" [class.active]="selectedTimeFilter === 'today'"
-          (click)="onFilterClick('today')">Today</button>
-        <button class="filter-btn" [class.active]="selectedTimeFilter === '7days'" (click)="onFilterClick('7days')">7
-          Days</button>
-        <button class="filter-btn" [class.active]="selectedTimeFilter === '30days'" (click)="onFilterClick('30days')">30
-          Days</button>
-        <button class="filter-btn" [class.active]="selectedTimeFilter === 'thismonth'"
-          (click)="onFilterClick('thismonth')">This Month</button>
-      </div>
+      </button>
+      <button class="dd-btn" [class.dd-btn--active]="selectedTimeFilter === '30days'"
+        (click)="onFilterClick('30days')">Last 30 days</button>
+      <button class="dd-btn" [class.dd-btn--active]="selectedTimeFilter === 'thismonth'"
+        (click)="onFilterClick('thismonth')">This month</button>
+
+      <span class="dd-fdiv"></span>
+
+      <button class="dd-pfilter" type="button">
+        <span class="dd-pfilter__ico" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path d="M2 4h12M4 8h8M6 12h4" stroke-linecap="round"/></svg>
+        </span>
+        <span class="dd-pfilter__body">
+          <span class="dd-pfilter__lbl">Products</span>
+          <span class="dd-pfilter__val">{{ allProductsSelected ? ('All ' + visibleCardIds.length) : (productSelectTrigger || ('All ' + visibleCardIds.length)) }}<span class="dd-pfilter__hint" *ngIf="hiddenCardIds.length > 0"> &middot; {{ hiddenCardIds.length }} hidden</span></span>
+        </span>
+        <svg class="dd-pfilter__chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path d="M4 6l4 4 4-4" stroke-linecap="round"/></svg>
+        <mat-form-field appearance="outline" class="product-select-field" subscriptSizing="dynamic">
+          <mat-label>Products</mat-label>
+          <mat-select multiple [formControl]="productFilterControl" panelClass="product-panel" placeholder="All products">
+            <mat-select-trigger>{{ productSelectTrigger }}</mat-select-trigger>
+            <mat-option *ngFor="let p of availableCardLabels" [value]="p">{{ p }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </button>
     </div>
   </header>
 
-  <!-- ========== VISIBLE PRODUCT CARDS ========== -->
-  <div class="grid">
-    <div class="card" *ngFor="let cardId of visibleCardIds">
-      <div class="card-header">
-        <div class="card-title-block">
-          <div class="card-title">{{ getCardName(cardId) }}</div>
-          <div class="card-subtitle" *ngIf="getCardSubNames(cardId).length > 0">{{ getCardSubNames(cardId).join(', ') }}
-          </div>
-        </div>
-        <div class="badge-row">
-          <div class="badge overall clickable" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
-            <span class="badge-num">{{ getCardGroupedAll(cardId).length | number }}</span>
-            <span class="badge-label">Overall</span>
-          </div>
-          <div class="badge eligible clickable" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
-            <span class="badge-num">{{ getCardGroupedFiltered(cardId).length | number }}</span>
-            <span class="badge-label">Eligible</span>
-          </div>
-          <div class="badge noteligible clickable"
-            (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
-            <span class="badge-num">{{ getCardGroupedNotEligible(cardId).length | number }}</span>
-            <span class="badge-label">Not Eligible</span>
-          </div>
+  <!-- KPI BENTO (ported) =================================== -->
+  <section class="dd-kpi">
+    <div class="dd-hero">
+      <div class="dd-hero__head">
+        <span class="dd-hero__eyebrow">Active Delivery Pipeline</span>
+        <span class="dd-live"><span class="dd-live__dot"></span>Live</span>
+      </div>
+      <div class="dd-hero__row">
+        <span class="dd-hero__num">{{ kpiOngoingTotal | number }}</span>
+        <div class="dd-hero__meta">
+          <span class="dd-hero__delta-lbl">participants in progress</span>
         </div>
       </div>
-      <div class="metrics-row">
-        <div class="metric clickable" (click)="openCardModal(cardId, 'nextmonth'); $event.stopPropagation()">
-          <span class="metric-num" [class.zero]="getCardGroupedNextMonth(cardId).length === 0">{{
-            getCardGroupedNextMonth(cardId).length }}</span>
-          <span class="metric-label">Next Mo.</span>
-        </div>
-        <div class="metric clickable" (click)="openCardModal(cardId, 'thismonth'); $event.stopPropagation()">
-          <span class="metric-num" [class.zero]="getCardGroupedThisMonth(cardId).length === 0">{{
-            getCardGroupedThisMonth(cardId).length }}</span>
-          <span class="metric-label">This Mo.</span>
-        </div>
-        <div class="metric clickable" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
-          <span class="metric-num" [class.zero]="getCardGroupedPurchased(cardId).length === 0">{{
-            getCardGroupedPurchased(cardId).length }}</span>
-          <span class="metric-label">Purchased</span>
-        </div>
-        <div class="metric clickable" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
-          <span class="metric-num" [class.zero]="getCardGroupedBonus(cardId).length === 0">{{
-            getCardGroupedBonus(cardId).length | number }}</span>
-          <span class="metric-label">Bonus</span>
-        </div>
-      </div>
-      <div class="status-row">
-        <div class="status-pill"><span class="status-dot active"></span>Active {{ getCardActiveSub(cardId) }}</div>
-        <div class="status-pill"><span class="status-dot inactive"></span>Non-active {{ getCardNonActiveSub(cardId) }}
-        </div>
-      </div>
-      <div class="funnel-section">
-        <div class="section-label">Journey Funnel</div>
-        <div class="funnel-grid">
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
-            <span class="funnel-num" [class.zero]="getCardFunnel(cardId).initiated.length === 0">{{
-              getCardFunnel(cardId).initiated.length }}</span>
-            <span class="funnel-label">Init</span>
-          </div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
-            <span class="funnel-num" [class.zero]="getCardFunnel(cardId).awaiting.length === 0">{{
-              getCardFunnel(cardId).awaiting.length | number }}</span>
-            <span class="funnel-label">Await</span>
-          </div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(cardId, 'started', $event)">
-            <span class="funnel-num" [class.zero]="getCardFunnel(cardId).started.length === 0">{{
-              getCardFunnel(cardId).started.length }}</span>
-            <span class="funnel-label">Started</span>
-          </div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
-            <span class="funnel-num" [class.zero]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{
-              getCardFunnel(cardId).ongoing?.length || 0 }}</span>
-            <span class="funnel-label">Ongoing</span>
-          </div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(cardId, 'completed', $event)">
-            <span class="funnel-num highlight">{{ getCardFunnel(cardId).completed.length }}</span>
-            <span class="funnel-label">Done</span>
-          </div>
-        </div>
-      </div>
-      <div class="time-row">
-        <div class="time-card clickable" (click)="openCardAvgModal(cardId, 'initToStart', $event)">
-          <span class="time-value" [class.zero]="getCardAvgInitToStart(cardId) === 0">{{ getCardAvgInitToStart(cardId)
-            }}d</span>
-          <span class="time-label">Init → Start</span>
-        </div>
-        <div class="time-card clickable" (click)="openCardAvgModal(cardId, 'startToComplete', $event)">
-          <span class="time-value" [class.zero]="getCardAvgStartToComplete(cardId) === 0"
-            [class.warn]="getCardAvgStartToComplete(cardId) > 0">{{ getCardAvgStartToComplete(cardId) }}d</span>
-          <span class="time-label">Start → Complete</span>
-        </div>
-      </div>
-      <div class="conversion-row">
-        <div class="conv-stat"><span class="conv-icon">⬆</span>
-          <div class="conv-content"><span class="conv-num zero">0</span><span class="conv-label">Upgraded</span></div>
-        </div>
-        <div class="conv-stat"><span class="conv-icon">🔗</span>
-          <div class="conv-content"><span class="conv-num zero">0</span><span class="conv-label">Refs Converted</span>
-          </div>
+      <span class="dd-hero__sub">Total participants currently going through delivery — across {{ visibleCardIds.length }} active products</span>
+      <div class="dd-hero__funnel">
+        <div class="dd-khf" *ngFor="let cardId of visibleCardIds">
+          <span class="dd-khf__name">{{ getCardName(cardId) }}</span>
+          <div class="dd-khf__bar"><div class="dd-khf__fill" [style.width.%]="ongoingPctOfMax(cardId)"></div></div>
+          <span class="dd-khf__num">{{ ongoingByCard(cardId) }}</span>
         </div>
       </div>
     </div>
+
+    <div class="dd-kpi-grid">
+      <div class="dd-kcell dd-kcell--ready" [class.dd-kcell--empty]="kpiReadyToInitiate === 0"
+        (click)="navToAttention('ready')">
+        <span class="dd-kcell__label">Ready to Start</span>
+        <span class="dd-kcell__value">{{ kpiReadyToInitiate | number }}</span>
+        <span class="dd-kcell__delta">payment confirmed — not yet initiated</span>
+        <div class="dd-kcell__spark">
+          <div class="b" *ngFor="let v of sparkReady"
+            [style.height.%]="(v / sparkMax(sparkReady)) * 100"
+            [class.empty]="v === 0"></div>
+        </div>
+      </div>
+
+      <div class="dd-kcell dd-kcell--stuck" [class.dd-kcell--alert]="kpiStuck > 0"
+        [class.dd-kcell--empty]="kpiStuck === 0"
+        (click)="navToAttention('stuck')">
+        <span class="dd-kcell__label">Stuck Participants</span>
+        <span class="dd-kcell__value">{{ kpiStuck | number }}</span>
+        <span class="dd-kcell__delta">no progress in 14+ days — needs follow-up</span>
+        <div class="dd-kcell__spark">
+          <div class="b" *ngFor="let v of sparkStuck"
+            [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
+            [class.empty]="v === 0"></div>
+        </div>
+      </div>
+
+      <div class="dd-kcell dd-kcell--done">
+        <span class="dd-kcell__label">Fully Delivered</span>
+        <span class="dd-kcell__value">{{ kpiCompletedTotal | number }}</span>
+        <span class="dd-kcell__delta">participants who completed delivery in selected period</span>
+        <div class="dd-kcell__spark">
+          <div class="b" *ngFor="let v of sparkCompleted"
+            [style.height.%]="(v / sparkMax(sparkCompleted)) * 100"
+            [class.empty]="v === 0"></div>
+        </div>
+      </div>
+
+      <div class="dd-kcell dd-kcell--avg">
+        <span class="dd-kcell__label">Avg. Days to Complete</span>
+        <span class="dd-kcell__value">{{ kpiAvgComplete }}<span class="dd-kcell__unit">d</span></span>
+        <div class="dd-kcell__gauge">
+          <div class="dd-gauge-track">
+            <div class="dd-gauge-fill" [style.width.%]="avgTimePct"></div>
+            <div class="dd-gauge-target" [style.left.%]="100"></div>
+          </div>
+          <span class="dd-gauge-lbl">target {{ avgTimeTarget }}d to finish delivery</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACTION CENTER (ported) =============================== -->
+  <section class="dd-action">
+    <div>
+      <div class="dd-section-head">
+        <span class="dd-section-title">Needs Your Attention</span>
+        <span class="dd-section-sub">Participants requiring immediate follow-up — act on these first</span>
+      </div>
+      <div class="dd-attention">
+        <button class="dd-tile dd-tile--alert" [class.dd-tile--empty]="kpiStuck === 0"
+          (click)="navToAttention('stuck')">
+          <span class="dd-tile__num">{{ kpiStuck | number }}</span>
+          <span class="dd-tile__label">Stuck</span>
+          <span class="dd-tile__hint">No updates for 14+ days — follow up now</span>
+          <span class="dd-tile__arr">&rarr;</span>
+        </button>
+        <button class="dd-tile" [class.dd-tile--empty]="kpiAwaitingTotal === 0"
+          (click)="navToAttention('awaiting')">
+          <span class="dd-tile__num">{{ kpiAwaitingTotal | number }}</span>
+          <span class="dd-tile__label">Awaiting Initiation</span>
+          <span class="dd-tile__hint">Payment not confirmed — delivery hasn't started yet</span>
+          <span class="dd-tile__arr">&rarr;</span>
+        </button>
+        <button class="dd-tile dd-tile--ok" [class.dd-tile--empty]="kpiReadyToInitiate === 0"
+          (click)="navToAttention('ready')">
+          <span class="dd-tile__num">{{ kpiReadyToInitiate | number }}</span>
+          <span class="dd-tile__label">Ready to Start</span>
+          <span class="dd-tile__hint">Payment confirmed — initiate their delivery now</span>
+          <span class="dd-tile__arr">&rarr;</span>
+        </button>
+        <button class="dd-tile" [class.dd-tile--empty]="kpiInitiatedNotConsuming === 0"
+          (click)="navToAttention('idle')">
+          <span class="dd-tile__num">{{ kpiInitiatedNotConsuming | number }}</span>
+          <span class="dd-tile__label">Started, Not Engaging</span>
+          <span class="dd-tile__hint">Delivery started but participant hasn't been active</span>
+          <span class="dd-tile__arr">&rarr;</span>
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <div class="dd-section-head">
+        <span class="dd-section-title">Delivery Pipeline by Product</span>
+        <span class="dd-section-sub">How participants are spread across each delivery stage</span>
+      </div>
+      <div class="dd-pby">
+        <div class="dd-pby-legend">
+          <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s1"></span>Init</span>
+          <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s2"></span>Await</span>
+          <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s3"></span>Started</span>
+          <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s4"></span>Ongoing</span>
+          <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s5"></span>Done</span>
+        </div>
+        <ng-container *ngFor="let cardId of visibleCardIds">
+          <ng-container *ngIf="getCardFunnel(cardId) as f">
+            <div class="dd-pby-row">
+              <span class="dd-pby-row__name" [title]="getCardName(cardId)">{{ getCardName(cardId) }}</span>
+              <div class="dd-pby-row__bar">
+                <div class="dd-pby-row__seg dd-bg-s1" *ngIf="f.initiated.length > 0" [style.flex]="f.initiated.length"></div>
+                <div class="dd-pby-row__seg dd-bg-s2" *ngIf="f.awaiting.length > 0"  [style.flex]="f.awaiting.length"></div>
+                <div class="dd-pby-row__seg dd-bg-s3" *ngIf="f.started.length > 0"   [style.flex]="f.started.length"></div>
+                <div class="dd-pby-row__seg dd-bg-s4" *ngIf="(f.ongoing?.length || 0) > 0" [style.flex]="f.ongoing?.length || 0"></div>
+                <div class="dd-pby-row__seg dd-bg-s5" *ngIf="f.completed.length > 0" [style.flex]="f.completed.length"></div>
+              </div>
+              <span class="dd-pby-row__total">{{ getCardPipelineTotal(cardId) | number }}</span>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB STRIP (custom, drives outerTabIndex) ============= -->
+  <div class="dd-tabs">
+    <button class="dd-tab" [class.is-active]="outerTabIndex === 0" (click)="outerTabIndex = 0">
+      Overview <span class="dd-tab__count">{{ visibleCardIds.length }}</span>
+    </button>
+    <button class="dd-tab" [class.is-active]="outerTabIndex === 1" (click)="outerTabIndex = 1">Analytics</button>
+    <button class="dd-tab" [class.is-active]="outerTabIndex === 2" (click)="outerTabIndex = 2">
+      Participants <span class="dd-tab__count">{{ participantsTotalCount | number }}</span>
+    </button>
+  </div>
+
+  <mat-tab-group class="dd-tab-group" animationDuration="200ms" dynamicHeight
+                 [(selectedIndex)]="outerTabIndex"
+                 (selectedTabChange)="onOuterTabChange($event)">
+    <mat-tab label="Overview">
+      <ng-template matTabContent>
+  <!-- ========== PRODUCT ROWS (ported from design.html) ========== -->
+  <div class="dd-products-section">
+    <div class="dd-products-header-row">
+      <span class="dd-products-title">Products Overview</span>
+      <span class="dd-products-sub">{{ visibleCardIds.length }} active &nbsp;&middot;&nbsp; <span class="dd-meta-pulse-inline"></span> Live</span>
+    </div>
+  </div>
+  <div class="dd-products">
+
+    <!-- Column header row -->
+    <div class="dd-prow-colhead" aria-hidden="true">
+      <div class="dd-prow-colhead__cell">Product</div>
+      <div class="dd-prow-colhead__cell">Eligible</div>
+      <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
+        <span class="dd-colhead__grp-lbl">Participants</span>
+        <div class="dd-colhead__grp-tags">
+          <span>Total</span><span>Not Elig.</span><span>Purch.</span><span>Bonus</span>
+        </div>
+      </div>
+      <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
+        <span class="dd-colhead__grp-lbl">Journey Funnel</span>
+        <div class="dd-colhead__grp-tags">
+          <span>Init</span><span>Await</span><span>Started</span><span>Ongoing</span><span>Done</span>
+        </div>
+      </div>
+      <div class="dd-prow-colhead__cell">Avg. Time</div>
+      <div class="dd-prow-colhead__cell">Status</div>
+    </div>
+
+    <article class="dd-prow" *ngFor="let cardId of visibleCardIds; let i = index; trackBy: trackByCardId">
+      <div class="dd-prow__id">
+        <span class="dd-prow__dot" [ngClass]="productDotClass(i)"></span>
+        <div class="dd-prow__name-block"
+             [title]="getCardName(cardId) + (getCardSubNames(cardId).length > 0 ? '\n' + getCardSubNames(cardId).join(' · ') : '')">
+          <span class="dd-prow__name">{{ getCardName(cardId) }}</span>
+          <span class="dd-prow__sub" *ngIf="getCardSubNames(cardId).length > 0">{{ getCardSubNames(cardId).join(' · ') }}</span>
+        </div>
+      </div>
+      <div class="dd-prow__hero" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
+        <span class="dd-prow__hero-num" [class.zero]="getCardGroupedFiltered(cardId).length === 0">{{ getCardGroupedFiltered(cardId).length | number }}</span>
+        <span class="dd-prow__hero-lbl">Eligible</span>
+      </div>
+      <div class="dd-prow__chips">
+        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
+          <span class="dd-prow__chip-num">{{ getCardGroupedAll(cardId).length | number }}</span>
+          <span class="dd-prow__chip-lbl">Overall</span>
+        </div>
+        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
+          <span class="dd-prow__chip-num" [class.zero]="getCardGroupedNotEligible(cardId).length === 0"
+                                          [class.alert]="getCardGroupedNotEligible(cardId).length > 0">{{ getCardGroupedNotEligible(cardId).length | number }}</span>
+          <span class="dd-prow__chip-lbl">Not Elig.</span>
+        </div>
+        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
+          <span class="dd-prow__chip-num" [class.zero]="getCardGroupedPurchased(cardId).length === 0">{{ getCardGroupedPurchased(cardId).length | number }}</span>
+          <span class="dd-prow__chip-lbl">Purch.</span>
+        </div>
+        <div class="dd-prow__chip" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
+          <span class="dd-prow__chip-num" [class.zero]="getCardGroupedBonus(cardId).length === 0">{{ getCardGroupedBonus(cardId).length | number }}</span>
+          <span class="dd-prow__chip-lbl">Bonus</span>
+        </div>
+      </div>
+      <div class="dd-prow__funnel">
+        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
+          <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{ getCardFunnel(cardId).initiated.length }}</span>
+          <span class="dd-fstep__lbl">Init</span>
+        </div>
+        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
+          <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{ getCardFunnel(cardId).awaiting.length | number }}</span>
+          <span class="dd-fstep__lbl">Await</span>
+        </div>
+        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'started', $event)">
+          <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{ getCardFunnel(cardId).started.length }}</span>
+          <span class="dd-fstep__lbl">Started</span>
+        </div>
+        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
+          <span class="dd-fstep__pill" [class.empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
+          <span class="dd-fstep__lbl">Ongoing</span>
+        </div>
+        <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'completed', $event)">
+          <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{ getCardFunnel(cardId).completed.length }}</span>
+          <span class="dd-fstep__lbl">Done</span>
+        </div>
+      </div>
+      <div class="dd-prow__time">
+        <div class="dd-ts" (click)="openCardAvgModal(cardId, 'initToStart', $event)">
+          <span class="dd-ts__lbl">Init &rarr; Start</span>
+          <span class="dd-ts__val" [class.zero]="getCardAvgInitToStart(cardId) === 0">{{ getCardAvgInitToStart(cardId) }}<span class="u">d</span></span>
+        </div>
+        <div class="dd-ts" (click)="openCardAvgModal(cardId, 'startToComplete', $event)">
+          <span class="dd-ts__lbl">Start &rarr; Done</span>
+          <span class="dd-ts__val" [class.zero]="getCardAvgStartToComplete(cardId) === 0">{{ getCardAvgStartToComplete(cardId) }}<span class="u">d</span></span>
+        </div>
+      </div>
+      <div class="dd-prow__status">
+        <button class="dd-statbadge dd-statbadge--active" type="button"
+          [class.dd-statbadge--zero]="(getCardFunnel(cardId).ongoing?.length || 0) === 0"
+          (click)="openCardFunnelModal(cardId, 'ongoing', $event); $event.stopPropagation()">
+          <span class="dd-statbadge__count">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
+          <span class="dd-statbadge__lbl">Ongoing</span>
+        </button>
+        <div class="dd-statbadge dd-statbadge--ended"
+          [class.dd-statbadge--zero]="getCardNonActiveSub(cardId) === 0">
+          <span class="dd-statbadge__count">{{ getCardNonActiveSub(cardId) }}</span>
+          <span class="dd-statbadge__lbl">Sub. Ended</span>
+        </div>
+      </div>
+    </article>
   </div>
 
   <!-- ========== HIDDEN PRODUCTS TOGGLE ========== -->
@@ -163,79 +345,88 @@
 
   <!-- ========== HIDDEN PRODUCT CARDS ========== -->
   <div class="grid hidden-cards" *ngIf="showHiddenProducts">
-    <div class="card hidden-card" *ngFor="let productId of hiddenCardIds">
-      <div class="card-header">
+    <div class="card hidden-card" *ngFor="let productId of hiddenCardIds; trackBy: trackByCardId">
+      <div class="card-top">
         <div class="card-title-block">
           <div class="card-title">{{ mapProductName[productId] }}</div>
-        </div>
-        <div class="badge-row">
           <span class="hidden-tag">Hidden</span>
-          <div class="badge overall clickable" (click)="openCardModal(productId, 'all'); $event.stopPropagation()">
-            <span class="badge-num">{{ getCardGroupedAll(productId).length | number }}</span>
-            <span class="badge-label">Overall</span>
-          </div>
-          <div class="badge eligible clickable"
-            (click)="openCardModal(productId, 'filtered'); $event.stopPropagation()">
-            <span class="badge-num">{{ getCardGroupedFiltered(productId).length | number }}</span>
-            <span class="badge-label">Eligible</span>
-          </div>
+        </div>
+        <div class="card-hero clickable" (click)="openCardModal(productId, 'filtered'); $event.stopPropagation()">
+          <span class="card-hero-num" [class.zero]="getCardGroupedFiltered(productId).length === 0">{{ getCardGroupedFiltered(productId).length | number }}</span>
+          <span class="card-hero-label">Eligible</span>
         </div>
       </div>
-      <div class="metrics-row">
-        <div class="metric clickable" (click)="openCardModal(productId, 'nextmonth'); $event.stopPropagation()"><span
-            class="metric-num" [class.zero]="getCardGroupedNextMonth(productId).length === 0">{{
-            getCardGroupedNextMonth(productId).length }}</span><span class="metric-label">Next Mo.</span></div>
-        <div class="metric clickable" (click)="openCardModal(productId, 'thismonth'); $event.stopPropagation()"><span
-            class="metric-num" [class.zero]="getCardGroupedThisMonth(productId).length === 0">{{
-            getCardGroupedThisMonth(productId).length }}</span><span class="metric-label">This Mo.</span></div>
-        <div class="metric clickable" (click)="openCardModal(productId, 'purchased'); $event.stopPropagation()"><span
-            class="metric-num" [class.zero]="getCardGroupedPurchased(productId).length === 0">{{
-            getCardGroupedPurchased(productId).length }}</span><span class="metric-label">Purchased</span></div>
-        <div class="metric clickable" (click)="openCardModal(productId, 'bonus'); $event.stopPropagation()"><span
-            class="metric-num" [class.zero]="getCardGroupedBonus(productId).length === 0">{{
-            getCardGroupedBonus(productId).length | number }}</span><span class="metric-label">Bonus</span></div>
+
+      <div class="chip-row">
+        <button class="chip chip-overall clickable" (click)="openCardModal(productId, 'all'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedAll(productId).length | number }}</span>
+          <span class="chip-label">Overall</span>
+        </button>
+        <button class="chip chip-purchased clickable" [class.chip-empty]="getCardGroupedPurchased(productId).length === 0"
+          (click)="openCardModal(productId, 'purchased'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedPurchased(productId).length | number }}</span>
+          <span class="chip-label">Purchased</span>
+        </button>
+        <button class="chip chip-bonus clickable" [class.chip-empty]="getCardGroupedBonus(productId).length === 0"
+          (click)="openCardModal(productId, 'bonus'); $event.stopPropagation()">
+          <span class="chip-num">{{ getCardGroupedBonus(productId).length | number }}</span>
+          <span class="chip-label">Bonus</span>
+        </button>
       </div>
-      <div class="status-row">
-        <div class="status-pill"><span class="status-dot active"></span>Active {{ getCardActiveSub(productId) }}</div>
-        <div class="status-pill"><span class="status-dot inactive"></span>Non-active {{ getCardNonActiveSub(productId)
-          }}</div>
-      </div>
+
       <div class="funnel-section">
         <div class="section-label">Journey Funnel</div>
-        <div class="funnel-grid">
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(productId, 'initiated', $event)"><span
-              class="funnel-num" [class.zero]="getCardFunnel(productId).initiated.length === 0">{{
-              getCardFunnel(productId).initiated.length }}</span><span class="funnel-label">Init</span></div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(productId, 'awaiting', $event)"><span
-              class="funnel-num" [class.zero]="getCardFunnel(productId).awaiting.length === 0">{{
-              getCardFunnel(productId).awaiting.length | number }}</span><span class="funnel-label">Await</span></div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(productId, 'started', $event)"><span
-              class="funnel-num" [class.zero]="getCardFunnel(productId).started.length === 0">{{
-              getCardFunnel(productId).started.length }}</span><span class="funnel-label">Started</span></div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(productId, 'ongoing', $event)"><span
-              class="funnel-num" [class.zero]="(getCardFunnel(productId).ongoing?.length || 0) === 0">{{
-              getCardFunnel(productId).ongoing?.length || 0 }}</span><span class="funnel-label">Ongoing</span></div>
-          <div class="funnel-step clickable" (click)="openCardFunnelModal(productId, 'completed', $event)"><span
-              class="funnel-num highlight">{{ getCardFunnel(productId).completed.length }}</span><span
-              class="funnel-label">Done</span></div>
-        </div>
-      </div>
-      <div class="time-row">
-        <div class="time-card clickable" (click)="openCardAvgModal(productId, 'initToStart', $event)"><span
-            class="time-value" [class.zero]="getCardAvgInitToStart(productId) === 0">{{ getCardAvgInitToStart(productId)
-            }}d</span><span class="time-label">Init → Start</span></div>
-        <div class="time-card clickable" (click)="openCardAvgModal(productId, 'startToComplete', $event)"><span
-            class="time-value" [class.zero]="getCardAvgStartToComplete(productId) === 0"
-            [class.warn]="getCardAvgStartToComplete(productId) > 0">{{ getCardAvgStartToComplete(productId)
-            }}d</span><span class="time-label">Start → Complete</span></div>
-      </div>
-      <div class="conversion-row">
-        <div class="conv-stat"><span class="conv-icon">⬆</span>
-          <div class="conv-content"><span class="conv-num zero">0</span><span class="conv-label">Upgraded</span></div>
-        </div>
-        <div class="conv-stat"><span class="conv-icon">🔗</span>
-          <div class="conv-content"><span class="conv-num zero">0</span><span class="conv-label">Refs Converted</span>
+        <div class="funnel-bars">
+          <div class="funnel-bar funnel-bar-1 clickable" [class.funnel-bar-empty]="getCardFunnel(productId).initiated.length === 0"
+            (click)="openCardFunnelModal(productId, 'initiated', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(productId).initiated.length }}</span>
+            <span class="funnel-bar-label">Init</span>
           </div>
+          <div class="funnel-bar funnel-bar-2 clickable" [class.funnel-bar-empty]="getCardFunnel(productId).awaiting.length === 0"
+            (click)="openCardFunnelModal(productId, 'awaiting', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(productId).awaiting.length | number }}</span>
+            <span class="funnel-bar-label">Await</span>
+          </div>
+          <div class="funnel-bar funnel-bar-3 clickable" [class.funnel-bar-empty]="getCardFunnel(productId).started.length === 0"
+            (click)="openCardFunnelModal(productId, 'started', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(productId).started.length }}</span>
+            <span class="funnel-bar-label">Started</span>
+          </div>
+          <div class="funnel-bar funnel-bar-4 clickable" [class.funnel-bar-empty]="(getCardFunnel(productId).ongoing?.length || 0) === 0"
+            (click)="openCardFunnelModal(productId, 'ongoing', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(productId).ongoing?.length || 0 }}</span>
+            <span class="funnel-bar-label">Ongoing</span>
+          </div>
+          <div class="funnel-bar funnel-bar-5 clickable funnel-bar-done"
+            (click)="openCardFunnelModal(productId, 'completed', $event)">
+            <span class="funnel-bar-num">{{ getCardFunnel(productId).completed.length }}</span>
+            <span class="funnel-bar-label">Done</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="card-footer-left">
+          <div class="time-stat clickable" (click)="openCardAvgModal(productId, 'initToStart', $event)">
+            <span class="time-stat-label">Init &rarr; Start</span>
+            <span class="time-stat-value" [class.zero]="getCardAvgInitToStart(productId) === 0">{{ getCardAvgInitToStart(productId) }}<span class="time-stat-unit">d</span></span>
+          </div>
+          <div class="time-stat clickable" (click)="openCardAvgModal(productId, 'startToComplete', $event)">
+            <span class="time-stat-label">Start &rarr; Done</span>
+            <span class="time-stat-value" [class.zero]="getCardAvgStartToComplete(productId) === 0">{{ getCardAvgStartToComplete(productId) }}<span class="time-stat-unit">d</span></span>
+          </div>
+        </div>
+        <div class="card-footer-right">
+          <span class="sub-pill sub-pill-ongoing">
+            <span class="sub-dot sub-dot-ongoing"></span>
+            <span class="sub-pill-count">{{ getCardFunnel(productId).ongoing?.length || 0 }}</span>
+            <span class="sub-pill-text">Ongoing</span>
+          </span>
+          <span class="sub-pill">
+            <span class="sub-dot sub-dot-inactive"></span>
+            <span class="sub-pill-count">{{ getCardNonActiveSub(productId) }}</span>
+            <span class="sub-pill-text">Sub. Ended</span>
+          </span>
         </div>
       </div>
     </div>
@@ -454,12 +645,282 @@
     </div>
   </div>
 
+  <!-- ========== STAGES ========== -->
+  <div class="flow-section">
+    <div class="header">
+      <div class="stages-title-block">
+        <div class="title">Stages</div>
+        <div class="stages-product-tabs">
+          <button class="stages-pchip"
+            *ngIf="!productFilterActive || (productFilterControl.value || []).includes('EI Starter Pack')"
+            [class.active]="selectedProductLabel === 'EI Starter Pack'"
+            (click)="selectProduct('EI Starter Pack')">
+            <span class="stages-pchip-dot stages-pchip-dot-starter"></span>EI Starter Pack
+          </button>
+          <button class="stages-pchip"
+            *ngIf="!productFilterActive || (productFilterControl.value || []).includes('EI Solution')"
+            [class.active]="selectedProductLabel === 'EI Solution'"
+            (click)="selectProduct('EI Solution')">
+            <span class="stages-pchip-dot stages-pchip-dot-ei"></span>EI Solution
+          </button>
+          <button class="stages-pchip"
+            *ngIf="!productFilterActive || (productFilterControl.value || []).includes('Critical Support')"
+            [class.active]="selectedProductLabel === 'Critical Support'"
+            (click)="selectProduct('Critical Support')">
+            <span class="stages-pchip-dot stages-pchip-dot-critical"></span>Critical Support
+          </button>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="search-container" *ngIf="selectedProductLabel">
+          <div class="search-field">
+            <mat-icon matSuffix>search</mat-icon>
+            <input matInput type="text" placeholder="Search participant..." (input)="searchParticipant($event)"
+              [(ngModel)]="searchText" />
+          </div>
+        </div>
+
+        <div class="stages-limited-chip" *ngIf="!appointmentsAccessible"
+             matTooltip="Your role can't read the appointments collection. Stage counts come from participantsproduct and still work; per-appointment detail is hidden.">
+          <span class="stages-limited-dot"></span>
+          <span class="stages-limited-text">Limited data</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stages-empty" *ngIf="!selectedProductLabel && !stagesLoading">
+      <div class="stages-empty-title">Pick a product to inspect stages</div>
+      <div class="stages-empty-hint">Choose EI Starter Pack or Critical Support above to drill into stage-by-stage data.</div>
+    </div>
+
+    <!-- Skeleton: kanban placeholder while selectProduct() resolves -->
+    <div class="stages-skeleton" *ngIf="stagesLoading" aria-busy="true" aria-live="polite">
+      <div class="stages-skel-col" *ngFor="let _ of [0,1,2,3,4,5]">
+        <div class="stages-skel-head">
+          <div class="stages-skel-line stages-skel-w50"></div>
+          <div class="stages-skel-pill"></div>
+        </div>
+        <div class="stages-skel-card" *ngFor="let __ of [0,1,2]">
+          <div class="stages-skel-line stages-skel-w70"></div>
+          <div class="stages-skel-line stages-skel-w40"></div>
+          <div class="stages-skel-line stages-skel-w60"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow Stats Cards -->
+    <!-- Total Eligible -->
+    <div class="d-flex board" *ngIf="selectedProductLabel && !stagesLoading">
+      <div id="loading" *ngIf="participantLoading">
+        <div class="spinner"></div>
+      </div>
+      <ng-container *ngIf="!participantLoading">
+        <div class="column" *ngFor="let col of selectedColumns; let i = index">
+          <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
+            <div class="header-col">
+              <div class="d-flex filter-asc" (click)="sortColumn(i)">
+                <div class="col-header-left">
+                  <span class="col-title">{{ col }}</span>
+                </div>
+                <div class="filter-asc ps-2">
+                  <i class="fas text-black-50 filter-asc" [ngClass]="{'fa-sort': !sortDirection[i], 'fa-sort-up': sortDirection[i] === 'asc', 'fa-sort-down': sortDirection[i] === 'desc'}">
+                  </i>
+                </div>
+              </div>
+              <span class="col-badge">
+                {{ filteredCardsMap[i]?.length || 0 }}
+              </span>
+            </div>
+            <div>
+              <div class="col-mini-stats">
+                <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
+                  <div (click)="openStageModal(col, 'Scheduled', stage.all)" class="mini-stat mini-stat-clickable"
+                    title="View scheduled participants">
+                    <div class="mini-stat-val" style="color:var(--blue)">
+                      {{ stage.all.length || 0 }}
+                    </div>
+                    <div class="mini-stat-lbl">Scheduled</div>
+                  </div>
+                  <!-- Awaiting -->
+                  <!-- <div (click)="openStageModal(col, 'Awaiting', stage.awaiting)" class="mini-stat mini-stat-clickable"
+                    title="View awaiting participants">
+                    <div class="mini-stat-val" style="color:var(--coral)">
+                      {{ stage.awaiting?.length || 0 }}
+                    </div>
+                    <div class="mini-stat-lbl">Awaiting</div>
+                  </div> -->
+                </ng-container>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-body">
+            <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
+              <div class="card" *ngFor="let c of filteredCardsMap[i]; trackBy: trackByCard"
+                [class.card-expanded]="c._expanded">
+
+                <!-- Visible Card -->
+                <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
+                  <div class="card-info">
+                    <div class="card-name">
+                      {{ c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name }}
+                    </div>
+                  </div>
+                </div>
+                <!-- Status -->
+                <div class="d-flex">
+                  <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
+                    {{ c?.profileid ? (c.status || 'NOT INITIATED') : 'Pending' }}
+                  </span>
+                  <span class="card-status" *ngIf="(c?.status === null || c?.status === 'initiated')">
+                    {{
+                    addonsPackageLookup[c?.packageref?.id || c?.packageref]
+                    || bonusPackageLookup[c?.packageref?.id || c?.packageref]
+                    || 'Purchased'
+                    }}
+                  </span>
+                </div>
+
+                <!-- Active Appointment Detail -->
+                <div class="detail-row" (click)="toggleExpand(c, i)">
+                  <span class="d-flex flex-column">
+                    <span>
+                      <span class="detail-label">
+                        {{ showActiveStage(c) }}
+                      </span>
+                      <span class="detail-val">
+                        {{ showParticipantActiveDate(c) }}
+                      </span>
+                    </span>
+                    <span>
+                      <ng-container *ngIf="c?.status === 'ongoing' && c.hosts?.length">
+                        <span class="detail-label">Specialist: </span>
+                        <span class="detail-val">
+                          {{
+                          mapMetaData[
+                          (c.hosts[0]?.path || c.hosts[0]).split('/').pop()
+                          ]?.name
+                          }}
+                        </span>
+                      </ng-container>
+                    </span>
+                    <span>
+                      <ng-container *ngIf="showDelayDate(c) as delay">
+                        <span *ngIf="delay" class="detail-label">Delayed By: </span>
+                        <span *ngIf="delay" class="detail-val">{{ delay }}</span>
+                      </ng-container>
+                    </span>
+                  </span>
+                  <span class="chevron" [class.open]="c._expanded">
+                  </span>
+                </div>
+
+                <!-- Expandable Section -->
+                <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
+                  <hr class="divider">
+
+                  <!-- Specialist row (from participant product hosts) -->
+                  <div class="expand-specialist-row" *ngIf="c?.hosts?.length">
+                    <span class="expand-spec-label">Specialist</span>
+                    <span class="expand-spec-name">
+                      {{ mapMetaData[(c.hosts[0]?.path || c.hosts[0]).split('/').pop()]?.name || '—' }}
+                    </span>
+                  </div>
+
+                  <!-- All appointments for this participant product -->
+                  <ng-container *ngIf="c?.allappointments?.length > 0; else noAppts">
+                    <div *ngFor="let appointment of c.allappointments"
+                      class="d-flex justify-content-between align-items-center mb-2">
+                      <div>
+                        <!-- Appointment type as the label -->
+                        <div class="detail-stage-label text-muted">
+                          {{ appointment?.appointmentTypeName || appointment?.formname || 'Appointment' }}
+                        </div>
+                        <div *ngIf="appointment?.starttime">
+                          <span class="detail-stage-label">Start: </span>
+                          <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
+                        </div>
+                        <div *ngIf="appointment?.endtime">
+                          <span class="detail-stage-label">End: </span>
+                          <span class="detail-stage-label">{{ formatDateTime(appointment?.endtime) }}</span>
+                        </div>
+                        <div *ngIf="appointment?.date">
+                          <span class="detail-stage-label">Submitted: </span>
+                          <span class="detail-stage-label">{{ formatDateTime(appointment?.date) }}</span>
+                        </div>
+                      </div>
+                      <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
+                        {{ getAppointmentStatus(appointment?.appointmentTypeName || appointment?.formname || '', appointment) }}
+                      </div>
+                    </div>
+                  </ng-container>
+
+                  <!-- No appointments at all -->
+                  <ng-template #noAppts>
+                    <div class="expand-no-appts">No appointments recorded</div>
+                  </ng-template>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #noData>
+              <div class="no-data-card">
+                No Data Yet
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Flow Table -->
+      <div class="flow-table-container" *ngIf="showTable">
+        <table class="flow-search-participant-table">
+          <thead>
+            <tr>
+              <th *ngFor="let header of searchedParticipantHeaders">
+                {{ header }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of filteredData">
+              <td>{{ row.name }}</td>
+              <td>{{ row.email }}</td>
+              <td>{{ row.initiated }}</td>
+              <td>{{ row.welcomeCall }}</td>
+              <td>{{ row.clarityCall }}</td>
+              <td>{{ row.diagnostics }}</td>
+              <td>{{ row.implementation }}</td>
+              <td>{{ row.midReviewDiagnostics }}</td>
+              <td>{{ row.implementationPhase2 }}</td>
+              <td>{{ row.finalReview }}</td>
+              <td>{{ row.completed }}</td>
+              <td>{{ row.needsValidation }}</td>
+            </tr>
+            <tr *ngIf="filteredData.length === 0">
+              <td colspan="12" style="text-align:center;">
+                No participant found
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== SPECIALIST APPOINTMENT SLOTS ========== -->
-  <div class="specialist-section-container">
+  <div class="specialist-section-container" [class.specialist-collapsed]="specialistCollapsed">
     <div class="specialist-section-header-row">
-      <h2 class="specialist-section-title">Specialist Appointment Slots</h2>
+      <div class="specialist-section-title-wrap">
+        <h2 class="specialist-section-title">Specialist Appointment Slots</h2>
+        <span class="specialist-section-summary" *ngIf="specialistCollapsed && !specialistLoading">
+          <span class="ss-pill"><strong>{{ slotOverview.totalSlots }}</strong> total</span>
+          <span class="ss-pill"><strong>{{ slotOverview.booked }}</strong> booked</span>
+          <span class="ss-pill"><strong>{{ slotOverview.available }}</strong> available</span>
+          <span class="ss-pill ss-pill-rate"><strong>{{ slotOverview.bookingRate }}%</strong> booking rate</span>
+        </span>
+      </div>
       <div class="specialist-header-controls">
-        <div class="date-input" (click)="specialistPicker.open()">
+        <div class="date-input" *ngIf="!specialistCollapsed" (click)="specialistPicker.open()">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <rect x="3" y="4" width="18" height="18" rx="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -475,17 +936,24 @@
             <mat-date-range-picker #specialistPicker></mat-date-range-picker>
           </mat-form-field>
         </div>
+        <button class="specialist-collapse-btn" (click)="onSpecialistExpandToggle()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline *ngIf="specialistCollapsed" points="6 9 12 15 18 9" />
+            <polyline *ngIf="!specialistCollapsed" points="18 15 12 9 6 15" />
+          </svg>
+          {{ specialistCollapsed ? 'Expand' : 'Collapse' }}
+        </button>
       </div>
     </div>
 
     <!-- Loading -->
-    <div class="specialist-loading" *ngIf="specialistLoading">
+    <div class="specialist-loading" *ngIf="specialistLoading && !specialistCollapsed">
       <div class="specialist-loading-spinner"></div>
       <span class="specialist-loading-text">Loading appointment slots...</span>
     </div>
 
     <!-- Content -->
-    <ng-container *ngIf="!specialistLoading">
+    <ng-container *ngIf="!specialistLoading && !specialistCollapsed">
       <div class="specialist-layout">
         <!-- Left: Summary Card -->
         <div class="specialist-summary">
@@ -590,266 +1058,330 @@
     </ng-container>
   </div>
 
-  <!-- ========== JOURNEY FLOW ========== -->
-  <div class="flow-section">
-    <div class="header">
-      <div class="title">Product Journey Flow Analysis</div>
-      <div class="header-right">
-        <!-- Toggle Button -->
-        <!-- <div class="toggle-group">
-          <button class="toggle-btn active">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-            Flow
-          </button>
-          <button class="toggle-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="3" y1="8" x2="21" y2="8" />
-              <line x1="8" y1="8" x2="8" y2="21" />
-              <line x1="14" y1="8" x2="14" y2="21" />
-            </svg>
-            Table
-          </button>
-        </div> -->
+    <!-- ========== COMPLETION HISTORY BY DFU PRODUCT ========== -->
+    <div class="completion-history-container">
+      <div class="ch-header">
+        <h2 class="ch-title">Completion History by DFU Product</h2>
+      </div>
 
-        <!-- Search Container -->
-        <div class="search-container">
-          <div class="search-field">
-            <mat-icon matSuffix>search</mat-icon>
-            <input matInput type="text" placeholder="Search participant..." (input)="searchParticipant($event)"
-              [(ngModel)]="searchText" />
+      <!-- Summary Bar (always visible) -->
+      <div class="ch-summary-bar">
+        <div class="ch-summary-item">
+          <div class="ch-sum-num">{{ getCompletionSummary().totalCompleted }}</div>
+          <div class="ch-sum-lbl">Total Completed</div>
+        </div>
+        <div class="ch-summary-sep"></div>
+        <div class="ch-summary-item">
+          <div class="ch-sum-num green">{{ getCompletionSummary().avgStartToDone }}d</div>
+          <div class="ch-sum-lbl">Avg. Days (Start→Done)</div>
+        </div>
+        <div class="ch-summary-sep"></div>
+        <div class="ch-summary-item">
+          <div class="ch-sum-num blue">{{ getCompletionSummary().avgInitToStart }}d</div>
+          <div class="ch-sum-lbl">Avg. Days (Init→Start)</div>
+        </div>
+        <div class="ch-summary-sep"></div>
+        <div class="ch-summary-item">
+          <div class="ch-sum-num purple">{{ getCompletionSummary().productsActive }}</div>
+          <div class="ch-sum-lbl">Products Active</div>
+        </div>
+      </div>
+
+      <!-- VISIBLE Product Cards (always shown) -->
+      <div class="ch-product-grid">
+        <div class="ch-product-card" *ngFor="let product of getCompletionProductsVisible()"
+          [style.--pc]="product.color">
+          <div class="ch-pc-head">
+            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color"
+              aria-hidden="true">{{ productMonogram(product.name) }}</span>
+            <div>
+              <div class="ch-pc-name">{{ product.name }}</div>
+              <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
+            </div>
+          </div>
+          <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
+          <div class="ch-pc-big-lbl">Completed</div>
+          <div class="ch-pc-stats">
+            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong>
+            </div>
+            <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
+                }}</strong>
+            </div>
+            <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
+            <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
+                product.avgInitToStart }}d</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
+                product.avgStartToDone }}d</strong></div>
           </div>
         </div>
+      </div>
 
-        <button class="clear-tab" [class.active]="!selectedProductLabel" (click)="clearStats()">
-          Clear Stats
+      <!-- Toggle for HIDDEN Product Cards -->
+      <div class="show-more-row" *ngIf="getCompletionProductsHidden().length > 0">
+        <button class="show-more-btn" (click)="showHiddenCompletionProducts = !showHiddenCompletionProducts">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline *ngIf="!showHiddenCompletionProducts" points="6 9 12 15 18 9" />
+            <polyline *ngIf="showHiddenCompletionProducts" points="18 15 12 9 6 15" />
+          </svg>
+          {{ showHiddenCompletionProducts ? 'Hide' : 'Show' }} {{ getCompletionProductsHidden().length }} Hidden
+          Products
         </button>
+      </div>
 
-        <!-- Product Selector -->
-        <div class="filter-tabs">
-          <button *ngFor="let p of products" class="tab" [class.active]="selectedProductLabel === p.label"
-            (click)="selectProduct(p.label)" [disabled]="!['EI Starter Pack', 'Critical Support'].includes(p?.label)">
-            {{ p.label }}
-          </button>
+      <!-- HIDDEN Product Cards (toggle) -->
+      <div class="ch-product-grid ch-hidden-cards" *ngIf="showHiddenCompletionProducts">
+        <div class="ch-product-card ch-hidden-card" *ngFor="let product of getCompletionProductsHidden()"
+          [style.--pc]="product.color">
+          <div class="ch-pc-head">
+            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color"
+              aria-hidden="true">{{ productMonogram(product.name) }}</span>
+            <div>
+              <div class="ch-pc-name">{{ product.name }}</div>
+              <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
+            </div>
+            <span class="hidden-tag" style="margin-left: auto;">Hidden</span>
+          </div>
+          <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
+          <div class="ch-pc-big-lbl">Completed</div>
+          <div class="ch-pc-stats">
+            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong>
+            </div>
+            <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
+                }}</strong>
+            </div>
+            <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
+            <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
+                product.avgInitToStart }}d</strong></div>
+            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
+                product.avgStartToDone }}d</strong></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Flow Stats Cards -->
-    <!-- Total Eligible -->
-    <div class="d-flex board">
-      <div id="loading" *ngIf="participantLoading">
-        <div class="spinner"></div>
-      </div>
-      <ng-container *ngIf="!participantLoading">
-        <div class="column" *ngFor="let col of selectedColumns; let i = index">
-          <div class="col-header" [style.--colColor]="'var(--c' + i + ')'">
-            <div class="header-col">
-              <div class="d-flex filter-asc" (click)="sortColumn(i)">
-                <div class="col-header-left">
-                  <span class="col-title">{{ col }}</span>
-                </div>
-                <div class="filter-asc ps-2">
-                  <i class="fas text-black-50 filter-asc" [ngClass]="{'fa-sort': !sortDirection[i], 'fa-sort-up': sortDirection[i] === 'asc', 'fa-sort-down': sortDirection[i] === 'desc'}">
-                  </i>
-                </div>
-              </div>
-              <span class="col-badge">
-                {{ filteredCardsMap[i]?.length || 0 }}
-              </span>
+  
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab label="Analytics">
+      <ng-template matTabContent>
+        <!-- ========== ANALYTICS TAB ========== -->
+        <div class="analytics-tab">
+
+          <!-- Analytics top bar -->
+          <div class="analytics-topbar">
+            <div class="analytics-topbar-info">
+              <span class="analytics-topbar-title">Analytics Overview</span>
+              <span class="analytics-topbar-hint">Reflects the same products and time filter as the Overview tab</span>
             </div>
-            <div>
-              <div class="col-mini-stats">
-                <ng-container *ngIf="stageData[col.toLowerCase()] as stage">
-                  <div (click)="openStageModal(col, 'Scheduled', stage.all)" class="mini-stat mini-stat-clickable"
-                    title="View scheduled participants">
-                    <div class="mini-stat-val" style="color:var(--blue)">
-                      {{ stage.all.length || 0 }}
-                    </div>
-                    <div class="mini-stat-lbl">Scheduled</div>
-                  </div>
-                  <!-- Awaiting -->
-                  <!-- <div (click)="openStageModal(col, 'Awaiting', stage.awaiting)" class="mini-stat mini-stat-clickable"
-                    title="View awaiting participants">
-                    <div class="mini-stat-val" style="color:var(--coral)">
-                      {{ stage.awaiting?.length || 0 }}
-                    </div>
-                    <div class="mini-stat-lbl">Awaiting</div>
-                  </div> -->
-                </ng-container>
-              </div>
-            </div>
+            <button class="analytics-refresh-btn"
+                    [disabled]="analyticsLoading"
+                    (click)="analyticsLoaded = false; loadAnalytics()">
+              <mat-icon class="analytics-refresh-icon" [class.spinning]="analyticsLoading">refresh</mat-icon>
+              {{ analyticsLoading ? 'Loading...' : 'Refresh' }}
+            </button>
           </div>
 
-          <div class="col-body">
-            <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
-              <div class="card" *ngFor="let c of filteredCardsMap[i]; trackBy: trackByCard"
-                [class.card-expanded]="c._expanded">
-
-                <!-- Visible Card -->
-                <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
-                  <div class="card-info">
-                    <div class="card-name">
-                      {{ c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name }}
-                    </div>
-                  </div>
-                </div>
-                <!-- Status -->
-                <div class="d-flex">
-                  <span class="card-status s-{{c.status || 'default'}} mb-0 pb-0" (click)="toggleExpand(c, i)">
-                    {{ c?.profileid ? (c.status || 'NOT INITIATED') : 'Pending' }}
-                  </span>
-                  <span class="card-status" *ngIf="(c?.status === null || c?.status === 'initiated')">
-                    {{
-                    addonsPackageLookup[c?.packageref?.id || c?.packageref]
-                    || bonusPackageLookup[c?.packageref?.id || c?.packageref]
-                    || 'Purchased'
-                    }}
-                  </span>
-                </div>
-
-                <!-- Active Appointment Detail -->
-                <div class="detail-row" (click)="toggleExpand(c, i)">
-                  <span class="d-flex flex-column">
-                    <span>
-                      <span class="detail-label">
-                        {{ showActiveStage(c) }}
-                      </span>
-                      <span class="detail-val">
-                        {{ showParticipantActiveDate(c) }}
-                      </span>
-                    </span>
-                    <span>
-                      <ng-container *ngIf="c?.status === 'ongoing' && c.hosts?.length">
-                        <span class="detail-label">Specialist: </span>
-                        <span class="detail-val">
-                          {{
-                          mapMetaData[
-                          (c.hosts[0]?.path || c.hosts[0]).split('/').pop()
-                          ]?.name
-                          }}
-                        </span>
-                      </ng-container>
-                    </span>
-                    <span>
-                      <ng-container *ngIf="showDelayDate(c) as delay">
-                        <span *ngIf="delay" class="detail-label">Delayed By: </span>
-                        <span *ngIf="delay" class="detail-val">{{ delay }}</span>
-                      </ng-container>
-                    </span>
-                  </span>
-                  <span class="chevron" [class.open]="c._expanded">
-                  </span>
-                </div>
-
-                <!-- Expandable Section -->
-                <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
-                  <hr class="divider">
-                  <ng-container>
-                    <div *ngFor="let stage of stages">
-                      <!-- When appointments exist -->
-                      <ng-container *ngIf="getAppointmentsByStage(stage, c?.allappointments) as appointments">
-                        <ng-container *ngIf="appointments.length > 0; else noAppointments">
-                          <div *ngFor="let appointment of appointments"
-                            class="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                              <div class="detail-stage-label text-muted">
-                                {{ stage }}
-                              </div>
-                              <div *ngIf="appointment?.starttime">
-                                <span class="detail-stage-label">Start: </span>
-                                <span class="detail-stage-label">
-                                  {{ formatDateTime(appointment?.starttime) }}
-                                </span>
-                              </div>
-                              <div *ngIf="appointment?.endtime">
-                                <span class="detail-stage-label">End: </span>
-                                <span class="detail-stage-label">
-                                  {{ formatDateTime(appointment?.endtime) }}
-                                </span>
-                              </div>
-                              <div *ngIf="appointment?.date">
-                                <span class="detail-stage-label">Submitted: </span>
-                                <span class="detail-stage-label">
-                                  {{ formatDateTime(appointment?.date) }}
-                                </span>
-                              </div>
-                            </div>
-                            <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
-                              {{ getAppointmentStatus(stage, appointment) }}
-                            </div>
-                          </div>
-                        </ng-container>
-                        <!-- When NO appointments -->
-                        <ng-template #noAppointments>
-                          <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                              <div class="detail-stage-label text-muted">
-                                {{ stage }}
-                              </div>
-                            </div>
-                            <div class="status-badge status-notscheduled">
-                              Not Scheduled
-                            </div>
-                          </div>
-                        </ng-template>
-                      </ng-container>
+          <!-- 1. Stage Distribution — reads live from funnelData (same source as Overview rows) -->
+          <section class="analytics-section" *ngIf="visibleCardIds.length > 0">
+            <header class="analytics-section-head">
+              <div>
+                <h2 class="analytics-section-title">Stage Distribution</h2>
+                <p class="analytics-section-sub">Where participants are right now — same data as the Overview funnel columns</p>
+              </div>
+              <div class="sd-legend">
+                <span class="sd-legend-item"><span class="sd-legend-dot" style="background:#a78bfa"></span>Initiated</span>
+                <span class="sd-legend-item"><span class="sd-legend-dot" style="background:#fb923c"></span>Awaiting</span>
+                <span class="sd-legend-item"><span class="sd-legend-dot" style="background:#60a5fa"></span>Started</span>
+                <span class="sd-legend-item"><span class="sd-legend-dot" style="background:#818cf8"></span>Ongoing</span>
+                <span class="sd-legend-item"><span class="sd-legend-dot" style="background:#34d399"></span>Completed</span>
+              </div>
+            </header>
+            <div class="sd-list" *ngIf="funnelChart.products.length > 0; else funnelEmpty">
+              <div class="sd-row" *ngFor="let p of funnelChart.products">
+                <span class="sd-name" [title]="p.product">{{ p.product }}</span>
+                <div class="sd-bar">
+                  <ng-container *ngFor="let s of p.stages">
+                    <div class="sd-seg"
+                         *ngIf="s.count > 0"
+                         [style.flex]="s.count"
+                         [style.background]="s.color"
+                         [matTooltip]="s.label + ': ' + s.count + ' participants (' + s.pct + '%)'">
+                      <span class="sd-seg-num" *ngIf="s.pct >= 8">{{ s.count }}</span>
                     </div>
                   </ng-container>
                 </div>
+                <span class="sd-total">{{ p.total | number }}</span>
               </div>
-            </ng-container>
-            <ng-template #noData>
-              <div class="no-data-card">
-                No Data Yet
-              </div>
+            </div>
+            <ng-template #funnelEmpty>
+              <div class="analytics-empty">No stage data for the selected products.</div>
             </ng-template>
+          </section>
+
+          <!-- Loading skeleton (for Velocity + Specialist) -->
+          <div class="analytics-loading" *ngIf="analyticsLoading">
+            <div class="skeleton analytics-skeleton-block"></div>
+            <div class="skeleton analytics-skeleton-block"></div>
           </div>
+
+          <!-- Error state -->
+          <div class="analytics-error" *ngIf="analyticsError && !analyticsLoading">
+            <div class="analytics-error-title">Couldn't load analytics</div>
+            <div class="analytics-error-hint">{{ analyticsError }}</div>
+            <button class="analytics-retry" (click)="analyticsLoaded = false; loadAnalytics()">Retry</button>
+          </div>
+
+          <!-- 2. Completion Velocity + 3. Specialist — need the async load -->
+          <ng-container *ngIf="!analyticsLoading && !analyticsError && analyticsLoaded">
+
+            <!-- 2. Completion Velocity -->
+            <section class="analytics-section">
+              <header class="analytics-section-head">
+                <div>
+                  <h2 class="analytics-section-title">Completion velocity</h2>
+                  <p class="analytics-section-sub">Weekly completions per product · last 12 weeks · visible products only</p>
+                </div>
+              </header>
+              <ng-container *ngIf="velocityChart.weeks.length > 0; else velocityEmpty">
+                <div class="analytics-chart-wrap">
+                  <svg class="velocity-svg"
+                       [attr.viewBox]="'0 0 ' + velocityChart.width + ' ' + velocityChart.height"
+                       preserveAspectRatio="xMidYMid meet">
+                    <g class="vc-axis">
+                      <line [attr.x1]="velocityChart.pad.l"
+                            [attr.y1]="velocityChart.height - velocityChart.pad.b"
+                            [attr.x2]="velocityChart.width - velocityChart.pad.r"
+                            [attr.y2]="velocityChart.height - velocityChart.pad.b" />
+                      <line [attr.x1]="velocityChart.pad.l"
+                            [attr.y1]="velocityChart.pad.t"
+                            [attr.x2]="velocityChart.pad.l"
+                            [attr.y2]="velocityChart.height - velocityChart.pad.b" />
+                    </g>
+                    <g class="vc-ylabel">
+                      <text [attr.x]="velocityChart.pad.l - 8" [attr.y]="velocityChart.pad.t + 4" text-anchor="end">{{ velocityChart.yMax }}</text>
+                      <text [attr.x]="velocityChart.pad.l - 8" [attr.y]="velocityChart.height - velocityChart.pad.b + 4" text-anchor="end">0</text>
+                    </g>
+                    <g class="vc-xlabel">
+                      <text *ngFor="let w of velocityChart.weeks; let i = index"
+                            [attr.x]="velocityChart.pad.l + i * ((velocityChart.width - velocityChart.pad.l - velocityChart.pad.r) / (velocityChart.weeks.length - 1 || 1))"
+                            [attr.y]="velocityChart.height - velocityChart.pad.b + 16"
+                            text-anchor="middle">{{ velocityWeekLabel(w) }}</text>
+                    </g>
+                    <g class="vc-lines">
+                      <ng-container *ngFor="let line of velocityChart.lines">
+                        <path [attr.d]="line.pathD" [attr.stroke]="line.color" class="vc-line-path" fill="none" />
+                        <circle *ngFor="let p of line.points"
+                                [attr.cx]="p.x" [attr.cy]="p.y" r="4"
+                                [attr.fill]="line.color" class="vc-line-dot">
+                          <title>{{ line.product }}: {{ p.count }} completions</title>
+                        </circle>
+                      </ng-container>
+                    </g>
+                    <!-- Number labels — rendered last so they sit on top of lines/dots -->
+                    <g class="vc-labels">
+                      <ng-container *ngFor="let line of velocityChart.lines">
+                        <ng-container *ngFor="let p of line.points">
+                          <text *ngIf="p.count > 0"
+                                [attr.x]="p.x"
+                                [attr.y]="p.y - 9"
+                                text-anchor="middle"
+                                [attr.fill]="line.color"
+                                class="vc-dot-label">{{ p.count }}</text>
+                        </ng-container>
+                      </ng-container>
+                    </g>
+                  </svg>
+                  <div class="vc-legend">
+                    <span class="vc-legend-item" *ngFor="let line of velocityChart.lines">
+                      <span class="vc-legend-swatch" [style.background]="line.color"></span>
+                      {{ line.product }}
+                    </span>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-template #velocityEmpty>
+                <div class="analytics-empty">No completions in the last 12 weeks for the visible products.</div>
+              </ng-template>
+            </section>
+
+            <!-- 3. Specialist Slot Utilization -->
+            <section class="analytics-section">
+              <header class="analytics-section-head">
+                <div>
+                  <h2 class="analytics-section-title">Specialist Slot Utilization</h2>
+                  <p class="analytics-section-sub">Booked vs. available appointment slots per specialist for the current period</p>
+                </div>
+              </header>
+              <!-- Loading state while specialistData is being fetched -->
+              <div class="spec-util-loading" *ngIf="specialistLoading">
+                <div class="specialist-loading-spinner"></div>
+                <span class="specialist-loading-text">
+                  Loading specialist slots…
+                  <span *ngIf="specialistLoadProgress" class="spec-load-progress">{{ specialistLoadProgress }}</span>
+                </span>
+              </div>
+
+              <ng-container *ngIf="!specialistLoading">
+                <ng-container *ngIf="specialistData.length > 0; else utilEmpty">
+                  <div class="spec-util-table">
+                    <div class="spec-util-head">
+                      <span class="spec-util-col spec-util-col--name">Specialist</span>
+                      <span class="spec-util-col spec-util-col--product">Product</span>
+                      <span class="spec-util-col spec-util-col--num">Booked</span>
+                      <span class="spec-util-col spec-util-col--num">Available</span>
+                      <span class="spec-util-col spec-util-col--bar">Slot Utilization</span>
+                      <span class="spec-util-col spec-util-col--pct">Rate</span>
+                    </div>
+                    <div class="spec-util-row" *ngFor="let s of specialistData">
+                      <span class="spec-util-col spec-util-col--name">
+                        <span class="spec-util-name">{{ s.name }}</span>
+                        <span class="spec-util-role">{{ s.role }}</span>
+                      </span>
+                      <span class="spec-util-col spec-util-col--product">
+                        <span class="sp-product-tag" [ngClass]="s.productClass">{{ s.product }}</span>
+                      </span>
+                      <span class="spec-util-col spec-util-col--num spec-util-booked">{{ s.booked }}</span>
+                      <span class="spec-util-col spec-util-col--num spec-util-avail">{{ s.availableSlots }}</span>
+                      <span class="spec-util-col spec-util-col--bar">
+                        <div class="spec-util-bar-track">
+                          <div class="spec-util-bar-fill"
+                               [style.width.%]="s.utilizationPct"
+                               [class.spec-util-bar--high]="s.utilizationPct >= 85"
+                               [class.spec-util-bar--med]="s.utilizationPct >= 60 && s.utilizationPct < 85"
+                               [class.spec-util-bar--low]="s.utilizationPct < 60">
+                          </div>
+                        </div>
+                      </span>
+                      <span class="spec-util-col spec-util-col--pct"
+                            [class.spec-util-pct--high]="s.utilizationPct >= 85"
+                            [class.spec-util-pct--med]="s.utilizationPct >= 60 && s.utilizationPct < 85"
+                            [class.spec-util-pct--low]="s.utilizationPct < 60">
+                        {{ s.utilizationPct }}%
+                        <span class="spec-util-note" *ngIf="s.utilizationNote" [style.color]="s.utilizationNoteColor">· {{ s.utilizationNote }}</span>
+                      </span>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #utilEmpty>
+                  <div class="analytics-empty-card">
+                    <div class="analytics-empty-icon">🔧</div>
+                    <div class="analytics-empty-title">Specialist slot data coming soon</div>
+                    <div class="analytics-empty-hint">This section is being optimised and will be available shortly.</div>
+                  </div>
+                </ng-template>
+              </ng-container>
+            </section>
+
+          </ng-container>
         </div>
-      </ng-container>
+      </ng-template>
+    </mat-tab>
 
-      <!-- Flow Table -->
-      <div class="flow-table-container" *ngIf="showTable">
-        <table class="flow-search-participant-table">
-          <thead>
-            <tr>
-              <th *ngFor="let header of searchedParticipantHeaders">
-                {{ header }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of filteredData">
-              <td>{{ row.name }}</td>
-              <td>{{ row.email }}</td>
-              <td>{{ row.initiated }}</td>
-              <td>{{ row.welcomeCall }}</td>
-              <td>{{ row.clarityCall }}</td>
-              <td>{{ row.diagnostics }}</td>
-              <td>{{ row.implementation }}</td>
-              <td>{{ row.midReviewDiagnostics }}</td>
-              <td>{{ row.implementationPhase2 }}</td>
-              <td>{{ row.finalReview }}</td>
-              <td>{{ row.completed }}</td>
-              <td>{{ row.needsValidation }}</td>
-            </tr>
-            <tr *ngIf="filteredData.length === 0">
-              <td colspan="12" style="text-align:center;">
-                No participant found
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
+    <mat-tab label="Participants">
+      <ng-template matTabContent>
     <!-- ========== PARTICIPANT MANAGEMENT (NEW DESIGN) ========== -->
     <div class="pm-section">
       <div class="pm-header">
@@ -881,8 +1413,13 @@
               </mat-select>
             </mat-form-field>
           </form>
-          <button class="pm-btn-primary" (click)="exportTableData()">Export List</button>
-          <button class="pm-btn-primary">Bulk Initiate Ready</button>
+          <button class="pm-btn-primary" (click)="exportTableData()">
+            Export &middot; <span class="pm-btn-filter">{{ participantsActiveTabName }}</span>
+          </button>
+          <button class="pm-btn-primary pm-btn-bulk" (click)="bulkInitiateReady()"
+            [disabled]="kpiReadyToInitiate === 0">
+            Bulk Initiate Ready <span class="pm-btn-count" *ngIf="kpiReadyToInitiate > 0">({{ kpiReadyToInitiate }})</span>
+          </button>
         </div>
       </div>
 
@@ -1038,109 +1575,9 @@
         </select><span>entries</span></div>
     </div>
 
-    <!-- ========== COMPLETION HISTORY BY DFU PRODUCT ========== -->
-    <div class="completion-history-container">
-      <div class="ch-header">
-        <h2 class="ch-title">Completion History by DFU Product</h2>
-      </div>
 
-      <!-- Summary Bar (always visible) -->
-      <div class="ch-summary-bar">
-        <div class="ch-summary-item">
-          <div class="ch-sum-num">{{ getCompletionSummary().totalCompleted }}</div>
-          <div class="ch-sum-lbl">Total Completed</div>
-        </div>
-        <div class="ch-summary-sep"></div>
-        <div class="ch-summary-item">
-          <div class="ch-sum-num green">{{ getCompletionSummary().avgStartToDone }}d</div>
-          <div class="ch-sum-lbl">Avg. Days (Start→Done)</div>
-        </div>
-        <div class="ch-summary-sep"></div>
-        <div class="ch-summary-item">
-          <div class="ch-sum-num blue">{{ getCompletionSummary().avgInitToStart }}d</div>
-          <div class="ch-sum-lbl">Avg. Days (Init→Start)</div>
-        </div>
-        <div class="ch-summary-sep"></div>
-        <div class="ch-summary-item">
-          <div class="ch-sum-num purple">{{ getCompletionSummary().productsActive }}</div>
-          <div class="ch-sum-lbl">Products Active</div>
-        </div>
-      </div>
-
-      <!-- VISIBLE Product Cards (always shown) -->
-      <div class="ch-product-grid">
-        <div class="ch-product-card" *ngFor="let product of getCompletionProductsVisible()"
-          [style.--pc]="product.color">
-          <div class="ch-pc-head">
-            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{
-              product.icon
-              }}</span>
-            <div>
-              <div class="ch-pc-name">{{ product.name }}</div>
-              <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
-            </div>
-          </div>
-          <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
-          <div class="ch-pc-big-lbl">Completed</div>
-          <div class="ch-pc-stats">
-            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong>
-            </div>
-            <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
-                }}</strong>
-            </div>
-            <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
-            <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
-            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
-                product.avgInitToStart }}d</strong></div>
-            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
-                product.avgStartToDone }}d</strong></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Toggle for HIDDEN Product Cards -->
-      <div class="show-more-row" *ngIf="getCompletionProductsHidden().length > 0">
-        <button class="show-more-btn" (click)="showHiddenCompletionProducts = !showHiddenCompletionProducts">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline *ngIf="!showHiddenCompletionProducts" points="6 9 12 15 18 9" />
-            <polyline *ngIf="showHiddenCompletionProducts" points="18 15 12 9 6 15" />
-          </svg>
-          {{ showHiddenCompletionProducts ? 'Hide' : 'Show' }} {{ getCompletionProductsHidden().length }} Hidden
-          Products
-        </button>
-      </div>
-
-      <!-- HIDDEN Product Cards (toggle) -->
-      <div class="ch-product-grid ch-hidden-cards" *ngIf="showHiddenCompletionProducts">
-        <div class="ch-product-card ch-hidden-card" *ngFor="let product of getCompletionProductsHidden()"
-          [style.--pc]="product.color">
-          <div class="ch-pc-head">
-            <span class="ch-pc-icon" [style.background]="product.iconBg" [style.color]="product.color">{{
-              product.icon
-              }}</span>
-            <div>
-              <div class="ch-pc-name">{{ product.name }}</div>
-              <div class="ch-pc-sub" *ngIf="product.subName">{{ product.subName }}</div>
-            </div>
-            <span class="hidden-tag" style="margin-left: auto;">Hidden</span>
-          </div>
-          <div class="ch-pc-big" [style.color]="product.color">{{ product.completed }}</div>
-          <div class="ch-pc-big-lbl">Completed</div>
-          <div class="ch-pc-stats">
-            <div class="ch-pc-stat"><span>Bonus completions</span><strong>{{ product.bonusCompletions }}</strong>
-            </div>
-            <div class="ch-pc-stat"><span>Purchased completions</span><strong>{{ product.purchasedCompletions
-                }}</strong>
-            </div>
-            <div class="ch-pc-stat"><span>Active sub users</span><strong>{{ product.activeSubUsers }}</strong></div>
-            <div class="ch-pc-stat"><span>Non-active sub users</span><strong>{{ product.noSubUsers }}</strong></div>
-            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Init→Start</span><strong [style.color]="product.color">{{
-                product.avgInitToStart }}d</strong></div>
-            <div class="ch-pc-stat ch-pc-stat-time"><span>⏱ Start→Done</span><strong class="green-text">{{
-                product.avgStartToDone }}d</strong></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
+      </ng-template>
+    </mat-tab>
+  </mat-tab-group>
+</div><!-- /.dd-app -->
+</div>

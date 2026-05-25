@@ -261,7 +261,9 @@ export class MarkAppointmentStatusComponent implements OnInit {
         updateDoc(Ref, {
           onboardingscheduled: null,
           onreschedule: true,
-        })
+        }).catch((e)=>{
+          console.error('Error updating document:', e);
+        });
       }
     }
 

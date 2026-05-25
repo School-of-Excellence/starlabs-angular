@@ -1,0 +1,175 @@
+<h2 mat-dialog-title class="dialog-title">
+  <span>{{ data?.type === 'edit' ? 'Edit Pipeline' : 'Add Pipeline' }}</span>
+  <button mat-icon-button (click)="dialogRef.close()">
+    <mat-icon>close</mat-icon>
+  </button>
+</h2>
+
+<mat-dialog-content class="dialog-content">
+  <form [formGroup]="pipelineform" class="pipeline-form">
+
+    <!-- Row 1: Name + Description -->
+    <div class="form-row">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Pipeline Name</mat-label>
+        <input matInput placeholder="Enter Pipeline Name" formControlName="pipelinename">
+        <mat-error *ngIf="pipelineform.get('pipelinename')?.hasError('required')">
+          Pipeline Name is required
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Pipeline Description</mat-label>
+        <textarea matInput placeholder="Enter Pipeline Description" formControlName="description" rows="3"></textarea>
+      </mat-form-field>
+    </div>
+
+    <!-- Row 2: Columns + Presale Owner + Stages + Visible To -->
+    <div class="form-row">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Table Columns</mat-label>
+        <mat-select formControlName="columns" multiple>
+          <mat-option *ngFor="let col of leadslist" [value]="col">{{ col }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Assignable Pre-Sale Owner</mat-label>
+        <mat-select formControlName="presaleowner" multiple>
+          <mat-option *ngFor="let owner of ownerlist" [value]="owner.owner_id">{{ owner.owner }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Stages Section -->
+      <div class="stages-section">
+        <div class="stages-header">
+          <label class="stages-label">Pipeline Stages</label>
+        </div>
+
+        <div class="available-stages">
+          <label class="sub-label">Available Stages (Click to select):</label>
+          <mat-chip-listbox
+            [(ngModel)]="selectedStageIds"
+            [ngModelOptions]="{standalone: true}"
+            (ngModelChange)="onStageSelectionChange($event)"
+            multiple>
+            <mat-chip-option
+              *ngFor="let stage of dealStagesList"
+              [value]="stage.id"
+              [selected]="selectedStageIds.includes(stage.id!)">
+              {{ stage.stageName }}
+            </mat-chip-option>
+          </mat-chip-listbox>
+        </div>
+
+        <div class="selected-stages" *ngIf="selectedStageIds.length > 0">
+          <label class="sub-label">Selected Stages (Drag to reorder):</label>
+          <div class="selected-chips-container" cdkDropList (cdkDropListDropped)="dropStage($event)">
+            <mat-chip
+              *ngFor="let stageId of selectedStageIds"
+              cdkDrag
+              class="selected-chip">
+              <mat-icon class="drag-handle" cdkDragHandle>drag_indicator</mat-icon>
+              {{ getStageNameById(stageId) }}
+              <mat-icon matChipRemove (click)="removeStageFromSelection(stageId)">cancel</mat-icon>
+            </mat-chip>
+          </div>
+        </div>
+
+        <div class="error-text" *ngIf="!pipelineform.controls['stages'].valid && selectedStageIds.length === 0">
+          Pipeline Stages are Required
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width" *ngIf="isDeveloper">
+        <mat-label>Pipeline Visible To</mat-label>
+        <mat-select formControlName="pipeline_visibleto" multiple>
+          <mat-option *ngFor="let owner of ownerlist" [value]="owner.owner_id">{{ owner.owner }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Row 3: Category + Settings -->
+    <div class="form-row">
+
+      <!-- Category Section -->
+      <div class="category-section">
+        <div *ngIf="hidecategory" class="category-select">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Pipeline Category</mat-label>
+            <mat-select formControlName="category">
+              <mat-option *ngFor="let cat of categoriesList" [value]="cat">{{ cat }}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="pipelineform.get('category')?.hasError('required')">
+              Category is required
+            </mat-error>
+          </mat-form-field>
+          <button mat-icon-button type="button" color="primary" (click)="hidecategory = !hidecategory">
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+
+        <div *ngIf="!hidecategory" class="category-create">
+          <label class="field-label">Create Categories</label>
+          <div class="chip-input-wrapper">
+            <div class="chips-container">
+              <span class="chip" *ngFor="let item of categoriesList; let i = index">
+                {{ item }}
+                <mat-icon class="chip-close" (click)="removeCategory(i)">close</mat-icon>
+              </span>
+              <input
+                class="stage-input"
+                placeholder="Add category and hit Enter..."
+                (keydown)="addCategoryFromInput($event)">
+            </div>
+          </div>
+          <div class="category-buttons">
+            <button mat-button type="button" (click)="hidecategory = !hidecategory">Back</button>
+            <button mat-button color="primary" type="button" (click)="saveCategory()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Section -->
+      <div class="settings-section">
+        <div class="setting-row" *ngIf="isDeveloper">
+          <span class="setting-label">Hidden Pipeline</span>
+          <mat-checkbox formControlName="hidden">
+            <span class="setting-status">{{ pipelineform.controls['hidden'].value ? 'Yes' : 'No' }}</span>
+          </mat-checkbox>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">Dynamic Leads</span>
+          <mat-checkbox formControlName="pipelinedynamic">
+            <span class="setting-status">{{ pipelineform.controls['pipelinedynamic'].value ? 'Enabled' : 'Disabled' }}</span>
+          </mat-checkbox>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">Assign Leads (Round Robin)</span>
+          <mat-checkbox formControlName="assignleads">
+            <span class="setting-status">{{ pipelineform.controls['assignleads'].value ? 'Enabled' : 'Disabled' }}</span>
+          </mat-checkbox>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">Publish Pipeline</span>
+          <mat-slide-toggle formControlName="delete">
+            {{ pipelineform.controls['delete'].value ? 'YES' : 'NO' }}
+          </mat-slide-toggle>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions class="dialog-actions">
+  <button mat-stroked-button color="warn" (click)="dialogRef.close()">Close</button>
+  <button mat-stroked-button color="primary"
+    [disabled]="!pipelineform.valid"
+    (click)="save(pipelineform.value)">
+    Save Pipeline
+  </button>
+</mat-dialog-actions>
