@@ -401,9 +401,6 @@
               <div class="event-card-content">
                 <div class="event-name">
                   {{ event.eventName }}
-                  <span class="event-month" *ngIf="event.date">
-                    · {{ event.date | date: 'MMM yyyy' }}
-                  </span>
                 </div>
                 <div class="event-date" *ngIf="event.date">
                   {{ event.date | date: 'MMM d, y' }}
@@ -480,15 +477,31 @@
                 </button>
               </div>
             </div>
-            <div class="video-remarks" *ngIf="event['remarks']">
-              <mat-icon class="remarks-icon">notes</mat-icon>
-              <span class="remarks-text">{{ event['extraVideos']?.length > 0 ? 'Video 1: ' : '' }}{{ event['remarks'] }}</span>
-            </div>
-            <ng-container *ngFor="let extra of event['extraVideos']; let vi = index">
-              <div class="video-remarks" *ngIf="extra.remarks">
-                <mat-icon class="remarks-icon">notes</mat-icon>
-                <span class="remarks-text">Video {{ vi + 2 }}: {{ extra.remarks }}</span>
+            <ng-container *ngIf="getRecentRemark(event['remarks']) as remark">
+              <div class="video-remarks">
+                <div class="remarks-content">
+                  <span class="remarks-text">{{ event['extraVideos']?.length > 0 ? 'Video 1: ' : '' }}{{ remark.text }}</span>
+                  <div class="remarks-meta">
+                    <span class="remarks-author">{{ getProfileName(remark.profileid) }}</span>
+                    <span class="remarks-dot">·</span>
+                    <span class="remarks-date">{{ remark.updatedon?.toDate ? (remark.updatedon.toDate() | date: 'MMM d, y') : (remark.updatedon | date: 'MMM d, y') }}</span>
+                  </div>
+                </div>
               </div>
+            </ng-container>
+            <ng-container *ngFor="let extra of event['extraVideos']; let vi = index">
+              <ng-container *ngIf="getRecentRemark(extra['remarks']) as remark">
+                <div class="video-remarks">
+                  <div class="remarks-content">
+                    <span class="remarks-text">Video {{ vi + 2 }}: {{ remark.text }}</span>
+                    <div class="remarks-meta">
+                      <span class="remarks-author">{{ getProfileName(remark.profileid) }}</span>
+                      <span class="remarks-dot">·</span>
+                      <span class="remarks-date">{{ remark.updatedon?.toDate ? (remark.updatedon.toDate() | date: 'MMM d, y') : (remark.updatedon | date: 'MMM d, y') }}</span>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
             </ng-container>
           </div>
         </div>
@@ -688,13 +701,45 @@
               </mat-form-field>
             </div>
 
-            <!-- <div class="form-group">
+            <div class="form-group">
               <label class="form-label">Remarks</label>
-              <mat-form-field appearance="outline" class="full-width">
-              <textarea matInput formControlName="remarks"placeholder="Add any remarks if there for this video..." rows="3"cdkTextareaAutosizecdkAutosizeMinRows="2" cdkAutosizeMaxRows="5">
-              </textarea>  
-              </mat-form-field>
-            </div> -->
+              <div class="remarks-list" *ngIf="$any(editVideoForm.get('entries')).at(i).get('remarks').controls.length > 0">
+                <div class="remark-item"
+                     *ngFor="let r of $any(editVideoForm.get('entries')).at(i).get('remarks').controls; let ri = index"
+                     [formGroup]="$any(r)">
+                  <div class="remark-item-body">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <textarea matInput
+                                formControlName="text"
+                                rows="2"
+                                cdkTextareaAutosize
+                                cdkAutosizeMinRows="2"
+                                cdkAutosizeMaxRows="4">
+                      </textarea>
+                    </mat-form-field>
+                    <div class="remark-item-meta" *ngIf="r.get('profileid')?.value">
+                      {{ getProfileName(r.get('profileid')?.value) }} · {{ r.get('updatedon')?.value?.toDate ? (r.get('updatedon')?.value.toDate() | date: 'MMM d, y') : '' }}
+                    </div>
+                  </div>
+                  <button class="remark-delete-btn" (click)="manageRemark($any(editVideoForm.get('entries')), i, 'remove', ri)" title="Delete">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <div class="remark-add-row">
+                <textarea class="remark-textarea"
+                          [(ngModel)]="RemarkTexts[i]"
+                          [ngModelOptions]="{standalone: true}"
+                          placeholder="Add a new remark..."
+                          rows="2">
+                </textarea>
+                <button class="remark-add-btn"
+                        (click)="manageRemark($any(editVideoForm.get('entries')), i, 'add')"
+                        [disabled]="!RemarkTexts[i]?.trim()">
+                  + Add
+                </button>
+              </div>
+            </div>
 
             <!-- Divider between entries -->
             <hr *ngIf="i < $any(editVideoForm.get('entries')).length - 1"
@@ -826,13 +871,33 @@
                 </mat-error>
               </mat-form-field>
             </div>
-            <!-- <div class="form-group" *ngIf="entry.get('type')?.value">
+            <div class="form-group" *ngIf="entry.get('type')?.value">
               <label class="form-label">Remarks</label>
-              <mat-form-field appearance="outline" class="full-width">
-                <textarea matInput formControlName="remarks" placeholder="Add any remarks if there for this video..."rows="3" cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="5"></textarea>
-                <mat-hint align="end">Optional</mat-hint>
-              </mat-form-field>
-            </div> -->
+              <div class="remarks-list" *ngIf="$any(entriesArray.at(i).get('remarks')).controls.length > 0">
+                <div class="remark-item"
+                     *ngFor="let r of $any(entriesArray.at(i).get('remarks')).controls; let ri = index">
+                  <div class="remark-item-body">
+                    <div class="remark-text-preview">{{ r.get('text')?.value }}</div>
+                  </div>
+                  <button class="remark-delete-btn" (click)="manageRemark(entriesArray, i, 'remove', ri)" title="Delete">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <div class="remark-add-row">
+                <textarea class="remark-textarea"
+                          [(ngModel)]="RemarkTexts[i]"
+                          [ngModelOptions]="{standalone: true}"
+                          placeholder="Add a remark..."
+                          rows="2">
+                </textarea>
+                <button class="remark-add-btn"
+                        (click)="manageRemark(entriesArray, i, 'add')"
+                        [disabled]="!RemarkTexts[i]?.trim()">
+                  + Add
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

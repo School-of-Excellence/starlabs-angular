@@ -1,0 +1,24 @@
+<div *ngIf="loading || saving" class="loading">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  <label *ngIf="loading">Loading delivery activities...</label>
+  <label *ngIf="saving">Saving new delivery activities...</label>
+</div>
+
+<div class="mainscreen" *ngIf="!loading">
+  <div class="heading">Add New Delivery Activities</div>
+  <div class="subheading">Product: <b>{{productName}}</b></div>
+
+  <mat-form-field class="fullfield" appearance="outline">
+    <mat-label>Select Activities</mat-label>
+    <mat-select [(ngModel)]="selectedActivities" multiple>
+      <mat-option *ngFor="let item of deliveryList" [value]="item">
+        {{mapdeliveries[item.path]}} ({{item.type}})
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <div class="actionbox">
+    <button class="closebtn" mat-stroked-button (click)="close()" [disabled]="saving">Cancel</button>
+    <button class="submitbtn" mat-stroked-button (click)="submit()" [disabled]="saving">Add Activities</button>
+  </div>
+</div>

@@ -1,0 +1,92 @@
+<!-- Studio Invitation Full-Screen Overlay -->
+<div class="inv-overlay" *ngIf="studioInvitation && !invitationAccepted">
+  <div class="inv-content">
+
+    <h1 class="inv-heading">
+      {{ joinLaterConfirm ? 'Confirmation Required!' : 'Your Turn Has Come!' }}
+    </h1>
+
+    <p class="inv-subheading" *ngIf="!joinLaterConfirm">
+      You are invited to join
+      <span class="inv-stage-name">{{ studioInvitation['stage'] }}</span>
+    </p>
+
+    <p class="inv-joinlater-warning" *ngIf="joinLaterConfirm">
+      This is a <strong>Queue Based Event.</strong>
+      If you miss this opportunity, you'll have to wait for the next available slot.
+    </p>
+
+    <div class="inv-invited-card" *ngIf="!joinLaterConfirm">
+      <p class="inv-invited-label">INVITED BY</p>
+      <p class="inv-invited-name">Excellence Installation Specialist</p>
+      <div class="inv-invited-session">
+        For&nbsp;<span class="inv-stage-name">{{ studioInvitation['stage'] }}</span>&nbsp;Session
+      </div>
+    </div>
+
+    <div class="inv-timer-wrap" [class.inv-timer--urgent]="isInvitationUrgent">
+      <svg class="inv-ring-svg" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="54" class="inv-ring-track" fill="none" stroke-width="8"/>
+        <circle cx="60" cy="60" r="54"
+          class="inv-ring-progress"
+          [class.inv-ring-progress--urgent]="isInvitationUrgent"
+          fill="none" stroke-width="8" stroke-linecap="round"
+          [style.stroke-dasharray]="RING_CIRCUMFERENCE"
+          [style.stroke-dashoffset]="invitationRingOffset"
+          transform="rotate(-90 60 60)"/>
+      </svg>
+      <div class="inv-timer-label">
+        <span class="inv-timer-value" [class.inv-timer-value--urgent]="isInvitationUrgent">
+          {{ formatInvitationTime(invitationSeconds) }}
+        </span>
+        <span class="inv-timer-unit">
+          {{ invitationSeconds >= 60 ? 'minutes' : 'seconds' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="inv-urgent-hint" *ngIf="isInvitationUrgent">⏱ Hurry! Time is almost up</div>
+
+  </div>
+
+  <div class="inv-actions">
+    <button class="inv-btn inv-btn--accept" (click)="acceptInvitation()">
+      → {{ joinLaterConfirm ? 'Join Now' : 'Accept Invitation & Join' }}
+    </button>
+    <button class="inv-btn inv-btn--later"
+      (click)="joinLaterConfirm ? confirmJoinLater() : onJoinLater()">
+      {{ joinLaterConfirm ? 'Confirm Join Later' : "I'll join later" }}
+    </button>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="inv-success-backdrop" *ngIf="invitationAccepted">
+  <div class="inv-success-dialog">
+
+    <div class="inv-success-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" width="36" height="36">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+
+    <h2 class="inv-success-title">Invitation Accepted!</h2>
+
+    <p class="inv-success-sub">
+      Great! You've successfully accepted the invitation from
+      <strong>Excellence Installation Specialist</strong>
+    </p>
+
+    <div class="inv-success-steps">
+      <p class="inv-success-steps-heading">💻 Next Steps</p>
+      <ul>
+        <li>✓ Continue the <strong>{{ studioInvitation?.['stage'] }}</strong> session on your laptop/desktop</li>
+        <li>✓ Check your email for the session link</li>
+        <li>✓ Join the session within the next few minutes</li>
+      </ul>
+    </div>
+
+    <button class="inv-success-btn" (click)="_closeInvitation()">Got it, Thanks!</button>
+
+  </div>
+</div>

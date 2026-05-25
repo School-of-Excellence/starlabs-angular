@@ -145,6 +145,14 @@
               [disabled]="getSelectedTokens().length === 0">
               <mat-icon>local_offer</mat-icon> Add Tag
             </button>
+            <button
+              class="btn btn-outline-primary"
+              mat-stroked-button
+              (click)="openBulkMovePanel()"
+              [disabled]="getSelectedTokens().length === 0">
+              <mat-icon>multiple_stop</mat-icon>
+              Bulk Move ({{getSelectedTokens().length}}/10)
+            </button>
           </div>
         </section>
 
@@ -171,10 +179,10 @@
               <span class="select-all-text">Select All</span>
             </div>
           </div>
-
+          <input type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
           <!-- Participants List - Merged from selected stages -->
           <div class="participants-list" *ngIf="selectedStages.length > 0">
-            <div *ngFor="let token of getMergedParticipants(); let i = index" class="participant-item"
+            <div *ngFor="let token of getFilteredMergedParticipants(); let i = index" class="participant-item"
               (click)="toggleTokenSelection(token)">
 
               <!-- Checkbox -->
@@ -194,6 +202,7 @@
                 <div class="participant-name">
                   <i class="bi bi-person-fill"></i>
                   {{mapProfileData[token.profile_id]?.['name']}}
+                  <span class="selection-dfu-tag" *ngIf="getTokenHighlight(token.profile_id) === 'orange'">DFU</span>
                 </div>
                 <div class="participant-email">
                   <i class="bi bi-envelope"></i>
@@ -236,7 +245,7 @@
 
           <!-- Participants List - Single stage (when no stages selected in dropdown) -->
           <div class="participants-list" *ngIf="selectedStages.length === 0">
-            <div *ngFor="let token of getStageParticipants(selectedChatStage)?.['tokenlist']; let i = index"
+            <div *ngFor="let token of getFilteredSingleStageParticipants(); let i = index"
               class="participant-item" (click)="toggleTokenSelection(token)">
 
               <!-- Checkbox -->
@@ -254,6 +263,7 @@
                 <div class="participant-name">
                   <i class="bi bi-person-fill"></i>
                   {{mapProfileData[token.profile_id]?.['name']}}
+                  <span class="selection-dfu-tag" *ngIf="getTokenHighlight(token.profile_id) === 'orange'">DFU</span>
                 </div>
                 <div class="participant-email">
                   <i class="bi bi-envelope"></i>
@@ -1178,7 +1188,12 @@
                     <mat-icon>message</mat-icon>
                   </button>
                   <button *ngIf="roles['developer']" class="text-secondary" mat-icon-button
-                    (click)="completeQueue(column.allTokens || column.tokenlist, column.stagename)"><mat-icon>cloud_done</mat-icon></button>
+                    (click)="completeQueue(column.allTokens || column.tokenlist, column.stagename)"><mat-icon>cloud_done</mat-icon>
+                  </button>
+                  <button mat-icon-button class="stage-activity-btn" matTooltip="Last 24hr activity" (click)="openStageActivity(column.stagename, column.type, $event)">
+                    <mat-icon style="font-size:18px; width:18px; height:18px;" [style.color]="stageActivityCacheLoading ? '#bbb' : '#1976d2'"> people_alt</mat-icon>
+                  </button>
+
                 </span><br>
               </div>
 
@@ -1786,6 +1801,286 @@
     </div>
   </mat-sidenav-content>
 </mat-sidenav-container>
+<!-- BULK MOVE PANEL -->
+<div class="bulk-overlay" *ngIf="showBulkMovePanel"
+  (click)="closeBulkMovePanel()">
+  <div class="bulk-dialog" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="bulk-header">
+      <div class="bulk-header-title">
+        <mat-icon>multiple_stop</mat-icon>
+        <span>
+          Bulk Move &mdash; {{bulkMoveCurrentStageObj?.stagename}}
+          <ng-container *ngIf="bulkMoveCurrentStageObj?.type">
+            ({{bulkMoveCurrentStageObj?.type}})
+          </ng-container>
+        </span>
+      </div>
+      <button mat-icon-button
+        (click)="closeBulkMovePanel()"
+        [disabled]="bulkMoveInProgress">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Main body -->
+    <div class="bulk-body" *ngIf="!bulkMoveCompleted">
+
+      <!-- Stage selector -->
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Move to Stage</mat-label>
+        <mat-select
+          [(ngModel)]="bulkMoveTargetStageKey"
+          [disabled]="bulkMoveInProgress">
+          <mat-option
+            *ngFor="let stage of availableStagesForBulkMove"
+            [value]="stage.stagename"
+            [disabled]="stage.stagename === bulkMoveCurrentStageObj?.stagename || 
+                        stage.stagename === bulkMoveCurrentStageObj?.stagename + ' (' + bulkMoveCurrentStageObj?.type + ')'">
+            {{stage.stagename}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- DFU warning banner -->
+      <div class="bulk-dfu-banner" *ngIf="bulkDFUCount > 0">
+        <mat-icon style="font-size:16px; width:16px; height:16px; vertical-align:middle;">info</mat-icon>
+        {{bulkDFUCount}} DFU participant(s) will be skipped
+      </div>
+
+      <!-- Participants list -->
+      <div class="bulk-list">
+        <div class="bulk-list-head">
+          <span>Name</span>
+          <span>Variation</span>
+          <span></span>
+        </div>
+        <div *ngFor="let r of bulkMoveResults" class="bulk-list-row" [class.bulk-row-dfu]="r.isDFU">
+          <span class="bulk-name">
+            {{mapProfileData[r.token.profile_id]?.['name']}}
+          </span>
+          <span class="bulk-variation">{{r.variationName}}</span>
+          <span class="bulk-dfu-tag" *ngIf="r.isDFU">DFU – Skip</span>
+        </div>
+      </div>
+
+      <!-- Action button -->
+      <button
+        mat-raised-button
+        color="primary"
+        class="bulk-action-btn"
+        (click)="executeBulkMove()"
+        [disabled]="!bulkMoveTargetStageKey || bulkMoveInProgress || bulkMovableCount === 0">
+        <mat-spinner
+          *ngIf="bulkMoveInProgress"
+          diameter="16"
+          class="btn-spinner">
+        </mat-spinner>
+        <span *ngIf="!bulkMoveInProgress">
+          Move {{bulkMovableCount}} Participant(s)
+        </span>
+        <span *ngIf="bulkMoveInProgress">Moving...</span>
+      </button>
+    </div>
+
+    <!-- Completed state -->
+    <div class="bulk-done" *ngIf="bulkMoveCompleted">
+      <mat-icon class="bulk-done-icon"
+        [style.color]="bulkMoveFailed ? '#d32f2f' : '#388e3c'">
+        {{bulkMoveFailed ? 'error' : 'check_circle'}}
+      </mat-icon>
+      <p *ngIf="!bulkMoveFailed" class="done-ok">
+        ✓ {{bulkMovableCount}} participant(s) moved successfully
+        <span *ngIf="bulkDFUCount > 0">&nbsp;({{bulkDFUCount}} DFU skipped)</span>
+      </p>
+      <p *ngIf="bulkMoveFailed" class="done-fail">
+        ✗ Move failed. Please try again.
+      </p>
+      <button mat-raised-button color="primary" (click)="closeBulkMovePanel()">
+        Done
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Stage Activity Panel ──────────────────────────────── -->
+<div class="stage-activity-overlay" *ngIf="showStageActivityPanel" (click)="closeStageActivityPanel()">
+  <div class="stage-activity-dialog" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="sa-header">
+      <div class="sa-header-left">
+        <mat-icon style="color:#1976d2; font-size:22px;">people_alt</mat-icon>
+        <div>
+          <mat-select class="sa-stage-select"
+            [(ngModel)]="selectedStageForActivity"
+            (ngModelChange)="onStageActivityFilterChange($event)"
+            [disabled]="stageActivityCacheLoading">
+            <mat-option *ngFor="let s of uniqueActivityStages" [value]="s.stagename">
+              {{s.stagename}}
+            </mat-option>
+          </mat-select>
+          <span class="sa-sub-label">— Last 24 hours</span>
+        </div>
+      </div>
+      <div class="sa-header-right">
+        <button mat-icon-button matTooltip="Refresh" (click)="fetchStageActivity()" [disabled]="stageActivityCacheLoading">
+          <mat-icon>refresh</mat-icon>
+        </button>
+        <button mat-stroked-button (click)="exportStageActivity()" [disabled]="stageActivityCacheLoading"
+          style="font-size:12px; height:32px; line-height:32px;">
+          <mat-icon style="font-size:16px; width:16px; height:16px;">
+            download
+          </mat-icon>
+          Export CSV
+        </button>
+        <button mat-icon-button (click)="closeStageActivityPanel()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sa-tabs">
+      <button
+        class="sa-tab"
+        [class.sa-tab-active]="stageActivityTab === 'cameIn'"
+        (click)="stageActivityTab = 'cameIn'">
+        <mat-icon style="font-size:16px; width:16px;
+                         height:16px; vertical-align:middle;">
+          login
+        </mat-icon>
+        Came In
+        <span class="sa-tab-count">
+          {{stageActivityData.cameIn.length}}
+        </span>
+      </button>
+      <button
+        class="sa-tab"
+        [class.sa-tab-active]="stageActivityTab === 'wentOut'"
+        (click)="stageActivityTab = 'wentOut'">
+        <mat-icon style="font-size:16px; width:16px;
+                         height:16px; vertical-align:middle;">
+          logout
+        </mat-icon>
+        Went Out
+        <span class="sa-tab-count">
+          {{stageActivityData.wentOut.length}}
+        </span>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="sa-body">
+
+      <!-- Loading -->
+      <div *ngIf="stageActivityCacheLoading" class="sa-loading">
+        <mat-spinner diameter="28"></mat-spinner>
+        <span>Loading activity...</span>
+      </div>
+
+      <!-- Came In -->
+      <ng-container
+        *ngIf="!stageActivityCacheLoading && stageActivityTab === 'cameIn'">
+
+        <div *ngIf="stageActivityData.cameIn.length === 0"
+          class="sa-empty">
+          <mat-icon>person_off</mat-icon>
+          <p>No participants came in during the last 24 hours</p>
+        </div>
+
+        <table *ngIf="stageActivityData.cameIn.length > 0"
+          class="sa-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>From Stage</th>
+              <th>Time</th>
+              <th>Moved By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let log of stageActivityData.cameIn;
+                        let i = index">
+              <td>{{i + 1}}</td>
+              <td>
+                <div class="sa-name">
+                  {{mapProfileData[log['profile_id']]?.['name'] || '—'}}
+                </div>
+                <div class="sa-email">
+                  {{mapProfileData[log['profile_id']]?.['email'] || ''}}
+                </div>
+              </td>
+              <td>
+                <span class="sa-stage-chip sa-from">
+                  {{log['previousstage'] || '—'}}
+                </span>
+              </td>
+              <td class="sa-time">
+                {{log['logdate']?.toDate() | date:'MMM d, h:mm a'}}
+              </td>
+              <td>
+                {{mapProfileData[log['movedby']]?.['name'] || '—'}}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+
+      <!-- Went Out -->
+      <ng-container
+        *ngIf="!stageActivityCacheLoading && stageActivityTab === 'wentOut'">
+
+        <div *ngIf="stageActivityData.wentOut.length === 0"
+          class="sa-empty">
+          <mat-icon>person_off</mat-icon>
+          <p>No participants went out during the last 24 hours</p>
+        </div>
+
+        <table *ngIf="stageActivityData.wentOut.length > 0"
+          class="sa-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>To Stage</th>
+              <th>Time</th>
+              <th>Moved By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let log of stageActivityData.wentOut;
+                        let i = index">
+              <td>{{i + 1}}</td>
+              <td>
+                <div class="sa-name">
+                  {{mapProfileData[log['profile_id']]?.['name'] || '—'}}
+                </div>
+                <div class="sa-email">
+                  {{mapProfileData[log['profile_id']]?.['email'] || ''}}
+                </div>
+              </td>
+              <td>
+                <span class="sa-stage-chip sa-to">
+                  {{log['currentstage'] || '—'}}
+                </span>
+              </td>
+              <td class="sa-time">
+                {{log['logdate']?.toDate() | date:'MMM d, h:mm a'}}
+              </td>
+              <td>
+                {{mapProfileData[log['movedby']]?.['name'] || '—'}}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+
+    </div>
+  </div>
+</div>
 
 <div *ngIf="showTimelineOverlay" class="timeline-overlay">
   <div class="timeline-backdrop" (click)="closeQueueTimeline()"></div>

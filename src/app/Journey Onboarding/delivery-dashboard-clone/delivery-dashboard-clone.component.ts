@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy, runInInjectionContext, Injector, NgZone } from '@angular/core'; // getFireStore
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -103,6 +103,27 @@ interface SpecialistRow {
     utilizationNoteColor?: string;
 }
 
+interface VelocityRow {
+    week: string;
+    product_id: string;
+    completions: number;
+}
+
+interface FunnelRow {
+    product_id: string;
+    stage: 'initiated' | 'awaiting' | 'started' | 'ongoing' | 'completed';
+    count: number;
+}
+
+interface UtilizationRow {
+    specialist_id: string;
+    profile_ref: string;
+    week: string;
+    booked: number;
+    available: number;
+    utilization: number;
+}
+
 @Component({
     selector: 'app-delivery-dashboard-clone',
     imports: [
@@ -130,6 +151,12 @@ interface SpecialistRow {
 export class DeliveryDashboardCloneComponent {
     @ViewChild('tabGroup') tabGroup: any;
     filterForm: FormGroup;
+
+    // Outer mat-tab-group selectedIndex (Overview=0, Analytics=1, Participants=2)
+    outerTabIndex: number = 0;
+
+    // Stages chip loading state (5-8s data fetch needs visible feedback)
+    stagesLoading: boolean = false;
 
     // Boolean declarations
     isLoading = true;
@@ -221,8 +248,12 @@ export class DeliveryDashboardCloneComponent {
         'Test-Glimpse',
         'Breakthrough Extreme Diagnostics & Implementation',
         'Evolution Prep',
-        'A&H Custom Motherhood Excellence Solution for Wife'
+        'A&H Custom Motherhood Excellence Solution for Wife',
+        'Test new'
     ]);
+
+    // Specialist section collapsed-by-default UX state (Option A redesign)
+    specialistCollapsed = true;
 
     // Merged product groups: display name -> product names
     mergedGroups: { [groupName: string]: string[] } = {
@@ -256,10 +287,15 @@ export class DeliveryDashboardCloneComponent {
     productIdToGroup: { [productId: string]: string } = {};
     hiddenProductIds: Set<string> = new Set();
 
-    // Date filter
-    selectedTimeFilter: string = 'all';
-    dateRangeStart: Date | null = null;
-    dateRangeEnd: Date | null = null;
+    // Date filter — default to Last 30 days per sanity-check feedback
+    // (this-month was masking pipeline counts when run early in a calendar month)
+    selectedTimeFilter: string = '30days';
+    dateRangeStart: Date | null = (() => {
+        const n = new Date();
+        const today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+        return new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    })();
+    dateRangeEnd: Date | null = new Date();
     range = new FormGroup({
         start: new FormControl<Date | null>(null),
         end: new FormControl<Date | null>(null),
@@ -272,6 +308,7 @@ export class DeliveryDashboardCloneComponent {
 
     private allFetchedAppointments: any[] = [];
     journeyFlowLoading: boolean = false;
+    appointmentsAccessible: boolean = true;
     journeyMonthPicker = new FormControl<Date>(new Date());
 
     originalData = {
@@ -340,7 +377,8 @@ export class DeliveryDashboardCloneComponent {
             "Next Month",
             "Onboarded",
             "Pre-Process",
-            "D&I Appointments",
+            "Diagnostics",
+            "Implementation",
             "Report",
             "Celebration Call"
         ],
@@ -351,9 +389,17 @@ export class DeliveryDashboardCloneComponent {
             "Pre-Process Form",
             "Diagnostics",
             "Implementation",
-            "Post-Process Form",
             "Review",
+            "Post-Process Form",
             "Completion"
+        ],
+
+        "eiCustomSolutions": [
+            "Total Eligible",
+            "Diagnostics",
+            "Implementation",
+            "Review",
+            "Celebration Call"
         ]
     };
 
@@ -373,8 +419,8 @@ export class DeliveryDashboardCloneComponent {
             'Pre-Process',
             'Diagnostics',
             'Implementation',
+            'Review',
             'Post-Process Form',
-            'Review'
         ],
         'EI Starter Pack': [
             'Welcome Call',
@@ -436,6 +482,7 @@ export class DeliveryDashboardCloneComponent {
     };
 
     specialistLoading = false;
+    specialistLoadProgress = '';   // e.g. "12 / 53"
     specialistSlotsInitialized = false;
     specialistDisplayMonth = '';
     specialistStartDate: Date | null = null;
@@ -463,6 +510,8 @@ export class DeliveryDashboardCloneComponent {
     ticketSubscription: any;
     selectedFilter: string = 'recent';
     selectedStageFilter: string = '';
+    selectedStatus: string = 'all';
+    allFunnelModalProfiles: any = {};
     selectedStage = '';
 
     openAppointmentModal = false;
@@ -475,8 +524,21 @@ export class DeliveryDashboardCloneComponent {
             thisMonth: [],
             nextMonth: [],
             onBoarded: [],
-            upcomingDIAppointments: [],
+            preprocess: [],
+            diagnostics: [],
+            implementation: [],
             reports: [],
+            celebrationCall: []
+        },
+
+        eiCustomSolutions: {
+            totalEligible: [],
+            pastMonth: [],
+            thisMonth: [],
+            nextMonth: [],
+            diagnostics: [],
+            implementation: [],
+            review: [],
             celebrationCall: []
         },
 
@@ -486,8 +548,8 @@ export class DeliveryDashboardCloneComponent {
             preprocess: [],
             diagnostics: [],
             implementation: [],
-            postForm: [],
             review: [],
+            postForm: [],
             completion: []
         }
     };
@@ -510,6 +572,12 @@ export class DeliveryDashboardCloneComponent {
             today: [],
             tomorrow: [],
             overdue: []
+        },
+        celebrationCall: {
+            all: [],
+            today: [],
+            tomorrow: [],
+            overdue: []
         }
     };
 
@@ -522,6 +590,7 @@ export class DeliveryDashboardCloneComponent {
         private fb: FormBuilder,
         private injector: Injector,
         private datepipe: DatePipe,
+        private ngZone: NgZone,
     ) {
         this.filterForm = this.fb.group({
             search: [''],
@@ -529,9 +598,146 @@ export class DeliveryDashboardCloneComponent {
             product: [[]]
         });
 
+        this.filterForm.get('product')!.valueChanges.subscribe(() => {
+            this.onProductMultiFilterChange();
+        });
+
+    }
+
+    get productFilterControl(): FormControl {
+        return this.filterForm.get('product') as FormControl;
+    }
+
+    private shortenProductName(rawName: string): string {
+        if (!rawName) return '';
+        const norm = rawName.toLowerCase().trim();
+        const matched = (this.products || []).find((p: any) =>
+            (p?.value || '').toLowerCase().trim() === norm ||
+            (p?.label || '').toLowerCase().trim() === norm
+        );
+        return matched?.label || rawName;
+    }
+
+    cardLabelForProductId(productId: string): string {
+        const groups = this.mergedGroupIds || {};
+        for (const groupName of Object.keys(groups)) {
+            const ids = groups[groupName];
+            if (ids && (ids instanceof Set ? ids.has(productId) : (ids as any)[productId] !== undefined)) {
+                return groupName;
+            }
+        }
+        return this.shortenProductName(this.mapProductName?.[productId] || '');
+    }
+
+    // ----- Memoization for hot getters (clear via invalidateMemos()) -------
+    private _memo = new Map<string, any>();
+    private invalidateMemos(): void { this._memo.clear(); }
+    private memoGet<T>(key: string, compute: () => T): T {
+        if (!this._memo.has(key)) this._memo.set(key, compute());
+        return this._memo.get(key);
+    }
+
+    trackByCardId = (_: number, id: string) => id;
+
+    get availableCardLabels(): string[] {
+        return this.memoGet('acl', () => {
+            const labels = new Set<string>();
+            for (const item of this.allMatchedProductsRaw || []) {
+                const pid = item?.productref?.id;
+                if (!pid) continue;
+                const label = this.cardLabelForProductId(pid);
+                if (label) labels.add(label);
+            }
+            return Array.from(labels).sort();
+        });
+    }
+
+    get allProductsSelected(): boolean {
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        const all = this.availableCardLabels;
+        return all.length > 0 && sel.length === all.length;
+    }
+
+    get productFilterActive(): boolean {
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length > 0 && !this.allProductsSelected;
+    }
+
+    get productSelectTrigger(): string {
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        const all = this.availableCardLabels;
+        if (sel.length === 0 || sel.length === all.length) return 'All products';
+        if (sel.length === 1) return sel[0];
+        return `${sel.length} products selected`;
+    }
+
+    toggleAllProducts(checked: boolean) {
+        this.productFilterControl?.setValue(checked ? [...this.availableCardLabels] : []);
+    }
+
+    get activeFilterSummary(): string {
+        const parts: string[] = [];
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        const all = this.availableCardLabels;
+        if (sel.length > 0 && sel.length < all.length) {
+            parts.push(sel.length === 1 ? sel[0] : `${sel.length} products`);
+        }
+        const tf = this.selectedTimeFilter;
+        const tfLabel: Record<string, string> = {
+            today: 'Today', '7days': '7 days', '30days': '30 days',
+            thismonth: 'This month', custom: 'Custom range'
+        };
+        if (tf && tf !== 'all' && tfLabel[tf]) parts.push(tfLabel[tf]);
+        return parts.join(' · ');
+    }
+
+    itemPassesProductFilter(item: any): boolean {
+        if (!this.productFilterActive) return true;
+        const pid = item?.productref?.id;
+        if (!pid) return false;
+        const label = this.cardLabelForProductId(pid);
+        if (!label) return false;
+        return ((this.productFilterControl.value as string[]) || []).includes(label);
+    }
+
+    private resolveProductLabel(picked: string): string | null {
+        // Direct match (e.g., 'EI Starter Pack' is both card label and mapProductGroupId key)
+        if (this.mapProductGroupId?.[picked]) return picked;
+        // Indirect match: the multi-select shows the full product NAME from Firestore
+        // (e.g., 'Critical Support Diagnostics and Implementation') but
+        // mapProductGroupId is keyed by the short label (e.g., 'Critical Support').
+        const norm = (picked || '').toLowerCase().trim();
+        const found = (this.products || []).find((p: any) =>
+            (p?.value || '').toLowerCase().trim() === norm ||
+            (p?.label || '').toLowerCase().trim() === norm
+        );
+        if (found && this.mapProductGroupId?.[found.label]) return found.label;
+        return null;
+    }
+
+    async onProductMultiFilterChange() {
+        if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
+        // Filter changed → flush memoized getters (visibleCardIds, allProductIdsFromRaw, etc.)
+        this.invalidateMemos();
+        const sel = (this.productFilterControl.value as string[]) || [];
+        let known: string | null = null;
+        if (this.productFilterActive && sel.length >= 1) {
+            for (const label of sel) {
+                const resolved = this.resolveProductLabel(label);
+                if (resolved) { known = resolved; break; }
+            }
+        }
+        if (known) {
+            this.selectedProductLabel = known;
+        } else {
+            this.clearStats();
+        }
+        // applyDateFilter rebuilds gated data and (when label is set) re-runs selectProduct
+        await this.applyDateFilter();
     }
 
     async ngOnInit() {
+        this.startLastUpdatedTimer();
         this.setCurrentMonth();
         this.initializeMonthFilter();
         try {
@@ -677,6 +883,11 @@ export class DeliveryDashboardCloneComponent {
         this.appointmentsSubscription?.unsubscribe();
         this.formsSubscription?.unsubscribe();
         this.ticketRequestSubscription?.unsubscribe();
+        // Clear the "last updated" timer
+        if (this._lastUpdatedTimer) {
+            clearInterval(this._lastUpdatedTimer);
+            this._lastUpdatedTimer = null;
+        }
     }
 
     onFilterClick(filter: string) {
@@ -719,6 +930,8 @@ export class DeliveryDashboardCloneComponent {
     ]);
 
     async applyDateFilter() {
+        // Invalidate memoized getters — fresh data is about to land.
+        this.invalidateMemos();
         try {
             const groupedAll = {};
             const groupedFiltered = {};
@@ -735,19 +948,26 @@ export class DeliveryDashboardCloneComponent {
             for (const item of this.allMatchedProductsRaw) {
                 const productId = item?.productref?.id;
                 if (!productId) continue;
+                if (!this.itemPassesProductFilter(item)) continue;
 
                 const status = item?.status?.toLowerCase?.() || null;
                 const profileId = item?.profileid;
-                const mode = this.mapMetaData?.[profileId]?.['participantmode']?.toLowerCase?.();
+                const mode = this.mapMetaData?.[profileId]?.['participantmode']?.toLowerCase().trim();
                 const totalPaid = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpaid'] ?? '0') || 0;
                 const totalPurchaseValue = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpurchasevalue'] ?? '0') || 0;
                 const totalBalance = totalPurchaseValue - totalPaid;
                 const minPayment = parseInt(item?.['minimumpayment']) || 0;
-                const isEligible = !this.excludedModes.has(mode?.toLowerCase().trim()) && (totalBalance <= 0 || totalPaid >= minPayment);
+                const isEligible = !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
                 const statusdate = item?.statusdate || {};
                 const tentativestart = item?.tentativestart || null;
+                const packageId = item?.packageref?.id;
 
                 if (!['completed', 'ongoing'].includes(status)) {
+                    // ── Pre-completion pool (Total, Eligible, Not Elig., Purchased, Bonus) ──
+                    // All four participant-count columns use the same base filter:
+                    // exclude completed and ongoing so the sums are consistent:
+                    //   Total = Eligible + Not Elig.
+                    //   Eligible = Purchased + Bonus
                     (groupedAll[productId] ||= []).push(item);
 
                     if (isEligible) {
@@ -761,20 +981,17 @@ export class DeliveryDashboardCloneComponent {
                                 (groupedNextMonth[productId] ||= []).push(item);
                             }
                         }
-                    } else (groupedNotEligible[productId] ||= []).push(item);
-                }
 
-                if (isEligible) {
-                    const packageId = item?.packageref?.id;
-
-                    if (packageId && this.bonusPackageIds.has(packageId)) {
-                        (groupedBonus[productId] ||= []).push(item);
-                    }
-                    else if (packageId && this.addonsPackageIds.has(packageId)) {
-                        (groupedAddons[productId] ||= []).push(item);
-                    }
-                    else {
-                        (groupedPurchased[productId] ||= []).push(item);
+                        // Purchased / Bonus split — inside same status guard so they match Eligible.
+                        // Addons are treated as Purchased (both are paid/entitled, non-bonus).
+                        if (packageId && this.bonusPackageLookup[packageId]) {
+                            (groupedBonus[productId] ||= []).push(item);
+                        } else {
+                            // Standard purchase OR addons package — both go into Purchased
+                            (groupedPurchased[productId] ||= []).push(item);
+                        }
+                    } else {
+                        (groupedNotEligible[productId] ||= []).push(item);
                     }
                 }
 
@@ -792,6 +1009,7 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 if (isEligible) {
+                    // Funnel Data (includes ongoing/completed — separate from the participant-count columns)
                     if (!status) {
                         funnelData[productId].awaiting.push(item);
                     } else if (status === 'initiated') {
@@ -817,6 +1035,16 @@ export class DeliveryDashboardCloneComponent {
         } catch (err) {
             console.log("error apply date filter", err);
         }
+
+        // Universal filter: rehydrate Stages section against freshly gated data
+        if (this.selectedProductLabel) {
+            await this.selectProduct(this.selectedProductLabel);
+        }
+
+        // Repopulate the actionable cohorts (Participants tab) from the
+        // freshly gated participantsproduct data. Stage-based, not appointment-
+        // based — so it works even when the appointments read is denied.
+        this.populateActionableCohorts();
     }
 
     getConversionRate(cardId: string): number {
@@ -828,8 +1056,12 @@ export class DeliveryDashboardCloneComponent {
 
     async selectProduct(product: string) {
         this.participantLoading = true;
-        this.productData = {};
-
+        // Clear previous product's data immediately so stale cards don't show while loading
+        this.productData = {
+            eiStarterPack:    { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions:{ totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            criticalSupport:  { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
+        };
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
@@ -843,14 +1075,18 @@ export class DeliveryDashboardCloneComponent {
         if (product === 'EI Starter Pack') {
             this.selectedColumns = this.columns.eiStarterPack;
             await this.filterProductData('eiStarterPack', product, productId);
-        }
-        else if (product === 'Critical Support') {
+            await this.filterStageData('eiStarterPack');
+        } else if (product === 'EI Solution') {
+            this.selectedColumns = this.columns.eiCustomSolutions;
+            await this.filterProductData('eiCustomSolutions', product, productId);
+            await this.filterStageData('eiCustomSolutions');
+        } else if (product === 'Critical Support') {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
+            await this.filterStageData('criticalSupport');
         }
-
-        if (product === 'Critical Support') await this.filterStageData();
         this.participantLoading = false;
+        this.stagesLoading = false;
     }
 
     async filterAppointmentsByType(): Promise<void> {
@@ -923,11 +1159,24 @@ export class DeliveryDashboardCloneComponent {
                             resolve();
                         },
                         error: (err) => {
-                            console.error("Error loading appointments:", err);
+                            // Defensive degrade: a Firestore permission denial on
+                            // the 'appointments' collection means the user's role
+                            // can't read appointment-level detail. Keep the page
+                            // alive — Stages columns are sourced from
+                            // participantsproduct + funnelData and continue to work.
+                            const denied = err?.code === 'permission-denied' ||
+                                /permission|insufficient/i.test(err?.message || '');
+                            if (denied) {
+                                console.warn("Appointments not accessible for this role; degrading gracefully.", err);
+                                this.appointmentsAccessible = false;
+                                this.allAppointments = [];
+                            } else {
+                                console.error("Error loading appointments:", err);
+                            }
                             this.loadingStates.appointments = true;
                             this.journeyFlowLoading = false;
                             this.cdr.detectChanges();
-                            reject(err);
+                            resolve();
                         }
                     });
                 this.appointmentsSubscription.add(sub);
@@ -949,8 +1198,21 @@ export class DeliveryDashboardCloneComponent {
                 thisMonth: [],
                 nextMonth: [],
                 onBoarded: [],
-                upcomingDIAppointments: [],
+                preprocess: [],
+                diagnostics: [],
+                implementation: [],
                 reports: [],
+                celebrationCall: []
+            },
+
+            eiCustomSolutions: {
+                totalEligible: [],
+                pastMonth: [],
+                thisMonth: [],
+                nextMonth: [],
+                diagnostics: [],
+                implementation: [],
+                review: [],
                 celebrationCall: []
             },
 
@@ -960,8 +1222,8 @@ export class DeliveryDashboardCloneComponent {
                 preprocess: [],
                 diagnostics: [],
                 implementation: [],
-                postForm: [],
                 review: [],
+                postForm: [],
                 completion: []
             }
         };
@@ -970,20 +1232,20 @@ export class DeliveryDashboardCloneComponent {
         const allAppointments = this.allAppointments;
         try {
             const totalEligible = this.getCardGroupedFiltered(productId);
-            if (productType === 'criticalSupport') {
+            if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
             }
-            else if (productType === 'eiStarterPack') {
+            else if (this.selectedProductType === 'eiStarterPack') {
                 for (let data of totalEligible) {
                     const { status, tentativestart } = data;
 
                     if (status === null || status === "initiated") {
-                        if (!tentativestart) productData.totalEligible.push(data);
+                        if (!tentativestart) productData.eiStarterPack.totalEligible.push(data);
                         else if (tentativestart) {
                             const date = tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData);
+                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, 'eiStarterPack');
                         }
                     }
                 };
@@ -1011,58 +1273,88 @@ export class DeliveryDashboardCloneComponent {
                 };
 
                 if (attendedAppointments.length === 0) {
-                    if (productType === 'criticalSupport') productData.criticalSupport.totalEligible.push(mergedData);
-                    if (productType === 'eiStarterPack') {
+                    if (this.selectedProductType === 'criticalSupport') {
+                        productData.criticalSupport.totalEligible.push(mergedData);
+                    } else if (this.selectedProductType === 'eiStarterPack') {
                         if (!data.tentativestart) {
                             productData.eiStarterPack.totalEligible.push(mergedData);
                         } else {
                             const date = data.tentativestart.toDate();
                             const itemMonth = date.getMonth();
                             const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData);
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, 'eiStarterPack');
+                        }
+                    } else if (this.selectedProductType === 'eiCustomSolutions') {
+                        if (!data.tentativestart) {
+                            productData.eiCustomSolutions.totalEligible.push(mergedData);
+                        } else {
+                            const date = data.tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, this.selectedProductType);
                         }
                     }
                 }
                 else if (attendedAppointments.length > 0) {
-                    // ========================= EI STARTER PACK =========================
-                    if (productType === 'eiStarterPack') {
-                        const celebrationCallAppointment = attendedAppointments.find(app =>
-                            app.formname?.toLowerCase() === `${product.toLowerCase()} celebration call`
+                    // ========================= EI CUSTOM SOLUTIONS =========================
+                    if (this.selectedProductType === 'eiCustomSolutions') {
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei review`
                         );
+                        const implementationAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei implementation`
+                        );
+                        const diagnosticsAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei diagnostics`
+                        );
+
+                        if (reviewAppointment) {
+                            productData.eiCustomSolutions.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
+                            });
+                        } else if (implementationAppointment) {
+                            productData.eiCustomSolutions.implementation.push({
+                                ...mergedData,
+                                ...implementationAppointment
+                            });
+                        } else if (diagnosticsAppointment) {
+                            productData.eiCustomSolutions.diagnostics.push({
+                                ...mergedData,
+                                ...diagnosticsAppointment
+                            });
+                        }
+                    }
+                    // ========================= EI STARTER PACK =========================
+                    else if (this.selectedProductType === 'eiStarterPack') {
                         const reportAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === `${product.toLowerCase()} post session check-in`
                         );
                         const implementationAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} implementation`
                         );
-
                         const diagnosticsAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} diagnostics`
                         );
-
                         const welcomeCallAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `${product.toLowerCase()} welcome call`
                         );
 
-                        if (celebrationCallAppointment) {
-                            productData.eiStarterPack.celebrationCall.push({
-                                ...mergedData,
-                                ...celebrationCallAppointment
-                            });
-                        }
-                        else if (reportAppointment) {
+                        if (reportAppointment) {
                             productData.eiStarterPack.reports.push({
                                 ...mergedData,
                                 ...reportAppointment
                             });
-
-                        }
-                        else if (implementationAppointment || diagnosticsAppointment) {
-                            productData.eiStarterPack.upcomingDIAppointments.push({
+                        } else if (implementationAppointment) {
+                            productData.eiStarterPack.implementation.push({
                                 ...mergedData,
-                                ...(implementationAppointment || diagnosticsAppointment)
+                                ...(implementationAppointment)
                             });
-
+                        } else if (diagnosticsAppointment) {
+                            productData.eiStarterPack.diagnostics.push({
+                                ...mergedData,
+                                ...(diagnosticsAppointment)
+                            });
                         } else if (welcomeCallAppointment) {
                             productData.eiStarterPack.onBoarded.push({
                                 ...mergedData,
@@ -1071,52 +1363,45 @@ export class DeliveryDashboardCloneComponent {
                         }
                     }
                     // ========================= CRITICAL SUPPORT =========================
-                    else if (productType === 'criticalSupport') {
-                        const reviewAppointment = attendedAppointments.find(app =>
-                            app.appointmentTypeName?.toLowerCase() === `critical support review`
-                        );
-
+                    else if (this.selectedProductType === 'criticalSupport') {
                         const postprocessAppointment = attendedAppointments.find(app =>
                             app.formname?.toLowerCase() === 'critical support post form'
                         );
-
+                        const reviewAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `critical support review`
+                        );
                         const implementationAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === 'critical support implementation'
                         );
-
                         const diagnosticsAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === 'critical support diagnostics'
                         );
-
                         const preprocessAppointment = attendedAppointments.find(app =>
-                            app.formname?.toLowerCase() === 'critical support request'
+                            app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-                        if (reviewAppointment) {
-                            productData.criticalSupport.review.push({
-                                ...mergedData,
-                                ...reviewAppointment
-                            });
-                        }
-                        else if (postprocessAppointment) {
+                       
+                        if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
                                 ...postprocessAppointment
                             });
-                        }
-                        else if (implementationAppointment) {
+                        } else if (reviewAppointment) {
+                            productData.criticalSupport.review.push({
+                                ...mergedData,
+                                ...reviewAppointment
+                            });
+                        } else if (implementationAppointment) {
                             productData.criticalSupport.implementation.push({
                                 ...mergedData,
                                 ...implementationAppointment
                             });
-                        }
-                        else if (diagnosticsAppointment) {
+                        } else if (diagnosticsAppointment) {
                             productData.criticalSupport.diagnostics.push({
                                 ...mergedData,
                                 ...diagnosticsAppointment
                             });
-                        }
-                        else if (preprocessAppointment) {
+                        } else if (preprocessAppointment) {
                             productData.criticalSupport.preprocess.push({
                                 ...mergedData,
                                 ...preprocessAppointment
@@ -1152,7 +1437,7 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any) {
+    handleMonthCategory(itemMonth: number, itemYear: number, data: any, allappointments: any, productData: any, productType: string) {
         let mergedData: any;
         if (allappointments !== null && allappointments?.length > 0) {
             mergedData = { ...data, allappointments: allappointments }
@@ -1161,21 +1446,18 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (itemMonth === this.currentMonth && itemYear === this.currentYear) {
-            productData.eiStarterPack.thisMonth.push(mergedData);
-        }
-        else if (
+            productData[productType].thisMonth.push(mergedData);
+        } else if (
             (itemMonth === this.currentMonth - 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 0 && itemMonth === 11 && itemYear === this.currentYear - 1)
         ) {
-            productData.eiStarterPack.pastMonth.push(mergedData);
-        }
-        else if (
+            productData[productType].pastMonth.push(mergedData);
+        } else if (
             (itemMonth === this.currentMonth + 1 && itemYear === this.currentYear) ||
             (this.currentMonth === 11 && itemMonth === 0 && itemYear === this.currentYear + 1)
         ) {
-            productData.eiStarterPack.nextMonth.push(mergedData);
-        }
-        else productData.eiStarterPack.totalEligible.push(mergedData);
+            productData[productType].nextMonth.push(mergedData);
+        } else productData[productType].totalEligible.push(mergedData);
     }
 
     async fetchTicketRiseParticipants() {
@@ -1270,7 +1552,7 @@ export class DeliveryDashboardCloneComponent {
             let typeName = '';
             if (app?.appointmentTypeName) {
                 typeName = app.appointmentTypeName;
-            } else if (app?.formname === 'Critical Support Request') {
+            } else if (app?.formname === 'Critical Support Pre Form') {
                 typeName = 'Pre-Process';
             } else if (app?.formname === 'Critical Support Post Form') {
                 typeName = 'Post-Process Form'
@@ -1318,7 +1600,7 @@ export class DeliveryDashboardCloneComponent {
     resolveAppointmentType(appointment: any) {
         // If it's from forms
         if (appointment?.formid) {
-            if (appointment?.formname === 'Critical Support Request') return 'Pre-Process';
+            if (appointment?.formname === 'Critical Support Pre Form') return 'Pre-Process';
             else if (appointment?.formname === 'Critical Support Post Form') return 'Post-Process Form';
             else if (appointment?.formname === 'Post Session Check-in') return 'Post Session Check-in';
         }
@@ -1329,12 +1611,29 @@ export class DeliveryDashboardCloneComponent {
         return match?.appointmenttype;
     }
 
-    async filterStageData() {
-        const stageConfig = [
-            { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
-            { key: 'implementation', appointmentType: 'Critical Support Implementation' },
-            { key: 'review', appointmentType: 'Critical Support Review' }
-        ];
+    async filterStageData(product: string) {
+        let stageConfig = [];
+        if (product === 'criticalSupport') {
+            stageConfig = [
+                { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
+                { key: 'implementation', appointmentType: 'Critical Support Implementation' },
+                { key: 'review', appointmentType: 'Critical Support Review' }
+            ];
+        } else if (product === 'eiStarterPack') {
+            stageConfig = [
+                { key: 'onboarded', appointmentType: 'EI Starter Pack Welcome Call' },
+                { key: 'diagnostics', appointmentType: 'EI Starter Pack Diagnostics' },
+                { key: 'implementation', appointmentType: 'EI Starter Pack Implementation' },
+                { key: 'celebration call', appointmentType: 'EI Starter Pack Celebration Call' }
+            ];
+        } else if (product === 'eiCustomSolutions') {
+            stageConfig = [
+                { key: 'diagnostics', appointmentType: 'EI Diagnostics' },
+                { key: 'implementation', appointmentType: 'EI Implementation' },
+                { key: 'review', appointmentType: 'EI Review' },
+                { key: 'celebration call', appointmentType: 'EI Celebration Call' }
+            ];
+        }
 
         stageConfig.forEach(stage => {
             this.stageData[stage.key] = this.filterAppointmentsForStage(stage.appointmentType);
@@ -1392,9 +1691,20 @@ export class DeliveryDashboardCloneComponent {
                 2: this.productData.eiStarterPack.thisMonth || [],
                 3: this.productData.eiStarterPack.nextMonth || [],
                 4: this.productData.eiStarterPack.onBoarded || [],
-                6: this.productData.eiStarterPack.upcomingDIAppointments || [],
-                7: this.productData.eiStarterPack.report || [],
-                8: this.productData.eiStarterPack.celebrationCall || []
+                5: this.productData.eiStarterPack.preprocess || [],
+                6: this.productData.eiStarterPack.diagnostics || [],
+                7: this.productData.eiStarterPack.implementation || [],
+                8: this.productData.eiStarterPack.report || [],
+                9: this.productData.eiStarterPack.celebrationCall || []
+            };
+        }
+        else if (this.selectedProductType === 'eiCustomSolutions') {
+            sources = {
+                0: this.productData.eiCustomSolutions.totalEligible || [],
+                1: this.productData.eiCustomSolutions.diagnostics || [],
+                2: this.productData.eiCustomSolutions.implementation || [],
+                3: this.productData.eiCustomSolutions.review || [],
+                4: this.productData.eiCustomSolutions.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'criticalSupport') {
@@ -1404,8 +1714,8 @@ export class DeliveryDashboardCloneComponent {
                 2: this.productData.criticalSupport.preprocess || [],
                 3: this.productData.criticalSupport.diagnostics || [],
                 4: this.productData.criticalSupport.implementation || [],
-                5: this.productData.criticalSupport.postForm || [],
-                6: this.productData.criticalSupport.review || [],
+                5: this.productData.criticalSupport.review || [],
+                6: this.productData.criticalSupport.postForm || [],
                 7: this.productData.criticalSupport.completion || []
             };
         }
@@ -1483,6 +1793,25 @@ export class DeliveryDashboardCloneComponent {
         });
     };
 
+    onSpecialistExpandToggle() {
+        this.specialistCollapsed = !this.specialistCollapsed;
+        if (!this.specialistCollapsed && !this.specialistSlotsInitialized) {
+            this.initSpecialistDateRange();
+            this.loadSpecialistBaseData();
+            // Re-wire the date-range subscription so changing the picker re-fetches data
+            this.specialistRange.valueChanges.subscribe((val) => {
+                if (val.start && val.end) {
+                    this.specialistStartDate = val.start;
+                    this.specialistEndDate = val.end;
+                    this.updateSpecialistDisplayMonth();
+                    if (this.specialistSlotsInitialized) {
+                        this.fetchSpecialistSlotsAndCompute();
+                    }
+                }
+            });
+        }
+    }
+
     initSpecialistDateRange() {
         const now = new Date();
         this.specialistStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1521,12 +1850,16 @@ export class DeliveryDashboardCloneComponent {
         this.cdr.detectChanges();
 
         try {
+            console.log('[Specialist] Step 1: querying products (mode=Priority Mode)...');
             const productsSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'products'),
                     where('mode', '==', 'Priority Mode')
                 ))
             );
+
+            console.log(`[Specialist] Step 1 done: ${productsSnap.docs.length} Priority Mode products found`);
+            console.log('[Specialist] Step 2: querying productToDeliverySequence...');
 
             const deliveryPromises = productsSnap.docs.map((productDoc) =>
                 runInInjectionContext(this.injector, () =>
@@ -1564,6 +1897,9 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
 
+            console.log(`[Specialist] Step 2 done: ${activityFetchList.length} activity refs to fetch`);
+            console.log('[Specialist] Step 3: fetching activity docs...');
+
             const activityResults: { productDoc: any; productName: string; activityRef: any; snap: any }[] = [];
             const actBatchSize = 15;
 
@@ -1578,6 +1914,8 @@ export class DeliveryDashboardCloneComponent {
                 );
                 activityResults.push(...batchResults);
             }
+
+            console.log(`[Specialist] Step 3 done: ${activityResults.length} activity docs fetched`);
 
             const seenTypeIds = new Set<string>();
             this.specialistSequences = [];
@@ -1600,6 +1938,8 @@ export class DeliveryDashboardCloneComponent {
                     appointmentTypeId,
                 });
             }
+
+            console.log(`[Specialist] Step 4: ${this.specialistSequences.length} unique appointment types → querying AppointmentType-To-Roles & Roles-To-EIS...`);
 
             const roleBatchSize = 10;
 
@@ -1651,24 +1991,24 @@ export class DeliveryDashboardCloneComponent {
             }
 
             this.specialistSlotsInitialized = true;
-            await this.fetchSpecialistSlotsAndCompute();
+            // TODO: availability slot fetching disabled — too many Firestore queries (53 sequences).
+            // Uncomment when a more efficient query strategy is in place.
+            // await this.fetchSpecialistSlotsAndCompute();
+            this.specialistLoading = false;
+            this.cdr.detectChanges();
 
         } catch (error) {
             console.error('Error loading specialist base data:', error);
-
-            if (retryCount < 2) {
-                setTimeout(() => this.loadSpecialistBaseData(retryCount + 1), 2000);
-                return;
-            }
-
             this.specialistLoading = false;
             this.cdr.detectChanges();
         }
     }
 
-    async fetchSpecialistSlotsAndCompute(retryCount = 0) {
+    async fetchSpecialistSlotsAndCompute() {
         if (!this.specialistStartDate || !this.specialistEndDate) return;
 
+        const total = this.specialistSequences.length;
+        console.log(`[Specialist] Step 5: fetching availability slots for ${total} sequences sequentially, range: ${this.specialistStartDate?.toDateString()} – ${this.specialistEndDate?.toDateString()}`);
         this.specialistLoading = true;
         this.cdr.detectChanges();
 
@@ -1679,72 +2019,76 @@ export class DeliveryDashboardCloneComponent {
             const rangeEnd = new Date(this.specialistEndDate);
             rangeEnd.setHours(23, 59, 59, 999);
 
-            const results = await Promise.all(
-                this.specialistSequences.map(async (seq) => {
-                    const typeId = seq.appointmentTypeId;
-                    const roles = this.specialistRolesMap[typeId] || [];
-                    const eisMap = this.specialistEISMap[typeId] || {};
-                    const matchedSlots: any[] = [];
-                    const availabilityPromises: Promise<void>[] = [];
+            const results: any[] = [];
 
-                    for (const role of roles) {
-                        const eisProfiles = eisMap[role] || [];
+            // Process sequences one at a time — firing all 50+ × roles × EIS queries in parallel
+            // overwhelms Firestore. Sequential is slower per-query but finishes reliably.
+            for (let i = 0; i < this.specialistSequences.length; i++) {
+                const seq = this.specialistSequences[i];
+                const typeId = seq.appointmentTypeId;
+                const roles = this.specialistRolesMap[typeId] || [];
+                const eisMap = this.specialistEISMap[typeId] || {};
+                const matchedSlots: any[] = [];
 
-                        for (const eisProfile of eisProfiles) {
-                            const promise = runInInjectionContext(this.injector, () =>
-                                getDocs(query(
-                                    collection(this.firestore, 'availability'),
-                                    where('profileref', '==', doc(this.firestore, eisProfile)),
-                                    where('appointments', 'array-contains', doc(this.firestore, 'appointmenttype/' + typeId)),
-                                    where('starttime', '>=', rangeStart),
-                                    where('starttime', '<=', rangeEnd)
-                                ))
-                            ).then((snapshot) => {
-                                snapshot.forEach((slotDoc) => {
-                                    const slotArray = slotDoc.data()[typeId];
+                for (const role of roles) {
+                    const eisProfiles = eisMap[role] || [];
 
-                                    if (!Array.isArray(slotArray)) return;
+                    for (const eisProfile of eisProfiles) {
+                        const snapshot = await runInInjectionContext(this.injector, () =>
+                            getDocs(query(
+                                collection(this.firestore, 'availability'),
+                                where('profileref', '==', doc(this.firestore, eisProfile)),
+                                where('appointments', 'array-contains', doc(this.firestore, 'appointmenttype/' + typeId)),
+                                where('starttime', '>=', rangeStart),
+                                where('starttime', '<=', rangeEnd)
+                            ))
+                        );
 
-                                    for (const slot of slotArray) {
-                                        const slotStart = slot.slotstart?.toDate?.() || (slot.slotstart ? new Date(slot.slotstart) : null);
+                        snapshot.forEach((slotDoc) => {
+                            const slotArray = slotDoc.data()[typeId];
+                            if (!Array.isArray(slotArray)) return;
 
-                                        if (!slotStart || slotStart < rangeStart || slotStart > rangeEnd) continue;
+                            for (const slot of slotArray) {
+                                const slotStart = slot.slotstart?.toDate?.() || (slot.slotstart ? new Date(slot.slotstart) : null);
+                                if (!slotStart || slotStart < rangeStart || slotStart > rangeEnd) continue;
 
-                                        matchedSlots.push({
-                                            booked: slot.booked || false,
-                                            available: slot.available || false,
-                                            eisprofile: eisProfile,
-                                        });
-                                    }
+                                matchedSlots.push({
+                                    booked: slot.booked || false,
+                                    available: slot.available || false,
+                                    eisprofile: eisProfile,
                                 });
-                            });
-
-                            availabilityPromises.push(promise);
-                        }
+                            }
+                        });
                     }
+                }
 
-                    await Promise.all(availabilityPromises);
+                results.push({
+                    appointmentType: typeId,
+                    appointmentLabel: seq.appointmentType,
+                    productName: seq.productName,
+                    productId: seq.productId,
+                    slots: matchedSlots,
+                });
 
-                    return {
-                        appointmentType: typeId,
-                        appointmentLabel: seq.appointmentType,
-                        productName: seq.productName,
-                        productId: seq.productId,
-                        slots: matchedSlots,
-                    };
-                })
-            );
+                // Update progress display every 5 sequences so the user sees movement
+                if ((i + 1) % 5 === 0 || i === total - 1) {
+                    this.specialistLoadProgress = `${i + 1} / ${total}`;
+                    console.log(`[Specialist] Step 5 progress: ${i + 1}/${total}`);
+                    this.cdr.detectChanges();
+                }
+            }
 
             this.specialistAllSlots = results;
+            this.specialistLoadProgress = '';
+            const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
+            console.log(`[Specialist] Step 5 done: ${totalSlotsFetched} slots across ${results.length} sequences`);
             this.computeSpecialistDisplayData();
+            console.log(`[Specialist] Done: ${this.specialistData.length} specialists in table`);
 
         } catch (error) {
+            // Log but don't retry via setTimeout — delayed retries would set specialistLoading=true
+            // again after the analytics section has already rendered, causing a persistent spinner.
             console.error('Error fetching specialist slots:', error);
-            if (retryCount < 2) {
-                console.log(`Retrying specialist slots (attempt ${retryCount + 1})...`);
-                setTimeout(() => this.fetchSpecialistSlotsAndCompute(retryCount + 1), 2000);
-                return;
-            }
         } finally {
             this.specialistLoading = false;
             this.cdr.detectChanges();
@@ -1879,42 +2223,282 @@ export class DeliveryDashboardCloneComponent {
     }
 
     get visibleCardIds(): string[] {
-        const allProductIds = this.allProductIdsFromRaw;
-        const seen = new Set<string>();
-        const result: string[] = [];
+        return this.memoGet('vci', () => {
+            const allProductIds = this.allProductIdsFromRaw;
+            const seen = new Set<string>();
+            const result: string[] = [];
 
-        for (const groupName of Object.keys(this.mergedGroupIds)) {
-            const groupPids = this.mergedGroupIds[groupName];
-            const hasData = [...groupPids].some((pid) => allProductIds.has(pid)); // Temporary
-            if (hasData) { // Temporary
-                result.push('group:' + groupName);
-                for (const pid of groupPids) seen.add(pid);
-            } // Temporary
-        }
+            for (const groupName of Object.keys(this.mergedGroupIds)) {
+                const groupPids = this.mergedGroupIds[groupName];
+                const hasData = [...groupPids].some((pid) => allProductIds.has(pid));
+                if (hasData) {
+                    result.push('group:' + groupName);
+                    for (const pid of groupPids) seen.add(pid);
+                }
+            }
 
-        for (const pid of allProductIds) {
-            if (seen.has(pid)) continue;
-            if (this.hiddenProductIds.has(pid)) continue;
-            result.push(pid);
-        }
+            for (const pid of allProductIds) {
+                if (seen.has(pid)) continue;
+                if (this.hiddenProductIds.has(pid)) continue;
+                result.push(pid);
+            }
 
-        return result.sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+            return result.sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+        });
     }
 
     get hiddenCardIds(): string[] {
-        const allProductIds = this.allProductIdsFromRaw;
-        return [...allProductIds]
-            .filter((pid) => this.hiddenProductIds.has(pid))
-            .sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+        return this.memoGet('hci', () => {
+            const allProductIds = this.allProductIdsFromRaw;
+            return [...allProductIds]
+                .filter((pid) => this.hiddenProductIds.has(pid))
+                .sort((a, b) => this.getCardGroupedAll(b).length - this.getCardGroupedAll(a).length);
+        });
+    }
+
+    // ===== Option A redesign: top-of-page KPIs derived from existing data =====
+    get kpiActivePipeline(): number {
+        return this.memoGet('kpiAP', () =>
+            this.visibleCardIds.reduce(
+                (sum, id) => sum + this.getCardGroupedFiltered(id).length, 0
+            )
+        );
+    }
+    get kpiOngoingTotal(): number {
+        return this.memoGet('kpiOG', () =>
+            this.visibleCardIds.reduce(
+                (sum, id) => sum + (this.getCardFunnel(id)?.ongoing?.length || 0), 0
+            )
+        );
+    }
+    getCardOngoing(cardId: string): number {
+        return this.getCardFunnel(cardId)?.ongoing?.length || 0;
+    }
+    get kpiReadyToInitiate(): number {
+        return this.originalData?.['readyForInitiation']?.count || 0;
+    }
+    get kpiStuck(): number {
+        return this.originalData?.['stuckCases']?.count || 0;
+    }
+    get kpiAwaitingTotal(): number {
+        return this.originalData?.['awaitingInitiation']?.count || 0;
+    }
+    get kpiInitiatedNotConsuming(): number {
+        return this.originalData?.['currentJourneyInitiated']?.count || 0;
+    }
+    get kpiCompletedTotal(): number {
+        return this.getCompletionSummary().totalCompleted;
+    }
+    get kpiAvgComplete(): number {
+        return this.getCompletionSummary().avgStartToDone;
+    }
+    get hasSpecialistData(): boolean {
+        return (this.slotOverview?.totalSlots || 0) > 0;
+    }
+
+    // ===== Ported design getters (delivery-dashboard hero focuses on ongoing) =====
+    // (kpiOngoingTotal already exists above; ongoingByCard delegates to getCardOngoing)
+    ongoingByCard(cardId: string): number {
+        return this.getCardOngoing(cardId);
+    }
+    get ongoingMaxAcrossProducts(): number {
+        return Math.max(1, ...this.visibleCardIds.map(id => this.getCardOngoing(id)));
+    }
+    ongoingPctOfMax(cardId: string): number {
+        const v = this.getCardOngoing(cardId);
+        return Math.max(4, Math.round((v / this.ongoingMaxAcrossProducts) * 100));
+    }
+    // Stage column → color modifier class (Stages kanban)
+    stageColorClass(stage: string): string {
+        if (!stage) return 'col--eligible';
+        const s = stage.toLowerCase().trim();
+        if (s.includes('eligible'))      return 'col--eligible';
+        if (s.includes('request'))       return 'col--request';
+        if (s.includes('pre-process')
+         || s.includes('preprocess')
+         || s.includes('welcome'))       return 'col--preprocess';
+        if (s.includes('diagnostic'))    return 'col--diagnostic';
+        if (s.includes('implement'))     return 'col--implement';
+        if (s.includes('review'))        return 'col--review';
+        if (s.includes('complet')
+         || s.includes('post-process')
+         || s.includes('celebration')
+         || s.includes('check-in'))      return 'col--completion';
+        return 'col--eligible';
+    }
+    // Dot color class for product rows (cycles through 5-color set by index)
+    productDotClass(idx: number): string {
+        const palette = ['dot-indigo', 'dot-teal', 'dot-emerald', 'dot-amber', 'dot-violet'];
+        return palette[idx % palette.length];
+    }
+    // Participants tab count (sum across the 3 sub-cohorts)
+    get participantsTotalCount(): number {
+        return (this.originalData?.['awaitingInitiation']?.count || 0)
+             + (this.originalData?.['currentJourneyInitiated']?.count || 0)
+             + (this.originalData?.['stuckCases']?.count || 0);
+    }
+
+    // ===== Action Center → Participants tab deep-links (Batch A) =====
+    // Maps an attention tile to (outer tab index, participants sub-tab index, optional activeFilter).
+    // Tab indices: outer 0=Overview, 1=Analytics, 2=Participants
+    // Inner sub-tabs: 0=Awaiting Initiation, 1=Initiated–Not Consuming, 2=Stuck Cases
+    navToAttention(target: 'stuck' | 'awaiting' | 'ready' | 'idle') {
+        this.outerTabIndex = 2;
+        switch (target) {
+            case 'stuck':
+                this.currentTabIndex = 2;
+                this.activeFilter = 'none';
+                break;
+            case 'awaiting':
+                this.currentTabIndex = 0;
+                this.activeFilter = 'none';
+                break;
+            case 'ready':
+                this.currentTabIndex = 0;
+                this.activeFilter = 'readyForInitiation';
+                break;
+            case 'idle':
+                this.currentTabIndex = 1;
+                this.activeFilter = 'none';
+                break;
+        }
+        if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
+        // Re-trigger paginated data for the newly active sub-tab
+        try { this.filterTableData?.(); } catch { /* ignore if not ready */ }
+    }
+
+    // Human-readable active sub-tab name for the Export button label
+    get participantsActiveTabName(): string {
+        switch (this.currentTabIndex) {
+            case 0: return 'Awaiting';
+            case 1: return 'Idle';
+            case 2: return 'Stuck';
+            default: return '';
+        }
+    }
+
+    // Bulk Initiate Ready — confirmation gate (Batch B)
+    bulkInitiateReady() {
+        const readyCount = this.kpiReadyToInitiate;
+        if (readyCount === 0) {
+            alert('No participants are currently in the Ready state to initiate.');
+            return;
+        }
+        const ok = confirm(
+            `Bulk-initiate ${readyCount} participant${readyCount === 1 ? '' : 's'}?\n\n` +
+            `This will trigger the initiation flow for everyone currently in the Ready state. ` +
+            `This action cannot be undone in one click.`
+        );
+        if (!ok) return;
+        // Surface intent — actual bulk logic is not yet implemented in the backend.
+        alert(`Bulk-initiate triggered for ${readyCount} participant${readyCount === 1 ? '' : 's'}. ` +
+              `Backend wiring is pending — this is a UX-confirmed stub.`);
+    }
+
+    // First-letter monogram for a product (replaces emoji icons in Completion History).
+    // 1 word → first 2 letters; 2 words → 2 initials; 3+ words → 3 initials.
+    // Avoids collisions when several products share a common prefix
+    // (e.g., "EI Solution" vs "EI Starter Pack" both starting with "EI").
+    productMonogram(name: string): string {
+        if (!name) return '?';
+        const cleaned = name.trim().replace(/^[^a-zA-Z0-9]+/, '');
+        const parts = cleaned.split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '?';
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        if (parts.length === 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return (parts[0][0] + parts[1][0] + parts[2][0]).toUpperCase();
+    }
+
+    // Per-product pipeline total for the Action Center mini-funnel rows
+    getCardPipelineTotal(cardId: string): number {
+        const f = this.getCardFunnel(cardId);
+        return (f?.initiated?.length || 0)
+             + (f?.awaiting?.length || 0)
+             + (f?.started?.length || 0)
+             + (f?.ongoing?.length || 0)
+             + (f?.completed?.length || 0);
+    }
+
+    // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
+    private _sparkCacheKey = '';
+    private _sparkCache: { ready: number[]; stuck: number[]; completed: number[] } = { ready: [], stuck: [], completed: [] };
+    private buildSparkData() {
+        const ids = this.visibleCardIds;
+        const key = ids.join('|') + ':' + this.selectedTimeFilter;
+        if (this._sparkCacheKey === key) return this._sparkCache;
+        const ready: number[] = [];
+        const stuck: number[] = [];
+        const completed: number[] = [];
+        const stuckByProfile = new Set((this.originalData?.['stuckCases']?.data || []).map((d: any) => d?.profileid));
+        const readyByProfile = new Set((this.originalData?.['readyForInitiation']?.data || []).map((d: any) => d?.profileid));
+        for (const id of ids) {
+            const pids = this.getCardProductIds(id);
+            const items = pids.flatMap(p => this.groupedFiltered?.[p] || []);
+            const profileSet = new Set(items.map((i: any) => i?.profileid));
+            let r = 0, s = 0;
+            profileSet.forEach((pid) => {
+                if (readyByProfile.has(pid)) r++;
+                if (stuckByProfile.has(pid)) s++;
+            });
+            ready.push(r);
+            stuck.push(s);
+            completed.push(this.getCardFunnel(id)?.completed?.length || 0);
+        }
+        this._sparkCache = { ready, stuck, completed };
+        this._sparkCacheKey = key;
+        return this._sparkCache;
+    }
+    get sparkReady(): number[]     { return this.buildSparkData().ready; }
+    get sparkStuck(): number[]     { return this.buildSparkData().stuck; }
+    get sparkCompleted(): number[] { return this.buildSparkData().completed; }
+    sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
+
+    // Avg-time gauge benchmark
+    avgTimeTarget = 30;
+    get avgTimePct(): number {
+        const v = this.kpiAvgComplete || 0;
+        return Math.min(150, Math.round((v / this.avgTimeTarget) * 100));
+    }
+
+    // Live "last updated" stamp — stored string so Angular's double-check pass sees the same value.
+    // Updated every 5 s outside the Angular zone to avoid NG0100.
+    lastUpdated = new Date();
+    lastUpdatedRelative = 'just now';
+    private _lastUpdatedTimer: ReturnType<typeof setInterval> | null = null;
+
+    private computeLastUpdatedRelative(): string {
+        const diff = Math.floor((Date.now() - this.lastUpdated.getTime()) / 1000);
+        if (diff < 5) return 'just now';
+        if (diff < 60) return diff + 's ago';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        return Math.floor(diff / 3600) + 'h ago';
+    }
+
+    private startLastUpdatedTimer() {
+        if (this._lastUpdatedTimer) return;
+        this.ngZone.runOutsideAngular(() => {
+            this._lastUpdatedTimer = setInterval(() => {
+                const next = this.computeLastUpdatedRelative();
+                if (next !== this.lastUpdatedRelative) {
+                    this.ngZone.run(() => {
+                        this.lastUpdatedRelative = next;
+                        this.cdr.markForCheck();
+                    });
+                }
+            }, 5000);
+        });
     }
 
     get allProductIdsFromRaw(): Set<string> {
-        const ids = new Set<string>();
-        for (const item of this.allMatchedProductsRaw) {
-            const pid = item['productref']?.id;
-            if (pid) ids.add(pid);
-        }
-        return ids;
+        return this.memoGet('apidsR', () => {
+            const ids = new Set<string>();
+            for (const item of this.allMatchedProductsRaw) {
+                if (!this.itemPassesProductFilter(item)) continue;
+                const pid = item['productref']?.id;
+                if (pid) ids.add(pid);
+            }
+            return ids;
+        });
     }
 
     getCardProductIds(cardId: string): string[] {
@@ -1930,7 +2514,7 @@ export class DeliveryDashboardCloneComponent {
         if (cardId.startsWith('group:')) {
             return cardId.replace('group:', '');
         }
-        return this.mapProductName[cardId] || 'Unknown';
+        return this.shortenProductName(this.mapProductName[cardId] || '') || 'Unknown';
     }
 
     getCardSubNames(cardId: string): string[] {
@@ -2182,9 +2766,6 @@ export class DeliveryDashboardCloneComponent {
         return date >= this.dateRangeStart && date <= this.dateRangeEnd;
     }
 
-    selectedStatus: string = 'all';
-    allFunnelModalProfiles: any = {};
-
     openFunnelModal(productId: string, type: string, event: Event) {
         event.stopPropagation();
 
@@ -2318,13 +2899,6 @@ export class DeliveryDashboardCloneComponent {
         this.avgModalProductId = productId;
         this.avgModalType = type;
         this.avgModalOpen = true;
-
-        const excludedModes = new Set([
-            'installation event mode',
-            'event mode',
-            // 'priority mode',
-            'integration mode',
-        ]);
 
         const items = this.allMatchedProductsRaw.filter((i) => i['productref']?.id === productId);
         const details = [];
@@ -3956,7 +4530,9 @@ export class DeliveryDashboardCloneComponent {
 
     getCompletionProducts(): CompletionProduct[] {
         const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#14b8a6', '#6366f1', '#ef4444', '#0891b2', '#be123c', '#7c3aed'];
-        const icons = ['🌱', '💡', '✨', '🔬', '🎯', '📦', '⚡', '🔮', '🎨', '🚀'];
+        // Monogram fallback: per-card monogram is computed from the product name (see productMonogram)
+        // Keep this stub for shape compatibility with downstream `product.icon` consumers.
+        const icons = ['', '', '', '', '', '', '', '', '', ''];
         const iconBgs = ['#eff6ff', '#f5f3ff', '#ecfdf5', '#fffbeb', '#f0fdfa', '#eef2ff', '#fef2f2', '#e0f2fe', '#fce7f3', '#ede9fe'];
 
         const buildProduct = (cardId: string, ci: number): CompletionProduct => {
@@ -3969,7 +4545,7 @@ export class DeliveryDashboardCloneComponent {
             let purchasedCompletions = 0;
             for (const item of completedItems) {
                 const packageId = item['packageref']?.id;
-                if (packageId && this.bonusPackageIds.has(packageId)) {
+                if (packageId && this.bonusPackageLookup[packageId]) {
                     bonusCompletions++;
                 } else {
                     purchasedCompletions++;
@@ -4129,7 +4705,9 @@ export class DeliveryDashboardCloneComponent {
 
     private buildCompletionProduct(cardId: string, ci: number): CompletionProduct {
         const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#14b8a6', '#6366f1', '#ef4444', '#0891b2', '#be123c', '#7c3aed'];
-        const icons = ['🌱', '💡', '✨', '🔬', '🎯', '📦', '⚡', '🔮', '🎨', '🚀'];
+        // Monogram fallback: per-card monogram is computed from the product name (see productMonogram)
+        // Keep this stub for shape compatibility with downstream `product.icon` consumers.
+        const icons = ['', '', '', '', '', '', '', '', '', ''];
         const iconBgs = ['#eff6ff', '#f5f3ff', '#ecfdf5', '#fffbeb', '#f0fdfa', '#eef2ff', '#fef2f2', '#e0f2fe', '#fce7f3', '#ede9fe'];
 
         const funnel = this.getCardFunnel(cardId);
@@ -4141,7 +4719,7 @@ export class DeliveryDashboardCloneComponent {
         let purchasedCompletions = 0;
         for (const item of completedItems) {
             const packageId = item['packageref']?.id;
-            if (packageId && this.bonusPackageIds.has(packageId)) {
+            if (packageId && this.bonusPackageLookup[packageId]) {
                 bonusCompletions++;
             } else {
                 purchasedCompletions++;
@@ -4355,5 +4933,500 @@ export class DeliveryDashboardCloneComponent {
         this.groupedByStageProfileAll = {};
         this.selectedFilter = 'all';
         this.selectedStageFilter = '';
+    }
+
+    // ===== Analytics tab =================================================
+
+    analyticsLoading = false;
+    analyticsLoaded = false;
+    analyticsError: string | null = null;
+    analyticsVelocity: VelocityRow[] = [];
+    analyticsFunnel: FunnelRow[] = [];
+    analyticsUtilization: UtilizationRow[] = [];
+
+    onOuterTabChange(event: any) {
+        const label = event?.tab?.textLabel || '';
+        if (label === 'Analytics') {
+            // Always reload — analytics are computed in-memory so this is instant.
+            // This ensures the charts reflect the current product-filter selection.
+            this.analyticsLoaded = false;
+            this.loadAnalytics();
+        }
+    }
+
+    async loadAnalytics(): Promise<void> {
+        if (this.analyticsLoading) return;
+        this.analyticsLoading = true;
+        this.analyticsError = null;
+        try {
+            // Use visibleCardIds (same product set as Overview) so analytics always matches.
+            const visibleProductNames = this.visibleCardIds.map(id => this.getCardName(id));
+
+            // 1. Load velocity — this is fast (in-memory compute).
+            //    Don't await specialist here: that chain is 5 collections deep and can be slow.
+            //    We load it independently so the section appears immediately.
+            const velocity = await this.completionVelocity({ weeks: 12, productIds: visibleProductNames });
+            this.analyticsVelocity = velocity;
+            // funnelChart reads directly from funnelData — no separate load needed.
+            this.analyticsLoaded = true;
+        } catch (e: any) {
+            this.analyticsError = e?.message || 'Failed to load analytics';
+            console.warn('Analytics load failed', e);
+        } finally {
+            this.analyticsLoading = false;
+            this.cdr.detectChanges();
+        }
+
+        // 2. Specialist slot load — disabled until fetchSpecialistSlotsAndCompute is optimised.
+        // if (!this.specialistSlotsInitialized) {
+        //     this.initSpecialistDateRange();
+        //     this.loadSpecialistBaseData();
+        // }
+    }
+
+    // ---- Velocity chart view-model ----------------------------------------
+
+    get velocityChart(): {
+        weeks: string[];
+        yMax: number;
+        lines: { product: string; pathD: string; points: { x: number; y: number; count: number }[]; color: string }[];
+        width: number;
+        height: number;
+        pad: { l: number; r: number; t: number; b: number };
+    } {
+        const rows = this.analyticsVelocity;
+        const w = 720, h = 234;
+        const pad = { l: 36, r: 14, t: 26, b: 26 };
+        if (rows.length === 0) {
+            return { weeks: [], yMax: 1, lines: [], width: w, height: h, pad };
+        }
+        const weeks = Array.from(new Set(rows.map(r => r.week))).sort();
+        const products = Array.from(new Set(rows.map(r => r.product_id))).sort();
+        const palette = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#0891b2'];
+        const yMax = Math.max(1, ...rows.map(r => r.completions));
+        const plotW = w - pad.l - pad.r;
+        const plotH = h - pad.t - pad.b;
+        const xStep = weeks.length > 1 ? plotW / (weeks.length - 1) : 0;
+        const xAt = (i: number) => pad.l + i * xStep;
+        const yAt = (v: number) => pad.t + (plotH - (v / yMax) * plotH);
+        const lines = products.map((p, idx) => {
+            const points = weeks.map((wk, i) => {
+                const row = rows.find(r => r.week === wk && r.product_id === p);
+                const c = row?.completions || 0;
+                return { x: xAt(i), y: yAt(c), count: c };
+            });
+            const pathD = points
+                .map((pt, i) => (i === 0 ? `M${pt.x},${pt.y}` : `L${pt.x},${pt.y}`))
+                .join(' ');
+            return { product: p, pathD, points, color: palette[idx % palette.length] };
+        });
+        return { weeks, yMax, lines, width: w, height: h, pad };
+    }
+
+    // ---- Funnel view-model -----------------------------------------------
+
+    get funnelChart(): {
+        products: { product: string; stages: { stage: string; label: string; count: number; pct: number; color: string }[]; total: number }[];
+    } {
+        // Uses the same funnelData as the Overview (time-filtered + product-filtered via visibleCardIds)
+        // so Analytics and Overview always agree on numbers.
+        const stageKeys = ['initiated', 'awaiting', 'started', 'ongoing', 'completed'] as const;
+        const stageLabels: Record<string, string> = { initiated: 'Initiated', awaiting: 'Awaiting', started: 'Started', ongoing: 'Ongoing', completed: 'Completed' };
+        const stageColors: Record<string, string> = { initiated: '#a78bfa', awaiting: '#fb923c', started: '#60a5fa', ongoing: '#818cf8', completed: '#34d399' };
+
+        return {
+            products: this.visibleCardIds.map(cardId => {
+                const funnel = this.getCardFunnel(cardId);
+                const stages = stageKeys.map(s => ({
+                    stage: s,
+                    label: stageLabels[s],
+                    count: (funnel[s] as any[])?.length || 0,
+                    pct: 0,
+                    color: stageColors[s],
+                }));
+                const total = stages.reduce((sum, s) => sum + s.count, 0) || 1;
+                stages.forEach(s => s.pct = Math.round((s.count / total) * 100));
+                return { product: this.getCardName(cardId), stages, total };
+            })
+        };
+    }
+
+    // ---- Specialist utilization view-model -------------------------------
+
+    get utilizationChart(): {
+        specialists: { specialist_id: string; profile_ref: string; weeks: { week: string; util: number; booked: number; available: number }[]; avgUtil: number }[];
+    } {
+        const bySpec = new Map<string, UtilizationRow[]>();
+        for (const r of this.analyticsUtilization) {
+            const arr = bySpec.get(r.specialist_id) || [];
+            arr.push(r);
+            bySpec.set(r.specialist_id, arr);
+        }
+        const specs: any[] = [];
+        bySpec.forEach((rows, id) => {
+            const sorted = rows.slice().sort((a, b) => a.week.localeCompare(b.week));
+            const avgUtil = sorted.length
+                ? sorted.reduce((s, r) => s + r.utilization, 0) / sorted.length
+                : 0;
+            specs.push({
+                specialist_id: id,
+                profile_ref: sorted[0]?.profile_ref || id,
+                weeks: sorted.map(r => ({
+                    week: r.week,
+                    util: r.utilization,
+                    booked: r.booked,
+                    available: r.available,
+                })),
+                avgUtil,
+            });
+        });
+        specs.sort((a, b) => b.avgUtil - a.avgUtil);
+        return { specialists: specs };
+    }
+
+    velocityWeekLabel(week: string): string {
+        // Compact label: "May 18" or just "18" depending on chart density
+        if (!week) return '';
+        const d = new Date(week);
+        const m = d.toLocaleString('en-US', { month: 'short' });
+        return `${m} ${d.getDate()}`;
+    }
+
+    utilTone(util: number): string {
+        if (util >= 0.85) return 'high';
+        if (util >= 0.6) return 'med';
+        if (util >= 0.3) return 'low';
+        return 'min';
+    }
+
+    // ===== Analytics — real Firestore data =================================
+
+    /** Convert any Firestore Timestamp / Date / epoch to a JS Date, or null. */
+    private tsToDate(ts: any): Date | null {
+        if (!ts) return null;
+        if (ts?.toDate) return ts.toDate() as Date;
+        if (ts instanceof Date) return ts;
+        if (typeof ts === 'number') return new Date(ts);
+        return null;
+    }
+
+    /** Return the ISO date string (YYYY-MM-DD) for the Monday of the given date's week. */
+    private weekMonday(d: Date): string {
+        const day = new Date(d);
+        const dow = (day.getDay() + 6) % 7; // 0 = Mon … 6 = Sun
+        day.setDate(day.getDate() - dow);
+        day.setHours(0, 0, 0, 0);
+        return day.toISOString().slice(0, 10);
+    }
+
+    /**
+     * Completion Velocity — counts participants whose `statusdate.completed`
+     * timestamp falls within each of the last `weeks` calendar weeks,
+     * grouped by product name.
+     */
+    async completionVelocity(opts: { weeks: number; productIds?: string[] | null } = { weeks: 12 }): Promise<VelocityRow[]> {
+        const { weeks, productIds } = opts;
+        const today = new Date();
+        const cutoffMs = today.getTime() - weeks * 7 * 24 * 60 * 60 * 1000;
+
+        // Build optional name filter (product label or product name)
+        const filterNames = new Set<string>(
+            (productIds ?? []).map(id => id.toLowerCase().trim()).filter(Boolean)
+        );
+
+        const map = new Map<string, number>(); // "week|productName" → completion count
+
+        for (const item of this.allMatchedProductsRaw) {
+            if ((item?.status || '').toString().toLowerCase().trim() !== 'completed') continue;
+
+            const completedDate = this.tsToDate(item?.statusdate?.completed);
+            if (!completedDate || completedDate.getTime() < cutoffMs) continue;
+
+            const productName = this.mapProductName?.[item?.productref?.id] || '';
+            if (!productName) continue;
+            if (filterNames.size > 0 && !filterNames.has(productName.toLowerCase().trim())) continue;
+
+            const key = `${this.weekMonday(completedDate)}|${productName}`;
+            map.set(key, (map.get(key) || 0) + 1);
+        }
+
+        const rows: VelocityRow[] = [];
+        for (const [key, completions] of map) {
+            const sep = key.indexOf('|');
+            rows.push({ week: key.slice(0, sep), product_id: key.slice(sep + 1), completions });
+        }
+        return rows.sort((a, b) => a.week.localeCompare(b.week));
+    }
+
+    /**
+     * Funnel Drop-off — for each product, shows how many participants are
+     * currently at each pipeline stage (cumulative: each tier includes all
+     * participants at that stage AND every stage beyond it).
+     *
+     * Stage mapping (from `status` field on participantsproduct):
+     *   null / unknown → 'initiated'
+     *   'initiated' | 'awaiting' | 'started' | 'ongoing' | 'completed' → direct
+     */
+    async funnelDropoff(opts: { fromDate?: string; productIds?: string[] | null } = {}): Promise<FunnelRow[]> {
+        const { productIds } = opts;
+        const stageOrder: FunnelRow['stage'][] = ['initiated', 'awaiting', 'started', 'ongoing', 'completed'];
+        const excludedStatuses = new Set(['rejected', 'cancelled', 'inactive', 'shifted']);
+
+        const filterNames = new Set<string>(
+            (productIds ?? []).map(id => id.toLowerCase().trim()).filter(Boolean)
+        );
+
+        // Count participants by current status, per product
+        const productStageCounts = new Map<string, Map<string, number>>();
+
+        for (const item of this.allMatchedProductsRaw) {
+            const rawStatus = (item?.status || '').toString().toLowerCase().trim();
+            if (!rawStatus || excludedStatuses.has(rawStatus)) continue;
+
+            const productName = this.mapProductName?.[item?.productref?.id] || '';
+            if (!productName) continue;
+            if (filterNames.size > 0 && !filterNames.has(productName.toLowerCase().trim())) continue;
+
+            const stage: FunnelRow['stage'] = (stageOrder as string[]).includes(rawStatus)
+                ? rawStatus as FunnelRow['stage']
+                : 'initiated';
+
+            if (!productStageCounts.has(productName)) {
+                productStageCounts.set(productName, new Map());
+            }
+            const sm = productStageCounts.get(productName)!;
+            sm.set(stage, (sm.get(stage) || 0) + 1);
+        }
+
+        // Non-cumulative: each stage shows only participants currently at that exact stage.
+        // This lets the stacked bar chart show WHERE people are right now (stage distribution).
+        const rows: FunnelRow[] = [];
+        for (const [productName, stageCounts] of productStageCounts) {
+            for (let i = 0; i < stageOrder.length; i++) {
+                rows.push({ product_id: productName, stage: stageOrder[i], count: stageCounts.get(stageOrder[i]) || 0 });
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * Specialist Utilization — for each specialist (taken from `hosts[0]` on
+     * participantsproduct), counts how many participants they were actively
+     * supporting during each of the last `weeks` calendar weeks.
+     *
+     * "Active during week W" = participant's `statusdate.ongoing` (or `.started`
+     * or `.initiated`) is before week-end, AND `statusdate.completed` is either
+     * absent or after week-start.
+     *
+     * `booked`       = active participant count for the week (+ any appointments)
+     * `available`    = assumed capacity (20) − booked
+     * `utilization`  = booked / 20, capped at 1
+     */
+    async specialistUtilization(opts: { weeks: number } = { weeks: 8 }): Promise<UtilizationRow[]> {
+        const { weeks } = opts;
+        const CAPACITY = 20;
+
+        const today = new Date();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+
+        // --- Build specialist → participant list ---
+        const specMap = new Map<string, { name: string; participants: any[] }>();
+
+        for (const item of this.allMatchedProductsRaw) {
+            const rawHost = item?.hosts?.[0];
+            if (!rawHost) continue;
+
+            const hostId: string = typeof rawHost === 'string'
+                ? (rawHost.split('/').pop() || rawHost)
+                : ((rawHost?.path || '').split('/').pop() || rawHost?.id || '');
+            if (!hostId) continue;
+
+            if (!specMap.has(hostId)) {
+                const name = this.mapMetaData?.[hostId]?.['name'] || hostId;
+                specMap.set(hostId, { name, participants: [] });
+            }
+            specMap.get(hostId)!.participants.push(item);
+        }
+
+        // --- Build appointment count: "week|hostId" → count ---
+        // Link appointments to specialists via participantproductid → docid/id → hosts[0]
+        const docToHost = new Map<string, string>();
+        for (const [hostId, data] of specMap) {
+            for (const item of data.participants) {
+                const docid = item?.docid || item?.id || '';
+                if (docid) docToHost.set(docid, hostId);
+            }
+        }
+
+        const apptMap = new Map<string, number>(); // "week|hostId" → appointment count
+        for (const appt of (this.allAppointments as any[])) {
+            const ppid: string = appt?.participantproductid || appt?.productid || '';
+            const hostId = docToHost.get(ppid);
+            if (!hostId) continue;
+            const startDate = this.tsToDate(appt?.starttime || appt?.appointmentstart);
+            if (!startDate) continue;
+            const key = `${this.weekMonday(startDate)}|${hostId}`;
+            apptMap.set(key, (apptMap.get(key) || 0) + 1);
+        }
+
+        // --- Build rows ---
+        const rows: UtilizationRow[] = [];
+
+        for (const [hostId, data] of specMap) {
+            for (let w = weeks - 1; w >= 0; w--) {
+                const weekStart = new Date(monday);
+                weekStart.setDate(monday.getDate() - w * 7);
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 7);
+                const weekStr = weekStart.toISOString().slice(0, 10);
+
+                let active = 0;
+                for (const item of data.participants) {
+                    const sd = item?.statusdate || {};
+                    const ongoingDate = this.tsToDate(sd['ongoing'] || sd['started'] || sd['initiated']);
+                    if (!ongoingDate) {
+                        if (w === 0) active++; // no timestamp → assume currently active
+                        continue;
+                    }
+                    const completedDate = this.tsToDate(sd['completed']);
+                    if (ongoingDate <= weekEnd && (!completedDate || completedDate >= weekStart)) {
+                        active++;
+                    }
+                }
+
+                const apptCount = apptMap.get(`${weekStr}|${hostId}`) || 0;
+                const booked = Math.max(active, apptCount);
+                const available = Math.max(0, CAPACITY - booked);
+                const utilization = Math.round(Math.min(1, booked / CAPACITY) * 1000) / 1000;
+
+                rows.push({ specialist_id: hostId, profile_ref: data.name, week: weekStr, booked, available, utilization });
+            }
+        }
+
+        return rows;
+    }
+
+    // ===== Actionable cohorts (populates the Participants tab from stage data) =====
+    //
+    // The original populator was appointment-driven (line 2787 area), so it returned
+    // empty whenever appointments couldn't be read (permission denial) or whenever a
+    // participant had never had an appointment. This stage-based populator walks
+    // participantsproduct directly (the data the Stages section already uses) and
+    // categorizes every actionable participant into one of three buckets, mapped to
+    // the PM table's column shape.
+
+    private readonly IDLE_DAYS = 7;
+    private readonly STUCK_DAYS = 15;
+
+    private daysSinceTs(ts: any): number {
+        if (!ts) return 0;
+        const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+        if (!d || isNaN(d.getTime())) return 0;
+        return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
+    }
+
+    populateActionableCohorts(): void {
+        const awaiting: any[] = [];
+        const idle: any[] = [];
+        const stuck: any[] = [];
+
+        const rejected = new Set(['rejected', 'cancelled', 'inactive']);
+
+        for (const item of this.allMatchedProductsRaw || []) {
+            if (!this.itemPassesProductFilter(item)) continue;
+
+            const profileId = item?.profileid;
+            if (!profileId) continue;
+            const meta = this.mapMetaData?.[profileId] || {};
+            const status = (item?.status || '').toString().toLowerCase().trim();
+            if (status === 'completed' || rejected.has(status)) continue;
+
+            const mode = (meta['participantmode'] || '').toString().toLowerCase().trim();
+            const totalPaid = parseInt(meta['pp_totalpaid'] ?? '0') || 0;
+            const totalPurchaseValue = parseInt(meta['pp_totalpurchasevalue'] ?? '0') || 0;
+            const totalBalance = totalPurchaseValue - totalPaid;
+            const minPayment = parseInt(item?.['minimumpayment']) || 0;
+            const isEligible = !this.excludedModes.has(mode)
+                && (totalBalance <= 0 || totalPaid >= minPayment);
+            const financialdata = isEligible ? 'Cleared' : 'Not Scheduled';
+
+            const productId = item?.productref?.id;
+            const productName = this.shortenProductName(this.mapProductName?.[productId] || '');
+            const journeyId = item?.journeyref?.id || meta['activejourney'];
+            const journeyName = this.mapjourneyname?.[journeyId] || 'N/A';
+
+            const sd = item?.statusdate || {};
+            const onboarded = meta['onboardedtime'] || sd['initiated'] || null;
+            const initiated = sd['initiated'] || null;
+            const lastActivity = sd['ongoing'] || sd['started'] || sd['initiated'] || onboarded;
+            const lastPayment = meta['lastpaymentdate'] || meta['lastpayment'] || null;
+
+            const daysSinceOnboarded = this.daysSinceTs(onboarded);
+            const daysSinceInitiated = this.daysSinceTs(initiated);
+            const daysSinceActivity = this.daysSinceTs(lastActivity);
+
+            // --- Awaiting Initiation -------------------------------------
+            // Payment cleared (eligible), and status is null/empty (not yet initiated)
+            if (!status && isEligible) {
+                awaiting.push({
+                    profileid: profileId,
+                    journey: journeyName,
+                    onboardedtime: onboarded,
+                    waitingperiod: daysSinceOnboarded,
+                    financialdata,
+                    lastpaymentdate: lastPayment,
+                    bottleneck: 'Ready for Initiation',
+                });
+                continue;
+            }
+
+            // --- Initiated · Not Consuming -------------------------------
+            // status='initiated' and idle > IDLE_DAYS
+            if (status === 'initiated' && daysSinceInitiated >= this.IDLE_DAYS) {
+                idle.push({
+                    profileid: profileId,
+                    journey: journeyName,
+                    initiatedtime: initiated,
+                    waitingperiod: daysSinceInitiated,
+                    generalnotes: [],
+                });
+            }
+
+            // --- Stuck Cases ----------------------------------------------
+            // In any active stage (initiated/ongoing) and no movement > STUCK_DAYS
+            if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
+                const days = daysSinceActivity;
+                const escalation = days > 30 ? 'HIGH' : days > 21 ? 'MEDIUM' : 'LOW';
+                stuck.push({
+                    profileid: profileId,
+                    activejourney: journeyName,
+                    product: productName || 'N/A',
+                    appointment: 'N/A',
+                    appointmentstatus: 'N/A',
+                    issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
+                    date: lastActivity,
+                    waitingperiod: days,
+                    lastaction: status,
+                    assignedto: 'Unassigned',
+                    escalationlevel: escalation,
+                    generalnotes: [],
+                });
+            }
+        }
+
+        this.originalData['awaitingInitiation'].data  = awaiting;
+        this.originalData['awaitingInitiation'].count = awaiting.length;
+        this.originalData['currentJourneyInitiated'].data  = idle;
+        this.originalData['currentJourneyInitiated'].count = idle.length;
+        this.originalData['stuckCases'].data  = stuck;
+        this.originalData['stuckCases'].count = stuck.length;
+
+        // Pagination depends on these arrays; recalc if a table is currently mounted.
+        if (typeof this.calculatePagination === 'function') {
+            this.calculatePagination();
+            this.updatePaginatedData?.();
+        }
     }
 }

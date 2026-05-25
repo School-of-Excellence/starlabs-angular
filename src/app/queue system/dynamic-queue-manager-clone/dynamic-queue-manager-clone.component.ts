@@ -100,7 +100,8 @@ interface ProfileNotificationSummary {
     MatTooltipModule,
     MatDatepickerModule,
     MatNativeDateModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
@@ -338,6 +339,25 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   notesDateStart: Date | null = null;
   notesDateEnd: Date | null = null;
   notesData: any[] = [];  
+  // Bulk Move 
+  showBulkMovePanel          = false;
+  bulkMoveInProgress         = false;
+  bulkMoveCompleted          = false;
+  bulkMoveFailed             = false;
+  bulkMoveTargetStageKey     = '';
+  bulkMoveCurrentStageObj: any = null;
+  availableStagesForBulkMove: any[] = [];
+  bulkMoveResults: { token: any; variationName: string; isDFU: boolean }[] = [];
+  // Stage Activity Panel
+  showStageActivityPanel: boolean = false;
+  selectedStageForActivity: string = '';
+  selectedStageTypeForActivity: string | null = null;
+  stageActivityTab: 'cameIn' | 'wentOut' = 'cameIn';
+  stageActivityData: { cameIn: any[], wentOut: any[] } = { cameIn: [], wentOut: [] };
+  stageActivityCache: any[] | null = null;
+  stageActivityCacheQueueId: string | null = null;
+  stageActivityCacheLoading: boolean = false;
+  participantSearchTerm: string = '';
 
   // Add this property
   isRoundRobinRunning = false;
@@ -1681,6 +1701,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.liveQueueSubscription.next()
     this.liveQueueSubscription.complete()
     this.liveQueueSubscription = new Subject<void>();
+
+    this.stageActivityCache = null;
+    this.stageActivityCacheQueueId = null;
+    this.stageActivityCacheLoading = false;
+    this.showStageActivityPanel = false;
     
     // Reset pagination and filters
     this.stageDisplayCounts = {};
@@ -2818,7 +2843,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   //   this.filteredAvailableStages = [...this.availableStages];
   // }
 
-  async moveTokenToStage(token: any, fromStage: string, fromstagetype: string, toStage: string, markascompleted: any) {
+  async moveTokenToStage(token: any, fromStage: string, fromstagetype: string, toStage: string, markascompleted: any, prefilledPeople?: any) {
     console.log(fromStage, fromstagetype, toStage, markascompleted);
     let targetStageName = toStage;
     let targetStageType = null;
@@ -2847,33 +2872,29 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     const dragType = dragStage.type;
     const dropType = dropStage.type;
 
-    const loading = this.dialog.open(LoadingProgressComponent, {
-      data: {
-        msg: "Moving Token " + token.tokennumber + "..."
-      },
+    const loading = prefilledPeople == null ? this.dialog.open(LoadingProgressComponent, {
+      data: { msg: "Moving Token " + token.tokennumber + "..." },
       disableClose: true
-    });
+    }) : null;
 
     let batch = writeBatch(this.firestore);
 
     try {
       if (dragIndex != dropIndex && dropType != "Activity") {
-        const peopledata = {
-          type: "general",
-          personoption: this.specialistList,
-          mentoroption: this.specialistList,
-          shadowoption: this.specialistList,
-          multiperson: true
-        };
+        let result = prefilledPeople ?? null;
 
-        const dialog = this.dialog.open(PeopleInvolvedComponent, {
-          disableClose: true,
-          data: peopledata
-        });
-
-        const result = await firstValueFrom(dialog.afterClosed());
         if (result == null) {
-          return;
+          const peopledata = {
+            type: "general",
+            personoption: this.specialistList,
+            mentoroption: this.specialistList,
+            shadowoption: this.specialistList,
+            multiperson: true
+          };
+          result = await firstValueFrom(
+            this.dialog.open(PeopleInvolvedComponent, { disableClose: true, data: peopledata }).afterClosed()
+          );
+          if (result == null) { return; }
         }
 
         if (result != null) {
@@ -3186,7 +3207,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     } catch (error) {
       console.error("Error moving token:", error);
     } finally {
-      loading.close();
+      loading?.close();
     }
   }
 
@@ -4121,9 +4142,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     if (existingToken) {
       this.selectedTokens.delete(existingToken);
-    } else {
-      this.selectedTokens.add(token);
+      return;
     }
+
+    if (this.selectedTokens.size >= 10) {
+      this.guard.openSnackBar('Maximum 10 participants can be selected at a time', 'OK', 2000);
+      return;
+    }
+
+    this.selectedTokens.add(token);
   }
 
   isTokenSelected(token: any): boolean {
@@ -5831,6 +5858,282 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     } else {
       this.selectedWhatsappPreview = { profileId, item };
     }
+  }
+
+  async openBulkMovePanel(): Promise<void> {
+    const selected = this.getSelectedTokens();
+
+    if (!selected.length) {
+      this.guard.openSnackBar('Please select participants first', 'OK', 2000);
+      return;
+    }
+
+    // All selected tokens must belong to the same stage column
+    const sourceStage = this.stageQueue.find(s =>
+      s.tokenlist.some((t: any) => t.profile_id === selected[0].profile_id)
+    );
+
+    if (!sourceStage) {
+      this.guard.openSnackBar('Could not identify source stage', 'OK', 2000);
+      return;
+    }
+
+    const allSameStage = selected.every(token =>
+      sourceStage.tokenlist.some((t: any) => t.profile_id === token.profile_id)
+    );
+
+    if (!allSameStage) {
+      this.guard.openSnackBar('All selected participants must be from the same stage', 'OK', 3000);
+      return;
+    }
+
+    // Reset state
+    this.bulkMoveCurrentStageObj = sourceStage;
+    this.bulkMoveTargetStageKey = '';
+    this.bulkMoveCompleted = false;
+    this.bulkMoveInProgress = false;
+    this.bulkMoveFailed = false;
+    this.availableStagesForBulkMove = [];
+
+    this.bulkMoveResults = selected.map(token => ({
+      token,
+      variationName: token.variationid
+        ? (this.mapVariation[token.variationid]?.variationname ?? 'Unknown')
+        : 'Default',
+      isDFU: this.getTokenHighlight(token.profile_id) === 'orange'
+    }));
+
+    this.checkAvailablestages(selected[0], sourceStage.stagename, sourceStage.type);
+
+    const stageListPerToken = selected.map(token =>
+      token.variationid && this.mapVariation[token.variationid]
+        ? (this.mapVariation[token.variationid]['stages'] as string[]) ?? []
+        : (this.selectedQueue?.stages as string[]) ?? []
+    );
+
+    this.availableStagesForBulkMove = this.availableStages.filter(stage => {
+      const typeMatch = stage.stagename.match(/^(.*?)\s*\((.*?)\)$/);
+      const baseName = typeMatch ? typeMatch[1].trim() : stage.stagename;
+      const stageType = typeMatch ? typeMatch[2]?.trim() : null;
+
+      if (stageType === 'Activity') return false;
+
+      return stageListPerToken.every(list => list.includes(baseName));
+    });
+
+    this.showBulkMovePanel = true;
+  }
+
+  async executeBulkMove(): Promise<void> {
+    const target = this.availableStagesForBulkMove.find(s => s.stagename === this.bulkMoveTargetStageKey);
+    if (!target) return;
+
+    const tokensToMove = this.bulkMoveResults.filter(r => !r.isDFU).map(r => r.token);
+    if (!tokensToMove.length) return;
+
+    const fromStageName = this.bulkMoveCurrentStageObj.stagename;
+    const fromStageType = this.bulkMoveCurrentStageObj.type;
+
+    const loading = this.dialog.open(LoadingProgressComponent, {
+      data: { msg: "Moving Participants..." },
+      disableClose: true
+    });
+
+    this.bulkMoveInProgress = true;
+
+    try {
+      for (const token of tokensToMove) {
+        await this.moveTokenToStage(
+          token, fromStageName, fromStageType,
+          target.stagename, false,
+          { person: [], mentor: [], shadow: [] }
+        );
+      }
+      this.bulkMoveFailed = false;
+    } catch (error) {
+      console.error("Error moving tokens:", error);
+      this.bulkMoveFailed = true;
+    } finally {
+      loading.close();
+    }
+
+    this.bulkMoveInProgress = false;
+    this.bulkMoveCompleted = true;
+  }
+
+  get bulkMovableCount(): number {
+    return this.bulkMoveResults.filter(r => !r.isDFU).length;
+  }
+
+  get bulkDFUCount(): number {
+    return this.bulkMoveResults.filter(r => r.isDFU).length;
+  }
+
+  closeBulkMovePanel(): void {
+    if (this.bulkMoveInProgress) return;
+
+    if (this.bulkMoveCompleted && !this.bulkMoveFailed) {
+      this.selectedTokens.clear();
+    }
+
+    this.showBulkMovePanel = false;
+    this.bulkMoveInProgress = false;
+    this.bulkMoveCompleted = false;
+    this.bulkMoveFailed = false;
+    this.bulkMoveTargetStageKey = '';
+    this.bulkMoveCurrentStageObj = null;
+    this.availableStagesForBulkMove = [];
+    this.bulkMoveResults = [];
+  }
+
+  async fetchStageActivity() {
+    if (!this.selectedQueue) return;
+
+    this.stageActivityCacheLoading = true;
+    this.stageActivityCache = null;
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue.docid);
+
+    try {
+      const snap = await getDocs(
+        query(
+          collection(this.firestore, 'queue stage log'),
+          where('queueref', '==', queueRef),
+          where('logdate', '>=', Timestamp.fromDate(since))
+        )
+      );
+      this.stageActivityCache = snap.docs.map(d => d.data());
+      this.stageActivityCacheQueueId = this.selectedQueue.docid;
+      this.stageActivityCacheLoading = false;
+      if (this.showStageActivityPanel) {
+        this.buildStageActivityData(this.selectedStageForActivity, this.selectedStageTypeForActivity);
+      }
+    } catch (err) {
+      console.error('Stage activity fetch error:', err);
+      this.stageActivityCacheLoading = false;
+    }
+  }
+
+  openStageActivity(stageName: string, stageType: string | null, event: Event) {
+    event.stopPropagation();
+    this.selectedStageForActivity = stageName;
+    this.selectedStageTypeForActivity = stageType;
+    this.stageActivityTab = 'cameIn';
+    this.showStageActivityPanel = true;
+    this.fetchStageActivity();
+  }
+
+  buildStageActivityData(stageName: string, stageType: string | null) {
+    const logs = this.stageActivityCache || [];
+
+    const sortDesc = (a: any, b: any) => {
+      const dateA = a['logdate']?.toDate?.() || new Date(0);
+      const dateB = b['logdate']?.toDate?.() || new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    };
+
+    this.stageActivityData = {
+      cameIn: logs.filter(log => {
+        if (log['currentstage'] !== stageName) return false;
+        if (!stageType) return true;
+        if (stageType === 'Queued') {
+          return [null, 'queued', 'invited'].includes(log['status']);
+        }
+        if (stageType === 'Waiting') return log['status'] === 'ready';
+        if (stageType === 'Activity') return !!log['liveassignmentid'];
+        return true;
+      }).sort(sortDesc),
+      wentOut: logs.filter(log =>
+        log['previousstage'] === stageName
+      ).sort(sortDesc)
+    };
+  }
+
+  get uniqueActivityStages(): any[] {
+    const seen = new Set<string>();
+    return this.stageQueue.filter((s: any) => {
+      if (s.stagename === 'Unattended Participants') return false;
+      if (seen.has(s.stagename)) return false;
+      seen.add(s.stagename);
+      return true;
+    });
+  }
+
+  onStageActivityFilterChange(stageName: string) {
+    this.selectedStageTypeForActivity = null;
+    this.buildStageActivityData(stageName, null);
+  }
+
+  closeStageActivityPanel() {
+    this.showStageActivityPanel = false;
+    this.stageActivityData = { cameIn: [], wentOut: [] };
+  }
+
+  exportStageActivity() {
+    const rows: any[] = [];
+
+    this.stageActivityData.cameIn.forEach(log => {
+      rows.push({
+        direction: 'Came In',
+        name: this.mapProfileData[log['profile_id']]?.['name'] || '',
+        email: this.mapProfileData[log['profile_id']]?.['email'] || '',
+        from_stage: log['previousstage'] || '',
+        to_stage: log['currentstage'] || '',
+        time: log['logdate']?.toDate
+          ? log['logdate'].toDate().toLocaleString() : '',
+        moved_by: this.mapProfileData[log['movedby']]?.['name'] || '',
+      });
+    });
+
+    this.stageActivityData.wentOut.forEach(log => {
+      rows.push({
+        direction: 'Went Out',
+        name: this.mapProfileData[log['profile_id']]?.['name'] || '',
+        email: this.mapProfileData[log['profile_id']]?.['email'] || '',
+        from_stage: log['previousstage'] || '',
+        to_stage: log['currentstage'] || '',
+        time: log['logdate']?.toDate
+          ? log['logdate'].toDate().toLocaleString() : '',
+        moved_by: this.mapProfileData[log['movedby']]?.['name'] || '',
+      });
+    });
+
+    const headers = [
+      'direction', 'name', 'email',
+      'from_stage', 'to_stage',
+      'time', 'moved_by'
+    ];
+    const stagePart = this.selectedStageForActivity +
+      (this.selectedStageTypeForActivity
+        ? '_' + this.selectedStageTypeForActivity : '');
+
+    this.downloadFile(
+      rows, headers,
+      `Stage_Activity_24h_${stagePart}_${new Date().toDateString()}`
+    );
+  }
+
+  getFilteredMergedParticipants(): any[] {
+    const tokens = this.getMergedParticipants();
+    if (!this.participantSearchTerm.trim()) return tokens;
+    const search = this.participantSearchTerm.toLowerCase().trim();
+    return tokens.filter(token => {
+      const name = (this.mapProfileData[token.profile_id]?.['name'] || '').toLowerCase();
+      const email = (this.mapProfileData[token.profile_id]?.['email'] || '').toLowerCase();
+      return name.includes(search) || email.includes(search);
+    });
+  }
+
+  getFilteredSingleStageParticipants(): any[] {
+    const tokens = this.getStageParticipants(this.selectedChatStage)?.['tokenlist'] || [];
+    if (!this.participantSearchTerm.trim()) return tokens;
+    const search = this.participantSearchTerm.toLowerCase().trim();
+    return tokens.filter(token => {
+      const name = (this.mapProfileData[token.profile_id]?.['name'] || '').toLowerCase();
+      const email = (this.mapProfileData[token.profile_id]?.['email'] || '').toLowerCase();
+      return name.includes(search) || email.includes(search);
+    });
   }
 
 }
