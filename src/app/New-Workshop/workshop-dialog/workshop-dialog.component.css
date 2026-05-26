@@ -22,3 +22,19 @@
   gap: 12px;
   padding: 16px 0;
 }
+.new-code-wrapper{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.new-code-field{
+  flex: 1;
+  margin-bottom: -22px;
+}
+
+.save-code-btn{
+  height: 45px;
+  margin-top: -18px;
+}

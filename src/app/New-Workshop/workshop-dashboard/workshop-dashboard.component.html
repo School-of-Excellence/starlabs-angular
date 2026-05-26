@@ -47,9 +47,9 @@
           </mat-icon>
 
         </button>&nbsp;&nbsp;
-          <button mat-raised-button color="accent" (click)="openNewUserDialog()">
+          <!-- <button mat-raised-button color="accent" (click)="openNewUserDialog()">
             {{'New Users ' + '( ' +objectKeys(mapProfileNew).length + ' )'}} 
-          </button>&nbsp;&nbsp;
+          </button>&nbsp;&nbsp; -->
           <button mat-raised-button color="accent" (click)="openQADialog()">
             <mat-icon>help_outline</mat-icon>
             Q & A
@@ -1626,7 +1626,7 @@
     <div class="panel-content">
     <div class="participant-container">
       <div class="participant-count">
-        <span class="count">{{ selectedParticipants.length }}</span>
+        <span class="count">{{ filteredParticipants.length }}</span>
         <span class="label">participants</span><br>
         <span class="label" style="font-size: 10px;">*click to export</span> 
       </div>
@@ -1637,7 +1637,9 @@
       <div class="participants-list">
         <div class="filter-header">
           <h4>Filter {{ filterOption | titlecase }} ({{ filteredParticipants.length }})</h4>
-          <div>
+          <div>  
+        <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' && 
+                            selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled'">
           <button mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants">
             <mat-icon>filter_list</mat-icon>
           </button>
@@ -1648,6 +1650,70 @@
               <mat-radio-button value="old">Old</mat-radio-button>
             </mat-radio-group>
           </mat-menu>
+        </ng-container>
+
+    <ng-container *ngIf="selectedStatusInfo?.status === 'totalNewUsers' || selectedStatusInfo?.status === 'totalNewUsersNotEnrolled'">
+          <button mat-icon-button [matMenuTriggerFor]="newUserFilterMenu" aria-label="Filter new users"
+            [color]="selectedSubscriberCode.length > 0 || showReferredOnly ? 'accent' : ''">
+            <mat-icon>filter_list</mat-icon>
+          </button>
+
+              <mat-menu #newUserFilterMenu="matMenu">
+                <div style="padding: 12px 16px; min-width: 260px;"
+                    (click)="$event.stopPropagation()">
+
+                  <p style="font-size: 11px; font-weight: 700; margin: 0 0 8px;
+                            text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6;">
+                    Subscribers
+                  </p>
+                  <mat-form-field appearance="outline" style="width: 100%;">
+                    <mat-label>Select Code</mat-label>
+                    <mat-select
+                      [(ngModel)]="selectedSubscriberCode"
+                      multiple
+                      [disabled]="showReferredOnly"
+                      (ngModelChange)="applyFilterSide()">
+                      <mat-option *ngFor="let code of subscriberCodes" [value]="code">
+                        {{ code }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+            <div style="padding-top: 12px; border-top: 1px solid rgba(128,128,128,0.2);">
+              <p style="font-size: 11px; font-weight: 700; margin: 0 0 8px;
+                        text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6;">
+                Referred
+              </p>
+              <mat-checkbox
+                [(ngModel)]="showReferredOnly"
+                [disabled]="selectedSubscriberCode.length > 0"
+                (change)="applyFilterSide()"
+                style="font-size: 13px;">
+                Referred (not subscribed)
+              </mat-checkbox>
+            </div>
+          </div>
+        </mat-menu>
+
+    </ng-container>
+          <ng-container *ngIf="selectedStatusInfo?.status === 'cohortParticipants'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="cohortTypeFilterMenu"
+                    [color]="cohortTypeFilter !== 'all' ? 'accent' : ''"
+                    aria-label="Filter by participant type">
+              <mat-icon>filter_alt</mat-icon>
+            </button>
+            <mat-menu #cohortTypeFilterMenu="matMenu">
+              <mat-radio-group [(ngModel)]="cohortTypeFilter"
+                               (change)="applyFilterSide()"
+                               (click)="$event.stopPropagation()"
+                               style="display: flex; flex-direction: column; padding: 8px 16px; gap: 6px;">
+                <mat-radio-button value="all">All</mat-radio-button>
+                <mat-radio-button value="facilitator">Facilitator</mat-radio-button>
+                <mat-radio-button value="cohort">Above Diagnostics</mat-radio-button>
+              </mat-radio-group>
+            </mat-menu>
+          </ng-container>
           <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
             <button mat-icon-button
                     [matMenuTriggerFor]="journeyFilterMenu"

@@ -85,8 +85,11 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     videoType?: string;
     docId?: string;
     linkedEventName?: string | null;
-    remarks?: string | null;
-    extraVideos?: { videoUrl: string; videoTitle: string; docId: string; videoType: string }[];
+    remarks?: { text: string; profileid: string; updatedon: any }[] | null;
+    extraVideos?: { videoUrl: string; videoTitle: string; docId: string; videoType: string; remarks?:
+    { text: string; 
+      profileid: string; 
+      updatedon: any }[] | null }[];
   }[] = [];
   dragCardIndex: number | null = null;
   dragOverIndex: number | null = null;
@@ -187,7 +190,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   private logEventFilterSub: Subscription | null = null;
   showJourneyTypeDropdown = false;
   showOnlyWithVideos = false;
+  showOnlyWithoutPhoto = false;
   exportLoading = false;
+  RemarkTexts: { [entryIndex: number]: string } = {};
   journeyFilterDropdownTop = 0;
   journeyFilterDropdownLeft = 0;
   // Delete
@@ -549,6 +554,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.selectedVideoFilters = [];
     this.journeyTypeFilter = 'all';
     this.showOnlyWithVideos = false;
+    this.showOnlyWithoutPhoto = false;
     this.showJourneyTypeDropdown = false;          
     this.eventFilterSearchCtrl.setValue('');   
     this.videoFilterSearchCtrl.setValue('');   
@@ -657,7 +663,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       selectedIds = selectedIds.length > 0? selectedIds.filter(id => withVideoIds.includes(id)): withVideoIds;
     }
 
-    const noFilters = !this.selectedParticipants.length &&!this.selectedJourneyFilters.length &&!this.selectedEventFilters.length &&!this.selectedVideoFilters.length&&this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos;
+    if (this.showOnlyWithoutPhoto) {
+      const withoutPhotoIds = await this.getParticipantsWithoutPhoto();
+      selectedIds = selectedIds.length > 0? selectedIds.filter(id => withoutPhotoIds.includes(id)): withoutPhotoIds;
+    }
+
+    const noFilters = !this.selectedParticipants.length &&!this.selectedJourneyFilters.length &&!this.selectedEventFilters.length &&!this.selectedVideoFilters.length&&this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos && !this.showOnlyWithoutPhoto;
     if (noFilters) {
         const snap = await getDocs(this.buildBaseQuery(undefined, startAfterDoc));
         await this.executeQuery(snap);
@@ -698,6 +709,39 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       );
       return Object.entries(this.mapProfiles)
         .filter(([, profile]: [string, any]) => profileIds.has(profile['profileid']))
+        .map(([id]) => id);
+    }
+
+    async getParticipantsWithoutPhoto(): Promise<string[]> {
+      const allProfileIds = Object.values(this.mapProfiles)
+        .map((p: any) => p?.['profileid'])
+        .filter(Boolean) as string[];
+      if (allProfileIds.length === 0) return [];
+
+      const chunks = this.chunkArray(allProfileIds, 30);
+      const snaps = await Promise.all(
+        chunks.map(chunk => getDocs(query(
+          collection(this.firestore, 'profile_data'),
+          where('profileid', 'in', chunk)
+        )))
+      );
+
+      const withPhotoSet = new Set<string>();
+      snaps.forEach(snap => {
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const photo = data['profile'] || null;
+          const profileImg = data['profileimg'] || null;
+          const resolvedPhoto = photo?.includes('profile-image-png-14') ? null : photo;
+          const resolvedProfileImg = profileImg?.includes('profile-image-png-14') ? null : profileImg;
+          if (resolvedProfileImg || resolvedPhoto) {
+            withPhotoSet.add(data['profileid']);
+          }
+        });
+      });
+
+      return Object.entries(this.mapProfiles)
+        .filter(([, profile]: [string, any]) => profile?.['profileid'] && !withPhotoSet.has(profile['profileid']))
         .map(([id]) => id);
     }
 
@@ -824,7 +868,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           eventId: eventref.path,
           docId: matchedVideo?.['docId'] || null,
           videoType: matchedVideo?.['type'] || null,
-          remarks: matchedVideo?.['remarks'] || null,
+          remarks: matchedVideo?.['remarks'] || [],
           extraVideos: matchedVideos.slice(1).map((v: any) => {
             let extraDate: Date | null = null;
             const rawExtraDate = v['recordeddate'] || null;
@@ -837,7 +881,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
               videoType: v['type'] || null,
               recordedDate: extraDate,
               eventId: eventref.path,
-              remarks: v['remarks'] || null,
+              remarks: v['remarks'] || [],
             };
           }),
         };
@@ -857,7 +901,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         videoUrl: v['videourl'],
         videoTitle: v['title'],
         videoType: v['type'],
-        remarks: v['remarks'] || null,
+        remarks: v['remarks'] || [],
         docId: v['docId'] || null,
 
       };
@@ -889,7 +933,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             docId: v['docId'] || null,
             linkedEventName,  
             eventId: path,
-            remarks: v['remarks'] || null,
+            remarks: v['remarks'] || [],
             extraVideos: [],
           };
       })
@@ -1179,7 +1223,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       type: ['', Validators.required],
       eventId: [''],
       videoUrl: ['', Validators.required],
-      remarks: [''],
+      remarks: this.fb.array([]),
     });
   }
 
@@ -1212,6 +1256,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.bulkImportLoading = false;
     this.bulkImportSaving = false;
     this.pendingLogEventIndex = null; 
+    this.RemarkTexts = {};
     if (this.addVideoSearchSub) {
       this.addVideoSearchSub.unsubscribe();
       this.addVideoSearchSub = null;
@@ -1302,10 +1347,14 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type: entry.type,
             eventref: eventRef,
             videourl: entry.videoUrl,
-            remarks: entry.remarks || null,
             uploadedon: serverTimestamp(),
             uploadedby: this.loggedInProfileId,
             delete: false,
+            remarks: (entry.remarks || []).map((r: any) => ({
+              text: r.text,
+              profileid: this.loggedInProfileId,
+              updatedon: Timestamp.now(),
+            })),
           });
         })
       );
@@ -1322,7 +1371,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           videoType: firstEntry.type,
           hasVideo: !!firstEntry.videoUrl,
           docId: savedRefs[0].id,
-          remarks: firstEntry.remarks || null,
+          remarks: firstEntry.remarks || [],
           date: firstEntry.recordedDate
             ? new Date(firstEntry.recordedDate)
             : current.date,
@@ -1331,7 +1380,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             videoTitle: e.title,
             docId: savedRefs[i + 1].id,
             videoType: e.type,
-            remarks: e.remarks || null,
+            remarks: e.remarks || [],
           })),
         };
         this.logEvents = [...updated];
@@ -1355,7 +1404,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         type: event.videoType || 'Event',
         eventId: event.eventId ? event.eventId.replace('event collection/', '') : '',
         videoUrl: event.videoUrl || '',
-        remarks: event.remarks || '',
+        remarks: event.remarks || [],
       },
       ...(event['extraVideos'] || []).map((v: any) => ({
         docId: v.docId || '',
@@ -1364,7 +1413,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         type: v.videoType || 'Event',
         eventId: v.eventId ? v.eventId.replace('event collection/', '') : '',
         videoUrl: v.videoUrl || '',
-        remarks: v.remarks || '',
+        remarks: v.remarks || [],
       }))
     ];
 
@@ -1377,7 +1426,13 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           type: [v.type, Validators.required],
           eventId: [v.eventId],
           videoUrl: [v.videoUrl, Validators.required],
-          remarks: [v.remarks],
+          remarks: this.fb.array(
+            (v.remarks || []).map((r: any) => this.fb.group({
+              text: [r.text || ''],
+              profileid: [r.profileid || ''],
+              updatedon: [r.updatedon || null],
+            }))
+          ),
         }))
       )
     });
@@ -1388,6 +1443,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.showEditVideoOverlay = false;
     this.editVideoIndex = null;
     this.editVideoSaving = false;
+    this.RemarkTexts = {};
   }
 
   async saveEditVideo() {
@@ -1412,7 +1468,11 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type: val.type,
             eventref: eventRef,
             videourl: val.videoUrl,
-            remarks: val.remarks || null,
+            remarks: (val.remarks || []).map((r: any) => ({
+              text: r.text,
+              profileid: r.profileid || this.loggedInProfileId,
+              updatedon: r.profileid ? r.updatedon : Timestamp.now(),
+            })),
           });
         })
       );
@@ -1434,7 +1494,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           videoUrl: primary.videoUrl,
           hasVideo: !!primary.videoUrl,
           docId: primary.docId,
-          remarks: primary.remarks || null,
+          remarks: primary.remarks || [],
           extraVideos: extras.map((e: any) => ({
             docId: e.docId,
             videoUrl: e.videoUrl,
@@ -1442,7 +1502,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             videoType: e.type,
             recordedDate: e.recordedDate ? new Date(e.recordedDate) : null,
             eventId: e.eventId ? `event collection/${e.eventId}` : null,
-            remarks: e.remarks || null,
+            remarks: e.remarks || [],
           })),
         };
 
@@ -1703,10 +1763,14 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type: row.type,
             eventref: eventRef,
             videourl: row.videoUrl,
-            remarks: row.remarks || null,
             uploadedon: serverTimestamp(),
             uploadedby: this.loggedInProfileId,
             delete: false,
+            remarks: row.remarks ? [{
+              text: row.remarks,
+              profileid: this.loggedInProfileId,
+              updatedon: Timestamp.now(),
+            }] : [],
           });
         })
       );
@@ -1744,6 +1808,10 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       if (this.showOnlyWithVideos) {
         const withVideoIds = await this.getParticipantsWithVideos();
         selectedIds = selectedIds.length > 0? selectedIds.filter(id => withVideoIds.includes(id)): withVideoIds;
+      }
+      if (this.showOnlyWithoutPhoto) {
+        const withoutPhotoIds = await this.getParticipantsWithoutPhoto();
+        selectedIds = selectedIds.length > 0? selectedIds.filter(id => withoutPhotoIds.includes(id)): withoutPhotoIds;
       }
       const allParticipants = selectedIds.length > 0
         ? selectedIds.map(id => ({
@@ -1859,5 +1927,37 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   onEntryTypeChange(entry: FormGroup) {
     entry.get('eventId')?.setValue('');
+  }
+
+  manageRemark(formArray: FormArray, entryIndex: number, action: 'add' | 'remove', remarkIndex?: number) {
+      const entry = formArray.at(entryIndex) as FormGroup;
+      const remarks = entry.get('remarks') as FormArray;
+      if (action === 'add') {
+        const text = (this.RemarkTexts[entryIndex] || '').trim();
+        if (!text) return;
+        remarks.push(this.fb.group({ text: [text] }));
+        this.RemarkTexts[entryIndex] = '';
+      } else {
+        remarks.removeAt(remarkIndex!);
+      }
+    }
+
+  getRecentRemark(remarks: { text: string; profileid: string; updatedon: any }[] | null | undefined) {
+    if (!remarks || remarks.length === 0) return null;
+    return remarks.reduce((latest, current) => {
+      const latestTime = latest.updatedon?.toDate?.() || new Date(latest.updatedon || 0);
+      const currentTime = current.updatedon?.toDate?.() || new Date(current.updatedon || 0);
+      return currentTime > latestTime ? current : latest;
+    });
+  }
+
+  getProfileName(profileid: string): string {
+    const entry = Object.entries(this.mapProfiles).find(
+      ([, profile]: [string, any]) => profile['profileid'] === profileid
+    );
+    if (entry) {
+      return this.participantOptions.find(p => p.id === entry[0])?.name || profileid;
+    }
+    return profileid;
   }
 }

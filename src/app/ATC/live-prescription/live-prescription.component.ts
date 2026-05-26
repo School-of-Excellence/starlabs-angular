@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
-import { collection, collectionGroup, collectionSnapshots, doc, docSnapshots, Firestore } from '@angular/fire/firestore';
+import { collection, collectionGroup, collectionSnapshots, doc, docSnapshots, getFirestore } from '@angular/fire/firestore';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -13,6 +13,8 @@ import { Subject, takeUntil } from 'rxjs';
   styleUrls: ['./live-prescription.component.css']
 })
 export class LivePrescriptionComponent implements OnInit {
+  firestoreDefault = getFirestore() // Default Firestore
+  firestoreATC = getFirestore("firestore-atc") // ATC Firestore
 
   atcReport = {
     date : new Date(),
@@ -42,7 +44,7 @@ export class LivePrescriptionComponent implements OnInit {
 
   private unsubscribe$ = new Subject<void>();
 
-  constructor(public firestore: Firestore, public route: ActivatedRoute) {
+  constructor(public route: ActivatedRoute) {
     this.atcReport = {
       date : new Date(),
       product : "",
@@ -67,25 +69,25 @@ export class LivePrescriptionComponent implements OnInit {
 
   ngOnInit(): void {
 
-    collectionSnapshots(collectionGroup(this.firestore,"authors")).pipe(takeUntil(this.unsubscribe$)).subscribe(prescriberAuthor=>{
+    collectionSnapshots(collectionGroup(this.firestoreATC,"authors")).pipe(takeUntil(this.unsubscribe$)).subscribe(prescriberAuthor=>{
       for (let i = 0; i < prescriberAuthor.length; i++) {
         this.mapProfiles[prescriberAuthor[i].ref.path] = prescriberAuthor[i].data()['name']
       }
     })
 
-    collectionSnapshots(collectionGroup(this.firestore, 'authors')).pipe(takeUntil(this.unsubscribe$)).subscribe(authors => {
+    collectionSnapshots(collectionGroup(this.firestoreATC, 'authors')).pipe(takeUntil(this.unsubscribe$)).subscribe(authors => {
       authors.forEach(author => {
         this.mapProfiles[author.ref.path] = author.data()['name'];
       });
     });
 
-    collectionSnapshots(collection(this.firestore,"profile_data")).pipe(takeUntil(this.unsubscribe$)).subscribe(profile=>{
+    collectionSnapshots(collection(this.firestoreDefault,"profile_data")).pipe(takeUntil(this.unsubscribe$)).subscribe(profile=>{
       for (let i = 0; i < profile.length; i++) {
         this.mapProfiles[profile[i].ref.path] = profile[i].data()['name']
       }
     })
 
-    collectionSnapshots(collection(this.firestore,"procedures")).pipe(takeUntil(this.unsubscribe$)).subscribe(procedure=>{
+    collectionSnapshots(collection(this.firestoreDefault,"procedures")).pipe(takeUntil(this.unsubscribe$)).subscribe(procedure=>{
       for (let i = 0; i < procedure.length; i++) {
         this.mapProcedures[procedure[i].ref.path] = procedure[i].data()['name']
       }
@@ -93,7 +95,7 @@ export class LivePrescriptionComponent implements OnInit {
   }
 
   getDraftATC(id:string){
-    docSnapshots(doc(collection(this.firestore,"temporary_ATC"),id)).pipe(takeUntil(this.unsubscribe$)).subscribe(draft=>{
+    docSnapshots(doc(collection(this.firestoreATC,"temporary_ATC"),id)).pipe(takeUntil(this.unsubscribe$)).subscribe(draft=>{
       if(draft.exists()){
         this.status = null
         var draftATC = draft.data();

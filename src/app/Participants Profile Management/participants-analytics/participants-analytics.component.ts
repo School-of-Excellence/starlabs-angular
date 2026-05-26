@@ -1,6 +1,6 @@
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, ElementRef, inject, ViewChild } from '@angular/core';
-import { Firestore, collection, doc, getDocs, query, collectionData, orderBy, updateDoc, DocumentReference, deleteDoc, getDoc, where, writeBatch, serverTimestamp, setDoc, DocumentSnapshot, onSnapshot, limit, startAfter } from '@angular/fire/firestore';
+import { Firestore, collection, doc, getDocs, query, collectionData, orderBy, updateDoc, DocumentReference, deleteDoc, getDoc, where, writeBatch, serverTimestamp, setDoc, DocumentSnapshot, onSnapshot, limit, startAfter, Timestamp, getFirestore} from '@angular/fire/firestore';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -56,6 +56,7 @@ import { WatiConfigDialogComponent } from './wati-config-dialog/wati-config-dial
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AddPendingActionComponent } from '../../AppEngagement/app-action-pending/add-pending-action/add-pending-action.component';
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../../New-Workshop/whatsapp-progress-dialog.component';
+import { getApp } from '@angular/fire/app';
 
 export class formelement {
   activejourney: Array<string[]> | null;
@@ -167,6 +168,7 @@ export class ParticipantsAnalyticsComponent {
   queueTokens: any[] = [];
   queueTokenMap: { [key: string]: any } = [];
   mapfiltervalues = {}
+  eventCollectionMap = {};
 
   emailList: any[] = []
   mapParticipantData = {}
@@ -187,12 +189,13 @@ export class ParticipantsAnalyticsComponent {
   object = ['customersupport', 'customersupportcategory']
   number = ['atccount', 'totaladjustmentaware', 'totaladjustmentunaware']
   stringarray = ['atcmodel']
-  arraystring = ['participantmode', 'country', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'emistatus', 'financialstatus', 'customerstatus', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
+  arraystring = ['participantmode', 'countrycode', 'currentcity', 'registeredcity', 'contract', 'paymentplan', 'financialstatus', 'customerstatus', 'lastsubscribedjourney', 'higherorderpurchase', 'registereduser']
   stringmaparray = ['productevent', 'queueevent']
   numbermapnumber = ['productcount'];
   computeColumns = ['UP! count' , 'CPM count'];
+  nonColumnArrayString = ['activejourney' , 'lastcompletedjourney']
   columnsDisplayed = [...this.arraystring, ...this.numberrange, ...this.string, ...this.object, ...this.stringarray, ...this.number, ...this.arrayarray, , ...this.range, ...this.numbermapnumber, ...this.stringmaparray, ...this.computeColumns,
-  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'journey', 'consumedproductcount', 'unconsumedproductcount']
+  ...['eiflix', 'solarvoice', 'generalcontent', 'remarks'],'totalpurchasevalue', 'journey', 'consumedproductcount', 'unconsumedproductcount' , 'emi status' , 'journeyonboarding']
   filterText = null
   showSectionType = null
   savedfilterquery: any = []
@@ -252,6 +255,8 @@ export class ParticipantsAnalyticsComponent {
   filterTagList: string = '';
   tagList = [];
 
+  isCheckListActive = false;
+
   //import 
   isExcelFile: boolean;
   @ViewChild('inputFile') inputFile: ElementRef;
@@ -276,6 +281,8 @@ export class ParticipantsAnalyticsComponent {
   private countdownInterval: any;
   timeLeft = 600;
 
+  watsonDatabase: Firestore;
+
   //loading function
   get loading() {
     return this.dialog.open(LoadingProgressComponent, { data: { msg: 'Processing Please Wait ...' }, disableClose: true });
@@ -290,7 +297,12 @@ export class ParticipantsAnalyticsComponent {
       // }else{
       //   this.router.navigateByUrl('/')
       // }
-    })
+    });
+
+    this.authguard.initializeWatson().then(()=>{
+      this.watsonDatabase = getFirestore(getApp("watson"));
+      console.log("WATSON Database Initialized");
+    });
 
   }
 
@@ -397,6 +409,7 @@ export class ParticipantsAnalyticsComponent {
   async fetchData() {
     let loadingref = this.loading
     this.filterdata = new formelement
+    this.filterdata.subscriptionstart = new dateElement
     this.filterdata.subscriptionend = new dateElement
     this.filterdata.purchasedate = new dateElement
     this.filterdata.age = new numberElement
@@ -436,6 +449,7 @@ export class ParticipantsAnalyticsComponent {
     this.productEventList = eventSnap.docs.map(e => {
       const element = e.data();
       this.mapfiltervalues[e.id] = element['name'];
+      this.eventCollectionMap[e.id] = element;
       return ({
         ...e.data(),
         id: e.id,
@@ -963,6 +977,7 @@ export class ParticipantsAnalyticsComponent {
   loadtabledata(value: any) {
     if (!this.selectedSavedFilterQueryLabel) {
       this.filterdata = new formelement
+      this.filterdata.subscriptionstart = new dateElement
       this.filterdata.subscriptionend = new dateElement
       this.filterdata.purchasedate = new dateElement
       this.filterdata.age = new numberElement
@@ -1023,6 +1038,7 @@ export class ParticipantsAnalyticsComponent {
   }
 
   async onDataSearch() {
+    this.isCheckListActive = false;
     let loadingref = this.loading
     let data = Object.assign({}, this.filterdata);
     for (const key in data) {
@@ -1043,17 +1059,17 @@ export class ParticipantsAnalyticsComponent {
     this.filtereddashboarddata = this.cloneddashboarddata.filter(e => {
       let booleanarray = []
       for (const key in data) {
-        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend'].includes(key)) {
+        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend' , 'subscriptionstart'].includes(key)) {
           if (this.arraystring.includes(key)) { [null, undefined].includes(e[key]) ? e[key] = 'none' : null }
 
-          if (e[key] != undefined && e[key] != null) {
+          if (['atccount'].includes(key) || (e[key] != undefined && e[key] != null)) {
             if (this.string.includes(key)) {
-              if (data[key].toLowerCase().replace(/\s+/g, '') === e[key].toLowerCase().replace(/\s+/g, '')) { booleanarray.push(true) }
+              if (data[key]?.toLowerCase().replace(/\s+/g, '') === e[key]?.toLowerCase().replace(/\s+/g, '')) { booleanarray.push(true) }
               else { booleanarray.push(false) }
             } else if (this.number.includes(key)) {
-              if (data[key] === e[key]) { booleanarray.push(true) }
+              if (data[key] === (e[key] ?? 0)) { booleanarray.push(true) }
               else { booleanarray.push(false) }
-            } else if (this.arraystring.includes(key)) {
+            } else if (this.arraystring.includes(key) || this.nonColumnArrayString.includes(key)) {
               if (data[key].includes(e[key])) { booleanarray.push(true) }
               else { booleanarray.push(false) }
             } else if (this.stringarray.includes(key)) {
@@ -1121,8 +1137,8 @@ export class ParticipantsAnalyticsComponent {
             booleanarray.push(false)
           }
         }
-        if (key === 'subscriptionend') {
-          const dateKey = e['customerstatus'] === 'active' ? 'subscriptionend' : ['discontinued', 'non active'].includes(e['customerstatus']) ? 'lastsubscriptionend' : null;
+        if (['subscriptionstart' ,'subscriptionend'].includes(key)) {
+          const dateKey = e['customerstatus'] === 'active' ? key : ['discontinued', 'non active'].includes(e['customerstatus']) ? `last${key}` : null;
           if ([null, undefined, ''].includes(dateKey) || [null, undefined, ''].includes(e[dateKey])) {
             booleanarray.push(false)
           } else {
@@ -1134,7 +1150,6 @@ export class ParticipantsAnalyticsComponent {
             }
           }
         }
-
 
         if (key === 'queuestage' && ![null, undefined, ''].includes(data['queueevent']) && ![null, undefined, ''].includes(data['queuestage'])) {
           const queue = data['queueevent'];
@@ -1290,6 +1305,7 @@ export class ParticipantsAnalyticsComponent {
 
   onformreset() {
     this.filterdata = new formelement
+    this.filterdata.subscriptionstart = new dateElement
     this.filterdata.subscriptionend = new dateElement
     this.filterdata.purchasedate = new dateElement
     this.filterdata.age = new numberElement
@@ -1581,26 +1597,34 @@ export class ParticipantsAnalyticsComponent {
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(value => {
       if (value != null) {
         value.data.forEach((profile: any) => {
-          const collRef = collection(this.firestore, "participantjourneyproduct")
-          const q = query(collRef, where('profileid', '==', profile.profileid), where('subscriptionend', '==', profile.subscriptionend))
-          getDocs(q).then(snap => {
-            for (let i = 0; i < snap.docs.length; i++) {
-              const element = snap.docs[i].data();
+          const purchaseRef = profile['customerstatus'] === 'active' ? profile['purchaseref'] : profile['customerstatus'] === 'non active' ? profile['lastsubscribedpurchaseref'] : null;
+          if(!purchaseRef) return
+          const docRef = doc(this.firestore, "participantjourneyproduct" , purchaseRef.id);
+          getDoc(docRef).then(snap => {
+              const element = snap.data();
               let subscriptionend = element['subscriptionend'].toDate();
               console.log(subscriptionend);
-              let newsubscriptionend = subscriptionend.setMonth(subscriptionend.getMonth() + value.input.duration)
+              let newsubscriptionend = null;
+              if (value.input.extendtype === 'duration') {
+                console.log('log' , value.input.duration)
+                newsubscriptionend = subscriptionend.setMonth(subscriptionend.getMonth() + value.input.duration);
+              } else {
+                const date = new Date(value.input.date);
+                date.setHours(23,59,59,999);
+                newsubscriptionend = date.getTime();
+              }
               console.log(subscriptionend, new Date(newsubscriptionend));
               element['extendreason'] = value.input.reason
               let currentdate = new Date()
               let journeystatus = (new Date(newsubscriptionend) < currentdate) ? "completed" : "ongoing"
-              let id = doc(this.firestore, 'subscription extend log').id;
+              let id = doc(collection(this.firestore, 'subscription extend log')).id;
               setDoc(doc(this.firestore, "subscription extend log", id), element)
               updateDoc(doc(this.firestore, "participantjourneyproduct", element['docid']), {
                 subscriptionend: new Date(newsubscriptionend),
                 extendreason: value.input.reason,
                 journeystatus: journeystatus
               })
-            }
+            
           })
         })
       }
@@ -2173,7 +2197,7 @@ export class ParticipantsAnalyticsComponent {
         else if (column === 'kyj') {
           formattedRow[column] = element[column];
         } else if (column === 'journey') {
-          formattedRow[column] = element['customerstatus'] === 'active' ? this.mapfiltervalues[element['activejourney']] : ['non active' , 'discontinued'].includes(element['customerstatus']) ? this.mapfiltervalues[element['lastcompletedjourney']] : ''
+          formattedRow[column] = this.getJourneyForParticipant(element);
         } else if (column === 'age') {
           formattedRow[column] = this.calculateAge(element['dateofbirth']);
         }
@@ -2202,6 +2226,8 @@ export class ParticipantsAnalyticsComponent {
             value = this.getCPMCount(element['profileid']);
           }
           formattedRow[column] = value;
+        } else if(column === 'emi status'){
+          formattedRow[column] = element['financedata']?.paymentstatus;
         }
         // Default case for other columns
         else {
@@ -2375,7 +2401,37 @@ export class ParticipantsAnalyticsComponent {
   // checklists
   navigateTochecklists(type) {
     if (type === 'higherorderpurchase') {
-      let higherorderpurchaseData = this.dashboardEntireData.filter(e => e['activejourney'] != null && e['activejourney'] != e['higherorderpurchase'])
+      // const data = this.dashboardEntireData.filter(e => ['active' , 'non active' , 'discontinued'].includes(e['customerstatus']));
+      // let higherorderpurchaseData = data.map(e =>({
+      //   name : e['name'],
+      //   journey : e['customerstatus'] === 'active' ? e['activejourney'] != e['higherorderpurchase'] :
+      // }))
+      let higherorderpurchaseData = [];
+
+      for(let metadata of this.dashboardEntireData){
+        const customerStatus = metadata['customerstatus'];
+        if(!['active' , 'non active'].includes(customerStatus)){
+          continue
+        }
+
+        if(customerStatus === 'active' && metadata['activejourney'] != metadata['higherorderpurchase']){
+          higherorderpurchaseData.push({
+            name : metadata['name'],
+            journey : metadata['activejourney'],
+            higherorderpurchase : metadata['higherorderpurchase'],
+            customerstatus : customerStatus
+          })
+        } else if(customerStatus === 'non active'  && metadata['lastcompletedjourney'] != metadata['higherorderpurchase'] ){
+          higherorderpurchaseData.push({
+            name : metadata['name'],
+            journey : metadata['lastcompletedjourney'],
+            higherorderpurchase : metadata['higherorderpurchase'],
+            customerstatus : customerStatus
+          })
+        }
+      }
+
+      console.log(higherorderpurchaseData)
       const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
         width: '90vw',
         height: '80vh',
@@ -2385,8 +2441,9 @@ export class ParticipantsAnalyticsComponent {
           checklistData: higherorderpurchaseData,
           columns: [
             { key: 'name', header: 'Name' },
-            { key: 'activejourney', header: 'Active Journey' },
-            { key: 'higherorderpurchase', header: 'Higher Order Purchase' }
+            { key: 'journey', header: 'Journey' },
+            { key: 'higherorderpurchase', header: 'Higher Order Purchase' },
+            { key: 'customerstatus', header: 'Customer Status' }
           ]
         }
       })
@@ -2427,9 +2484,10 @@ export class ParticipantsAnalyticsComponent {
   patchCustomerStatus() {
     this.onformreset();
     this.selection.clear();
-    const participants = this.dataSource.data.filter((p: any) => [null, undefined, ''].includes(p?.customerstatus));
+    const participants = this.dataSource.data.filter((p: any) => ['none'].includes(p?.customerstatus));
     this.selection.select(...participants);
     this.dataSource.data = participants;
+    this.isCheckListActive = true;
   }
 
   // function to clear participant with no customer status active option
@@ -2438,8 +2496,143 @@ export class ParticipantsAnalyticsComponent {
     this.onDataSearch();
   }
 
-  openWatsonCustomerStatus() {
+  // checklist for firstpurchase
+  async openFirstPurchaseCheckList(){
+    let loadingref = this.loading
+    const data = [];
+    const starlabsSalesMap : {[key : string] : Array<any>} = {};
+    const watsonSalesMap : {[key : string] : Array<any>} = {};
 
+    const starlabQuery = query(collection(this.firestore , 'salesleads') , where('status', '==', 'Approved') , orderBy('purchasedate', 'asc'));
+    const starlabSalesSnap = await getDocs(starlabQuery)
+
+    for(let doc of starlabSalesSnap.docs){
+      const sale = doc.data();
+      const profileid = sale['profileid'] ?? 'Unknown';
+      starlabsSalesMap[profileid] = starlabsSalesMap[profileid] ?? [];
+      starlabsSalesMap[profileid].push(sale);
+    }
+
+    const watsonQuery = query(collection(this.watsonDatabase , 'ParticipantPurchases'));
+    const watsonSalesSnap = await getDocs(watsonQuery);
+
+    for(let doc of watsonSalesSnap.docs){
+      const sale = doc.data();
+      if([null , undefined , ''].includes(sale['purchasedate'])) continue
+      const profileid = sale['participantid'] ?? 'Unknown';
+      watsonSalesMap[profileid] = watsonSalesMap[profileid] ?? [];
+      watsonSalesMap[profileid].push(sale);
+    }
+
+    for(let metadata of this.dashboardEntireData.slice(0,500)){
+
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("Metadata not found for", metadata);
+        continue;
+      }
+
+    let starlabsFirstPurchase = null;
+    let watsonFirstPurchase = null;
+
+    const starlabsSales = starlabsSalesMap[profileid] ?? [];
+    if(starlabsSales.length > 0){
+      starlabsFirstPurchase = starlabsSales[0];
+    }
+
+    if ([null, undefined, ''].includes(starlabsFirstPurchase)) {
+      data.push({
+        name : metadata['name'] ?? '',
+        email : metadata['email'] ?? '',
+      });
+      continue
+    }
+    
+    if (![null, undefined, ''].includes(starlabsFirstPurchase['watsonparticipantid'])) {
+      const watsonSale = watsonSalesMap[starlabsFirstPurchase['watsonparticipantid']] ?? [];
+      if(watsonSale.length > 0){
+        watsonSale.sort((sale1, sale2) => new Date(sale1).getTime() - new Date(sale2).getTime());
+        watsonFirstPurchase = watsonSale.at(0); 
+      }
+    } else if (![null, undefined, ''].includes(starlabsFirstPurchase['watsonpurchaseid'])) {
+      const watsonSaleDoc = await getDoc(doc(this.watsonDatabase , 'ParticipantPurchases' , starlabsFirstPurchase['watsonpurchaseid']));
+      watsonFirstPurchase = watsonSaleDoc.exists() ? watsonSaleDoc.data() : null;
+    }
+
+    if (!watsonFirstPurchase) {
+      console.log('no watson document');
+      data.push({
+        name : metadata['name'] ?? '',
+        email : metadata['email'] ?? '',
+        starlabspurchase: starlabsFirstPurchase['purchaselabel'],
+        starlabspurchasedate: starlabsFirstPurchase["purchasedate"]?.toDate()?.toLocaleDateString('en-CA'),
+      });
+      continue
+    }
+
+    const starlabPurchaseDate = starlabsFirstPurchase['purchasedate']?.toDate() ?? null;
+    const watsonPurchaseDate = watsonFirstPurchase['purchasedate'] ? new Date(watsonFirstPurchase['purchasedate']) : null;
+    const date = starlabPurchaseDate?.getDate() === watsonPurchaseDate?.getDate();
+    const month = starlabPurchaseDate?.getMonth() === watsonPurchaseDate?.getMonth();
+    const year = starlabPurchaseDate?.getFullYear() === watsonPurchaseDate?.getFullYear();
+
+    const dateMatch = date && month && year;
+    let unmatchReason = [];
+    if (!dateMatch) {
+      if (!date) {
+        unmatchReason.push('date is not matched');
+      }
+
+      if (!month) {
+        unmatchReason.push('month is not matched');
+      }
+
+      if (!year) {
+        unmatchReason.push('year is not matched');
+      }
+    }
+
+      data.push({
+        name : metadata['name'] ?? '',
+        email : metadata['email'] ?? '',
+        starlabspurchase: starlabsFirstPurchase['purchaselabel'],
+        starlabspurchasedate: starlabsFirstPurchase["purchasedate"]?.toDate()?.toLocaleDateString('en-CA'),
+        watsonpurchase: watsonFirstPurchase['product'],
+        watsonpurchasedate: watsonFirstPurchase["purchasedate"],
+        datematched: dateMatch ? 'Yes' : 'No',
+        reason: unmatchReason.toString()
+      })
+
+    }
+
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '95vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant First Purchase',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'starlabspurchase', header: 'Star Labs Purchase' },
+            { key: 'starlabspurchasedate', header: 'Star Labs Purchase' },
+            { key: 'watsonpurchase', header: 'Watson Purchase' },
+            { key: 'watsonpurchasedate', header: 'Watson Purchase Date' },
+            { key: 'datematched', header: 'Date Matched' },
+            { key: 'reason', header: 'Reason' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
   }
 
   // Function to add products to participant Journey 
@@ -2968,6 +3161,722 @@ export class ParticipantsAnalyticsComponent {
       const count =  this.participantProductMap[profileId][productId]?.consumedCount || 0;
       return total + count;
     } , 0);
+  }
+
+  getJourneyForParticipant(metadata){
+    const customerStatus = metadata['customerstatus'] ?? null;
+    
+    if (customerStatus === 'active') {
+      return this.mapfiltervalues[metadata['activejourney']];
+    } else if (customerStatus === 'non active') {
+      return this.mapfiltervalues[metadata['lastcompletedjourney']];
+    } else if (customerStatus === 'discontinued') {
+      return this.mapfiltervalues[metadata['lastsubscribedjourney']];
+    } 
+    return ''
+  }
+
+  getLastAttendedEventForParticipant(metadata){
+    const productEvent = metadata?.productevent ?? {};
+    const attendedEventIds : any[]= Object.values(productEvent).flat()
+    let lastAttendedEvent = null;
+
+    for(let eventId of attendedEventIds){
+      const endDate = this.eventCollectionMap[eventId]?.end_date?.toDate() ?? null;
+      if([null , undefined , ''].includes(endDate)){
+        console.log('there is no end date for event id : ' , eventId);
+        continue
+      }
+
+      if ([null , undefined , ''].includes(lastAttendedEvent) || lastAttendedEvent?.endDate?.getTime() <= endDate?.getTime()) {
+        
+        lastAttendedEvent = {
+          eventId,
+          endDate
+        };
+      }
+    }
+
+    return lastAttendedEvent?.eventId;
+    
+  }
+
+  async openCheckListForProductEvent(){
+    let loadingref = this.loading
+    const data = [];
+    const eventRequestSnapMap = {};
+
+    const eventReqRef = collection(this.firestore, 'event participation request');
+    const q = query(eventReqRef, where("status", "==", "attended"))
+
+    const eventReqSnap = await getDocs(q);
+
+
+    for(let doc of eventReqSnap.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        eventRequestSnapMap[profileid] = eventRequestSnapMap[profileid] ?? [];
+        eventRequestSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("Metadata not found for", metadata);
+        continue;
+      }
+
+      const eventParticipantRequests = eventRequestSnapMap[profileid] ?? [];
+
+      var profileEventAttended = {};
+
+      for (let i = 0; i < eventParticipantRequests.length; i++) {
+        var attendedData = eventParticipantRequests[i];
+        profileEventAttended[attendedData["productref"].id] =
+          profileEventAttended[attendedData["productref"].id] || [];
+        profileEventAttended[attendedData["productref"].id].push(
+          attendedData["eventref"].id,
+        );
+      }
+      
+      let event = Object.values(profileEventAttended).flat().map((event : any)=>this.mapfiltervalues[event]).join(' , ');
+
+      data.push({
+        name: metadata.name ?? '',
+        email: metadata.email ?? '',
+        productevent: event,
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Product Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'productevent', header: 'Product Event' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+   async openCheckListForLastAttendedEvent(){
+    let loadingref = this.loading
+    const data = [];
+    const eventRequestSnapMap = {};
+
+    const eventReqRef = collection(this.firestore, 'event participation request');
+    const q = query(eventReqRef, where("status", "==", "attended"))
+
+    const eventReqSnap = await getDocs(q);
+
+
+    for(let doc of eventReqSnap.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        eventRequestSnapMap[profileid] = eventRequestSnapMap[profileid] ?? [];
+        eventRequestSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("Metadata not found for", metadata);
+        continue;
+      }
+
+      const eventParticipantRequests = eventRequestSnapMap[profileid] ?? [];
+
+      var profileEventAttended = {};
+
+      for (let i = 0; i < eventParticipantRequests.length; i++) {
+        var attendedData = eventParticipantRequests[i];
+        profileEventAttended[attendedData["productref"].id] =
+          profileEventAttended[attendedData["productref"].id] || [];
+        profileEventAttended[attendedData["productref"].id].push(
+          attendedData["eventref"].id,
+        );
+      }
+      
+      metadata['productevent'] = profileEventAttended;
+      const lastAttendedEvent = this.getLastAttendedEventForParticipant(metadata)
+
+      data.push({
+        name: metadata.name ?? '',
+        email: metadata.email ?? '',
+        lastattendedevent : this.mapfiltervalues[lastAttendedEvent]
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Product Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'lastattendedevent', header: 'Last Attended Event' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+  async openCheckListForJourneyOnboarding(){
+    let loadingref = this.loading
+    const data = [];
+    const journeySnapshotMap = {};
+
+    const journeyProductRef = collection(this.firestore, 'participantjourneyproduct');
+
+    const journeySnapshot = await getDocs(journeyProductRef);
+
+
+    for(let doc of journeySnapshot.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        journeySnapshotMap[profileid] = journeySnapshotMap[profileid] ?? [];
+        journeySnapshotMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("Metadata not found for", metadata);
+        continue;
+      }
+
+      const journeyProductProfile = journeySnapshotMap[profileid] ?? [];
+
+      const activeJourneyList = journeyProductProfile.filter(
+        (e) =>
+          ["initiated", "ongoing", "completed"].includes(e["journeystatus"]) &&
+          ![null, undefined, ""].includes(e["journeyref"]),
+      );
+      const nullJourneyList = journeyProductProfile.filter(
+        (e) =>
+          [null].includes(e["journeystatus"]) &&
+          ![null, undefined, ""].includes(e["journeyref"]),
+      );
+      const cancelledJourneyList = journeyProductProfile.filter(
+        (e) =>
+          ["cancelled"].includes(e["journeystatus"]) &&
+          ![null, undefined, ""].includes(e["journeyref"]),
+      );
+      const closedLastJourneyList = journeyProductProfile.filter(
+        (e) =>
+          ["closed lost"].includes(e["journeystatus"]) &&
+          ![null, undefined, ""].includes(e["journeyref"]),
+      );
+
+      const newData = {
+      journeyonboarding: null,
+      customerstatus: null,
+      activejourney : null,
+      lastcompletedjourney: null,
+      lastsubscribedjourney: null,
+    };
+
+    let ongoingJourney = [];
+    let completedjourney = [];
+    const cancelledJourney = [...cancelledJourneyList];
+
+    if (
+      ["banned", "late"].includes(metadata["customerstatus"])
+    ) {
+      newData.customerstatus = metadata["customerstatus"];
+    } else if (nullJourneyList.length > 0 || closedLastJourneyList.length > 0) {
+      newData.customerstatus = "none";
+      newData["participantmode"] = null;
+    } else if (activeJourneyList.length != 0) {
+      activeJourneyList.forEach((journeyElement) => {
+        if (
+          ["initiated", "ongoing"].includes(journeyElement["journeystatus"])
+        ) {
+          ongoingJourney.push(journeyElement);
+        } else if (journeyElement["journeystatus"] == "completed") {
+          completedjourney.push(journeyElement);
+        }
+      });
+
+      if (ongoingJourney.length != 0) {
+        ongoingJourney = ongoingJourney.sort(
+          (a, b) =>
+            b["subscriptionend"]?.toDate() - a["subscriptionend"]?.toDate(),
+        );
+        const currentDate = new Date();
+        const currentOngoing = ongoingJourney.find(
+          (e) => e["journeystatus"] == "ongoing",
+        );
+        const currentInitiated = ongoingJourney.find(
+          (e) => e["journeystatus"] == "initiated",
+        );
+
+        const liveJourney =
+          currentOngoing ?? currentInitiated ?? ongoingJourney[0];
+        const hasSubscription =
+          liveJourney["subscriptionend"] &&
+          liveJourney["subscriptionend"].toDate() >= currentDate;
+
+        if (liveJourney && hasSubscription) {
+          if (
+            ongoingJourney.length == 1 &&
+            cancelledJourney.length == 0 &&
+            completedjourney.length == 0
+          ) {
+            newData.customerstatus = "active";
+            newData.journeyonboarding = liveJourney['onboarded'] ?? null;
+            newData.activejourney = liveJourney["journeyref"]?.id ?? null;
+
+          } else {
+            newData.customerstatus = "none";
+          }
+        } else if (liveJourney && !hasSubscription) {
+          newData.customerstatus = "none";
+        }
+      } else if (
+        completedjourney.length == 1 &&
+        ongoingJourney.length == 0 &&
+        cancelledJourney.length == 0
+      ) {
+        newData.customerstatus = "non active";
+        newData["lastcompletedjourney"] = completedjourney[0]["journeyref"]?.id ?? null;
+      } else {
+        newData.customerstatus = "none";
+      }
+    } else if (
+      cancelledJourney.length == 1 &&
+      ongoingJourney.length == 0 &&
+      completedjourney.length == 0
+    ) {
+      newData.customerstatus = "discontinued";
+      newData["lastsubscribedjourney"] = cancelledJourney[0]["journeyref"]?.id ?? null;
+    } else {
+      newData.customerstatus = "none";
+      newData["participantmode"] = null;
+    }
+
+    let journey = null;
+    if(newData.customerstatus === 'active'){
+      journey = newData.activejourney
+    } else if(newData.customerstatus === 'non active'){
+      journey = newData.lastcompletedjourney
+    } else if(newData.customerstatus === 'discontinued'){
+      journey = newData.lastsubscribedjourney
+    }
+      data.push({
+        name: metadata.name ?? '',
+        email: metadata.email ?? '',
+        journey : journey,
+        journeyonboarding : newData.journeyonboarding,
+        customerstatus : newData.customerstatus,
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Product Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'journey', header: 'Journey' },
+            { key: 'journeyonboarding', header: 'Onboarded' },
+            { key: 'customerstatus', header: 'Customer Status' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+  async openCheckListForQueueEvent(){
+    let loadingref = this.loading
+    const data = [];
+    const queueTokenSnapMap = {};
+
+    const queueRef = collection(this.firestore, 'queue_token');
+    const q = query(queueRef,
+      where("tokenstatus", "==", "Active"),
+      where("stagestatus", "==", "Approved"),
+      where("currentstage", "==", "Completed"))
+
+    const queueTokenSnap = await getDocs(q);
+
+
+    for(let doc of queueTokenSnap.docs){
+      const data = doc.data();
+      const profileid = data['profile_id'];
+      if(![null , undefined , ''].includes(data['profile_id'])){
+        queueTokenSnapMap[profileid] = queueTokenSnapMap[profileid] ?? [];
+        queueTokenSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("Metadata not found for", metadata);
+        continue;
+      }
+
+      const queueToken = queueTokenSnapMap[profileid] ?? [];
+
+      metadata["queueevent"] =
+        metadata["queueevent"] || {};
+
+      var profileQueueAttended = {};
+      for (let i = 0; i < queueToken.length; i++) {
+        const attendedData = queueToken[i];
+        profileQueueAttended[attendedData["productref"].id] = profileQueueAttended[attendedData["productref"].id] || [];
+        profileQueueAttended[attendedData["productref"].id].push( attendedData["queueref"].id, );
+      }
+
+      let queue = '';
+
+      Object.entries(profileQueueAttended).forEach(([key , value])=>{
+        const product = this.mapfiltervalues[key] ?? '';
+        // console.log(this.mapfiltervalues[(value as []).at(0)])
+        const queues = (value as []).map((queue)=>this.mapfiltervalues[queue]).toString();
+        queue += `${product} : ${queues}\n`
+      })
+
+      data.push({
+        name: metadata.name ?? '',
+        email: metadata.email ?? '',
+        queueevent: queue,
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Queue Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'queueevent', header: 'Queue Event' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+   async openCheckListForHigherOrderPurchase(){
+    let loadingref = this.loading
+    const data = [];
+    const participantJourneyProductSnapMap = {};
+
+    const q = query(collection(this.firestore , 'participantjourneyproduct'));
+    const participantJourneyProductSnap = await getDocs(q);
+
+    for(let doc of participantJourneyProductSnap.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        participantJourneyProductSnapMap[profileid] = participantJourneyProductSnapMap[profileid] ?? [];
+        participantJourneyProductSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("No Profile id : ", metadata['name']);
+        continue;
+      }
+      
+      let higherOrderPurchase = null;
+      var liveJourney = null;
+
+      var journeyProductProfile = participantJourneyProductSnapMap[profileid] ?? [];
+
+      var activeJourneyList = journeyProductProfile.filter(
+        (e) =>
+          [null, "initiated", "ongoing", "completed"].includes(
+            e["journeystatus"],
+          ) && ![null, undefined, ""].includes(e["journeyref"]),
+      );
+
+      if (activeJourneyList.length != 0) {
+        var ongoingJourney = [];
+        var completedjourney = [];
+        activeJourneyList.forEach((journeyElement) => {
+          if (
+            [null, "initiated", "ongoing"].includes(
+              journeyElement["journeystatus"],
+            )
+          ) {
+            ongoingJourney.push(journeyElement);
+          } else if (journeyElement["journeystatus"] == "completed") {
+            completedjourney.push(journeyElement);
+          }
+        });
+
+        if (completedjourney.length != 0) {
+          if (ongoingJourney.length == 0) {
+            liveJourney = completedjourney[0];
+          }
+        }
+
+        if (ongoingJourney.length != 0) {
+          ongoingJourney = ongoingJourney.sort(
+            (a, b) =>
+              b["subscriptionend"].toDate() - a["subscriptionend"].toDate(),
+          );
+          var currentOngoing = ongoingJourney.find(
+            (e) => e["journeystatus"] == "ongoing",
+          );
+          var currentInitiated = ongoingJourney.find(
+            (e) => e["journeystatus"] == "initiated",
+          );
+          if (![null, undefined].includes(currentOngoing)) {
+            liveJourney = currentOngoing;
+          } else if (![null, undefined].includes(currentInitiated)) {
+            liveJourney = currentInitiated;
+          } else {
+            liveJourney = ongoingJourney[0];
+          }
+        }
+
+        higherOrderPurchase = activeJourneyList.reduce(
+          (higherOrderJourney, currentJourney) => {
+            if (
+              ![null, undefined].includes(
+                this.mapfiltervalues[currentJourney["journeyref"].id],
+              ) &&
+              ![null, undefined].includes(
+                this.mapfiltervalues[higherOrderJourney["journeyref"].id],
+              ) &&
+              ![null, undefined].includes(
+                this.mapfiltervalues[currentJourney["journeyref"].id]["sequence"],
+              ) &&
+              ![null, undefined].includes(
+                this.mapfiltervalues[higherOrderJourney["journeyref"].id]["sequence"],
+              )
+            ) {
+              return this.mapfiltervalues[currentJourney["journeyref"].id]["sequence"] <
+                this.mapfiltervalues[higherOrderJourney["journeyref"].id]["sequence"]
+                ? currentJourney
+                : higherOrderJourney;
+            }
+            else if (![null, undefined].includes(
+              this.mapfiltervalues[higherOrderJourney["journeyref"].id],
+            ) && ![null, undefined].includes(
+              this.mapfiltervalues[higherOrderJourney["journeyref"].id]["sequence"],
+            )) {
+              return higherOrderJourney
+            } else {
+              return currentJourney;
+            }
+          },
+        );
+      }
+      let higherOrderPurchaseJourney = ![null, undefined].includes(
+        higherOrderPurchase,
+      )
+        ? higherOrderPurchase["journeyref"].id
+        : null;
+
+      data.push({
+        name: metadata["name"],
+        email: metadata["email"],
+        higherorderpurchase: higherOrderPurchaseJourney,
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Queue Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'higherorderpurchase', header: 'Higher Order Purchase' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+  async openCheckListForPurchase(){
+    let loadingref = this.loading
+    const data = [];
+    const participantJourneyProductSnapMap = {};
+
+    const q = query(collection(this.firestore , 'participantjourneyproduct'));
+    const participantJourneyProductSnap = await getDocs(q);
+
+    for(let doc of participantJourneyProductSnap.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        participantJourneyProductSnapMap[profileid] = participantJourneyProductSnapMap[profileid] ?? [];
+        participantJourneyProductSnapMap[profileid].push(data);
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("No Profile id : ", metadata['name']);
+        continue;
+      }
+
+
+      var journeyProductProfile = participantJourneyProductSnapMap[profileid] ?? [];
+
+      var activeJourneyList = journeyProductProfile.filter(
+        (e) =>
+          [null, "initiated", "ongoing", "completed" , 'upgraded' , "shifted"].includes(
+            e["journeystatus"],
+          ) && ![null, undefined, ""].includes(e["journeyref"]),
+      );
+
+      let purchase = activeJourneyList.map((p)=>p['journeyref'].id)
+
+      data.push({
+        name: metadata["name"],
+        email: metadata["email"],
+        purchase : purchase.map((id)=>this.mapfiltervalues[id]).join(' , ')
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Queue Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'purchase', header: 'Overall Purchase' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
+  }
+
+  async openCheckListForPaymentPlan() {
+    let loadingref = this.loading
+    const data = [];
+    const participantSnapMap = {};
+
+    const participantSnap = await getDocs(collection(this.watsonDatabase , 'Participants'));
+
+    for(let doc of participantSnap.docs){
+      const data = doc.data();
+      const profileid = data['profileid'];
+      if(![null , undefined , ''].includes(data['profileid'])){
+        participantSnapMap[profileid] = data;
+      }
+    }
+
+    for (const metadata of this.dashboardEntireData) {
+      const profileid = metadata.profileid;
+
+      if ([null, undefined, ""].includes(profileid)) {
+        console.log("No Profile id : ", metadata['name']);
+        continue;
+      }
+
+
+      const watsonProfile = participantSnapMap[profileid];
+
+      data.push({
+        name: metadata["name"],
+        email: metadata["email"],
+        paymentplan : watsonProfile ? watsonProfile['pp_method'] ?? null : 'No Profile'
+      });
+    }
+    loadingref.close()
+    const dialogRef = this.dialog.open(ParticipantsChecklistsComponent, {
+        width: '90vw',
+        height: '80vh',
+        maxWidth: '1200px',
+        data: {
+          type: 'Participant Queue Event Details',
+          checklistData: data,
+          columns: [
+            { key: 'name', header: 'Name' },
+            { key: 'email', header: 'Email' },
+            { key: 'paymentplan', header: 'Payment Plan' },
+          ]
+        }
+      })
+
+      // Handle dialog result if needed
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          console.log('Dialog closed with result:', result);
+        }
+      });
   }
 
   // rawProductsData

@@ -1,10 +1,10 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, inject } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { collection, collectionData, doc, Firestore, getDocs, getDoc, orderBy, query, where, updateDoc, arrayUnion, serverTimestamp, Timestamp } from '@angular/fire/firestore';
+import { collection, collectionData, doc, Firestore, getDocs, getDoc, orderBy, query, where, updateDoc, arrayUnion, serverTimestamp, Timestamp, getFirestore } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -75,7 +75,7 @@ export class ViewParticipantsFormComponent {
   selectedQueue: any = [];
   selectedForm: any = [];
   formnamelist: any[] = [];
-  participantList: any[] = [];  
+  participantList: any[] = [];
   filterForm: FormGroup;
   workshopList: any[] = [];
   workshopListNew: any[] = [];
@@ -88,14 +88,14 @@ export class ViewParticipantsFormComponent {
   queueFilterCtrl = new FormControl<string>('');
   workshopFilterCtrl = new FormControl<string>('');
   formFilterCtrl = new FormControl<string>('');
-  participantFilterCtrl = new FormControl<string>('');  
+  participantFilterCtrl = new FormControl<string>('');
 
 
   // Filtered lists
   filteredQueueList: any[] = [];
   filteredCombinedWorkshopList: any[] = [];
   filteredFormList: any[] = [];
-  filteredParticipantList: any[] = [];  
+  filteredParticipantList: any[] = [];
   private combinedWorkshopList: any[] = [];
   importedMatchedProfileIds: string[] = [];
 
@@ -126,7 +126,7 @@ export class ViewParticipantsFormComponent {
 
   importedEmails: string[] = [];
   showImportedEmailsFilter = false;
-  profileEmailMap: any = {};  
+  profileEmailMap: any = {};
 
   //Email import results tracking
   matchedEmailsCount: number = 0;
@@ -150,9 +150,10 @@ export class ViewParticipantsFormComponent {
   }
 
   private destroy$ = new Subject<void>();
+  firestoreDefault = getFirestore()
+  firestoreForms = getFirestore('firestore-forms')
 
   constructor(
-    private firestore: Firestore,
     private authguard: AuthguardService,
     private router: Router,
     private fb: FormBuilder,
@@ -200,7 +201,7 @@ export class ViewParticipantsFormComponent {
       if (queryRunTimes >= 4) loadingRef.close();
     });
 
-    const queueGenerationCollRef = collection(this.firestore, "queue generation");
+    const queueGenerationCollRef = collection(this.firestoreDefault, "queue generation");
     const queueGenerationQuery = query(queueGenerationCollRef, orderBy("queueenddate", "desc"));
     collectionData(queueGenerationQuery).pipe(takeUntil(this.destroy$)).subscribe(async queuesnap => {
       this.queuelist = queuesnap;
@@ -212,7 +213,7 @@ export class ViewParticipantsFormComponent {
       this.filteredQueueList = [...this.queuelist];
     });
 
-    const deliveryFormsCollRef = collection(this.firestore, "delivery forms");
+    const deliveryFormsCollRef = collection(this.firestoreDefault, "delivery forms");
     getDocs(deliveryFormsCollRef).then(snap => {
       this.formnamelist = snap.docs.map(e => e.data());
       this.formnamelist.sort((a, b) => (a['formname'] || '').localeCompare(b['formname'] || ''));
@@ -221,7 +222,7 @@ export class ViewParticipantsFormComponent {
       if (queryRunTimes >= 4) loadingRef.close();
     });
 
-    const eiflixWorkshopCollRef = collection(this.firestore, "eiflix workshop");
+    const eiflixWorkshopCollRef = collection(this.firestoreDefault, "eiflix workshop");
     getDocs(eiflixWorkshopCollRef).then(snap => {
       this.workshopList = snap.docs.map(e => e.data());
       for (let i = 0; i < this.workshopList.length; i++) {
@@ -233,7 +234,7 @@ export class ViewParticipantsFormComponent {
       if (queryRunTimes >= 4) loadingRef.close();
     });
 
-    const eiflixWorkshopnewCollRef = collection(this.firestore, "workshopconfiguration");
+    const eiflixWorkshopnewCollRef = collection(this.firestoreDefault, "workshopconfiguration");
     getDocs(eiflixWorkshopnewCollRef).then(snap => {
       this.workshopListNew = snap.docs.map(e => e.data());
       for (let i = 0; i < this.workshopListNew.length; i++) {
@@ -263,7 +264,7 @@ export class ViewParticipantsFormComponent {
     this.queueFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterQueues());
     this.workshopFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterWorkshops());
     this.formFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterForms());
-    this.participantFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterParticipants());  
+    this.participantFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterParticipants());
 
   }
 
@@ -345,11 +346,11 @@ export class ViewParticipantsFormComponent {
     let loadingRef = this.loadingScreen;
     this.endDate = new Date(new Date(this.endDate).setHours(23, 59, 59, 0));
     this.startDate = new Date(new Date(this.startDate).setHours(0, 0, 0, 0));
-    const formsByClientCollRef = collection(this.firestore, "formsByClient");
+    const formsByClientCollRef = collection(this.firestoreForms, "formsByClient");
     const formsByClientQuery = query(formsByClientCollRef, where('date', '>', this.startDate), where('date', '<', this.endDate), orderBy('date', 'desc'));
     collectionData(formsByClientQuery).pipe(takeUntil(this.destroy$)).subscribe(async formsnap => {
       this.participantForm = formsnap;
-      this.buildParticipantList();  
+      this.buildParticipantList();
       this.ngAfterViewInit(this.participantForm);
       this.selection.clear();
       loadingRef.close();
@@ -464,27 +465,27 @@ export class ViewParticipantsFormComponent {
     if (!file) return;
 
     const reader = new FileReader();
-    
+
     reader.onload = (e: any) => {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        
+
         // Read first sheet
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-        
+
         // Find Email column index
         const headers = jsonData[0] as string[];
-        const emailColumnIndex = headers.findIndex(h => 
+        const emailColumnIndex = headers.findIndex(h =>
           h && h.toString().toLowerCase().trim() === 'email'
         );
-        
+
         if (emailColumnIndex === -1) {
           alert('No "Email" column found in the file. Please ensure your file has an "Email" column.');
           return;
         }
-        
+
         // Extract emails (skip header row)
         const emails: string[] = [];
         for (let i = 1; i < jsonData.length; i++) {
@@ -494,27 +495,27 @@ export class ViewParticipantsFormComponent {
             emails.push(email.toString().toLowerCase().trim());
           }
         }
-        
+
         if (emails.length === 0) {
           alert('No emails found in the file.');
           return;
         }
-        
+
         this.importedEmails = emails;
         this.showImportedEmailsFilter = true;
         this.applyImportedEmailsFilter();
-        
+
         alert(`Successfully imported ${emails.length} email(s).`);
-        
+
         // Reset file input
         event.target.value = '';
-        
+
       } catch (error) {
         console.error('Error reading file:', error);
         alert('Error reading file. Please ensure it is a valid Excel or CSV file.');
       }
     };
-    
+
     reader.readAsArrayBuffer(file);
   }
 
@@ -597,8 +598,8 @@ export class ViewParticipantsFormComponent {
   // OPEN IN NEW TAB (existing logic)
   // ==========================================
   onFormPreview(form: any) {
-    let path = doc(this.firestore, "formsByClient", form['docid']).path;
-    const url = this.router.createUrlTree(['/formtemplate'], { queryParams: { id: form.formid, type: 'form', patchdata: path } });
+    let path = doc(this.firestoreForms, "formsByClient", form['docid']).path;
+    const url = this.router.createUrlTree(['/formtemplate'], { queryParams: { id: form.formid, type: 'form', patchdata: path, viewFilledForm: 'true' } });
     window.open(url.toString(), '_blank');
   }
 
@@ -615,8 +616,8 @@ export class ViewParticipantsFormComponent {
 
     try {
       const [formTemplateDoc, submittedFormDoc] = await Promise.all([
-        getDoc(doc(this.firestore, 'delivery forms', row.formid)),
-        getDoc(doc(this.firestore, 'formsByClient', row.docid))
+        getDoc(doc(this.firestoreDefault, 'delivery forms', row.formid)),
+        getDoc(doc(this.firestoreForms, 'formsByClient', row.docid))
       ]);
 
       if (!formTemplateDoc.exists() || !submittedFormDoc.exists()) {
@@ -652,8 +653,8 @@ export class ViewParticipantsFormComponent {
       const results = await Promise.all(
         selectedRows.map(async (row) => {
           const [formTemplateDoc, submittedFormDoc] = await Promise.all([
-            getDoc(doc(this.firestore, 'delivery forms', row.formid)),
-            getDoc(doc(this.firestore, 'formsByClient', row.docid))
+            getDoc(doc(this.firestoreDefault, 'delivery forms', row.formid)),
+            getDoc(doc(this.firestoreForms, 'formsByClient', row.docid))
           ]);
           if (!formTemplateDoc.exists() || !submittedFormDoc.exists()) return null;
           return this.buildFormDisplayData(row, formTemplateDoc.data(), submittedFormDoc.data());
@@ -784,7 +785,7 @@ export class ViewParticipantsFormComponent {
   toggleLike(row: any) {
     const newValue = !row.liked;
     row.liked = newValue;
-    const docRef = doc(this.firestore, 'formsByClient', row.docid);
+    const docRef = doc(this.firestoreForms, 'formsByClient', row.docid);
 
     if (newValue) {
       row.likedetails = { user: this.loggedInProfileId, time: new Date() };
@@ -801,7 +802,7 @@ export class ViewParticipantsFormComponent {
   toggleFlag(row: any) {
     const newValue = !row.tagged;
     row.tagged = newValue;
-    const docRef = doc(this.firestore, 'formsByClient', row.docid);
+    const docRef = doc(this.firestoreForms, 'formsByClient', row.docid);
 
     if (newValue) {
       row.tagdetails = { user: this.loggedInProfileId, time: new Date() };
@@ -818,7 +819,7 @@ export class ViewParticipantsFormComponent {
   toggleOpportunity(row: any) {
     const newValue = !row.opportunity;
     row.opportunity = newValue;
-    const docRef = doc(this.firestore, 'formsByClient', row.docid);
+    const docRef = doc(this.firestoreForms, 'formsByClient', row.docid);
 
     if (newValue) {
       row.opportunitydetails = { user: this.loggedInProfileId, time: new Date() };
@@ -858,7 +859,7 @@ export class ViewParticipantsFormComponent {
       }
       this.notesRecord.notes.push(newNote);
 
-      const docRef = doc(this.firestore, 'formsByClient', this.notesRecord.docid);
+      const docRef = doc(this.firestoreForms, 'formsByClient', this.notesRecord.docid);
       updateDoc(docRef, {
         notes: arrayUnion({
           notes: this.notesText.trim(),
@@ -932,11 +933,11 @@ export class ViewParticipantsFormComponent {
       const excelData: any[] = [];
       for (let i = 0; i < selectedRows.length; i++) {
         const row = selectedRows[i];
-        const formDocRef = doc(this.firestore, "delivery forms", row.formid);
+        const formDocRef = doc(this.firestoreDefault, "delivery forms", row.formid);
         const formTemplateDoc = await getDoc(formDocRef);
         if (!formTemplateDoc.exists()) continue;
         const formTemplate = formTemplateDoc.data();
-        const submittedFormDoc = await getDoc(doc(this.firestore, "formsByClient", row.docid));
+        const submittedFormDoc = await getDoc(doc(this.firestoreForms, "formsByClient", row.docid));
         if (!submittedFormDoc.exists()) continue;
         const submittedFormData = submittedFormDoc.data();
 
@@ -1036,10 +1037,10 @@ export class ViewParticipantsFormComponent {
 
       for (let formIndex = 0; formIndex < selectedRows.length; formIndex++) {
         const row = selectedRows[formIndex];
-        const formTemplateDoc = await getDoc(doc(this.firestore, "delivery forms", row.formid));
+        const formTemplateDoc = await getDoc(doc(this.firestoreDefault, "delivery forms", row.formid));
         if (!formTemplateDoc.exists()) continue;
         const formTemplate = formTemplateDoc.data();
-        const submittedFormDoc = await getDoc(doc(this.firestore, "formsByClient", row.docid));
+        const submittedFormDoc = await getDoc(doc(this.firestoreForms, "formsByClient", row.docid));
         if (!submittedFormDoc.exists()) continue;
         const submittedFormData = submittedFormDoc.data();
 
@@ -1200,13 +1201,12 @@ export class ViewParticipantsFormComponent {
   // HELPER: Generate and Download Single PDF (unchanged)
   // ==========================================
   private async generateAndDownloadPDF(form: any): Promise<void> {
-    const formDocRef = doc(this.firestore, "delivery forms", form.formid);
+    const formDocRef = doc(this.firestoreDefault, "delivery forms", form.formid);
     const formTemplateDoc = await getDoc(formDocRef);
     if (!formTemplateDoc.exists()) throw new Error('Form template not found');
     const formTemplate = formTemplateDoc.data();
 
-    const submittedFormPath = doc(this.firestore, "formsByClient", form.docid).path;
-    const submittedFormDoc = await getDoc(doc(this.firestore, submittedFormPath));
+    const submittedFormDoc = await getDoc(doc(this.firestoreForms, "formsByClient", form.docid));
     if (!submittedFormDoc.exists()) throw new Error('Submitted form not found');
     const submittedFormData = submittedFormDoc.data();
 

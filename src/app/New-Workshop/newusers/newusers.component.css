@@ -1,6 +1,11 @@
 .users-table {
   width: 100%;
 }
+.filter-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .subscriber-label {
   color: red;
   font-weight: 600;
@@ -11,4 +16,43 @@
   margin-bottom: 10px;
   display: flex;
   justify-content: flex-end;
+}
+.header-btn {
+  display: flex;
+  gap: 12px;
+}
+
+.header-btn button:hover {
+  background-color: #e0e0e0;
+}
+
+.header-btn button:focus {
+  background-color: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 10px;   
+  padding-left: 600px;      
+}
+.selected {
+  display: flex;
+  gap: 2px;
+  background-color: #e3f2fd;
+  border-radius: 6px;
+}
+.dialog-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialog-title{
+  margin: 0;
+}
+
+.close-btn{
+  margin-right: 8px;
 }

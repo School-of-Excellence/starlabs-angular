@@ -5,17 +5,19 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
-import { 
-  collection, 
-  collectionSnapshots, 
-  doc, 
-  Firestore, 
-  getDocs, 
-  query, 
-  updateDoc, 
-  where, 
+import {
+  collection,
+  collectionSnapshots,
+  doc,
+  Firestore,
+  getDocs,
+  getDoc,
+  getFirestore,
+  query,
+  updateDoc,
+  where,
   writeBatch,
-  orderBy 
+  orderBy
 } from '@angular/fire/firestore';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -29,6 +31,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormsModule } from '@angular/forms';
+import { FormTemplatePreviewComponent } from '../../Product Designer/delivery-set/form-template-preview/form-template-preview.component'
 
 interface Marathon {
   id: string;
@@ -140,11 +143,11 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   mapParticipantAssignmentsByStatus: { [key: string]: ParticipantAssignment[] } = {};
   filteredParticipantAssignmentsByStatus: { [key: string]: ParticipantAssignment[] } = {};
   originalParticipantAssignmentsByStatus: { [key: string]: ParticipantAssignment[] } = {};
-  
+
   // Profile & Cohort Maps
   mapProfile: { [key: string]: any } = {};
   mapCohorts: { [key: string]: any } = {};
-  
+
   // Status Management
   statusList: string[] = ['initiated', 'ongoing', 'review', 'rework', 'completed'];
   statusIcons: { [key: string]: string } = {
@@ -154,19 +157,19 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     'rework': 'refresh',
     'completed': 'check_circle'
   };
-  
+
   selectedParticipantAssignments: { [key: string]: { [key: string]: boolean } } = {};
-  
+
   // User & Access
   loggedInProfileId: string | null = null;
   bigAdminAccess = false;
   admins: string[] = [];
-  
+
   // Other
   summary = '';
   currentDate = new Date();
   showDetailsPanel = true;
-  
+
   private subscription = new Subject<void>();
 
   constructor(
@@ -230,7 +233,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
       collection(this.firestore, 'big marathon'),
       orderBy('title', 'asc')
     );
-    
+
     const snap = await getDocs(marathonQuery);
     this.marathons = snap.docs.map(doc => ({
       id: doc.id,
@@ -243,7 +246,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
       collection(this.firestore, 'big cohorts'),
       orderBy('name', 'asc')
     );
-    
+
     const snap = await getDocs(cohortsQuery);
     this.allCohorts = snap.docs.map(doc => ({
       id: doc.id,
@@ -269,38 +272,38 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     this.cohortQueues = [];
     this.selectedCohortQueueId = null;
     this.clearParticipantData();
-    
+
     if (this.selectedMarathon?.color) {
       this.themeColor = this.selectedMarathon.color;
     } else {
       this.themeColor = '#374151';
     }
-    
+
     if (!marathonId) {
       this.filteredCohorts = [];
       return;
     }
-    
+
     // Filter cohorts based on marathon
     const marathonRef = doc(this.firestore, 'big marathon', marathonId);
-    this.filteredCohorts = this.allCohorts.filter(cohort => 
+    this.filteredCohorts = this.allCohorts.filter(cohort =>
       cohort.marathonref?.id === marathonId || cohort.marathonref?.path?.includes(marathonId)
     );
-    
+
     this.loadingAssignments = true;
-    
+
     const assignmentQuery = query(
       collection(this.firestore, 'big assignment'),
       where('marathonref', '==', marathonRef)
     );
-    
+
     const snap = await getDocs(assignmentQuery);
     this.assignments = snap.docs.map(doc => ({
       id: doc.id,
       docid: doc.id,
       ...doc.data()
     } as Assignment));
-    
+
     this.filteredAssignments = [...this.assignments];
     this.loadingAssignments = false;
 
@@ -357,29 +360,29 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     this.selectedAssignment = null;
     this.assignmentSearchText = '';
     this.clearParticipantData();
-    
+
     if (!cohortId) {
       // Show all assignments for this marathon
       this.filterAssignmentsBySearch();
       return;
     }
-    
+
     // Fetch assignments that have cohortref matching the selected cohort
     this.loadingAssignments = true;
-    
+
     const cohortRef = doc(this.firestore, 'big cohorts', cohortId);
     const assignmentQuery = query(
       collection(this.firestore, 'big assignment'),
       where('cohortsref', '==', cohortRef)
     );
-    
+
     const snap = await getDocs(assignmentQuery);
     const cohortAssignments = snap.docs.map(doc => ({
       id: doc.id,
       docid: doc.id,
       ...doc.data()
     } as Assignment));
-    
+
     // Also filter by marathon if selected
     if (this.selectedMarathonId) {
       this.cohortBaseAssignments = cohortAssignments.filter(a =>
@@ -434,22 +437,22 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     this.selectedAssignmentId = assignmentId;
     this.selectedCohortQueueId = null;
     this.clearParticipantData();
-    
+
     if (!assignmentId) {
       this.selectedAssignment = null;
       return;
     }
-    
+
     this.loadingParticipants = true;
     this.selectedAssignment = this.assignments.find(a => a.id === assignmentId) || null;
-    
+
     if (this.selectedAssignment) {
       this.admins = this.selectedAssignment['selectedAdmin'] || [];
       this.summary = this.selectedAssignment['summary'] || '';
     }
-    
+
     const assignmentRef = doc(this.firestore, 'big assignment', assignmentId);
-    
+
     collectionSnapshots(
       query(
         collection(this.firestore, 'big participants assignments'),
@@ -458,10 +461,10 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     ).pipe(takeUntil(this.subscription)).subscribe(async snapData => {
       const snap = snapData.map(doc => ({ id: doc.id, docid: doc.id, ...doc.data() } as ParticipantAssignment));
       this.allParticipantAssignments = snap;
-      
+
       const cohortMap: { [key: string]: { count: number; data?: any } } = {};
       const cohortsIdList: string[] = [];
-      
+
       for (const element of snap) {
         if (element.cohortsref) {
           const cohortId = element.cohortsref.id;
@@ -472,7 +475,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
           cohortMap[cohortId].count++;
         }
       }
-      
+
       // Load any missing cohorts
       const filteredCohortsIdList = cohortsIdList.filter(e => !this.mapCohorts[e]);
       for (let i = 0; i < filteredCohortsIdList.length; i += 10) {
@@ -486,14 +489,14 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
           });
         }
       }
-      
+
       this.cohortQueues = cohortsIdList.map(id => ({
         id,
         name: this.mapCohorts[id]?.name || 'Unknown',
         color: this.mapCohorts[id]?.color || null,
         participantCount: cohortMap[id]?.count || 0
       }));
-      
+
       this.processParticipantsByStatus(snap);
       this.loadingParticipants = false;
     });
@@ -501,18 +504,18 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
 
   processParticipantsByStatus(participants: ParticipantAssignment[]) {
     this.mapParticipantAssignmentsByStatus = {};
-    
+
     let filteredParticipants = participants;
     if (this.selectedCohortQueueId) {
       filteredParticipants = participants.filter(p => p.cohortsref?.id === this.selectedCohortQueueId);
     }
-    
+
     for (const element of filteredParticipants) {
       const status = element.status || 'initiated';
       this.mapParticipantAssignmentsByStatus[status] = this.mapParticipantAssignmentsByStatus[status] || [];
       this.mapParticipantAssignmentsByStatus[status].push(element);
     }
-    
+
     this.originalParticipantAssignmentsByStatus = JSON.parse(JSON.stringify(this.mapParticipantAssignmentsByStatus));
     this.filteredParticipantAssignmentsByStatus = this.mapParticipantAssignmentsByStatus;
   }
@@ -572,7 +575,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   // Get all participants for communication (selected or all if none selected)
   getParticipantsForCommunication(): ParticipantAssignment[] {
     const totalSelected = this.getTotalSelectedCount();
-    
+
     if (totalSelected > 0) {
       // Return only selected participants
       const selectedParticipants: ParticipantAssignment[] = [];
@@ -606,12 +609,12 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
 
   onSearchParticipant(event: Event, status: string) {
     const filterText = (event.target as HTMLInputElement).value?.toLowerCase().trim() || '';
-    
+
     if (!filterText) {
-      this.filteredParticipantAssignmentsByStatus[status] = 
+      this.filteredParticipantAssignmentsByStatus[status] =
         JSON.parse(JSON.stringify(this.originalParticipantAssignmentsByStatus[status] || []));
     } else {
-      this.filteredParticipantAssignmentsByStatus[status] = 
+      this.filteredParticipantAssignmentsByStatus[status] =
         (this.originalParticipantAssignmentsByStatus[status] || []).filter((e: any) =>
           this.mapProfile[e.profileid]?.name?.toLowerCase().includes(filterText)
         );
@@ -621,7 +624,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   selectAll(assignmentstatus: string, event: MatCheckboxChange) {
     this.selectedParticipantAssignments[assignmentstatus] = {};
     if (event.checked) {
-      this.selectedParticipantAssignments[assignmentstatus] = 
+      this.selectedParticipantAssignments[assignmentstatus] =
         (this.filteredParticipantAssignmentsByStatus[assignmentstatus] || []).reduce((acc, cur) => {
           acc[cur.docid] = true;
           return acc;
@@ -632,9 +635,9 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   toggleSelectAll(status: string) {
     const allSelected = this.isAllSelected(status);
     this.selectedParticipantAssignments[status] = {};
-    
+
     if (!allSelected) {
-      this.selectedParticipantAssignments[status] = 
+      this.selectedParticipantAssignments[status] =
         (this.filteredParticipantAssignmentsByStatus[status] || []).reduce((acc, cur) => {
           acc[cur.docid] = true;
           return acc;
@@ -644,7 +647,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
 
   onSelectParticipantAssignment(assignmentstatus: string, participantAssignmentId: string, event: MatCheckboxChange) {
     this.selectedParticipantAssignments[assignmentstatus] = this.selectedParticipantAssignments[assignmentstatus] || {};
-    
+
     if (event.checked) {
       this.selectedParticipantAssignments[assignmentstatus][participantAssignmentId] = true;
     } else {
@@ -658,15 +661,15 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
       this.snackbar.open('No participants selected', 'OK', { duration: 3000 });
       return;
     }
-    
+
     const batch = writeBatch(this.firestore);
     const filteredAssignments = Object.keys(selected).filter(e => selected[e]);
-    
+
     for (const docid of filteredAssignments) {
       const ref = doc(this.firestore, 'big participants assignments', docid);
       batch.update(ref, { status: toStatus });
     }
-    
+
     try {
       await batch.commit();
       this.snackbar.open(`Moved ${filteredAssignments.length} participant(s) to ${toStatus}`, 'OK', { duration: 3000 });
@@ -692,18 +695,18 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     const selectedParticipants = (this.filteredParticipantAssignmentsByStatus[status] || []).filter(assignment =>
       this.selectedParticipantAssignments[status]?.[assignment.docid]
     );
-    
+
     const profileIds: string[] = [];
-    const participants = selectedParticipants.length > 0 
-      ? selectedParticipants 
+    const participants = selectedParticipants.length > 0
+      ? selectedParticipants
       : this.filteredParticipantAssignmentsByStatus[status] || [];
-    
+
     participants.forEach(participant => {
       if (participant.profileid) {
         profileIds.push(participant.profileid);
       }
     });
-    
+
     if (this.bigAdminAccess) {
       const url = this.router.createUrlTree(['bigchatscreen'], {
         queryParams: {
@@ -736,18 +739,18 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   sendNotification() {
     const profileIds = this.getProfileIdsForCommunication();
     const totalSelected = this.getTotalSelectedCount();
-    
+
     if (profileIds.length === 0) {
       this.snackbar.open('No participants to send notification', 'OK', { duration: 3000 });
       return;
     }
-    
-    const message = totalSelected > 0 
+
+    const message = totalSelected > 0
       ? `Sending notification to ${profileIds.length} selected participant(s)...`
       : `Sending notification to all ${profileIds.length} participant(s)...`;
-    
+
     this.snackbar.open(message, 'OK', { duration: 2000 });
-    
+
     // TODO: Implement your notification logic here
     console.log('Sending notification to profile IDs:', profileIds);
     // Example: this.notificationService.send(profileIds, this.selectedAssignmentId);
@@ -756,26 +759,26 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   sendEmail() {
     const profileIds = this.getProfileIdsForCommunication();
     const totalSelected = this.getTotalSelectedCount();
-    
+
     if (profileIds.length === 0) {
       this.snackbar.open('No participants to send email', 'OK', { duration: 3000 });
       return;
     }
-    
-    const message = totalSelected > 0 
+
+    const message = totalSelected > 0
       ? `Opening email for ${profileIds.length} selected participant(s)...`
       : `Opening email for all ${profileIds.length} participant(s)...`;
-    
+
     this.snackbar.open(message, 'OK', { duration: 2000 });
-    
+
     // TODO: Implement your email logic here
     console.log('Sending email to profile IDs:', profileIds);
-    
+
     // Get emails from profiles
     const emails = profileIds
       .map(id => this.mapProfile[id]?.email)
       .filter(email => email);
-    
+
     if (emails.length > 0) {
       // Open mailto link
       const mailtoLink = `mailto:${emails.join(',')}?subject=Assignment: ${this.selectedAssignment?.title || ''}`;
@@ -786,26 +789,26 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   sendWhatsApp() {
     const profileIds = this.getProfileIdsForCommunication();
     const totalSelected = this.getTotalSelectedCount();
-    
+
     if (profileIds.length === 0) {
       this.snackbar.open('No participants to send WhatsApp', 'OK', { duration: 3000 });
       return;
     }
-    
-    const message = totalSelected > 0 
+
+    const message = totalSelected > 0
       ? `Opening WhatsApp for ${profileIds.length} selected participant(s)...`
       : `Opening WhatsApp for all ${profileIds.length} participant(s)...`;
-    
+
     this.snackbar.open(message, 'OK', { duration: 2000 });
-    
+
     // TODO: Implement your WhatsApp logic here
     console.log('Sending WhatsApp to profile IDs:', profileIds);
-    
+
     // Get phone numbers from profiles
     const phones = profileIds
       .map(id => this.mapProfile[id]?.phone || this.mapProfile[id]?.mobile)
       .filter(phone => phone);
-    
+
     if (phones.length === 1) {
       // Single recipient - open WhatsApp directly
       const phone = phones[0].replace(/\D/g, '');
@@ -820,7 +823,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
 
   markAssignmentCompletion(event: MatCheckboxChange) {
     if (!this.selectedAssignment) return;
-    
+
     updateDoc(doc(this.firestore, 'big assignment', this.selectedAssignment.docid), {
       status: event.checked ? 'completed' : 'ongoing'
     });
@@ -828,21 +831,133 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
 
   onUpdateSummary() {
     if (!this.selectedAssignment) return;
-    
+
     updateDoc(doc(this.firestore, 'big assignment', this.selectedAssignment.docid), {
       summary: this.summary
     });
     this.snackbar.open('Summary updated', 'OK', { duration: 2000 });
   }
+  extractFormValues(formData: any): any {
+    const values: any = {};
+    if (!formData?.formarray) return values;
+    let n = 0;
+    formData.formarray.forEach((field: any) => {
+      if (!['label', 'video', 'audio'].includes(field.type)) {
+        const controlKey = field.formcontrol ?? `control${n}`;
+        field.formcontrol = controlKey;
+        values[controlKey] = field.value ?? null;
+        n++;
+      }
+    });
+    return values;
+  }
 
   review(assignment: ParticipantAssignment) {
     if (!this.selectedAssignment) return;
-    
     const assignmentType = this.selectedAssignment.assignmenttype;
-    
+
     if (assignmentType === 'Form') {
-      const url = `/formbasedsubmission?id=${this.selectedAssignment['formtemplate']}&type=form&patchdata=${assignment['activityref']?.id}&profileid=${assignment.profileid}&participantAssignmentId=${assignment.docid}`;
-      window.open(url, '_blank');
+      const formTemplateId = assignment['formtemplate'] ?? this.selectedAssignment['selectedform'];
+      const activityrefId = assignment['activityref']?.id;
+      if (!formTemplateId || !activityrefId) {
+        this.snackbar.open('Form data not found', 'OK', { duration: 3000 });
+        console.error('Missing formtemplate or activityref:', assignment);
+        return;
+      }
+
+      // fetch the filled form data from formsByClient
+      const firestoreForms = getFirestore('firestore-forms');
+      getDoc(doc(firestoreForms, 'formsByClient', activityrefId)).then(snap => {
+        if (!snap.exists()) {
+          getDoc(doc(this.firestore, 'formsByClient', activityrefId)).then(snap2 => {
+            if (!snap2.exists()) {
+              this.snackbar.open('Form submission not found', 'OK', { duration: 3000 });
+              return;
+            }
+            const formData = snap2.data();
+            this.dialog.open(FormTemplatePreviewComponent, {
+              width: '800px',
+              maxWidth: '95vw',
+              maxHeight: '90vh',
+              data: {
+                formData: formData,
+                formValues: this.extractFormValues(formData),
+                reviewaccess: this.loggedInProfileId !== assignment.profileid,
+                participantassignmentid: assignment.docid,
+                validate: false,
+                loginid: this.loggedInProfileId,
+                profileid: assignment.profileid,
+                viewOnly: true
+              },
+              disableClose: true
+            }).afterClosed().subscribe(async (result) => {
+              console.log('dialog result:', result);
+              console.log('reviewnotes:', result?.reviewnotes);
+              if (result && result.confirmed) {
+                const updatePayload: any = { status: result.status };
+                if (result.reviewnotes && result.reviewnotes.length > 0) {
+                  const newLogEntry = {
+                    notes: Array.isArray(result.reviewnotes)
+                      ? result.reviewnotes.filter((n: string) => n?.trim())
+                      : [result.reviewnotes],
+                    date: new Date(),
+                    reviewedby: this.loggedInProfileId,
+                    status: result.status
+                  };
+                  const existingLog = assignment['activitylog'] || [];
+                  updatePayload['activitylog'] = [...existingLog, newLogEntry];
+                }
+                await updateDoc(
+                  doc(this.firestore, 'big participants assignments', assignment.docid),
+                  updatePayload
+                );
+                this.snackbar.open('Status updated to ' + result.status, 'OK', { duration: 3000 });
+              }
+            });
+          });
+          return;
+        }
+        const formData = snap.data();
+        this.dialog.open(FormTemplatePreviewComponent, {
+          width: '800px',
+          maxWidth: '95vw',
+          maxHeight: '90vh',
+          data: {
+            formData: formData,
+            formValues: this.extractFormValues(formData),
+            reviewaccess: this.loggedInProfileId !== assignment.profileid,
+            participantassignmentid: assignment.docid,
+            validate: false,
+            loginid: this.loggedInProfileId,
+            profileid: assignment.profileid,
+            viewOnly: true
+          },
+          disableClose: true
+        }).afterClosed().subscribe(async (result) => {
+          console.log('dialog result:', result);
+  console.log('reviewnotes:', result?.reviewnotes);
+          if (result && result.confirmed) {
+            const updatePayload: any = { status: result.status };
+            if (result.reviewnotes && result.reviewnotes.length > 0) {
+              const newLogEntry = {
+                notes: Array.isArray(result.reviewnotes)
+                  ? result.reviewnotes.filter((n: string) => n?.trim())
+                  : [result.reviewnotes],
+                date: new Date(),
+                reviewedby: this.loggedInProfileId,
+                status: result.status
+              };
+              const existingLog = assignment['activitylog'] || [];
+              updatePayload['activitylog'] = [...existingLog, newLogEntry];
+            }
+            await updateDoc(
+              doc(this.firestore, 'big participants assignments', assignment.docid),
+              updatePayload
+            );
+            this.snackbar.open('Status updated to ' + result.status, 'OK', { duration: 3000 });
+          }
+        });
+      });
     } else if (assignmentType === 'ATC') {
       const url = this.router.createUrlTree(['/previewATC'], {
         queryParams: {
@@ -860,12 +975,12 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
       const url = this.router.createUrlTree(['/previewtripleATC'], {
         queryParams: {
           type: 'validation',
-          atcdocid: assignment['activityref']?.id,
+          atcdocid: assignment['atcdocid'] ?? assignment['activityref']?.id,
           validation: true,
           profileid: assignment.profileid,
           marathonid: assignment['marathonref']?.id,
           assignmentid: assignment.docid,
-          participantassignmentid: assignment['participantAssignmentId']
+          participantassignmentid: assignment.docid
         }
       }).toString();
       window.open(url, '_blank');

@@ -1,11 +1,11 @@
-import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { CommonModule, formatDate } from '@angular/common';
+import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -34,6 +34,10 @@ interface purchaseProduct {
   unlimited: any
   participantproductid: any
   deliverytype: any
+  rowlogs?: any
+  _initiationNote?: string
+  _statusBefore?: any
+  _autoFromJourney?: boolean
 }
 
 interface ParticipantPurchase {
@@ -49,6 +53,10 @@ interface ParticipantPurchase {
   watsonpurchaselabel: any
   purchasedate: any
   products: Array<purchaseProduct>
+  journeyproductlogs?: any
+  purchaselogs?: any
+  removedProductLogs?: any
+  _changeNote?: string
 }
 
 
@@ -72,6 +80,7 @@ interface ParticipantPurchase {
     MatNativeDateModule,
     MatSelectModule,
     MatDividerModule,
+    MatDialogModule,
     CdkDropList,
     DragDropModule
   ],
@@ -82,6 +91,7 @@ export class JourneyProductPurchaseComponent {
 
   reviewMode:boolean = false
   participantProductList = []
+  removedGroups: any[] = []
   validationMode:boolean = false
   // "watsonpurchaseid",
   requiredJourneyKey = ["subscriptionstart", "subscriptionend"]
@@ -121,6 +131,52 @@ export class JourneyProductPurchaseComponent {
   // mapProductDelivery = {}
   mapMinimumRequiredAmount:any = {}
   watsonDatabase: any;
+  loggedinprofileid = null
+  pendingChanges = []
+  pendingDeletes = []
+  fieldLabels = {
+    participantsproduct: {
+      journeyref: "Journey",
+      productref: "Product",
+      packageref: "Package",
+      tentativestart: "Tentative Start",
+      minimumpayment: "Minimum Payment",
+      status: "Product Status",
+      subscriptionstart: "Subscription Start",
+      subscriptionend: "Subscription End",
+      unlimited: "Unlimited",
+      deliverytype: "Delivery Option"
+    },
+    journeyproductpurchase: {
+      watsonpurchaseid: "Watson Purchase",
+      watsonpurchaselabel: "Watson Label",
+      journeyref: "Journey",
+      purchasetype: "Purchase Type"
+    },
+    participantjourneyproduct: {
+      journeystatus: "Journey Status",
+      subscriptionstart: "Subscription Start",
+      subscriptionend: "Subscription End",
+      journeyref: "Journey"
+    }
+  }
+  excludedLogFields = ["Products", "Participant Products"]
+  collectionLabels = {
+    participantsproduct: "Product",
+    journeyproductpurchase: "Purchase",
+    participantjourneyproduct: "Journey Product"
+  }
+  purchaseLogs = []
+  mapDocLogs = {}
+  mapPurchaseDoc = {}
+  mapJourneyProductDoc = {}
+  mapProfileNames = {}
+  historyExpanded = {}
+  removedLogs = []
+  allRemovedEntries = []
+  showRemovedLogs = false
+
+  @ViewChild('confirmInitiateDialog') confirmInitiateDialog!: TemplateRef<any>
 
   constructor(
     public router: Router,
@@ -187,6 +243,12 @@ export class JourneyProductPurchaseComponent {
         this.mapProductDeliveryType[data["product"].id] = (data["deliveryoptions"] ?? []).map(e => e["deliverytype"])
       }
       console.log(this.mapProductDeliveryType)
+    })
+    this.guard.username().then(profile=>{
+      this.loggedinprofileid = profile?.["profileid"] ?? null
+    })
+    this.guard.getProfileMap().then(profileMap=>{
+      this.mapProfileNames = profileMap?.["map"] ?? {}
     })
   }
 
@@ -260,12 +322,15 @@ export class JourneyProductPurchaseComponent {
         mapPurchase[doc.id] = doc.data()
       }
     })
+    this.mapPurchaseDoc = mapPurchase
+    this.mapJourneyProductDoc = {}
     await getDocs(query(collection(this.firestore,"participantjourneyproduct"), where("profileid", "==", this.profileid))).then(clientjourney=>{
       // var journeyProductlist:Array<purchaseJourney> = []
       var PurchaseboxList:Array<ParticipantPurchase> = []
       for (let i = 0; i < clientjourney.docs.length; i++) {
         const journeyproduct = clientjourney.docs[i];
-        const journeyproductdata = journeyproduct.data(); 
+        const journeyproductdata = journeyproduct.data();
+        this.mapJourneyProductDoc[journeyproduct.id] = journeyproductdata
         // journeyProductlist.push({
         //   docid: journeyproductdata["docid"],
         //   journeyref: journeyproductdata["journeyref"]?.id ?? null,
@@ -323,6 +388,107 @@ export class JourneyProductPurchaseComponent {
     })
     // console.log("journey box", this.participantJourneyProducts)
     console.log("Purchase box", this.participantPurchase)
+    await this.loadPurchaseLogs()
+  }
+
+  async loadPurchaseLogs(){
+    await getDocs(query(collection(this.firestore,"participant purchase logs"), where("profileid", "==", this.profileid))).then(logs=>{
+      this.purchaseLogs = logs.docs.map(e => e.data()).sort((a, b) =>
+        (b["date"]?.toDate?.()?.getTime?.() ?? 0) - (a["date"]?.toDate?.()?.getTime?.() ?? 0)
+      )
+      this.buildDocLogMap()
+    }).catch(err=>{
+      console.log(err)
+    })
+  }
+
+  buildDocLogMap(){
+    var map = {}
+    var removed = []
+    for (let i = 0; i < this.purchaseLogs.length; i++) {
+      const log = this.purchaseLogs[i]
+      const changes = log["changes"] ?? []
+      for (let j = 0; j < changes.length; j++) {
+        const change = changes[j]
+        const docid = change["docid"]
+        if(docid == null) continue
+        const fields = change["fields"] ?? {}
+        const visibleFieldKeys = Object.keys(fields).filter(k => !this.excludedLogFields.includes(k))
+        if(change["action"] == "updated" && visibleFieldKeys.length == 0) continue
+        const entry = {
+          date: log["date"],
+          loggedinprofile: log["loggedinprofile"],
+          collection: change["collection"],
+          docid: docid,
+          action: change["action"],
+          label: change["label"] ?? "",
+          journey: change["journey"] ?? "",
+          note: change["note"] ?? "",
+          initiationNote: change["initiationNote"] ?? "",
+          parentPurchaseref: change["parentPurchaseref"] ?? "",
+          parentJourneyProductref: change["parentJourneyProductref"] ?? "",
+          fields: fields,
+          fieldKeys: visibleFieldKeys
+        }
+        if(change["action"] == "removed"){
+          removed.push(entry)
+        }
+        else{
+          if(map[docid] == null) map[docid] = []
+          map[docid].push(entry)
+        }
+      }
+    }
+    removed.sort((a, b) =>
+      (b["date"]?.toDate?.()?.getTime?.() ?? 0) - (a["date"]?.toDate?.()?.getTime?.() ?? 0)
+    )
+    this.mapDocLogs = map
+    this.allRemovedEntries = removed
+    this.attachRowLogs()
+  }
+
+  attachRowLogs(){
+    var purchaseByRef = {}
+    for(let i = 0; i < this.participantPurchase.length; i++){
+      const p = this.participantPurchase[i]
+      p["removedProductLogs"] = []
+      if(p["purchaseref"]) purchaseByRef[p["purchaseref"]] = p
+    }
+    var orphans = []
+    const removedEntries = this.allRemovedEntries ?? []
+    for(let i = 0; i < removedEntries.length; i++){
+      const e = removedEntries[i]
+      const parent = e["parentPurchaseref"] ? purchaseByRef[e["parentPurchaseref"]] : null
+      if(parent && e["collection"] == "participantsproduct"){
+        parent["removedProductLogs"].push(e)
+      } else {
+        orphans.push(e)
+      }
+    }
+    this.removedLogs = orphans
+    for (let i = 0; i < this.participantPurchase.length; i++) {
+      const purchase = this.participantPurchase[i]
+      purchase["journeyproductlogs"] = this.mergeLogs(purchase["participantjourneyproductref"])
+      purchase["purchaselogs"] = this.mergeLogs(purchase["purchaseref"])
+      const products = purchase["products"] ?? []
+      for (let j = 0; j < products.length; j++) {
+        products[j]["rowlogs"] = this.mergeLogs(products[j]["participantproductid"])
+      }
+    }
+  }
+
+  mergeLogs(...docids){
+    var entries = []
+    for (let i = 0; i < docids.length; i++) {
+      const id = docids[i]
+      if(id != null && this.mapDocLogs[id] != null){
+        entries = entries.concat(this.mapDocLogs[id])
+      }
+    }
+    entries.sort((a, b) =>
+      (b["date"]?.toDate?.()?.getTime?.() ?? 0) - (a["date"]?.toDate?.()?.getTime?.() ?? 0)
+    )
+    return entries
   }
 
   onJourneyChange(journeyindex){
@@ -331,7 +497,7 @@ export class JourneyProductPurchaseComponent {
       var mappedProduct = this.mapJourneyToProduct[this.participantPurchase[journeyindex].journeyref] ?? [null]
       for (let i = 0; i < mappedProduct.length; i++) {
         const product = mappedProduct[i];
-        this.newProduct(journeyindex, product)
+        this.newProduct(journeyindex, product, true)
       }
     }
   }
@@ -429,14 +595,18 @@ export class JourneyProductPurchaseComponent {
             }
             else{
               this.participantPurchase.splice(journeyindex, 1)
+              var journeyName = this.purchaseLabel(selectedJourney)
               if(selectedJourney.purchaseref != null){
                 this.documentToDelete.push(doc(this.firestore,"journeyproductpurchase",selectedJourney.purchaseref).path)
+                this.collectDelete("journeyproductpurchase", selectedJourney.purchaseref, journeyName, journeyName)
               }
               if(selectedJourney.participantjourneyproductref != null){
                 this.documentToDelete.push(doc(this.firestore,"participantjourneyproduct",selectedJourney.participantjourneyproductref).path)
+                this.collectDelete("participantjourneyproduct", selectedJourney.participantjourneyproductref, journeyName, journeyName)
               }
               journeyproduct.filter(e => e.participantproductid != null).forEach(p =>{
                 this.documentToDelete.push(doc(this.firestore,"participantsproduct",p.participantproductid).path)
+                this.collectDelete("participantsproduct", p.participantproductid, this.productLabel(p), journeyName, selectedJourney.purchaseref, selectedJourney.participantjourneyproductref)
               })
             }
             this.loadingWidget.close()
@@ -451,7 +621,7 @@ export class JourneyProductPurchaseComponent {
     }
   }
 
-  newProduct(journeyindex, productref = null){
+  newProduct(journeyindex, productref = null, autoFromJourney = false){
     this.participantPurchase[journeyindex].products.push({
       productref: productref,
       packageref: null,
@@ -460,7 +630,8 @@ export class JourneyProductPurchaseComponent {
       status: null,
       unlimited: false,
       participantproductid: null,
-      deliverytype: null
+      deliverytype: null,
+      _autoFromJourney: autoFromJourney
     })
   }
 
@@ -472,11 +643,13 @@ export class JourneyProductPurchaseComponent {
       }
       else{
         this.loadingWidget = this.loadingDialog("Removing Product.....")
+        var selectedJourney = this.participantPurchase[journeyindex]
         await this.validateANDdeleteProduct(journeyindex, productindex).then(value=>{
           if(value){
             this.participantPurchase[journeyindex].products.splice(productindex, 1)
             if(selectedProduct.participantproductid != null){
               this.documentToDelete.push(doc(this.firestore,"participantsproduct",selectedProduct.participantproductid).path)
+              this.collectDelete("participantsproduct", selectedProduct.participantproductid, this.productLabel(selectedProduct), this.purchaseLabel(selectedJourney), selectedJourney.purchaseref, selectedJourney.participantjourneyproductref)
             }
           }
           else{
@@ -567,7 +740,9 @@ export class JourneyProductPurchaseComponent {
           subscriptionstart: purchase.subscriptionstart,
           subscriptionend: purchase.subscriptionend,
           unlimited: product.unlimited ?? false,
-          deliverytype: product['deliverytype'] ?? null
+          deliverytype: product['deliverytype'] ?? null,
+          _initiationNote: product['_initiationNote'] ?? null,
+          _autoFromJourney: product['_autoFromJourney'] ?? false
         })
 
         // if(product["status"] == "initiated" && (product["delivery"] ?? []).length == 0){
@@ -592,7 +767,12 @@ export class JourneyProductPurchaseComponent {
     // console.log("Journey", this.participantJourneyProducts)
     if(this.validateReview()){
       this.reviewMode = true
+      this.participantPurchase.forEach(p => p._changeNote = '')
+      this.participantProductList.forEach((p: any) => p.note = '')
       this.participantProductList.sort((a, b) => a["sequenceorder"] - b["sequenceorder"])
+      this.computeReviewDiffs()
+      this.computeRemovedGroups()
+      this.recomputeMissingNotes()
       console.log("Purchase", this.participantPurchase)
       console.log("Participant Product", this.participantProductList)
     }
@@ -601,21 +781,193 @@ export class JourneyProductPurchaseComponent {
     }
   }
 
+  computeRemovedGroups(){
+    const groups: any[] = []
+    const purchaseByDocid = new Map<string, any>()
+
+    this.pendingDeletes.forEach((d: any) => {
+      if(d.collection === 'journeyproductpurchase'){
+        const group = {
+          type: 'purchase',
+          purchaseDocid: d.docid,
+          journey: d.journey,
+          label: d.label,
+          productLabels: [] as string[],
+          deleteEntries: [d] as any[],
+          note: ''
+        }
+        purchaseByDocid.set(d.docid, group)
+        groups.push(group)
+      }
+    })
+
+    this.pendingDeletes.forEach((d: any) => {
+      if(d.collection === 'participantjourneyproduct'){
+        const group = groups.find(g =>
+          g.type === 'purchase' &&
+          g.journey === d.journey &&
+          !g.deleteEntries.some((e: any) => e.collection === 'participantjourneyproduct')
+        )
+        if(group) group.deleteEntries.push(d)
+      }
+      else if(d.collection === 'participantsproduct'){
+        if(d.parentPurchaseref && purchaseByDocid.has(d.parentPurchaseref)){
+          const group = purchaseByDocid.get(d.parentPurchaseref)
+          group.productLabels.push(d.label)
+          group.deleteEntries.push(d)
+        }
+        else{
+          groups.push({
+            type: 'product',
+            journey: d.journey,
+            label: d.label,
+            productLabels: [],
+            deleteEntries: [d],
+            note: ''
+          })
+        }
+      }
+    })
+
+    this.removedGroups = groups
+  }
+
+  hasMissingReviewNotes = false
+
+  recomputeMissingNotes(){
+    if(!this.reviewMode){ this.hasMissingReviewNotes = false; return }
+    for(const p of this.participantProductList as any[]){
+      if(p._changed && !p._autoFromJourney && !((p.note ?? '').trim())){ this.hasMissingReviewNotes = true; return }
+    }
+    for(const j of this.participantPurchase as any[]){
+      if(j._changed && !((j._changeNote ?? '').trim())){ this.hasMissingReviewNotes = true; return }
+    }
+    for(const g of this.removedGroups){
+      if(!((g.note ?? '').trim())){ this.hasMissingReviewNotes = true; return }
+    }
+    this.hasMissingReviewNotes = false
+  }
+
+  private diffFields(collectionName: string, oldData: any, newData: any): Array<{label: string, old: any, new: any}> {
+    const labels = this.fieldLabels[collectionName] ?? {}
+    const diffs: Array<{label: string, old: any, new: any}> = []
+    Object.keys(newData).forEach(key => {
+      const label = labels[key]
+      if(label == null) return
+      const oldRaw = oldData ? oldData[key] : null
+      const newRaw = newData[key]
+      const oldN = this.normalizeForDiff(oldRaw)
+      const newN = this.normalizeForDiff(newRaw)
+      if(JSON.stringify(oldN) !== JSON.stringify(newN)){
+        diffs.push({ label, old: oldRaw ?? null, new: newRaw ?? null })
+      }
+    })
+    return diffs
+  }
+
+  computeReviewDiffs(){
+    this.participantProductList.forEach((product: any, i: number) => {
+      const isNew = product.participantproductid == null
+      const productData = {
+        journeyref: product.journeyref != null ? doc(this.firestore,"journey",product.journeyref) : null,
+        productref: product.productref != null ? doc(this.firestore,"products",product.productref) : null,
+        packageref: product.packageref != null ? doc(this.firestore,"package",product.packageref) : null,
+        tentativestart: product.tentativestart ?? null,
+        minimumpayment: product.minimumpayment ?? null,
+        status: product.status,
+        sequenceorder: i,
+        subscriptionstart: product.subscriptionstart ?? null,
+        subscriptionend: product.subscriptionend ?? null,
+        unlimited: product.unlimited ?? false,
+        deliverytype: product.deliverytype
+      }
+      const oldProduct = isNew ? null : (this.mapParticipantProducts[product.participantproductid] ?? null)
+      product._diff = this.diffFields('participantsproduct', oldProduct, productData)
+      product._isNew = isNew
+      product._changed = isNew || product._diff.length > 0
+    })
+
+    for(let i = 0; i < this.participantPurchase.length; i++){
+      const purchase: any = this.participantPurchase[i]
+      const purchaseproduct = this.participantProductList.filter((e: any) => e.purchaseindex === i)
+      const productRefList = purchaseproduct.map((e: any) => doc(this.firestore,"products",e.productref))
+      const productParticipantList = purchaseproduct.map((p: any) => ({
+        participantproductid: p.participantproductid,
+        productref: doc(this.firestore,"products",p.productref)
+      }))
+      const isNew = purchase.purchaseref == null
+      const purchaseData: any = {
+        productref: productRefList,
+        watsonpurchaseid: purchase.watsonpurchaseid,
+        watsonpurchaselabel: purchase.watsonpurchaselabel
+      }
+      const journeyproductData: any = {
+        journeystatus: purchase.journeystatus,
+        productref: productRefList,
+        participantproducts: productParticipantList,
+        subscriptionstart: purchase.subscriptionstart ?? null,
+        subscriptionend: purchase.subscriptionend ?? null
+      }
+      const oldP = isNew ? null : (this.mapPurchaseDoc[purchase.purchaseref] ?? null)
+      const oldJP = isNew ? null : (this.mapJourneyProductDoc[purchase.participantjourneyproductref] ?? null)
+      const purchaseDiffs = this.diffFields('journeyproductpurchase', oldP, purchaseData)
+      const jpDiffs = this.diffFields('participantjourneyproduct', oldJP, journeyproductData)
+      const merged = new Map<string, {label: string, old: any, new: any}>()
+      purchaseDiffs.forEach(d => merged.set(d.label, d))
+      jpDiffs.forEach(d => { if(!merged.has(d.label)) merged.set(d.label, d) })
+      purchase._diff = Array.from(merged.values())
+      purchase._isNew = isNew
+      purchase._changed = isNew || purchase._diff.length > 0
+    }
+  }
+
+  formatDiffValue(label: string, value: any): string {
+    if(value == null || value === '') return '—'
+    if(label === 'Journey'){
+      const id = value?.id ?? (typeof value === 'string' && value.includes('/') ? value.split('/').pop() : value)
+      return this.mapJourney[id] ?? String(id ?? '—')
+    }
+    if(label === 'Product'){
+      const refs = Array.isArray(value) ? value : [value]
+      return refs.map(r => {
+        const id = r?.id ?? (typeof r === 'string' && r.includes('/') ? r.split('/').pop() : r)
+        return this.mapProduct[id] ?? String(id ?? '—')
+      }).filter(Boolean).join(', ') || '—'
+    }
+    if(label === 'Package'){
+      const id = value?.id ?? (typeof value === 'string' && value.includes('/') ? value.split('/').pop() : value)
+      return this.mapPackage[id] ?? String(id ?? '—')
+    }
+    if(label === 'Subscription Start' || label === 'Subscription End' || label === 'Tentative Start'){
+      const d = value?.toDate ? value.toDate() : (value instanceof Date ? value : new Date(value))
+      if(!d || isNaN(d.getTime())) return String(value)
+      return d.toLocaleDateString()
+    }
+    if(typeof value === 'boolean') return value ? 'Yes' : 'No'
+    return String(value)
+  }
+
   drop(event: CdkDragDrop<any[]>) {
     console.log('Drop event:', event);
-    
+
     if (event.previousIndex !== event.currentIndex) {
       moveItemInArray(this.participantProductList, event.previousIndex, event.currentIndex);
-      console.log('Updated list:', this.participantProductList); 
+      console.log('Updated list:', this.participantProductList);
+      if(this.reviewMode){
+        this.computeReviewDiffs()
+      }
     }
   }
 
   updateProduct(){
-    this.loadingWidget = this.loadingDialog("Saving Purchase.....")
-    var write = 0
+    this.pendingChanges = []
+    var productSaves = []
     for (let i = 0; i < this.participantProductList.length; i++) {
       const product = this.participantProductList[i];
-      var productData = {
+      if(product["participantproductid"] == null){
+        product["participantproductid"] = doc(collection(this.firestore, 'participantsproduct')).id
+      }
+      var productData: any = {
         journeyref: product["journeyref"] != null ? doc(this.firestore,"journey",product["journeyref"]) : null,
         productref: product["productref"] != null ? doc(this.firestore,"products",product["productref"]) : null,
         packageref: product["packageref"] != null ? doc(this.firestore,"package",product["packageref"]) : null,
@@ -629,47 +981,44 @@ export class JourneyProductPurchaseComponent {
         profileid: this.profileid,
         deliverytype: product["deliverytype"]
       }
-      if(product["participantproductid"] == null){
-        product["participantproductid"] = doc(collection(this.firestore, 'participantsproduct')).id
-        var additionalData = {
-          docid: product["participantproductid"],
-        }
-        productData = {...productData, ...additionalData}
+      const oldProduct = this.mapParticipantProducts[product["participantproductid"]] ?? null
+      if(oldProduct == null){
+        productData = {...productData, docid: product["participantproductid"]}
       }
-      console.log(product["participantproductid"], " ---- ", productData)
-      setDoc(doc(this.firestore,"participantsproduct",product["participantproductid"]),productData,{merge: true}).then(() =>{
-        write += 1
-        if(write == this.participantProductList.length){
-          this.updatePurchase()
-        }
-      }).catch(err=>{
-        console.log(err)
-        i = this.participantProductList.length + 1
-        this.loadingWidget?.close()
+      const before = this.pendingChanges.length
+      this.collectChange("participantsproduct", product["participantproductid"], oldProduct, productData)
+      const changed = this.pendingChanges.length > before
+      if(changed){
+        const note = (product["note"] ?? '').trim()
+        if(note) this.pendingChanges[this.pendingChanges.length - 1]["note"] = note
+        if(product["_initiationNote"]) this.pendingChanges[this.pendingChanges.length - 1]["initiationNote"] = product["_initiationNote"]
+      }
+      productSaves.push({
+        ref: doc(this.firestore,"participantsproduct",product["participantproductid"]),
+        data: productData,
+        changed: changed,
+        sourceProduct: product
       })
     }
-  }
 
-  updatePurchase(){
-    console.log("Purchase.......")
-    var write = 0
+    var purchaseSaves = []
     for (let i = 0; i < this.participantPurchase.length; i++) {
       const purchase = this.participantPurchase[i];
-      var purchaseproduct = this.participantProductList.filter(e => e["purchaseindex"] == i)
-      var productRefList = purchaseproduct.map(e => doc(this.firestore,"products",e["productref"]))
-      var productParticipantList = []
+      const purchaseproduct = this.participantProductList.filter(e => e["purchaseindex"] == i)
+      const productRefList = purchaseproduct.map(e => doc(this.firestore,"products",e["productref"]))
+      const productParticipantList = []
       purchaseproduct.forEach(p => {
         productParticipantList.push({
           participantproductid: p["participantproductid"],
           productref: doc(this.firestore,"products",p["productref"])
         })
       })
-      var purchaseData = {
+      var purchaseData: any = {
         productref: productRefList,
         watsonpurchaseid: purchase["watsonpurchaseid"],
         watsonpurchaselabel: purchase["watsonpurchaselabel"],
       }
-      var journeyproductData = {
+      var journeyproductData: any = {
         journeystatus: purchase["journeystatus"],
         productref: productRefList,
         participantproducts: productParticipantList,
@@ -679,45 +1028,96 @@ export class JourneyProductPurchaseComponent {
       purchase["participantjourneyproductref"] = purchase["participantjourneyproductref"] ?? doc(collection(this.firestore, 'participantjourneyproduct')).id
       if(purchase["purchaseref"] == null){
         purchase["purchaseref"] = doc(collection(this.firestore, 'journeyproductpurchase')).id
-        var additionalPurchase = {
+        purchaseData = {...purchaseData,
           docid: purchase["purchaseref"],
           journeyref: purchase["journeyref"] != null ? doc(this.firestore,"journey",purchase["journeyref"]) : null,
           participantjourneyproductref: doc(this.firestore,"participantjourneyproduct",purchase["participantjourneyproductref"]),
           profileid: this.profileid,
           purchasetype: purchase["purchasetype"]
         }
-        purchaseData = {...purchaseData, ...additionalPurchase}
-        var additionaljourneyproductData = {
+        journeyproductData = {...journeyproductData,
           docid: purchase["participantjourneyproductref"],
           journeyref: purchase["journeyref"] != null ? doc(this.firestore,"journey",purchase["journeyref"]) : null,
           purchaseref: doc(this.firestore,"journeyproductpurchase",purchase["purchaseref"]),
           profileid: this.profileid,
         }
-        journeyproductData = {...journeyproductData, ...additionaljourneyproductData}
       }
-      console.log("journeyproductpurchase", "-----", purchaseData)
-      console.log("participantjourneyproduct", "-----", journeyproductData)
-      setDoc(doc(this.firestore,"journeyproductpurchase",purchase["purchaseref"]),purchaseData, {merge: true}).then(()=>{
-        write +=1
-        if(write == (this.participantPurchase.length * 2)){
-          this.updateDeliverySequence() 
+      const oldPurchase = this.mapPurchaseDoc[purchase["purchaseref"]] ?? null
+      const oldJP = this.mapJourneyProductDoc[purchase["participantjourneyproductref"]] ?? null
+      const before = this.pendingChanges.length
+      this.collectChange("journeyproductpurchase", purchase["purchaseref"], oldPurchase, purchaseData)
+      this.collectChange("participantjourneyproduct", purchase["participantjourneyproductref"], oldJP, journeyproductData)
+      const changed = this.pendingChanges.length > before
+      if(changed){
+        const note = (purchase["_changeNote"] ?? '').trim()
+        if(note){
+          for(let k = before; k < this.pendingChanges.length; k++){
+            this.pendingChanges[k]["note"] = note
+          }
         }
-      }).catch(err=>{
-        console.log(err)
-        i = this.participantPurchase.length + 1
-        this.loadingWidget?.close()
-      })
-      setDoc(doc(this.firestore,"participantjourneyproduct",purchase["participantjourneyproductref"]),journeyproductData, {merge: true}).then(()=>{
-        write +=1
-        if(write == (this.participantPurchase.length * 2)){
-          this.updateDeliverySequence()
-        }
-      }).catch(err=>{
-        console.log(err)
-        i = this.participantPurchase.length + 1
-        this.loadingWidget?.close()
+      }
+      purchaseSaves.push({
+        purchaseRef: doc(this.firestore,"journeyproductpurchase",purchase["purchaseref"]),
+        purchaseData: purchaseData,
+        jpRef: doc(this.firestore,"participantjourneyproduct",purchase["participantjourneyproductref"]),
+        journeyproductData: journeyproductData,
+        changed: changed,
+        sourcePurchase: purchase
       })
     }
+
+    const missing = []
+    productSaves.forEach(s => {
+      if(s.changed && !s.sourceProduct["_autoFromJourney"] && !((s.sourceProduct["note"] ?? '').trim())){
+        const name = this.mapProduct[s.sourceProduct["productref"]] ?? 'Product'
+        const pkg = this.mapPackage[s.sourceProduct["packageref"]]
+        missing.push("Product: " + (pkg ? name + ' / ' + pkg : name))
+      }
+    })
+    purchaseSaves.forEach(s => {
+      if(s.changed && !((s.sourcePurchase["_changeNote"] ?? '').trim())){
+        missing.push("Purchase: " + this.purchaseLabel(s.sourcePurchase))
+      }
+    })
+    this.removedGroups.forEach((g: any) => {
+      if(!((g.note ?? '').trim())){
+        missing.push((g.type === 'purchase' ? 'Removed Purchase: ' : 'Removed Product: ') + g.label)
+      }
+    })
+    if(missing.length > 0){
+      alert("Please add notes for these changed rows:\n• " + missing.join("\n• "))
+      this.pendingChanges = []
+      return
+    }
+
+    this.removedGroups.forEach((g: any) => {
+      const note = (g.note ?? '').trim()
+      if(!note) return
+      g.deleteEntries.forEach((e: any) => e.note = note)
+    })
+
+    this.loadingWidget = this.loadingDialog("Saving Purchase.....")
+    const totalWrites = productSaves.length + purchaseSaves.length * 2
+    if(totalWrites == 0){
+      this.updateDeliverySequence()
+      return
+    }
+    var write = 0
+    const onDone = () => {
+      write += 1
+      if(write == totalWrites){
+        this.updateDeliverySequence()
+      }
+    }
+    const onErr = (err) => {
+      console.log(err)
+      this.loadingWidget?.close()
+    }
+    productSaves.forEach(s => setDoc(s.ref, s.data, {merge: true}).then(onDone).catch(onErr))
+    purchaseSaves.forEach(s => {
+      setDoc(s.purchaseRef, s.purchaseData, {merge: true}).then(onDone).catch(onErr)
+      setDoc(s.jpRef, s.journeyproductData, {merge: true}).then(onDone).catch(onErr)
+    })
   }
 
   async updateDeliverySequence(){
@@ -725,6 +1125,7 @@ export class JourneyProductPurchaseComponent {
     await this.guard.updateDeliverySequence(this.profileid, this.participantProductList).catch(err=>{
       console.log(err)
     })
+    await this.writePurchaseLog()
     this.deleteDocuments()
     // await this.firestore.collection("participantdeliverysequence").doc(this.profileid).get().toPromise().then(async sequence=>{
     //   var mapProductDelivery = {}
@@ -779,6 +1180,165 @@ export class JourneyProductPurchaseComponent {
     this.location.back()
     // this.router.navigateByUrl("/participant profiles")
   }
+
+  normalizeForDiff(value){
+    if(value == null) return null
+    if(typeof value.path === 'string' && typeof value.id === 'string') return value.path
+    if(typeof value.toDate === 'function') return value.toDate().toISOString()
+    if(value instanceof Date) return value.toISOString()
+    if(Array.isArray(value)) return value.map(v => this.normalizeForDiff(v))
+    if(typeof value === 'object'){
+      var obj = {}
+      Object.keys(value).sort().forEach(k => obj[k] = this.normalizeForDiff(value[k]))
+      return obj
+    }
+    return value
+  }
+
+  collectChange(collectionName, docid, oldData, newData){
+    var isNew = oldData == null
+    var fields = {}
+    var labels = this.fieldLabels[collectionName] ?? {}
+    Object.keys(newData).forEach(key => {
+      var label = labels[key]
+      if(label == null) return
+      var oldVal = this.normalizeForDiff(oldData ? oldData[key] : null)
+      var newVal = this.normalizeForDiff(newData[key])
+      if(JSON.stringify(oldVal) !== JSON.stringify(newVal)){
+        fields[label] = { old: oldVal ?? null, new: newVal ?? null }
+      }
+    })
+    if(isNew || Object.keys(fields).length > 0){
+      this.pendingChanges.push({
+        collection: collectionName,
+        docid: docid,
+        action: isNew ? "added" : "updated",
+        fields: fields
+      })
+    }
+  }
+
+  collectDelete(collectionName, docid, label, journey, parentPurchaseref?, parentJourneyProductref?){
+    if(docid == null) return
+    this.pendingDeletes.push({
+      collection: collectionName,
+      docid: docid,
+      action: "removed",
+      label: label ?? "",
+      journey: journey ?? "",
+      parentPurchaseref: parentPurchaseref ?? "",
+      parentJourneyProductref: parentJourneyProductref ?? "",
+      fields: {}
+    })
+  }
+
+  productLabel(product){
+    var name = this.mapProduct[product["productref"]] ?? product["productref"] ?? "Product"
+    var pkg = this.mapPackage[product["packageref"]]
+    return pkg ? (name + " / " + pkg) : name
+  }
+
+  purchaseLabel(purchase){
+    if(purchase["purchasetype"] == "journey"){
+      return this.mapJourney[purchase["journeyref"]] ?? "Journey"
+    }
+    return purchase["watsonpurchaselabel"] ?? "Product Purchase"
+  }
+
+  captureStatus(product, opened){
+    if(opened){
+      product._statusBefore = product.status
+    }
+  }
+
+  findInitiatedConflicts(product){
+    var conflicts = []
+    for(let i = 0; i < this.participantPurchase.length; i++){
+      const products = this.participantPurchase[i].products ?? []
+      for(let j = 0; j < products.length; j++){
+        const p = products[j]
+        if(p === product) continue
+        if(p.status === 'initiated' || p.status === 'ongoing'){
+          conflicts.push({ label: this.productLabel(p), status: p.status })
+        }
+      }
+    }
+    return conflicts
+  }
+
+  onProductStatusChange(product, newStatus){
+    if(newStatus !== 'initiated'){
+      delete product._initiationNote
+      return
+    }
+    const conflicts = this.findInitiatedConflicts(product)
+    if(conflicts.length === 0){
+      delete product._initiationNote
+      return
+    }
+    const productName = this.productLabel(product)
+    this.dialog.open(this.confirmInitiateDialog, {
+      data: { conflicts, productName },
+      width: '460px'
+    }).afterClosed().subscribe(result => {
+      if(result === true){
+        product._initiationNote = 'Initiated while ' + conflicts.map(c => c.label + ' (' + c.status + ')').join(', ')
+      }
+      else{
+        product.status = product._statusBefore ?? null
+        delete product._initiationNote
+      }
+    })
+  }
+
+  async writePurchaseLog(){
+    var allChanges = this.pendingChanges.concat(this.pendingDeletes)
+    if(allChanges.length == 0) return
+    var logRef = doc(collection(this.firestore, "participant purchase logs"))
+    var logData = {
+      docid: logRef.id,
+      profileid: this.profileid,
+      loggedinprofile: this.loggedinprofileid,
+      date: new Date(),
+      changes: allChanges
+    }
+    await setDoc(logRef, logData).then(()=>{
+      this.purchaseLogs.unshift(logData)
+      this.buildDocLogMap()
+    }).catch(err=>{
+      console.log(err)
+    })
+    this.pendingChanges = []
+    this.pendingDeletes = []
+  }
+
+  formatLogDate(date){
+    var d = date?.toDate ? date.toDate() : date
+    if(d == null) return ""
+    return formatDate(d, 'dd/MM/yyyy, h:mm a', 'en-US', '+0530')
+  }
+
+  formatLogValue(value){
+    if(value == null || value === "") return "—"
+    if(value === true) return "Yes"
+    if(value === false) return "No"
+    if(Array.isArray(value)) return value.map(v => this.formatLogValue(v)).join(", ")
+    if(typeof value === 'string'){
+      if(/^\d{4}-\d{2}-\d{2}T/.test(value)){
+        return formatDate(new Date(value), 'dd/MM/yyyy', 'en-US', '+0530')
+      }
+      if(value.startsWith("journey/")) return this.mapJourney[value.split("/")[1]] ?? value
+      if(value.startsWith("products/")) return this.mapProduct[value.split("/")[1]] ?? value
+      if(value.startsWith("package/")) return this.mapPackage[value.split("/")[1]] ?? value
+    }
+    if(typeof value === 'object') return JSON.stringify(value)
+    return value
+  }
+
+  trackByIndex(i: number){ return i }
+  trackByPurchaseRef(i: number, item: any){ return item.participantjourneyproductref ?? i }
+  trackByProductId(i: number, item: any){ return item.participantproductid ?? i }
+  trackByOptionId(i: number, item: any){ return item.id ?? item.docid ?? i }
 
   purchaseExchange(currentPurchaseIndex,productIndex,selectedPurchaseIndex){
     // console.log(this.participantProductList);
