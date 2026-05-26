@@ -298,6 +298,36 @@
             </div>
 
             <div class="preview-bar-right">
+              <div class="cc-bcc-bar">
+                <mat-form-field appearance="outline" class="ccbcc-ff">
+                  <mat-label>CC</mat-label>
+                  <mat-chip-grid #ccChipGrid>
+                    <mat-chip-row *ngFor="let r of ccRecipients; let i = index" (removed)="removeCcRecipient(i)">
+                      {{r.email}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+                    </mat-chip-row>
+                  </mat-chip-grid>
+                  <input placeholder="Enter email and press Enter" type="email"
+                    [(ngModel)]="customCcEmail" [matChipInputFor]="ccChipGrid"
+                    [matChipInputSeparatorKeyCodes]="separatorKeysCodes" (matChipInputTokenEnd)="addCustomCcEmail(); customCcEmail = ''">
+                  <mat-icon matSuffix>alternate_email</mat-icon>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="ccbcc-ff">
+                  <mat-label>BCC</mat-label>
+                  <mat-chip-grid #bccChipGrid>
+                    <mat-chip-row *ngFor="let r of bccRecipients; let i = index" (removed)="removeBccRecipient(i)">
+                      {{r.email}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+                    </mat-chip-row>
+                  </mat-chip-grid>
+                  <input placeholder="Enter email and press Enter"
+                    type="email" [(ngModel)]="customBccEmail" [matChipInputFor]="bccChipGrid"
+                    [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                    (matChipInputTokenEnd)="addCustomBccEmail(); customBccEmail = ''">
+                  <mat-icon matSuffix>visibility_off</mat-icon>
+                </mat-form-field>
+              </div>
+
+
               <mat-form-field appearance="outline" class="from-ff">
                 <mat-label>From</mat-label>
                 <mat-select [(ngModel)]="fromemail">
