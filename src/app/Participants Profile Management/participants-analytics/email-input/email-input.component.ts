@@ -90,8 +90,7 @@ export class EmailInputComponent {
     'starlabs@excellenceinstallation.com',
     'support@intl.soexcellence.com'
   ];
-  // metaDataFields = ['name', 'phonenumber', 'email', 'participantmode', 'customerstatus', 'financialstatus'];
-   metaDataFields = ['name', 'phonenumber', 'email'];
+  metaDataFields = ['name', 'phonenumber', 'email', 'participantmode', 'customerstatus', 'financialstatus'];
 
   // ─── Objects ────────────────────────────────────────────────────────────────
   selectedTemplate: any = {};
@@ -114,9 +113,7 @@ export class EmailInputComponent {
     postmarktemplateid: '',
     postmark_msgid: [],
     emailid: [],
-    emailmap: {},
-    cc: '',
-    bcc: ''
+    emailmap: {}
   };
 
   // ─── Booleans ───────────────────────────────────────────────────────────────
@@ -129,11 +126,6 @@ export class EmailInputComponent {
   isValidatingEmails = false;
   isSheetValid = false;
   isUploadingEmailAttachment = false;
-
-  ccRecipients: any[] = [];
-  bccRecipients: any[] = [];
-  customCcEmail = '';
-  customBccEmail = '';
 
   /** Whether localStorage has saved variable configs for the current template */
   hasSavedVariables = false;
@@ -207,7 +199,7 @@ export class EmailInputComponent {
   fetchPostmarkSenders(){
     docData(doc(this.firestore,'classify','postmarkserver')).subscribe((senders)=>{
       console.log('Sender Emails:',senders);
-
+      
       this.fromEmails = senders['senderemails'] || [
         'starlabs@excellenceinstallation.com',
         'support@intl.soexcellence.com'
@@ -350,23 +342,6 @@ export class EmailInputComponent {
     return this.extractVariables(tpl).filter(v => this.isVariableConfigured(v)).length;
   }
 
-  removeCcRecipient(index: number): void { this.ccRecipients.splice(index, 1); }
-  addCustomCcEmail(): void {
-    const email = this.customCcEmail.trim();
-    if (email && this.isValidEmail(email) && !this.ccRecipients.find(r => r.email === email)) {
-      this.ccRecipients.push({ id: 'custom', name: email, email, avatar: null });
-    }
-    this.customCcEmail = '';
-  }
-  removeBccRecipient(index: number): void { this.bccRecipients.splice(index, 1); }
-  addCustomBccEmail(): void {
-    const email = this.customBccEmail.trim();
-    if (email && this.isValidEmail(email) && !this.bccRecipients.find(r => r.email === email)) {
-      this.bccRecipients.push({ id: 'custom', name: email, email, avatar: null });
-    }
-    this.customBccEmail = '';
-  }
-
   // ─── Template/queued selection ───────────────────────────────────────────────
 
   onTemplateChange(template: any): void {
@@ -402,8 +377,6 @@ export class EmailInputComponent {
     this.initVariableConfigs(queuedEmail.body || '');
     this.showPreview = true;
     this.selectedTabIndex = 2;
-    this.ccRecipients = (queuedEmail.cc || '').split(',').map((e: string) => e.trim()).filter(Boolean).map((email: string) => ({ id: 'custom', name: email, email, avatar: null }));
-    this.bccRecipients = (queuedEmail.bcc || '').split(',').map((e: string) => e.trim()).filter(Boolean).map((email: string) => ({ id: 'custom', name: email, email, avatar: null }));
   }
 
   onQueuedEmailSearch(): void {
@@ -669,8 +642,6 @@ export class EmailInputComponent {
       servername: this.selectedTemplate['servername'] || '',
       attachments: this.emailAttachments,
       postmarkAttachments: this.buildPostmarkAttachments(),
-      cc: this.ccRecipients.map(r => r.email).join(', '),
-      bcc: this.bccRecipients.map(r => r.email).join(', '),
     });
   }
 

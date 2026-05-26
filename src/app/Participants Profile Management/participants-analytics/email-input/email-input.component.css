@@ -2313,13 +2313,4 @@
   .preview-bar-left {
     gap: 6px;
   }
-
-  .cc-bcc-bar {
-    display: flex;
-    gap: 12px;
-    margin: 0 0 12px;
-  }
-  .ccbcc-ff {
-    flex: 1;
-  }
 }
