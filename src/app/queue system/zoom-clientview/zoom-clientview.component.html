@@ -19,7 +19,96 @@
   <div class="d-flex flex-row justify-content-center">
     <h1>Zoom ClientView Component</h1>
   </div>
-  
+
+  <!-- Meeting ended / link invalid screen -->
+  <div class="wait-screen" *ngIf="meetingEnded">
+    <div class="wait-card wait-card--ended">
+      <div class="wait-card__pulse wait-card__pulse--static">
+        <span class="wait-pulse__core wait-pulse__core--ended">
+          <mat-icon>
+            {{ endedReason === 'completed' ? 'check_circle' :
+               endedReason === 'cancelled' ? 'cancel' :
+               endedReason === 'notfound' ? 'link_off' : 'event_busy' }}
+          </mat-icon>
+        </span>
+      </div>
+
+      <span class="wait-card__eyebrow wait-card__eyebrow--ended">
+        {{ endedReason === 'completed' ? 'Session Completed' :
+           endedReason === 'cancelled' ? 'Session Cancelled' :
+           endedReason === 'notfound' ? 'Invalid Link' : 'Session Expired' }}
+      </span>
+
+      <h2 class="wait-card__title">
+        <ng-container *ngIf="endedReason === 'completed'">This consultation has wrapped up</ng-container>
+        <ng-container *ngIf="endedReason === 'cancelled'">This session was cancelled</ng-container>
+        <ng-container *ngIf="endedReason === 'notfound'">This meeting link is no longer valid</ng-container>
+        <ng-container *ngIf="endedReason === 'expired' || !endedReason">This meeting has ended</ng-container>
+      </h2>
+
+      <p class="wait-card__body">
+        <ng-container *ngIf="endedReason === 'completed'">
+          Thank you for joining the session. Your specialist has marked the consultation as complete.
+          You can now close this window.
+        </ng-container>
+        <ng-container *ngIf="endedReason === 'cancelled'">
+          Your specialist had to cancel this session. Please reach out to support to reschedule.
+        </ng-container>
+        <ng-container *ngIf="endedReason === 'notfound'">
+          The meeting you're trying to join doesn't exist anymore. It may have been removed,
+          or the link you used is incorrect. Please contact your specialist for a fresh link.
+        </ng-container>
+        <ng-container *ngIf="endedReason === 'expired' || !endedReason">
+          This meeting link has expired. If you believe this is a mistake,
+          please contact your specialist for assistance.
+        </ng-container>
+      </p>
+
+      <div class="wait-card__hint">
+        <mat-icon>support_agent</mat-icon>
+        Need help? Reach out to your specialist for next steps.
+      </div>
+    </div>
+  </div>
+
+  <!-- Specialist-wait screen (shown to participants until specialist joins) -->
+  <div class="wait-screen" *ngIf="waitingForSpecialist && !meetingEnded">
+    <div class="wait-card">
+      <div class="wait-card__pulse">
+        <span class="wait-pulse__ring wait-pulse__ring--a"></span>
+        <span class="wait-pulse__ring wait-pulse__ring--b"></span>
+        <span class="wait-pulse__core">
+          <mat-icon>medical_information</mat-icon>
+        </span>
+      </div>
+
+      <span class="wait-card__eyebrow">
+        <span class="wait-card__eyebrow-dot"></span>
+        Preparing your session
+      </span>
+
+      <h2 class="wait-card__title">
+        Hello{{ participantName ? ', ' + participantName : '' }} —
+        your specialist is reviewing your records
+      </h2>
+
+      <p class="wait-card__body">
+        They are going through your <strong>submitted forms</strong> and
+        <strong>ATC</strong> before the consultation starts.
+        The call will begin automatically the moment they're ready.
+      </p>
+
+      <div class="wait-card__dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+
+      <div class="wait-card__hint">
+        <mat-icon>info</mat-icon>
+        Please stay on this page — no action needed from you.
+      </div>
+    </div>
+  </div>
+
   <div id="zmmtg-root"></div>
   <div *ngIf="profileHost">
     <div class="slider-container">

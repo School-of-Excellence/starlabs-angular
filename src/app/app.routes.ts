@@ -100,6 +100,7 @@ export const routes: Routes = [
   {path: 'ads', loadComponent: () => import('./content/click-ads/click-ads.component').then(m => m.ClickAdsComponent), canActivate:[authGuard]},
   {path: 'queuevenue', loadComponent: () => import('./queue system/queue-venue/queue-venue.component').then(m => m.QueueVenueComponent), canActivate:[authGuard]},
   {path: 'dynamicstudio', loadComponent: () => import('./queue system/dynamic-studio/dynamic-studio.component').then(m => m.DynamicStudioComponent), canActivate:[authGuard]},
+  {path: 'dynamicstudiov2', loadComponent: () => import('./queue system/dynamic-studio-v2/dynamic-studio-v2.component').then(m => m.DynamicStudioV2Component), canActivate:[authGuard]},
   {path: 'view-participants-form', loadComponent: () => import('./Participants Profile Management/view-participants-form/view-participants-form.component').then(m => m.ViewParticipantsFormComponent), canActivate:[authGuard]},
   {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
   {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
