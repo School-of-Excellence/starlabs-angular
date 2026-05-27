@@ -131,6 +131,7 @@ export class WatiInputComponent {
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
   private profileSearchSubject = new Subject<string>();
+  workshopTitle = '';
 
   // ── Schedule ──────────────────────────────────────────────────────────
   isScheduled = false;
@@ -193,6 +194,7 @@ export class WatiInputComponent {
     this.loadQueuedTemplates();
     this.loadProfiles();
     this.loadMetadataFields();
+    this.loadWorkshopTitle();
   }
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
@@ -202,6 +204,23 @@ export class WatiInputComponent {
     setTimeout(() => {
       document.getElementById('configure-params-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 150);
+  }
+
+  async loadWorkshopTitle() {
+    try {
+      const snap = await getDocs(collection(this.firestore, 'workshopconfiguration'));
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        this.workshopTitle = data?.['detailpage']?.['title'] ?? '';
+        const p = this.templateParams.find(p => p.name === 'workshoptitle');
+        if (p && !p.staticValue) {
+          p.staticValue = this.workshopTitle;
+          this.updatePreview();
+        }
+      }
+    } catch (e) {
+      console.error('Error loading workshop title', e);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -292,9 +311,20 @@ export class WatiInputComponent {
   }
 
   private initParamConfig(paramNames: string[]) {
-    this.templateParamNames = paramNames;
-    this.templateParams = paramNames.map(name => {
+    const headerBody = this.selectedTemplate['header']?.['headerOriginal'] || '';
+    const headerParams = this.parseTemplateParams(headerBody);
+    const allParams = [...new Set([...headerParams, ...paramNames])];
+
+    this.templateParamNames = allParams;
+    this.templateParams = allParams.map(name => {
       const existing = this.templateParams.find(p => p.name === name);
+      // Auto-fill Title from workshopTitle silently
+      if (name === 'Title' && this.workshopTitle) {
+        return { name, fillType: 'static', staticValue: this.workshopTitle, metadataField: '', excelColumn: '' };
+      }
+      if (!existing && name === 'workshoptitle') {
+        return { name, fillType: 'static', staticValue: this.workshopTitle, metadataField: '', excelColumn: '' };
+      }
       return existing ?? { name, fillType: 'static', staticValue: '', metadataField: '', excelColumn: '' };
     });
     this.updatePreview();
@@ -691,6 +721,7 @@ export class WatiInputComponent {
       notes: this.isTemplateAvailable ? this.selectedTemplate['notes'] : this.notes,
       parameterConfig: this.buildParamConfigForSave(), paramFillMode: this.getDominantFillMode(),
       templateData: { ...this.selectedTemplate },
+      workshopTitle: this.workshopTitle,
     };
     if (status === 'queued') { archiveDoc.queuedAt = serverTimestamp(); archiveDoc.templatevalidated = false; }
     if (this.uploadedFile && this.fileUploadUrl) {
