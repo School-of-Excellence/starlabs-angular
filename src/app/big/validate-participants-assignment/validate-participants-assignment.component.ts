@@ -840,9 +840,13 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
   extractFormValues(formData: any): any {
     const values: any = {};
     if (!formData?.formarray) return values;
+    let n = 0;
     formData.formarray.forEach((field: any) => {
-      if (field.formcontrol && !['label', 'video', 'audio'].includes(field.type)) {
-        values[field.formcontrol] = field.value ?? null;
+      if (!['label', 'video', 'audio'].includes(field.type)) {
+        const controlKey = field.formcontrol ?? `control${n}`;
+        field.formcontrol = controlKey;
+        values[controlKey] = field.value ?? null;
+        n++;
       }
     });
     return values;
@@ -853,7 +857,7 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
     const assignmentType = this.selectedAssignment.assignmenttype;
 
     if (assignmentType === 'Form') {
-      const formTemplateId = assignment['formtemplate'];
+      const formTemplateId = assignment['formtemplate'] ?? this.selectedAssignment['selectedform'];
       const activityrefId = assignment['activityref']?.id;
       if (!formTemplateId || !activityrefId) {
         this.snackbar.open('Form data not found', 'OK', { duration: 3000 });
@@ -865,7 +869,52 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
       const firestoreForms = getFirestore('firestore-forms');
       getDoc(doc(firestoreForms, 'formsByClient', activityrefId)).then(snap => {
         if (!snap.exists()) {
-          this.snackbar.open('Form submission not found', 'OK', { duration: 3000 });
+          getDoc(doc(this.firestore, 'formsByClient', activityrefId)).then(snap2 => {
+            if (!snap2.exists()) {
+              this.snackbar.open('Form submission not found', 'OK', { duration: 3000 });
+              return;
+            }
+            const formData = snap2.data();
+            this.dialog.open(FormTemplatePreviewComponent, {
+              width: '800px',
+              maxWidth: '95vw',
+              maxHeight: '90vh',
+              data: {
+                formData: formData,
+                formValues: this.extractFormValues(formData),
+                reviewaccess: this.loggedInProfileId !== assignment.profileid,
+                participantassignmentid: assignment.docid,
+                validate: false,
+                loginid: this.loggedInProfileId,
+                profileid: assignment.profileid,
+                viewOnly: true
+              },
+              disableClose: true
+            }).afterClosed().subscribe(async (result) => {
+              console.log('dialog result:', result);
+              console.log('reviewnotes:', result?.reviewnotes);
+              if (result && result.confirmed) {
+                const updatePayload: any = { status: result.status };
+                if (result.reviewnotes && result.reviewnotes.length > 0) {
+                  const newLogEntry = {
+                    notes: Array.isArray(result.reviewnotes)
+                      ? result.reviewnotes.filter((n: string) => n?.trim())
+                      : [result.reviewnotes],
+                    date: new Date(),
+                    reviewedby: this.loggedInProfileId,
+                    status: result.status
+                  };
+                  const existingLog = assignment['activitylog'] || [];
+                  updatePayload['activitylog'] = [...existingLog, newLogEntry];
+                }
+                await updateDoc(
+                  doc(this.firestore, 'big participants assignments', assignment.docid),
+                  updatePayload
+                );
+                this.snackbar.open('Status updated to ' + result.status, 'OK', { duration: 3000 });
+              }
+            });
+          });
           return;
         }
         const formData = snap.data();
@@ -926,12 +975,12 @@ export class ValidateParticipantsAssignmentComponent implements OnInit, OnDestro
       const url = this.router.createUrlTree(['/previewtripleATC'], {
         queryParams: {
           type: 'validation',
-          atcdocid: assignment['activityref']?.id,
+          atcdocid: assignment['atcdocid'] ?? assignment['activityref']?.id,
           validation: true,
           profileid: assignment.profileid,
           marathonid: assignment['marathonref']?.id,
           assignmentid: assignment.docid,
-          participantassignmentid: assignment['participantAssignmentId']
+          participantassignmentid: assignment.docid
         }
       }).toString();
       window.open(url, '_blank');
