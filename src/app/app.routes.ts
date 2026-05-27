@@ -232,7 +232,7 @@ export const routes: Routes = [
   {path: 'bigProfile', loadComponent: () => import('./big/big-profile/big-profile.component').then(m => m.BigProfileComponent), canActivate:[authGuard]},
   {path: 'particiant_assignment_board', loadComponent: () => import('./big/participant-assignment-board/participant-assignment-board.component').then(m => m.ParticipantAssignmentBoardComponent), canActivate: [authGuard]},
   {path: 'zoommeeting_bigparticipants', loadComponent: () => import('./big/zoom-meeting/zoom-meeting.component').then(m => m.ZoomMeetingComponent), canActivate: [authGuard]},
-  {path: 'bigcohorts', loadComponent: () => import('./big/big-cohort-clone-2/big-cohort-clone-2.component').then(m => m.BigCohortClone2Component), canActivate: [authGuard]},
+  {path: 'bigcohorts', loadComponent: () => import('./big/cohort-management/cohort-management.component').then(m => m.CohortManagementComponent), canActivate: [authGuard]},
   {path: 'manualassignment', loadComponent: () => import('./big/manual-assignments/manual-assignments.component').then(m => m.ManualAssignmentsComponent), canActivate: [authGuard]},
   {path: 'validateParticipantAssignments', loadComponent: () => import('./big/validate-participants-assignment/validate-participants-assignment.component').then(m => m.ValidateParticipantsAssignmentComponent), canActivate: [authGuard]},
   {path: 'biglevel', loadComponent: () => import('./big/big-level/big-level.component').then(m => m.BigLevelComponent), canActivate: [authGuard]},

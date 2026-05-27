@@ -1,0 +1,619 @@
+<div class="loading-overlay" *ngIf="loading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+    <div class="loading-progress">
+      <div class="progress-bar">
+        <!-- <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div> -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bc-root" class="dashboard-wrapper" [class.select-mode]="selectMode">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-logo">CS</div>
+      <div class="brand-text">
+        <div class="brand-sub">COHORT</div>
+        <div class="brand-name">Management</div>
+      </div>
+    </div>
+
+    <div class="topbar-search">
+      <svg class="ico" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.35-4.35" />
+      </svg>
+      <input type="text" placeholder="Search cohorts or participants…" [(ngModel)]="participantSearchQuery"
+        (input)="onParticipantSearch()" />
+    </div>
+
+    <div class="topbar-actions">
+      <!-- Marathon Selection -->
+      <mat-form-field appearance="outline" class="select-field">
+        <mat-label>Marathon</mat-label>
+        <mat-select [(ngModel)]="selectedMarathon" (selectionChange)="toggleMarathonSelection()">
+          <mat-option [value]="option.docid" *ngFor="let option of marathonList">
+            {{option.title || option.name}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Event Selection -->
+      <mat-form-field appearance="outline" class="select-field">
+        <mat-label>Event</mat-label>
+        <mat-select (selectionChange)="toggleEventSelection()" [(ngModel)]="selectedAcceleratorEvent" multiple>
+          <mat-option [value]="option.ref.id" *ngFor="let option of searchableEventList">
+            {{option.name}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Queue Selection -->
+      <mat-form-field appearance="outline" class="select-field">
+        <mat-label>Select Queue</mat-label>
+        <mat-select (selectionChange)="toggleQueueSelection()" [(ngModel)]="selectedQueueEvent" multiple>
+          <mat-option [value]="option.docid" *ngFor="let option of searchableQueueList">
+            {{option.queuename || option.name || option.id}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Zone Selection -->
+      <mat-form-field appearance="outline" class="select-field">
+        <mat-label>Zone</mat-label>
+        <mat-select (selectionChange)="toggleZoneSelection()" [(ngModel)]="selectedZoneEvent" multiple>
+          <mat-option [value]="option.ref.id" *ngFor="let option of searchableZoneEventList">
+            <div class="zone-option">
+              <span class="zone-name">{{option.name}}</span>
+              <span class="zone-sub" *ngIf="option.cohorts?.length">
+                {{option.cohorts.length}} cohort(s) · {{mapAcceleratorEvent[option.eventref?.id] || 'No event'}}
+              </span>
+            </div>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+
+      <!-- <button class="icon-btn" title="Filter">
+        <svg class="ico" viewBox="0 0 24 24">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+      </button>
+      <button class="icon-btn" title="Columns">
+        <svg class="ico" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="18" />
+          <rect x="14" y="3" width="7" height="18" />
+        </svg>
+      </button> -->
+
+      <button class="btn-create" (click)="onCreateCohort()">
+        <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Create
+      </button>
+
+      <button class="btn btn-ghost" (click)="exportCohortsData()" title="Export all">
+        <mat-icon>download</mat-icon> Export
+      </button>
+
+      <div class="mode-seg">
+        <button class="mode-btn active">
+          <svg class="ico sm" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          Plan
+        </button>
+        <button class="mode-btn">
+          <span class="floor-dot"></span>
+          Floor
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="refine-bar">
+    <div class="refine-row">
+      <span class="refine-label">REFINE</span>
+
+      <div class="select-wrap">
+        <select (change)="setTypeFilter($any($event).target.value)">
+          <option value="all">All</option>
+          <option value="general">General</option>
+          <option value="event">Event</option>
+        </select>
+        <svg class="select-arrow" viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
+
+      <div class="select-wrap">
+        <select (change)="setCategoryFilter($any($event).target.value)">
+          <option value="all">All categories</option>
+          <option value="readiness">readiness</option>
+          <option value="studio">Studio Group</option>
+          <option value="educational">Educational</option>
+          <option value="operational">Operational</option>
+        </select>
+        <svg class="select-arrow" viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
+
+      <div class="select-wrap">
+        <select (change)="setStatusFilter($any($event).target.value)">
+          <option value="all">NO STATUS</option>
+          <option value="active">Active</option>
+          <option value="nonactive">Non Active</option>
+        </select>
+        <svg class="select-arrow" viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
+
+      <mat-form-field appearance="outline" class="select-field">
+        <mat-label>Tags</mat-label>
+        <mat-select [(ngModel)]="selectedTags" (selectionChange)="toggleTagSelection()" multiple>
+          <mat-option [value]="tag.id" *ngFor="let tag of filteredTagsList">
+            {{tag.name || tag.tagname}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <label class="toggle-label">
+        <input type="checkbox" [checked]="showTemporaryOnly" (change)="toggleTemporaryOnly()">
+        Temporary only
+      </label>
+
+      <label class="toggle-label">
+        <input type="checkbox" [checked]="showExpiredCohorts" (change)="toggleExpiredCohorts()" />
+        <span>Show expired</span>
+      </label>
+
+      <div class="refine-spacer"></div>
+      <button class="clear-all" *ngIf="hasActiveFilters()" (click)="clearAllFilters()" title="Clear all filters">
+        <mat-icon>backspace</mat-icon> Clear
+      </button>
+    </div>
+
+    <!-- Active filters row -->
+    <!-- <div class="active-filters">
+      <span class="refine-label">ACTIVE</span>
+      <span class="filter-chip">
+        TYPE: Studio Based
+        <button class="chip-remove">×</button>
+      </span>
+      <span class="filter-chip">
+        CATEGORY: diagnostics
+        <button class="chip-remove">×</button>
+      </span>
+      <button class="clear-all-btn">Clear all</button>
+    </div> -->
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       MAIN CONTENT AREA
+  ═══════════════════════════════════════════ -->
+  <div class="main-content">
+
+    <!-- ─── LEFT: Unassigned Sidebar ─── -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Unassigned</span>
+        <span class="unassigned-badge">{{this.filterUnassignParticipants.length}}</span>
+        <button class="icon-btn sidebar-collapse" title="Collapse">
+          <svg class="ico sm" viewBox="0 0 24 24">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-search">
+        <svg class="ico sm" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <input type="text" placeholder="Search by name or event" [(ngModel)]="unassignSearch"
+          (input)="filterUnassignSearch()" />
+      </div>
+
+      <div class="participant-list" *ngIf="selectedAcceleratorEvent.length > 0">
+
+        <div class="participant-row" draggable="true" *ngFor="let unassign of this.filterUnassignParticipants ?? []">
+          <svg class="ico sm drag-icon" viewBox="0 0 24 24">
+            <circle cx="8" cy="6" r="1" fill="currentColor" />
+            <circle cx="8" cy="12" r="1" fill="currentColor" />
+            <circle cx="8" cy="18" r="1" fill="currentColor" />
+            <circle cx="16" cy="6" r="1" fill="currentColor" />
+            <circle cx="16" cy="12" r="1" fill="currentColor" />
+            <circle cx="16" cy="18" r="1" fill="currentColor" />
+          </svg>
+          <div class="p-avatar purple">{{this.getAvatar(mapProfile[unassign?.participantId ?? '']) | uppercase}}</div>
+          <div class="p-info">
+            <div class="p-name">{{mapProfile[unassign?.participantId ?? ''] ?? ''}}</div>
+            <div class="p-meta"><mat-icon style="font-size: 17px;">event</mat-icon>
+              {{unassign.eventName}}</div>
+          </div>
+        </div>
+
+      </div>
+      <div class="sidebar-hint">drag a person onto a cohort to assign</div>
+    </div>
+
+    <!-- ─── RIGHT: Cohort Grid ─── -->
+    <div class="cohort-area">
+
+      <!-- Grid top controls -->
+      <div class="grid-controls">
+        <span class="grid-title">Cohorts</span>
+        <span class="grid-count">{{filteredCohortsList.length}}</span>
+        <div class="grid-spacer"></div>
+        <button class="btn-select" (click)="toggleSelectMode()">
+          <svg class="ico sm" viewBox="0 0 24 24">
+            <polyline points="9 11 12 14 22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+          Select
+        </button>
+        <span class="divider-v">|</span>
+        <div class="select-wrap">
+          <select (change)="setGroupBy($any($event).target.value)">
+            <option value="none">No Category</option>
+            <option value="daterange">Date range</option>
+            <option value="levels">Levels</option>
+          </select>
+          <svg class="select-arrow" viewBox="0 0 24 24">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Empty state (no cohorts) -->
+      <div class="empty-state" *ngIf="filteredCohortsList.length === 0">
+        <mat-icon>folder_open</mat-icon>
+        <h3>No cohorts found</h3>
+        <p>Try adjusting your filters, or create a new cohort.</p>
+        <button class="btn btn-primary" (click)="onCreateCohort()">
+          <mat-icon>add</mat-icon> Create Cohort
+        </button>
+      </div>
+
+      <!-- ─── GROUP: STUDIO BASED ─── -->
+      <ng-container *ngFor="let groupKey of getGroupKeys()">
+        <div class="group-header studio" *ngIf="groupBy !== 'none'">
+          <span class="group-dot studio"></span>
+          {{groupKey}}
+          <span class="group-count">{{groupedCohorts[groupKey]?.length || 0}} cohort(s)</span>
+          <div class="group-rule"></div>
+        </div>
+
+        <div class="cohort-grid">
+
+          <div class="cohort-card card" [class.select-mode]="selectMode"
+            [class.checked]="isCohortSelected(cohorts['docid'])" (click)="onCardClick($event, cohorts)"
+            *ngFor="let cohorts of groupedCohorts[groupKey]">
+            <div class="card-top">
+              <span class="card-check" (click)="toggleCohortSelected(cohorts['docid']); $event.stopPropagation()">
+                <mat-icon>check</mat-icon>
+              </span>
+              <span class="status-dot" [class.idle]="cohorts['status'] === 'nonactive'"></span>
+              <span class="card-name">{{cohorts['name']}}</span>
+              <button class="card-menu" (click)="onEditCohort(cohorts); $event.stopPropagation()" title="Edit cohort">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button class="card-menu danger" (click)="deleteCohort(cohorts); $event.stopPropagation()"
+                title="Delete cohort">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+            <div class="card-tags">
+              <span
+                *ngIf="cohorts['cohortCategory'] !== 'readiness' && cohorts['cohortCategory'] !== 'educational' && cohorts['cohortCategory'] !== 'operational' && bigActivityMap != null"
+                class="tag studio">
+                Studio: {{bigActivityMap[cohorts['bigactivity']]?.['activity'] || cohorts['bigactivity'] ||
+                'Not-Configured'}}
+              </span>
+              <span *ngIf="cohorts['cohortCategory'] != 'studio'" class="tag cat">{{cohorts['cohortCategory'] ||
+                ''}}</span>
+              <span *ngIf="cohorts['isTemporary'] && getTemporaryCohortDateDisplay(cohorts)" class="tag temp"
+                [class.live]="isTemporaryCohortEndsToday(cohorts)">
+                {{getTemporaryCohortDateDisplay(cohorts)}}
+              </span>
+            </div>
+            <div class="card-context">
+              <!-- <span class="ctx-item">
+                B!G Accelerator Apr 2026
+              </span>
+              <span class="ctx-date">● Apr 16, 2026</span> -->
+              <span *ngIf="getCohortEventName(cohorts)" class="ctx-item">
+                {{getCohortEventName(cohorts)}}</span>
+              <span *ngIf="!getCohortEventName(cohorts) && mapMarathon[cohorts['marathonref']?.id]?.['title']"
+                class="ctx-item">
+                {{mapMarathon[cohorts['marathonref']?.id]?.['title']}}
+              </span>
+              <span *ngIf="getCohortCreatedDate(cohorts)" class="ctx-date"> {{getCohortCreatedDate(cohorts)}}</span>
+            </div>
+            <div class="card-stats"
+              [class]="selectedQueueEvent.length > 0 && cohorts['cohortCategory'] == 'studio' ? 'cols-5' : 'cols-2'">
+              <div class="stat">
+                <div class="stat-val">
+                  <span *ngIf="!participantSearchQuery" class="stat-val">{{cohorts['participantidlist']?.length
+                    || 0}}</span>
+                  <span *ngIf="participantSearchQuery"
+                    class="stat-val">{{getMatchingParticipantCount(cohorts)}}/{{cohorts['participantidlist']?.length
+                    || 0}}</span>
+                </div>
+                <div class="stat-key">PARTICIPANTS</div>
+              </div>
+              <div class="stat">
+                <div class="stat-val">{{getActivitiesCount(cohorts['docid'])}}</div>
+                <div class="stat-key">ACTIVITIES</div>
+              </div>
+              <ng-container *ngIf="selectedQueueEvent.length > 0 && cohorts['cohortCategory'] == 'studio'">
+                <div class="stat">
+                  <div class="stat-val">{{getCohortTotalStudiosCount(cohorts)}}</div>
+                  <div class="stat-key">STUDIOS</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-val">{{getParticipantCheckedInCount(cohorts)}}</div>
+                  <div class="stat-key">CHECKED IN</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-val">{{getCohortLiveAssignmentsCount(cohorts)}}</div>
+                  <div class="stat-key">LIVE</div>
+                </div>
+              </ng-container>
+
+              <!-- <button [class.on]="cohorts['contentview'] === 'participants'" class="rem-button stat"
+                (click)="cohorts['contentview'] = 'participants'; $event.stopPropagation()">
+                <mat-icon>people</mat-icon>
+                Participants
+                <span *ngIf="!participantSearchQuery" class="stat-val">({{cohorts['participantidlist']?.length || 0}})</span>
+                <span *ngIf="participantSearchQuery" class="stat-val">({{getMatchingParticipantCount(cohorts)}}/{{cohorts['participantidlist']?.length
+                  || 0}})</span>
+              </button>
+              <button [class.on]="cohorts['contentview'] === 'activities'" class="rem-button stat"
+                (click)="cohorts['contentview'] = 'activities'; $event.stopPropagation()">
+                <mat-icon>assignment</mat-icon> Activities ({{getActivitiesCount(cohorts['docid'])}})
+              </button> -->
+            </div>
+            <div class="card-tabs">
+              <button class="card-tab" [class.active]="cohorts['contentview'] === 'participants'"
+                (click)="cohorts['contentview'] = 'participants'; $event.stopPropagation()">
+                <svg class="ico sm" viewBox="0 0 24 24">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+                Participants
+                (<span *ngIf="!participantSearchQuery">{{cohorts['participantidlist']?.length
+                  || 0}}</span>
+                <span
+                  *ngIf="participantSearchQuery">{{getMatchingParticipantCount(cohorts)}}/{{cohorts['participantidlist']?.length
+                  || 0}}</span>
+                )
+              </button>
+              <button class="card-tab" [class.active]="cohorts['contentview'] === 'activities'"
+                (click)="cohorts['contentview'] = 'activities'; $event.stopPropagation()">Activities
+                ({{getActivitiesCount(cohorts['docid'])}})</button>
+              <button class="p-select-toggle" [class.on]="isParticipantSelectActive(cohorts['docid'])"
+                *ngIf="cohorts['contentview'] === 'participants' && cohorts['participantidlist']?.length > 0"
+                (click)="toggleParticipantSelectMode(cohorts['docid']); $event.stopPropagation()">
+                <mat-icon>{{isParticipantSelectActive(cohorts['docid']) ? 'check_box' :
+                  'check_box_outline_blank'}}</mat-icon>
+                {{isParticipantSelectActive(cohorts['docid']) ? 'Cancel' : 'Select'}}
+              </button>
+              <span class="p-select-count"
+                *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0">
+                <mat-icon>check_circle</mat-icon>
+                {{selectedParticipantIds.size}}
+              </span>
+            </div>
+            <div class="cohort-card-holder">
+              <div class="card-people" *ngIf="cohorts['contentview'] === 'participants'">
+
+                <div class="empty-state"
+                  *ngIf="!cohorts['participantidlist'] || cohorts['participantidlist'].length === 0"
+                  style="padding:28px 10px">
+                  <mat-icon>people</mat-icon>
+                  <p>No participants yet</p>
+                </div>
+
+                <div class="empty-state"
+                  *ngIf="cohorts['participantidlist']?.length > 0 && getFilteredParticipants(cohorts['participantidlist']).length === 0 && participantSearchQuery"
+                  style="padding:28px 10px">
+                  <mat-icon>search_off</mat-icon>
+                  <p>No participants match "{{participantSearchQuery}}"</p>
+                </div>
+
+                <div>
+                  <div class="cp-row row"
+                    *ngFor="let participant of getFilteredParticipants(cohorts['participantidlist']).slice(0,5)"
+                    [class.selectable]="isParticipantSelectActive(cohorts['docid'])"
+                    [class.checked]="isParticipantSelectActive(cohorts['docid']) && isParticipantChecked(participant)"
+                    (click)="isParticipantSelectActive(cohorts['docid']) && toggleParticipantChecked(participant, $event)"
+                    draggable="true">
+                    <span class="p-check" *ngIf="isParticipantSelectActive(cohorts['docid'])">
+                      <mat-icon>check</mat-icon>
+                    </span>
+                    <svg class="ico sm drag-icon" viewBox="0 0 24 24">
+                      <circle cx="8" cy="6" r="1" fill="currentColor" />
+                      <circle cx="8" cy="12" r="1" fill="currentColor" />
+                      <circle cx="8" cy="18" r="1" fill="currentColor" />
+                      <circle cx="16" cy="6" r="1" fill="currentColor" />
+                      <circle cx="16" cy="12" r="1" fill="currentColor" />
+                      <circle cx="16" cy="18" r="1" fill="currentColor" />
+                    </svg>
+                    <div class="cp-av blue">
+                      {{getAvatar(mapProfile[participant] || participant) | uppercase}}
+                    </div>
+                    <span class="cp-name">{{mapProfile[participant] || participant}}</span>
+                  </div>
+                  <div class="cp-more" *ngIf="getFilteredParticipants(cohorts['participantidlist']) > 5">
+                    +{{getFilteredParticipants(cohorts['participantidlist']) - 4}} more</div>
+                </div>
+              </div>
+
+
+              <div class="card-activities" *ngIf="cohorts['contentview'] === 'activities'">
+
+                <div class="empty-state"
+                  *ngIf="!mapParticiantsAssignments[cohorts['docid']] || (mapParticiantsAssignments[cohorts['docid']] | keyvalue).length === 0"
+                  style="padding:28px 10px">
+                  <mat-icon>assignment</mat-icon>
+                  <p>No activities yet</p>
+                </div>
+
+                <ng-container *ngFor="let assignment of mapParticiantsAssignments[cohorts['docid']] | keyvalue">
+                  <!-- Deleted assignment -->
+                  <div class="activity-card deleted" *ngIf="!mapBigAssignment[$any(assignment.key)]">
+                    <mat-icon>warning</mat-icon>
+                    <span>Assignment deleted</span>
+                  </div>
+
+                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]">
+                    <div class="ac-icon"><mat-icon>assignment</mat-icon></div>
+                    <div class="act-info">
+                      <div class="act-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</div>
+                      <div class="ac-stats">
+                        <div class="ac-stat ongoing">
+                          <span class="ac-stat-num">{{mapOngoingAssignments[$any(assignment.key)]?.length ||
+                            0}}<small>/{{$any(assignment.value).length || 0}}</small></span>
+                          <span class="ac-stat-lbl">Ongoing</span>
+                        </div>
+                        <div class="ac-stat done">
+                          <span class="ac-stat-num">{{mapCompletedAssignments[$any(assignment.key)]?.length ||
+                            0}}<small>/{{$any(assignment.value).length || 0}}</small></span>
+                          <span class="ac-stat-lbl">Done</span>
+                        </div>
+                        <div class="ac-progress" *ngIf="$any(assignment.value).length > 0">
+                          <div class="ac-progress-bar"
+                            [style.width.%]="((mapCompletedAssignments[$any(assignment.key)]?.length || 0) * 100) / ($any(assignment.value).length || 1)">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- <span class="act-badge published">published</span> -->
+                  </div>
+                </ng-container>
+                <!-- <div class="activity-row">
+              <span class="act-icon">☑</span>
+              <div class="act-info">
+                <div class="act-title">Pre-session reflection form</div>
+                <div class="act-meta">form · cohort participants</div>
+              </div>
+              <span class="act-badge scheduled">scheduled</span>
+            </div>
+            <div class="activity-row">
+              <span class="act-icon">♪</span>
+              <div class="act-info">
+                <div class="act-title">Installation Artistry playlist</div>
+                <div class="act-meta">playlist · cohort participants</div>
+              </div>
+              <span class="act-badge published">published</span>
+            </div>
+            <div class="activity-row">
+              <span class="act-icon">🔔</span>
+              <div class="act-info">
+                <div class="act-title">Reminder — review before session</div>
+                <div class="act-meta">notify · cohort participants</div>
+              </div>
+              <span class="act-badge draft">draft</span>
+            </div> -->
+                <!-- <button class="add-activity-btn">
+              <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Activity
+            </button> -->
+              </div>
+            </div>
+
+            <div class="card-foot"
+              *ngIf="!(isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0)">
+              <button class="foot-btn" (click)="openCohortChat(cohorts); $event.stopPropagation()"
+                title="Chat"><mat-icon>chat</mat-icon></button>
+              <button class="foot-btn" (click)="sendCohortNotification(cohorts); $event.stopPropagation()"
+                title="Notify all"><mat-icon>notifications</mat-icon></button>
+              <button class="foot-btn" (click)="sendCohortWhatsapp(cohorts); $event.stopPropagation()"
+                title="WhatsApp all"><svg class="ico sm" viewBox="0 0 24 24">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg></button>
+              <button class="foot-btn" (click)="sendCohortEmail(cohorts); $event.stopPropagation()"
+                title="Email all"><mat-icon>email</mat-icon></button>
+              <button class="foot-btn" (click)="sendCohortRecommendedPlaylist(cohorts); $event.stopPropagation()"
+                title="Recommend playlist all"><mat-icon>music_note</mat-icon></button>
+
+              <div class="foot-spacer"></div>
+              <button class="btn-activity" (click)="onCreateAssignment(cohorts); $event.stopPropagation()">
+                <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Activity
+              </button>
+            </div>
+
+            <div class="card-foot selected-mode"
+              *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0">
+              <span class="foot-label"><mat-icon>people</mat-icon> Send to <b>{{selectedParticipantIds.size}}</b>
+                selected</span>
+              <span class="foot-spacer"></span>
+              <button class="foot-btn" (click)="sendSelectedNotification(cohorts); $event.stopPropagation()"
+                title="Notify selected"><mat-icon>notifications</mat-icon></button>
+              <button class="foot-btn" (click)="sendSelectedEmail(cohorts); $event.stopPropagation()"
+                title="Email selected"><mat-icon>email</mat-icon></button>
+              <button class="foot-btn whatsapp" (click)="sendSelectedWhatsapp(cohorts); $event.stopPropagation()"
+                title="WhatsApp selected">
+                <i class="fa-brands fa-whatsapp"></i>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      </ng-container>
+
+    </div><!-- /cohort-area -->
+
+  </div><!-- /main-content -->
+
+  <div class="selectbar" *ngIf="selectMode">
+    <div class="sb-main-row">
+      <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
+      <span class="sb-divider"></span>
+      <button class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
+        <mat-icon>select_all</mat-icon> All
+      </button>
+      <ng-container *ngIf="selectedCohortIds.size > 0">
+        <button class="sb-btn ghost" (click)="sendSelectedCohortsNotification()" title="Notify selected cohorts">
+          <mat-icon>notifications</mat-icon>
+        </button>
+        <button class="sb-btn ghost" (click)="sendSelectedCohortsEmail()" title="Email selected cohorts">
+          <mat-icon>email</mat-icon>
+        </button>
+        <button class="sb-btn ghost wa" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
+          <i class="fa-brands fa-whatsapp"></i>
+        </button>
+      </ng-container>
+      <button class="sb-btn ghost" (click)="toggleSelectMode()" title="Exit select mode">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <ng-container *ngIf="selectedCohortIds.size > 0">
+      <div class="sb-action-row">
+        <button class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()"
+          title="recommend playlist selected cohorts">
+          <mat-icon>music_note</mat-icon> Recommend Playlist
+        </button>
+        <button class="sb-btn primary" (click)="exportSelectedCohorts()">
+          <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})
+        </button>
+      </div>
+    </ng-container>
+  </div>
+
+</div><!-- /bc-root -->
