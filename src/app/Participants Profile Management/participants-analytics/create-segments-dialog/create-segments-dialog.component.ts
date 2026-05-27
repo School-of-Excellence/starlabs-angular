@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, Input, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormControl, FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
@@ -14,11 +14,15 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, collectionData, setDoc, writeBatch, where } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, collectionData, setDoc, writeBatch, where, orderBy, limit } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
 import { MatOptionModule } from '@angular/material/core';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ActivatedRoute } from '@angular/router';
+import { AuthguardService } from '../../../authguard.service';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
 
 @Component({
   selector: 'app-create-segments-dialog',
@@ -42,6 +46,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatTooltipModule,
     MatDividerModule,
     MatAutocompleteModule,
+    MatDatepickerModule,   
+    MatNativeDateModule,
   ],
   templateUrl: './create-segments-dialog.component.html',
   styleUrl: './create-segments-dialog.component.css'
@@ -51,6 +57,29 @@ export class CreateSegmentsDialogComponent implements OnInit {
   private fb = inject(FormBuilder);
   private snackBar = inject(MatSnackBar);
 
+  @Input() loggedInUser: any = null
+  reviewAccess: boolean = false;
+  submissionAccess: boolean = false;
+  constructor(
+      private route: ActivatedRoute,
+      private auth: AuthguardService,
+    ) {
+      this.auth.getRoles().then(async roles => {
+        if (roles["ah"] || roles["admin"] || roles["developer"]) {
+          this.reviewAccess = true;
+        }
+        else {
+          this.reviewAccess = false;
+        }
+        if (roles['profile_ref'].id === this.route.snapshot.queryParams['profileid']) {
+          this.submissionAccess = true
+        } else {
+          this.submissionAccess = false
+        }
+        this.loggedInUser = roles['profile_ref'].id
+        console.log("profileid from url", this.route.snapshot.queryParams['profileid']);
+      })
+    }
   // Table columns
   displayedColumns: string[] = ['segmentname', 'participantlists', 'tags', 'actions'];
   
@@ -86,9 +115,245 @@ export class CreateSegmentsDialogComponent implements OnInit {
   filteredTags$!: Observable<any[]>;
   filteredEditTags$!: Observable<any[]>;
 
+  // participant segment logs states
+  historyPanelOpen = false;
+  logs: any[] = [];
+  logsLoading = false;
+  logsPage = 0;
+  logsPageSize = 15;
+  expandedLogIds = new Set<string>();
+  historySearchTerm = '';
+  historyFilter = 'all';
+  filteredLogs: any[] = [];
+  historyDateStart: Date | null = null;
+  historyDateEnd: Date | null = null;
+
+mapUsers: Record<string, string> = {};
+
   ngOnInit(): void {
     this.initializeForms();
     this.loadData();
+  }
+
+  toggleLogExpand(docId: string): void {
+  if (this.expandedLogIds.has(docId)) {
+    this.expandedLogIds.delete(docId);
+  } else {
+    this.expandedLogIds.add(docId);
+  }
+  this.expandedLogIds = new Set(this.expandedLogIds);
+}
+  get pagedLogs() {
+    const start = this.logsPage * this.logsPageSize;
+    return this.logs.slice(start, start + this.logsPageSize);
+  }
+
+  get totalLogPages() {
+    return Math.ceil(this.logs.length / this.logsPageSize);
+  }
+
+  toggleHistoryPanel() {
+    this.historyPanelOpen = !this.historyPanelOpen;
+    if (this.historyPanelOpen && this.logs.length === 0) {
+      this.loadLogs();
+    }
+  }
+
+  async loadLogs() {
+  this.logsLoading = true;
+  this.logsPage = 0;
+  try {
+    const q = query(
+      collection(this.firestore, 'participant_list_log'),
+      orderBy('created_date', 'desc'),
+      limit(200)
+    );
+    const snap = await getDocs(q);
+    this.logs = snap.docs
+      .map(d => d.data())
+      .filter(d => d?.['type'] === 'segment'); 
+    this.filteredLogs = [...this.logs];
+    console.log('Loaded logs:', this.logs.length);
+  } catch(e) {
+    console.error('loadLogs error:', e);
+  } finally {
+    this.logsLoading = false;
+  }
+}
+
+setHistoryFilter(f: string): void {
+  this.historyFilter = f;
+  this.logsPage = 0;
+  this.applyHistoryFilter();
+}
+
+applyHistoryFilter(): void {
+  const term = this.historySearchTerm.trim().toLowerCase();
+
+  let endDate: Date | null = null;
+  if (this.historyDateEnd) {
+    endDate = new Date(this.historyDateEnd);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  this.filteredLogs = this.logs.filter(log => {
+    const typeMatch =
+      this.historyFilter === 'all' || log.action_type === this.historyFilter;
+
+    let dateMatch = true;
+    if (this.historyDateStart || endDate) {
+      const logDate: Date = log.created_date?.toDate?.() ?? new Date(0);
+      if (this.historyDateStart && logDate < this.historyDateStart) dateMatch = false;
+      if (endDate && logDate > endDate) dateMatch = false;
+    }
+
+    let textMatch = true;
+    if (term) {
+      const desc: string = (
+        log.metadata?.description ||
+        log.metadata?.current?.description || ''
+      ).toLowerCase();
+
+      const segName: string = (
+        log.metadata?.current?.segmentname ||
+        log.metadata?.previous?.segmentname || ''
+      ).toLowerCase();
+
+      const listIds: string[] = [
+        ...(log.metadata?.current?.participantlistid  || []),
+        ...(log.metadata?.previous?.participantlistid || []),
+        ...(log.metadata?.current?.added_profiles     || []),
+        ...(log.metadata?.current?.profilelist        || []),
+      ];
+      const listNamesMatch = listIds.some(id =>
+        this.getListName(id).toLowerCase().includes(term)
+      );
+
+      textMatch = desc.includes(term) || segName.includes(term) || listNamesMatch;
+    }
+
+    return typeMatch && dateMatch && textMatch;
+  });
+
+  this.logsPage = 0;
+}
+
+getListName(listId: string): string {
+  if (!listId) return '—';
+  return this.mapParticipantList[listId]?.listname || listId;
+}
+
+getUserName(userId: string): string {
+  if (!userId) return '—';
+  return this.mapUsers[userId] || userId;
+}
+
+getLogCountByType(type: string): number {
+  return this.logs.filter(l => l.action_type === type).length;
+}
+
+getLogProfiles(log: any): string[] {
+  const listIds: string[] = (
+    log.metadata?.current?.participantlistid ||
+    log.metadata?.current?.added_profiles    ||
+    log.metadata?.current?.profilelist       ||
+    []
+  );
+  return listIds;
+}
+
+get pagedFilteredLogs(): any[] {
+  const start = this.logsPage * this.logsPageSize;
+  return this.filteredLogs.slice(start, start + this.logsPageSize);
+}
+
+get groupedPagedLogs(): { date: string; logs: any[] }[] {
+  const groups: { date: string; logs: any[] }[] = [];
+  let currentDate = '';
+  for (const log of this.pagedFilteredLogs) {
+    const d = log.created_date?.toDate?.();
+    const label = d ? this.formatDateLabel(d) : 'Unknown date';
+    if (label !== currentDate) {
+      currentDate = label;
+      groups.push({ date: label, logs: [] });
+    }
+    groups[groups.length - 1].logs.push(log);
+  }
+  return groups;
+}
+
+formatDateLabel(d: Date): string {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const fmt = (dt: Date) => dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (d.toDateString() === today.toDateString()) return `Today · ${fmt(d)}`;
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday · ${fmt(d)}`;
+  return fmt(d);
+}
+
+getLogItemClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'hp-item-created',
+    delete: 'hp-item-deleted',
+    edit: 'hp-item-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogIconClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'log-icon-created', delete: 'log-icon-deleted', edit: 'log-icon-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogBadgeClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'badge-created', delete: 'badge-deleted', edit: 'badge-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogExpandClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'expand-created', edit: 'expand-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogExpandLabelClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'expand-label-created', edit: 'expand-label-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogParticipantsClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'participants-created', edit: 'participants-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogLabel(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'Created', delete: 'Deleted', edit: 'Edited'
+  };
+  return map[actionType] ?? actionType;
+}
+
+scrollLogTop(): void {
+  document.querySelector('.hp-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+  getLogIcon(actionType: string): string {
+    const map: Record<string, string> = {
+      edit: 'edit',
+      create: 'add_circle',
+      delete: 'delete'
+    };
+    return map[actionType] ?? 'history';
   }
 
   initializeForms(): void {
@@ -167,7 +432,7 @@ export class CreateSegmentsDialogComponent implements OnInit {
         const participantlistData = participantlist[i];
         this.participantLists.push(participantlistData);
         this.mapParticipantList[participantlistData['docid']] = participantlistData;
-      }
+}
     });
 
     // Load participant tags
@@ -291,7 +556,22 @@ export class CreateSegmentsDialogComponent implements OnInit {
         });
         this.showCreateForm = false;
         await this.loadSegments();
-      })
+      }
+    )
+    // add activity log
+    const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+    await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+      doc_id: activityDocId,
+      action_type: 'create',
+      created_date: new Date(),
+      type: 'segment',
+      edited_by: this.loggedInUser,
+      referals: doc(this.firestore, 'segments', segmentsRef.id),
+      metadata: {
+        current: { segmentname: formValue.segmentname.trim(), participantlistid: formValue.participantlistid, tagids: formValue.tagids || [] },
+        description: `Created segment "${formValue.segmentname.trim()}" with ${formValue.participantlistid.length} list(s).`
+      }
+    });
     } catch (error) {
       console.error('Error creating segment:', error);
       this.snackBar.open('Error creating segment. Please try again.', 'Close', { duration: 3000 });
@@ -400,10 +680,27 @@ export class CreateSegmentsDialogComponent implements OnInit {
     }
 
     this.updatingSegment = true;
+    const oldName = this.selectedSegment.segmentname;
     try {
       await updateDoc(doc(this.firestore, 'segments', this.selectedSegment.docid), {
         segmentname: newName,
         updateddate: new Date()
+      });
+
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { segmentname: oldName },
+          current: { segmentname: newName },
+          description: `Renamed segment from "${oldName}" to "${newName}".`
+        }
       });
 
       this.snackBar.open('Segment name updated successfully', 'Close', { duration: 3000 });
@@ -427,6 +724,9 @@ export class CreateSegmentsDialogComponent implements OnInit {
     if (!this.selectedSegment) return;
 
     this.updatingSegment = true;
+    const previousListIds = [...(this.selectedSegment.participantlistid || [])];
+    const listName = this.mapParticipantList[listId]?.['listname'] || listId;
+
     try {
       // Update segment document
       await updateDoc(doc(this.firestore, 'segments', this.selectedSegment.docid), {
@@ -434,9 +734,40 @@ export class CreateSegmentsDialogComponent implements OnInit {
         updateddate: new Date()
       });
 
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { participantlistid: previousListIds },
+          current: { participantlistid: previousListIds.filter(id => id !== listId) },
+          description: `Removed list "${listName}" from segment "${this.selectedSegment.segmentname}".`
+        }
+      });
+
       // Update participant list document
       await updateDoc(doc(this.firestore, 'participant list', listId), {
         segmentid: arrayRemove(this.selectedSegment.docid)
+      });
+
+      // add activity log
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { participantlistid: previousListIds },
+          current: { participantlistid: previousListIds.filter(id => id !== listId) },
+          description: `Removed list "${listName}" from segment "${this.selectedSegment.segmentname}".`
+        }
       });
 
       this.snackBar.open('Participant list removed successfully', 'Close', { duration: 3000 });
@@ -478,6 +809,8 @@ export class CreateSegmentsDialogComponent implements OnInit {
       return;
     }
 
+    const previousListIds = [...(this.selectedSegment.participantlistid || [])];
+    const listName = this.mapParticipantList[listId]?.['listname'] || listId;
     this.updatingSegment = true;
     try {
       // Update segment document
@@ -486,9 +819,40 @@ export class CreateSegmentsDialogComponent implements OnInit {
         updateddate: new Date()
       });
 
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { participantlistid: previousListIds },
+          current: { participantlistid: [...previousListIds, listId] },
+          description: `Added list "${listName}" to segment "${this.selectedSegment.segmentname}".`
+        }
+      });
+
       // Update participant list document
       await updateDoc(doc(this.firestore, 'participant list', listId), {
         segmentid: arrayUnion(this.selectedSegment.docid)
+      });
+
+      // add activity log
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { participantlistid: previousListIds },
+          current: { participantlistid: [...previousListIds, listId] },
+          description: `Added list "${listName}" to segment "${this.selectedSegment.segmentname}".`
+        }
       });
 
       this.snackBar.open('Participant list added successfully', 'Close', { duration: 3000 });
@@ -513,6 +877,8 @@ export class CreateSegmentsDialogComponent implements OnInit {
     if (!this.selectedSegment) return;
 
     this.updatingSegment = true;
+    const previousTagIds = [...(this.selectedSegment.tagids || [])];
+    const tagName = this.mapParticipantTag[tagId]?.name || tagId;
     try {
       // Update segment document
       await updateDoc(doc(this.firestore, 'segments', this.selectedSegment.docid), {
@@ -520,9 +886,40 @@ export class CreateSegmentsDialogComponent implements OnInit {
         updateddate: new Date()
       });
 
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { tagids: previousTagIds },
+          current: { tagids: previousTagIds.filter(id => id !== tagId) },
+          description: `Removed tag "${tagName}" from segment "${this.selectedSegment.segmentname}".`
+        }
+      });
+
       // Update participant tag document
       await updateDoc(doc(this.firestore, 'participant tags', tagId), {
         segmentid: arrayRemove(this.selectedSegment.docid)
+      });
+
+      // add activity log
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { tagids: previousTagIds },
+          current: { tagids: previousTagIds.filter(id => id !== tagId) },
+          description: `Removed tag "${tagName}" from segment "${this.selectedSegment.segmentname}".`
+        }
       });
 
       this.snackBar.open('Tag removed successfully', 'Close', { duration: 3000 });
@@ -549,6 +946,8 @@ export class CreateSegmentsDialogComponent implements OnInit {
 
     const tagId = this.addTagForm.value.tagid;
 
+    const previousTagIds = [...(this.selectedSegment.tagids || [])];
+    const tagName = this.mapParticipantTag[tagId]?.name || tagId;
     this.updatingSegment = true;
     try {
       // Update segment document
@@ -557,9 +956,40 @@ export class CreateSegmentsDialogComponent implements OnInit {
         updateddate: new Date()
       });
 
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { tagids: previousTagIds },
+          current: { tagids: [...previousTagIds, tagId] },
+          description: `Added tag "${tagName}" to segment "${this.selectedSegment.segmentname}".`
+        }
+      });
+
       // Update participant tag document
       await updateDoc(doc(this.firestore, 'participant tags', tagId), {
         segmentid: arrayUnion(this.selectedSegment.docid)
+      });
+
+      // add activity log
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', this.selectedSegment.docid),
+        metadata: {
+          previous: { tagids: previousTagIds },
+          current: { tagids: [...previousTagIds, tagId] },
+          description: `Added tag "${tagName}" to segment "${this.selectedSegment.segmentname}".`
+        }
       });
 
       this.snackBar.open('Tag added successfully', 'Close', { duration: 3000 });
@@ -588,6 +1018,7 @@ export class CreateSegmentsDialogComponent implements OnInit {
       return;
     }
 
+    const previousData = { segmentname: segment.segmentname, participantlistid: [...(segment.participantlistid || [])], tagids: [...(segment.tagids || [])] };
     this.loading = true;
     try {
       // Remove segment reference from all participant lists
@@ -608,6 +1039,20 @@ export class CreateSegmentsDialogComponent implements OnInit {
       
       // Delete segment document
       await deleteDoc(doc(this.firestore, 'segments', segment.docid));
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'delete',
+        created_date: new Date(),
+        type: 'segment',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'segments', segment.docid),
+        metadata: {
+          previous: previousData,
+          description: `Deleted segment "${segment.segmentname}".`
+        }
+      });
 
       this.snackBar.open('Segment deleted successfully', 'Close', { duration: 3000 });
       

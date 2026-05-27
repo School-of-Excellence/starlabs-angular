@@ -139,14 +139,24 @@
                     <h1 class="page-title">Participant Lists Management</h1>
                     <span class="list-count">{{ filteredParticipantLists.length }} list(s)</span>
                   </div>
-                  <button 
-                    mat-raised-button 
-                    color="primary" 
-                    (click)="toggleCreateForm()"
-                    [disabled]="loading">
-                    <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
-                    {{ showCreateForm ? 'Cancel' : 'Create List' }}
-                  </button>
+                  <div class="header-actions">
+                    <button
+                      mat-stroked-button
+                      class="history-btn"
+                      (click)="toggleHistoryPanel()"
+                      [disabled]="loading">
+                      <mat-icon>history</mat-icon>
+                      History
+                    </button>
+                    <button
+                      mat-raised-button
+                      color="primary"
+                      (click)="toggleCreateForm()"
+                      [disabled]="loading">
+                      <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
+                      {{ showCreateForm ? 'Cancel' : 'Create List' }}
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Filter Section -->
@@ -315,9 +325,9 @@
                                 [matTooltip]="getListConflictTooltip(list.docid)"
                                 matTooltipPosition="right">
                                 <mat-icon class="conflict-icon">warning</mat-icon>
-                              <span class="conflict-label">
-                                {{ conflicts.count }} conflict(s) in live lists
-                              </span>
+                                <span class="conflict-label">
+                                  {{ conflicts.count }} conflict(s) in live lists
+                                </span>
                               </div>
                               <div class="matched-profiles-indicator" *ngIf="isFiltering && getMatchedProfilesInList(list).length > 0">
                                 <mat-icon>person_search</mat-icon>
@@ -372,7 +382,7 @@
                                 *ngIf="getMatchedProfilesInList(list).length > 3"
                                 class="more-chip">
                                 +{{ getMatchedProfilesInList(list).length - 3 }}
-                                </mat-chip>
+                              </mat-chip>
                             </mat-chip-set>
                           </div>
                           <!-- ── Inline conflict chip list ── -->
@@ -458,7 +468,6 @@
                         *matRowDef="let row; columns: displayedColumns;"
                         [class.selected-row]="selectedList?.docid === row.docid"
                         [class.has-matches]="isFiltering && getMatchedProfilesInList(row).length > 0"
-                        [class.has-conflicts]="!!getListConflicts(row.docid)"
                         [class.has-conflicts]="!!getListConflicts(row.docid)"
                         (click)="onSelectList(row)">
                       </tr>
@@ -565,97 +574,97 @@
                 <mat-divider *ngIf="getConflictsForSelectedList().length > 0"></mat-divider>
 
                 <!-- Current Participants -->
-<div class="panel-section">
-  <h3 class="section-title">
-    <mat-icon>list</mat-icon>
-    Current Participants ({{ selectedList.profiles?.length || 0 }})
-  </h3>
+                <div class="panel-section">
+                  <h3 class="section-title">
+                    <mat-icon>list</mat-icon>
+                    Current Participants ({{ selectedList.profiles?.length || 0 }})
+                  </h3>
 
-        <!-- Search bar -->
-        <mat-form-field appearance="outline" class="full-width side-panel-search">
-          <mat-label>Search participants</mat-label>
-          <input
-            matInput
-            [(ngModel)]="sidePanelSearchTerm"
-            placeholder="Search by name..."
-            autocomplete="off">
-          <mat-icon matPrefix>search</mat-icon>
-          <button
-            mat-icon-button
-            matSuffix
-            *ngIf="sidePanelSearchTerm"
-            (click)="sidePanelSearchTerm = ''"
-            matTooltip="Clear search">
-            <mat-icon>close</mat-icon>
-                </button>
-              </mat-form-field>
+                  <!-- Search bar -->
+                  <mat-form-field appearance="outline" class="full-width side-panel-search">
+                    <mat-label>Search participants</mat-label>
+                    <input
+                      matInput
+                      [(ngModel)]="sidePanelSearchTerm"
+                      placeholder="Search by name..."
+                      autocomplete="off">
+                    <mat-icon matPrefix>search</mat-icon>
+                    <button
+                      mat-icon-button
+                      matSuffix
+                      *ngIf="sidePanelSearchTerm"
+                      (click)="sidePanelSearchTerm = ''"
+                      matTooltip="Clear search">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </mat-form-field>
 
-        <!-- Filtered count hint -->
-        <div class="side-panel-search-hint"
-            *ngIf="sidePanelSearchTerm.trim() && selectedList.profiles?.length">
-          <mat-icon>filter_alt</mat-icon>
-          <span>
-            {{ getFilteredParticipants().length }} of
-            {{ selectedList.profiles.length }} participant(s) shown
-          </span>
-        </div>
+                  <!-- Filtered count hint -->
+                  <div class="side-panel-search-hint"
+                      *ngIf="sidePanelSearchTerm.trim() && selectedList.profiles?.length">
+                    <mat-icon>filter_alt</mat-icon>
+                    <span>
+                      {{ getFilteredParticipants().length }} of
+                      {{ selectedList.profiles.length }} participant(s) shown
+                    </span>
+                  </div>
 
-  <div class="current-participants"
-       *ngIf="selectedList.profiles && selectedList.profiles.length > 0">
-    <div
-      class="participant-item"
-      *ngFor="let profile of getFilteredParticipants(); let i = index"
-      [class.matched]="isFiltering && filterProfile(profile.id)"
-      [class.conflicting]="isProfileConflicting(profile.id)">
+                  <div class="current-participants"
+                       *ngIf="selectedList.profiles && selectedList.profiles.length > 0">
+                    <div
+                      class="participant-item"
+                      *ngFor="let profile of getFilteredParticipants(); let i = index"
+                      [class.matched]="isFiltering && filterProfile(profile.id)"
+                      [class.conflicting]="isProfileConflicting(profile.id)">
       <!-- rest of participant item unchanged -->
-      <div class="participant-info">
-        <div class="participant-number">{{ i + 1 }}</div>
-        <mat-icon
-          *ngIf="isProfileConflicting(profile.id)"
-          class="participant-conflict-icon"
-          [matTooltip]="getConflictTooltip(profile.id)"
-          matTooltipPosition="right">
-          warning
-        </mat-icon>
-        <mat-icon *ngIf="!isProfileConflicting(profile.id)" class="participant-icon">
-          person
-        </mat-icon>
-        <div class="participant-details">
-          <span class="participant-name">{{ profile.name }}</span>
-          <span *ngIf="isProfileConflicting(profile.id)" class="participant-conflict-detail">
-            <mat-icon class="conflict-detail-icon">warning</mat-icon>
-            Also in live list(s): {{ getProfileConflict(profile.id)?.segmentNames?.join(', ') }}
-          </span>
-          <span class="participant-email" *ngIf="profile.email">{{ profile.email }}</span>
-          <span class="participant-phone" *ngIf="profile.phone">{{ profile.phone }}</span>
-          <span class="participant-id">ID: {{ profile.id }}</span>
-        </div>
-      </div>
-      <button
-        mat-icon-button
-        color="warn"
-        (click)="removeProfileFromList(profile.id)"
-        [disabled]="updatingList"
-        matTooltip="Remove from list">
-        <mat-icon>remove_circle</mat-icon>
-      </button>
-    </div>
+                      <div class="participant-info">
+                        <div class="participant-number">{{ i + 1 }}</div>
+                        <mat-icon
+                          *ngIf="isProfileConflicting(profile.id)"
+                          class="participant-conflict-icon"
+                          [matTooltip]="getConflictTooltip(profile.id)"
+                          matTooltipPosition="right">
+                          warning
+                        </mat-icon>
+                        <mat-icon *ngIf="!isProfileConflicting(profile.id)" class="participant-icon">
+                          person
+                        </mat-icon>
+                        <div class="participant-details">
+                          <span class="participant-name">{{ profile.name }}</span>
+                          <span *ngIf="isProfileConflicting(profile.id)" class="participant-conflict-detail">
+                            <mat-icon class="conflict-detail-icon">warning</mat-icon>
+                            Also in live list(s): {{ getProfileConflict(profile.id)?.segmentNames?.join(', ') }}
+                          </span>
+                          <span class="participant-email" *ngIf="profile.email">{{ profile.email }}</span>
+                          <span class="participant-phone" *ngIf="profile.phone">{{ profile.phone }}</span>
+                          <span class="participant-id">ID: {{ profile.id }}</span>
+                        </div>
+                      </div>
+                      <button
+                        mat-icon-button
+                        color="warn"
+                        (click)="removeProfileFromList(profile.id)"
+                        [disabled]="updatingList"
+                        matTooltip="Remove from list">
+                        <mat-icon>remove_circle</mat-icon>
+                      </button>
+                    </div>
 
-    <!-- No results from search -->
-    <div class="empty-state"
-         *ngIf="sidePanelSearchTerm.trim() && getFilteredParticipants().length === 0">
-      <mat-icon class="empty-icon">search_off</mat-icon>
-      <p>No participants match "{{ sidePanelSearchTerm }}"</p>
-    </div>
-  </div>
+                    <!-- No results from search -->
+                    <div class="empty-state"
+                         *ngIf="sidePanelSearchTerm.trim() && getFilteredParticipants().length === 0">
+                      <mat-icon class="empty-icon">search_off</mat-icon>
+                      <p>No participants match "{{ sidePanelSearchTerm }}"</p>
+                    </div>
+                  </div>
 
-  <div class="empty-state"
-       *ngIf="!selectedList.profiles || selectedList.profiles.length === 0">
-    <mat-icon class="empty-icon">inbox</mat-icon>
-    <p>No participants in this list</p>
-    <p class="empty-subtitle">Add participants using the form below</p>
-  </div>
-</div>
+                  <div class="empty-state"
+                       *ngIf="!selectedList.profiles || selectedList.profiles.length === 0">
+                    <mat-icon class="empty-icon">inbox</mat-icon>
+                    <p>No participants in this list</p>
+                    <p class="empty-subtitle">Add participants using the form below</p>
+                  </div>
+                </div>
 
                 <mat-divider></mat-divider>
 
@@ -699,10 +708,144 @@
               </div>
             </div>
 
-            <!-- Backdrop -->
+            <!-- Edit panel backdrop -->
             <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
-            <div class="conflict-dialog-backdrop" 
-                *ngIf="showConflictDialog" 
+            <div class="history-backdrop" *ngIf="historyPanelOpen" (click)="toggleHistoryPanel()"></div>
+            <div class="history-panel" [class.open]="historyPanelOpen">
+
+              <div class="hp-header">
+                <div class="hp-header-left">
+                  <mat-icon class="hp-icon">history</mat-icon>
+                  <h2 class="hp-title">History Log</h2>
+                  <span class="hp-badge">{{ logs.length }} entries</span>
+                </div>
+                <button mat-icon-button (click)="toggleHistoryPanel()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="hp-filters">
+
+                <mat-form-field appearance="outline" class="hp-search-field">
+                  <mat-label>Search by participant, list or profile name</mat-label>
+                  <input matInput [(ngModel)]="historySearchTerm" (ngModelChange)="applyHistoryFilter()" autocomplete="off">
+                  <mat-icon matPrefix>search</mat-icon>
+                  <button mat-icon-button matSuffix *ngIf="historySearchTerm" (click)="historySearchTerm=''; applyHistoryFilter()">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="hp-date-field">
+                  <mat-label>Filter by date range</mat-label>
+                  <mat-date-range-input [rangePicker]="historyDatePicker">
+                    <input matStartDate [(ngModel)]="historyDateStart" (ngModelChange)="applyHistoryFilter()" placeholder="Start date">
+                    <input matEndDate   [(ngModel)]="historyDateEnd"   (ngModelChange)="applyHistoryFilter()" placeholder="End date">
+                  </mat-date-range-input>
+                  <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
+                  <mat-datepicker-toggle matIconSuffix [for]="historyDatePicker"></mat-datepicker-toggle>
+                  <mat-date-range-picker #historyDatePicker></mat-date-range-picker>
+                  <button mat-icon-button matSuffix
+                    *ngIf="historyDateStart || historyDateEnd"
+                    (click)="historyDateStart=null; historyDateEnd=null; applyHistoryFilter()"
+                    style="margin-right:36px">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </mat-form-field>
+
+                <p class="hp-chips-label">Filter by activity</p>
+                <div class="hp-chips">
+                  <span class="hp-chip" [class.chip-all]="historyFilter==='all'" (click)="setHistoryFilter('all')">
+                    <mat-icon>list</mat-icon> All
+                    <span class="hp-chip-count">{{ getFilteredCountForAll() }}</span>
+                  </span>
+                  <span class="hp-chip" [class.chip-created]="historyFilter==='create'" (click)="setHistoryFilter('create')">
+                    <mat-icon>create_new_folder</mat-icon> Created
+                    <span class="hp-chip-count">{{ getLogCountByType('create') }}</span>
+                  </span>
+                  <span class="hp-chip" [class.chip-deleted]="historyFilter==='delete'" (click)="setHistoryFilter('delete')">
+                    <mat-icon>delete</mat-icon> Deleted
+                    <span class="hp-chip-count">{{ getLogCountByType('delete') }}</span>
+                  </span>
+                  <span class="hp-chip" [class.chip-added]="historyFilter==='edit'" (click)="setHistoryFilter('edit')">
+                    <mat-icon>edit</mat-icon> Edited
+                    <span class="hp-chip-count">{{ getLogCountByType('edit') }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="hp-loading" *ngIf="logsLoading">
+                <mat-spinner diameter="28"></mat-spinner>
+                <span>Loading activity...</span>
+              </div>
+
+              <div class="hp-empty" *ngIf="!logsLoading && filteredLogs.length === 0">
+                <mat-icon class="hp-empty-icon">history_toggle_off</mat-icon>
+                <p>No activity recorded yet</p>
+              </div>
+
+              <div class="hp-body" *ngIf="!logsLoading && filteredLogs.length > 0">
+                <ng-container *ngFor="let group of groupedPagedLogs; trackBy: trackByDate">
+                  <p class="hp-date-label">{{ group.date }}</p>
+              
+                  <div *ngFor="let log of group.logs; trackBy: trackByLog" class="hp-log-item"
+                    [ngClass]="getLogItemClass(log.action_type)">
+              
+                    <div class="hp-log-main">
+                      <div class="hp-log-top">
+                        <mat-icon class="hp-log-icon" [ngClass]="getLogIconClass(log.action_type)">
+                          {{ getLogIcon(log.action_type) }}
+                        </mat-icon>
+                        <span class="hp-log-badge" [ngClass]="getLogBadgeClass(log.action_type)">
+                          {{ getLogLabel(log.action_type) }}
+                        </span>
+                        <span class="hp-log-time">{{ log.created_date.toDate() | date:'shortTime' }}</span>
+                      </div>
+                      <p class="hp-log-desc">
+                        {{ log.metadata?.description || log.metadata?.current?.description }}
+                      </p>
+                      <p class="hp-log-by">
+                        <mat-icon style="font-size:13px;width:13px;height:13px;vertical-align:-2px">
+                          account_circle
+                        </mat-icon>
+                        By: {{ getUserName(log.edited_by) }}
+                      </p>
+                    </div>
+
+                    <div *ngIf="getLogProfiles(log).length > 0"
+                        class="hp-view-participants-row"
+                        [ngClass]="getLogExpandClass(log.action_type)">
+                      <button class="hp-view-btn"
+                              type="button"
+                              [ngClass]="getLogExpandLabelClass(log.action_type)"
+                              (click)="$event.stopPropagation(); onViewParticipants($event, log)">
+                        <mat-icon style="font-size:15px;width:15px;height:15px;vertical-align:-3px">group</mat-icon>
+                        View {{ getLogProfiles(log).length }} participant(s)
+                      </button>
+                    </div>
+
+</div>
+                </ng-container>
+              </div>
+
+              <div class="hp-footer" *ngIf="!logsLoading && filteredLogs.length > 0">
+                <span>Showing {{ pagedFilteredLogs.length }} of {{ filteredLogs.length }} entries</span>
+                <div class="hp-pagination">
+                  <button mat-stroked-button [disabled]="logsPage === 0" (click)="logsPage = logsPage - 1; scrollLogTop()">
+                    <mat-icon>chevron_left</mat-icon>
+                  </button>
+                  <span>{{ logsPage + 1 }} / {{ totalLogPages }}</span>
+                  <button mat-stroked-button [disabled]="logsPage >= totalLogPages - 1" (click)="logsPage = logsPage + 1; scrollLogTop()">
+                    <mat-icon>chevron_right</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+
+            <div class="conflict-dialog-backdrop"
+                *ngIf="showConflictDialog"
                 (click)="closeConflictDialog()">
             </div>
 
@@ -718,14 +861,14 @@
               </div>
 
               <div class="conflict-dialog-body">
-                <div class="conflict-dialog-row" 
+                <div class="conflict-dialog-row"
                     *ngFor="let conflict of getAllConflictsForDialog()">
                   <div class="conflict-dialog-person">
                     <mat-icon>person</mat-icon>
                     <span>{{ conflict.profileName }}</span>
                   </div>
                   <mat-chip-set class="conflict-dialog-chips">
-                    <mat-chip 
+                    <mat-chip
                       *ngFor="let segName of conflict.segmentNames"
                       class="conflict-dialog-chip">
                       {{ segName }}
@@ -735,8 +878,8 @@
               </div>
             </div>
 
-            <!-- Popup for the participants when there is a conflict -->
-            <div class="mcp-backdrop" 
+            <!-- Participant conflict popup-->
+            <div class="mcp-backdrop"
                  *ngIf="showMergeConflictPopup"
                  (click)="cancelMergeConflictPopup()">
             </div>
@@ -792,18 +935,18 @@
                         </div>
                       </td>
                       <td class="col-previous">
-              <div class="mcp-prev-pills">
-                <span class="mcp-list-pill prev-pill"
-                  *ngFor="let cl of conflict.conflictingLists">
-                  {{ cl.listName }}
-                </span>
-              </div>
-            </td>
-            <td class="col-current">
-              <span class="mcp-list-pill current-pill">
-                {{ pendingMergeTargetList?.name }}
-              </span>
-            </td>
+                        <div class="mcp-prev-pills">
+                          <span class="mcp-list-pill prev-pill"
+                            *ngFor="let cl of conflict.conflictingLists">
+                            {{ cl.listName }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="col-current">
+                        <span class="mcp-list-pill current-pill">
+                          {{ pendingMergeTargetList?.name }}
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -825,12 +968,69 @@
                     (click)="confirmMergeWithSelection()" [disabled]="loading">
                     <mat-spinner diameter="18" *ngIf="loading" class="button-spinner"></mat-spinner>
                     <mat-icon *ngIf="!loading">merge</mat-icon>
-                                <span>{{ loading ? 'Merging...' : 'Confirm Merge' }}</span>
+                    <span>{{ loading ? 'Merging...' : 'Confirm Merge' }}</span>
                   </button>
                 </div>
               </div>
+            </div>
+            <!-- log dialog box -->
+            <div class="pv-backdrop" *ngIf="showParticipantsPopup" (click)="closeParticipantsPopup()">
+            </div>
 
-</div>
+            <div class="pv-inline-popup" *ngIf="showParticipantsPopup">
+
+              <div class="pv-header">
+                <div class="pv-title">
+                  <mat-icon class="pv-title-icon">group</mat-icon>
+                  <span>Participants ({{ participantsPopupProfiles.length }})</span>
+                </div>
+                <button mat-icon-button (click)="closeParticipantsPopup()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <div class="pv-search">
+                <mat-form-field appearance="outline" class="pv-search-field">
+                  <mat-label>Search by name</mat-label>
+                  <input matInput [(ngModel)]="participantsPopupSearch" placeholder="Type a name..." autocomplete="off">
+                  <mat-icon matPrefix>search</mat-icon>
+                  <button mat-icon-button matSuffix *ngIf="participantsPopupSearch" (click)="participantsPopupSearch = ''"
+                    matTooltip="Clear">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </mat-form-field>
+
+                <div class="pv-search-hint" *ngIf="participantsPopupSearch.trim()">
+                  <mat-icon>filter_alt</mat-icon>
+                  <span>
+                    {{ filteredParticipantsPopup.length }} of
+                    {{ participantsPopupProfiles.length }} participant(s) shown
+                  </span>
+                </div>
+              </div>
+
+              <div class="pv-body">
+                <ng-container *ngIf="filteredParticipantsPopup.length > 0; else pvEmpty">
+                  <div class="pv-row" *ngFor="let p of filteredParticipantsPopup">
+                    <span class="pv-num">{{ p.index }}</span>
+                    <mat-icon class="pv-person-icon">person</mat-icon>
+                    <span class="pv-name">{{ p.name }}</span>
+                  </div>
+                </ng-container>
+                <ng-template #pvEmpty>
+                  <div class="pv-empty">
+                    <mat-icon>search_off</mat-icon>
+                    <p *ngIf="participantsPopupSearch.trim()">
+                      No results for "{{ participantsPopupSearch }}"
+                    </p>
+                    <p *ngIf="!participantsPopupSearch.trim()">
+                      No participants found
+                    </p>
+                  </div>
+                </ng-template>
+              </div>
+
+            </div>
           </div>
         </div>
       </mat-tab>
@@ -845,6 +1045,7 @@
           <app-create-segments-dialog></app-create-segments-dialog>
         </div>
       </mat-tab>
+
     </mat-tab-group>
   </div>
 </div>

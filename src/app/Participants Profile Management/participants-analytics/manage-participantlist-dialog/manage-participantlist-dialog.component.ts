@@ -13,7 +13,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatBadgeModule } from '@angular/material/badge';
-import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, getDoc, setDoc, where} from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, getDoc, setDoc, where, orderBy, limit} from '@angular/fire/firestore';
 import { MatOption, MatSelectModule } from "@angular/material/select";
 import { MatTabGroup, MatTab } from "@angular/material/tabs";
 import { CreateSegmentsDialogComponent } from "../create-segments-dialog/create-segments-dialog.component";
@@ -21,6 +21,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatOptionModule } from '@angular/material/core';
 import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 import {  MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { AuthguardService } from '../../../authguard.service';
+import { ActivatedRoute } from '@angular/router';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
 
 interface Profile {
   id: string;
@@ -80,7 +84,9 @@ interface ListConflictSummary {
     FormsModule,
     CreateSegmentsDialogComponent,
     ProfilePictureComponent,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    MatDatepickerModule,
+    MatNativeDateModule
   ],
   templateUrl: './manage-participantlist-dialog.component.html',
   styleUrls: ['./manage-participantlist-dialog.component.css']
@@ -90,7 +96,25 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   private firestore = inject(Firestore);
   private fb = inject(FormBuilder);
   private snackBar = inject(MatSnackBar);
-  private dialog = inject(MatDialog);
+  private _groupedCache: { date: string; logs: any[] }[] = [];
+  private _groupedCacheKey = '';
+  // participant list logs states
+  historyPanelOpen = false;
+  logs: any[] = [];
+  logsLoading = false;
+  logsPage = 0;
+  logsPageSize = 15;
+  historySearchTerm = '';
+  historyFilter = 'all';
+  filteredLogs: any[] = [];
+  historyDateStart: Date | null = null;
+  historyDateEnd: Date | null = null;
+  mapUsers: Record<string, string> = {};
+  showParticipantsPopup = false;
+  participantsPopupProfiles: { index: number; name: string }[] = [];
+
+
+
 
   // Table columns
   displayedColumns: string[] = ['listname', 'participants', 'liveStatus', 'actions'];
@@ -147,12 +171,31 @@ export class ManageParticipantlistDialogComponent implements OnInit {
    
   // mergeconflictpopup state
   showMergeConflictPopup = false;
-
+  loggedInUser: any = null
+  reviewAccess: boolean = false;
+  submissionAccess: boolean = false;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
     public dialogRef: MatDialogRef<ManageParticipantlistDialogComponent>,
+    private auth: AuthguardService,
+    private route: ActivatedRoute,
   ) {
+    this.auth.getRoles().then(async roles => {
+      if (roles["ah"] || roles["admin"] || roles["developer"]) {
+        this.reviewAccess = true;
+      }
+      else {
+        this.reviewAccess = false;
+      }
+      if (roles['profile_ref'].id === this.route.snapshot.queryParams['profileid']) {
+        this.submissionAccess = true
+      } else {
+        this.submissionAccess = false
+      }
+      this.loggedInUser = roles['profile_ref'].id
+      console.log("profileid from url", this.loggedInUser);
+    })
 
     this.createListForm = this.fb.group({
       listname: ['', [Validators.required, Validators.minLength(3)]]
@@ -193,15 +236,352 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadData();
+  this.loadData();
+}
+
+  // get list log
+
+onViewParticipants(event : any, log: any): void {
+  console.log('i have been clicked')
+  // event.stopPropagation();
+  // event.preventDefault();
+
+  const rawIds = this.getLogProfiles(log);
+  this.participantsPopupProfiles = rawIds.map((pid: string, i: number) => ({
+    index: i + 1,
+    name: this.getProfileName(pid) || pid
+  }));
+
+  this.showParticipantsPopup = true;
+}
+
+participantsPopupSearch = '';
+
+get filteredParticipantsPopup() {
+  const term = this.participantsPopupSearch.trim().toLowerCase();
+  if (!term) return this.participantsPopupProfiles;
+  return this.participantsPopupProfiles.filter(p =>
+    p.name.toLowerCase().includes(term)
+  );
+}
+
+getLogProfiles(log: any): string[] {
+  const meta = log?.metadata || {};
+  const ids =
+    meta?.current?.added_profiles   ||
+    meta?.current?.profilelist       ||
+    meta?.previous?.profilelist      ||
+    [];
+  return Array.isArray(ids) ? ids.filter((id: string) => !!id) : [];
+}
+
+
+  get totalLogPages() {
+    return Math.ceil(this.logs.length / this.logsPageSize);
+  }
+
+  toggleHistoryPanel() {
+    console.log("toggle calling")
+    this.historyPanelOpen = !this.historyPanelOpen;
+    if (this.historyPanelOpen && this.logs.length === 0) {
+      this.loadLogs();
+    }
+  }
+
+  closeParticipantsPopup(): void {
+  this.showParticipantsPopup = false;
+  this.participantsPopupProfiles = [];
+  this.participantsPopupSearch = ''; 
+}
+
+  async loadLogs() {
+  this.logsLoading = true;
+  this.logsPage = 0;
+  try {
+    const q = query(
+      collection(this.firestore, 'participant_list_log'),
+      orderBy('created_date', 'desc'),
+      limit(200)
+    );
+    console.log("log data console")
+    const snap = await getDocs(q);
+    this.logs = snap.docs
+      .map(d => d.data())
+      .filter(d => d?.['type'] === 'list');  
+    this.filteredLogs = [...this.logs];
+    console.log('Loaded logs:', this.logs.length);
+  } catch(e) {
+    console.error('loadLogs error:', e);
+  } finally {
+    this.logsLoading = false;
+  }
+}
+
+setHistoryFilter(f: string): void {
+  this.historyFilter = f;
+  this.logsPage = 0;
+  this.applyHistoryFilter();
+}
+
+applyHistoryFilter(): void {
+  const term = this.historySearchTerm.trim().toLowerCase();
+
+  let endDate: Date | null = null;
+  if (this.historyDateEnd) {
+    endDate = new Date(this.historyDateEnd);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  this.filteredLogs = this.logs.filter(log => {
+    const typeMatch =
+      this.historyFilter === 'all' || log.action_type === this.historyFilter;
+
+    let dateMatch = true;
+    if (this.historyDateStart || endDate) {
+      const logDate: Date = log.created_date?.toDate?.() ?? new Date(0);
+      if (this.historyDateStart && logDate < this.historyDateStart) dateMatch = false;
+      if (endDate && logDate > endDate) dateMatch = false;
+    }
+
+    let textMatch = true;
+    if (term) {
+      const desc: string = (
+        log.metadata?.description ||
+        log.metadata?.current?.description || ''
+      ).toLowerCase();
+
+      const listName: string = (
+        log.metadata?.current?.listname ||
+        log.metadata?.previous?.listname || ''
+      ).toLowerCase();
+
+      const profileIds: string[] = [
+        ...(log.metadata?.current?.profilelist    || []),
+        ...(log.metadata?.previous?.profilelist   || []),
+        ...(log.metadata?.current?.added_profiles || []),
+      ];
+      const profileNamesMatch = profileIds.some(id =>
+        this.getProfileName(id).toLowerCase().includes(term)
+      );
+
+      textMatch = desc.includes(term) || listName.includes(term) || profileNamesMatch;
+    }
+
+    return typeMatch && dateMatch && textMatch;
+  });
+
+  this.logsPage = 0;
+}
+
+getLogCountByType(type: string): number {
+  const term = this.historySearchTerm.trim().toLowerCase();
+
+  let endDate: Date | null = null;
+  if (this.historyDateEnd) {
+    endDate = new Date(this.historyDateEnd);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  return this.logs.filter(log => {
+    if (log.action_type !== type) return false;
+
+    let dateMatch = true;
+    if (this.historyDateStart || endDate) {
+      const logDate: Date = log.created_date?.toDate?.() ?? new Date(0);
+      if (this.historyDateStart && logDate < this.historyDateStart) dateMatch = false;
+      if (endDate && logDate > endDate) dateMatch = false;
+    }
+
+    let textMatch = true;
+    if (term) {
+      const desc: string = (
+        log.metadata?.description ||
+        log.metadata?.current?.description || ''
+      ).toLowerCase();
+      const listName: string = (
+        log.metadata?.current?.listname ||
+        log.metadata?.previous?.listname || ''
+      ).toLowerCase();
+      const profileIds: string[] = [
+        ...(log.metadata?.current?.profilelist    || []),
+        ...(log.metadata?.previous?.profilelist   || []),
+        ...(log.metadata?.current?.added_profiles || []),
+      ];
+      const profileNamesMatch = profileIds.some(id =>
+        this.getProfileName(id).toLowerCase().includes(term)
+      );
+      textMatch = desc.includes(term) || listName.includes(term) || profileNamesMatch;
+    }
+
+    return dateMatch && textMatch;
+  }).length;
+}
+
+trackByDate(index: number, group: { date: string; logs: any[] }): string {
+  return group.date;
+}
+
+trackByLog(index: number, log: any): string {
+  return log.doc_id || index;
+}
+
+get groupedPagedLogs(): { date: string; logs: any[] }[] {
+  const paged = this.pagedFilteredLogs;
+  const key = `${this.logsPage}-${this.filteredLogs.length}-${paged.length}-${paged[0]?.doc_id ?? ''}`;
+
+  if (key === this._groupedCacheKey) {
+    return this._groupedCache;
+  }
+
+  this._groupedCacheKey = key;
+  const groups: { date: string; logs: any[] }[] = [];
+  let currentDate = '';
+
+  for (const log of paged) {
+    const d = log.created_date?.toDate?.();
+    const label = d ? this.formatDateLabel(d) : 'Unknown date';
+    if (label !== currentDate) {
+      currentDate = label;
+      groups.push({ date: label, logs: [] });
+    }
+    groups[groups.length - 1].logs.push(log);
+  }
+
+  this._groupedCache = groups;
+  return this._groupedCache;
+}
+
+getFilteredCountForAll(): number {
+  const term = this.historySearchTerm.trim().toLowerCase();
+
+  let endDate: Date | null = null;
+  if (this.historyDateEnd) {
+    endDate = new Date(this.historyDateEnd);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  if (!term && !this.historyDateStart && !endDate) return this.logs.length;
+
+  return this.logs.filter(log => {
+    let dateMatch = true;
+    if (this.historyDateStart || endDate) {
+      const logDate: Date = log.created_date?.toDate?.() ?? new Date(0);
+      if (this.historyDateStart && logDate < this.historyDateStart) dateMatch = false;
+      if (endDate && logDate > endDate) dateMatch = false;
+    }
+
+    let textMatch = true;
+    if (term) {
+      const desc = (log.metadata?.description || log.metadata?.current?.description || '').toLowerCase();
+      const listName = (log.metadata?.current?.listname || log.metadata?.previous?.listname || '').toLowerCase();
+      const profileIds: string[] = [
+        ...(log.metadata?.current?.profilelist    || []),
+        ...(log.metadata?.previous?.profilelist   || []),
+        ...(log.metadata?.current?.added_profiles || []),
+      ];
+      const profileNamesMatch = profileIds.some(id =>
+        this.getProfileName(id).toLowerCase().includes(term)
+      );
+      textMatch = desc.includes(term) || listName.includes(term) || profileNamesMatch;
+    }
+
+    return dateMatch && textMatch;
+  }).length;
+}
+
+getUserName(userId: string): string {
+  if (!userId) return '—';
+  return this.mapUsers[userId] || userId;
+}
+
+get pagedFilteredLogs(): any[] {
+  const start = this.logsPage * this.logsPageSize;
+  return this.filteredLogs.slice(start, start + this.logsPageSize);
+}
+
+formatDateLabel(d: Date): string {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const fmt = (dt: Date) => dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (d.toDateString() === today.toDateString()) return `Today · ${fmt(d)}`;
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday · ${fmt(d)}`;
+  return fmt(d);
+}
+
+getLogItemClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'hp-item-created',
+    delete: 'hp-item-deleted',
+    edit: 'hp-item-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogIconClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'log-icon-created', delete: 'log-icon-deleted', edit: 'log-icon-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogBadgeClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'badge-created', delete: 'badge-deleted', edit: 'badge-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogExpandClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'expand-created', edit: 'expand-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogExpandLabelClass(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'expand-label-created', edit: 'expand-label-edited'
+  };
+  return map[actionType] ?? '';
+}
+
+getLogLabel(actionType: string): string {
+  const map: Record<string, string> = {
+    create: 'Created', delete: 'Deleted', edit: 'Edited'
+  };
+  return map[actionType] ?? actionType;
+}
+
+scrollLogTop(): void {
+  document.querySelector('.hp-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+  getLogIcon(actionType: string): string {
+    const map: Record<string, string> = {
+      edit: 'edit',
+      create: 'add_circle',
+      delete: 'delete'
+    };
+    return map[actionType] ?? 'history';
   }
 
   async loadData(): Promise<void> {
     this.loading = true;
     try {
       await this.loadAllProfiles();
+      try {
+        const usersSnap = await getDocs(collection(this.firestore, 'profile_data'));
+        usersSnap.forEach(d => {
+          const data = d.data() as any;
+          const name = data['name'] || data['email'] || d.id;
+          if (data['profileid']) this.mapUsers[data['profileid']] = name;
+          this.mapUsers[d.id] = name;
+        });
+      } catch (e) {
+        console.warn('Could not load users for name resolution', e);
+      }
       await this.loadParticipantLists();
-      // Initialize filtered list with all data
       this.filteredParticipantLists = [...this.participantLists];
       await this.computeLiveSegmentConflicts();
     } catch (error) {
@@ -523,6 +903,21 @@ export class ManageParticipantlistDialogComponent implements OnInit {
       };
 
       await setDoc(listsRef, listData);
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'create',
+        created_date: new Date(),
+        type: 'list',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'participant list', listsRef.id),
+        metadata: {
+          current: { listname: listData.listname, profilelist: listData.profilelist, live: false },
+          description: `Created participant list "${listData.listname}" with ${listData.profilelist.length} profile(s).`
+        }
+      });
+      console.log("activity log added")
 
       this.snackBar.open(
         `Participant list "${formValue.listname}" created successfully with ${this.externalProfileIds.length} profile(s)!`,
@@ -534,7 +929,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
       this.showCreateForm = false;
       this.isListNameDuplicate = false;
       await this.loadParticipantLists();
-            await this.computeLiveSegmentConflicts();
+      await this.computeLiveSegmentConflicts();
       // Re-apply filter if active
       if (this.isFiltering) {
         this.applyFilter(this.filterForm.value);
@@ -564,6 +959,22 @@ export class ManageParticipantlistDialogComponent implements OnInit {
       await updateDoc(doc(this.firestore, 'participant list', list.docid), {
         live: newLiveValue,
         updateddate: new Date()
+      });
+
+      // add  activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'list',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'participant list', list.docid),
+        metadata: {
+          previous: { live: list.live },
+          current: { live: newLiveValue },
+          description: `Changed live status of "${list.name}" from ${list.live} to ${newLiveValue}.`
+        }
       });
 
       list.live = newLiveValue;
@@ -640,10 +1051,28 @@ export class ManageParticipantlistDialogComponent implements OnInit {
 
     this.updatingList = true;
     try {
+      const previousProfileIds = [...(this.selectedList.profileids || [])];
+      const removedProfile = this.allProfiles.find(p => p.id === profileId);
       // Update participant list document
       await updateDoc(doc(this.firestore, 'participant list', this.selectedList.docid), {
         profilelist: arrayRemove(profileId),
         updateddate: new Date()
+      });
+
+      // Add to activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'list',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'participant list', this.selectedList.docid),
+        metadata: {
+          previous: { profilelist: previousProfileIds },
+          current: { profilelist: previousProfileIds.filter(id => id !== profileId) },
+          description: `Removed profile "${removedProfile?.name || profileId}" from list "${this.selectedList.name}".`
+        }
       });
 
       this.snackBar.open('Profile removed successfully', 'Close', { duration: 3000 });
@@ -826,6 +1255,23 @@ private async executeMerge(
           }
         })
       );
+
+      // add activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'list',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'participant list', list.docid),
+        metadata: {
+          current: { added_profiles: profileIdsToMerge.map(p => p['profileid'] || p) },
+          description: `Merged ${profileIdsToMerge.length} profile(s) into list "${list.name}".`
+        }
+      });
+      console.log("activity log added")
+
  
       this.snackBar.open(
         `Removed ${conflictsToRemove.length} participant(s) from their previous live segment list(s).`,
@@ -848,6 +1294,22 @@ private async executeMerge(
         updateddate: new Date()
       });
     }
+
+    // add activity log
+    const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'edit',
+        created_date: new Date(),
+        type: 'list',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'participant list', list.docid),
+        metadata: {
+          current: { added_profiles: profileIdsToMerge.map(p => p['profileid'] || p) },
+          description: `Merged ${profileIdsToMerge.length} profile(s) into list "${list.name}".`
+        }
+      });
+      console.log("activity log added")
  
     this.snackBar.open(
       `Successfully merged ${profileIdsToMerge.length} profile(s) into "${list.name}"`,
@@ -945,8 +1407,25 @@ toggleAllMergeConflicts(event: Event): void {
         }
       }
 
+      const previousData = { listname: list.name, profilelist: [...list.profileids], live: list.live ?? false };
+
       // Delete participant list document
       await deleteDoc(doc(this.firestore, 'participant list', list.docid));
+
+      // Add to activity log
+      const activityDocId = doc(collection(this.firestore, 'participant_list_log')).id;
+      await setDoc(doc(this.firestore, 'participant_list_log', activityDocId), {
+        doc_id: activityDocId,
+        action_type: 'delete',
+        created_date: new Date(),
+        type: 'list',
+        edited_by: this.loggedInUser,
+        referals: doc(this.firestore, 'participant list', list.docid),
+        metadata: {
+          previous: previousData,
+          description: `Deleted participant list "${list.name}".`
+        }
+      });
 
       this.snackBar.open('Participant list deleted successfully', 'Close', { duration: 3000 });
 
