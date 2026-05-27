@@ -1170,6 +1170,16 @@ export class AuthguardService {
     }
   }
 
+  async initializeSalescrm() {
+    var credential = {}
+    if(environment["salescrm"]){
+      credential = environment["salescrm"]
+      if (getApps().filter(e => e.name == "salescrm").length == 0) {
+        initializeApp(credential, 'salescrm');
+      }
+    }
+  }
+
   async moveQueueStage(formref, videoask) {
     let currentStage = this.profileJourneyProduct["queuemode"]["currentstage"];
     let currentIndex = this.profileJourneyProduct["queuestages"].indexOf(currentStage);

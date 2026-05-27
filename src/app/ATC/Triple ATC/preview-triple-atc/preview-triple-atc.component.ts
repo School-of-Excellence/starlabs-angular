@@ -36,19 +36,19 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
   loading = false;
   atcid: string;
   atcData: any = null;
-  
+
   // Subscriptions
   atcSubscription: Subscription;
   adjustmentSubscription: Subscription;
   procedureSubscription: Subscription;
   roleSubscription: Subscription;
-  
+
   // Metadata
   profileMap: any = {};
   procedureMap: any = {};
-  
+
   mentorProfileid: string[] = [];
-  
+
   // Processed data
   tripleatclist: any[] = [];
   transcriptionData: any[] = [];
@@ -126,7 +126,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
 
   async fetchATCData(): Promise<void> {
     this.loading = true;
-    
+
     const atcDocRef = doc(this.firestoreATC, 'triple atc', this.atcid);
     this.atcSubscription = docData(atcDocRef).subscribe(async (data) => {
       if (data) {
@@ -142,10 +142,10 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
 
   async fetchTranscriptions(): Promise<void> {
     const adjCollection = collection(this.firestoreATC, 'triple atc', this.atcid, 'corrections');
-    
+
     this.adjustmentSubscription = collectionSnapshots(adjCollection).subscribe(async (adjustments) => {
       this.transcriptionData = [];
-      
+
       for (const adjustmentDoc of adjustments) {
         const adjustmentData = adjustmentDoc.data();
         const transcription: any = {
@@ -178,18 +178,18 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
             }
           }
         });
-        
+
         this.transcriptionData.push(transcription);
       }
       console.log(this.transcriptionData);
-      
+
       this.organizeTripleATCList();
     });
   }
 
   organizeTripleATCList(): void {
     this.tripleatclist = [];
-    
+
     if (this.atcData['perceptualposition']) {
       for (const position of this.atcData['perceptualposition']) {
         this.tripleatclist.push({
@@ -215,7 +215,13 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
 
   editATC(): void {
     const url = this.router.serializeUrl(
-      this.router.createUrlTree(['/edittripleATC/' + this.atcid])
+      this.router.createUrlTree(['/edittripleATC/' + this.atcid], {
+        queryParams: {
+          marathonid: this.marathonId,
+          assignmentid: this.assignmentId,
+          participantassignmentid: this.participantAssignmentId
+        }
+      })
     );
     window.open(url, '_blank');
   }
@@ -228,10 +234,10 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
     if (this.actionNotes != '') {
       console.log('Rework clicked', this.actionNotes);
       const notes = this.actionNotes;
-      const activityref = doc(this.firestoreDefault, "bigformassignment", this.participantAssignmentId);
+      // const activityref = doc(this.firestoreATC, 'triple atc', this.atcid);
       const activitylog = [
         {
-          activityreference: activityref,
+          activityreference: this.atcid,
           notes,
           reviewdate: new Date(),
           reviewer: this.loggedInProfileId
@@ -243,7 +249,7 @@ export class PreviewTripleATCComponent implements OnInit, OnDestroy {
         return updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
           activitylog: updatedActivityLog,
           status: "rework",
-          activityref: doc(this.firestoreATC, 'triple atc', this.atcid)
+          activityref: this.atcid
         });
       }).then(() => {
         console.log("New activity log added");
