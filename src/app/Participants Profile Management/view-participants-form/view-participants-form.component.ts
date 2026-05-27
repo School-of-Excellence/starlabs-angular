@@ -75,7 +75,7 @@ export class ViewParticipantsFormComponent {
   selectedQueue: any = [];
   selectedForm: any = [];
   formnamelist: any[] = [];
-  participantList: any[] = [];  
+  participantList: any[] = [];
   filterForm: FormGroup;
   workshopList: any[] = [];
   workshopListNew: any[] = [];
@@ -88,14 +88,14 @@ export class ViewParticipantsFormComponent {
   queueFilterCtrl = new FormControl<string>('');
   workshopFilterCtrl = new FormControl<string>('');
   formFilterCtrl = new FormControl<string>('');
-  participantFilterCtrl = new FormControl<string>('');  
+  participantFilterCtrl = new FormControl<string>('');
 
 
   // Filtered lists
   filteredQueueList: any[] = [];
   filteredCombinedWorkshopList: any[] = [];
   filteredFormList: any[] = [];
-  filteredParticipantList: any[] = [];  
+  filteredParticipantList: any[] = [];
   private combinedWorkshopList: any[] = [];
   importedMatchedProfileIds: string[] = [];
 
@@ -126,7 +126,7 @@ export class ViewParticipantsFormComponent {
 
   importedEmails: string[] = [];
   showImportedEmailsFilter = false;
-  profileEmailMap: any = {};  
+  profileEmailMap: any = {};
 
   //Email import results tracking
   matchedEmailsCount: number = 0;
@@ -264,7 +264,7 @@ export class ViewParticipantsFormComponent {
     this.queueFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterQueues());
     this.workshopFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterWorkshops());
     this.formFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterForms());
-    this.participantFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterParticipants());  
+    this.participantFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterParticipants());
 
   }
 
@@ -350,7 +350,7 @@ export class ViewParticipantsFormComponent {
     const formsByClientQuery = query(formsByClientCollRef, where('date', '>', this.startDate), where('date', '<', this.endDate), orderBy('date', 'desc'));
     collectionData(formsByClientQuery).pipe(takeUntil(this.destroy$)).subscribe(async formsnap => {
       this.participantForm = formsnap;
-      this.buildParticipantList();  
+      this.buildParticipantList();
       this.ngAfterViewInit(this.participantForm);
       this.selection.clear();
       loadingRef.close();
@@ -465,27 +465,27 @@ export class ViewParticipantsFormComponent {
     if (!file) return;
 
     const reader = new FileReader();
-    
+
     reader.onload = (e: any) => {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        
+
         // Read first sheet
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-        
+
         // Find Email column index
         const headers = jsonData[0] as string[];
-        const emailColumnIndex = headers.findIndex(h => 
+        const emailColumnIndex = headers.findIndex(h =>
           h && h.toString().toLowerCase().trim() === 'email'
         );
-        
+
         if (emailColumnIndex === -1) {
           alert('No "Email" column found in the file. Please ensure your file has an "Email" column.');
           return;
         }
-        
+
         // Extract emails (skip header row)
         const emails: string[] = [];
         for (let i = 1; i < jsonData.length; i++) {
@@ -495,27 +495,27 @@ export class ViewParticipantsFormComponent {
             emails.push(email.toString().toLowerCase().trim());
           }
         }
-        
+
         if (emails.length === 0) {
           alert('No emails found in the file.');
           return;
         }
-        
+
         this.importedEmails = emails;
         this.showImportedEmailsFilter = true;
         this.applyImportedEmailsFilter();
-        
+
         alert(`Successfully imported ${emails.length} email(s).`);
-        
+
         // Reset file input
         event.target.value = '';
-        
+
       } catch (error) {
         console.error('Error reading file:', error);
         alert('Error reading file. Please ensure it is a valid Excel or CSV file.');
       }
     };
-    
+
     reader.readAsArrayBuffer(file);
   }
 
@@ -599,7 +599,7 @@ export class ViewParticipantsFormComponent {
   // ==========================================
   onFormPreview(form: any) {
     let path = doc(this.firestoreForms, "formsByClient", form['docid']).path;
-    const url = this.router.createUrlTree(['/formtemplate'], { queryParams: { id: form.formid, type: 'form', patchdata: path } });
+    const url = this.router.createUrlTree(['/formtemplate'], { queryParams: { id: form.formid, type: 'form', patchdata: path, viewFilledForm: 'true' } });
     window.open(url.toString(), '_blank');
   }
 

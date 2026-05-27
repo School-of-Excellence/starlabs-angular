@@ -121,6 +121,7 @@ export class ParticipantAssignmentBoardComponent {
       for (let i = 0; i < assignmentSnap.length; i++) {
         const element = assignmentSnap[i].data();
         const docId = assignmentSnap[i].id;
+        element['docid'] = docId;
         this.mapAssignments[docId] = element;
       }
 
@@ -211,12 +212,16 @@ export class ParticipantAssignmentBoardComponent {
 
         const activity = {
           ...this.mapAssignments[assignmentId],
+          docid: assignmentId,
           participantAssignmentId: participantAssignment['docid'],
           profileId: participantAssignment['profileid'],
           activityref: participantAssignment['activityref'],
-          formtemplate: participantAssignment['formtemplate'],
-          summary: participantAssignment['summary'],
-          activityLog: participantAssignment['activitylog'] || [],
+          formtemplate: participantAssignment['formtemplate'] ?? this.mapAssignments[assignmentId]?.['selectedform'],
+          summary: this.normalizeToArray(participantAssignment['summary']),
+          activityLog: (participantAssignment['activitylog'] || []).map(log => ({  // ← add this
+            ...log,
+            notes: this.normalizeToArray(log['notes'])
+          })),
           originalStatus: participantAssignment['status'],
           atcdocid:participantAssignment['atcdocid']
         };
@@ -227,6 +232,12 @@ export class ParticipantAssignmentBoardComponent {
       this.categorizeActivities(selectedMarathon['marathonref'].id);
       this.applyStatusFilter("myactivities");
     });
+  }
+
+  normalizeToArray(value: any): any[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    return [value];
   }
 
   categorizeActivities(marathonId: string) {
@@ -395,7 +406,7 @@ export class ParticipantAssignmentBoardComponent {
   }
 
   performAction(activity: any,activityDate:boolean) {
-    console.log(activity,"activity");
+    // console.log(activity,"activity");
     if (activity.originalStatus === 'sent') {
       let confirmend = confirm(' Are you sure want to accept the Activity');
       if(confirmend){
@@ -566,7 +577,7 @@ export class ParticipantAssignmentBoardComponent {
   reviewLastForm(activity: any){
     console.log(activity);
 
-    const formtemplateid = activity.formtemplate;
+    const formtemplateid = activity.formtemplate ?? activity.selectedform;
     const profileId = activity.profileId;
     const activityref = activity.activityref;
     const summary = activity.summary;
@@ -741,12 +752,18 @@ export class ParticipantAssignmentBoardComponent {
     window.open(url, '_blank');
   }
 
-  editTripleATC(activity){
-    console.log(activity);
-    const url = this.router.createUrlTree(['/edittripleATC/' + activity.activityref.id], {
+  editTripleATC(activity) {
+    const atcDocId = activity.activityref?.id ?? activity.activityref ?? activity.atcdocid;
+
+    if (!atcDocId) {
+      this.openSnackBar('No ATC submission found to edit.', 'OK');
+      return;
+    }
+
+    const url = this.router.createUrlTree(['/edittripleATC/' + atcDocId], {
       queryParams: {
         type: 'validation',
-        atcdocid:activity.activityref.id,
+        atcdocid: atcDocId,
         profileid: this.currentProfile['profileid'],
         marathonid: activity.marathonref.id,
         assignmentid: activity.docid,
@@ -758,11 +775,17 @@ export class ParticipantAssignmentBoardComponent {
 
 
   previewTripleATC(activity) {
-    console.log(activity);
+    const atcDocId = activity.activityref?.id ?? activity.activityref ?? activity.atcdocid;
+
+    if (!atcDocId) {
+      this.openSnackBar('No ATC submission found.', 'OK');
+      return;
+    }
+
     const url = this.router.createUrlTree(['/previewtripleATC'], {
       queryParams: {
         type: 'validation',
-        atcdocid:activity.activityref.id,
+        atcdocid: atcDocId,
         validation: true,
         profileid: this.currentProfile['profileid'],
         marathonid: activity.marathonref.id,

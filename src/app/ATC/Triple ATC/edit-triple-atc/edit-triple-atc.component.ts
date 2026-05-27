@@ -191,7 +191,7 @@ export class EditTripleATCComponent implements OnDestroy {
     route.queryParams.subscribe((data)=>{
       this.marathonId = data['marathonid']
       this.assignmentId = data['assignmentid']
-      this.participantAssignmentId = data['participantassignmentid'] 
+      this.participantAssignmentId = data['participantassignmentid']
     });
   }
 
@@ -337,19 +337,19 @@ export class EditTripleATCComponent implements OnDestroy {
               }
               this.reportATC.transcription[i].procedure[j].assigned_to = agentList
             }
-            for (let a = 0; a < atcDocData["perceptualposition"].length; a++) {
-              const position = atcDocData["perceptualposition"][a];
-              if (this.tripleATC[a] == null || this.tripleATC[a] == undefined) {
-                this.tripleATC.push({
-                  position: position,
-                  atc: this.reportATC.transcription.filter(e => e.perceptualposition == position)
-                })
-              }
-              else {
-                this.tripleATC[a]["atc"] = this.reportATC.transcription.filter(e => e.perceptualposition == position)
-              }
-            }
             if (totalProcedureRead == adjustment.size) {
+              for (let a = 0; a < atcDocData["perceptualposition"].length; a++) {
+                const position = atcDocData["perceptualposition"][a];
+                if (this.tripleATC[a] == null || this.tripleATC[a] == undefined) {
+                  this.tripleATC.push({
+                    position: position,
+                    atc: this.reportATC.transcription.filter(e => e.perceptualposition == position)
+                  })
+                }
+                else {
+                  this.tripleATC[a]["atc"] = this.reportATC.transcription.filter(e => e.perceptualposition == position)
+                }
+              }
               this.getATCoptions()
             }
           })
@@ -953,7 +953,7 @@ export class EditTripleATCComponent implements OnDestroy {
           // var assignlevel = {}
           for (let a = 0; a < this.newTranscription[i].procedure[j].assigned_to.length; a++) {
             assignref.push(doc(this.firestoreATC, this.newTranscription[i].procedure[j].assigned_to[a]))
-            // assignlevel[this.newTranscription[i].procedure[j].assigned_to[a].split('/')[1]] = this.levelMap[this.newTranscription[i].procedure[j].assigned_to[a]]             
+            // assignlevel[this.newTranscription[i].procedure[j].assigned_to[a].split('/')[1]] = this.levelMap[this.newTranscription[i].procedure[j].assigned_to[a]]
             if (!adjAgent.includes(this.newTranscription[i].procedure[j].assigned_to[a].split('/')[1])) {
               adjAgent.push(this.newTranscription[i].procedure[j].assigned_to[a].split('/')[1])
             }
@@ -991,11 +991,13 @@ export class EditTripleATCComponent implements OnDestroy {
       }
     }
     await batchATC.commit().then(async () => {
-      await updateDoc(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId), {
-        status: 'review',
-        activityref: doc(this.firestoreDefault, finalCollection, this.atcnewid),
-        atcdocid: this.atcnewid
-      });
+      if (this.bigActivity()){
+        await updateDoc(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId), {
+          status: 'review',
+          activityref: doc(this.firestoreDefault, finalCollection, this.atcnewid),
+          atcdocid: this.atcnewid
+        });
+      }
       this.completed(doc(this.firestoreATC, finalCollection, this.atcnewid))
     }).catch(err => {
       console.log(err)
