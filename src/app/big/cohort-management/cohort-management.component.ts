@@ -2460,8 +2460,11 @@ export class CohortManagementComponent {
     const { CohortDetailComponent } = await import('../cohort-detail/cohort-detail.component');
     this.dialog.open(CohortDetailComponent, {
       width: '100vw',
+      maxWidth: '100vw',
       height: '100vh',
-      panelClass: 'cohort-detail-dialog',
+      maxHeight: '100vh',
+      panelClass: ['cohort-detail-dialog', 'cohort-detail-dialog-fullscreen'],
+      hasBackdrop: false,
       autoFocus: false,
       data: {
         cohort: cohorts,

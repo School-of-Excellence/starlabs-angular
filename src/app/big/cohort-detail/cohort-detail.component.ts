@@ -91,10 +91,27 @@ export class CohortDetailComponent  implements OnDestroy {
 
   // Derived
   participantRows: ParticipantRow[] = [];
-  contentTab: 'participants' | 'activities' | 'studios' | 'comms' =
-    'participants';
+  contentTab: 'studios' | 'participants' | 'activities' | 'comms' = 'studios';
   ownerList: string[] = [];
   selectedOwner: string = '';
+
+  // Studios tab UI state
+  studioGroupFilter: Set<string> = new Set<string>(); // selected group codes (uP! / LYL / B!G). Empty = all.
+  studioUnassignedSearch: string = '';
+  /** docids of expanded studio cards (the chevron toggles entry presence). */
+  studioExpanded: Set<string> = new Set<string>();
+
+  toggleStudioExpanded(studio: any, event?: Event) {
+    if (event) event.stopPropagation();
+    const sid = studio?.docid || studio?.id;
+    if (!sid) return;
+    if (this.studioExpanded.has(sid)) this.studioExpanded.delete(sid);
+    else this.studioExpanded.add(sid);
+  }
+  isStudioExpanded(studio: any): boolean {
+    const sid = studio?.docid || studio?.id;
+    return !!sid && this.studioExpanded.has(sid);
+  }
 
   loading: boolean = false;
   isDialogMode: boolean = false;
@@ -315,6 +332,296 @@ export class CohortDetailComponent  implements OnDestroy {
     return !!this.mapLiveParticipants?.[participantId];
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // Studios — UI helpers (match standalone "Studio" tab design)
+  // ════════════════════════════════════════════════════════════════
+
+  /** Filtered list of studios (applies group filter pills). */
+  getFilteredStudios(): any[] {
+    const all = this.getCohortStudios() || [];
+    if (this.studioGroupFilter.size === 0) return all;
+    return all.filter((s: any) => this.studioGroupFilter.has(this.getStudioGroupCode(s)));
+  }
+
+  /** All possible group codes (uP! / LYL / B!G) discovered across studios. */
+  getStudioGroupCodes(): string[] {
+    const codes = new Set<string>();
+    (this.getCohortStudios() || []).forEach((s: any) => {
+      const c = this.getStudioGroupCode(s);
+      if (c) codes.add(c);
+    });
+    return Array.from(codes).sort();
+  }
+
+  /** Studio code shown in card header (S 01, S 02 …). */
+  getStudioCode(studio: any, indexFallback?: number): string {
+    const raw = studio?.studioname || studio?.name || '';
+    const m = String(raw).match(/(?:^|[\s\-_#])S?\s*(\d{1,3})/i);
+    if (m && m[1]) return `S ${m[1].padStart(2, '0')}`;
+    if (typeof indexFallback === 'number') return `S ${String(indexFallback + 1).padStart(2, '0')}`;
+    return raw || 'Studio';
+  }
+
+  /** Group code derived from studio name / stage (uP!, LYL, B!G). */
+  getStudioGroupCode(studio: any): string {
+    const src = `${studio?.studioname || ''} ${studio?.name || ''} ${studio?.stagename || ''} ${studio?.studioData?.stagename || ''}`.toUpperCase();
+    if (src.includes('UP!') || /\bUP\b/.test(src)) return 'uP!';
+    if (src.includes('LYL')) return 'LYL';
+    if (src.includes('B!G') || /\bBIG\b/.test(src)) return 'B!G';
+    return '';
+  }
+
+  /** True if studio currently has any live activity. */
+  isStudioLive(studio: any): boolean {
+    const sid = studio?.docid || studio?.id;
+    return !!sid && !!this.mapLiveAssignmentByStudio?.[sid];
+  }
+
+  /** All participant IDs paired into this studio. */
+  getStudioParticipantIds(studio: any): string[] {
+    const arr: any[] = studio?.pairing || studio?.specialistpairing || studio?.participants || [];
+    return (arr || []).filter((x: any) => !!x);
+  }
+
+  /** Activity label for a participant inside a studio (from participantsactivity map). */
+  getStudioParticipantActivity(studio: any, pid: string): string {
+    const activityId = studio?.['participantsactivity']?.[pid];
+    if (!activityId) return '';
+    const m = this.bigActivityMap as any;
+    return m?.[activityId]?.['activity'] || activityId;
+  }
+
+  /** Split a studio's participants into SPECIALIST / WORKING WITH / MENTOR / SHADOWING buckets. */
+  getStudioRoles(studio: any): {
+    specialists: string[],
+    workingWith: string[],
+    mentors: string[],
+    shadowing: string[],
+  } {
+    const ids = this.getStudioParticipantIds(studio);
+    const specialists: string[] = [];
+    const workingWith: string[] = [];
+    const mentors: string[] = [];
+    const shadowing: string[] = [];
+    ids.forEach((pid: string) => {
+      const act = (this.getStudioParticipantActivity(studio, pid) || '').toLowerCase();
+      if (act.includes('eis') || act.includes('specialist')) specialists.push(pid);
+      else if (act.includes('mentor')) mentors.push(pid);
+      else if (act.includes('shadow') || act.includes('observ')) shadowing.push(pid);
+      else workingWith.push(pid);
+    });
+    // Fallback: if no participant matched anything, treat the first as specialist
+    if (specialists.length === 0 && workingWith.length === 0 && mentors.length === 0 && shadowing.length === 0 && ids.length) {
+      specialists.push(ids[0]);
+      if (ids.length > 1) workingWith.push(ids[1]);
+      if (ids.length > 2) mentors.push(ids[2]);
+      if (ids.length > 3) shadowing.push(...ids.slice(3));
+    }
+    return { specialists, workingWith, mentors, shadowing };
+  }
+
+  /** Participants in cohort but NOT in any studio (for Unassigned-to-Studio panel). */
+  getUnassignedToStudio(): string[] {
+    const cohortParticipants: string[] = this.cohort?.['participantidlist'] || [];
+    const inAnyStudio = new Set<string>();
+    (this.getCohortStudios() || []).forEach((s: any) => {
+      this.getStudioParticipantIds(s).forEach(pid => inAnyStudio.add(pid));
+    });
+    const result = cohortParticipants.filter(pid => !inAnyStudio.has(pid));
+    const q = (this.studioUnassignedSearch || '').toLowerCase().trim();
+    if (!q) return result;
+    return result.filter(pid => (this.mapProfile?.[pid] || pid).toLowerCase().includes(q));
+  }
+
+  /** Toggle a group-code filter pill (uP!/LYL/B!G). */
+  toggleStudioGroupFilter(code: string) {
+    if (this.studioGroupFilter.has(code)) this.studioGroupFilter.delete(code);
+    else this.studioGroupFilter.add(code);
+  }
+
+  isStudioGroupSelected(code: string): boolean {
+    return this.studioGroupFilter.size === 0 || this.studioGroupFilter.has(code);
+  }
+
+  /** SESSION LOG done count — best-effort using participantsactivity. */
+  getSessionDoneCount(studio: any): number {
+    const log = studio?.['sessionlog'] || studio?.['sessions'] || null;
+    if (Array.isArray(log)) return log.filter((s: any) => s?.status === 'done' || s?.done === true).length;
+    if (typeof log === 'number') return log;
+    return 0;
+  }
+
+  /** Initials for an avatar — uses mapProfile name fallback. */
+  getInitialsForId(pid: string): string {
+    const name = this.mapProfile?.[pid] || pid;
+    return this.getInitials(name);
+  }
+
+  /** Get display name. */
+  getNameForId(pid: string): string {
+    return this.mapProfile?.[pid] || pid;
+  }
+
+  /** Avatar colour class via deterministic hash. */
+  getAvatarColorClass(pid: string): string {
+    const palette = ['purple', 'blue', 'green', 'amber', 'rose'];
+    if (!pid) return palette[0];
+    let h = 0;
+    for (let i = 0; i < pid.length; i++) { h = ((h << 5) - h + pid.charCodeAt(i)) | 0; }
+    return palette[Math.abs(h) % palette.length];
+  }
+
+  /** Re-pair button (placeholder). Hook your existing re-pair logic here. */
+  onRepairStudios() {
+    // Hook into existing re-pair implementation if present.
+    // No-op placeholder — UI feedback only.
+    this._snackBar?.open('Re-pair triggered', 'OK', { duration: 1500 });
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // Drag & drop — unassigned participant → studio
+  // ════════════════════════════════════════════════════════════════
+  private studioDragPayload: { participantId: string, sourceStudioId?: string | null } | null = null;
+  hoverDropStudioId: string | null = null;
+
+  onUnassignedDragStart(event: DragEvent, participantId: string) {
+    if (!event.dataTransfer) return;
+    this.studioDragPayload = { participantId, sourceStudioId: null };
+    event.dataTransfer.effectAllowed = 'move';
+    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.studioDragPayload)); } catch {}
+  }
+
+  onStudioParticipantDragStart(event: DragEvent, participantId: string, sourceStudio: any) {
+    if (!event.dataTransfer) return;
+    event.stopPropagation();
+    this.studioDragPayload = { participantId, sourceStudioId: sourceStudio?.docid || sourceStudio?.id };
+    event.dataTransfer.effectAllowed = 'move';
+    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.studioDragPayload)); } catch {}
+  }
+
+  onStudioCardDragOver(event: DragEvent, studio: any) {
+    if (!this.studioDragPayload) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    this.hoverDropStudioId = studio?.docid || studio?.id || null;
+  }
+
+  onStudioCardDragLeave(_event: DragEvent, studio: any) {
+    const sid = studio?.docid || studio?.id;
+    if (this.hoverDropStudioId === sid) this.hoverDropStudioId = null;
+  }
+
+  async onStudioCardDrop(event: DragEvent, targetStudio: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    const payload = this.studioDragPayload;
+    this.studioDragPayload = null;
+    this.hoverDropStudioId = null;
+    if (!payload || !targetStudio) return;
+
+    const targetId = targetStudio?.docid || targetStudio?.id;
+    if (!targetId) return;
+    if (payload.sourceStudioId === targetId) return;
+    await this.assignParticipantToStudio(payload.participantId, targetStudio, payload.sourceStudioId || null);
+  }
+
+  /** Drop handler: add participant to the target studio (and remove from source if any). */
+  async assignParticipantToStudio(participantId: string, targetStudio: any, sourceStudioId: string | null): Promise<void> {
+    if (!participantId || !targetStudio) return;
+    const targetId = targetStudio?.docid || targetStudio?.id;
+    if (!targetId) return;
+
+    // Already in target? bail.
+    const targetPairing: string[] = (targetStudio['pairing'] || []) as string[];
+    if (targetPairing.includes(participantId)) {
+      this._snackBar?.open('Already in this studio', 'OK', { duration: 1500 });
+      return;
+    }
+
+    try {
+      // Update target studio in Firestore
+      const targetRef = doc(this.firestore, 'studio pairing', targetId);
+      await updateDoc(targetRef, { pairing: arrayUnion(participantId) }).catch(async () => {
+        // fallback collection name
+        const altRef = doc(this.firestore, 'studiopairing', targetId);
+        await updateDoc(altRef, { pairing: arrayUnion(participantId) });
+      });
+
+      // Local mutation — keep the in-memory list in sync (passed by reference from parent)
+      targetStudio['pairing'] = targetStudio['pairing'] || [];
+      if (!targetStudio['pairing'].includes(participantId)) targetStudio['pairing'].push(participantId);
+
+      // Remove from source if cross-studio move
+      if (sourceStudioId) {
+        const srcStudio = (this.studioPairingList || []).find((s: any) => (s?.docid || s?.id) === sourceStudioId);
+        if (srcStudio) {
+          const srcRef = doc(this.firestore, 'studio pairing', sourceStudioId);
+          await updateDoc(srcRef, { pairing: arrayRemove(participantId) }).catch(async () => {
+            const altRef = doc(this.firestore, 'studiopairing', sourceStudioId);
+            await updateDoc(altRef, { pairing: arrayRemove(participantId) });
+          });
+          srcStudio['pairing'] = (srcStudio['pairing'] || []).filter((p: string) => p !== participantId);
+        }
+      }
+
+      // Refresh the parent map so unassigned-to-studio recomputes
+      this.refreshStudioMappings(participantId, targetStudio, sourceStudioId);
+
+      this._snackBar?.open(`Assigned ${this.getNameForId(participantId)} to studio`, 'OK', { duration: 1800 });
+    } catch (err) {
+      console.error('Failed to assign participant to studio', err);
+      this._snackBar?.open('Failed to assign. Try again.', 'Dismiss', { duration: 2500 });
+    }
+  }
+
+  /** Remove participant from a studio (× button on a role row). */
+  async removeParticipantFromStudio(participantId: string, studio: any, event?: Event): Promise<void> {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    if (!participantId || !studio) return;
+    const sid = studio?.docid || studio?.id;
+    if (!sid) return;
+
+    try {
+      const sref = doc(this.firestore, 'studio pairing', sid);
+      await updateDoc(sref, { pairing: arrayRemove(participantId) }).catch(async () => {
+        const altRef = doc(this.firestore, 'studiopairing', sid);
+        await updateDoc(altRef, { pairing: arrayRemove(participantId) });
+      });
+      studio['pairing'] = (studio['pairing'] || []).filter((p: string) => p !== participantId);
+      this.refreshStudioMappings(participantId, null, sid);
+      this._snackBar?.open(`Removed ${this.getNameForId(participantId)}`, 'OK', { duration: 1500 });
+    } catch (err) {
+      console.error('Failed to remove participant', err);
+      this._snackBar?.open('Failed to remove. Try again.', 'Dismiss', { duration: 2500 });
+    }
+  }
+
+  /** Keep mapParticipantStudios in sync after an assign/move/remove. */
+  private refreshStudioMappings(participantId: string, targetStudio: any | null, sourceStudioId: string | null) {
+    if (!this.mapParticipantStudios) this.mapParticipantStudios = {};
+    const entry: any[] = this.mapParticipantStudios[participantId] || [];
+
+    // Remove the source mapping
+    let next = entry;
+    if (sourceStudioId) {
+      next = entry.filter((e: any) => e?.studioId !== sourceStudioId);
+    }
+    // Add the target mapping
+    if (targetStudio) {
+      const sid = targetStudio?.docid || targetStudio?.id;
+      const already = next.some((e: any) => e?.studioId === sid);
+      if (!already) {
+        next = [...next, {
+          studioId: sid,
+          studioData: targetStudio,
+          studioin: !!targetStudio['studioin'],
+          checkin: !!targetStudio['checkin'],
+        }];
+      }
+    }
+    this.mapParticipantStudios[participantId] = next;
+  }
+
   private computeActivitiesFromInjectedMaps() {
     if (!this.cohortId) {
       this.activities = [];
@@ -470,7 +777,7 @@ export class CohortDetailComponent  implements OnDestroy {
     );
   }
 
-  setTab(tab: 'participants' | 'activities' | 'studios' | 'comms') {
+  setTab(tab: 'studios' | 'participants' | 'activities' | 'comms') {
     this.contentTab = tab;
   }
 
