@@ -4363,3 +4363,11 @@
   padding: 16px 20px;
   border-top: 1px solid #eee;
 }
+.oneway-btn {
+  background-color: #6366f1 !important;
+  color: white !important;
+}
+.oneway-fab {
+  background-color: #6366f1 !important;
+  color: white !important;
+}
