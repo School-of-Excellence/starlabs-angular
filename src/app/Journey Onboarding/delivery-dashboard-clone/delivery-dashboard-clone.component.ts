@@ -91,13 +91,15 @@ interface SlotByProduct {
 
 interface SpecialistRow {
     name: string;
+    eisId: string;
     role: string;
-    product: string;
+    appointmentTypeName: string;
+    appointmentTypeId: string;
+    productId: string;
     productClass: string;
     appointmentsGiven: number;
     booked: number;
     availableSlots: number;
-    slotDots: string[];  // 'booked' | 'open' | 'confirmed'
     utilizationPct: number;
     utilizationNote?: string;
     utilizationNoteColor?: string;
@@ -364,6 +366,10 @@ export class DeliveryDashboardCloneComponent {
     selectedProductType: string = '';
     selectedColumns: string[] = [];
 
+    filteredBookedAppointments: any[] = [];
+    expandedSpecialist: string | null = null;
+    minDate: Date = new Date();
+
     private appointmentsSubscription: Subscription | null = null;
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
@@ -516,6 +522,14 @@ export class DeliveryDashboardCloneComponent {
 
     openAppointmentModal = false;
     participantLoading = false;
+
+    selectedSpecialistSlots: any;
+    availableDates: any[] = [];
+    selectedDate: string = '';
+    selectedEisProfile: string = '';
+    selectedEISId = null;
+    selectedAppointmentTypeId = null;
+    selectedView: string = 'booked';
 
     productData: any = {
         eiStarterPack: {
@@ -1058,16 +1072,16 @@ export class DeliveryDashboardCloneComponent {
         this.participantLoading = true;
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
-            eiStarterPack:    { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions:{ totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
-            criticalSupport:  { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
+            eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
 
         if (this.allAppointments?.length === 0) {
-            await this.filterAppointmentsByType();
+            await this.filterAppointmentsByType('all', null);
             await this.FilterReportData(productId);
             if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
@@ -1089,7 +1103,7 @@ export class DeliveryDashboardCloneComponent {
         this.stagesLoading = false;
     }
 
-    async filterAppointmentsByType(): Promise<void> {
+    async filterAppointmentsByType(mode: string, appointmentTypeId: string): Promise<void> {
         this.journeyFlowLoading = true;
         this.cdr.detectChanges();
 
@@ -1115,36 +1129,52 @@ export class DeliveryDashboardCloneComponent {
                 const startTimestamp = Timestamp.fromDate(monthStart);
                 const endTimestamp = Timestamp.fromDate(monthEnd);
 
-                const q = query(
-                    collection(this.firestore, "appointments"),
-                    where("cancelled", "==", false),
-                    where("starttime", ">=", startTimestamp),
-                    where("starttime", "<=", endTimestamp)
-                );
+                let q: any;
+                if (mode === 'all') {
+                    q = query(
+                        collection(this.firestore, "appointments"),
+                        where("cancelled", "==", false),
+                        where("starttime", ">=", startTimestamp),
+                        where("starttime", "<=", endTimestamp)
+                    );
+                } else if (mode === 'custom') {
+                    q = query(
+                        collection(this.firestore, "appointments"),
+                        where("cancelled", "==", false),
+                        where("starttime", ">=", startTimestamp),
+                        where("starttime", "<=", endTimestamp),
+                        where(
+                            "appointment",
+                            "==",
+                            doc(this.firestore, `/appointmenttype/${appointmentTypeId}`)
+                        )
+                    );
+                }
 
                 const sub = collectionData(q, { idField: 'id' })
                     .subscribe({
                         next: async (appointmentsSnap: any[]) => {
 
                             let updatedAppointments = [...appointmentsSnap];
+
                             await Promise.all(
-                                updatedAppointments.map(async (appointment) => {
-                                    appointment.appointmentTypeName =
-                                        await this.resolveAppointmentType(appointment);
+                                updatedAppointments.map(async (appointment: any) => {
+                                    appointment.appointmentTypeName = await this.resolveAppointmentType(appointment);
                                 })
                             );
 
                             updatedAppointments = updatedAppointments.map((app: any) => {
+
                                 const matchedProduct = this.allMatchedProductsRaw.find(
                                     (product: any) =>
                                         product.docid === app.participantproductid
                                 );
+
                                 return {
-                                    ...app,
-                                    ...matchedProduct
+                                    ...matchedProduct,
+                                    ...app
                                 };
                             });
-
                             const hasChanges = this.allAppointments !== updatedAppointments;
                             if (hasChanges) {
                                 this.allAppointments = updatedAppointments;
@@ -1380,7 +1410,7 @@ export class DeliveryDashboardCloneComponent {
                             app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-                       
+
                         if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
@@ -1738,7 +1768,6 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async fetchDFUProductData() {
-
         const dfuProducts = this.rawProductData.filter((e) => e['type']?.toLowerCase() == 'dfu');
         const dfuProductIds = Array.from(new Set(dfuProducts.map((p) => p['id'])));
         const rejectedStatuses = new Set(['cancelled', 'shifted']);
@@ -1793,68 +1822,87 @@ export class DeliveryDashboardCloneComponent {
         });
     };
 
-    onSpecialistExpandToggle() {
+    async onSpecialistExpandToggle() {
         this.specialistCollapsed = !this.specialistCollapsed;
         if (!this.specialistCollapsed && !this.specialistSlotsInitialized) {
             this.initSpecialistDateRange();
-            this.loadSpecialistBaseData();
-            // Re-wire the date-range subscription so changing the picker re-fetches data
-            this.specialistRange.valueChanges.subscribe((val) => {
-                if (val.start && val.end) {
-                    this.specialistStartDate = val.start;
-                    this.specialistEndDate = val.end;
-                    this.updateSpecialistDisplayMonth();
-                    if (this.specialistSlotsInitialized) {
-                        this.fetchSpecialistSlotsAndCompute();
-                    }
-                }
-            });
+            await this.loadSpecialistBaseData();
         }
     }
 
     initSpecialistDateRange() {
-        const now = new Date();
-        this.specialistStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        this.specialistEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+
+        this.specialistStartDate = today;
+        this.specialistEndDate = nextWeek;
+
         this.specialistRange.setValue({
-            start: this.specialistStartDate,
-            end: this.specialistEndDate,
+            start: today,
+            end: nextWeek,
         });
         this.updateSpecialistDisplayMonth();
     }
 
+    // WHEN USER CHANGES START DATE
+    async onSpecialistDateChange(selectedDate: Date) {
+        this.specialistLoading = true;
+        if (!selectedDate) return;
+
+        const start = new Date(selectedDate);
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(start);
+        end.setDate(start.getDate() + 7);
+
+        this.specialistStartDate = start;
+        this.specialistEndDate = end;
+
+        this.specialistRange.patchValue({
+            start,
+            end,
+        });
+
+        this.updateSpecialistDisplayMonth();
+        await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
+    }
+
     updateSpecialistDisplayMonth() {
-        if (!this.specialistStartDate || !this.specialistEndDate) return;
+        const start = this.specialistStartDate;
+        const end = this.specialistEndDate;
 
-        const monthNames = [
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December',
-        ];
+        if (!start || !end) return;
 
-        const startMonth = this.specialistStartDate.getMonth();
-        const startYear = this.specialistStartDate.getFullYear();
-        const endMonth = this.specialistEndDate.getMonth();
-        const endYear = this.specialistEndDate.getFullYear();
-
-        if (startMonth === endMonth && startYear === endYear) {
-            this.specialistDisplayMonth = `${monthNames[startMonth]} ${startYear}`;
-        } else {
-            const startLabel = this.datepipe.transform(this.specialistStartDate, 'MMM d, yyyy');
-            const endLabel = this.datepipe.transform(this.specialistEndDate, 'MMM d, yyyy');
-            this.specialistDisplayMonth = `${startLabel} – ${endLabel}`;
-        }
+        this.specialistDisplayMonth =
+            `${start.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            })} - ${end.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            })}`;
     }
 
     async loadSpecialistBaseData(retryCount = 0) {
         this.specialistLoading = true;
         this.cdr.detectChanges();
+        this.specialistAllSlots = [];
+        this.specialistData = [];
+        this.filteredBookedAppointments = [];
+        this.availableDates = [];
 
         try {
             console.log('[Specialist] Step 1: querying products (mode=Priority Mode)...');
             const productsSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'products'),
-                    where('mode', '==', 'Priority Mode')
+                    where('mode', '==', 'Priority Mode'),
+                    where('product', '==', 'Critical Support Diagnostics And Implementation')
                 ))
             );
 
@@ -1881,7 +1929,7 @@ export class DeliveryDashboardCloneComponent {
                     const deliveryOptions = deliveryDoc.data()['deliveryoptions'];
                     if (!Array.isArray(deliveryOptions) || deliveryOptions.length === 0) continue;
 
-                    const lastOption = deliveryOptions.at(-1);
+                    const lastOption = deliveryOptions.at(0);
                     const deliverySequence = lastOption?.deliverysequence;
                     if (!Array.isArray(deliverySequence)) continue;
 
@@ -1938,65 +1986,8 @@ export class DeliveryDashboardCloneComponent {
                     appointmentTypeId,
                 });
             }
-
-            console.log(`[Specialist] Step 4: ${this.specialistSequences.length} unique appointment types → querying AppointmentType-To-Roles & Roles-To-EIS...`);
-
-            const roleBatchSize = 10;
-
-            for (let i = 0; i < this.specialistSequences.length; i += roleBatchSize) {
-                const batch = this.specialistSequences.slice(i, i + roleBatchSize);
-
-                await Promise.all(
-                    batch.map(async (sequence) => {
-                        const typeId = sequence.appointmentTypeId;
-
-                        const rolesSnap = await runInInjectionContext(this.injector, () =>
-                            getDocs(query(
-                                collection(this.firestore, 'AppointmentType-To-Roles'),
-                                where('assigned_appttype_ref', '==', doc(this.firestore, 'appointmenttype/' + typeId)),
-                                limit(1)
-                            ))
-                        );
-
-                        const roles: string[] = [];
-                        rolesSnap.forEach((roleDoc) => {
-                            const requiredRoles = roleDoc.data()['required_role'] ?? [];
-                            requiredRoles.forEach((element: any) => roles.push(element.path));
-                        });
-                        this.specialistRolesMap[typeId] = roles;
-
-                        const eisMap: { [role: string]: string[] } = {};
-
-                        await Promise.all(
-                            roles.map(async (rolePath) => {
-                                const eisSnap = await runInInjectionContext(this.injector, () =>
-                                    getDocs(query(
-                                        collection(this.firestore, 'Roles-To-EIS'),
-                                        where('assigned_role_ref', '==', doc(this.firestore, rolePath))
-                                    ))
-                                );
-
-                                const eisRefs: string[] = [];
-                                eisSnap.forEach((eisDoc) => {
-                                    const assignedEis = eisDoc.data()['assigned_eis'] ?? [];
-                                    assignedEis.forEach((element: any) => eisRefs.push(element.path));
-                                });
-                                eisMap[rolePath] = eisRefs;
-                            })
-                        );
-
-                        this.specialistEISMap[typeId] = eisMap;
-                    })
-                );
-            }
-
-            this.specialistSlotsInitialized = true;
-            // TODO: availability slot fetching disabled — too many Firestore queries (53 sequences).
-            // Uncomment when a more efficient query strategy is in place.
-            // await this.fetchSpecialistSlotsAndCompute();
             this.specialistLoading = false;
-            this.cdr.detectChanges();
-
+            console.log(`[Specialist] Step 4: ${this.specialistSequences.length} unique appointment types → querying AppointmentType-To-Roles & Roles-To-EIS...`);
         } catch (error) {
             console.error('Error loading specialist base data:', error);
             this.specialistLoading = false;
@@ -2004,14 +1995,22 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    async fetchSpecialistSlotsAndCompute() {
+    async fetchSpecialistSlotsAndCompute(appointmentTypeId: string) {
         if (!this.specialistStartDate || !this.specialistEndDate) return;
 
-        const total = this.specialistSequences.length;
-        console.log(`[Specialist] Step 5: fetching availability slots for ${total} sequences sequentially, range: ${this.specialistStartDate?.toDateString()} – ${this.specialistEndDate?.toDateString()}`);
+        const filteredSequences = appointmentTypeId
+            ? this.specialistSequences.filter(
+                (seq: any) => seq.appointmentTypeId === this.selectedAppointmentTypeId
+            )
+            : this.specialistSequences;
+        const total = filteredSequences.length;
+
+        console.log(
+            `[Specialist] Step 5: fetching availability slots for ${total} sequences sequentially, range: ${this.specialistStartDate?.toDateString()} – ${this.specialistEndDate?.toDateString()}`
+        );
+
         this.specialistLoading = true;
         this.cdr.detectChanges();
-
         try {
             const rangeStart = new Date(this.specialistStartDate);
             rangeStart.setHours(0, 0, 0, 0);
@@ -2021,10 +2020,8 @@ export class DeliveryDashboardCloneComponent {
 
             const results: any[] = [];
 
-            // Process sequences one at a time — firing all 50+ × roles × EIS queries in parallel
-            // overwhelms Firestore. Sequential is slower per-query but finishes reliably.
-            for (let i = 0; i < this.specialistSequences.length; i++) {
-                const seq = this.specialistSequences[i];
+            for (let i = 0; i < filteredSequences.length; i++) {
+                const seq = filteredSequences[i];
                 const typeId = seq.appointmentTypeId;
                 const roles = this.specialistRolesMap[typeId] || [];
                 const eisMap = this.specialistEISMap[typeId] || {};
@@ -2032,13 +2029,16 @@ export class DeliveryDashboardCloneComponent {
 
                 for (const role of roles) {
                     const eisProfiles = eisMap[role] || [];
-
                     for (const eisProfile of eisProfiles) {
                         const snapshot = await runInInjectionContext(this.injector, () =>
                             getDocs(query(
                                 collection(this.firestore, 'availability'),
                                 where('profileref', '==', doc(this.firestore, eisProfile)),
-                                where('appointments', 'array-contains', doc(this.firestore, 'appointmenttype/' + typeId)),
+                                where(
+                                    'appointments',
+                                    'array-contains',
+                                    doc(this.firestore, 'appointmenttype/' + typeId)
+                                ),
                                 where('starttime', '>=', rangeStart),
                                 where('starttime', '<=', rangeEnd)
                             ))
@@ -2049,10 +2049,18 @@ export class DeliveryDashboardCloneComponent {
                             if (!Array.isArray(slotArray)) return;
 
                             for (const slot of slotArray) {
-                                const slotStart = slot.slotstart?.toDate?.() || (slot.slotstart ? new Date(slot.slotstart) : null);
-                                if (!slotStart || slotStart < rangeStart || slotStart > rangeEnd) continue;
+                                const slotStart =
+                                    slot.slotstart?.toDate?.()
+                                    || (slot.slotstart ? new Date(slot.slotstart) : null);
+                                if (
+                                    !slotStart
+                                    || slotStart < rangeStart
+                                    || slotStart > rangeEnd
+                                ) continue;
 
                                 matchedSlots.push({
+                                    slotStart: slot.slotstart,
+                                    slotEnd: slot.slotend,
                                     booked: slot.booked || false,
                                     available: slot.available || false,
                                     eisprofile: eisProfile,
@@ -2063,31 +2071,36 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 results.push({
-                    appointmentType: typeId,
-                    appointmentLabel: seq.appointmentType,
+                    appointmentTypeId: typeId,
+                    appointmentTypeName: seq.appointmentType,
                     productName: seq.productName,
                     productId: seq.productId,
                     slots: matchedSlots,
                 });
 
-                // Update progress display every 5 sequences so the user sees movement
+                // progress update
                 if ((i + 1) % 5 === 0 || i === total - 1) {
+
                     this.specialistLoadProgress = `${i + 1} / ${total}`;
-                    console.log(`[Specialist] Step 5 progress: ${i + 1}/${total}`);
+                    console.log(
+                        `[Specialist] Step 5 progress: ${i + 1}/${total}`
+                    );
                     this.cdr.detectChanges();
                 }
             }
 
             this.specialistAllSlots = results;
             this.specialistLoadProgress = '';
-            const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
-            console.log(`[Specialist] Step 5 done: ${totalSlotsFetched} slots across ${results.length} sequences`);
+            const totalSlotsFetched =
+                results.reduce((sum, r) => sum + r.slots.length, 0);
+            console.log(
+                `[Specialist] Step 5 done: ${totalSlotsFetched} slots across ${results.length} sequences`
+            );
             this.computeSpecialistDisplayData();
-            console.log(`[Specialist] Done: ${this.specialistData.length} specialists in table`);
-
+            console.log(
+                `[Specialist] Done: ${this.specialistData.length} specialists in table`
+            );
         } catch (error) {
-            // Log but don't retry via setTimeout — delayed retries would set specialistLoading=true
-            // again after the analytics section has already rendered, causing a persistent spinner.
             console.error('Error fetching specialist slots:', error);
         } finally {
             this.specialistLoading = false;
@@ -2102,7 +2115,10 @@ export class DeliveryDashboardCloneComponent {
 
         const productMap = new Map<string, { name: string; booked: number; total: number }>();
         const specialistMap = new Map<string, {
+            productId: string;
             productNames: Set<string>;
+            appointmentTypeName: string;
+            appointmentTypeId: string;
             totalSlots: number;
             booked: number;
             available: number;
@@ -2116,12 +2132,13 @@ export class DeliveryDashboardCloneComponent {
         for (const appointmentSlot of this.specialistAllSlots) {
             const productName = appointmentSlot.productName || 'Unknown';
             const productId = appointmentSlot.productId;
+            const appointmentTypeName = appointmentSlot.appointmentTypeName;
+            const appointmentTypeId = appointmentSlot.appointmentTypeId;
 
             if (!productMap.has(productId)) {
                 productMap.set(productId, { name: productName, booked: 0, total: 0 });
             }
             const productEntry = productMap.get(productId)!;
-
             for (const slot of appointmentSlot.slots) {
                 totalSlots++;
                 productEntry.total++;
@@ -2130,14 +2147,19 @@ export class DeliveryDashboardCloneComponent {
 
                 if (!specialistMap.has(eisId)) {
                     specialistMap.set(eisId, {
+                        productId: '',
                         productNames: new Set(),
+                        appointmentTypeName: '',
+                        appointmentTypeId: '',
                         totalSlots: 0,
                         booked: 0,
                         available: 0,
                     });
                 }
-
                 const specialistEntry = specialistMap.get(eisId)!;
+                specialistEntry.productId = productId;
+                specialistEntry.appointmentTypeName = appointmentTypeName;
+                specialistEntry.appointmentTypeId = appointmentTypeId;
                 specialistEntry.productNames.add(productName);
                 specialistEntry.totalSlots++;
 
@@ -2178,20 +2200,10 @@ export class DeliveryDashboardCloneComponent {
 
         const productClassList = ['upi', 'wig', 'ftm', 'pto', 'ei', 'cs'];
         this.specialistData = [];
-
         for (const [eisId, entry] of specialistMap) {
             if (entry.totalSlots === 0) continue;
 
             const name = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || eisId;
-            const productNamesArray = Array.from(entry.productNames);
-            const productDisplay = productNamesArray.length > 1
-                ? `${productNamesArray[0]} +${productNamesArray.length - 1}`
-                : (productNamesArray[0] || 'N/A');
-
-            const slotDots: string[] = [];
-            for (let i = 0; i < Math.min(entry.booked, 20); i++) slotDots.push('booked');
-            for (let i = 0; i < Math.min(entry.available, 20); i++) slotDots.push('open');
-
             const utilizationPct = Math.round((entry.booked / entry.totalSlots) * 100);
 
             let utilizationNote = '';
@@ -2206,20 +2218,159 @@ export class DeliveryDashboardCloneComponent {
 
             this.specialistData.push({
                 name,
+                eisId,
                 role: 'Specialist',
-                product: productDisplay,
+                appointmentTypeName: entry.appointmentTypeName,
+                appointmentTypeId: entry.appointmentTypeId,
+                productId: entry.productId,
                 productClass: productClassList[this.specialistData.length % productClassList.length],
                 appointmentsGiven: entry.totalSlots,
                 booked: entry.booked,
                 availableSlots: entry.available,
-                slotDots,
                 utilizationPct,
                 utilizationNote: utilizationNote || undefined,
                 utilizationNoteColor: utilizationNoteColor || undefined,
             });
         }
-
         this.specialistData.sort((a, b) => b.appointmentsGiven - a.appointmentsGiven);
+    }
+
+    async onActivityChange(appointmentTypeId: string) {
+        this.selectedAppointmentTypeId = appointmentTypeId;
+        if (!appointmentTypeId) return;
+
+        const rolesSnap = await runInInjectionContext(this.injector, () =>
+            getDocs(query(
+                collection(this.firestore, 'AppointmentType-To-Roles'),
+                where(
+                    'assigned_appttype_ref',
+                    '==',
+                    doc(this.firestore, `appointmenttype/${this.selectedAppointmentTypeId}`)
+                ),
+                limit(1)
+            ))
+        );
+
+        const roles: string[] = [];
+        rolesSnap.forEach((roleDoc) => {
+            const requiredRoles = roleDoc.data()['required_role'] ?? [];
+            requiredRoles.forEach((role: any) => {
+                roles.push(role.path);
+            });
+        });
+        this.specialistRolesMap[this.selectedAppointmentTypeId] = roles;
+
+        const eisMap: { [role: string]: string[] } = {};
+        await Promise.all(
+            roles.map(async (rolePath) => {
+                const eisSnap = await runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'Roles-To-EIS'),
+                        where(
+                            'assigned_role_ref',
+                            '==',
+                            doc(this.firestore, rolePath)
+                        )
+                    ))
+                );
+                const eisRefs: string[] = [];
+                eisSnap.forEach((eisDoc) => {
+                    const assignedEis = eisDoc.data()['assigned_eis'] ?? [];
+                    assignedEis.forEach((eis: any) => {
+                        eisRefs.push(eis.path);
+                    });
+                });
+                eisMap[rolePath] = eisRefs;
+            })
+        );
+        this.specialistEISMap[this.selectedAppointmentTypeId] = eisMap;
+        await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
+    }
+
+    async openSpecialistSlots(eisId: string) {
+        if (this.expandedSpecialist === eisId) {
+            this.expandedSpecialist = null;
+            this.filteredBookedAppointments = [];
+            return;
+        }
+        this.selectedEISId = eisId;
+        this.filteredBookedAppointments = [];
+        this.expandedSpecialist = eisId;
+
+        await this.filterAppointmentsByType('custom', this.selectedAppointmentTypeId);
+        const profileId = this.mapMetaData[eisId]?.profileid;
+
+        this.filteredBookedAppointments = this.allAppointments.filter((appointment: any) => {
+
+            const hostMatched = appointment?.hosts?.some((host: any) => {
+                const hostPath = host?.path || host;
+                return hostPath.split('/').pop() === profileId;
+            });
+            const appointmentMatched =
+                appointment?.appointment?.id === this.selectedAppointmentTypeId;
+
+            return (
+                hostMatched &&
+                !appointment?.attended &&
+                appointmentMatched
+            );
+
+        });
+    }
+
+    getSpecialistAvailability(eisProfile: string) {
+        this.selectedEisProfile = eisProfile;
+        this.generateWeekDates();
+
+        if (this.availableDates.length > 0) {
+            this.onDateSelect(this.availableDates[0]);
+        }
+    }
+
+    setSpecialistView(view: string) {
+        this.selectedView = view;
+        if (
+            view === 'available' &&
+            this.availableDates.length > 0
+        ) {
+            this.onDateSelect(this.availableDates[0]);
+        }
+    }
+
+    onDateSelect(date: any) {
+        this.selectedDate = date.fullDate.toDateString();
+        const appointmentData = this.specialistAllSlots.find(
+            (item: any) =>
+                item.appointmentTypeId ===
+                this.selectedAppointmentTypeId
+        );
+        if (!appointmentData) return;
+        this.selectedSpecialistSlots =
+            appointmentData.slots.filter(
+                (slot: any) =>
+                    slot?.eisprofile?.split('/').pop() ===
+                    this.selectedEisProfile &&
+                    slot.slotStart
+                        ?.toDate()
+                        .toDateString() === this.selectedDate
+            );
+    }
+
+    generateWeekDates() {
+        this.availableDates = [];
+        const currentDate = new Date(this.specialistStartDate);
+        while (currentDate <= this.specialistEndDate) {
+            this.availableDates.push({
+                fullDate: new Date(currentDate),
+                date: currentDate.getDate(),
+                day: currentDate
+                    .toLocaleDateString('en-US', {
+                        weekday: 'short',
+                    })
+                    .toUpperCase(),
+            });
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
     }
 
     get visibleCardIds(): string[] {
@@ -2312,18 +2463,18 @@ export class DeliveryDashboardCloneComponent {
     stageColorClass(stage: string): string {
         if (!stage) return 'col--eligible';
         const s = stage.toLowerCase().trim();
-        if (s.includes('eligible'))      return 'col--eligible';
-        if (s.includes('request'))       return 'col--request';
+        if (s.includes('eligible')) return 'col--eligible';
+        if (s.includes('request')) return 'col--request';
         if (s.includes('pre-process')
-         || s.includes('preprocess')
-         || s.includes('welcome'))       return 'col--preprocess';
-        if (s.includes('diagnostic'))    return 'col--diagnostic';
-        if (s.includes('implement'))     return 'col--implement';
-        if (s.includes('review'))        return 'col--review';
+            || s.includes('preprocess')
+            || s.includes('welcome')) return 'col--preprocess';
+        if (s.includes('diagnostic')) return 'col--diagnostic';
+        if (s.includes('implement')) return 'col--implement';
+        if (s.includes('review')) return 'col--review';
         if (s.includes('complet')
-         || s.includes('post-process')
-         || s.includes('celebration')
-         || s.includes('check-in'))      return 'col--completion';
+            || s.includes('post-process')
+            || s.includes('celebration')
+            || s.includes('check-in')) return 'col--completion';
         return 'col--eligible';
     }
     // Dot color class for product rows (cycles through 5-color set by index)
@@ -2334,8 +2485,8 @@ export class DeliveryDashboardCloneComponent {
     // Participants tab count (sum across the 3 sub-cohorts)
     get participantsTotalCount(): number {
         return (this.originalData?.['awaitingInitiation']?.count || 0)
-             + (this.originalData?.['currentJourneyInitiated']?.count || 0)
-             + (this.originalData?.['stuckCases']?.count || 0);
+            + (this.originalData?.['currentJourneyInitiated']?.count || 0)
+            + (this.originalData?.['stuckCases']?.count || 0);
     }
 
     // ===== Action Center → Participants tab deep-links (Batch A) =====
@@ -2392,7 +2543,7 @@ export class DeliveryDashboardCloneComponent {
         if (!ok) return;
         // Surface intent — actual bulk logic is not yet implemented in the backend.
         alert(`Bulk-initiate triggered for ${readyCount} participant${readyCount === 1 ? '' : 's'}. ` +
-              `Backend wiring is pending — this is a UX-confirmed stub.`);
+            `Backend wiring is pending — this is a UX-confirmed stub.`);
     }
 
     // First-letter monogram for a product (replaces emoji icons in Completion History).
@@ -2413,10 +2564,10 @@ export class DeliveryDashboardCloneComponent {
     getCardPipelineTotal(cardId: string): number {
         const f = this.getCardFunnel(cardId);
         return (f?.initiated?.length || 0)
-             + (f?.awaiting?.length || 0)
-             + (f?.started?.length || 0)
-             + (f?.ongoing?.length || 0)
-             + (f?.completed?.length || 0);
+            + (f?.awaiting?.length || 0)
+            + (f?.started?.length || 0)
+            + (f?.ongoing?.length || 0)
+            + (f?.completed?.length || 0);
     }
 
     // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
@@ -2448,8 +2599,8 @@ export class DeliveryDashboardCloneComponent {
         this._sparkCacheKey = key;
         return this._sparkCache;
     }
-    get sparkReady(): number[]     { return this.buildSparkData().ready; }
-    get sparkStuck(): number[]     { return this.buildSparkData().stuck; }
+    get sparkReady(): number[] { return this.buildSparkData().ready; }
+    get sparkStuck(): number[] { return this.buildSparkData().stuck; }
     get sparkCompleted(): number[] { return this.buildSparkData().completed; }
     sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
 
@@ -4470,7 +4621,7 @@ export class DeliveryDashboardCloneComponent {
         if (!selectedDate) return;
         this.selectedMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         this.updateDisplayMonth();
-        this.filterAppointmentsByType();
+        this.filterAppointmentsByType('all', null);
     }
 
     onJourneyMonthSelected(event: Date, picker: any) {
@@ -4478,7 +4629,7 @@ export class DeliveryDashboardCloneComponent {
         this.journeyMonthPicker.setValue(this.selectedMonth);
         this.updateDisplayMonth();
         picker.close();
-        this.filterAppointmentsByType();
+        this.filterAppointmentsByType('all', null);
     }
 
     getCompletionSummary(): CompletionSummary {
@@ -4933,6 +5084,10 @@ export class DeliveryDashboardCloneComponent {
         this.groupedByStageProfileAll = {};
         this.selectedFilter = 'all';
         this.selectedStageFilter = '';
+    }
+
+    goToBooking() {
+        this.router.navigate(['/book-appointment']);
     }
 
     // ===== Analytics tab =================================================
@@ -5416,11 +5571,11 @@ export class DeliveryDashboardCloneComponent {
             }
         }
 
-        this.originalData['awaitingInitiation'].data  = awaiting;
+        this.originalData['awaitingInitiation'].data = awaiting;
         this.originalData['awaitingInitiation'].count = awaiting.length;
-        this.originalData['currentJourneyInitiated'].data  = idle;
+        this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
-        this.originalData['stuckCases'].data  = stuck;
+        this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
 
         // Pagination depends on these arrays; recalc if a table is currently mounted.
